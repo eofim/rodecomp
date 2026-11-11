@@ -1979,7 +1979,7 @@ void __stdcall ProcessVendingSale(int field8, int itemIdWord, int quantityWord, 
 
 // OFFSET: 0x00D08670
 // FUNCTION: fn_21592
-void __declspec(noinline) __stdcall ProcessBuyingStorePurchase(int field14, int itemId, int quantity, int field8, int fieldC, int field10) {
+void __declspec(noinline) CGameMode::ProcessBuyingStorePurchase(int field14, int itemId, int quantity, int field8, int fieldC, int field10) {
   ITEM_INFO item = g_session.FindItem1758ByItemId(itemId);
   item.SetItemId(itemId);
   item.quantity = quantity;
