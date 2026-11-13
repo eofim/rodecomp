@@ -28,6 +28,9 @@ extern "C" {
 #include <new>
 #include <utility>
 
+template __declspec(noinline) bool std::string_view::_Equal(const std::string_view) const noexcept;
+template __declspec(noinline) std::list<std::string>::const_iterator std::find<std::list<std::string>::const_iterator, std::string_view>(std::list<std::string>::const_iterator, const std::list<std::string>::const_iterator, const std::string_view&);
+
 #pragma pack(push, 1)
 struct RenewQuestOngoingRecord {
   /* 0000 */ unsigned int questId;
@@ -85,24 +88,6 @@ static_assert(sizeof(PACKET_CZ_QUEST_STATUS_REQ_BUFFER) == 0x800);
 
 // GLOBAL: gl_24837
 CRenewQuestMgr* g_renewQuestMgr;
-
-// OFFSET: 0x00676110
-// FUNCTION: fn_05417
-RenewQuestOngoingInfo::RenewQuestOngoingInfo() : m_simpleView(true), baseExpReward(""), jobExpReward("") {
-  this->m_descriptions.clear();
-  this->m_rewards.clear();
-  for (int index = 0; index < 3; ++index) {
-    this->m_huntMobId[index] = 31999;
-    this->m_huntMinLevel[index] = -1;
-    this->m_huntMaxLevel[index] = -1;
-  }
-
-  for (int index = 0; index < 3; ++index) {
-    for (int offset = 0; offset < 0x33; ++offset) {
-      this->m_huntName[index][offset] = 0;
-    }
-  }
-}
 
 // OFFSET: 0x006765C0
 // FUNCTION: fn_05420
@@ -187,8 +172,7 @@ std::string RenewQuestOngoingInfo::GetDateString() const {
 // OFFSET: 0x006779A0
 // FUNCTION: fn_05432
 void CRenewQuestMgr::AddIconTooltip(std::string_view icon, std::string_view tooltip) {
-  const std::string text(tooltip);
-  this->m_iconTooltips[std::string(icon)] = text;
+  this->m_iconTooltips[std::string(icon)] = std::string(tooltip);
 }
 
 // OFFSET: 0x00677F40
@@ -357,10 +341,10 @@ std::string RenewQuestOngoingInfo::GetHuntText(int index) const {
     if (this->m_huntMinLevel[index] >= 0 && this->m_huntMaxLevel[index] >= 0 && (minLevel != 0 || this->m_huntMaxLevel[index] != 0)) {
       if (minLevel == 0) {
         text = std::format("{} Lv.{}▼", name, maxLevel);
-      } else if (this->m_huntMaxLevel[index] != 0) {
-        text = std::format("{} Lv.{}~Lv.{}", name, minLevel, maxLevel);
-      } else {
+      } else if (this->m_huntMaxLevel[index] == 0) {
         text = std::format("{} Lv.{}▲", name, minLevel);
+      } else {
+        text = std::format("{} Lv.{}~Lv.{}", name, minLevel, maxLevel);
       }
     } else {
       text = name;
@@ -451,7 +435,8 @@ void CRenewQuestMgr::WriteOngoingQuests(char* buffer) {
     offset += sizeof(RenewQuestOngoingRecord);
 
     for (int index = 0; index < huntCount; ++index) {
-      RenewQuestHuntRecord hunt = {};
+      RenewQuestHuntRecord hunt;
+      SecureZeroMemory(&hunt, sizeof(hunt));
       hunt.huntId = static_cast<int>(info.m_huntId[index]);
       hunt.monsterCondition = info.m_huntConditionFlags[index];
       hunt.monsterId = info.m_huntMobId[index];
@@ -525,17 +510,17 @@ void CRenewQuestMgr::AddNewQuest(unsigned int id) {
 // OFFSET: 0x0067A630
 // FUNCTION: fn_05451
 void CRenewQuestMgr::AddOngoingQuest(unsigned int id, RenewQuestOngoingInfo& info) {
-  int type = 0;
-  int destinationY = 0;
-  int destinationX = 0;
-  const char* text7 = nullptr;
-  const char* text6 = nullptr;
-  const char* text5 = nullptr;
-  const char* text4 = nullptr;
-  const char* text3 = nullptr;
-  const char* icon = nullptr;
-  const char* title = nullptr;
   bool simpleView = true;
+  const char* title = nullptr;
+  const char* icon = nullptr;
+  const char* text3 = nullptr;
+  const char* text4 = nullptr;
+  const char* text5 = nullptr;
+  const char* text6 = nullptr;
+  const char* text7 = nullptr;
+  int destinationX = 0;
+  int destinationY = 0;
+  int type = 0;
   if (g_session.m_hotkeyScript->Call("GetOngoingQuestInfoByID", "d>bsssssssddd", id, &simpleView, &title, &icon, &text3, &text4, &text5, &text6,
                         &text7, &destinationX, &destinationY, &type)) {
     info.m_title = title ? title : "";
@@ -556,7 +541,7 @@ void CRenewQuestMgr::AddOngoingQuest(unsigned int id, RenewQuestOngoingInfo& inf
     info.m_iconTooltip = this->GetIconTooltip(info.m_icon);
   }
 
-  UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.basicInfoWnd);
+  UIWindow* window = static_cast<UIWindow*>(g_windowMgr.basicInfoWnd);
   if (window != nullptr) {
     info.m_title = window->FitDisplayText(250, info.m_title.c_str(), 0, 12, 1);
     info.summary = window->FitDisplayText(250, info.summary.c_str(), 0, 12, 0);
@@ -588,8 +573,8 @@ bool CRenewQuestMgr::IsInFilter(int filter, std::string_view icon) {
   case 0:
     return true;
   case 1:
-    for (const auto& entry : this->m_filters) {
-      const std::list<std::string>& icons = entry.second.m_icons;
+    for (auto& entry : this->m_filters) {
+      std::list<std::string>& icons = entry.second.m_icons;
       if (icons.end() != std::find(icons.begin(), icons.end(), icon)) {
         return false;
       }
@@ -852,7 +837,7 @@ int CRenewQuestMgr::L_AddOngoingDescription(lua_State* state) {
   const unsigned int id = static_cast<unsigned int>(luaL_checknumber(state, 1));
   std::string description = luaL_checkstring(state, 2);
   DecodeTextEscapes(description);
-  g_renewQuestMgr->m_ongoingQuests[id].m_descriptions.push_back(description);
+  g_renewQuestMgr->m_ongoingQuests[static_cast<unsigned int>(id)].m_descriptions.push_back(description);
   return 0;
 }
 
@@ -862,7 +847,7 @@ int CRenewQuestMgr::L_AddOngoingRewardInfo(lua_State* state) {
   const unsigned int id = static_cast<unsigned int>(luaL_checknumber(state, 1));
   const unsigned int item = static_cast<unsigned int>(luaL_checknumber(state, 2));
   const unsigned int count = static_cast<unsigned int>(luaL_checknumber(state, 3));
-  g_renewQuestMgr->m_ongoingQuests[id].m_rewards.push_back(std::make_pair(item, count));
+  g_renewQuestMgr->m_ongoingQuests[static_cast<unsigned int>(id)].m_rewards.push_back(std::make_pair(item, count));
   return 0;
 }
 
@@ -873,7 +858,7 @@ int CRenewQuestMgr::L_AddRecommendedQuestInfo(lua_State* state) {
   const int index = static_cast<int>(luaL_checknumber(state, 2));
   std::string description = luaL_checkstring(state, 3);
   DecodeTextEscapes(description);
-  g_renewQuestMgr->m_recommendedQuests[id].m_descriptions[index].push_back(description);
+  g_renewQuestMgr->m_recommendedQuests[static_cast<unsigned int>(id)].m_descriptions[index].push_back(description);
   return 0;
 }
 

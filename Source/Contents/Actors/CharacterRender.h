@@ -1,6 +1,9 @@
 #ifndef RAGNAROK_SOURCE_CONTENTS_ACTORS_CHARACTERRENDER_H
 #define RAGNAROK_SOURCE_CONTENTS_ACTORS_CHARACTERRENDER_H
 
+#include "Contents/Actors/RenderObject.h"
+#include "Utility/Math/Vector3d.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <list>
@@ -39,9 +42,7 @@ public:
   void OffsetAccessoryLayerDepth(int layer, SpriteCellQuad& quad, float bottomDepth, float topDepth) const;
   RenderPrimitive* DrawShadow(const float* matrix, float scale) const;
 
-  /* 0004 */ int positionX;
-  /* 0008 */ int positionY;
-  /* 000C */ int positionZ;
+  /* 0004 */ vector3d position;
   /* 0010 */ int job;
   /* 0014 */ int headJob;
   /* 0018 */ int appearance[4];
@@ -71,10 +72,10 @@ public:
   /* 0084 */ float padding_0084;
   /* 0088 */ float cameraUpX;
   /* 008C */ float cameraUpY;
-  /* 0090 */ int cameraUpZ;
-  /* 0094 */ int renderBounds[5];
-  /* 00A8 */ int screenX;
-  /* 00AC */ int screenY;
+  /* 0090 */ float cameraUpZ;
+  /* 0094 */ RenderBounds renderBounds;
+  /* 00A8 */ float screenX;
+  /* 00AC */ float screenY;
   /* 00B0 */ unsigned char drawShadow;
   /* 00B4 */ std::map<int, int> layerViews;
   /* 00BC */ int robe;

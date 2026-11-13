@@ -42,19 +42,19 @@ void CCommonFloorEffect::Close() {
 void CCommonFloorEffect::Open() {
   for (int i = 0; i < 2; ++i) {
     const int angle = i * 180;
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
     if (particle) {
       particle->SetTexture("effect\\ra_unlimit.tga");
       particle->effectId = this->id;
-      particle->groupIndex = 1;
       particle->columnIndex = i;
       particle->rowIndex = 0;
+      particle->groupIndex = 1;
       particle->alpha = 90;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(angle);
+      particle->angle = static_cast<float>(angle);
       particle->phaseParameter = angle;
       particle->speedParameter = 6.0f;
       particle->scale = 15.0f;
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->particles.push_back(particle);
     }
   }
@@ -69,13 +69,13 @@ void CCommonFloorEffect::ResetParticles() {
     particle->position.x = this->position[0];
     particle->position.y = this->position[1];
     particle->position.z = this->position[2];
-    particle->scale = *reinterpret_cast<float*>(&this->scaleParameter);
-    *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(*reinterpret_cast<int*>(this->angleParameter));
-    particle->phaseParameter = static_cast<int>(static_cast<float>(particle->rowIndex) * *reinterpret_cast<float*>(&this->rotationParameter));
-    particle->alpha = *reinterpret_cast<int*>(this->alphaParameters);
+    particle->scale = this->scaleParameter;
+    particle->angle = static_cast<float>(this->baseAngle);
+    particle->phaseParameter = static_cast<int>(static_cast<float>(particle->rowIndex) * this->rotationParameter);
+    particle->alpha = this->baseAlpha;
     particle->sourceBlend = 5;
     particle->destinationBlend = 7;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     particle->elapsedFrames = 0;
   }
 }
@@ -89,11 +89,13 @@ bool CCommonFloorEffect::IsAlive() {
 // FUNCTION: fn_06941
 void CCommonFloorEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
-    if (CParticle* particle = *it) {
-      int angle = static_cast<int>(particle->speedParameter + *reinterpret_cast<float*>(&particle->angleBits));
+    CParticle* particle = *it;
+    vector3d& position = particle->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
+    if (particle) {
+      int angle = static_cast<int>(particle->speedParameter + particle->angle);
       if (angle >= 360) {
         angle -= 360;
       } else if (angle < 0) {
@@ -101,7 +103,7 @@ void CCommonFloorEffect::OnProcess() {
       }
 
       const float degrees = static_cast<float>(angle);
-      *reinterpret_cast<float*>(&particle->angleBits) = degrees;
+      particle->angle = degrees;
 
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
@@ -116,7 +118,7 @@ void CCommonFloorEffect::OnProcess() {
       result.Compose(scale, rotation);
       particle->transform = result;
     }
-    ++(*it)->elapsedFrames;
+    ++particle->elapsedFrames;
   }
 }
 

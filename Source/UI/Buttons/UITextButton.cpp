@@ -1,4 +1,5 @@
 #include "Client/Input/InputCharset.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -63,19 +64,6 @@
 #include <cstring>
 #include "Resource/MSGSTRINGID.h"
 
-#include "Utility/StdWindowListEmplace.h"
-
-using IntIntTree = std::_Tree<std::_Tmap_traits<int, int, std::less<int>, std::allocator<std::pair<const int, int>>, false>>;
-extern template std::_Tree_find_result<std::_Tree_node<std::pair<const int, int>, void*>*>
-IntIntTree::_Find_lower_bound<int>(const int&) const;
-using IdListLineTree = std::_Tree<std::_Tmap_traits<int, IdListLine, std::less<int>, std::allocator<std::pair<const int, IdListLine>>, false>>;
-extern template std::_Tree_find_result<std::_Tree_node<std::pair<const int, IdListLine>, void*>*>
-IdListLineTree::_Find_lower_bound<int>(const int&) const;
-using ExtendedListLineTree = std::_Tree<std::_Tmap_traits<int, ExtendedListLine, std::less<int>, std::allocator<std::pair<const int, ExtendedListLine>>, false>>;
-extern template std::_Tree_find_result<std::_Tree_node<std::pair<const int, ExtendedListLine>, void*>*>
-ExtendedListLineTree::_Find_lower_bound<int>(const int&) const;
-extern template UITextButton** std::allocator<UITextButton*>::allocate(const std::size_t);
-
 // OFFSET: 0x0086EEB0
 // FUNCTION: fn_11085
 UITextButton::UITextButton() : UIButton() {
@@ -134,7 +122,7 @@ void UITextButton::Paint() {
   }
 
   if (this->m_outline) {
-    DrawOutlinedText(*this, 1, 1, this->m_text.c_str(), 0, this->m_color, this->m_outlineColor, this->m_family, this->m_height, 1, 0);
+    this->DrawOutlinedText(1, 1, this->m_text.c_str(), 0, this->m_color, this->m_outlineColor, this->m_family, this->m_height, 1, 0);
   } else {
     this->DrawTextAt(1, 1, this->m_text.c_str(), 0, this->m_family, this->m_height, this->m_color, 0, 0);
   }
@@ -179,8 +167,6 @@ void UITextButton::OnMouseMove(int x, int y) {
     }
   }
 }
-
-
 
 // OFFSET: 0x00892000
 // FUNCTION: fn_11461
@@ -432,9 +418,6 @@ void UIBarGraph4::OnMouseHover(int, int) {
 
   this->ToScreen(screenX, screenY);
 
-
-
-
   char text[260];
   std::memset(text, 0, sizeof(text));
   const int permille = static_cast<int>(static_cast<float>(*this->m_current) / static_cast<float>(*this->m_maximum) * 1000.0f);
@@ -452,9 +435,6 @@ void UIINT64BarGraph::OnMouseHover(int, int) {
   int screenX = 0, screenY = -16;
 
   this->ToScreen(screenX, screenY);
-
-
-
 
   char text[260];
   std::memset(text, 0, sizeof(text));
@@ -527,20 +507,19 @@ void UIBasicItemCtrl::OnMouseHover(int, int) {
 
   if (std::atoi(this->m_item.itemId.c_str()) < 1) {
     text = this->m_tooltip;
-  } else if (this->m_item.identity[1] == 0) {
-    text = static_cast<const std::string&>(this->m_item.DisplayName(0));
-  } else if (this->m_item.optionCount != 0) {
-    text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), this->m_item.DisplayName(0).c_str(), this->m_item.optionCount, this->m_item.quantity));
+  } else if (this->m_item.identity[1] > 0) {
+    if (this->m_item.optionCount != 0) {
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), this->m_item.DisplayName(0).c_str(), this->m_item.optionCount, this->m_item.quantity));
+    } else {
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA2), this->m_item.DisplayName(0).c_str(), this->m_item.quantity));
+    }
   } else {
-    text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA2), this->m_item.DisplayName(0).c_str(), this->m_item.quantity));
+    text = static_cast<const std::string&>(this->m_item.DisplayName(0));
   }
 
   int screenX = 0, screenY = 0;
 
   this->ToScreen(screenX, screenY);
-
-
-
 
   if (!text.empty()) {
     g_modeMgr.gameMode->ShowTooltip(text.c_str(), screenX, screenY, -1, false, true);
@@ -558,9 +537,6 @@ void UIBasicSkillCtrl::OnMouseHover(int, int) {
 
   this->ToScreen(screenX, screenY);
 
-
-
-
   LuaScript& script = *g_session.m_hotkeyScript;
   CSkillInfo skill = g_session.LookupSkill(static_cast<std::uint32_t>(this->m_skillId));
   const int sp = skill.UseSpAmount(script, skill.level);
@@ -568,9 +544,9 @@ void UIBasicSkillCtrl::OnMouseHover(int, int) {
   std::string text;
 
   if (SkillUsesPercentSp(static_cast<int>(skill.id))) {
-    text = SkillUseTextPercent(skill.DisplayName(script), skill.level, sp, ap);
+    text = SkillUseTextPercent(skill.DisplayName(), skill.level, sp, ap);
   } else {
-    text = SkillUseTextFlat(skill.DisplayName(script), skill.level, sp, ap);
+    text = SkillUseTextFlat(skill.DisplayName(), skill.level, sp, ap);
   }
 
   if (!text.empty()) {
@@ -653,9 +629,6 @@ void UIStaticItem::OnMouseHover(int, int) {
   int screenX = 0, screenY = -20;
 
   this->ToScreen(screenX, screenY);
-
-
-
 
   g_modeMgr.gameMode->ShowTooltip(text, screenX, screenY, -1, false, true);
 }
@@ -1300,19 +1273,22 @@ void UITVTextButton::OnRBtnUp(int x, int y) {
 // OFFSET: 0x00892DE0
 // FUNCTION: fn_11495
 void UIComboBoxV2Wnd::OnWheel(int value) {
-  this->selected += 0 > value ? 1 : -1;
+  int selected = this->selected + (0 > value ? 1 : -1);
+  this->selected = selected;
 
   const int count = static_cast<int>(this->list->lines.size());
-  if (count <= this->selected) {
-    this->selected = count - 1;
+  if (count <= selected) {
+    selected = count - 1;
+    this->selected = selected;
   }
 
-  if (this->selected < 0) {
+  if (selected < 0) {
     this->selected = 0;
+    selected = 0;
   }
 
   if (this->parent) {
-    this->parent->SendMsg(this, UM_COMBOBOX_SELECTED, this->selected, 0, 0, 0);
+    this->parent->SendMsg(this, UM_COMBOBOX_SELECTED, selected, 0, 0, 0);
   }
 
   this->Invalidate();
@@ -1376,7 +1352,7 @@ void UIListBoxID::Refresh() {
     bar->position = bar->maximum;
   }
 
-  bar->Invalidate();
+  this->verticalBar->Invalidate();
 }
 
 // OFFSET: 0x00895D80
@@ -1470,20 +1446,23 @@ void UITreeView::Resize(int width, int height) {
 void UITreeView::UpdateScrollBar() {
   const int visible = this->geometry.height / this->itemHeight;
   const int count = this->itemCount;
-  const int excess = count - visible;
-  const int overflow = excess < 0 ? 0 : excess;
+  const int overflow = 0 > count - visible ? 0 : count - visible;
   this->verticalOverflow = overflow != 0;
-  auto* bar = this->verticalBar;
+  UIScrollBar* bar = this->verticalBar;
   bar->total = count;
   bar->visible = visible;
-  bar->maximum = overflow;
-  bar->Invalidate();
-
-  if (bar->position > bar->maximum) {
-    bar->position = bar->maximum;
-  }
-
-  if (!overflow) {
+  if (overflow != 0) {
+    bar->maximum = overflow;
+    bar->Invalidate();
+    if (bar->position > bar->maximum) {
+      bar->position = bar->maximum;
+    }
+  } else {
+    bar->maximum = 0;
+    bar->Invalidate();
+    if (bar->position > bar->maximum) {
+      bar->position = bar->maximum;
+    }
     this->scrollRow = 0;
     this->itemCount = 0;
   }
@@ -1562,7 +1541,7 @@ void UITVTextButton::Paint() {
   }
 
   if (this->m_outlined != 0) {
-    DrawOutlinedText(*this, inset + 1, 2, this->displayText.c_str(), 0, color, this->m_outlineColor, this->m_fontFamily, this->m_fontHeight, 1, 0);
+    this->DrawOutlinedText(inset + 1, 2, this->displayText.c_str(), 0, color, this->m_outlineColor, this->m_fontFamily, this->m_fontHeight, 1, 0);
   } else {
     this->DrawTextAt(inset + 1, 2, this->displayText.c_str(), 0, this->m_fontFamily, this->m_fontHeight, color, 0, 0);
   }
@@ -1848,9 +1827,9 @@ void UIINT64BarGraph::Paint() {
   }
 
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 26, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(26, 2, red, green, blue);
   this->ClearSurface((green & 255) << 16 | (green & 255) << 8 | (red & 255));
-  SkinPaletteChannels(ResourceMgr::Instance(), 30, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(30, 2, red, green, blue);
   this->FillRegion(1, 1, this->geometry.width - 2, this->geometry.height - 2, (blue & 255) << 16 | (green & 255) << 8 | (red & 255));
 
   if (this->m_maximum == 0) {
@@ -1863,7 +1842,7 @@ void UIINT64BarGraph::Paint() {
     return;
   }
 
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 6, red, green, blue);
 
   if (this->m_plainColor == 0 && 25.0 > ratio * 100.0) {
     red = 255;
@@ -1886,7 +1865,7 @@ void UIItemMoveInfo::Paint() {
   }
 
   if (this->m_outline != 0) {
-    DrawOutlinedText(*this, 1, 1, this->m_text.c_str(), 0, this->m_color, this->m_outlineColor, this->m_family, this->m_height, 1, 0);
+    this->DrawOutlinedText(1, 1, this->m_text.c_str(), 0, this->m_color, this->m_outlineColor, this->m_family, this->m_height, 1, 0);
   } else {
     this->DrawTextAt(1, 1, this->m_text.c_str(), 0, this->m_family, this->m_height, this->m_color, 0, 0);
   }
@@ -1906,7 +1885,7 @@ void UIItemTagButton::Paint() {
   }
 
   if (this->m_outline != 0) {
-    DrawOutlinedText(*this, 1, this->textY, this->m_text.c_str(), 0, this->m_color, this->m_outlineColor, this->m_family, this->m_height, 1, 0);
+    this->DrawOutlinedText(1, this->textY, this->m_text.c_str(), 0, this->m_color, this->m_outlineColor, this->m_family, this->m_height, 1, 0);
   } else {
     this->DrawTextAt(1, this->textY, this->m_text.c_str(), 0, this->m_family, this->m_height, this->m_color, 0, 0);
   }
@@ -1943,7 +1922,7 @@ void UIListBoxNavi::Paint() {
     }
 
     const auto& line = this->lines[index];
-    DrawColoredText(*this, 3 - this->horizontalOffset, this->lineHeight * row, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false);
+    this->DrawColoredText(3 - this->horizontalOffset, this->lineHeight * row, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false);
 
     if (this->lineColors[index] == 1) {
       color = 0;
@@ -1989,31 +1968,28 @@ void UIScrollBar2::Paint() {
   }
 
   std::string path = "유저인터페이스\\basic_interface\\";
-  if (this->vertical == 1) {
+  switch (this->vertical) {
+  case 1: {
     this->FillRegion(0, 11, 10, this->geometry.height - 21, 0);
     if (this->state == 1) {
-      auto* up = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up.bmp").c_str())));
-      this->DrawBitmap(0, 0, up, false);
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up.bmp").c_str()))), false);
     } else if (this->state == 4) {
-      auto* up = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up.bmp").c_str())));
-      this->DrawBitmap(0, 0, up, false);
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up.bmp").c_str()))), false);
     } else {
-      auto* up = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up.bmp").c_str())));
-      this->DrawBitmap(0, 0, up, false);
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up.bmp").c_str()))), false);
     }
 
     const int thumb = this->ThumbOffset() + this->arrowLength;
     this->FillRegion(0, thumb + 1, 10, this->ThumbLength() - 1, 0xAFAAA5);
     if (this->state == 2) {
-      auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down.bmp").c_str())));
-      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, down, false);
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down.bmp").c_str()))), false);
     } else if (this->state == 5) {
-      auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down.bmp").c_str())));
-      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, down, false);
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down.bmp").c_str()))), false);
     } else {
-      auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down.bmp").c_str())));
-      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, down, false);
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down.bmp").c_str()))), false);
     }
+    break;
+  }
   }
 }
 
@@ -2026,17 +2002,15 @@ void UIScrollBar3::Paint() {
   }
 
   std::string path = "유저인터페이스\\basic_interface\\";
-  if (this->vertical == 1) {
+  switch (this->vertical) {
+  case 1: {
     this->FillRegion(0, 10, 9, this->geometry.height - 20, 0xF1F1F1);
     if (this->state == 1) {
-      auto* up = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up1.bmp").c_str())));
-      this->DrawBitmap(0, 0, up, false);
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up1.bmp").c_str()))), false);
     } else if (this->state == 4) {
-      auto* up = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up1.bmp").c_str())));
-      this->DrawBitmap(0, 0, up, false);
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up1.bmp").c_str()))), false);
     } else {
-      auto* up = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up1.bmp").c_str())));
-      this->DrawBitmap(0, 0, up, false);
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_up1.bmp").c_str()))), false);
     }
 
     int thumb = this->ThumbOffset() + this->arrowLength;
@@ -2051,15 +2025,14 @@ void UIScrollBar3::Paint() {
 
     this->FillRegion(0, thumb + 1, 9, length - 1, 0xE9E9E9);
     if (this->state == 2) {
-      auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down1.bmp").c_str())));
-      this->DrawBitmap(0, this->geometry.height - this->arrowLength, down, false);
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down1.bmp").c_str()))), false);
     } else if (this->state == 5) {
-      auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down1.bmp").c_str())));
-      this->DrawBitmap(0, this->geometry.height - this->arrowLength, down, false);
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down1.bmp").c_str()))), false);
     } else {
-      auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down1.bmp").c_str())));
-      this->DrawBitmap(0, this->geometry.height - this->arrowLength, down, false);
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "dialscr_down1.bmp").c_str()))), false);
     }
+    break;
+  }
   }
 
   this->minimumThumb = 0;
@@ -2075,12 +2048,10 @@ void UIScrollBar4::Paint() {
 
   std::string path = "유저인터페이스\\basic_interface\\";
   if (this->vertical == 0) {
-    auto* track = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "scrollbar.bmp").c_str())));
-    this->DrawBitmap(0, 0, track, true);
+    this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "scrollbar.bmp").c_str()))), true);
 
     const int offset = this->ThumbOffset();
-    auto* thumb = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "scroll_bar.bmp").c_str())));
-    this->DrawBitmap(offset, 0, thumb, true);
+    this->DrawBitmap(offset, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve((path + "scroll_bar.bmp").c_str()))), true);
   }
 
   this->minimumThumb = 0;
@@ -2433,9 +2404,9 @@ void UICaptchaImage::Paint() {
 // FUNCTION: fn_11350
 void UIComboBox::Paint() {
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 6, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(6, 6, red, green, blue);
   this->ClearSurface(RGB(red, green, blue));
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(1, 1, this->geometry.width - 2, this->geometry.height - 2, RGB(red, green, blue));
 
   this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\sysboxs_lu.bmp"))), false);
@@ -2451,7 +2422,7 @@ void UIComboBox::Paint() {
 
   for (int index = first, row = 0; index < static_cast<int>(end); ++index, ++row) {
     if (index == this->selected) {
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, red, green, blue);
+      g_skinInfo.PaletteChannels(6, 2, red, green, blue);
       this->FillRegion(3, row * this->lineHeight + 1, this->geometry.width - 6, this->lineHeight - 2, RGB(red, green, blue));
     }
 
@@ -2460,7 +2431,7 @@ void UIComboBox::Paint() {
   }
 
   if (this->verticalOverflow != 0) {
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(this->geometry.width - 16, 0, 16, this->geometry.height, RGB(red, green, blue));
   }
 
@@ -2745,7 +2716,7 @@ void UINewComboBoxCtrl::Paint() {
   this->FillRegion(0, 0, this->geometry.width, this->geometry.height, RGB(this->red, this->green, this->blue));
 
   if (!this->borderless) {
-    DrawRectangleBorder(*this, 0, 0, this->geometry.width, this->geometry.height, RGB(this->borderRed, this->borderGreen, this->borderBlue));
+    this->DrawRectOutline(0, 0, this->geometry.width, this->geometry.height, RGB(this->borderRed, this->borderGreen, this->borderBlue));
   }
 }
 
@@ -2820,8 +2791,6 @@ void UIScrollBar_Custom::SetThumbBitmaps(std::string top, std::string middle, st
 
 #include <format>
 
-extern template std::string std::format<const std::string&>(const std::_Fmt_string<const std::string&>, const std::string&);
-
 // OFFSET: 0x00884720
 // FUNCTION: fn_11310
 void UIItemTagOnChat::PlaceTagButton(UIWindow* button, const std::string& name, const int& x, int) {
@@ -2848,7 +2817,7 @@ void UIItemTagOnMail::PlaceTagButton(UIWindow* button, const std::string& name, 
 
   unsigned line = 0;
   int consumed = 0;
-  UIRodexComposeWnd* compose = reinterpret_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd);
+  UIRodexComposeWnd* compose = static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd);
   const int left = compose->m_contents->geometry.x;
   const int top = compose->m_contents->geometry.y;
   const int lineHeight = compose->m_contents->lineHeight;
@@ -2880,7 +2849,7 @@ void UIItemTagOnMail::PlaceTagButton(UIWindow* button, const std::string& name, 
 // OFFSET: 0x00884C40
 // FUNCTION: fn_11312
 void UIItemTagOnMegaPhone::PlaceTagButton(UIWindow* button, const std::string& name, const int& x, int) {
-  UINpcEditDialogWnd* owner = reinterpret_cast<UINpcEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd);
+  UINpcEditDialogWnd* owner = static_cast<UINpcEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd);
   if (!owner || owner->edit->geometry.id != 492) {
     return;
   }
@@ -2891,7 +2860,7 @@ void UIItemTagOnMegaPhone::PlaceTagButton(UIWindow* button, const std::string& n
   unsigned bytes = 0;
   const int width = reinterpret_cast<UIItemTagCtrl*>(owner)->MeasureText(name.c_str(), bytes);
   button->Move(
-    this->textWidth + width > reinterpret_cast<UINpcEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->edit->geometry.width ? 1000
+    this->textWidth + width > static_cast<UINpcEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->edit->geometry.width ? 1000
     : position != 0                                                                                                     ? position
                                                                                                                         : left + 2 + width,
     top + 1
@@ -2924,7 +2893,7 @@ void UIItemTagButton::OnLBtnDown(int x, int y) {
   } else {
     this->geometry.state = 1;
     if (this->parent) {
-      this->parent->SendMsg(this, UM_TEXT_LBTN_UP, this->geometry.id, this->m_value, reinterpret_cast<std::intptr_t>(this->itemPayload), 0);
+      this->parent->SendMsg(this, UM_TEXT_LBTN_UP, this->geometry.id, this->m_value, reinterpret_cast<std::intptr_t>(&this->item), 0);
       this->Invalidate();
       return;
     }
@@ -3032,7 +3001,7 @@ void UIListBoxID::Paint() {
       this->parent->Invalidate();
     }
   } else {
-    this->ClearSurface(RGB(this->backgroundChannels[0], this->backgroundChannels[4], this->backgroundChannels[8]));
+    this->ClearSurface(RGB(this->backgroundColor[0], this->backgroundColor[1], this->backgroundColor[2]));
   }
 
   const int first = this->topLine;
@@ -3044,8 +3013,8 @@ void UIListBoxID::Paint() {
       this->FillRegion(0, (index - first) * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->selectionColor);
     }
 
-    DrawColoredText(
-      *this, 3 - this->horizontalOffset, (index - first) * this->lineHeight, this->lines[index].text.c_str(),
+    this->DrawColoredText(
+      3 - this->horizontalOffset, (index - first) * this->lineHeight, this->lines[index].text.c_str(),
       static_cast<unsigned>(this->lines[index].text.size()), color, 0, 12, false
     );
   }
@@ -3060,7 +3029,7 @@ void UIListBoxTitle::Paint() {
       this->parent->Invalidate();
     }
   } else {
-    this->ClearSurface(RGB(this->backgroundChannels[0], this->backgroundChannels[4], this->backgroundChannels[8]));
+    this->ClearSurface(RGB(this->backgroundColor[0], this->backgroundColor[1], this->backgroundColor[2]));
   }
 
   const int first = this->topLine;
@@ -3081,8 +3050,8 @@ void UIListBoxTitle::Paint() {
       }
     }
 
-    DrawColoredText(
-      *this, 3 - this->horizontalOffset, (index - first) * this->lineHeight, this->lines[index].text.c_str(),
+    this->DrawColoredText(
+      3 - this->horizontalOffset, (index - first) * this->lineHeight, this->lines[index].text.c_str(),
       static_cast<unsigned>(this->lines[index].text.size()), color, 0, 12, false
     );
   }
@@ -3092,9 +3061,9 @@ void UIListBoxTitle::Paint() {
 // FUNCTION: fn_11355
 void UIComboBoxID::Paint() {
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 6, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(6, 6, red, green, blue);
   this->ClearSurface(RGB(red, green, blue));
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(1, 1, this->geometry.width - 2, this->geometry.height - 2, RGB(red, green, blue));
 
   this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\sysboxs_lu.bmp"))), false);
@@ -3113,7 +3082,7 @@ void UIComboBoxID::Paint() {
 
   for (int index = first; index < static_cast<int>(end); ++index) {
     if (index == this->selected) {
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, red, green, blue);
+      g_skinInfo.PaletteChannels(6, 2, red, green, blue);
       this->FillRegion(3, (index - first) * this->lineHeight + 1, this->geometry.width - 6, this->lineHeight - 2, RGB(red, green, blue));
     }
 
@@ -3123,7 +3092,7 @@ void UIComboBoxID::Paint() {
   }
 
   if (this->verticalOverflow != 0) {
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(this->geometry.width - 16, 0, 16, this->geometry.height, RGB(red, green, blue));
   }
 
@@ -3198,8 +3167,8 @@ void UIListBox2::Paint() {
     }
 
     const std::string& line = this->lines[index];
-    DrawStyledColoredText(
-      *this, x, y, line.c_str(), static_cast<unsigned>(line.size()), color, this->fontFamily, this->fontHeight, this->bold, this->italic, false
+    this->DrawStyledColoredText(
+      x, y, line.c_str(), static_cast<unsigned>(line.size()), color, this->fontFamily, this->fontHeight, this->bold, this->italic, false
     );
   }
 }
@@ -3230,11 +3199,10 @@ void UIPcGage::Paint() {
     if (this->maximum != 0) {
       const float percent = static_cast<float>(this->current * 100 / this->maximum);
       if (0.0f != percent) {
-        const int width = static_cast<int>(static_cast<float>(this->geometry.width) * percent / 100.0f - 2.0f);
         if (25.0f > percent) {
-          this->FillRegion(1, 1, width, this->geometry.height - 2, this->colors[4]);
+          this->FillRegion(1, 1, static_cast<int>(static_cast<float>(this->geometry.width) * percent / 100.0f - 2.0f), this->geometry.height - 2, this->colors[4]);
         } else {
-          this->FillRegion(1, 1, width, this->geometry.height - 2, this->colors[2]);
+          this->FillRegion(1, 1, static_cast<int>(static_cast<float>(this->geometry.width) * percent / 100.0f - 2.0f), this->geometry.height - 2, this->colors[2]);
         }
       }
     }
@@ -3245,10 +3213,15 @@ void UIPcGage::Paint() {
       const float percent = static_cast<float>(this->current * 100 / this->maximum);
       const float second = static_cast<float>(this->secondaryValue * 100 / this->secondaryMaximum);
       if (percent != 0.0f) {
-        this->FillRegion(
-          1, 1, static_cast<int>(static_cast<float>(this->geometry.width) * percent / 100.0f - 2.0f), (this->geometry.height - 3) / 2,
-          25.0f > percent ? this->colors[4] : this->colors[2]
-        );
+        if (25.0f > percent) {
+          this->FillRegion(
+            1, 1, static_cast<int>(static_cast<float>(this->geometry.width) * percent / 100.0f - 2.0f), (this->geometry.height - 3) / 2, this->colors[4]
+          );
+        } else {
+          this->FillRegion(
+            1, 1, static_cast<int>(static_cast<float>(this->geometry.width) * percent / 100.0f - 2.0f), (this->geometry.height - 3) / 2, this->colors[2]
+          );
+        }
       }
       if (second != 0.0f) {
         this->FillRegion(
@@ -3377,7 +3350,11 @@ void UITextViewEX::Paint() {
             x = 0;
           }
           const bool hasImage = !StringImage(*text).empty();
-          text->Move(x, hasImage ? y - 7 : y);
+          if (hasImage) {
+            text->Move(x, y - 7);
+          } else {
+            text->Move(x, y);
+          }
           x = x + 5 + text->geometry.width;
         }
       }
@@ -3449,14 +3426,12 @@ void UIChatHisBox2::Paint() {
   FontCache& fonts = g_fontCache;
   for (int row = 0; top + row < static_cast<int>(end); ++row) {
     const int index = top + row;
-    int x;
     if (g_serviceType == 19 && g_tipOfTheDayEnglish) {
       const int width = this->TextWidth(this->lines[index].c_str(), 0, 0, 12, 0, 0);
-      x = this->geometry.width - width - 19;
+      this->DrawTextAt(this->geometry.width - width - 19, this->lineHeight * row + 3, this->lines[index].c_str(), 0, 0, 12, this->lineColors[index], 0, 0);
     } else {
-      x = 2;
+      this->DrawTextAt(2, this->lineHeight * row + 3, this->lines[index].c_str(), 0, 0, 12, this->lineColors[index], 0, 0);
     }
-    this->DrawTextAt(x, this->lineHeight * row + 3, this->lines[index].c_str(), 0, 0, 12, this->lineColors[index], 0, 0);
     this->PlaceNaviLinks(index);
     this->PlaceItemTags(index);
   }
@@ -3525,9 +3500,9 @@ void UIString::Paint() {
     while (cur < end) {
       cur = ParseColorCode(SegmentEnd(cur, end), color);
     }
-    DrawColoredText(*this, 24, 7, this->text.c_str(), static_cast<unsigned>(this->text.size()), color, 0, 12, false);
+    this->DrawColoredText(24, 7, this->text.c_str(), static_cast<unsigned>(this->text.size()), color, 0, 12, false);
   } else {
-    DrawColoredText(*this, 0, 0, this->text.c_str(), static_cast<unsigned>(this->text.size()), color, 0, 12, false);
+    this->DrawColoredText(0, 0, this->text.c_str(), static_cast<unsigned>(this->text.size()), color, 0, 12, false);
   }
 }
 
@@ -3562,9 +3537,6 @@ int UISlotBmpButton::SendMsg(UIWindow* sender, int message, std::intptr_t argume
 #include "Utility/Timestamp.h"
 #include "Client/Mode/CMode.h"
 #include "Client/Mode/CLoginMode.h"
-
-#include "Utility/StdStringConcat.h"
-
 
 // OFFSET: 0x0088EBC0
 // FUNCTION: fn_11385
@@ -3637,9 +3609,7 @@ void UISlotBmpButton::Paint() {
 // OFFSET: 0x0086D5F0
 // FUNCTION: fn_11049
 UIItemTagButton::UIItemTagButton() {
-  new (reinterpret_cast<ITEM_INFO*>(reinterpret_cast<unsigned char*>(this) + 0xF8)) ITEM_INFO();
   this->textY = 1;
   this->tipId = 0;
 }
-
 

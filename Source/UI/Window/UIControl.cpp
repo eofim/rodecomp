@@ -37,6 +37,8 @@
 #include <format>
 #include <windows.h>
 
+template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
+
 template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char* const, std::size_t, const char* const, std::size_t) noexcept;
 template __declspec(noinline) std::map<int, CResPtr<CBitmapRes>>::const_iterator std::map<int, CResPtr<CBitmapRes>>::_Mybase::find(const int&) const;
 
@@ -235,7 +237,7 @@ CBitmapRes* CUIControl::LoadBitmapResource(const std::string& name, bool resolve
 }
 
 // INLINED
-__forceinline CUIButton::CUIButton() : CUIControl(), state(0), disabled(0), tooltip(), clickWindow(nullptr), hoverWindow(nullptr) {
+__forceinline CUIButton::CUIButton() : CUIControl(), state(0), disabled(0), tooltip(), onClick(), onHover() {
 }
 
 // OFFSET: 0x009BDF40
@@ -383,7 +385,7 @@ void CUIVScrollBar::SetTotal(int value) {
 // OFFSET: 0x009D3120
 // FUNCTION: fn_14028
 void CUIVScrollBar::SetOnChange(std::function<void(int)> handler) {
-  AssignHandler(this->onChange, handler);
+  this->onChange = handler;
 }
 
 // OFFSET: 0x009F2E80
@@ -468,7 +470,7 @@ void CUIHThumb::Paint() {
     const int end = this->geometry.width - (this->bottom ? this->bottom->image.width : 0);
     if (this->top) {
       if (this->transparent) {
-        this->DrawAuxiliary(1, 0, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->top)), true, false);
+        this->DrawAuxiliary(1, 0, 0, this->top, true, false);
       } else {
         this->DrawBitmap(0, 0, this->top, false);
       }
@@ -478,7 +480,7 @@ void CUIHThumb::Paint() {
     if (this->middle) {
       while (x < end) {
         if (this->transparent) {
-          this->DrawAuxiliary(1, x, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->middle)), true, false);
+          this->DrawAuxiliary(1, x, 0, this->middle, true, false);
         } else {
           this->DrawBitmap(x, 0, this->middle, false);
         }
@@ -488,14 +490,14 @@ void CUIHThumb::Paint() {
 
     if (this->bottom) {
       if (this->transparent) {
-        this->DrawAuxiliary(1, this->geometry.width - this->bottom->image.width, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->bottom)), true, false);
+        this->DrawAuxiliary(1, this->geometry.width - this->bottom->image.width, 0, this->bottom, true, false);
       } else {
         this->DrawBitmap(this->geometry.width - this->bottom->image.width, 0, this->bottom, false);
       }
     }
   } else if (this->middle) {
     if (this->transparent) {
-      this->DrawAuxiliary(1, 0, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->middle)), true, false);
+      this->DrawAuxiliary(1, 0, 0, this->middle, true, false);
     } else {
       this->DrawBitmap(0, 0, this->middle, false);
     }
@@ -602,10 +604,10 @@ void CUIVScrollBar::Paint() {
 
   if (this->transparent) {
     for (int y = 0; y < this->trackLength - this->background->image.height; y += this->background->image.height) {
-      this->DrawAuxiliary(1, 0, this->upButton->geometry.height + y, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->background)), true, false);
+      this->DrawAuxiliary(1, 0, this->upButton->geometry.height + y, this->background, true, false);
     }
     this->DrawAuxiliary(
-      1, 0, this->geometry.height - this->downButton->geometry.height - this->background->image.height, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->background)), true, false
+      1, 0, this->geometry.height - this->downButton->geometry.height - this->background->image.height, this->background, true, false
     );
     return;
   }
@@ -725,7 +727,7 @@ void CUIVThumb::Paint() {
     const int end = this->geometry.height - (this->bottom ? this->bottom->image.height : 0);
     if (this->top) {
       if (this->transparent) {
-        this->DrawAuxiliary(1, 0, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->top)), true, false);
+        this->DrawAuxiliary(1, 0, 0, this->top, true, false);
       } else {
         this->DrawBitmap(0, 0, this->top, false);
       }
@@ -735,7 +737,7 @@ void CUIVThumb::Paint() {
     if (this->middle) {
       while (y < end) {
         if (this->transparent) {
-          this->DrawAuxiliary(1, 0, y, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->middle)), true, false);
+          this->DrawAuxiliary(1, 0, y, this->middle, true, false);
         } else {
           this->DrawBitmap(0, y, this->middle, false);
         }
@@ -745,14 +747,14 @@ void CUIVThumb::Paint() {
 
     if (this->bottom) {
       if (this->transparent) {
-        this->DrawAuxiliary(1, 0, this->geometry.height - this->bottom->image.height, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->bottom)), true, false);
+        this->DrawAuxiliary(1, 0, this->geometry.height - this->bottom->image.height, this->bottom, true, false);
       } else {
         this->DrawBitmap(0, this->geometry.height - this->bottom->image.height, this->bottom, false);
       }
     }
   } else if (this->middle) {
     if (this->transparent) {
-      this->DrawAuxiliary(1, 0, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->middle)), true, false);
+      this->DrawAuxiliary(1, 0, 0, this->middle, true, false);
     } else {
       this->DrawBitmap(0, 0, this->middle, false);
     }
@@ -791,8 +793,7 @@ void CUIButton::SetState(int value) {
 // OFFSET: 0x009D3050
 // FUNCTION: fn_14027
 void CUIButton::SetOnClick(std::function<void()> handler) {
-  std::function<void()>& onClick = *reinterpret_cast<std::function<void()>*>(this->clickHandlerStorage);
-  onClick = handler;
+  this->onClick = handler;
 }
 
 // OFFSET: 0x009EE920
@@ -815,8 +816,8 @@ void CUIButton::OnLBtnDown(int, int) {
 void CUIButton::OnLBtnUp(int, int) {
   this->SetState(2);
   if (this == g_windowMgr.Capture()) {
-    if (!this->disabled && this->clickWindow) {
-      this->clickWindow->IsFrameWnd();
+    if (!this->disabled && this->onClick) {
+      this->onClick();
     }
     g_windowMgr.ReleaseCapture();
   }
@@ -831,8 +832,8 @@ void CUIButton::OnMouseEnter() {
 // OFFSET: 0x009EEA00
 // FUNCTION: fn_14631
 void CUIButton::OnMouseHover(int, int) {
-  if (this->hoverWindow) {
-    this->hoverWindow->IsFrameWnd();
+  if (this->onHover) {
+    this->onHover();
   }
 
   if (this->tooltip.empty()) {
@@ -1139,6 +1140,7 @@ bool CUITab::SelectIndex(unsigned int index) {
   return true;
 }
 
+#pragma inline_depth(0)
 // OFFSET: 0x009F16F0
 // FUNCTION: fn_14695
 void CUITabButton::SetSelected(bool selected) {
@@ -1146,11 +1148,12 @@ void CUITabButton::SetSelected(bool selected) {
   if (this->page) {
     this->page->Show(selected);
   }
-  if (selected && this->clickWindow) {
-    this->clickWindow->IsFrameWnd();
+  if (selected && this->onClick) {
+    this->onClick();
   }
   this->Invalidate();
 }
+#pragma inline_depth()
 
 // OFFSET: 0x009F1740
 // FUNCTION: fn_14696
@@ -1228,12 +1231,12 @@ void CUIStaticImage::Paint() {
     const int height = static_cast<int>(static_cast<float>(res->image.height) * factor);
     const int width = static_cast<int>(static_cast<float>(res->image.width) * factor);
     if (transparent) {
-      this->DrawAuxiliaryScaled(1, 0, 0, width, height, reinterpret_cast<BitmapImage*>(res), 1, false);
+      this->DrawAuxiliaryScaled(1, 0, 0, width, height, res, 1, false);
     } else {
-      this->DrawBitmapScaled(0, 0, width, height, reinterpret_cast<BitmapImage*>(res), 0);
+      this->DrawBitmapScaled(0, 0, width, height, res, 0);
     }
   } else if (transparent) {
-    this->DrawAuxiliary(1, 0, 0, reinterpret_cast<BitmapImage*>(res), true, false);
+    this->DrawAuxiliary(1, 0, 0, res, true, false);
   } else {
     this->DrawBitmap(0, 0, res, false);
   }
@@ -1351,8 +1354,9 @@ void CUITitleBar::SetSecondButton(CUIButton* button) {
 
   const char* behavior = nullptr;
   if (g_session.m_hotkeyScript->Call("GetBeHaviorOfWindow", "d>s", this->parent->geometry.id, &behavior) && behavior) {
+    CUIButton* second = static_cast<CUIButton*>(this->secondButton);
     const std::string text = behavior;
-    static_cast<CUIButton*>(this->secondButton)->tooltip = text;
+    second->tooltip = text;
   }
 }
 
@@ -1453,7 +1457,7 @@ void CUIImageButton::Paint() {
 
   if (image) {
     if (this->transparent) {
-      this->DrawAuxiliary(1, 0, 0, reinterpret_cast<BitmapImage*>(image), true, false);
+      this->DrawAuxiliary(1, 0, 0, image, true, false);
       return;
     }
     this->DrawBitmap(0, 0, image, false);
@@ -1730,8 +1734,7 @@ void CUIListBoxEx<AdventureGuide::CUIItemInfo, AdventureGuide::CItemData>::AddNe
       AdventureGuide::CUIItemInfo* item = new AdventureGuide::CUIItemInfo();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
-      CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-      item->SetImageResources(images[0], images[1], images[2], images[3]);
+      item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->onHover = [this](CUIListItem* listItem) {
         for (AdventureGuide::CUIItemInfo* other : this->items) {
           other->SetHighlighted(other == listItem);
@@ -1796,8 +1799,7 @@ void CUIListBoxEx<AdventureGuide::CUIMonsterInfo, AdventureGuide::CMonsterData>:
       AdventureGuide::CUIMonsterInfo* item = new AdventureGuide::CUIMonsterInfo();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
-      CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-      item->SetImageResources(images[0], images[1], images[2], images[3]);
+      item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->onHover = [this](CUIListItem* listItem) {
         for (AdventureGuide::CUIMonsterInfo* other : this->items) {
           other->SetHighlighted(other == listItem);
@@ -1862,8 +1864,7 @@ void CUIListBoxEx<AdventureGuide::CUIQuestInfo, AdventureGuide::CQuestInfo>::Add
       AdventureGuide::CUIQuestInfo* item = new AdventureGuide::CUIQuestInfo();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
-      CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-      item->SetImageResources(images[0], images[1], images[2], images[3]);
+      item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->onHover = [this](CUIListItem* listItem) {
         for (AdventureGuide::CUIQuestInfo* other : this->items) {
           other->SetHighlighted(other == listItem);
@@ -1928,8 +1929,7 @@ void CUIListBoxEx<AdventureGuide::CUITabInfo, Guide_Intro::Contents>::AddNewItem
       AdventureGuide::CUITabInfo* item = new AdventureGuide::CUITabInfo();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
-      CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-      item->SetImageResources(images[0], images[1], images[2], images[3]);
+      item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->onHover = [this](CUIListItem* listItem) {
         for (AdventureGuide::CUITabInfo* other : this->items) {
           other->SetHighlighted(other == listItem);
@@ -2154,10 +2154,10 @@ void CUIHScrollBar::Paint() {
 
   if (this->transparent) {
     for (int x = 0; x < this->trackLength - this->background->image.width; x += this->background->image.width) {
-      this->DrawAuxiliary(1, this->upButton->geometry.width + x, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->background)), true, false);
+      this->DrawAuxiliary(1, this->upButton->geometry.width + x, 0, this->background, true, false);
     }
     this->DrawAuxiliary(
-      1, this->geometry.width - this->downButton->geometry.width - this->background->image.width, 0, reinterpret_cast<BitmapImage*>(static_cast<CBitmapRes*>(this->background)), true, false
+      1, this->geometry.width - this->downButton->geometry.width - this->background->image.width, 0, this->background, true, false
     );
     return;
   }
@@ -2772,9 +2772,6 @@ CUIListBoxEx<AdventureGuide::CUITabInfo, Guide_Intro::Contents>::~CUIListBoxEx()
 // OFFSET: 0x009BFDB0
 // FUNCTION: fn_13963
 CUIButton::~CUIButton() {
-  using Handler = std::function<void()>;
-  reinterpret_cast<Handler*>(this->hoverHandlerStorage)->~Handler();
-  reinterpret_cast<Handler*>(this->clickHandlerStorage)->~Handler();
 }
 
 // OFFSET: 0x009BFED0
@@ -3118,8 +3115,8 @@ void CUITextButton::DrawLabel() {
       );
     }
     if (this->outline) {
-      DrawOutlinedText(
-        *this, this->textX + 1, this->textY + 1, this->displayText.c_str(), 0, this->textColors[this->state], this->outlineColor, this->fontIndex,
+      this->DrawOutlinedText(
+        this->textX + 1, this->textY + 1, this->displayText.c_str(), 0, this->textColors[this->state], this->outlineColor, this->fontIndex,
         this->fontHeight, this->bold, 0
       );
       return;
@@ -3136,8 +3133,8 @@ void CUITextButton::DrawLabel() {
     );
   }
   if (this->outline) {
-    DrawOutlinedText(
-      *this, this->textX, this->textY, this->displayText.c_str(), 0, this->textColors[this->state], this->outlineColor, this->fontIndex,
+    this->DrawOutlinedText(
+      this->textX, this->textY, this->displayText.c_str(), 0, this->textColors[this->state], this->outlineColor, this->fontIndex,
       this->fontHeight, this->bold, 0
     );
     return;
@@ -3190,8 +3187,8 @@ void CUIStaticText::Paint() {
     );
   }
   if (this->outline) {
-    DrawOutlinedText(
-      *this, this->textX, this->textY + 1, this->displayText.c_str(), 0, this->color, this->outlineColor, this->fontIndex, this->fontHeight, this->bold,
+    this->DrawOutlinedText(
+      this->textX, this->textY + 1, this->displayText.c_str(), 0, this->color, this->outlineColor, this->fontIndex, this->fontHeight, this->bold,
       0
     );
     return;
@@ -3656,11 +3653,11 @@ void CUIEditBox::OnCreate(int width, int height) {
 void CUITextViewer::AddLine(const std::string& text) {
   const int scrollWidth = this->scrollBar->geometry.visible ? this->scrollBar->geometry.width : 0;
   const int availableWidth = std::max(0, this->geometry.width - (this->paddingLeft + this->paddingRight + scrollWidth));
-  unsigned char align;
+  int align;
   if (this->textX == 6) {
     align = 2;
   } else {
-    align = this->textX == 2 ? 1 : 0;
+    align = this->textX == 2;
   }
   LineFontFlags flags{this->bold, false};
   CCreateLineInfo lineInfo(
@@ -3673,7 +3670,7 @@ void CUITextViewer::AddLine(const std::string& text) {
     for (const auto& row : lineInfo.m_lines) {
       for (UIWindow* child : row) {
         child->Move(child->geometry.x, child->geometry.y + this->contentHeight);
-        this->AddChild(child);
+        this->AddChildFront(child);
         this->childPositions[child] = std::pair<int, int>(child->geometry.x, child->geometry.y);
       }
     }

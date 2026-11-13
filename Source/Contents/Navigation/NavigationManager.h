@@ -28,6 +28,13 @@ struct NaviCell {
 };
 
 struct NaviLink {
+  // INLINED
+  NaviLink& operator=(const NaviLink& other) {
+    this->link = other.link;
+    this->cost = other.cost;
+    return *this;
+  }
+
   /* 0000 */ CNavi_Link* link;
   /* 0004 */ int cost;
 };
@@ -37,6 +44,13 @@ struct NaviDataEntry {
 
   // INLINED
   NaviDataEntry(int previous, CNavi_Link* link, int cost) : previous(previous), link(link), cost(cost) {}
+
+  // INLINED
+  ~NaviDataEntry() {
+    this->previous = -1;
+    this->link = nullptr;
+    this->cost = 0;
+  }
 
   void Reset();
   void Init();

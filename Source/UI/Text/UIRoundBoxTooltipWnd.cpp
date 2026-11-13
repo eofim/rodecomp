@@ -1,4 +1,5 @@
 #include "UI/Window/UIEnums.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Text/UIRoundBoxTooltipWnd.h"
 
@@ -34,10 +35,13 @@ void UIRoundBoxTooltipWnd::OnCreate(int width, int height) {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 1, 1, red, green, blue);
+  g_skinInfo.PaletteChannels(1, 1, red, green, blue);
 
-  this->viewer->backgroundColor = 0xFFFF00FF;
-  this->viewer->Invalidate();
+  {
+    auto* viewer = this->viewer;
+    viewer->backgroundColor = 0xFFFF00FF;
+    viewer->Invalidate();
+  }
   this->viewer->color = 0x803B1A;
   this->AddChild(this->viewer);
 }
@@ -61,22 +65,22 @@ void UIColoringTextViewer::Paint() {
 
   const int first = this->topLine;
   const int limit = this->geometry.height / spacing + first;
-  int end = static_cast<int>(std::min<unsigned>(this->lines.size(), limit));
+  int end = static_cast<int>(std::min<unsigned>(limit, this->lines.size()));
   if (this->lineLimit) {
     end = this->lineLimit;
   }
 
   for (int index = first; index < end; ++index) {
     const auto& line = this->lines[index];
-    DrawColoredText(*this, 3, this->lineHeight * (index - first) + 4, line.c_str(), static_cast<unsigned>(line.size()), this->color, 0, 12, false);
+    this->DrawColoredText(3, this->lineHeight * (index - first) + 4, line.c_str(), static_cast<unsigned>(line.size()), this->color, 0, 12, false);
   }
 }
 
 // OFFSET: 0x0099A3F0
 // FUNCTION: fn_13542
 void UIRoundBoxTooltipWnd::Paint() {
-  DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xEFB8B8);
-  DrawFilledRoundedBorder(*this, 1, 1, this->geometry.width - 2, this->geometry.height - 2, 0xEFE7E7);
+  this->DrawFilledRoundedOutline(0, 0, this->geometry.width, this->geometry.height, 0xEFB8B8);
+  this->DrawFilledRoundedOutline(1, 1, this->geometry.width - 2, this->geometry.height - 2, 0xEFE7E7);
 }
 
 // OFFSET: 0x0099A430

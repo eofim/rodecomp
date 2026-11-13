@@ -1,4 +1,5 @@
 #include "Contents/Actors/GameActor.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Effects/EffectResourceSwitcher.h"
 #include "Contents/Effects/Core/Effect.h"
 #include "Contents/Effects/Core/EffectActor.h"
@@ -35,12 +36,14 @@ public:
 
 class CSkillAction_SKE_SKY_SUN : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
 };
 
 class CSkillAction_SKE_SKY_MOON : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
@@ -166,7 +169,7 @@ public:
 // FUNCTION: fn_08815
 void CSkillObjectAction_SKE_STAR_CANNON::OnSkillObjectCreate(int argument, CRenderObject* object, CGameActor* source) {
   if (object) {
-    g_effectMgr->Spawn(object->render.accountId, 2350, object->render.position, 0, argument, 0, 0);
+    g_effectMgr->Spawn(object->render.accountId, 0x92E, object->render.position, 0, argument, 0, 0);
   }
 }
 
@@ -180,7 +183,7 @@ int CSkillAction_SKE_ALL_IN_THE_SKY::GetSkillAttackMotion() {
 // FUNCTION: fn_08817
 void CSkillAction_SKE_ALL_IN_THE_SKY::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(845, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BEGINSPELL_N8, level / 16);
   }
 }
 
@@ -197,7 +200,7 @@ void CSkillAction_SKE_ALL_IN_THE_SKY::OnTargetSkillCast(int argument1, int argum
 // FUNCTION: fn_08819
 void CSkillAction_SKE_ENCHANTING_SKY::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(831, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BEGINSPELL_N2, level / 16);
   }
 }
 
@@ -228,6 +231,12 @@ void CEfstAction_SKY_ENCHANT::OnEfstUpdate(int efstId, int value, int argument3,
     EffectLists* effects = g_effectMgr;
     effects->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("ske_enchanting_sky_01"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
+}
+
+// OFFSET: 0x00797D30
+// FUNCTION: fn_08823
+int CSkillAction_SKE_SKY_SUN::GetSkillAttackMotion() {
+  return 2;
 }
 
 // OFFSET: 0x00797D40
@@ -263,6 +272,12 @@ void CSkillAction_SKE_SKY_SUN::OnSkillDamage(int level, CGameActor* source, CGam
     EffectLists* effects = g_effectMgr;
     effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("sky_sun_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
+}
+
+// OFFSET: 0x00798230
+// FUNCTION: fn_08826
+int CSkillAction_SKE_SKY_MOON::GetSkillAttackMotion() {
+  return 2;
 }
 
 // OFFSET: 0x00798240
@@ -317,7 +332,7 @@ void CSkillAction_SKE_STAR_LIGHT_KICK::OnSkillEffect(int level, CGameActor* sour
     return;
   }
 
-  source->LaunchEffect(2426, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+  source->LaunchEffect(EF_FORCE_ANIM_27, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
   EffectLists* effects = g_effectMgr;
   effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("star_light_kick"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   effects = g_effectMgr;
@@ -464,8 +479,10 @@ void CSkillAction_SKE_SUNSET_BLAST::OnSkillEffect(int level, CGameActor* source,
       return;
     }
 
-    const int offsetZ = 15 - std::max(0, std::rand() % 30);
-    const int offsetX = 15 - std::max(0, std::rand() % 30);
+    const int rollZ = std::rand() % 30;
+    const int offsetZ = 15 - (rollZ >= 0 ? rollZ : 0);
+    const int rollX = std::rand() % 30;
+    const int offsetX = 15 - (rollX >= 0 ? rollX : 0);
     effect->position[0] = target->render.position.x + offsetX;
     effect->position[1] = target->render.position.y + 0.0f;
     effect->position[2] = target->render.position.z + offsetZ;
@@ -576,7 +593,7 @@ int CSkillAction_SKE_MIDNIGHT_KICK::GetSkillAttackMotion() {
 // FUNCTION: fn_08857
 void CSkillAction_SKE_MIDNIGHT_KICK::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(58, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BEGINSPELL6, level / 16);
   }
 }
 
@@ -599,7 +616,7 @@ int CSkillAction_SKE_DAWN_BREAK::GetSkillAttackMotion() {
 // FUNCTION: fn_08860
 void CSkillAction_SKE_DAWN_BREAK::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(58, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BEGINSPELL6, level / 16);
   }
 }
 
@@ -628,7 +645,7 @@ bool CSkillAction_SKE_TWINKLING_GALAXY::KeepSkillAttackSpeed() {
 // FUNCTION: fn_08864
 void CSkillAction_SKE_TWINKLING_GALAXY::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(441, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BLUECASTING, level / 16);
   }
 }
 
@@ -636,7 +653,7 @@ void CSkillAction_SKE_TWINKLING_GALAXY::OnSkillCast(int level, CGameActor* sourc
 // FUNCTION: fn_08865
 void CSkillObjectAction_SKE_TWINKLING_GALAXY::OnSkillObjectCreate(int argument, CRenderObject* object, CGameActor* source) {
   if (object) {
-    g_effectMgr->Spawn(object->render.accountId, 2349, object->render.position, 0, argument, 0, 0);
+    g_effectMgr->Spawn(object->render.accountId, 0x92D, object->render.position, 0, argument, 0, 0);
   }
 }
 
@@ -650,7 +667,7 @@ bool CSkillAction_SKE_STAR_BURST::KeepSkillAttackMotion(int argument) {
 // FUNCTION: fn_08867
 void CSkillAction_SKE_STAR_BURST::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(441, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BLUECASTING, level / 16);
   }
 }
 
@@ -658,7 +675,7 @@ void CSkillAction_SKE_STAR_BURST::OnSkillCast(int level, CGameActor* source) {
 // FUNCTION: fn_08868
 void CEfstAction_STAR_BURST::OnEfstBegin(int efstId, int value, int argument3, int argument4, CRenderObject* actor, bool argument6) {
   if (actor) {
-    g_effectMgr->Spawn(actor->render.accountId, 2348, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    g_effectMgr->Spawn(actor->render.accountId, 0x92C, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -692,6 +709,55 @@ bool CSkillAction_SKE_STAR_CANNON::KeepSkillAttackSpeed() {
 // FUNCTION: fn_08873
 void CSkillAction_SKE_STAR_CANNON::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(441, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_BLUECASTING, level / 16);
   }
 }
+
+// GLOBAL: gl_25870
+static EfstActionRegistrar s_efstAction1390(1390, NewAction<CEfstAction_DAWN_MOON, CEfstAction>);
+// GLOBAL: gl_25871
+static EfstActionRegistrar s_efstAction1389(1389, NewAction<CEfstAction_MIDNIGHT_MOON, CEfstAction>);
+// GLOBAL: gl_25872
+static EfstActionRegistrar s_efstAction1386(1386, NewAction<CEfstAction_NOON_SUN, CEfstAction>);
+// GLOBAL: gl_25873
+static EfstActionRegistrar s_efstAction1388(1388, NewAction<CEfstAction_RISING_MOON, CEfstAction>);
+// GLOBAL: gl_25874
+static EfstActionRegistrar s_efstAction1385(1385, NewAction<CEfstAction_RISING_SUN, CEfstAction>);
+// GLOBAL: gl_25875
+static EfstActionRegistrar s_efstAction1392(1392, NewAction<CEfstAction_SKY_ENCHANT, CEfstAction>);
+// GLOBAL: gl_25876
+static EfstActionRegistrar s_efstAction1391(1391, NewAction<CEfstAction_STAR_BURST, CEfstAction>);
+// GLOBAL: gl_25877
+static EfstActionRegistrar s_efstAction1387(1387, NewAction<CEfstAction_SUNSET_SUN, CEfstAction>);
+// GLOBAL: gl_25878
+static CSkillObjectActionRegistration s_skillObjectAction287(287, NewAction<CSkillObjectAction_SKE_STAR_CANNON, CSkillObjectAction>);
+// GLOBAL: gl_25879
+static CSkillObjectActionRegistration s_skillObjectAction286(286, NewAction<CSkillObjectAction_SKE_TWINKLING_GALAXY, CSkillObjectAction>);
+// GLOBAL: gl_25880
+static SkillActionRegistrar s_skillAction5474(5474, NewAction<CSkillAction_SKE_ALL_IN_THE_SKY, CSkillAction>);
+// GLOBAL: gl_25881
+static SkillActionRegistrar s_skillAction5470(5470, NewAction<CSkillAction_SKE_DAWN_BREAK, CSkillAction>);
+// GLOBAL: gl_25882
+static SkillActionRegistrar s_skillAction5475(5475, NewAction<CSkillAction_SKE_ENCHANTING_SKY, CSkillAction>);
+// GLOBAL: gl_25883
+static SkillActionRegistrar s_skillAction5469(5469, NewAction<CSkillAction_SKE_MIDNIGHT_KICK, CSkillAction>);
+// GLOBAL: gl_25884
+static SkillActionRegistrar s_skillAction5466(5466, NewAction<CSkillAction_SKE_NOON_BLAST, CSkillAction>);
+// GLOBAL: gl_25885
+static SkillActionRegistrar s_skillAction5468(5468, NewAction<CSkillAction_SKE_RISING_MOON, CSkillAction>);
+// GLOBAL: gl_25886
+static SkillActionRegistrar s_skillAction5465(5465, NewAction<CSkillAction_SKE_RISING_SUN, CSkillAction>);
+// GLOBAL: gl_25887
+static SkillActionRegistrar s_skillAction5503(5503, NewAction<CSkillAction_SKE_SKY_MOON, CSkillAction>);
+// GLOBAL: gl_25888
+static SkillActionRegistrar s_skillAction5502(5502, NewAction<CSkillAction_SKE_SKY_SUN, CSkillAction>);
+// GLOBAL: gl_25889
+static SkillActionRegistrar s_skillAction5472(5472, NewAction<CSkillAction_SKE_STAR_BURST, CSkillAction>);
+// GLOBAL: gl_25890
+static SkillActionRegistrar s_skillAction5473(5473, NewAction<CSkillAction_SKE_STAR_CANNON, CSkillAction>);
+// GLOBAL: gl_25891
+static SkillActionRegistrar s_skillAction5504(5504, NewAction<CSkillAction_SKE_STAR_LIGHT_KICK, CSkillAction>);
+// GLOBAL: gl_25892
+static SkillActionRegistrar s_skillAction5467(5467, NewAction<CSkillAction_SKE_SUNSET_BLAST, CSkillAction>);
+// GLOBAL: gl_25893
+static SkillActionRegistrar s_skillAction5471(5471, NewAction<CSkillAction_SKE_TWINKLING_GALAXY, CSkillAction>);

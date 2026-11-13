@@ -26,6 +26,8 @@
 #include <cstring>
 #include <new>
 
+template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
+
 // GLOBAL: gl_25003
 std::vector<AchTracingEntry> g_achievementTracking;
 
@@ -60,7 +62,7 @@ UIAchievementWnd::UIAchievementWnd() : UIFrameWnd(0) {
 
 // OFFSET: 0x007B2E80
 // FUNCTION: fn_09192
-UIAchievementWnd::~UIAchievementWnd() {
+__declspec(noinline) UIAchievementWnd::~UIAchievementWnd() {
 }
 
 // OFFSET: 0x007B37F0
@@ -69,11 +71,11 @@ void UIAchListWnd::SelectAchievement(int index) {
   this->selectedIndex = index;
 
   if (this->parent) {
-    int id = -1;
-    if (static_cast<unsigned>(index) < this->ids.size()) {
-      id = this->ids[index];
+    if (this->ids.size() > static_cast<unsigned>(index)) {
+      this->parent->SendMsg(this, UM_LIST_SELECTION, this->ids[index], 0, 0, 0);
+    } else {
+      this->parent->SendMsg(this, UM_LIST_SELECTION, -1, 0, 0, 0);
     }
-    this->parent->SendMsg(this, UM_LIST_SELECTION, id, 0, 0, 0);
   }
 
   this->Invalidate();
@@ -399,8 +401,8 @@ void UIAchListWnd::Paint() {
 
     if (flags[1] == 1) {
       const std::string date = FormatOwnedString("%4d.%2d.%2d", record.year, record.month, record.day);
-      DrawOutlinedText(
-        *this, static_cast<int>(276.0 - this->TextWidth(date.c_str(), 0, 0, 10, 0, 0) * 0.5), this->rowHeight * row + 55, date.c_str(), 0, 0x635AA5,
+      this->DrawOutlinedText(
+        static_cast<int>(276.0 - this->TextWidth(date.c_str(), 0, 0, 10, 0, 0) * 0.5), this->rowHeight * row + 55, date.c_str(), 0, 0x635AA5,
         0xFFFFFF, 0, 10, 0, 0
       );
     }
@@ -486,7 +488,7 @@ void UIAchTV::Paint() {
     if (this->outlineColor == 0) {
       this->DrawTextAt(3, this->lineHeight * row + 4, line.c_str(), line.size(), 0, 12, this->textColor, 0, 0);
     } else {
-      DrawOutlinedText(*this, 3, this->lineHeight * row + 4, line.c_str(), line.size(), this->textColor, this->outlineColor, 0, 12, 0, 0);
+      this->DrawOutlinedText(3, this->lineHeight * row + 4, line.c_str(), line.size(), this->textColor, this->outlineColor, 0, 12, 0, 0);
     }
 
     if (this->underline == 1) {
@@ -528,7 +530,7 @@ void UIAchSummaryWnd::Paint() {
       this->DrawBitmap(x + 12, 360, AchievementBitmap("유저인터페이스\\achievement_re\\list_rewardbox_not_receive.bmp"), true);
     }
 
-    DrawOutlinedText(*this, x - 3, 366, FormatOwnedString("%4d.%2d.%2d", record.year, record.month, record.day).c_str(), 0, 0x635AA5, 0xFFFFFF, 0, 10, 0, 0);
+    this->DrawOutlinedText(x - 3, 366, FormatOwnedString("%4d.%2d.%2d", record.year, record.month, record.day).c_str(), 0, 0x635AA5, 0xFFFFFF, 0, 10, 0, 0);
     x += 316;
   }
 }
@@ -638,8 +640,8 @@ void UICustomGageBar::Paint() {
     return;
   }
 
-  DrawRectangleBorder(*this, 0, 0, this->geometry.width, this->geometry.height, this->outerBorderColor);
-  DrawRectangleBorder(*this, 1, 1, this->geometry.width - 2, this->geometry.height - 2, this->innerBorderColor);
+  this->DrawRectOutline(0, 0, this->geometry.width, this->geometry.height, this->outerBorderColor);
+  this->DrawRectOutline(1, 1, this->geometry.width - 2, this->geometry.height - 2, this->innerBorderColor);
   this->FillRegion(2, 2, this->geometry.width - 4, this->geometry.height - 4, this->backgroundColor);
 
   const float percent = static_cast<float>(this->value) * 100.0f / static_cast<float>(this->maximum);
@@ -715,12 +717,17 @@ void UIAchievementWnd::SelectAchievement(int id) {
   if (index < list->rowCount) {
     list->firstRow = 0;
   } else {
-    list->firstRow = std::min(static_cast<unsigned>(index), static_cast<unsigned>(list->achievementList->count - list->rowCount));
+    const unsigned limit = static_cast<unsigned>(list->achievementList->count - list->rowCount);
+    list->firstRow = static_cast<unsigned>(index) > limit ? limit : index;
   }
 
   list->scrollBar->SetPosition(list->firstRow);
   if (list->parent) {
-    list->parent->SendMsg(list, UM_LIST_SELECTION, static_cast<unsigned>(list->selectedIndex) < list->ids.size() ? list->ids[list->selectedIndex] : -1, 0, 0, 0);
+    if (list->ids.size() > static_cast<unsigned>(list->selectedIndex)) {
+      list->parent->SendMsg(list, UM_LIST_SELECTION, list->ids[list->selectedIndex], 0, 0, 0);
+    } else {
+      list->parent->SendMsg(list, UM_LIST_SELECTION, -1, 0, 0, 0);
+    }
   }
 
   list->Invalidate();
@@ -914,7 +921,7 @@ int UIAchViewWnd::SendMsg(UIWindow*, int message, std::intptr_t argument1, std::
       PACKET_CZ_REQ_ACH_REWARD packet;
       packet.packetType = ID_CZ_REQ_ACH_REWARD;
       packet.achievementId = this->achievementId;
-      GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
     }
     break;
   case UM_SELECT_ACHIEVEMENT:
@@ -972,7 +979,11 @@ void UIAchListWnd::SetAchievements(std::map<int, AchievementInfo>* achievements,
   this->UpdateScroll();
   this->selectedIndex = 0;
   if (this->parent) {
-    this->parent->SendMsg(this, UM_LIST_SELECTION, this->ids.empty() ? -1 : this->ids[0], 0, 0, 0);
+    if (this->ids.size() > 0) {
+      this->parent->SendMsg(this, UM_LIST_SELECTION, this->ids[0], 0, 0, 0);
+    } else {
+      this->parent->SendMsg(this, UM_LIST_SELECTION, -1, 0, 0, 0);
+    }
   }
 
   this->Invalidate();
@@ -1021,9 +1032,11 @@ void UIAchievementWnd::SelectTab(int group, int sub) {
   this->tab->Select(group, sub);
 
   if (group == 0) {
-    this->upper->SetTitle(LookupMessage(MSI_OTPUSER_ONLY));
+    const std::string title = LookupMessage(MSI_OTPUSER_ONLY);
+    this->upper->SetTitle(title);
   } else {
-    this->upper->SetTitle(this->tab->Label(this->group, this->sub));
+    const std::string title = this->tab->Label(this->group, this->sub);
+    this->upper->SetTitle(title);
   }
   this->upper->Invalidate();
 

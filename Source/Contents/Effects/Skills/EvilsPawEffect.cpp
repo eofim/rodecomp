@@ -29,7 +29,7 @@ void CEvilsPawEffect::Close() {
 // OFFSET: 0x006FED20
 // FUNCTION: fn_06957
 void CEvilsPawEffect::Open() {
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+  CParticle* particle = CreateParticle(&this->positionVector, 5);
   if (particle) {
     particle->SetColor(255, 255, 255);
     particle->alpha = 255;
@@ -39,7 +39,7 @@ void CEvilsPawEffect::Open() {
     particle->offsetZ = this->offset.z;
     particle->sourceBlend = 5;
     particle->destinationBlend = 6;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     this->particles.push_back(particle);
   }
 
@@ -78,10 +78,12 @@ bool CEvilsPawEffect::IsAlive() {
 // FUNCTION: fn_06960
 void CEvilsPawEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
-    if (CParticle* particle = *it) {
+    CParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
+    if (particle) {
       particle->SetTexture(this->textures[this->textureIndex].c_str());
 
       matrix rotation;
@@ -105,7 +107,7 @@ void CEvilsPawEffect::OnProcess() {
 
   if (--this->delayCounter < 0) {
     ++this->textureIndex;
-    if (this->textureIndex > this->textures.size() - 1) {
+    if (this->textures.size() - 1 < this->textureIndex) {
       this->textureIndex = 0;
     }
     this->delayCounter = this->frameDelay;

@@ -31,6 +31,8 @@
 #include <windows.h>
 #include <timeapi.h>
 
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 namespace {
   __declspec(noinline) float ScreenLineSine(float angle) {
     return static_cast<float>(std::sin(static_cast<double>(angle)));
@@ -395,8 +397,8 @@ void UIRoMapWnd::DrawSelectedMapPreview() {
     y = g_renderer->viewport.height - 130;
   }
 
-  WorldViewArea* previous = reinterpret_cast<WorldViewArea*>(this->previewArea);
-  this->previewArea = reinterpret_cast<int*>(new WorldViewArea{x, y, x + 130, y + 130, 1});
+  WorldViewArea* previous = this->previewArea;
+  this->previewArea = new WorldViewArea{x, y, x + 130, y + 130, 1};
   delete previous;
 
   tagRECT area = {x, y, x + 130, y + 130};
@@ -407,15 +409,15 @@ void UIRoMapWnd::DrawSelectedMapPreview() {
     name.resize(name.size() - 4);
   }
 
-  DrawOutlinedText(*this, x + 3, y + 115, name.c_str(), 0, 0xFFFFFF, 0x5C5C5C, 0, 12, 1, 0);
+  this->DrawOutlinedText(x + 3, y + 115, name.c_str(), 0, 0xFFFFFF, 0x5C5C5C, 0, 12, 1, 0);
 
   {
     std::string path = "유저인터페이스\\map\\";
     path += name;
     path += ".bmp";
-    this->previewTexture = reinterpret_cast<int>(g_texMgr.Load(path.c_str(), 0, true, true, false));
+    this->previewTexture = g_texMgr.Load(path.c_str(), 0, true, true, false);
   }
 
   name = g_session.GetMapDisplayName(this->selectedRecord->name.c_str());
-  DrawOutlinedText(*this, x + 3, y + 3, name.c_str(), 0, 0xD2FF, 0, 0, 12, 1, 0);
+  this->DrawOutlinedText(x + 3, y + 3, name.c_str(), 0, 0xD2FF, 0, 0, 12, 1, 0);
 }

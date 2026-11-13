@@ -107,7 +107,9 @@ void CAcidifiedThrow::OnProcess() {
 
   CRenderObject* sourceActor = FindRenderObject(this->sourceActor);
   if (sourceActor) {
-    this->impactPosition = sourceActor->render.position;
+    this->impactPosition.x = sourceActor->render.position.x;
+    this->impactPosition.y = sourceActor->render.position.y;
+    this->impactPosition.z = sourceActor->render.position.z;
   }
 
   if (this->projectileEmitter) {
@@ -157,15 +159,16 @@ void CAcidifiedThrow::OnProcess() {
     float p1Z = this->impactPosition.z + rotZ;
 
     float t = this->trajectoryTime;
+    const vector3d start = this->impactPosition;
     float oneMinusT = 1.0f - t;
     float term0 = static_cast<float>(std::pow(static_cast<double>(oneMinusT), 2.0));
     float term1 = (t + t) * oneMinusT;
     float term2 = static_cast<float>(std::pow(static_cast<double>(t), 2.0));
 
     EZ2STREmitter* emitter = this->projectileEmitter;
-    emitter->position.x = term1 * p1X + term2 * worldX + term0 * this->impactPosition.x;
-    emitter->position.y = term1 * p1Y + term2 * worldY + term0 * this->impactPosition.y;
-    emitter->position.z = term1 * p1Z + term2 * worldZ + term0 * this->impactPosition.z;
+    emitter->position.x = term1 * p1X + term2 * worldX + term0 * start.x;
+    emitter->position.y = term1 * p1Y + term2 * worldY + term0 * start.y;
+    emitter->position.z = term1 * p1Z + term2 * worldZ + term0 * start.z;
 
     reinterpret_cast<CEZ2STRParticle*>(emitter)->Process(0.0f, 0.0f, 0.0f);
 
@@ -176,7 +179,7 @@ void CAcidifiedThrow::OnProcess() {
     FreeParticle(reinterpret_cast<CParticle*>(this->projectileEmitter));
     this->projectileEmitter = nullptr;
 
-    CRenderObject* player = reinterpret_cast<CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
+    CRenderObject* player = reinterpret_cast<CRenderObject*>(reinterpret_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
     float soundX = player->render.position.x - this->impactPosition.x;
     float soundZ = player->render.position.z - this->impactPosition.z;
 
@@ -204,7 +207,7 @@ void CAcidifiedThrow::OnProcess() {
   for (__int64 i = 0; i < 3; ++i) {
     EZ2STREmitter* emitter = this->impactEmitters[i];
     if (emitter) {
-      if (emitter->lifetime == 0.0f || static_cast<float>(emitter->elapsed) < emitter->lifetime * 60.0f) {
+      if (0.0f == emitter->lifetime || static_cast<float>(emitter->elapsed) < emitter->lifetime * 60.0f) {
         emitter->position.x = this->impactPosition.x - 1.0f;
         emitter->position.y = this->impactPosition.y - 14.0f;
         emitter->position.z = this->impactPosition.z;

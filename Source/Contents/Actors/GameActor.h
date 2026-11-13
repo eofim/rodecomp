@@ -20,6 +20,8 @@ enum {
   BODYSTATE_STONECURSE_ING,
 };
 
+class UIWindow;
+
 struct ActorHitInfo {
   /* 0000 */ int padding_0000;
   /* 0004 */ int damage;
@@ -66,22 +68,26 @@ struct ActorDamageMessage {
   /* 0034 */ int skillTarget;
 };
 
+class CMercenaryAI;
+class UIPcGage;
+
 class CGameActor : public EffectActor {
 public:
   CGameActor();
   ~CGameActor() override;
   bool OnProcess() override = 0;
-  void SendMsg(CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m) override;
+  void SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) override;
 
   /* 0158 */ int movementState[6];
-  /* 0170 */ unsigned char destinationAndSpeed[0x08];
+  /* 0170 */ int destCellY;
+  /* 0174 */ int moveSpeed;
   /* 0178 */ int isCounter;
   /* 017C */ int isTrickDead;
   /* 0180 */ int isPlayHitWave;
   /* 0184 */ int isAsuraAttack;
-  /* 0188 */ int sceneNameWindow;
-  /* 018C */ int actorTitleWindow;
-  /* 0190 */ unsigned char hitWaveName[0x80];
+  /* 0188 */ UIWindow* sceneNameWindow;
+  /* 018C */ UIWindow* actorTitleWindow;
+  /* 0190 */ char hitWaveName[0x80];
   /* 0210 */ std::uint16_t characterLevel;
   /* 0212 */ unsigned char padding_0212[0x02];
   /* 0214 */ vector3d accel;
@@ -98,7 +104,7 @@ public:
   /* 0258 */ std::uint32_t lastServerTime;
   /* 025C */ int job;
   /* 0260 */ int sex;
-  /* 0264 */ int actorWindows[5];
+  /* 0264 */ UIWindow* actorWindows[5];
   /* 0278 */ int freezeEndTick;
   /* 027C */ int petEmotionStartTick;
   /* 0280 */ std::uint32_t skillRechargeEndTick;
@@ -108,7 +114,7 @@ public:
   /* 0290 */ int nameWidth;
   /* 0294 */ int xSize;
   /* 0298 */ int ySize;
-  /* 029C */ unsigned char headType[0x04];
+  /* 029C */ int headType;
   /* 02A0 */ std::list<ActorDamageMessage> willBeAttackList;
   /* 02A8 */ std::list<ActorDamageMessage> willBeAttackedList;
   /* 02B0 */ int willBeDead;
@@ -133,13 +139,13 @@ public:
   /* 02F4 */ int lastDamage;
   /* 02F8 */ int hasHp;
   /* 02FC */ int maxHp;
-  /* 0300 */ int hpGaugeWindow;
+  /* 0300 */ UIPcGage* hpGaugeWindow;
   /* 0304 */ unsigned char hpGaugeFlags;
   /* 0305 */ unsigned char hasSp;
   /* 0306 */ unsigned char padding_0306[2];
   /* 0308 */ int spGaugeValue;
-  /* 030C */ int homunAI;
-  /* 0310 */ int merAI;
+  /* 030C */ CMercenaryAI* homunAI;
+  /* 0310 */ CMercenaryAI* merAI;
   /* 0314 */ unsigned char objectType;
   /* 0315 */ unsigned char padding_0315[3];
   /* 0318 */ float homunMsg[6];
@@ -147,15 +153,15 @@ public:
   /* 0348 */ float merMsg[6];
   /* 0360 */ float merResMsg[6];
   /* 0378 */ float attackMotion;
-  /* 037C */ int statusEffects[13];
+  /* 037C */ CGameObject* statusEffects[13];
   /* 03B0 */ std::list<CGameObject*> msgEffectList;
   /* 03B8 */ int transformJobs[3];
   /* 03C4 */ int monsterTransformJob;
   /* 03C8 */ int transformPriority;
   /* 03CC */ int charmType;
   /* 03D0 */ int charmCount;
-  /* 03D4 */ int firstFollowerEffect;
-  /* 03D8 */ int secondFollowerEffect;
+  /* 03D4 */ CGameObject* firstFollowerEffect;
+  /* 03D8 */ CGameObject* secondFollowerEffect;
   /* 03DC */ int mountedState;
   union { /* 03E0 */ std::uint16_t actorFlags; struct { unsigned char storedActorEntry; /* 03E1 */ bool modelReady; }; };
   /* 03E2 */ unsigned char padding_03E2[0x06];
@@ -232,7 +238,6 @@ public:
   void SetActorJob(int job);
   void RenderMercenary(const float* matrix, int job);
   void ProcessBodyState();
-  int GetShield();
   int GetEffectiveJob(int job);
   void LaunchAttackProjectile(int target, float scale);
   void SetStatusStates(int bodyState, std::uint32_t stateFlags, int effectState, bool notify);
@@ -259,7 +264,7 @@ public:
   void SetEffectState(int effectId, bool on);
   void SetEffectInstance(int effectId, int instance, bool on);
   void ResetJobEffects();
-  void ClearStatusEffectInstance(int value);
+  void ClearStatusEffectInstance(CGameObject* value);
   void SpawnDamageDigits(int unused, int damage, std::uint32_t color, int type);
   __declspec(noinline) int WeaponActionBase(int weaponType);
   int GetShapeShift();
@@ -278,7 +283,7 @@ public:
   void UpdateDamageMessages();
   void ProcessHitMessage(CGameObject* sender, const ActorHitInfo* info, int unused1, int unused2);
   void ProcessSkillMessage(CGameObject* sender, const ActorSkillInfo* info, int unused1, int unused2);
-  int GetEffectCounter(int effectId);
+  CGameObject* GetEffectCounter(int effectId);
   float GetNameOffset();
   float GetNameHeight();
   void SetStackedEffect(int effectId, bool on);

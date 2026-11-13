@@ -77,6 +77,8 @@ namespace {
   }
 }
 
+template __declspec(noinline) std::pair<std::set<PakUsedBlock>::iterator, bool> std::set<PakUsedBlock>::_Mybase::insert<false, 0>(PakUsedBlock&&);
+
 // OFFSET: 0x005EF3F0
 // FUNCTION: fn_04004
 // OFFSET: 0x005EF660
@@ -544,20 +546,23 @@ namespace myGPack {
       }
     }
 
+    std::uint64_t position = 0;
     this->m_freeBlocks.clear();
 
-    std::uint64_t position = 0;
-
     for (const PakUsedBlock& block : used) {
-      if (position < block.offset) {
-        this->m_freeBlocks.insert({static_cast<std::uint32_t>(block.offset - position), position});
+      const std::uint64_t offset = block.offset;
+      const std::uint32_t size = block.size;
+      if (position < offset) {
+        const std::uint64_t gap = offset - position;
+        this->m_freeBlocks.insert({static_cast<std::uint32_t>(gap), position});
       }
 
-      position = block.offset + block.size;
+      position = offset + size;
     }
 
     if (position < this->m_output.GetSize()) {
-      this->m_freeBlocks.insert({static_cast<std::uint32_t>(this->m_output.GetSize() - position), position});
+      const std::uint64_t gap = this->m_output.GetSize() - position;
+      this->m_freeBlocks.insert({static_cast<std::uint32_t>(gap), position});
     }
   }
 
@@ -740,8 +745,9 @@ namespace myGPack {
           return false;
         }
 
+        const std::uint8_t* data = buffer.data();
         const std::uint64_t offset = this->Allocate(entry.alignedSize);
-        if (!this->m_output.Write(offset, buffer.data(), entry.alignedSize)) {
+        if (!this->m_output.Write(offset, data, entry.alignedSize)) {
           return false;
         }
 

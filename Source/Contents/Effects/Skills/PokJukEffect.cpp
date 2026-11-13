@@ -5,12 +5,22 @@
 #include "Contents/Camera/Camera.h"
 #include "Contents/Effects/Core/EffectMemoryMgr.h"
 #include "Contents/Effects/Particles/Particle.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Utility/Math/AffineMatrix.h"
 
 #include <algorithm>
 #include <cstdlib>
 
 namespace {
+struct ZeroVector3d : vector3d {
+  // INLINED
+  ZeroVector3d() {
+    this->x = 0.0f;
+    this->y = 0.0f;
+    this->z = 0.0f;
+  }
+};
+
 // INLINED
 __forceinline int ClampedRandom(int range) {
   const int value = rand() % range;
@@ -24,20 +34,20 @@ void CPokJukEffect::SpawnParticles() {
   int row = 0;
   for (int rowStart = 0; rowStart < 640; rowStart += 160) {
     for (int column = 0; column < 160; ++column) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle) {
         particle->effectId = this->id;
         particle->columnIndex = column;
         particle->rowIndex = row;
         particle->groupIndex = 1;
         particle->elapsedFrames = -300 - ClampedRandom(50);
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(ClampedRandom(360));
+        particle->angle = static_cast<float>(ClampedRandom(360));
         particle->alpha = 0;
         particle->speedParameter = 2.0f;
         particle->scale = static_cast<float>(ClampedRandom(100)) * 0.004f + 0.4f;
         particle->angleParameter = ClampedRandom(360);
         particle->phaseParameter = ClampedRandom(360);
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         this->particles.push_back(particle);
 
         const int index = column + rowStart;
@@ -111,18 +121,16 @@ void CPokJukEffect::OnProcess() {
       const int age = particle->elapsedFrames;
 
       if (age > 0) {
-        vector3d* trail = this->trails[index];
-
         if (age % 3 == 0) {
-          trail[3].x = trail[2].x;
-          trail[3].y = trail[2].y;
-          trail[3].z = trail[2].z;
-          trail[2].x = trail[1].x;
-          trail[2].y = trail[1].y;
-          trail[2].z = trail[1].z;
-          trail[1].x = trail[0].x;
-          trail[1].y = trail[0].y;
-          trail[1].z = trail[0].z;
+          this->trails[index][3].x = this->trails[index][2].x;
+          this->trails[index][3].y = this->trails[index][2].y;
+          this->trails[index][3].z = this->trails[index][2].z;
+          this->trails[index][2].x = this->trails[index][1].x;
+          this->trails[index][2].y = this->trails[index][1].y;
+          this->trails[index][2].z = this->trails[index][1].z;
+          this->trails[index][1].x = this->trails[index][0].x;
+          this->trails[index][1].y = this->trails[index][0].y;
+          this->trails[index][1].z = this->trails[index][0].z;
         }
 
         const int delay = this->delays[index];
@@ -139,11 +147,11 @@ void CPokJukEffect::OnProcess() {
           this->beats[index] = 0;
         }
 
-        float& spinAngle = *reinterpret_cast<float*>(&particle->angleBits);
+        float& spinAngle = particle->angle;
         spinAngle = static_cast<float>((static_cast<int>(spinAngle) + 5) % 360);
 
         if (this->states[index] == 0) {
-          trail[0].y -= 0.25f;
+          this->trails[index][0].y -= 0.25f;
 
           if (age > 154) {
             this->states[index] = 1;
@@ -152,11 +160,11 @@ void CPokJukEffect::OnProcess() {
         } else if (this->states[index] == 1) {
           const int heading = particle->angleParameter;
           const float speed = particle->scale;
-          trail[0].y += speed * g_sinTable[heading];
+          this->trails[index][0].y += speed * g_sinTable[heading];
           const float flat = speed * g_cosTable[heading];
-          trail[0].x += flat * g_cosTable[particle->phaseParameter];
-          trail[0].z += flat * g_sinTable[particle->phaseParameter];
-          trail[0].y += 0.02f;
+          this->trails[index][0].x += flat * g_cosTable[particle->phaseParameter];
+          this->trails[index][0].z += flat * g_sinTable[particle->phaseParameter];
+          this->trails[index][0].y += 0.02f;
           particle->scale = speed * 0.98f;
 
           const int alpha = particle->alpha;
@@ -173,9 +181,9 @@ void CPokJukEffect::OnProcess() {
           particle->elapsedFrames = 0;
           particle->phaseParameter = ClampedRandom(360);
           particle->scale = static_cast<float>(ClampedRandom(100)) * 0.004f + 0.4f;
-          trail[0].x = -15.0f;
-          trail[0].y = 0.0f;
-          trail[0].z = 0.0f;
+          this->trails[index][0].x = -15.0f;
+          this->trails[index][0].y = 0.0f;
+          this->trails[index][0].z = 0.0f;
           this->states[index] = 0;
         }
       }
@@ -196,14 +204,17 @@ void CPokJukEffect::Render() {
       const int index = particle->rowIndex * 160 + particle->columnIndex;
 
       for (int layer = 0; layer < 2; ++layer) {
-        vector3d corners[4]{};
+        ZeroVector3d corners[4];
         const float radius = particle->speedParameter - shrink;
 
-        for (int corner = 0; corner < 4; ++corner) {
-          const int angle = static_cast<int>(static_cast<float>(corner * 90) + *reinterpret_cast<float*>(&particle->angleBits)) % 360;
-          corners[corner].x = radius * g_cosTable[angle];
-          corners[corner].y = 0.0f;
-          corners[corner].z = radius * g_sinTable[angle];
+        vector3d* corner = corners;
+        for (int offset = 0; offset < 360; offset += 90) {
+          corner->y = 0.0f;
+          int angle = static_cast<int>(static_cast<float>(offset) + particle->angle);
+          angle = angle % 360;
+          corner->x = radius * g_cosTable[angle];
+          corner->z = radius * g_sinTable[angle];
+          ++corner;
         }
 
         this->FaceCamera(corners);
@@ -249,7 +260,7 @@ void CPokJukEffect::Render() {
         particle->alpha = shown;
         particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
         particle->alpha = alpha;
-        shrink += layer == 0 ? 0.5f : 0.25f;
+        shrink += layer == 0 ? g_depthAverageHalf : 0.25f;
       }
     }
   }

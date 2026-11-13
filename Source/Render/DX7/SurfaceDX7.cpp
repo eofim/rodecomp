@@ -101,19 +101,22 @@ bool CSurfaceDX7::Resize(int width, int height) {
 SurfaceLock CSurfaceDX7::Lock() {
   SurfaceLock output{};
 
-  if (this->m_surface) {
-    DDSURFACEDESC2 description{};
-
-    if (SUCCEEDED(this->m_surface->Lock(nullptr, &description, DDLOCK_WAIT, nullptr))) {
-      output.success = true;
-      output.pixels = description.lpSurface;
-      output.pitch = description.lPitch;
-      output.width = description.dwWidth;
-      output.height = description.dwHeight;
-      output.bitsPerPixel = description.ddpfPixelFormat.dwRGBBitCount;
-    }
+  if (!this->m_surface) {
+    return output;
   }
 
+  DDSURFACEDESC2 description{};
+
+  if (FAILED(this->m_surface->Lock(nullptr, &description, DDLOCK_WAIT, nullptr))) {
+    return output;
+  }
+
+  output.success = true;
+  output.pixels = description.lpSurface;
+  output.pitch = description.lPitch;
+  output.width = description.dwWidth;
+  output.height = description.dwHeight;
+  output.bitsPerPixel = description.ddpfPixelFormat.dwRGBBitCount;
   return output;
 }
 
@@ -214,14 +217,14 @@ void CSurfaceDX7::Draw(int x, int y, int width, int height, std::uint32_t) {
   }
   if (x < 0) {
     source.left = -x;
-    x = 0;
   }
+  const int destinationX = x < 0 ? 0 : x;
   if (y < 0) {
     source.top = -y;
-    y = 0;
   }
+  const int destinationY = y < 0 ? 0 : y;
   if (source.right > source.left && source.bottom > source.top) {
-    this->m_owner->renderTarget->BltFast(x, y, this->m_surface, &source, DDBLTFAST_SRCCOLORKEY | DDBLTFAST_WAIT);
+    this->m_owner->renderTarget->BltFast(destinationX, destinationY, this->m_surface, &source, DDBLTFAST_SRCCOLORKEY | DDBLTFAST_WAIT);
   }
 }
 

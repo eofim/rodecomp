@@ -13,10 +13,12 @@
 
 #include "Resource/MSGSTRINGID.h"
 
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 // GLOBAL: gl_24886
-extern const int g_runeSetSlotX[6] = {87, 201, 19, 269, 87, 201};
+const int g_runeSetSlotX[6] = {87, 201, 19, 269, 87, 201};
 // GLOBAL: gl_24887
-extern const int g_runeSetSlotY[6] = {70, 70, 207, 207, 344, 344};
+const int g_runeSetSlotY[6] = {70, 70, 207, 207, 344, 344};
 
 // OFFSET: 0x00816630
 // FUNCTION: fn_10164
@@ -487,7 +489,7 @@ void UIRuneSystemWnd::OnProcess() {
 // OFFSET: 0x0081CF10
 // FUNCTION: fn_10217
 void UIRuneSetList::OnWheel(int delta) {
-  this->ScrollBy(2 * (delta < 0) - 1);
+  this->ScrollBy(2 * (0 > delta) - 1);
 }
 
 // OFFSET: 0x0081D460
@@ -586,18 +588,18 @@ int UIRuneSystem_tagListWnd::SendMsg(UIWindow*, int message, std::intptr_t argum
   case UM_COMMAND:
     switch (argument1) {
     case ID_PREV_PAGE:
-      this->m_firstTag = --this->m_firstTag < 0 ? 0 : this->m_firstTag;
-      this->Invalidate();
-      break;
-    case ID_NEXT_PAGE: {
-      ++this->m_firstTag;
-      const int first = this->m_firstTag;
-      if (CRuneSystemMgr::GetInstance()->GetTagCount() < first + 10) {
-        this->m_firstTag = first - 1;
+      if (--this->m_firstTag < 0) {
+        this->m_firstTag = 0;
       }
       this->Invalidate();
       break;
-    }
+    case ID_NEXT_PAGE:
+      ++this->m_firstTag;
+      if (CRuneSystemMgr::GetInstance()->GetTagCount() < this->m_firstTag + 10) {
+        --this->m_firstTag;
+      }
+      this->Invalidate();
+      break;
     }
     break;
   case 0xA9:
@@ -961,8 +963,8 @@ void UIRune_Decom::OnRBtnDown(int x, int y) {
   const int index = this->HitTestItem(x, y);
   if (index != -1) {
     ITEM_INFO item;
-    item.SetItemId((*this->m_decomList)[index].m_itemId);
     item.identified = 1;
+    item.SetItemId((*this->m_decomList)[index].m_itemId);
     UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
     if (window) {
       window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
@@ -1135,8 +1137,8 @@ void UIGage_Circle::Paint() {
   );
 
   const std::string text = FormatOwnedString("%.2f%%", static_cast<double>(static_cast<float>(this->m_value) * 0.001f));
-  const int width = this->TextWidth(text.c_str(), text.size(), 0, 12, 0, 0);
-  this->DrawTextAt(static_cast<int>(static_cast<float>(this->geometry.width - width) * 0.5f), this->m_textY, text.c_str(), 0,
+  const int space = this->geometry.width - this->TextWidth(text.c_str(), text.size(), 0, 12, 0, 0);
+  this->DrawTextAt(static_cast<int>(static_cast<float>(space) * 0.5f), this->m_textY, text.c_str(), 0,
     0, 12, 0xFFFFFF, 1, 0
   );
 }
@@ -1273,8 +1275,8 @@ void UIRune_Decom::OnMouseHover(int x, int y) {
   }
 
   ITEM_INFO item;
-  item.SetItemId((*this->m_decomList)[index].m_itemId);
   item.identified = 1;
+  item.SetItemId((*this->m_decomList)[index].m_itemId);
   int tipX = index % 4 * 54 + 211;
   int tipY = index > 3 ? 387 : 333;
   this->ToScreen(tipX, tipY);
@@ -1496,7 +1498,7 @@ UIRuneSystemWnd::UIRuneSystemWnd() : UIFrameWnd(0), m_nextTick(0) {
   RuneSystemOpenPacket packet;
   packet.id = 0x0BE0;
   packet.open = 1;
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
 }
 
 // OFFSET: 0x00814DE0
@@ -1738,7 +1740,7 @@ int UIRune_Decom::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
           packet.itemId = item.GetItemId();
           packet.itemIndex = item.identity[1];
           packet.decomType = this->m_decomType + 1;
-          GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
           CRuneSystemMgr::GetInstance()->SetRequestPending(true);
         }
       }
@@ -2214,8 +2216,11 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
     return 0;
   }
   case 0xA9:
-    this->m_tab->geometry.state = argument1;
-    this->m_tab->Invalidate();
+    {
+      auto* tab = this->m_tab;
+      tab->geometry.state = argument1;
+      tab->Invalidate();
+    }
     this->SelectTab();
     switch (argument1) {
     case 0:
@@ -2306,7 +2311,7 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         packet.id = 0x0BD6;
         packet.runeId = static_cast<int>(rune->GetId());
         packet.tagId = static_cast<std::uint16_t>(rune->GetTagId());
-        GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
     } else if (argument1 == 0x158) {
       RuneSetData* runeSet = CRuneSystemMgr::GetInstance()->GetCurRuneSet();
@@ -2317,7 +2322,7 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         packet.id = 0x0BD6;
         packet.tagId = static_cast<std::uint16_t>(runeSet->GetTagId());
         packet.runeId = 0;
-        GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
     }
     break;

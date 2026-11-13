@@ -1,6 +1,7 @@
 #ifndef RAGNAROK_SOURCE_CONTENTS_EFFECTS_CORE_EFFECT_H
 #define RAGNAROK_SOURCE_CONTENTS_EFFECTS_CORE_EFFECT_H
 
+#include "Utility/Math/Vector3d.h"
 #include <cstddef>
 #include <cstdint>
 #include <list>
@@ -65,8 +66,14 @@ public:
   bool InRange();
 
   /* 0004 */ int id;
-  /* 0008 */ float position[3];
-  /* 0014 */ float sourcePosition[3];
+  union {
+    /* 0008 */ float position[3];
+    /* 0008 */ vector3d positionVector;
+  };
+  union {
+    /* 0014 */ float sourcePosition[3];
+    /* 0014 */ vector3d sourcePositionVector;
+  };
   /* 0020 */ std::uint32_t actor;
   /* 0024 */ std::uint32_t sourceActor;
   /* 0028 */ int frame;
@@ -76,10 +83,12 @@ public:
   /* 0035 */ unsigned char padding_0035[3];
   /* 0038 */ int range;
   /* 003C */ unsigned char areaParameters[12];
-  /* 0048 */ int scaleParameter;
-  /* 004C */ unsigned char angleParameter[4];
-  /* 0050 */ int rotationParameter;
-  /* 0054 */ unsigned char alphaParameters[92];
+  /* 0048 */ float scaleParameter;
+  /* 004C */ int baseAngle;
+  /* 0050 */ float rotationParameter;
+  /* 0054 */ int baseAlpha;
+  /* 0058 */ int fadeAlpha;
+  /* 005C */ float heights[21];
   /* 00B0 */ int effectLevel;
   /* 00B4 */ std::vector<EffectEvent> events;
   /* 00C0 */ unsigned char retained;

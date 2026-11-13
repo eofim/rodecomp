@@ -1,4 +1,5 @@
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Effects/Primitives/EffectPrim.h"
 #include "Contents/Effects/Primitives/EffectPrimitiveState.h"
 #include "Contents/Effects/Core/RagEffect.h"
@@ -85,7 +86,7 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
     if (slot.flag1[0] == 0) {
       if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
         CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-        CRagEffect* effect = gameMode->scene->player->LaunchEffect(850, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+        CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SOULLIGHT2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
         if (effect) {
           vector3d position{baseX, baseY, baseZ};
           effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -93,7 +94,7 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
       } else {
         CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
         if (auto* actor = static_cast<CGameActor*>(gameMode->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10])))) {
-          CRagEffect* effect = actor->LaunchEffect(850, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+          CRagEffect* effect = actor->LaunchEffect(EF_SOULLIGHT2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
           if (effect) {
             vector3d position{baseX, baseY, baseZ};
             effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -103,7 +104,7 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
     } else {
       if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
         CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-        CRagEffect* effect = gameMode->scene->player->LaunchEffect(932, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+        CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SOULLIGHT3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
         if (effect) {
           vector3d position{baseX, baseY, baseZ};
           effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -111,7 +112,7 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
       } else {
         CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
         if (auto* actor = static_cast<CGameActor*>(gameMode->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10])))) {
-          CRagEffect* effect = actor->LaunchEffect(932, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+          CRagEffect* effect = actor->LaunchEffect(EF_SOULLIGHT3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
           if (effect) {
             vector3d position{baseX, baseY, baseZ};
             effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -126,7 +127,9 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
 // FUNCTION: fn_19998
 __declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
   if (this->state.master) {
-    this->render.position = this->state.master->render.position;
+    this->render.position.x = this->state.master->render.position.x;
+    this->render.position.y = this->state.master->render.position.y;
+    this->render.position.z = this->state.master->render.position.z;
   }
 
   const float z = this->render.position.z;
@@ -213,9 +216,7 @@ void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
   const short alpha = static_cast<short>(this->state.alpha);
 
   for (int ec = 0; ec < 4; ++ec) {
-    const EffectPrimitiveSlot& slot = this->state.slots[ec];
-
-    if (slot.life <= 0 || !(this->state.alpha > 0.0f)) {
+    if (this->state.slots[ec].life <= 0 || !(this->state.alpha > 0.0f)) {
       continue;
     }
 
@@ -265,25 +266,25 @@ void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
         const unsigned char blue = static_cast<unsigned char>(cell.color >> 16);
         const std::uint32_t color = (((((alpha << 8) + red) << 8) + green) << 8) + blue;
         const float angle = static_cast<float>(cell.rotation) + this->state.roll;
-        DrawTrailSpriteQuad(*this, slot.vecBPre, top, left, bottom, right, screenY, depth, 0.0001f, angle, color, image, sprite->palette, 0x101);
+        DrawTrailSpriteQuad(*this, this->state.slots[ec].vecBPre, top, left, bottom, right, screenY, depth, 0.0001f, angle, color, image, sprite->palette, 0x101);
 
         const std::uint32_t paleGlow = (alpha << 24) + 0x64FF64;
         const std::uint32_t brightGlow = (alpha << 24) + 0x0AFF0A;
         DrawTrailSpriteQuad(
-          *this, slot.vecBPre, top, left, bottom, right, screenY, depth, 0.0002f, angle, slot.flag1[0] == 2 ? brightGlow : paleGlow, image,
+          *this, this->state.slots[ec].vecBPre, top, left, bottom, right, screenY, depth, 0.0002f, angle, this->state.slots[ec].flag1[0] == 2 ? brightGlow : paleGlow, image,
           sprite->palette, 5, 2.0f
         );
 
         const std::uint32_t halfColor = (((((alpha / 2 << 8) + red) << 8) + green) << 8) + blue;
-        DrawTrailSpriteQuad(*this, slot.vecBNow, top, left, bottom, right, screenY, depth, 0.0001f, angle, halfColor, image, sprite->palette, 0x101);
+        DrawTrailSpriteQuad(*this, this->state.slots[ec].vecBNow, top, left, bottom, right, screenY, depth, 0.0001f, angle, halfColor, image, sprite->palette, 0x101);
         DrawTrailSpriteQuad(
-          *this, slot.vecBNow, top, left, bottom, right, screenY, depth, 0.0002f, angle, slot.flag1[0] == 2 ? brightGlow : paleGlow, image,
+          *this, this->state.slots[ec].vecBNow, top, left, bottom, right, screenY, depth, 0.0002f, angle, this->state.slots[ec].flag1[0] == 2 ? brightGlow : paleGlow, image,
           sprite->palette, 5, 2.0f
         );
 
-        DrawTrailSpriteQuad(*this, slot.vecTPre, top, left, bottom, right, screenY, depth, 0.0001f, angle, color, image, sprite->palette, 0x101);
+        DrawTrailSpriteQuad(*this, this->state.slots[ec].vecTPre, top, left, bottom, right, screenY, depth, 0.0001f, angle, color, image, sprite->palette, 0x101);
         DrawTrailSpriteQuad(
-          *this, slot.vecTPre, top, left, bottom, right, screenY, depth, 0.0002f, angle, slot.flag1[0] == 2 ? brightGlow : paleGlow, image,
+          *this, this->state.slots[ec].vecTPre, top, left, bottom, right, screenY, depth, 0.0002f, angle, this->state.slots[ec].flag1[0] == 2 ? brightGlow : paleGlow, image,
           sprite->palette, 5, 2.0f
         );
       }

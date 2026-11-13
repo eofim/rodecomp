@@ -15,23 +15,21 @@ CStarEmperorEffect::CStarEmperorEffect() : CEffect(-1), sphere(), rings() {
 // OFFSET: 0x0072BE20
 // FUNCTION: fn_07476
 void CStarEmperorEffect::BuildSphere() {
-  for (int row = 0; row < 6;) {
+  for (int row = 0; row < 6; ++row) {
     const float top = static_cast<float>(row) * 0.16666667f;
+    const float bottom = static_cast<float>(row + 1) * 0.16666667f;
     const float topPitch = (static_cast<float>(row) * 30.0f - 90.0f) / 180.0f * 3.141592f;
-    ++row;
-    const float bottom = static_cast<float>(row) * 0.16666667f;
-    const float bottomPitch = (static_cast<float>(row) * 30.0f - 90.0f) / 180.0f * 3.141592f;
+    const float bottomPitch = (static_cast<float>(row + 1) * 30.0f - 90.0f) / 180.0f * 3.141592f;
 
-    for (int column = 0; column < 12;) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 1);
+    for (int column = 0; column < 12; ++column) {
+      CParticle* particle = CreateParticle(&this->positionVector, 1);
       particle->SetTexture("effect\\star_emperor\\boom.tga");
 
       float leftYaw = static_cast<float>(column);
       const float left = leftYaw * 0.083333336f;
       particle->vertices[0].u = left < 0.0f ? 0.0f : (left > 1.0f ? 1.0f : left);
       particle->vertices[0].v = top < 0.0f ? 0.0f : (top > 1.0f ? 1.0f : top);
-      ++column;
-      float rightYaw = static_cast<float>(column);
+      float rightYaw = static_cast<float>(column + 1);
       const float right = rightYaw * 0.083333336f;
       particle->vertices[1].u = right < 0.0f ? 0.0f : (right > 1.0f ? 1.0f : right);
       particle->vertices[1].v = top < 0.0f ? 0.0f : (top > 1.0f ? 1.0f : top);
@@ -87,7 +85,7 @@ void CStarEmperorEffect::Open() {
   this->BuildSphere();
 
   for (int i = 0; i < 10; ++i) {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 0x201);
+    CParticle* particle = CreateParticle(&this->positionVector, 0x201);
     particle->effectId = this->id;
     particle->columnIndex = i;
     particle->rowIndex = 0;
@@ -209,8 +207,8 @@ void CStarEmperorEffect::OnProcess() {
         step = half > frame ? half - frame : frame - half;
       }
 
-      const float size = -(1.15f / static_cast<float>(this->effectLifetime)) * g_depthAverageHalf * static_cast<float>((step + 1) * step / 2) +
-                         static_cast<float>(step) * 1.15f;
+      const float acceleration = -(1.15f / static_cast<float>(this->effectLifetime));
+      const float size = acceleration * 0.5f * static_cast<float>((step + 1) * step / 2) + static_cast<float>(step) * 1.15f;
       matrix scale;
       scale.SetScale(size, size, size);
       matrix rotation;
@@ -221,10 +219,7 @@ void CStarEmperorEffect::OnProcess() {
 
       if (this->id == 1203) {
         const int quarter = this->effectLifetime / 4;
-        if (quarter <= step) {
-          step = this->effectLifetime - step;
-        }
-        particle->alpha = 255 / quarter * step;
+        particle->alpha = (quarter > step ? step : this->effectLifetime - step) * (255 / quarter);
       } else {
         const int half = this->effectLifetime / 2;
         const int fade = 255 / half;

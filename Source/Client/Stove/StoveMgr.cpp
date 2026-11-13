@@ -108,20 +108,6 @@ void CStoveMgr::FetchCategoryProducts() {
   } while (g_stoveWaitingCallback);
 }
 
-// INLINED
-template <std::uint64_t Key, std::size_t Length>
-const char* DecryptName(const char (&source)[Length]) {
-  thread_local EncryptedName<Length, Key> name(source);
-  return name.Text();
-}
-
-// INLINED
-template <std::uint64_t Key, std::size_t Length>
-const char* DecryptName(const std::array<char, Length>& source) {
-  thread_local EncryptedName<Length, Key> name(source);
-  return name.Text();
-}
-
 struct AccessTokenFailureMessage {
   EncryptedName<100, 0x3375B1C7DBB5FD55ULL>& operator()() const;
 };
@@ -169,43 +155,43 @@ struct ConfirmPurchaseCallback {
 // OFFSET: 0x0063A780
 // FUNCTION: fn_04771
 void OnStoveInitialized(Stove::PCSDK::CallbackResult callbackResult) {
-  InitializeCallback()(callbackResult);
+  static_cast<const InitializeCallback*>(nullptr)->operator()(callbackResult);
 }
 
 // OFFSET: 0x0063A7F0
 // FUNCTION: fn_04772
 void OnStoveTermsAgreementFetched(Stove::PCSDK::CallbackResult callbackResult, int unused, const wchar_t* url) {
-  TermsAgreementCallback()(callbackResult, unused, url);
+  static_cast<const TermsAgreementCallback*>(nullptr)->operator()(callbackResult, unused, url);
 }
 
 // OFFSET: 0x0063A860
 // FUNCTION: fn_04773
 void OnStoveAllProductsFetched(Stove::PCSDK::CallbackResult callbackResult, const Stove::PCSDK::IAP::StovePCProduct* products, unsigned int count) {
-  CategoryProductsCallback()(callbackResult, products, count);
+  static_cast<const CategoryProductsCallback*>(nullptr)->operator()(callbackResult, products, count);
 }
 
 // OFFSET: 0x0063A8D0
 // FUNCTION: fn_04774
 void OnStoveCategoryProductsFetched(Stove::PCSDK::CallbackResult callbackResult, const Stove::PCSDK::IAP::StovePCProduct* products, unsigned int count) {
-  FetchProductsCallback()(callbackResult, products, count);
+  static_cast<const FetchProductsCallback*>(nullptr)->operator()(callbackResult, products, count);
 }
 
 // OFFSET: 0x0063A940
 // FUNCTION: fn_04775
 void OnStovePurchaseStarted(Stove::PCSDK::CallbackResult callbackResult, Stove::PCSDK::IAP::StovePCPurchaseResult purchaseResult) {
-  PurchaseResultCallback()(callbackResult, purchaseResult);
+  static_cast<const PurchaseResultCallback*>(nullptr)->operator()(callbackResult, purchaseResult);
 }
 
 // OFFSET: 0x0063A9D0
 // FUNCTION: fn_04776
 void OnStovePurchaseConfirmed(Stove::PCSDK::CallbackResult callbackResult, bool purchased, int productCount, unsigned int count, int remainingCount, int resultCode) {
-  ConfirmPurchaseCallback()(callbackResult, purchased, productCount, count, remainingCount, resultCode);
+  static_cast<const ConfirmPurchaseCallback*>(nullptr)->operator()(callbackResult, purchased, productCount, count, remainingCount, resultCode);
 }
 
 // OFFSET: 0x0063AA50
 // FUNCTION: fn_04777
 void OnStoveShutdown(Stove::PCSDK::CallbackResult callbackResult, Stove::PCSDK::Base::StovePCShutdown shutdown) {
-  ShutdownCallback()(callbackResult, shutdown);
+  static_cast<const ShutdownCallback*>(nullptr)->operator()(callbackResult, shutdown);
 }
 
 
@@ -237,9 +223,9 @@ void ShutdownCallback::operator()(Stove::PCSDK::CallbackResult callbackResult, S
     std::string message =
         EncodeText(CP_ACP, std::wstring(reinterpret_cast<const Stove::PCSDK::Base::StovePCLogEvent&>(shutdown).GetCategory1()));
     if (reinterpret_cast<const Stove::PCSDK::Base::StovePCToken&>(shutdown).GetAccessToken() == nullptr) {
-      constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x91E147EBBD47C39FULL);
+      constexpr auto captionSourceText = OBFUSCATE_SOURCE("메시지", 0x91E147EBBD47C39FULL);
       const auto& captionSource = captionSourceText.data;
-      const char* caption = DecryptName<0x91E147EBBD47C39FULL>(captionSource);
+      const char* caption = OBFUSCATE_DECRYPT(0x91E147EBBD47C39FULL, captionSource);
       MessageBoxA(hWnd, message.c_str(), caption, MB_OK);
       g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
     } else if (g_modeMgr.state == 0) {
@@ -256,9 +242,9 @@ void ShutdownCallback::operator()(Stove::PCSDK::CallbackResult callbackResult, S
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY2, reinterpret_cast<std::intptr_t>(message.c_str()), 0x62B0FF, 0, 0, 0);
     }
   } else {
-    constexpr auto captionSourceText = CRYPT_NAME("메시지", 0xA1A55B4D1597EDD3ULL);
+    constexpr auto captionSourceText = OBFUSCATE_SOURCE("메시지", 0xA1A55B4D1597EDD3ULL);
     const auto& captionSource = captionSourceText.data;
-    const char* caption = DecryptName<0xA1A55B4D1597EDD3ULL>(captionSource);
+    const char* caption = OBFUSCATE_DECRYPT(0xA1A55B4D1597EDD3ULL, captionSource);
     MessageBoxA(hWnd, FormatOwnedString(TokenCallbackFailureMessage()().Text()).c_str(), caption, MB_OK);
     PostQuitMessage(0);
   }
@@ -300,11 +286,11 @@ void FetchProductsCallback::operator()(Stove::PCSDK::CallbackResult callbackResu
       }
     }
   } else {
-    constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x8B3FEB5B8BD5C3C3ULL);
+    constexpr auto captionSourceText = OBFUSCATE_SOURCE("메시지", 0x8B3FEB5B8BD5C3C3ULL);
     const auto& captionSource = captionSourceText.data;
-    const char* caption = DecryptName<0x8B3FEB5B8BD5C3C3ULL>(captionSource);
-    constexpr std::array<char, 56> messageSource = CRYPT_NAME("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0xF7530137154D8FE5ULL);
-    const char* message = DecryptName<0xF7530137154D8FE5ULL>(messageSource);
+    const char* caption = OBFUSCATE_DECRYPT(0x8B3FEB5B8BD5C3C3ULL, captionSource);
+    constexpr std::array<char, 56> messageSource = OBFUSCATE_SOURCE("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0xF7530137154D8FE5ULL);
+    const char* message = OBFUSCATE_DECRYPT(0xF7530137154D8FE5ULL, messageSource);
     MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
   }
 }
@@ -315,18 +301,17 @@ void PurchaseResultCallback::operator()(Stove::PCSDK::CallbackResult callbackRes
   g_stoveWaitingCallback = false;
   if (callbackResult.GetResult().IsSuccessful()) {
     if (reinterpret_cast<std::intptr_t>(reinterpret_cast<const Stove::PCSDK::IAP::StovePCChargeInfo&>(purchaseResult).GetChargeTypeName()) != 2) {
+      CStoveMgr* stoveMgr = g_stoveMgr;
       const std::int64_t productId = reinterpret_cast<const Stove::PCSDK::IAP::StovePCOrderProduct&>(purchaseResult).GetProductId();
-      g_stoveMgr->m_purchaseIdLow = static_cast<int>(productId);
-      g_stoveMgr->m_purchaseIdHigh = static_cast<int>(productId >> 32);
-      g_stoveMgr->m_purchaseUrl = static_cast<const std::string&>(
+      stoveMgr->m_purchaseIdLow = static_cast<int>(productId);
+      stoveMgr->m_purchaseIdHigh = static_cast<int>(productId >> 32);
+      stoveMgr = g_stoveMgr;
+      stoveMgr->m_purchaseUrl = static_cast<const std::string&>(
           EncodeText(CP_ACP, std::wstring(reinterpret_cast<const Stove::PCSDK::IAP::StovePCPurchasedProduct&>(purchaseResult).GetCategoryId())));
     }
   } else {
-    constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x078333BB9725B7C9ULL);
-    const auto& captionSource = captionSourceText.data;
-    const char* caption = DecryptName<0x078333BB9725B7C9ULL>(captionSource);
-    constexpr std::array<char, 56> messageSource = CRYPT_NAME("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0x0BEB63A5C905B3A7ULL);
-    const char* message = DecryptName<0x0BEB63A5C905B3A7ULL>(messageSource);
+    const char* caption = OBFUSCATE_TEXT("메시지", 0x078333BB9725B7C9ULL);
+    const char* message = OBFUSCATE_ARRAY_TEXT("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0x0BEB63A5C905B3A7ULL, char);
     MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
   }
 }
@@ -362,10 +347,10 @@ void CategoryProductsCallback::operator()(Stove::PCSDK::CallbackResult callbackR
         } else if (std::strcmp(categoryId.c_str(), "44C71118750747D") == 0) {
           list = 8;
         } else {
-          const char captionSource[] = CRYPT_CHARS(7, "메시지", 0xC52FB5FBB94FF917ULL);
-          const char* caption = DecryptName<0xC52FB5FBB94FF917ULL>(captionSource);
-          constexpr std::array<char, 34> messageSource = CRYPT_NAME("등록되지 않은 카테고리입니다 (%s)", 0x17359BF953C367B3ULL);
-          const char* message = DecryptName<0x17359BF953C367B3ULL>(messageSource);
+          const char captionSource[] = OBFUSCATE_SOURCE_CHARS(7, "메시지", 0xC52FB5FBB94FF917ULL);
+          const char* caption = OBFUSCATE_DECRYPT(0xC52FB5FBB94FF917ULL, captionSource);
+          constexpr std::array<char, 34> messageSource = OBFUSCATE_SOURCE("등록되지 않은 카테고리입니다 (%s)", 0x17359BF953C367B3ULL);
+          const char* message = OBFUSCATE_DECRYPT(0x17359BF953C367B3ULL, messageSource);
           MessageBoxA(hWnd, FormatOwnedString(message, categoryId.c_str()).c_str(), caption, MB_OK);
           continue;
         }
@@ -389,11 +374,11 @@ void CategoryProductsCallback::operator()(Stove::PCSDK::CallbackResult callbackR
         } else if (std::strcmp(categoryId.c_str(), "14A6891F90E24D7") == 0) {
           list = 8;
         } else {
-          constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x69FD1D9733D3CFC1ULL);
+          constexpr auto captionSourceText = OBFUSCATE_SOURCE("메시지", 0x69FD1D9733D3CFC1ULL);
           const auto& captionSource = captionSourceText.data;
-          const char* caption = DecryptName<0x69FD1D9733D3CFC1ULL>(captionSource);
-          constexpr std::array<char, 34> messageSource = CRYPT_NAME("등록되지 않은 카테고리입니다 (%s)", 0x93E7A3A1F587CDC5ULL);
-          const char* message = DecryptName<0x93E7A3A1F587CDC5ULL>(messageSource);
+          const char* caption = OBFUSCATE_DECRYPT(0x69FD1D9733D3CFC1ULL, captionSource);
+          constexpr std::array<char, 34> messageSource = OBFUSCATE_SOURCE("등록되지 않은 카테고리입니다 (%s)", 0x93E7A3A1F587CDC5ULL);
+          const char* message = OBFUSCATE_DECRYPT(0x93E7A3A1F587CDC5ULL, messageSource);
           MessageBoxA(hWnd, FormatOwnedString(message, categoryId.c_str()).c_str(), caption, MB_OK);
           continue;
         }
@@ -432,10 +417,10 @@ void CategoryProductsCallback::operator()(Stove::PCSDK::CallbackResult callbackR
       }
     }
   } else {
-    const char captionSource[] = CRYPT_CHARS(7, "메시지", 0x8B65CD61012B5931ULL);
-    const char* caption = DecryptName<0x8B65CD61012B5931ULL>(captionSource);
-    constexpr std::array<char, 56> messageSource = CRYPT_NAME("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0xF5657D1F3DE5CDC7ULL);
-    const char* message = DecryptName<0xF5657D1F3DE5CDC7ULL>(messageSource);
+    const char captionSource[] = OBFUSCATE_SOURCE_CHARS(7, "메시지", 0x8B65CD61012B5931ULL);
+    const char* caption = OBFUSCATE_DECRYPT(0x8B65CD61012B5931ULL, captionSource);
+    constexpr std::array<char, 56> messageSource = OBFUSCATE_SOURCE("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0xF5657D1F3DE5CDC7ULL);
+    const char* message = OBFUSCATE_DECRYPT(0xF5657D1F3DE5CDC7ULL, messageSource);
     MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
   }
 }
@@ -463,10 +448,10 @@ EncryptedName<100, 0x4F1791FB1503C713ULL>& TokenCallbackFailureMessage::operator
 void InitializeCallback::operator()(Stove::PCSDK::CallbackResult callbackResult) const {
   g_stoveWaitingCallback = false;
   if (!callbackResult.GetResult().IsSuccessful()) {
-    const char captionSource[] = CRYPT_CHARS(7, "메시지", 0x31D7C1EDA345E36DULL);
-    const char* caption = DecryptName<0x31D7C1EDA345E36DULL>(captionSource);
-    const char messageSource[] = CRYPT_CHARS(45, "필수 사전 작업이 실패하여 게임을 종료합니다.", 0xD3755DD95F47A909ULL);
-    const char* message = DecryptName<0xD3755DD95F47A909ULL>(messageSource);
+    const char captionSource[] = OBFUSCATE_SOURCE_CHARS(7, "메시지", 0x31D7C1EDA345E36DULL);
+    const char* caption = OBFUSCATE_DECRYPT(0x31D7C1EDA345E36DULL, captionSource);
+    const char messageSource[] = OBFUSCATE_SOURCE_CHARS(45, "필수 사전 작업이 실패하여 게임을 종료합니다.", 0xD3755DD95F47A909ULL);
+    const char* message = OBFUSCATE_DECRYPT(0xD3755DD95F47A909ULL, messageSource);
     MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
     PostQuitMessage(0);
   }
@@ -494,18 +479,12 @@ void ConfirmPurchaseCallback::operator()(Stove::PCSDK::CallbackResult callbackRe
       }
     } else {
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-      constexpr auto noticeSourceText = CRYPT_NAME("구매된 아이템이 없습니다.", 0x61FF87ED7BF39BE1ULL);
-      const auto& noticeSource = noticeSourceText.data;
-      const char* notice = DecryptName<0x61FF87ED7BF39BE1ULL>(noticeSource);
+      const char* notice = OBFUSCATE_TEXT("구매된 아이템이 없습니다.", 0x61FF87ED7BF39BE1ULL);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(notice), 0xFFE6E6, 0, 0, 0);
     }
   } else {
-    constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x2D394DBD0F332733ULL);
-    const auto& captionSource = captionSourceText.data;
-    const char* caption = DecryptName<0x2D394DBD0F332733ULL>(captionSource);
-    constexpr auto messageSourceText = CRYPT_NAME("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0x7D993F650D2785FFULL);
-    const auto& messageSource = messageSourceText.data;
-    const char* message = DecryptName<0x7D993F650D2785FFULL>(messageSource);
+    const char* caption = OBFUSCATE_TEXT("메시지", 0x2D394DBD0F332733ULL);
+    const char* message = OBFUSCATE_TEXT("장애가 발생 하였습니다. STOVE 고객센터로 문의 바랍니다.", 0x7D993F650D2785FFULL);
     MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
   }
 }
@@ -526,9 +505,9 @@ bool CStoveMgr::Initialize() {
   }
 
   Stove::PCSDK::Base::StovePCInitializeParam param;
-  constexpr auto sandboxSourceText = CRYPT_NAME("/stove_sandbox", 0x490FFB43A12F0DB9ULL);
+  constexpr auto sandboxSourceText = OBFUSCATE_SOURCE("/stove_sandbox", 0x490FFB43A12F0DB9ULL);
   const auto& sandboxSource = sandboxSourceText.data;
-  const char* sandbox = DecryptName<0x490FFB43A12F0DB9ULL>(sandboxSource);
+  const char* sandbox = OBFUSCATE_DECRYPT(0x490FFB43A12F0DB9ULL, sandboxSource);
   if (std::strstr(g_commandLine, sandbox) != nullptr) {
     this->m_environment = 1;
     param.SetEnvironment(L"SANDBOX");
@@ -536,9 +515,9 @@ bool CStoveMgr::Initialize() {
     param.SetApplicationKey(L"6b57af29764992a85cf793b01d4af15be6047715fd5f4687b23d0a1ba02337f5");
     this->m_applicationId = L"SB__SH_IPJVFX";
   } else {
-    constexpr auto liveSourceText = CRYPT_NAME("/stove_live", 0x91651D81F559F971ULL);
+    constexpr auto liveSourceText = OBFUSCATE_SOURCE("/stove_live", 0x91651D81F559F971ULL);
     const auto& liveSource = liveSourceText.data;
-    const char* live = DecryptName<0x91651D81F559F971ULL>(liveSource);
+    const char* live = OBFUSCATE_DECRYPT(0x91651D81F559F971ULL, liveSource);
     if (std::strstr(g_commandLine, live) != nullptr) {
       this->m_environment = 2;
       param.SetEnvironment(L"LIVE");
@@ -548,15 +527,15 @@ bool CStoveMgr::Initialize() {
     }
   }
 
-  constexpr auto skipRestartSourceText = CRYPT_NAME("/stove_cag_tool", 0x73D1674B61DF7B0BULL);
+  constexpr auto skipRestartSourceText = OBFUSCATE_SOURCE("/stove_cag_tool", 0x73D1674B61DF7B0BULL);
   const auto& skipRestartSource = skipRestartSourceText.data;
-  const char* skipRestart = DecryptName<0x73D1674B61DF7B0BULL>(skipRestartSource);
+  const char* skipRestart = OBFUSCATE_DECRYPT(0x73D1674B61DF7B0BULL, skipRestartSource);
   if (std::strstr(g_commandLine, skipRestart) == nullptr && Base_RestartAppIfNecessary(&param) == true) {
-    constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x0F0F8B6B8F9D19D1ULL);
+    constexpr auto captionSourceText = OBFUSCATE_SOURCE("메시지", 0x0F0F8B6B8F9D19D1ULL);
     const auto& captionSource = captionSourceText.data;
-    const char* caption = DecryptName<0x0F0F8B6B8F9D19D1ULL>(captionSource);
-    constexpr std::array<char, 38> messageSource = CRYPT_NAME("Stove 클라이언트를 통해 실행해 주세요", 0xD98F03A52D35636DULL);
-    const char* message = DecryptName<0xD98F03A52D35636DULL>(messageSource);
+    const char* caption = OBFUSCATE_DECRYPT(0x0F0F8B6B8F9D19D1ULL, captionSource);
+    constexpr std::array<char, 38> messageSource = OBFUSCATE_SOURCE("Stove 클라이언트를 통해 실행해 주세요", 0xD98F03A52D35636DULL);
+    const char* message = OBFUSCATE_DECRYPT(0xD98F03A52D35636DULL, messageSource);
     MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
     return false;
   }
@@ -571,11 +550,11 @@ bool CStoveMgr::Initialize() {
     return true;
   }
 
-  constexpr auto captionSourceText = CRYPT_NAME("메시지", 0x812BE72BCD5707B7ULL);
+  constexpr auto captionSourceText = OBFUSCATE_SOURCE("메시지", 0x812BE72BCD5707B7ULL);
   const auto& captionSource = captionSourceText.data;
-  const char* caption = DecryptName<0x812BE72BCD5707B7ULL>(captionSource);
-  constexpr std::array<char, 45> messageSource = CRYPT_NAME("필수 사전 작업이 실패하여 게임을 종료합니다.", 0x59278F63D79F3DA1ULL);
-  const char* message = DecryptName<0x59278F63D79F3DA1ULL>(messageSource);
+  const char* caption = OBFUSCATE_DECRYPT(0x812BE72BCD5707B7ULL, captionSource);
+  constexpr std::array<char, 45> messageSource = OBFUSCATE_SOURCE("필수 사전 작업이 실패하여 게임을 종료합니다.", 0x59278F63D79F3DA1ULL);
+  const char* message = OBFUSCATE_DECRYPT(0x59278F63D79F3DA1ULL, messageSource);
   MessageBoxA(hWnd, FormatOwnedString(message).c_str(), caption, MB_OK);
   return false;
 }
@@ -592,7 +571,7 @@ const char* CStoveMgr::GetAccessToken() {
     return this->m_accessToken;
   }
 
-  constexpr std::array<char, 7> source = CRYPT_NAME("메시지", 0x1D6D75EDE7CD311FULL);
+  constexpr std::array<char, 7> source = OBFUSCATE_SOURCE("메시지", 0x1D6D75EDE7CD311FULL);
   thread_local EncryptedName<sizeof(source), 0x1D6D75EDE7CD311FULL> caption(source);
   MessageBoxA(hWnd, FormatOwnedString(AccessTokenFailureMessage()().Text()).c_str(), caption.Text(), MB_OK);
   PostQuitMessage(0);
@@ -608,7 +587,7 @@ void CStoveMgr::FetchUser() {
     StringFormat(this->m_memberNumber, sizeof(this->m_memberNumber), _TRUNCATE, "%llu", user.GetMemberNumber());
     StringFormat(this->m_gameUserId, sizeof(this->m_gameUserId), _TRUNCATE, "%llu", user.GetGameUserId());
   } else {
-    constexpr auto sourceText = CRYPT_NAME("메시지", 0xD1538513DF975701ULL);
+    constexpr auto sourceText = OBFUSCATE_SOURCE("메시지", 0xD1538513DF975701ULL);
     const auto& source = sourceText.data;
     thread_local EncryptedName<sizeof(source), 0xD1538513DF975701ULL> caption(source);
     MessageBoxA(hWnd, FormatOwnedString(UserFailureMessage()().Text()).c_str(), caption.Text(), MB_OK);
@@ -642,21 +621,21 @@ void CStoveMgr::StartPurchase(const std::vector<ITEM_INFO>& items) {
   } while (g_stoveWaitingCallback);
 
   if (this->m_purchaseUrl.size() == 0) {
-    constexpr auto parametersSourceText = CRYPT_NAME("https://cs.onstove.com/service/RAGNAROK_IND", 0x69D345DB950F336DULL);
+    constexpr auto parametersSourceText = OBFUSCATE_SOURCE("https://cs.onstove.com/service/RAGNAROK_IND", 0x69D345DB950F336DULL);
     const auto& parametersSource = parametersSourceText.data;
-    const char* parameters = DecryptName<0x69D345DB950F336DULL>(parametersSource);
-    constexpr auto fileSourceText = CRYPT_NAME("https://cs.onstove.com/service/RAGNAROK_IND", 0xC7912587FFF31B71ULL);
+    const char* parameters = OBFUSCATE_DECRYPT(0x69D345DB950F336DULL, parametersSource);
+    constexpr auto fileSourceText = OBFUSCATE_SOURCE("https://cs.onstove.com/service/RAGNAROK_IND", 0xC7912587FFF31B71ULL);
     const auto& fileSource = fileSourceText.data;
-    const char* file = DecryptName<0xC7912587FFF31B71ULL>(fileSource);
-    constexpr auto verbSourceText = CRYPT_NAME("OPEN", 0x8F1B5BFD5F6175B5ULL);
+    const char* file = OBFUSCATE_DECRYPT(0xC7912587FFF31B71ULL, fileSource);
+    constexpr auto verbSourceText = OBFUSCATE_SOURCE("OPEN", 0x8F1B5BFD5F6175B5ULL);
     const auto& verbSource = verbSourceText.data;
-    const char* verb = DecryptName<0x8F1B5BFD5F6175B5ULL>(verbSource);
+    const char* verb = OBFUSCATE_DECRYPT(0x8F1B5BFD5F6175B5ULL, verbSource);
     ShellExecuteA(nullptr, verb, file, parameters, nullptr, SW_SHOWNORMAL);
   } else {
     const char* url = this->m_purchaseUrl.c_str();
-    constexpr auto verbSourceText = CRYPT_NAME("OPEN", 0x9B17C9EFDBB39F2FULL);
+    constexpr auto verbSourceText = OBFUSCATE_SOURCE("OPEN", 0x9B17C9EFDBB39F2FULL);
     const auto& verbSource = verbSourceText.data;
-    const char* verb = DecryptName<0x9B17C9EFDBB39F2FULL>(verbSource);
+    const char* verb = OBFUSCATE_DECRYPT(0x9B17C9EFDBB39F2FULL, verbSource);
     ShellExecuteA(nullptr, verb, url, url, nullptr, SW_SHOWNORMAL);
     if (g_windowMgr.Confirm(PurchaseCheckingMessage()().Text(), 2, true, false, 0, "Message", 250, 170, 0) == 187) {
       IAP_ConfirmPurchase((static_cast<std::int64_t>(this->m_purchaseIdHigh) << 32) | static_cast<std::uint32_t>(this->m_purchaseIdLow), OnStovePurchaseConfirmed);
@@ -687,9 +666,6 @@ void TermsAgreementCallback::operator()(Stove::PCSDK::CallbackResult callbackRes
     g_modeMgr.GetGameMode()->SendMsg(MM_REQUEST_CASH_SHOP, 0, 0, 0, 0);
   } else {
     std::string path = EncodeText(CP_ACP, std::wstring(url));
-    constexpr auto sourceText = CRYPT_NAME("OPEN", 0x2FF3C5036D070127ULL);
-    const auto& source = sourceText.data;
-    thread_local EncryptedName<sizeof(source), 0x2FF3C5036D070127ULL> verb(source);
-    ShellExecuteA(nullptr, verb.Text(), path.c_str(), path.c_str(), nullptr, SW_SHOWNORMAL);
+    ShellExecuteA(nullptr, OBFUSCATE_TEXT_NAMED("OPEN", 0x2FF3C5036D070127ULL, verb), path.c_str(), path.c_str(), nullptr, SW_SHOWNORMAL);
   }
 }

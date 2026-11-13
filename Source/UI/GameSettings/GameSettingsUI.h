@@ -29,7 +29,6 @@ extern int g_textureDetailLevel;
 extern int g_textureFiltering;
 extern int g_configuredRenderBackend;
 extern bool g_restartClient;
-extern bool g_gameOptionFlag;
 extern std::map<int, int> g_optionHotkeys;
 
 template <class T, class D> class CUIComboBox : public CUIControl {
@@ -171,6 +170,7 @@ public:
   __declspec(noinline) CUIGroupProcessPriority();
   void OnCreate(int width, int height) override;
   void OnInit() override;
+  void Apply() override;
   void Refresh() override;
   void OnSelect(CUIRadioButton* button);
 
@@ -313,17 +313,17 @@ public:
   /* 0094 */ CUIGroupTrilinear* m_trilinear;
 };
 
-class CUIListPage : public CUIControl {
+class CUIListPage final : public CUIControl {
 public:
   __declspec(noinline) CUIListPage();
   void OnCreate(int width, int height) override;
   void OnInit() override;
   void Paint() override;
   virtual void OnSelectOption(CUIOptionItem* item, const TALKTYPE& type);
-  bool SetOptionChecked(int id);
-  void BindOption(CUIOptionItem* item, const TALKTYPE& id);
-  void LoadOptions(int tab);
-  __declspec(noinline) void RefreshOptions();
+  virtual void BindOption(CUIOptionItem* item, const TALKTYPE& id);
+  virtual void LoadOptions(int tab);
+  virtual void RefreshOptions();
+  virtual bool SetOptionChecked(int id);
   __declspec(noinline) void RefreshHotkeyLabels();
   std::string GetHotkeyText(int tab, int index);
 
@@ -394,5 +394,44 @@ public:
   /* 00F8 */ CUIImageButton* m_applyButton;
   /* 00FC */ CUIImageButton* m_closeButton;
 };
+
+template <>
+__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::SelectItem(CUIListItem* item);
+template <>
+__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::SelectItem(CUIListItem* item);
+template <>
+__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::SelectItem(CUIListItem* item);
+template <>
+__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::SelectItem(CUIListItem* item);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::AddNewItem();
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::AddNewItem();
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::AddNewItem();
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::AddNewItem();
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::AddNewItem();
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::LoadSkin(bool resolveSkin);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::LoadSkin(bool resolveSkin);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::LoadSkin(bool resolveSkin);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::LoadSkin(bool resolveSkin);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::LoadSkin(bool resolveSkin);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::Resize(int width, int height);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::Resize(int width, int height);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::Resize(int width, int height);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::Resize(int width, int height);
+template <>
+void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::Resize(int width, int height);
 
 #endif

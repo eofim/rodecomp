@@ -1,4 +1,5 @@
 #include "Client/Mode/CGameMode.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/GameActor.h"
 #include "Contents/Camera/Camera.h"
@@ -12,6 +13,7 @@
 #include "Resource/MSGSTRINGID.h"
 class CSkillAction_WH_GALESTORM : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
@@ -34,6 +36,7 @@ public:
 
 class CSkillAction_WH_CRESCIVE_BOLT : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   int GetSkillCastMotion() override;
   bool SuppressSupportSkillArrow() override;
   bool SuppressAttackSkillArrow() override;
@@ -48,6 +51,12 @@ public:
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
 };
+
+// OFFSET: 0x007A5A70
+// FUNCTION: fn_09022
+int CSkillAction_WH_GALESTORM::GetSkillAttackMotion() {
+  return 2;
+}
 
 // OFFSET: 0x007A5A80
 // FUNCTION: fn_09023
@@ -64,7 +73,7 @@ void CSkillAction_WH_GALESTORM::OnSkillCast(int level, CGameActor* source) {
 // FUNCTION: fn_09024
 void CSkillAction_WH_GALESTORM::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
   if (source && target) {
-    g_effectMgr->Spawn(target->render.accountId, 1973, target->render.position, 0, level, 0, 0);
+    g_effectMgr->Spawn(target->render.accountId, 0x7B5, target->render.position, 0, level, 0, 0);
   }
 }
 
@@ -141,6 +150,12 @@ int CSkillAction_WH_CRESCIVE_BOLT::GetSkillCastMotion() {
   return 18;
 }
 
+// OFFSET: 0x007A63E0
+// FUNCTION: fn_09034
+int CSkillAction_WH_CRESCIVE_BOLT::GetSkillAttackMotion() {
+  return 2;
+}
+
 // OFFSET: 0x007A63F0
 // FUNCTION: fn_09035
 bool CSkillAction_WH_CRESCIVE_BOLT::SuppressSupportSkillArrow() {
@@ -210,7 +225,7 @@ void CSkillAction_WH_WILD_WALK::OnSkillEffect(int level, CGameActor* source, CGa
   if (source) {
     EffectLists* effects = g_effectMgr;
     effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("wild_walk"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-    source->LaunchEffect(2425, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    source->LaunchEffect(EF_WH_WILD_WALK, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
   }
 }
 
@@ -225,3 +240,19 @@ void CSkillAction_WH_WILD_WALK::OnSkillDamage(int sourceActor, CGameActor* targe
     }
   }
 }
+
+// OFFSET: 0x00463230
+// FUNCTION: fn_45568
+static bool s_efstActionRegistered1252 = [](std::function<CEfstAction*()> factory) {
+  CSkillActionMgr::GetInstance()->RegisterEfstAction(1252, factory);
+  return true;
+}(NewAction<CEfstAction_CALAMITYGALE, CEfstAction>);
+
+// GLOBAL: gl_25951
+static SkillActionRegistrar s_skillAction5328(5328, NewAction<CSkillAction_WH_CALAMITYGALE, CSkillAction>);
+// GLOBAL: gl_25952
+static SkillActionRegistrar s_skillAction5334(5334, NewAction<CSkillAction_WH_CRESCIVE_BOLT, CSkillAction>);
+// GLOBAL: gl_25953
+static SkillActionRegistrar s_skillAction5330(5330, NewAction<CSkillAction_WH_GALESTORM, CSkillAction>);
+// GLOBAL: gl_25954
+static SkillActionRegistrar s_skillAction6520(6520, NewAction<CSkillAction_WH_WILD_WALK, CSkillAction>);

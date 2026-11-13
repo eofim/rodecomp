@@ -369,7 +369,7 @@ void UIGradeEnchantWnd::OnLBtnDown(int x, int y) {
   }
 
   if (this->state == 1 && this->item.identity[1] > 0 && x >= 64 && x <= 110 && y >= 125 && y <= 171) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->drag.BeginItem(g_windowMgr, 33, this->item, 1, -1);
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(33, this->item, 1, -1);
   }
 }
 
@@ -478,12 +478,18 @@ void UIGradeEnchantWnd::OnProcess() {
                         g_session.m_zeny < this->SelectedMaterialZeny() || this->baseSuccessRate == 0;
 
   if (disabled) {
-    this->startButton->SetDisabled(1);
-    this->startButton->Invalidate();
+    {
+      auto* startButton = this->startButton;
+      startButton->SetDisabled(1);
+      startButton->Invalidate();
+    }
     this->startButton->SetState(3);
   } else {
-    this->startButton->SetDisabled(0);
-    this->startButton->Invalidate();
+    {
+      auto* startButton = this->startButton;
+      startButton->SetDisabled(0);
+      startButton->Invalidate();
+    }
     this->startButton->SetState(0);
   }
 }
@@ -551,7 +557,7 @@ int UIGradeEnchantWnd::SendMsg(
             packet.useBlessing = this->blessingAmount > 0;
             packet.blessingCount = this->blessingAmount / this->info.blessingStepAmount;
             packet.protect = this->protect;
-            GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+            GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
           }
         }
       }
@@ -560,7 +566,7 @@ int UIGradeEnchantWnd::SendMsg(
     case ID_CLOSE: {
       GradeEnchantClosePacket packet;
       packet.id = ID_CZ_GRADE_ENCHANT_CLOSE_UI;
-      GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       g_windowMgr.CloseWindow(WID_GRADEENCHANTWND);
       break;
     }
@@ -582,7 +588,7 @@ int UIGradeEnchantWnd::SendMsg(
     break;
   case UM_REFRESHITEM:
     if (this->state == 0 || this->state == 1) {
-      const ITEM_INFO dropped = LookupClientItemByIdentity(g_session.m_inventoryItems, argument1);
+      const ITEM_INFO dropped = g_session.LookupClientItemByIdentity(argument1);
       if (g_session.HasSwapEquipmentItem(dropped.identity[1]) == 1) {
         g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         return -1;
@@ -592,7 +598,7 @@ int UIGradeEnchantWnd::SendMsg(
         GradeEnchantSelectPacket packet;
         packet.id = ID_CZ_GRADE_ENCHANT_SELECT_EQUIPMENT;
         packet.index = static_cast<std::uint16_t>(argument1);
-        GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
     }
     break;
@@ -618,7 +624,7 @@ void UIGradeEnchantWnd::SetEnchantInfo(
     return;
   }
 
-  const ITEM_INFO owned = LookupClientItemByIdentity(g_session.m_inventoryItems, index);
+  const ITEM_INFO owned = g_session.LookupClientItemByIdentity(index);
   if (owned.identity[1] == 0) {
     return;
   }

@@ -24,7 +24,7 @@ public:
     int x, int y, const CSprRes& sprite, const ActionFrame& frame, const std::uint32_t* palette
   ) override;
   void DrawSurface(
-    int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter, int format
+    int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter
   ) override;
   void Fill(const RECT* rectangle, std::uint32_t color) override;
   void Draw(int x, int y, int width, int height, std::uint32_t color) override;
@@ -39,6 +39,7 @@ public:
   void Brighten(int x, int y, int width, int height, int amount) override;
   void Dim(int x, int y, int width, int height, int percent) override;
   void UploadTexture(CTexture*& texture);
+  void UpdateCache();
   HGDIOBJ Create(int width, int height);
   void ApplyPixelFilter(int filter, unsigned int* red, unsigned int* green, unsigned int* blue);
   void SetAlpha(unsigned char maxLuminance);

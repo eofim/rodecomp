@@ -249,7 +249,7 @@ bool CSession::UpdateSkill(const CSkillInfo& value, unsigned char notify, unsign
     }
 
     if (grouped || snapshot.available) {
-      if (CSkillInfo::UsesLevel(*this->m_hotkeyScript, static_cast<int>(snapshot.id)) && snapshot.level != 0) {
+      if (CSkillInfo::UsesLevel(static_cast<int>(snapshot.id)) && snapshot.level != 0) {
         const int saved = this->UseLevel(static_cast<int>(snapshot.id));
         if (saved <= 0 || saved > snapshot.level) {
           this->m_skillBundle.SetSkillValue(static_cast<int>(snapshot.id), snapshot.level);
@@ -390,25 +390,22 @@ bool CSession::EquipAlternateCostumeItem(const ITEM_INFO& item) {
 // OFFSET: 0x00E07930
 // FUNCTION: fn_23747
 void CSession::AddStackedItem(ITEM_INFO item) {
-  int index;
-  for (index = 0; index < 5; ++index) {
+  for (int index = 0; index < 5; ++index) {
     if (this->selectionItems[index].quantity != 0 && this->selectionItems[index].identity[1] == item.identity[1]) {
+      this->selectionItems[index].quantity += item.quantity;
+      goto refresh;
+    }
+  }
+
+  for (int index = 0; index < 5; ++index) {
+    if (this->selectionItems[index].quantity == 0) {
+      this->selectionItems[index] = item;
       break;
     }
   }
 
-  if (index < 5) {
-    this->selectionItems[index].quantity += item.quantity;
-  } else {
-    for (index = 0; index < 5; ++index) {
-      if (this->selectionItems[index].quantity == 0) {
-        this->selectionItems[index] = item;
-        break;
-      }
-    }
-  }
-
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.rodexComposeWnd)) {
+refresh:
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.rodexComposeWnd)) {
     window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
 }
@@ -554,7 +551,7 @@ void CSession::DeleteProhibitionLog(std::uint32_t aid, std::uint32_t minutes) {
 // FUNCTION: fn_23764
 std::int64_t CSession::FindSummonHp(std::int64_t key) const {
   auto found = this->summonHp.find(key);
-  if (found != this->summonHp.end()) {
+  if (this->summonHp.end() != found) {
     return found->second;
   }
 
@@ -565,7 +562,7 @@ std::int64_t CSession::FindSummonHp(std::int64_t key) const {
 // FUNCTION: fn_23765
 std::int64_t CSession::FindSummonMaxHp(std::int64_t key) const {
   auto found = this->summonMaxHp.find(key);
-  if (found != this->summonMaxHp.end()) {
+  if (this->summonMaxHp.end() != found) {
     return found->second;
   }
 
@@ -593,16 +590,17 @@ void CSession::UpdateAchievementRecord(const AchievementRecordPacket& packet) {
     std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
     record.completedAt = packet.completedAt;
     record.rewarded = packet.rewarded;
-    this->SplitDate(packet.completedAt, reinterpret_cast<std::uint16_t&>(record.year), reinterpret_cast<std::uint16_t&>(record.month), reinterpret_cast<std::uint16_t&>(record.day));
+    record.SplitDate(packet.completedAt, reinterpret_cast<std::uint16_t&>(record.year), reinterpret_cast<std::uint16_t&>(record.month), reinterpret_cast<std::uint16_t&>(record.day));
     return;
   }
 
   SessionRecord6144 record;
-  record.completionFlags = static_cast<std::uint16_t>(1 | packet.completed << 8);
+  reinterpret_cast<unsigned char*>(&record.completionFlags)[0] = 1;
+  reinterpret_cast<unsigned char*>(&record.completionFlags)[1] = packet.completed;
   std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
   record.completedAt = packet.completedAt;
   record.rewarded = packet.rewarded;
-  this->SplitDate(packet.completedAt, reinterpret_cast<std::uint16_t&>(record.year), reinterpret_cast<std::uint16_t&>(record.month), reinterpret_cast<std::uint16_t&>(record.day));
+  record.SplitDate(packet.completedAt, reinterpret_cast<std::uint16_t&>(record.year), reinterpret_cast<std::uint16_t&>(record.month), reinterpret_cast<std::uint16_t&>(record.day));
   this->achievements.insert({packet.id, record});
 }
 
@@ -658,7 +656,7 @@ int CSession::CountSelectionItems() const {
 
 // OFFSET: 0x00E09080
 // FUNCTION: fn_23775
-void CSession::SplitDate(__time32_t time, std::uint16_t& year, std::uint16_t& month, std::uint16_t& day) const {
+__declspec(noinline) void SessionRecord6144::SplitDate(__time32_t time, std::uint16_t& year, std::uint16_t& month, std::uint16_t& day) const {
   time = time > 0 ? time : 0;
 
   const std::tm local = *_localtime32(&time);
@@ -941,7 +939,7 @@ void CSession::ReturnStackedItem(int index, int count) {
     }
   }
 
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.rodexComposeWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.rodexComposeWnd)) {
     window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
 }

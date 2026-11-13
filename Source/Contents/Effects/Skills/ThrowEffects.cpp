@@ -52,7 +52,7 @@ void CThrowItemEffect::Open() {
 
   for (int row = 0; row < this->projectileCount; ++row) {
     for (int column = 0; column < this->trailCount; ++column) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -70,7 +70,7 @@ void CThrowItemEffect::Open() {
         particle->SetTexture("유저인터페이스\\item\\빈병.bmp");
         particle->scale = 1.5f;
         particle->SetColor(135, 255, 135);
-        particle->angleBits = 0;
+        particle->angle = 0;
         particle->speedParameter = particle->animationParameter / 25.0f;
         particle->alpha = 255;
         particle->offsetX = this->position[0];
@@ -88,7 +88,7 @@ void CThrowItemEffect::Open() {
         particle->SetTexture("유저인터페이스\\item\\돌.bmp");
         particle->scale = 1.0f;
         particle->SetColor(255, 255, 255);
-        particle->angleBits = 0;
+        particle->angle = 0;
         particle->speedParameter = 2.0f;
         particle->alpha = 255;
         particle->offsetX = this->position[0];
@@ -144,7 +144,7 @@ void CThrowItemEffect::Open() {
         particle->SetTexture("유저인터페이스\\item\\쿠나이_독.bmp");
         particle->scale = 3.0f;
         particle->SetColor(255, 200, 255);
-        *reinterpret_cast<float*>(&particle->angleBits) = 330.0f;
+        particle->angle = 330.0f;
         particle->speedParameter = 1.5f;
         particle->alpha = 255;
         particle->offsetX = this->position[0];
@@ -163,7 +163,7 @@ void CThrowItemEffect::Open() {
         particle->SetTexture("effect\\coin_a.bmp");
         particle->scale = 2.5f;
         particle->SetColor(255, 200, 0);
-        *reinterpret_cast<float*>(&particle->angleBits) = 330.0f;
+        particle->angle = 330.0f;
         particle->speedParameter = 2.0f;
         particle->alpha = 255;
         particle->destinationBlend = 6;
@@ -173,25 +173,20 @@ void CThrowItemEffect::Open() {
         break;
       case EF_KAIHOU:
         if (CGameActor* owner = static_cast<CGameActor*>(FindRenderObject(this->actor))) {
-          switch (owner->charmType) {
-          case CHARM_TYPE_WATER:
+          if (owner->charmType == CHARM_TYPE_WATER) {
             particle->SetTexture("effect\\WaterOrb.bmp");
             particle->scale = 1.0f;
-            break;
-          case CHARM_TYPE_LAND:
+          } else if (owner->charmType == CHARM_TYPE_LAND) {
             particle->SetTexture("effect\\StoneOrb.bmp");
-            break;
-          case CHARM_TYPE_FIRE:
+          } else if (owner->charmType == CHARM_TYPE_FIRE) {
             particle->SetTexture("effect\\FireOrb.bmp");
-            break;
-          case CHARM_TYPE_WIND:
+          } else if (owner->charmType == CHARM_TYPE_WIND) {
             particle->SetTexture("effect\\LightningOrb.bmp");
-            break;
           }
 
           this->effectLifetime = 200;
           particle->scale = 2.0f;
-          *reinterpret_cast<float*>(&particle->angleBits) = 330.0f;
+          particle->angle = 330.0f;
           particle->speedParameter = 1.5f;
           particle->alpha = 255;
           particle->offsetZ = this->position[2];
@@ -215,7 +210,7 @@ void CThrowItemEffect::InitFlameParticle(CParticle* particle) {
   this->InitTrajectory(particle);
   particle->scale = 1.5f;
   particle->SetColor(255, 255, 255);
-  particle->angleBits = 0;
+  particle->angle = 0;
   particle->alpha = 255;
   particle->speedParameter = particle->animationParameter / 25.0f;
   const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
@@ -232,7 +227,7 @@ void CThrowItemEffect::InitPotionParticle(CParticle* particle, int kind) {
   this->arcHeight = 30.0f;
   this->InitTrajectory(particle);
   particle->scale = 1.5f;
-  particle->angleBits = 0;
+  particle->angle = 0;
   particle->alpha = 255;
   particle->speedParameter = particle->animationParameter / 25.0f;
   const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
@@ -266,7 +261,7 @@ __declspec(noinline) void CThrowItemEffect::InitSpinParticle(CParticle* particle
   this->arcHeight = 1.0f;
   particle->scale = 2.0f;
   particle->SetColor(255, 200, 255);
-  *reinterpret_cast<float*>(&particle->angleBits) = 330.0f;
+  particle->angle = 330.0f;
   particle->speedParameter = 3.0f;
   particle->alpha = 255;
   const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
@@ -306,17 +301,17 @@ bool CThrowItemEffect::IsAlive() {
 void CThrowItemEffect::OnProcess() {
   for (auto particle = this->particles.begin(); particle != this->particles.end(); ++particle) {
     CParticle* target = *particle;
-
-    target->position.x = this->position[0];
-    target->position.y = this->position[1];
-    target->position.z = this->position[2];
+    vector3d& targetPosition = (*particle)->position;
+    targetPosition.x = this->position[0];
+    targetPosition.y = this->position[1];
+    targetPosition.z = this->position[2];
 
     if (target != nullptr && this->launchDelay <= this->frame) {
       float& angle = target->speedParameter;
-      float& rotation = *reinterpret_cast<float*>(&target->angleBits);
-      float& offsetX = *reinterpret_cast<float*>(&target->offsetX);
-      float& offsetY = *reinterpret_cast<float*>(&target->offsetY);
-      float& offsetZ = *reinterpret_cast<float*>(&target->offsetZ);
+      float& rotation = target->angle;
+      float& offsetX = target->offsetX;
+      float& offsetY = target->offsetY;
+      float& offsetZ = target->offsetZ;
 
       if (target->columnIndex == 0) {
         rotation = static_cast<float>(static_cast<int>(rotation + 45.0f) % 360);
@@ -335,8 +330,8 @@ void CThrowItemEffect::OnProcess() {
       if (progress > 1.05f) {
         target->alpha = std::ranges::max(target->alpha - 20, 0);
       } else {
-        const int index = *reinterpret_cast<const int*>(&target->effectParameters[4]);
-        const float radius = angle / *reinterpret_cast<const float*>(&target->effectParameters[0xC]);
+        const int index = target->phaseParameter;
+        const float radius = angle / target->animationParameter;
         offsetX = angle * g_cosTable[index] + offsetX;
         offsetY = radius * this->heightDelta + offsetY;
         offsetZ = angle * g_sinTable[index] + offsetZ;
@@ -403,7 +398,7 @@ void CThrowItemEffect::InitTrajectory(CParticle* particle) {
   this->heightDelta = this->sourcePosition[1] - this->position[1];
 
   const unsigned short heading = static_cast<unsigned short>(static_cast<int>(DirectionAngle(deltaX, deltaZ)));
-  unsigned short offset = 0;
+  int offset = 0;
   if (this->id == 981) {
     offset = static_cast<unsigned short>(static_cast<short>(360 / this->projectileCount) * static_cast<short>(particle->rowIndex));
   }
@@ -427,7 +422,7 @@ void CVolcanoEffect::AddRings() {
   int row = 0;
   for (int baseAngle = 0; baseAngle < 360; baseAngle += 90) {
     for (int segment = 0; segment <= 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -444,7 +439,7 @@ void CVolcanoEffect::AddRings() {
         particle->animationParameter = 0.0f;
         particle->angleParameter = 360;
         particle->alpha = 1;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(row * 90);
+        particle->angle = static_cast<float>(row * 90);
         particle->scale = static_cast<float>(row) + 1.0f;
         break;
       case EF_VOLCANO:
@@ -463,7 +458,7 @@ void CVolcanoEffect::AddRings() {
         particle->animationParameter = 0.0f;
         particle->angleParameter = 360;
         particle->alpha = 1;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(baseAngle);
+        particle->angle = static_cast<float>(baseAngle);
         particle->scale = static_cast<float>(row) + 1.0f;
         break;
       case EF_GUMGANG5:
@@ -471,7 +466,7 @@ void CVolcanoEffect::AddRings() {
         particle->angleParameter = 360;
         particle->speedParameter = 25.0f;
         particle->phaseParameter = 80;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(row * 90);
+        particle->angle = static_cast<float>(row * 90);
         particle->animationParameter = 0.0f;
         particle->scale = static_cast<float>(row) + 1.0f;
         particle->SetColor(0, 0, 255);
@@ -508,7 +503,7 @@ void CVolcanoEffect::AddRings() {
         break;
       }
 
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->particles.push_back(particle);
     }
 
@@ -568,12 +563,14 @@ void CVolcanoEffect::OnProcess() {
 
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
 
     if (particle) {
-      particle->scale += this->id == EF_GUMGANG2 ? 0.1f : 0.3f;
+      const float scale = particle->scale + (this->id == EF_GUMGANG2 ? 0.1f : 0.3f);
+      particle->scale = scale;
 
       int tilt = particle->phaseParameter - 1;
       if (this->id == EF_GUMGANG2) {
@@ -583,7 +580,7 @@ void CVolcanoEffect::OnProcess() {
       }
       particle->phaseParameter = tilt;
 
-      float& spin = *reinterpret_cast<float*>(&particle->angleBits);
+      float& spin = particle->angle;
       spin = static_cast<float>(static_cast<int>(spin) + (this->id != EF_GUMGANG2) * 2 + 3);
 
       switch (this->id) {
@@ -631,9 +628,9 @@ void CVolcanoEffect::OnProcess() {
       const float height = radius * g_sinTable[tilt];
 
       EffectPoint corners[2];
-      corners[0].x = particle->scale * cosine;
+      corners[0].x = scale * cosine;
       corners[0].y = 0.0f;
-      corners[0].z = particle->scale * sine;
+      corners[0].z = scale * sine;
       corners[1].x = corners[0].x + spread * cosine;
       corners[1].y = 0.0f - height;
       corners[1].z = corners[0].z + spread * sine;

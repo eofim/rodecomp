@@ -28,7 +28,7 @@ void CSquareRangeEffect::Open() {
     this->size = 7.0f;
   }
 
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+  CParticle* particle = CreateParticle(&this->positionVector, 5);
   if (!particle) {
     return;
   }
@@ -61,9 +61,10 @@ bool CSquareRangeEffect::IsAlive() {
 void CSquareRangeEffect::OnProcess() {
   for (std::vector<CParticle*>::iterator it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
     if (particle) {
       if (this->resize) {
         particle->scale = this->size * 2.5f;
@@ -72,7 +73,7 @@ void CSquareRangeEffect::OnProcess() {
 
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
-      rotation.MakeXRotation(1.5707964f);
+      rotation.MakeXRotation(1.570796f);
       matrix scale;
       std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
       scale.SetScale(particle->scale, particle->scale, 1.0f);

@@ -104,8 +104,11 @@ void UIItemReformWnd::OnCreate(int width, int height) {
   this->reformButton->Configure(60, LookupMessage(MSI_ITEM_REFORM_WARNNING_CARD_MAYBE_LOST));
   this->reformButton->Move(365, 236);
   this->reformButton->SetId(184);
-  this->reformButton->SetDisabled(1);
-  this->reformButton->Invalidate();
+  {
+    UIButton* button = this->reformButton;
+    button->SetDisabled(1);
+    button->Invalidate();
+  }
   this->AddChild(this->reformButton);
 
   this->list = new UIItemReformWnd_List();
@@ -189,8 +192,8 @@ void UIItemReformWnd_DetailBtn::Paint() {
 // FUNCTION: fn_04112
 void UIItemReformWnd_DetailMsg::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xFFFFFF);
-  DrawRoundedBorder(*this, 2, 2, this->geometry.width - 4, this->geometry.height - 4, 0xC8C8C8);
+  this->DrawFilledRoundedOutline(0, 0, this->geometry.width, this->geometry.height, 0xFFFFFF);
+  this->DrawRoundedOutline(2, 2, this->geometry.width - 4, this->geometry.height - 4, 0xC8C8C8);
   this->FillRegion(8, 8, this->geometry.width - 16, this->geometry.height - 16, 0xF7F7F7);
 }
 
@@ -200,9 +203,7 @@ void UIItemReformWnd_Item::Paint() {
   this->ClearSurface(0xFFFF00FF);
   if (this->item) {
     ResourceMgr& resources = ResourceMgr::Instance();
-    const std::string name = FormatOwnedString("유저인터페이스\\item\\%s.bmp", ItemResourcePath(*this->item));
-    CBitmapRes* bitmap = static_cast<CBitmapRes*>(resources.Load(Resolve(name.c_str())));
-    this->DrawBitmap(0, 0, bitmap, true);
+    this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(resources.Load(Resolve(FormatOwnedString("유저인터페이스\\item\\%s.bmp", ItemResourcePath(*this->item)).c_str()))), true);
   }
 }
 
@@ -348,14 +349,17 @@ void UIItemReformWnd_List::UpdateScrollBar() {
 // OFFSET: 0x005FDEA0
 // FUNCTION: fn_04129
 void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
-  this->baseIcon->item = nullptr;
-  this->baseIcon->Invalidate();
-  this->resultIcon->item = nullptr;
-  this->resultIcon->Invalidate();
-  for (std::vector<UIItemReformWnd_Item*>::iterator it = this->materialIcons.begin(); it != this->materialIcons.end(); ++it) {
-    if (*it) {
-      (*it)->item = nullptr;
-      (*it)->Invalidate();
+  UIItemReformWnd_Item* baseIcon = this->baseIcon;
+  baseIcon->item = nullptr;
+  baseIcon->Invalidate();
+  UIItemReformWnd_Item* resultIcon = this->resultIcon;
+  resultIcon->item = nullptr;
+  resultIcon->Invalidate();
+  for (std::vector<UIItemReformWnd_Item*>::iterator it = this->materialIcons.begin(), end = this->materialIcons.end(); it != end; ++it) {
+    UIItemReformWnd_Item* icon = *it;
+    if (icon) {
+      icon->item = nullptr;
+      icon->Invalidate();
     }
   }
   this->warning.clear();
@@ -365,10 +369,7 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
     return;
   }
 
-  if (!g_itemReformMgr) {
-    g_itemReformMgr = new (std::nothrow) CItemReformMgr;
-  }
-  ItemReformInfo* info = g_itemReformMgr->FindReform(std::atoi(this->reformItem.itemId.c_str()), std::atoi(this->selectedItem->itemId.c_str()));
+  ItemReformInfo* info = CItemReformMgr::Instance()->FindReform(std::atoi(this->reformItem.itemId.c_str()), std::atoi(this->selectedItem->itemId.c_str()));
   if (!info) {
     return;
   }
@@ -377,13 +378,11 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
   this->resultItem.identity[0] = 5;
   this->resultItem.identified = 1;
   this->resultItem.refiningLevel = this->selectedItem->refiningLevel + static_cast<int>(info->changeRefineValue);
-  for (int index = 0; index < 25; ++index) {
-    this->resultItem.options[index] = 0;
-  }
+  SecureZeroMemory(this->resultItem.options, sizeof(this->resultItem.options));
   if (info->randomOptionCode.size() == 0) {
     this->resultItem.optionCount = this->selectedItem->optionCount;
     memcpy_s(this->resultItem.options, sizeof(this->resultItem.options), this->selectedItem->options, this->selectedItem->optionCount * 5);
-  } else if (info->randomOptionCode.size() != 2 || info->randomOptionCode[0] != 'G' || info->randomOptionCode[1] != '0') {
+  } else if (info->randomOptionCode != "G0") {
     this->resultItem.optionCount = 1;
     *reinterpret_cast<short*>(this->resultItem.options) = g_itemOptionPlaceholderId;
   }
@@ -404,8 +403,11 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
     this->materials.push_back(material);
   }
 
-  this->reformButton->SetDisabled(1);
-  this->reformButton->Invalidate();
+  {
+    UIButton* button = this->reformButton;
+    button->SetDisabled(1);
+    button->Invalidate();
+  }
   this->detailButton->Enable(0);
   bool insufficient = false;
   for (std::vector<ITEM_INFO>::iterator it = this->materials.begin(); it != this->materials.end(); ++it) {
@@ -417,8 +419,11 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
   if (insufficient) {
     this->warning = LookupMessage(MSI_ITEM_REFORM_WARNNING_ENCHANT_MAYBE_LOST);
   } else {
-    this->reformButton->SetDisabled(0);
-    this->reformButton->Invalidate();
+    {
+      UIButton* button = this->reformButton;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
   }
 
   this->information = info->informationString;
@@ -427,16 +432,19 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
     this->warning = LookupMessage(MSI_ENCHANT_FAILED);
   }
 
-  this->baseIcon->item = this->selectedItem;
-  this->baseIcon->Invalidate();
-  this->resultIcon->item = &this->resultItem;
-  this->resultIcon->Invalidate();
+  baseIcon = this->baseIcon;
+  baseIcon->item = this->selectedItem;
+  baseIcon->Invalidate();
+  resultIcon = this->resultIcon;
+  resultIcon->item = &this->resultItem;
+  resultIcon->Invalidate();
   for (unsigned int index = 0; index < this->materials.size(); ++index) {
     if (index >= this->materialIcons.size()) {
       break;
     }
-    this->materialIcons[index]->item = &this->materials[index];
-    this->materialIcons[index]->Invalidate();
+    UIItemReformWnd_Item* icon = this->materialIcons[index];
+    icon->item = &this->materials[index];
+    icon->Invalidate();
   }
   this->Invalidate();
 }
@@ -462,7 +470,7 @@ int UIItemReformWnd::SendMsg(
         packet.packetType = ID_CZ_ITEM_REFORM;
         packet.itemId = this->reformItem.GetItemId();
         packet.index = static_cast<std::int16_t>(this->selectedItem->identity[1]);
-        GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
       }
       break;
     case ID_CLOSE:
@@ -536,7 +544,7 @@ int UIItemReformWnd_List::SendMsg(
         bool emptySocket = true;
         if (info->isEmptySocket == 1) {
           for (unsigned int slot = std::min(ItemSlotsCount(item), 4); slot < 4; ++slot) {
-            if (static_cast<int>(slot) < 4 && reinterpret_cast<const int*>(item.cards)[slot] > 0) {
+            if (static_cast<int>(slot) < 4 && static_cast<int>(item.cards[slot]) > 0) {
               emptySocket = false;
               break;
             }

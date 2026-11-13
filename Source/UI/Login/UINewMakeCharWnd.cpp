@@ -28,7 +28,19 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <string>
 #include <timeapi.h>
+
+// GLOBAL: gl_25613
+static const std::string s_makeCharItemLinkOpen = "<ITEML>";
+
+// GLOBAL: gl_25614
+static const std::string s_makeCharItemLinkClose = "</ITEML>";
+
+// OFFSET: 0x007D9960
+// FUNCTION: fn_09607
+UIHairBitmap::UIHairBitmap() : UIBitmapButton() {
+}
 
 // OFFSET: 0x007D9A50
 // FUNCTION: fn_09609
@@ -73,10 +85,10 @@ UINewMakeCharWnd::UINewMakeCharWnd()
   this->m_action = 0;
   this->m_frame = 0;
 
-  this->m_raceActions[0].assign(static_cast<const std::string&>(GetBodyActionResourceName(this->m_job, this->m_sex, 0, 0)));
+  this->m_raceActions[0].assign(static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_job, this->m_sex, 0, 0)));
   this->m_raceSprites[0].assign(static_cast<const std::string&>(g_session.GetBodySprName(this->m_job, this->m_sex, 0, 0)));
 
-  if (!g_session.IsDoramJob(this->m_job) && this->m_sex == 1 && this->m_head == 13) {
+  if (!g_session.IsDoramJob(this->m_job) && this->m_sex == 1 && 13 == this->m_head) {
     this->m_head = 14;
   }
 
@@ -97,7 +109,7 @@ UINewMakeCharWnd::UINewMakeCharWnd()
     this->m_racePalettes[0].assign(static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_job, this->m_sex, headPalette)));
   }
 
-  this->m_raceOffsets = GetBodyImfName(this->m_job, this->m_sex, this->m_head, this->m_costumeJob);
+  this->m_raceOffsets = g_session.GetBodyImfName(this->m_job, this->m_sex, this->m_head, this->m_costumeJob);
 
   this->previewState = 0;
   this->m_startTime = timeGetTime();
@@ -228,7 +240,7 @@ void UINewMakeCharWnd::Paint() {
 
     this->geometry.surface->DrawSurface(
       this->m_viewX + offset.x + cell.x, this->m_viewY + offset.y + cell.y, texture, static_cast<int>(record.u0 * 256.0f),
-      static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0, 0
+      static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
 }
@@ -244,9 +256,9 @@ void UINewMakeCharWnd::OnProcess() {
 int UIHairStyleButton::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
   switch (message) {
   case UM_SETSTATE: {
-    bool previous = this->m_selected;
+    const bool previous = this->m_selected;
     this->m_selected = argument1 != 0;
-    if (previous != (argument1 != 0)) {
+    if (previous != this->m_selected) {
       if (argument1) {
         this->SetBitmap("유저인터페이스\\make_character_ver2\\bt_hairStyle_select.bmp", 0, 0);
         this->SetBitmap("유저인터페이스\\make_character_ver2\\bt_hairStyle_select.bmp", 1, 0);
@@ -273,7 +285,7 @@ int UIHairStyleButton::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       }
       this->m_preview->Enable(1);
       sprintf_s(
-        name, this->m_sex == 0 ? "유저인터페이스\\make_character_ver2\\img_hairStyle_girl%02d.bmp" : "유저인터페이스\\make_character_ver2\\img_hairStyle%02d.bmp",
+        name, this->m_sex != 0 ? "유저인터페이스\\make_character_ver2\\img_hairStyle%02d.bmp" : "유저인터페이스\\make_character_ver2\\img_hairStyle_girl%02d.bmp",
         this->m_style + 1
       );
     } else if (this->m_race == 1) {
@@ -285,10 +297,11 @@ int UIHairStyleButton::SendMsg(UIWindow* sender, int message, std::intptr_t argu
         return 0;
       }
       this->m_preview->Enable(1);
-      sprintf_s(
-        name, this->m_sex == 0 ? "유저인터페이스\\make_character_ver2\\img_hairStyle_doramGirl%02d.bmp" : "유저인터페이스\\make_character_ver2\\img_hairStyle_doramBoy%02d.bmp",
-        this->m_style + 1
-      );
+      if (this->m_sex == 0) {
+        sprintf_s(name, "유저인터페이스\\make_character_ver2\\img_hairStyle_doramGirl%02d.bmp", this->m_style + 1);
+      } else {
+        sprintf_s(name, "유저인터페이스\\make_character_ver2\\img_hairStyle_doramBoy%02d.bmp", this->m_style + 1);
+      }
     }
     if (this->m_preview) {
       this->m_preview->SetBitmap(name, 0, 0);
@@ -318,7 +331,7 @@ void UIHairStyleButton::OnCreate(int width, int height) {
 // OFFSET: 0x007DBFD0
 // FUNCTION: fn_09626
 void UINewMakeCharWnd::UpdatePreviewResources() {
-  this->m_raceActions[0] = static_cast<const std::string&>(GetBodyActionResourceName(this->m_job, this->m_sex, this->m_job, 0));
+  this->m_raceActions[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_job, this->m_sex, this->m_job, 0));
   this->m_raceSprites[0] = static_cast<const std::string&>(g_session.GetBodySprName(this->m_job, this->m_sex, this->m_job, 0));
   int head = this->m_head;
   this->m_raceActions[1] = static_cast<const std::string&>(g_session.GetHeadActName(this->m_job, this->m_sex, &head));
@@ -337,7 +350,7 @@ void UINewMakeCharWnd::UpdatePreviewResources() {
     this->m_racePalettes[0] = static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_job, this->m_sex, headPalette));
   }
 
-  this->m_raceOffsets = GetBodyImfName(this->m_job, this->m_sex, this->m_head, this->m_costumeJob);
+  this->m_raceOffsets = g_session.GetBodyImfName(this->m_job, this->m_sex, this->m_head, this->m_costumeJob);
 }
 
 // OFFSET: 0x007DA340
@@ -404,7 +417,7 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
   UIDescriptRace* doram = new UIDescriptRace(1);
   const char* doramNormal;
   const char* doramActive;
-  if (!g_doramCreationEnabled) {
+  if (!g_session.m_makeableDoram) {
     doramActive = "유저인터페이스\\make_character_ver2\\img_doram_comingSoon.bmp";
     doramNormal = doramActive;
   } else {
@@ -544,79 +557,79 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
   switch (argument1) {
   case ID_OK: {
     for (int index = 0; index < 2; ++index) {
-      if ((g_doramCreationEnabled || index != 1) && sender == this->m_raceViews[index]) {
+      if ((g_session.m_makeableDoram || index != 1) && sender == this->m_raceViews[index]) {
         return 0;
       }
     }
 
-    int messageId;
     if (this->m_nameEdit->Length() < 4) {
-      messageId = 0x15;
-    } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>("<ITEML>")) != nullptr ||
-               _mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>("</ITEML>")) != nullptr) {
-      messageId = 0xAFC;
-    } else {
-      int valid = 1;
-      if (g_serviceType == 1) {
-        valid = ValidateCharacterName(this->m_nameEdit->Text());
-      }
-      int allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
-      bool hasControlCharacter = g_session.HasControlCharacter(this->m_nameEdit->Text());
-      int blank = g_session.IsBlankString(this->m_nameEdit->Text());
-
-      if (!hasControlCharacter && allowed == 1 && valid == 1 && blank == 0) {
-        if (this->m_nameEdit->Length() >= 24) {
-          g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
-          this->m_nameEdit->SetText("");
-          return 0;
-        }
-
-        char name[24] = {};
-        strcpy(name, this->m_nameEdit->Text());
-        memcpy(this->m_name, name, sizeof(this->m_name));
-        memcpy_s(&g_charInfo, sizeof(g_charInfo), this->characterData, sizeof(g_charInfo));
-        if (strstr(g_charInfo.name, "\xB1\xD7\xB6\xF3\xBA\xF1\xC6\xBC") != nullptr) {
-          return 0;
-        }
-        _strlwr(name);
-        if (strstr(name, "gravity") != nullptr) {
-          return 0;
-        }
-        if ((name[0] == '[' && name[1] == 'g' && name[2] == 'm') || (name[1] == '[' && name[2] == 'g' && name[3] == 'm') ||
-            (name[2] == '[' && name[3] == 'g' && name[4] == 'm')) {
-          return 0;
-        }
-
-        g_modeMgr.gameMode->SendMsg(LMM_SENDCHARINFO, 0, 0, 0, 0);
-        g_windowMgr.Schedule(this);
-      } else {
-        if (hasControlCharacter || allowed == 0) {
-          g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
-        }
-        if (valid == 0) {
-          g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
-        }
-        if (blank == 1) {
-          g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
-        }
-      }
-
-      CMode* mode = g_modeMgr.gameMode;
-      mode->SendMsg(LMM_SET_MAKING_CHAR_NAME, reinterpret_cast<int>(this->m_nameEdit->Text()), 0, 0, 0);
-      int payload[8];
-      payload[0] = this->m_stats[0];
-      payload[1] = this->m_stats[1];
-      payload[2] = this->m_stats[2];
-      payload[3] = this->m_stats[3];
-      payload[4] = this->m_stats[4];
-      payload[5] = this->m_stats[5];
-      payload[6] = this->m_headPalette;
-      payload[7] = this->m_head;
-      mode->SendMsg(LMM_SET_CHAR_PARAM, reinterpret_cast<int>(payload), 0, 0, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
       return 0;
     }
 
-    g_windowMgr.Confirm(LookupMessage(messageId), 0, true, false, 0, "Message", 280, 120, 0);
+    if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_makeCharItemLinkOpen.c_str())) != nullptr ||
+        _mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_makeCharItemLinkClose.c_str())) != nullptr) {
+      g_windowMgr.Confirm(LookupMessage(0xAFC), 0, true, false, 0, "Message", 280, 120, 0);
+      return 0;
+    }
+
+    int valid = 1;
+    if (g_serviceType == 1 && !ValidateCharacterName(this->m_nameEdit->Text())) {
+      valid = 0;
+    }
+    int allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
+    bool hasControlCharacter = g_session.HasControlCharacter(this->m_nameEdit->Text());
+    int blank = g_session.IsBlankString(this->m_nameEdit->Text());
+
+    if (!hasControlCharacter && allowed == 1 && valid == 1 && blank == 0) {
+      if (this->m_nameEdit->Length() >= 24) {
+        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+        this->m_nameEdit->SetText("");
+        return 0;
+      }
+
+      char name[24] = {};
+      strcpy(name, this->m_nameEdit->Text());
+      memcpy(this->m_name, name, sizeof(this->m_name));
+      memcpy_s(&g_charInfo, sizeof(g_charInfo), this->characterData, sizeof(g_charInfo));
+      if (strstr(g_charInfo.name, "\xB1\xD7\xB6\xF3\xBA\xF1\xC6\xBC") != nullptr) {
+        return 0;
+      }
+      _strlwr(name);
+      if (strstr(name, "gravity") != nullptr) {
+        return 0;
+      }
+      if ((name[0] == '[' && name[1] == 'g' && name[2] == 'm') || (name[1] == '[' && name[2] == 'g' && name[3] == 'm') ||
+          (name[2] == '[' && name[3] == 'g' && name[4] == 'm')) {
+        return 0;
+      }
+
+      g_modeMgr.gameMode->SendMsg(LMM_SENDCHARINFO, 0, 0, 0, 0);
+      g_windowMgr.Schedule(this);
+    } else {
+      if (hasControlCharacter || allowed == 0) {
+        g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+      }
+      if (valid == 0) {
+        g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
+      }
+      if (blank == 1) {
+        g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+      }
+    }
+
+    CMode* mode = g_modeMgr.gameMode;
+    mode->SendMsg(LMM_SET_MAKING_CHAR_NAME, reinterpret_cast<int>(this->m_nameEdit->Text()), 0, 0, 0);
+    int payload[8];
+    payload[0] = this->m_stats[0];
+    payload[1] = this->m_stats[1];
+    payload[2] = this->m_stats[2];
+    payload[3] = this->m_stats[3];
+    payload[4] = this->m_stats[4];
+    payload[5] = this->m_stats[5];
+    payload[6] = this->m_headPalette;
+    payload[7] = this->m_head;
+    mode->SendMsg(LMM_SET_CHAR_PARAM, reinterpret_cast<int>(payload), 0, 0, 0);
     return 0;
   }
 
@@ -626,7 +639,7 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
     return 0;
 
   case ID_SLOT:
-    if (g_doramCreationEnabled || sender != this->m_raceViews[1]) {
+    if (g_session.m_makeableDoram || sender != this->m_raceViews[1]) {
       for (int index = 0; index < 2; ++index) {
         if (sender == this->m_raceViews[index]) {
           this->m_race = index;

@@ -1,4 +1,5 @@
 #include "Network/Packets/NoticeEnums.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/Items/ItemType.h"
@@ -39,6 +40,7 @@
 #include "Render/Text/EmbedFont.h"
 #include "Utility/Cipher/XorBytes.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include <algorithm>
 #include <array>
@@ -58,11 +60,11 @@
 #include <utility>
 #include <vector>
 
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 extern "C" {
 #include <lualib.h>
 }
-
-void __fastcall RefreshItemWindows(UIWindowMgr* mgr);
 
 namespace EquipmentProperties {
   class CEquipmentProperties;
@@ -78,6 +80,12 @@ struct EquipmentValueC {
   /* 0000 */ int value;
 };
 template __declspec(noinline) std::unordered_map<int, EquipmentValueC>::unordered_map();
+template __declspec(noinline) void std::_Tree_val<std::_Tree_simple_types<unsigned int>>::_Erase_tree<std::allocator<std::_Tree_node<unsigned int, void*>>>(
+  std::allocator<std::_Tree_node<unsigned int, void*>>&, std::_Tree_node<unsigned int, void*>*
+) noexcept;
+template __declspec(noinline) void std::_Tree_val<std::_Tree_simple_types<std::pair<const int, int>>>::_Erase_tree<std::allocator<std::_Tree_node<std::pair<const int, int>, void*>>>(
+  std::allocator<std::_Tree_node<std::pair<const int, int>, void*>>&, std::_Tree_node<std::pair<const int, int>, void*>*
+) noexcept;
 
 struct EquipmentEntryA {
   /* 0000 */ int value;
@@ -525,7 +533,12 @@ void EquipmentPropertyStore::Clear() {
 // OFFSET: 0x006965A0
 // FUNCTION: fn_05740
 EquipmentPropertyStore::~EquipmentPropertyStore() {
-  this->Clear();
+  for (auto& group : this->properties) {
+    for (const auto& property : std::as_const(group.second)) {
+      delete property.second;
+    }
+  }
+  this->properties.clear();
 }
 
 // OFFSET: 0x00699040
@@ -4854,10 +4867,10 @@ int GetPlayerValue(lua_State* state) {
   int value = 0;
   switch (args[0]) {
   case SP_SP:
-    value = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0]);
+    value = g_session.m_sp;
     break;
   case SP_MAXSP:
-    value = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4]);
+    value = g_session.m_maxSp;
     break;
   case SP_BASELEVEL:
     value = g_session.m_level;
@@ -4950,7 +4963,7 @@ int GetWeaponClass(lua_State* state) {
 // OFFSET: 0x006BF240
 // FUNCTION: fn_06290
 int IsPremiumPcCafe(lua_State* state) {
-  lua_pushnumber(state, g_mileageWndActive == 1 ? 2 : 0);
+  lua_pushnumber(state, g_session.m_mileageWndActive == 1 ? 2 : 0);
   return 1;
 }
 
@@ -5058,8 +5071,8 @@ void CSession::AddPartyMember(MessengerMember& member) {
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
   if (mode && (mode->scene->isPKZone != 0 || mode->scene->isEventPVPMode != 0)) {
     EffectActor* actor = static_cast<EffectActor*>(mode->scene->GetGameActorByAID(member.accountId));
-    if (actor && !actor->HasId(160)) {
-      actor->LaunchEffect(160, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    if (actor && !actor->HasId(EF_PARTY)) {
+      actor->LaunchEffect(EF_PARTY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
   }
 }
@@ -5568,7 +5581,7 @@ bool CGameMode::IsValidCell(int x, int y) {
     return false;
   }
   CPlayer* player = this->scene->player;
-  if (x == reinterpret_cast<const int&>(player->destCellX) && y == player->destCellZ) {
+  if (x == player->destCellX && y == player->destCellZ) {
     return false;
   }
   int column;
@@ -5591,8 +5604,8 @@ __declspec(noinline) void CSession::UpdateRandomStats() {
     this->randomStatIndexD = std::ranges::max(std::rand() % 12, 0);
   }
 
-  const int bound70 = reinterpret_cast<int&>(this->spAndHomunculusStats[0]);
-  const int bound74 = reinterpret_cast<int&>(this->spAndHomunculusStats[4]);
+  const int bound70 = this->m_sp;
+  const int bound74 = this->m_maxSp;
   const int bound68 = this->hp;
   const int bound6C = this->maxHp;
   this->randomStatIndexC = std::ranges::max(std::rand() % 12, 0);
@@ -5612,12 +5625,12 @@ __declspec(noinline) void CSession::UpdateRandomStats() {
     this->maxHp = bound6C;
     this->RefreshHpSpWindows();
   }
-  if (reinterpret_cast<int&>(this->spAndHomunculusStats[0]) != bound70) {
-    reinterpret_cast<int&>(this->spAndHomunculusStats[0]) = bound70;
+  if (this->m_sp != bound70) {
+    this->m_sp = bound70;
     this->RefreshHpSpWindows();
   }
-  if (reinterpret_cast<int&>(this->spAndHomunculusStats[4]) != bound74) {
-    reinterpret_cast<int&>(this->spAndHomunculusStats[4]) = bound74;
+  if (this->m_maxSp != bound74) {
+    this->m_maxSp = bound74;
     this->RefreshHpSpWindows();
   }
 }
@@ -6230,7 +6243,7 @@ void CGameMode::Zc_Mer_Init(const unsigned char* data) {
   const MercenaryInitPacket* packet = reinterpret_cast<const MercenaryInitPacket*>(data);
   g_session.m_mercSkills.clear();
   CRenderObject* actor = this->scene->GetGameActorByAID(packet->aid);
-  *reinterpret_cast<std::uint32_t*>(&g_session.companionTargetState[8]) = packet->aid;
+  g_session.m_mercenaryAid = packet->aid;
   g_session.mercenaryAlive = 1;
   if (actor != nullptr) {
     g_session.m_mercenaryClass = static_cast<CGameActor*>(actor)->GetEffectiveJob(-1);
@@ -6256,7 +6269,7 @@ void CGameMode::Zc_Mer_Init(const unsigned char* data) {
   g_session.m_mercenaryLoyalty = packet->loyalty;
   g_session.m_mercenarySummons = packet->summons;
   g_session.m_mercenaryKills = packet->kills;
-  *reinterpret_cast<int*>(&g_session.mercenaryAttackRange[0]) = packet->attackRange;
+  g_session.m_mercenaryAttackRange = packet->attackRange;
   g_session.m_mercenaryExpiration = packet->expiration;
 }
 
@@ -6316,13 +6329,6 @@ void CGameMode::Zc_Mer_Par_Change(const unsigned char* data) {
   g_session.RefreshMercenaryInfo();
 }
 
-// INLINED
-template <std::uint64_t Key, std::size_t Length>
-const char* DecryptName(const char (&source)[Length]) {
-  thread_local EncryptedName<Length, Key> name(source);
-  return name.Text();
-}
-
 // GLOBAL: gl_25251
 HANDLE g_embedFontFiles;
 
@@ -6330,35 +6336,27 @@ HANDLE g_embedFontFiles;
 // FUNCTION: fn_23337
 void CSession::InitClientData() {
   if (!g_itemInfoMgr->Load()) {
-    const auto captionSource = CRYPT_NAME("Error", 0xCD8F077123FB7D6FULL);
-    const char* caption = DecryptName<0xCD8F077123FB7D6FULL>(captionSource.data);
-    const auto messageSource = CRYPT_NAME("ItemInfo file Init", 0x23BBD58F8B5FF5C9ULL);
-    const char* message = DecryptName<0x23BBD58F8B5FF5C9ULL>(messageSource.data);
+    const char* caption = OBFUSCATE_TEXT("Error", 0xCD8F077123FB7D6FULL);
+    const char* message = OBFUSCATE_TEXT("ItemInfo file Init", 0x23BBD58F8B5FF5C9ULL);
     MessageBoxA(nullptr, message, caption, 0);
   }
 
   if (!g_specialPopupMgr->Init()) {
-    const auto captionSource = CRYPT_NAME("Error", 0x17A9E5BF39AD4737ULL);
-    const char* caption = DecryptName<0x17A9E5BF39AD4737ULL>(captionSource.data);
-    const auto messageSource = CRYPT_NAME("SPECIALPOPUP file Init", 0x9949BFD527532943ULL);
-    const char* message = DecryptName<0x9949BFD527532943ULL>(messageSource.data);
+    const char* caption = OBFUSCATE_TEXT("Error", 0x17A9E5BF39AD4737ULL);
+    const char* message = OBFUSCATE_TEXT("SPECIALPOPUP file Init", 0x9949BFD527532943ULL);
     MessageBoxA(nullptr, message, caption, 0);
   }
 
   if (!g_runeSystemMgr->LoadScripts()) {
-    const auto captionSource = CRYPT_NAME("Error", 0xCFF3899D95AF355FULL);
-    const char* caption = DecryptName<0xCFF3899D95AF355FULL>(captionSource.data);
-    const auto messageSource = CRYPT_NAME("CRuneSystemMgr file Init", 0x13E33FA1A591AB67ULL);
-    const char* message = DecryptName<0x13E33FA1A591AB67ULL>(messageSource.data);
+    const char* caption = OBFUSCATE_TEXT("Error", 0xCFF3899D95AF355FULL);
+    const char* message = OBFUSCATE_TEXT("CRuneSystemMgr file Init", 0x13E33FA1A591AB67ULL);
     MessageBoxA(nullptr, message, caption, 0);
   }
 
   static_cast<void>(CTipBoxMgr::Create());
   if (!g_itemTagOwner->RegisterLuaFunctions()) {
-    const auto captionSource = CRYPT_NAME("Error", 0x4F99DF03C3EF31B7ULL);
-    const char* caption = DecryptName<0x4F99DF03C3EF31B7ULL>(captionSource.data);
-    const auto messageSource = CRYPT_NAME("TipBox file Init", 0xE52DF30DCBAF7125ULL);
-    const char* message = DecryptName<0xE52DF30DCBAF7125ULL>(messageSource.data);
+    const char* caption = OBFUSCATE_TEXT("Error", 0x4F99DF03C3EF31B7ULL);
+    const char* message = OBFUSCATE_TEXT("TipBox file Init", 0xE52DF30DCBAF7125ULL);
     MessageBoxA(nullptr, message, caption, 0);
   }
 
@@ -6775,7 +6773,7 @@ EquipmentProperties::CEquipmentWearable::CEquipmentWearable(const ITEM_INFO* ite
 
   for (int index = 0; index < 4; ++index) {
     int card;
-    std::memcpy(&card, item->cards + index * sizeof(card), sizeof(card));
+    std::memcpy(&card, &item->cards[index], sizeof(card));
     if (card != 0) {
       const CEquipmentAttachable attachable(card, index, this);
       this->m_attachables.push_back(attachable);

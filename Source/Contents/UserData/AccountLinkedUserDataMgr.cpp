@@ -2,7 +2,6 @@
 #include "Render/DeviceContext/DCSurface.h"
 #include "Script/LuaScript.h"
 #include "Contents/UserData/AccountLinkedUserDataMgr.h"
-#include "Contents/UserData/AccountService.h"
 #include "Contents/UserData/AccountUserData.h"
 #include "Contents/Async/AsyncWorkMgr.h"
 #include "Contents/Hotkeys/EmotionHotkeys.h"
@@ -12,6 +11,7 @@
 #include "Utility/Cipher/XorBytes.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include <json/reader.h>
 #include <json/writer.h>
@@ -20,17 +20,8 @@
 
 namespace {
   // INLINED
-  template <std::uint64_t Key, std::size_t Length>
-  const char* DecryptText(const std::uint8_t (&source)[Length]) {
-    thread_local EncryptedName<Length, Key> text(source);
-    return text.Text();
-  }
-
-  // INLINED
   const char* DefaultAccountName() {
-    constexpr std::array<std::uint8_t, 8> sourceArray = CRYPT_NAME("unknown", 0x1D6D75EDE7CD311FULL);
-    const std::uint8_t (&source)[8] = sourceArray._Elems;
-    return DecryptText<0x1D6D75EDE7CD311FULL>(source);
+    return OBFUSCATE_BYTES_TEXT("unknown", 0x1D6D75EDE7CD311FULL);
   }
 }
 
@@ -98,19 +89,19 @@ void CAccountLinkedUserDataMgr::CompleteLoad(
     Json::Value root;
     Json::Reader reader;
     if (reader.parse(response, root, true)) {
-      constexpr std::array<std::uint8_t, 5> typeSourceArray = CRYPT_NAME("Type", 0xC52FB5FBB94FF917ULL);
+      constexpr std::array<std::uint8_t, 5> typeSourceArray = OBFUSCATE_SOURCE("Type", 0xC52FB5FBB94FF917ULL);
       const std::uint8_t (&typeSource)[5] = typeSourceArray._Elems;
-      switch (root[DecryptText<0xC52FB5FBB94FF917ULL>(typeSource)].asInt()) {
+      switch (root[(OBFUSCATE_DECRYPT(0xC52FB5FBB94FF917ULL, typeSource))].asInt()) {
       case 1: {
-        constexpr std::array<std::uint8_t, 5> whisperSourceArray = CRYPT_NAME("data", 0x93E7A3A1F587CDC5ULL);
+        constexpr std::array<std::uint8_t, 5> whisperSourceArray = OBFUSCATE_SOURCE("data", 0x93E7A3A1F587CDC5ULL);
         const std::uint8_t (&whisperSource)[5] = whisperSourceArray._Elems;
-        LoadWhisperBlockList(root[DecryptText<0x93E7A3A1F587CDC5ULL>(whisperSource)]);
-        constexpr std::array<std::uint8_t, 5> emotionSourceArray = CRYPT_NAME("data", 0x2FF3C5036D070127ULL);
+        LoadWhisperBlockList(root[(OBFUSCATE_DECRYPT(0x93E7A3A1F587CDC5ULL, whisperSource))]);
+        constexpr std::array<std::uint8_t, 5> emotionSourceArray = OBFUSCATE_SOURCE("data", 0x2FF3C5036D070127ULL);
         const std::uint8_t (&emotionSource)[5] = emotionSourceArray._Elems;
-        g_session.m_emotionHotkeys.Load(root[DecryptText<0x2FF3C5036D070127ULL>(emotionSource)]);
-        constexpr std::array<std::uint8_t, 5> hotkeySourceArray = CRYPT_NAME("data", 0x17359BF953C367B3ULL);
+        g_session.m_emotionHotkeys.Load(root[(OBFUSCATE_DECRYPT(0x2FF3C5036D070127ULL, emotionSource))]);
+        constexpr std::array<std::uint8_t, 5> hotkeySourceArray = OBFUSCATE_SOURCE("data", 0x17359BF953C367B3ULL);
         const std::uint8_t (&hotkeySource)[5] = hotkeySourceArray._Elems;
-        g_userHotkeyMgr->LoadV2(*g_session.m_hotkeyScript, root[DecryptText<0x17359BF953C367B3ULL>(hotkeySource)]);
+        g_userHotkeyMgr->LoadV2(root[(OBFUSCATE_DECRYPT(0x17359BF953C367B3ULL, hotkeySource))]);
       }
         [[fallthrough]];
       case 2:
@@ -128,28 +119,24 @@ void CAccountLinkedUserDataMgr::CompleteLoad(
 
 // OFFSET: 0x005BCB10
 // FUNCTION: fn_03467
-void CAccountLinkedUserDataMgr::RefreshUrls(LuaScript& settings, LuaScript& tables, const char* host, const char* port, const char* overrideKey) {
-  const std::string base = ResolveAccountServiceBase(settings, tables, host, port, overrideKey);
+void CAccountLinkedUserDataMgr::RefreshUrls() {
+  const std::string base = g_session.ResolveAccountServiceBase();
   if (!base.empty()) {
-    constexpr std::array<std::uint8_t, 17> saveSourceArray = CRYPT_NAME("/userconfig/save", 0x59278F63D79F3DA1ULL);
-    const std::uint8_t (&saveSource)[17] = saveSourceArray._Elems;
-    this->m_saveUrl = base + DecryptText<0x59278F63D79F3DA1ULL>(saveSource);
-    constexpr std::array<std::uint8_t, 17> loadSourceArray = CRYPT_NAME("/userconfig/load", 0x812BE72BCD5707B7ULL);
-    const std::uint8_t (&loadSource)[17] = loadSourceArray._Elems;
-    this->m_loadUrl = base + DecryptText<0x812BE72BCD5707B7ULL>(loadSource);
+    this->m_saveUrl = base + OBFUSCATE_TEXT("/userconfig/save", 0x59278F63D79F3DA1ULL);
+    this->m_loadUrl = base + OBFUSCATE_TEXT("/userconfig/load", 0x812BE72BCD5707B7ULL);
   }
 }
 
 // OFFSET: 0x005BD170
 // FUNCTION: fn_03470
-void CAccountLinkedUserDataMgr::Reset(LuaScript& script, const char* host, const char* port, const char* overrideKey) {
+void CAccountLinkedUserDataMgr::Reset() {
   this->m_accountId = 0;
   this->m_accountName = "unknown";
   this->m_loaded = false;
   g_whisperBlockMgr->Reset();
   g_session.m_emotionHotkeys.saved.clear();
   g_userHotkeyMgr->Reset();
-  this->RefreshUrls(script, script, host, port, overrideKey);
+  this->RefreshUrls();
 }
 
 // OFFSET: 0x005BD650
@@ -179,15 +166,15 @@ void CAccountLinkedUserDataMgr::Save() {
     emotions.Export(data);
   }
 
-  if (g_userHotkeyMgr->HasChanges(*g_session.m_hotkeyScript)) {
-    g_userHotkeyMgr->Export(*g_session.m_hotkeyScript, data);
+  if (g_userHotkeyMgr->HasChanges() == true) {
+    this->ExportUserHotkey(data);
   }
 
   if (!data.isNull()) {
     root["data"] = data;
     Json::StyledWriter writer;
     const std::string response = writer.write(root);
-    g_asyncWorkMgr->SaveAccount(this->m_accountId, this->m_accountName, this->SaveUrl(), std::string(reinterpret_cast<const char*>(&g_session.webServiceLoginData[0x08]), 16), response);
+    g_asyncWorkMgr->SaveAccount(this->m_accountId, this->m_accountName, this->SaveUrl(), std::string(g_session.m_webAuthToken, 16), response);
     ++this->m_pendingLoads;
   }
 }

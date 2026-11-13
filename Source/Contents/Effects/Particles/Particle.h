@@ -51,6 +51,7 @@ public:
 
   void Reset();
   void SetQuad(RenderVertex* vertices, float top, float bottom, float left, float right);
+  void InitParticleQuad(RenderVertex* vertices);
   void Render(bool billboard, float top, float bottom, float left, float right, bool unused, bool depth);
   void Render(const ParticleQuad& quad);
   void SetColor(short redValue, short greenValue, short blueValue);
@@ -73,15 +74,15 @@ public:
   /* 0040 */ short blue;
   /* 0042 */ unsigned char padding_0042[2];
   /* 0044 */ int alpha;
-  /* 0048 */ unsigned char effectParameters[4];
+  /* 0048 */ int effectParameter;
   /* 004C */ int phaseParameter;
   /* 0050 */ int angleParameter;
   /* 0054 */ float animationParameter;
-  /* 0058 */ unsigned char animationParameters[0x50];
+  /* 0058 */ float animationParameters[20];
   /* 00A8 */ unsigned char animationState;
   /* 00A9 */ unsigned char frameParameters[0x17];
   /* 00C0 */ float speedParameter;
-  /* 00C4 */ int angleBits;
+  /* 00C4 */ float angle;
   /* 00C8 */ int auxiliaryParameter;
   /* 00CC */ float life;
   /* 00D0 */ float offsetX = 0;
@@ -166,7 +167,6 @@ public:
   /* 3FF4 */ int padding_3FF4;
 };
 
-void InitParticleQuad(RenderVertex* vertices);
 float RandomRange(float minimum, float maximum);
 vector2d RandomDiscPoint(float x, float y, long long radius);
 std::string EmitterKey(std::string effect, std::string emitter);

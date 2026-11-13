@@ -53,15 +53,15 @@ void UIPreviewEquipWnd::DrawCharacter() {
   float up[3];
   up[0] = this->m_render->cameraUpX;
   up[1] = this->m_render->cameraUpY;
-  up[2] = *reinterpret_cast<float*>(&this->m_render->cameraUpZ);
-  view.LookAt(eye, reinterpret_cast<float*>(&this->m_render->positionX), up);
+  up[2] = this->m_render->cameraUpZ;
+  view.LookAt(eye, &this->m_render->position.x, up);
 
   float screenX = 0.0f;
   float screenY = 0.0f;
   float depth = 0.0f;
   g_renderer->ProjectViewportCentered(
-    reinterpret_cast<float*>(&this->m_render->positionX), view.values, &screenX, &screenY, &depth,
-    static_cast<float>(this->geometry.width) + *reinterpret_cast<float*>(&this->m_render->viewportOffsetX),
+    &this->m_render->position.x, view.values, &screenX, &screenY, &depth,
+    static_cast<float>(this->geometry.width) + this->m_render->viewportOffsetX,
     static_cast<float>(this->geometry.height) + this->m_render->viewportOffsetY
   );
 
@@ -166,7 +166,7 @@ void UIPreviewEquipWnd::SyncFromPlayer() {
   this->m_render->madogearType = player->GetMadogearType();
   this->m_render->riding = player->isRiding;
   this->m_render->bodyCostume = player->GetBodyCostume();
-  *reinterpret_cast<float*>(&this->m_render->viewportOffsetX) = -5.0f;
+  this->m_render->viewportOffsetX = -5.0f;
   this->m_render->viewportOffsetY = 136.0f;
   this->RefreshHeadgearLocations();
   this->Invalidate();

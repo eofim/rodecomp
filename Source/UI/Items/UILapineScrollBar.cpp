@@ -279,7 +279,7 @@ int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
     if (std::find_if(this->items.begin(), this->items.end(), [id](ITEM_INFO entry) { return id == entry.identity[1]; }) != this->items.end()) {
       return 0;
     }
-    ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, id);
+    ITEM_INFO item = g_session.LookupClientItemByIdentity(id);
     item.quantity = quantity;
     {
       std::vector<char*> breaks;
@@ -297,8 +297,11 @@ int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
     }
     this->items.push_back(item);
     if (static_cast<int>(this->items.size()) == this->maxItems) {
-      this->moveButton->SetDisabled(1);
-      this->moveButton->Invalidate();
+      {
+        auto* moveButton = this->moveButton;
+        moveButton->SetDisabled(1);
+        moveButton->Invalidate();
+      }
     }
     this->Invalidate();
     return 1;
@@ -309,7 +312,7 @@ int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
 // OFFSET: 0x00602030
 // FUNCTION: fn_04178
 unsigned char UILapineBox_IngredientListWnd::AddIngredient(std::uint32_t id) {
-  ITEM_INFO owned = LookupClientItemByIdentity(g_session.m_inventoryItems, id);
+  ITEM_INFO owned = g_session.LookupClientItemByIdentity(id);
   if (owned.identity[1] == 0) {
     return 0;
   }
@@ -372,11 +375,11 @@ UILapineScrollBar::UILapineScrollBar() : UIScrollBar() {
 
 // OFFSET: 0x005FF370
 // FUNCTION: fn_04143
-UIIngredientInfoWnd::~UIIngredientInfoWnd() = default;
+__declspec(noinline) UIIngredientInfoWnd::~UIIngredientInfoWnd() = default;
 
 UILapineBoxWnd::~UILapineBoxWnd() {
   this->items.clear();
   short packetType = ID_CZ_RANDOM_COMBINE_ITEM_UI_CLOSE;
   CRagConnection& connection = GetRagConnection();
-  connection.Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packetType), &packetType);
+  connection.Send(GetRagConnection().GetPacketSize(packetType), &packetType);
 }

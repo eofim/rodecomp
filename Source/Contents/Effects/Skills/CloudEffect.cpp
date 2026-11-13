@@ -61,7 +61,7 @@ void CCloud::Close() {
 // OFFSET: 0x006FBBD0
 // FUNCTION: fn_06917
 void CCloud::Open() {
-  this->particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 1);
+  this->particle = CreateParticle(&this->positionVector, 1);
   if (CParticle* particle = this->particle) {
     particle->effectId = this->id;
     particle->columnIndex = 0;
@@ -127,8 +127,7 @@ void CCloud::OnProcess() {
 
   const int frame = particle->elapsedFrames;
   if (frame < this->fadeInEnd) {
-    const float value = this->alpha + this->fadeInStep;
-    this->alpha = value > 255.0f ? 255.0f : value;
+    this->alpha = std::min({this->alpha + this->fadeInStep, 255.0f});
     particle->alpha = static_cast<int>(this->alpha);
   } else if (frame > this->fadeOutStart) {
     this->alpha -= this->fadeOutStep;

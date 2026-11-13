@@ -106,7 +106,7 @@ public:
   void ReceiveBuyingStoreResult(const BuyingStoreResultPacket* packet);
   void ReceiveAchievementList(int count, int score, short achievementLevel, int completed, int total, const AchievementRecordPacket* packets);
   void ReceiveMacroReporterList(int count, const int* aids);
-  /* 0058 */ unsigned char areaBounds[0x10];
+  /* 0058 */ int areaBounds[4];
   /* 0068 */ char mapName[16];
   /* 0078 */ unsigned char padding_0078[0xC];
   /* 0084 */ std::vector<std::string> mapResources;
@@ -114,15 +114,22 @@ public:
   /* 00CC */ CWorld* scene;
   /* 00D0 */ CView* camera;
   /* 00D4 */ CMousePointer* mousePointer;
-  /* 00D8 */ unsigned char leftBtnClickTick[0x04];
+  /* 00D8 */ std::uint32_t leftBtnClickTick;
   /* 00DC */ int oldMouseX;
   /* 00E0 */ int oldMouseY;
   /* 00E4 */ int rBtnClickX;
   /* 00E8 */ int rBtnClickY;
-  /* 00EC */ unsigned char lastActorIds[0x0C];
+  /* 00EC */ int lastPcGid;
+  /* 00F0 */ int lastMonGid;
+  /* 00F4 */ int lastLockOnMonGid;
   /* 00F8 */ int isAutoMoveClickOn;
   /* 00FC */ int isWaitingEnterRoom;
-  /* 0100 */ unsigned char equipmentRequestState[0x18];
+  /* 0100 */ int isWaitingAddExchangeItem;
+  /* 0104 */ std::uint32_t waitingWearEquipAck;
+  /* 0108 */ std::uint32_t waitingTakeoffEquipAck;
+  /* 010C */ int isReqUpgradeSkillLevel;
+  /* 0110 */ int exchangeItemCnt;
+  /* 0114 */ int isWaitingCancelExchangeItem;
   /* 0118 */ std::string refuseWhisperName;
   /* 0130 */ std::string streamFileName;
   /* 0148 */ std::string exchangeName;
@@ -136,7 +143,7 @@ public:
   /* 01C4 */ std::map<std::uint32_t, MiniMapPing> compassPosList;
   /* 01CC */ std::vector<int> actorMenuIds;
   /* 01D8 */ std::list<std::uint32_t> m_skillUnitIds;
-  /* 01E0 */ unsigned char windowInvalidateTick[4];
+  /* 01E0 */ std::uint32_t windowInvalidateTick;
   /* 01E4 */ std::vector<GameModeLoopSound> loopSounds;
   /* 01F0 */ std::map<std::uint32_t, MinimapMarker> minimapMarkers;
   /* 01F8 */ int hoveredStatusIconId;
@@ -150,21 +157,31 @@ public:
   /* 0254 */ int canRotateView;
   /* 0258 */ int hasViewParameters;
   /* 025C */ std::int16_t viewParameters[9];
-  /* 026E */ unsigned char requestTimers[0x1A];
+  /* 0270 */ std::uint32_t syncAcknowledged;
+  /* 0274 */ std::uint32_t syncRequestTick;
+  /* 0278 */ std::uint32_t emotionRequestTick;
+  /* 027C */ std::uint32_t chatRoomRequestTick;
+  /* 0280 */ std::uint32_t merchantShopRequestTick;
+  /* 0284 */ unsigned char isEmotionRequested;
   /* 0288 */ float fixedLongitude;
-  /* 028C */ unsigned char lastCoupleIds[0x08];
+  /* 028C */ std::uint32_t lastCoupleIds[2];
   /* 0294 */ char coupleName[0x18];
   /* 02AC */ UINameBalloonText* nameBalloon;
   /* 02B0 */ UINameBalloonText* itemNameBalloon;
   /* 02B4 */ UIWindow* itemWindow;
-  /* 02B8 */ unsigned char balloonDisplayState[0x14];
+  /* 02B8 */ UIWindow* skillBalloon;
+  /* 02BC */ UIWindow* skillHintBalloon;
+  /* 02C0 */ int unknown_02C0;
+  /* 02C4 */ int isNameBalloonPlaced;
+  /* 02C8 */ int isItemNameBalloonPlaced;
   /* 02CC */ int waitingUseItemAck;
-  /* 02D0 */ unsigned char waitingItemThrowAck[0x04];
+  /* 02D0 */ int waitingItemThrowAck;
   /* 02D4 */ int waitingReqStatusAck;
   /* 02D8 */ std::uint32_t balloonActorId;
   /* 02DC */ int lastNaid;
   /* 02E0 */ int menuTargetAid;
-  /* 02E4 */ unsigned char nameBalloonSize[0x08];
+  /* 02E4 */ int nameBalloonWidth;
+  /* 02E8 */ int nameBalloonHeight;
   /* 02EC */ std::string menuTargetName;
   /* 0304 */ unsigned char padding_0304[0x04];
   /* 0308 */ ModeDragState drag;
@@ -185,7 +202,8 @@ public:
   /* 0450 */ int sameChatRepeatCount;
   /* 0454 */ int serverTimeSyncCount;
   /* 0458 */ int checkGroundAlpha;
-  /* 045C */ unsigned char cardAndSkillBalloonIds[0x08];
+  /* 045C */ int cardItemIndex;
+  /* 0460 */ int shownSkillId;
   /* 0464 */ int countdownStartTick;
   /* 0468 */ int recordChatCount;
   /* 046C */ std::string recordChat[11];
@@ -239,6 +257,11 @@ public:
   bool IsEffectId990Group(int id);
   bool IsEffectId994Group(int id);
   bool ConfirmDraggedItemUse();
+  void ClearDrag();
+  void BeginDragItem(int source, const ITEM_INFO& item, int quantity, int slot);
+  void BeginDragSkill(int source, std::uint32_t id, const char* name, int level, int slot);
+  void BeginDragBarterItem(int source, const BarterMarketItem& item, int quantity, int slot);
+  void BeginDragBarterEntry(int source, const BarterMarketEntry& entry, int quantity, int slot);
   void RefreshStatusStateEffect(int actorId);
   void RefreshNotificationWindows(int value);
   void UpdatePetFriendlyWindow(int previousFriendly);
@@ -426,7 +449,7 @@ public:
   void ReceiveToggle128(int enabled);
   void PlaceWindow16(unsigned int xPercent, unsigned int yPercent);
   void ReceiveExtraInventorySlots(const unsigned char* packet);
-  void ReceiveActorMessage144(const unsigned char* packet);
+  void ReceiveFastMove(const unsigned char* packet);
   void StopActorMove(std::uint32_t aid, std::int16_t x, std::int16_t y, unsigned char flag);
   void NotifyGmCheckerResult(int result);
   void NotifyCaptchaRegistrationResult(int result);
@@ -607,7 +630,7 @@ public:
   void ProcessIncomingPackets();
   void TargetActorByAid(int aid);
   void OnChangeState(int value) override;
-  void PlaceWindowAtActor(UIWindow* window, CGameActor* actor);
+  void PlaceWindowAtActor(UIWindow* window, CRenderObject* actor);
   void ReceiveSummonHpInit(const unsigned char* buffer);
   void ReceiveSummonHpUpdate(const unsigned char* buffer);
   void ReceiveGameOptionResult(int command, int result, int enabled);
@@ -730,7 +753,7 @@ public:
   void ReceiveItem1758List(const unsigned char* packet);
   void ReceiveOpenedVendingItemList(const unsigned char* packet);
   void ReceiveItem1748List(const unsigned char* packet);
-  void ReceiveActorStatusValue(std::uint32_t aid, int status, int amount, int option);
+  void ReceiveActorStatusValue(std::uint32_t aid, int status, std::int64_t amount);
   void ReceiveActorSkillResult(const unsigned char* packet);
   void UpdateSkillCooldown(std::uint16_t skill, std::uint32_t remaining, std::uint32_t duration);
   void LoadCooldownSnapshot(const void* packet);
@@ -822,7 +845,7 @@ public:
   void ReceiveVendingItemList(int aid, int storeId, char own, int count, std::uint32_t duration, const unsigned char* data, int value, int unused);
   void ReceiveVendingItemList2(int aid, int storeId, char own, int count, std::uint32_t duration, const unsigned char* data);
   void ReceiveVendingItemSoldNow(const unsigned char* data);
-  void ProcessBuyingStorePurchase(int field14, int itemId, int quantity, int field8, int fieldC, int field10);
+  void ProcessBuyingStorePurchase(int updateTime, int itemId, int amount, int zeny, int zenyLimit, int charId);
   void ReceiveBuyingStorePurchase(const unsigned char* packet);
   void ReceiveFriendAddResult(const unsigned char* data);
   void ReceiveNavigation(const unsigned char* packet);
@@ -949,7 +972,7 @@ public:
   void ReceiveActorMoveEntryLegacy(const unsigned char* data);
   void SpawnMovingActor(
     unsigned char objectType, std::uint32_t aid, std::uint32_t gid, short speed, short bodyState, short healthState, int effectState, short job, short head,
-    int weapon, int shield, short accessory, std::uint32_t moveStartTime, short accessory2, short accessory3, short headPalette, short bodyPalette,
+    std::int64_t weapon, short accessory, std::uint32_t moveStartTime, short accessory2, short accessory3, short headPalette, short bodyPalette,
     short headDir, short robe, int guildId, short guildVersion, short honor, int virtue, unsigned char pkMode, unsigned char sex,
     const unsigned char* moveData, unsigned char xSize, unsigned char ySize, short level, short font, int maxHp, int hp, unsigned char isBoss,
     std::string name, short body
@@ -959,7 +982,7 @@ public:
   void ReceiveActorStandEntryLegacy(const unsigned char* data);
   void SpawnStandingActor(
     unsigned char objectType, std::uint32_t aid, std::uint32_t gid, short speed, short bodyState, short healthState, int effectState, short job, short head,
-    int weapon, int shield, short accessory, short accessory2, short accessory3, short headPalette, short bodyPalette, short headDir, short robe,
+    std::int64_t weapon, short accessory, short accessory2, short accessory3, short headPalette, short bodyPalette, short headDir, short robe,
     int guildId, short guildVersion, short honor, int virtue, unsigned char pkMode, unsigned char sex, const unsigned char* posDir, unsigned char xSize,
     unsigned char ySize, short level, short font, int maxHp, int hp, unsigned char isBoss, std::string name, short body
   );
@@ -968,7 +991,7 @@ public:
   void ReceiveActorStateEntryLegacy(const unsigned char* data);
   void SpawnStateActor(
     unsigned char objectType, std::uint32_t aid, std::uint32_t gid, short speed, short bodyState, short healthState, int effectState, short job, short head,
-    int weapon, int shield, short accessory, short accessory2, short accessory3, short headPalette, short bodyPalette, short headDir, short robe,
+    std::int64_t weapon, short accessory, short accessory2, short accessory3, short headPalette, short bodyPalette, short headDir, short robe,
     int guildId, short guildVersion, short honor, int virtue, unsigned char pkMode, unsigned char sex, const unsigned char* posDir, unsigned char xSize,
     unsigned char ySize, unsigned char state, short level, short font, int maxHp, int hp, unsigned char isBoss, std::string name, short body
   );
@@ -984,6 +1007,26 @@ void DecodeSrcDst(const unsigned char* packed, int* srcX, int* srcY, int* dstX, 
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(offsetof(CGameMode, mapName) == 0x68);
+static_assert(offsetof(CGameMode, areaBounds) == 0x58);
+static_assert(offsetof(CGameMode, leftBtnClickTick) == 0xD8);
+static_assert(offsetof(CGameMode, lastPcGid) == 0xEC);
+static_assert(offsetof(CGameMode, isAutoMoveClickOn) == 0xF8);
+static_assert(offsetof(CGameMode, isWaitingAddExchangeItem) == 0x100);
+static_assert(offsetof(CGameMode, isWaitingCancelExchangeItem) == 0x114);
+static_assert(offsetof(CGameMode, syncAcknowledged) == 0x270);
+static_assert(offsetof(CGameMode, isEmotionRequested) == 0x284);
+static_assert(offsetof(CGameMode, fixedLongitude) == 0x288);
+static_assert(offsetof(CGameMode, nameBalloon) == 0x2AC);
+static_assert(offsetof(CGameMode, skillBalloon) == 0x2B8);
+static_assert(offsetof(CGameMode, isItemNameBalloonPlaced) == 0x2C8);
+static_assert(offsetof(CGameMode, waitingUseItemAck) == 0x2CC);
+static_assert(offsetof(CGameMode, waitingItemThrowAck) == 0x2D0);
+static_assert(offsetof(CGameMode, nameBalloonHeight) == 0x2E8);
+static_assert(offsetof(CGameMode, menuTargetName) == 0x2EC);
+static_assert(offsetof(CGameMode, cardItemIndex) == 0x45C);
+static_assert(offsetof(CGameMode, shownSkillId) == 0x460);
+static_assert(offsetof(CGameMode, countdownStartTick) == 0x464);
+static_assert(offsetof(CGameMode, mouseRollCount) == 0x5F4);
 static_assert(offsetof(CGameMode, guildMemberStatusCache) == 0x194);
 static_assert(offsetof(CGameMode, actorPosList) == 0x19C);
 static_assert(offsetof(CGameMode, pickupReqItemNaidList) == 0x1A4);
@@ -1027,11 +1070,11 @@ extern std::map<int, MiniMapEffectMarker> g_miniMapEffectMarkers;
 extern char g_pendingWhisperCount;
 void CloseWhisperRecord();
 extern unsigned char g_gameModePacketBuffer[0x10000];
-extern int g_overweightThresholdPercent;
-extern int g_buyingStoreMode;
-extern int g_buyingStoreDbNumber;
-extern int g_buyingStoreNoPermission;
 extern std::string g_gameModeNamelessTag;
 void __stdcall OpenWordDisplay(CGameActor* actor);
+int CountItemRandomOptions(const unsigned char* entries);
+void TraceSelection(int selection);
+void TraceSelectionRange(int first, int last);
+void WriteMyLog(const char* file, int line, const char* format, ...);
 
 #endif

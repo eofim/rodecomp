@@ -25,9 +25,9 @@
 #include <format>
 #include <string>
 
-template <>
-void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::OnScroll(int position);
-template <> void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::AddNewItem(); template <> void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::LoadSkin(bool resolveSkin); template <> void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::Resize(int width, int height);
+template __declspec(noinline) std::_Tree_find_result<std::_Tree_node<std::pair<const unsigned int, RenewQuestOngoingInfo>, void*>*>
+std::map<unsigned int, RenewQuestOngoingInfo>::_Mybase::_Find_lower_bound<unsigned int>(const unsigned int&) const;
+
 // OFFSET: 0x00A4F580
 // FUNCTION: fn_16213
 bool UnusedTrueA4F580() {
@@ -45,9 +45,6 @@ bool UnusedTrueA4F590() {
 bool UnusedTrueA4F5A0() {
   return true;
 }
-
-template <>
-__declspec(noinline) CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::CUIListBoxEx();
 
 // OFFSET: 0x00A4F630
 // FUNCTION: fn_16217
@@ -133,19 +130,18 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
 // FUNCTION: fn_16236
 template <>
 void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::OnScroll(int position) {
-  auto it = this->items.begin();
-  if (it == this->items.end()) {
+  if (this->items.empty()) {
     return;
   }
   if (this->data.size() == 0) {
-    for (; it != this->items.end(); ++it) {
-      (*it)->index = -1;
-      (*it)->Show(0);
+    for (OngoingQuestInfo::CUIRewardItem* item : this->items) {
+      item->index = -1;
+      item->Show(0);
     }
     return;
   }
 
-  const int first = (*it)->index;
+  const int first = this->items.front()->index;
   unsigned int row = position / this->rowHeight;
   if (first != -1) {
     if (first < static_cast<int>(row)) {
@@ -153,13 +149,14 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
         std::rotate(this->items.begin(), this->items.begin() + (row - first), this->items.end());
       }
     } else if (first > static_cast<int>(row)) {
-      if (first - row < static_cast<unsigned int>(this->items.size())) {
-        std::rotate(this->items.begin(), this->items.end() - (first - row), this->items.end());
+      const unsigned int distance = first - row;
+      if (distance < static_cast<unsigned int>(this->items.size())) {
+        std::rotate(this->items.begin(), this->items.end() - distance, this->items.end());
       }
     }
   }
 
-  it = this->items.begin();
+  auto it = this->items.begin();
   for (int y = this->itemY - position % this->rowHeight; y < this->geometry.height; y += this->rowHeight, ++it, ++row) {
     if (it == this->items.end() || row >= this->data.size()) {
       break;
@@ -180,9 +177,10 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
     }
   }
 
-  for (; it != this->items.end(); ++it) {
-    (*it)->index = -1;
-    (*it)->Show(0);
+  for (const auto end = this->items.end(); it != end; ++it) {
+    OngoingQuestInfo::CUIRewardItem* item = *it;
+    item->index = -1;
+    item->Show(0);
   }
 }
 
@@ -780,13 +778,12 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
 // FUNCTION: fn_16234
 template <>
 void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (OngoingQuestInfo::CUIRewardItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -910,19 +907,22 @@ void CUIRewards::OnCreate(int width, int height) {
   rewardList->rowHeight = 41;
   rewardList->SetSize(225, 41);
   this->rewardList->Move(110, 72);
-  this->rewardList->onSelect = [this](CUIRewardItem* item, const CRewardItemData& data) { this->OnPrepareItem(item, data); };
-  this->rewardList->binder = [this](CUIRewardItem* item, const CRewardItemData& data) { this->OnBindItem(item, data); };
+  this->rewardList->SetOnSelect([this](CUIRewardItem* item, const CRewardItemData& data) { this->OnPrepareItem(item, data); });
+  this->rewardList->SetBinder([this](CUIRewardItem* item, const CRewardItemData& data) { this->OnBindItem(item, data); });
   this->rewardList->SetImages("", "", "", "");
-  this->rewardList->itemX = 0;
-  this->rewardList->itemY = 0;
+  {
+    CUIListBoxEx<CUIRewardItem, CRewardItemData>* rewardList = this->rewardList;
+    rewardList->itemX = 0;
+    rewardList->itemY = 0;
+  }
   this->rewardList->scrollBar->SetSize(7, 41);
   this->rewardList->scrollBar->Move(218, 0);
   this->rewardList->scrollBar->step = 41;
-  this->rewardList->scrollBar->SetButtonImages(
+  this->rewardList->SetScrollBarButtonImages(
     "유저인터페이스\\Renew_QuestUI\\bt_scrollbar_arrow_upper.bmp", "유저인터페이스\\Renew_QuestUI\\bt_scrollbar_arrow_down.bmp"
   );
-  this->rewardList->scrollBar->SetBackground("");
-  this->rewardList->scrollBar->SetThumbImages(
+  this->rewardList->SetScrollBarBackground("");
+  this->rewardList->SetScrollBarThumbImages(
     "유저인터페이스\\Renew_QuestUI\\bt_scrollBar_up.bmp", "유저인터페이스\\Renew_QuestUI\\bt_scrollBar_mid.bmp",
     "유저인터페이스\\Renew_QuestUI\\bt_scrollBar_down.bmp"
   );

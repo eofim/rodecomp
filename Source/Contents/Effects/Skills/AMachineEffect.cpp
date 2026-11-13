@@ -16,19 +16,19 @@ CAMachineEffect::CAMachineEffect() : CEffect(-1), state(0) {
 void CAMachineEffect::Open() {
   this->retained = 1;
 
-  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (particle) {
     particle->Load("a_machine\\a_machine\\a_machine_attack_waiting.str");
     this->stateParticles[0] = particle;
   }
 
-  particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (particle) {
     particle->Load("a_machine\\a_machine\\a_machine_attack.str");
     this->stateParticles[1] = particle;
   }
 
-  particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (particle) {
     particle->Load("a_machine\\a_machine\\a_machine_waiting.str");
     particle->m_loop = true;
@@ -62,9 +62,10 @@ void CAMachineEffect::OnProcess() {
     return;
   }
 
-  const float x = this->position[0];
-  const float y = this->position[1];
-  const float z = this->position[2];
+  const vector3d source = this->positionVector;
+  const float x = source.x;
+  const float y = source.y;
+  const float z = source.z;
   const matrix view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
   const float* inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse.values;
   float viewX = view.values[0] * x + view.values[3] * y + view.values[6] * z + view.values[9] + 0.0f;

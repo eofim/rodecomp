@@ -37,7 +37,7 @@ void CCharacterLinkedUserDataMgr::CompleteLoad(
 
     {
       const Json::Value sorting = root["data"]["SortPrivateTab"];
-      g_sortPrivateTab = sorting.isNull() ? false : sorting.asBool();
+      g_session.m_sortPrivateTab = sorting.isNull() ? false : sorting.asBool();
     }
 
     this->LoadNormalItemSlots(root["data"]);
@@ -64,7 +64,8 @@ void CCharacterLinkedUserDataMgr::Load(std::uint32_t accountId, std::uint32_t ch
     return;
   }
 
-  g_asyncWorkMgr->LoadCharacter(
-    accountId, characterId, accountName, this->LoadUrl(), std::string(reinterpret_cast<const char*>(&g_session.webServiceLoginData[0x08]), 16)
+  CAsyncWorkMgr* manager = g_asyncWorkMgr;
+  manager->LoadCharacter(
+    accountId, characterId, accountName, this->LoadUrl(), std::string(g_session.m_webAuthToken, 16)
   );
 }

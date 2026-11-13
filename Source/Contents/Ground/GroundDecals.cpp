@@ -9,6 +9,10 @@
 #include "Resource/World/TerrainResource.h"
 #include "Utility/Math/ScalarConversion.h"
 
+// STATIC: 0x01347EB0
+// GLOBAL: gl_25477
+float g_groundGridUV[8] = {0, 0, 1, 0, 0, 1, 1, 1};
+
 // OFFSET: 0x00AC0A90
 // FUNCTION: fn_17569
 bool GroundGeometry::CellRectangle(int column, int row, float* vertices) const {
@@ -71,7 +75,8 @@ namespace {
       return;
     }
 
-    for (auto& vertex : vertices) {
+    for (int index = 0; index < 4; ++index) {
+      float* vertex = vertices[index];
       if (column & 1) {
         if (vertices[1][0] > vertex[0]) {
           vertex[0] = (vertices[1][0] - vertex[0]) * 0.5f + vertex[0];
@@ -96,8 +101,8 @@ namespace {
       primitive->vertices[corner].z = primitive->vertices[corner].z - bias;
     }
 
-    const float scaleU = static_cast<float>(texture.Width()) / static_cast<float>(texture.TextureWidth());
-    const float scaleV = static_cast<float>(texture.Height()) / static_cast<float>(texture.TextureHeight());
+    const float scaleU = static_cast<float>(texture.ImageWidth()) / static_cast<float>(texture.TextureWidth());
+    const float scaleV = static_cast<float>(texture.ImageHeight()) / static_cast<float>(texture.TextureHeight());
 
     for (unsigned corner = 0; corner < 4; ++corner) {
       primitive->vertices[corner].u = scaleU * uv[corner * 2];
@@ -142,11 +147,8 @@ __declspec(noinline) void GroundGeometry::DrawGridDecal(
 void GroundGeometry::DrawGrid(
   const float* matrix, int column, int row, std::uint32_t color
 ) const {
-  // STATIC: 0x01347EB0
-  // GLOBAL: gl_25477
-  static const float uv[8] = {0, 0, 1, 0, 0, 1, 1, 1};
   this->DrawGridDecal(
-    matrix, column, row, color, *g_texMgr.Load("grid.tga", 0, false, true, false), uv
+    matrix, column, row, color, *g_texMgr.Load("grid.tga", 0, false, true, false), g_groundGridUV
   );
 }
 

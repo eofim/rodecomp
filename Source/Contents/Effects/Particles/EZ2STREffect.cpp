@@ -1,3 +1,4 @@
+#include "Contents/Actors/Pc.h"
 #include "Contents/Effects/Particles/EZ2STREffect.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
@@ -5400,7 +5401,7 @@ void CEZ2STRScreenEffect::OnProcess() {
   if (this->id == 0x851) {
     int frame = this->particle->elapsedFrames - 30;
     if (frame >= 0 && frame % 64 == 0) {
-      CRenderObject* player = reinterpret_cast<CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
+      CRenderObject* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
       g_soundMgr->PlayWave(
         "effect\\ABC_ABYSS_SQUARE.wav", player->render.position.x - this->position[0], 0.0f, player->render.position.z - this->position[2], 250, 40, 1.0f, 0
       );
@@ -5603,7 +5604,7 @@ int CEZ2STRScreenEffect::GetFrame() {
 // FUNCTION: fn_19039
 void CEZ2STRScreenEffect::Open() {
   CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(
-    CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5)
+    CreateEZ2STRParticle(&this->positionVector, 5)
   );
   if (!particle) {
     return;
@@ -5760,7 +5761,7 @@ void CEZ2STRScreenEffect::Open() {
     particle->m_loop = true;
   }
 
-  InitParticleQuad(particle->vertices);
+  particle->InitParticleQuad(particle->vertices);
   this->particle = particle;
   this->InitParticle(particle, this->id);
 
@@ -6505,14 +6506,14 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_WOODEN_WARRIOR_THROWROCK: {
-    const double angle = ScreenAngle(*reinterpret_cast<const vector3d*>(this->position), *reinterpret_cast<const vector3d*>(this->sourcePosition));
+    const double angle = ScreenAngle(this->positionVector, this->sourcePositionVector);
     this->particle->m_angle = static_cast<float>(angle + 180.0);
     this->AddEvent(0, "effect\\BO_THROWROCK.wav", 0, 0);
     break;
   }
 
   case EF_WOODEN_WARRIOR_ATTACK: {
-    const double angle = ScreenAngle(*reinterpret_cast<const vector3d*>(this->position), *reinterpret_cast<const vector3d*>(this->sourcePosition));
+    const double angle = ScreenAngle(this->positionVector, this->sourcePositionVector);
     this->particle->m_angle = static_cast<float>(angle + 180.0);
     this->AddEvent(0, "effect\\BO_WOODEN_ATTACK.wav", 0, 0);
     break;

@@ -29,13 +29,17 @@ void CSphereWindEffect::Open() {
     const int id = this->id;
     int tilt = start;
     for (int ring = 0; ring < 4; ++ring) {
-      const float radius = static_cast<float>(std::max(rand() % 11, 0)) * 0.2f + 4.0f;
-      const int rotation = std::max(rand() % 360, 0);
-      const int spread = std::max(rand() % 91, 0) + 180;
-      const int spin = std::max(rand() % 4, 0) + 3;
+      const int radiusRoll = rand() % 11;
+      const float radius = static_cast<float>(radiusRoll >= 0 ? radiusRoll : 0) * 0.2f + 4.0f;
+      const int rotationRoll = rand() % 360;
+      const int rotation = rotationRoll >= 0 ? rotationRoll : 0;
+      const int spreadRoll = rand() % 91;
+      const int spread = (spreadRoll >= 0 ? spreadRoll : 0) + 180;
+      const int spinRoll = rand() % 4;
+      const int spin = (spinRoll >= 0 ? spinRoll : 0) + 3;
 
       for (int segment = 0; segment < 21; ++segment) {
-        CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+        CParticle* particle = CreateParticle(&this->positionVector, 5);
         if (!particle) {
           continue;
         }
@@ -46,13 +50,13 @@ void CSphereWindEffect::Open() {
         particle->groupIndex = 1;
         particle->speedParameter = radius;
         particle->scale = 14.0f;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(rotation);
+        particle->angle = static_cast<float>(rotation);
         particle->phaseParameter = tilt;
         particle->alpha = 100;
         particle->angleParameter = spread;
         particle->animationParameter = -14.0f;
-        *reinterpret_cast<float*>(particle->animationParameters) = static_cast<float>(spin);
-        InitParticleQuad(particle->vertices);
+        particle->animationParameters[0] = static_cast<float>(spin);
+        particle->InitParticleQuad(particle->vertices);
         this->particles.push_back(particle);
 
         if (id == 346) {
@@ -91,9 +95,9 @@ void CSphereWindEffect::OnProcess() {
 // OFFSET: 0x00B78480
 // FUNCTION: fn_19192
 __declspec(noinline) void CSphereWindEffect::UpdateParticle(CParticle* particle) {
-  float& rotation = *reinterpret_cast<float*>(&particle->angleBits);
+  float& rotation = particle->angle;
   if (particle) {
-    float value = *reinterpret_cast<const float*>(particle->animationParameters) + rotation;
+    float value = *static_cast<const float*>(particle->animationParameters) + rotation;
     if (value >= 360.0f) {
       value -= 360.0f;
     }

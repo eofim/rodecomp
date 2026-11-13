@@ -18,8 +18,7 @@ ScreenDimensions* DefaultResolution(ScreenDimensions* output);
 struct RenderSystemHolder {
   /* 0000 */ CRenderSystemBase* system;
 
-  RenderSystemHolder() : system(nullptr) {
-  }
+  RenderSystemHolder();
   ~RenderSystemHolder() noexcept;
   CRenderer* CreateRenderer();
   CSurface* CreateSurface(std::uint32_t width, std::uint32_t height);
@@ -71,7 +70,7 @@ public:
     int x, int y, const CSprRes& sprite, const ActionFrame& frame, const std::uint32_t* palette
   ) override;
   void DrawSurface(
-    int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter, int format
+    int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter
   ) override;
   void Fill(const RECT* rectangle, std::uint32_t color) override;
   void Draw(int x, int y, int width, int height, std::uint32_t color) override;

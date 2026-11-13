@@ -68,6 +68,7 @@
 #include "Contents/Effects/Skills/WindEffect.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Client/Mode/CGameMode.h"
 #include "Client/Session/Session.h"
@@ -450,10 +451,15 @@ struct CEffectAllocator : CAllocator {
 // OFFSET: 0x00B1D9E0
 // FUNCTION: fn_18561
 __declspec(noinline) EncryptedName<0x44, 0x2F8B0F37118D157FULL>& ThunderingOrbName() {
-  constexpr auto sourceText = CRYPT_NAME("DRUID\\KR_THUNDERING_ORB\\thundering_orb_orb\\thundering_orb_small.str", 0x2F8B0F37118D157FULL);
-  const auto& source = sourceText.data;
-  thread_local EncryptedName<sizeof(source), 0x2F8B0F37118D157FULL> name(source);
-  return name;
+  OBFUSCATE_STRING_BODY("DRUID\\KR_THUNDERING_ORB\\thundering_orb_orb\\thundering_orb_small.str", 0x2F8B0F37118D157FULL);
+}
+
+// INLINED
+__forceinline EffectLists::EffectLists() {
+  this->initialized = false;
+  if (this->RegisterAllocators()) {
+    this->initialized = true;
+  }
 }
 
 // OFFSET: 0x00B24FA0
@@ -463,15 +469,7 @@ bool CreateEffectMgr() {
     return false;
   }
 
-  EffectLists* mgr = new (std::nothrow) EffectLists;
-  if (mgr) {
-    mgr->initialized = false;
-    if (mgr->RegisterAllocators()) {
-      mgr->initialized = true;
-    }
-  }
-
-  g_effectMgr = mgr;
+  g_effectMgr = new (std::nothrow) EffectLists;
   if (!g_effectMgr) {
     return false;
   }
@@ -522,9 +520,10 @@ void EffectLists::SpawnLevel99(CRenderObject* actor, unsigned char flag, int ext
 
     effect->SetActor(static_cast<std::uint32_t>(aid));
     effect->SetSourceActor(0);
-    effect->position[0] = position.x;
-    effect->position[1] = position.y;
-    effect->position[2] = position.z;
+    float* target = effect->position;
+    target[0] = position.x;
+    target[1] = position.y;
+    target[2] = position.z;
     effect->SetId(EF_LEVEL99);
     effect->Open();
     effect->InitEvents();
@@ -547,9 +546,7 @@ CEffect* CEffectAllocator<CThunderingOrb>::Create() {
 
 // INLINED
 EncryptedName<0x3B, 0x39FF7FB50DEB998FULL>& WindBombName() {
-  const char source[] = CRYPT_CHARS(59, "DRUID\\DR_WIND_BOMB\\wind_bomb_tornado\\wind_bomb_tornado.str", 0x39FF7FB50DEB998FULL);
-  thread_local EncryptedName<sizeof(source), 0x39FF7FB50DEB998FULL> name(source);
-  return name;
+  OBFUSCATE_STRING_BODY("DRUID\\DR_WIND_BOMB\\wind_bomb_tornado\\wind_bomb_tornado.str", 0x39FF7FB50DEB998FULL);
 }
 
 // OFFSET: 0x00B20E70
@@ -1370,7 +1367,7 @@ CMeteorEffect::~CMeteorEffect() {
 
 // OFFSET: 0x00B1D6E0
 // FUNCTION: fn_18558
-CShadowExceedNew::~CShadowExceedNew() {
+__declspec(noinline) CShadowExceedNew::~CShadowExceedNew() {
 }
 
 CSprArrowEffect::~CSprArrowEffect() {
@@ -5196,7 +5193,7 @@ bool HasEffectScript(std::string path, std::string name) {
 
   std::string emitterKey = EmitterKey(name, "emitterInfo");
   g_session.m_hotkeyScript->Call("IsExistValue", "s>b", emitterKey.c_str(), &exists);
-  return exists;
+  return exists ? true : false;
 }
 
 // OFFSET: 0x00B3B0A0

@@ -2,6 +2,7 @@
 #include "Contents/Effects/Particles/SpriteEffect.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
@@ -15,13 +16,6 @@
 #include <cstdint>
 
 namespace {
-
-// INLINED
-template <std::uint64_t Key, std::size_t Length>
-const char* DecryptName(const char (&source)[Length]) {
-  thread_local EncryptedName<Length, Key> name(source);
-  return name.Text();
-}
 
 }
 
@@ -43,15 +37,16 @@ void CSpriteEffect::Close() {
 // OFFSET: 0x00B78B40
 // FUNCTION: fn_19197
 void CSpriteEffect::Open() {
-  CSpriteParticle* particle = static_cast<CSpriteParticle*>(CreateSpriteParticle(reinterpret_cast<const vector3d*>(this->position), 0x200));
+  CSpriteParticle* particle = static_cast<CSpriteParticle*>(CreateSpriteParticle(&this->positionVector, 0x200));
   if (!particle) {
     return;
   }
 
   particle->effectId = this->id;
-  particle->columnIndex = 1;
-  particle->rowIndex = 0;
-  particle->groupIndex = 1;
+  int* indices = &particle->groupIndex;
+  indices[1] = 1;
+  indices[2] = 0;
+  indices[0] = 1;
   this->SetupParticle(particle);
   particle->actorId = this->actor;
   this->particles.push_back(particle);
@@ -336,13 +331,9 @@ void CSpriteEffect::SetupParticle(CSpriteParticle* particle) {
     particle->frameDelay = 8.0f;
     break;
   case EF_UNK_2443: {
-    constexpr auto spriteSourceText = CRYPT_NAME("이팩트\\C_2025RosFesta.spr", 0xDB27CB557D038759ULL);
-    const auto& spriteSource = spriteSourceText.data;
-    particle->SetSprite(DecryptName<0xDB27CB557D038759ULL>(spriteSource));
+    particle->SetSprite(OBFUSCATE_TEXT("이팩트\\C_2025RosFesta.spr", 0xDB27CB557D038759ULL));
 
-    constexpr auto actionSourceText = CRYPT_NAME("이팩트\\C_2025RosFesta.act", 0x51BB39B763BBBD8DULL);
-    const auto& actionSource = actionSourceText.data;
-    particle->SetAction(DecryptName<0x51BB39B763BBBD8DULL>(actionSource));
+    particle->SetAction(OBFUSCATE_TEXT("이팩트\\C_2025RosFesta.act", 0x51BB39B763BBBD8DULL));
     particle->flags = 1;
     particle->depthOffset = 0.0015f;
     particle->loopMode = 0;

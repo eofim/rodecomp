@@ -27,7 +27,7 @@ void CMagicFloorEffect::AddFloors() {
   };
 
   for (int index = 0; index < 6; ++index) {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
     if (!particle) {
       continue;
     }
@@ -38,10 +38,10 @@ void CMagicFloorEffect::AddFloors() {
     particle->rowIndex = 0;
     particle->groupIndex = 1;
     particle->alpha = 255;
-    *reinterpret_cast<float*>(&particle->angleBits) = 0.0f;
+    particle->angle = 0.0f;
     particle->phaseParameter = 0;
     particle->scale = 30.0f;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     this->floors.push_back(particle);
   }
 }
@@ -50,9 +50,10 @@ void CMagicFloorEffect::AddFloors() {
 // FUNCTION: fn_18930
 void CMagicFloorEffect::AddClouds(int layer) {
   for (int ring = 0; ring < 4; ++ring) {
-    const int angle = std::max(0, rand() % 360);
+    const int roll = rand() % 360;
+    const int angle = roll >= 0 ? roll : 0;
     for (int segment = 0; segment < 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -64,8 +65,9 @@ void CMagicFloorEffect::AddClouds(int layer) {
       particle->groupIndex = 1;
       particle->alpha = 200;
       particle->angleParameter = 30;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(angle);
-      particle->phaseParameter = std::max(0, rand() % 21) + 80;
+      particle->angle = static_cast<float>(angle);
+      const int phase = rand() % 21;
+      particle->phaseParameter = (phase >= 0 ? phase : 0) + 80;
       particle->animationParameter = 1.0f;
       particle->SetColor(255, 100, 100);
 
@@ -77,7 +79,7 @@ void CMagicFloorEffect::AddClouds(int layer) {
         particle->scale = 22.0f;
       }
 
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->particles.push_back(particle);
     }
   }
@@ -116,13 +118,13 @@ void CMagicFloorEffect::ResetParticles() {
     particle->position.x = this->position[0];
     particle->position.y = this->position[1];
     particle->position.z = this->position[2];
-    particle->scale = *reinterpret_cast<const float*>(&this->scaleParameter);
-    *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(*reinterpret_cast<const int*>(this->angleParameter));
-    particle->phaseParameter = static_cast<int>(static_cast<float>(particle->rowIndex) * *reinterpret_cast<const float*>(&this->rotationParameter));
-    particle->alpha = *reinterpret_cast<const int*>(this->alphaParameters);
+    particle->scale = this->scaleParameter;
+    particle->angle = static_cast<float>(this->baseAngle);
+    particle->phaseParameter = static_cast<int>(static_cast<float>(particle->rowIndex) * this->rotationParameter);
+    particle->alpha = this->baseAlpha;
     particle->sourceBlend = 5;
     particle->destinationBlend = 7;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     particle->elapsedFrames = 0;
   }
 }
@@ -138,12 +140,13 @@ bool CMagicFloorEffect::IsAlive() {
 void CMagicFloorEffect::OnProcess() {
   for (std::vector<CParticle*>::iterator it = this->floors.begin(); it != this->floors.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
 
     if (particle) {
-      const float current = *reinterpret_cast<const float*>(&particle->angleBits);
+      const float current = particle->angle;
       int angle = 0;
       switch (particle->columnIndex) {
       case 0:
@@ -166,7 +169,7 @@ void CMagicFloorEffect::OnProcess() {
         angle += 360;
       }
 
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(angle);
+      particle->angle = static_cast<float>(angle);
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
       rotation.MakeZRotation(static_cast<float>(angle) / 180.0f * 3.141592f);
@@ -184,17 +187,18 @@ void CMagicFloorEffect::OnProcess() {
 
   for (std::vector<CParticle*>::iterator it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
 
     if (particle) {
-      const int direction = static_cast<int>(*reinterpret_cast<const float*>(&particle->angleBits) + 5.0f) % 360;
+      const int direction = static_cast<int>(particle->angle + 5.0f) % 360;
       const int sweep = std::min(particle->angleParameter + 3, 180);
       particle->angleParameter = sweep;
       int alpha = particle->alpha;
       const int phase = particle->elapsedFrames % 300;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(direction);
+      particle->angle = static_cast<float>(direction);
       if (phase == 0) {
         alpha = 50;
       } else if (phase > 100) {
@@ -209,14 +213,14 @@ void CMagicFloorEffect::OnProcess() {
       const float radius = particle->animationParameter;
       const int angle =
         static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(sweep) / 20.0f) * segment) +
-                         *reinterpret_cast<const float*>(&particle->angleBits)) %
+                         particle->angle) %
         360;
       const int tilt = particle->phaseParameter;
       const float spread = radius * g_cosTable[tilt];
       const float height = radius * g_sinTable[tilt];
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];
-      const float floorRadius = *reinterpret_cast<const float*>(&this->scaleParameter);
+      const float floorRadius = this->scaleParameter;
 
       EffectPoint points[4];
       points[0].x = floorRadius * cosine;

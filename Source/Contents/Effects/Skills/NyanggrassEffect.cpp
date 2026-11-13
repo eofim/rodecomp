@@ -86,14 +86,14 @@ void CMultiTexParticle::AllocateVertices(int count) {
 // OFFSET: 0x007080F0
 // FUNCTION: fn_07069
 void CMultiTexParticle::Render(int column, int row) {
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-  if (!gameMode->scene->ground) {
+  GroundGeometry* ground = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->ground;
+  if (!ground) {
     return;
   }
 
   EffectPoint corners[4];
 
-  if (!gameMode->scene->ground->TerrainCellCorners(column, row, &corners[0].x)) {
+  if (!ground->TerrainCellCorners(column, row, &corners[0].x)) {
     return;
   }
 
@@ -107,10 +107,14 @@ void CMultiTexParticle::Render(int column, int row) {
     g_renderer->viewport.Project(&corners[i].x, cameraMatrix, this->command.vertices[i]);
     this->command.vertices[i].z -= 0.000030517578125f;
     this->command.vertices[i].diffuse = 0xFFFFFFFF;
-    this->command.vertices[i].u = this->uv1[i][0] + this->offsetU;
-    this->command.vertices[i].v = this->uv1[i][1] + this->offsetV;
-    this->command.vertices[i].lightU = this->uv2[i][0];
-    this->command.vertices[i].lightV = this->uv2[i][1];
+    const float u = this->uv1[i][0] + this->offsetU;
+    const float v = this->uv1[i][1] + this->offsetV;
+    this->command.vertices[i].u = u;
+    this->command.vertices[i].v = v;
+    const float lightU = this->uv2[i][0];
+    const float lightV = this->uv2[i][1];
+    this->command.vertices[i].lightU = lightU;
+    this->command.vertices[i].lightV = lightV;
   }
 
   g_renderer->SubmitAuxiliaryPrimitive(reinterpret_cast<LightmappedPrimitive*>(&this->command));
@@ -150,7 +154,7 @@ void CNyanggrassEffect::Open() {
 
   for (int row = 0; row < this->gridSize; ++row) {
     for (int column = 0; column < this->gridSize; ++column) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 1);
+      CParticle* particle = CreateEZ2STRParticle(&this->positionVector, 1);
       if (particle) {
         CEZ2STRParticle* effect = static_cast<CEZ2STRParticle*>(particle);
         effect->effectId = this->id;
@@ -158,12 +162,14 @@ void CNyanggrassEffect::Open() {
         effect->rowIndex = 0;
         effect->groupIndex = 1;
         effect->m_loop = true;
-        const vector3d origin = *reinterpret_cast<const vector3d*>(this->position);
+        const vector3d origin = this->positionVector;
         const int half = this->gridSize / 2;
-        effect->position.x = static_cast<float>((column - half) * 5) + origin.x;
+        const float x = static_cast<float>((column - half) * 5) + origin.x;
+        const float z = static_cast<float>((row - half) * 5) + origin.z;
+        effect->position.x = x;
         effect->position.y = origin.y;
-        effect->position.z = static_cast<float>((row - half) * 5) + origin.z;
-        InitParticleQuad(effect->vertices);
+        effect->position.z = z;
+        effect->InitParticleQuad(effect->vertices);
         effect->Open("su_nyanggrass\\su_nyanggrass.str");
         this->particles.push_back(particle);
       }

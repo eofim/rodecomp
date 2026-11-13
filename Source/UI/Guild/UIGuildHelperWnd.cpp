@@ -1,4 +1,5 @@
 #include "UI/Guild/UIGuildHelperWnd.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
@@ -323,7 +324,11 @@ void UIGuildHelperWnd::OnCreate(int width, int height) {
     this->m_button->SetBitmap((prefix + names[i][1] + ".bmp").c_str(), 1, 0);
     this->m_button->SetBitmap((prefix + names[i][2] + ".bmp").c_str(), 2, 0);
     this->m_button->SetSize(this->m_button->BitmapWidth(), this->m_button->BitmapHeight());
-    this->m_button->Move(i < 2 ? x : width - 52, height - 24);
+    if (i < 2) {
+      this->m_button->Move(x, height - 24);
+    } else {
+      this->m_button->Move(width - 52, height - 24);
+    }
     this->m_button->SetId(ids[i]);
     this->AddChild(this->m_button);
     x += 62;
@@ -399,9 +404,8 @@ void UIGuildTipWnd::OnCreate(int width, int height) {
   unsigned int red;
   unsigned int green;
   unsigned int blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
-  this->m_textViewer->backgroundColor = 0xFF000000 | RGB(red, green, blue);
-  this->m_textViewer->Invalidate();
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  this->m_textViewer->SetBackgroundColor(0xFF000000 | RGB(red, green, blue));
   this->AddChild(this->m_textViewer);
 
   if (!g_guildTip.m_bTryLoading) {

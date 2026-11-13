@@ -20,7 +20,7 @@
 // OFFSET: 0x00544A60
 // FUNCTION: fn_01820
 std::uint32_t __fastcall sub_544A60(const CRenderer* renderer) {
-  return renderer->viewDirectionZ;
+  return reinterpret_cast<const std::uint32_t&>(renderer->viewDirectionZ);
 }
 
 // OFFSET: 0x0055D150
@@ -69,7 +69,7 @@ void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
   CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("이팩트\\RankFont.spr"));
 
   int digits[2];
-  int score = g_session.m_score1 < 0 ? 0 : g_session.m_score1;
+  int score = g_session.m_score1 >= 0 ? g_session.m_score1 : 0;
   int count = (score > 9) + 1;
   digits[0] = score % 10;
   digits[1] = (score /= 10) % 10;
@@ -89,7 +89,7 @@ void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
     }
   }
 
-  score = g_session.m_score2 < 0 ? 0 : g_session.m_score2;
+  score = g_session.m_score2 >= 0 ? g_session.m_score2 : 0;
   count = (score > 9) + 1;
   digits[0] = score % 10;
   digits[1] = (score /= 10) % 10;

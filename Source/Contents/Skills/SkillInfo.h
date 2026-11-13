@@ -93,6 +93,25 @@ public:
   }
 };
 
+struct EfstActionRegistrar {
+  EfstActionRegistrar(int efstId, std::function<CEfstAction*()> factory);
+};
+
+struct SkillActionRegistrar {
+  SkillActionRegistrar(int skillId, std::function<CSkillAction*()> factory);
+};
+
+class CSkillObjectActionRegistration {
+public:
+  CSkillObjectActionRegistration(int skillId, std::function<CSkillObjectAction*()> factory);
+};
+
+// INLINED
+template <class Action, class Base>
+Base* NewAction() {
+  return new Action;
+}
+
 struct SkillInfoEntry {
   // INLINED
   SkillInfoEntry& operator=(const SkillInfoEntry& other) {
@@ -117,13 +136,37 @@ public:
   virtual ~CSkillInfo();
   __declspec(noinline) bool IsValid() const;
   bool MatchesShortcut(const NormalItemSlot* slot) const;
-  int UseApAmount(LuaScript& script, int skillLevel) const;
-  int UseSpAmount(LuaScript& script, int skillLevel) const;
-  const char* DisplayName(LuaScript& script) const;
-  const char* IdName(LuaScript& script) const;
-  static const char* DisplayName(LuaScript& script, int skillId);
-  static const char* IdName(LuaScript& script, int skillId);
-  static bool UsesLevel(LuaScript& script, int skillId);
+  int UseApAmount(int skillLevel) const;
+  // INLINED
+  __declspec(noinline) int UseApAmount(LuaScript&, int skillLevel) const {
+    return this->UseApAmount(skillLevel);
+  }
+  int UseSpAmount(int skillLevel) const;
+  // INLINED
+  __declspec(noinline) int UseSpAmount(LuaScript&, int skillLevel) const {
+    return this->UseSpAmount(skillLevel);
+  }
+  const char* DisplayName() const;
+  const char* IdName() const;
+  // INLINED
+  __declspec(noinline) const char* IdName(LuaScript&) const {
+    return this->IdName();
+  }
+  static const char* DisplayName(int skillId);
+  // INLINED
+  __declspec(noinline) static const char* DisplayName(LuaScript&, int skillId) {
+    return CSkillInfo::DisplayName(skillId);
+  }
+  static const char* IdName(int skillId);
+  // INLINED
+  __declspec(noinline) static const char* IdName(LuaScript&, int skillId) {
+    return CSkillInfo::IdName(skillId);
+  }
+  static bool UsesLevel(int skillId);
+  // INLINED
+  __declspec(noinline) static bool UsesLevel(LuaScript&, int skillId) {
+    return CSkillInfo::UsesLevel(skillId);
+  }
 
   /* 0004 */ std::int32_t available;
   /* 0008 */ std::uint32_t id;

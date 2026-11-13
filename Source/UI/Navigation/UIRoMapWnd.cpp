@@ -36,7 +36,8 @@
 #include <new>
 #include <vector>
 
-extern template void std::string::resize(size_type, char);
+template __declspec(noinline) std::vector<std::string>& std::map<std::string, std::vector<std::string>>::operator[](const std::string&);
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 // GLOBAL: gl_24799
 CWorldViewMgr g_worldViewMgr;
@@ -58,8 +59,8 @@ void SetRoMapMarker(std::string name, const WorldViewArea& area, RoMapMarker& ma
 
   marker.name = name;
   marker.area = area;
-  marker.centerX = centerX;
-  marker.centerY = centerY;
+  marker.center[0] = centerX;
+  marker.center[1] = centerY;
   marker.width = static_cast<float>(width);
   marker.height = static_cast<float>(height);
 }
@@ -68,9 +69,9 @@ void SetRoMapMarker(std::string name, const WorldViewArea& area, RoMapMarker& ma
 // FUNCTION: fn_12622
 __declspec(noinline) void UIRoMapWnd::ClearRecords() {
   this->m_records.clear();
-  this->previewTexture = 0;
+  this->previewTexture = nullptr;
   this->hoverTooltip = 0;
-  this->previewArea = 0;
+  this->previewArea = nullptr;
   this->selectedRecord = 0;
   this->hoveredRecord = 0;
   this->padding_00CC = 0;
@@ -79,24 +80,23 @@ __declspec(noinline) void UIRoMapWnd::ClearRecords() {
 // OFFSET: 0x0091E0F0
 // FUNCTION: fn_12625
 void UIRoMapWnd::ResetKafraBounds() {
-  *reinterpret_cast<int*>(reinterpret_cast<unsigned char*>(this) + 0x21C) = 0;
-  *reinterpret_cast<int*>(reinterpret_cast<unsigned char*>(this) + 0x224) = 0;
-  *reinterpret_cast<int*>(reinterpret_cast<unsigned char*>(this) + 0x218) = 0;
-  *reinterpret_cast<int*>(reinterpret_cast<unsigned char*>(this) + 0x220) = 0;
+  this->m_kafraTop = 0;
+  this->m_kafraBottom = 0;
+  this->m_kafraLeft = 0;
+  this->m_kafraRight = 0;
 }
 
 // OFFSET: 0x0091EBA0
 // FUNCTION: fn_12634
 void UIRoMapWnd::UpdateNavigationButtons() {
-  UIWindow** buttons = reinterpret_cast<UIWindow**>(reinterpret_cast<unsigned char*>(this) + 0x20C);
-  if (g_windowMgr.navigationWnd != nullptr && !g_navigationManager.expandedMap) {
-    buttons[0]->Move(-100, -100);
-    buttons[1]->Move(-100, -100);
-    buttons[2]->Move(-100, -100);
+    if (g_windowMgr.navigationWnd != nullptr && !g_navigationManager.expandedMap) {
+    this->m_searchButton->Move(-100, -100);
+    this->m_searchListButton->Move(-100, -100);
+    this->m_searchEdit->Move(-100, -100);
   } else {
-    buttons[0]->Move(335, 0);
-    buttons[1]->Move(375, 3);
-    buttons[2]->Move(131, 0);
+    this->m_searchButton->Move(335, 0);
+    this->m_searchListButton->Move(375, 3);
+    this->m_searchEdit->Move(131, 0);
     g_navigationManager.hideWindow = true;
   }
 
@@ -129,17 +129,17 @@ void UIRoMapWnd::DrawHoverTooltip() {
   int maxWidth = 0;
   const int lineHeight = this->TextHeight(" ", 0, 0, 12, 1, 0) + 3;
   const WorldViewRecord* record = this->hoveredRecord;
-  const int* anchor = this->previewArea;
+  const WorldViewArea* anchor = this->previewArea;
   const RECT rect = reinterpret_cast<const RECT&>(record->left);
   int x;
-  if (anchor[2] < rect.right) {
+  if (anchor->right < rect.right) {
     leftSide = true;
-    x = anchor[0] - 10;
+    x = anchor->left - 10;
   } else {
-    x = anchor[2] + 10;
+    x = anchor->right + 10;
   }
 
-  int y = anchor[1];
+  int y = anchor->top;
   int count = 0;
   for (std::list<std::string>::const_iterator it = record->relatedNames.begin(); it != this->hoveredRecord->relatedNames.end(); ++it) {
     const int width = this->TextWidth(it->c_str(), 0, 0, 12, 1, 0);
@@ -164,8 +164,8 @@ void UIRoMapWnd::DrawHoverTooltip() {
 
   int textY = y + 5;
   for (std::list<std::string>::const_iterator it = this->hoveredRecord->relatedNames.begin(); it != this->hoveredRecord->relatedNames.end(); ++it) {
-    const std::uint32_t color = std::strcmp(it->c_str(), g_session.DecodePlayerName()) == 0 ? 0x8080F0 : 0xFFFFFF;
-    DrawOutlinedText(*this, boxX + 5, textY, it->c_str(), 0, color, 0, 0, 12, 1, 0);
+    const std::uint32_t color = std::strcmp(it->c_str(), g_session.DecodePlayerName()) != 0 ? 0xFFFFFF : 0x8080F0;
+    this->DrawOutlinedText(boxX + 5, textY, it->c_str(), 0, color, 0, 0, 12, 1, 0);
     textY += lineHeight;
   }
 
@@ -277,7 +277,7 @@ void UIRoMapWnd::DrawFieldLabels() {
       }
 
       const int levelX = CenteredTextX(*this, name, field->left, field->right, levelHeight, 1);
-      DrawOutlinedText(*this, levelX, levelY, name.c_str(), 0, levelColor, levelOutline, 0, levelHeight, 1, 0);
+      this->DrawOutlinedText(levelX, levelY, name.c_str(), 0, levelColor, levelOutline, 0, levelHeight, 1, 0);
     }
   }
 }
@@ -294,9 +294,9 @@ void UIRoMapWnd::DrawRecordBorders() {
     const int width = it->right - it->left;
     const int height = it->bottom - it->top;
     if (mapName == it->name) {
-      DrawRoundedBorder(*this, it->left, it->top, width, height, 0x23AEE8);
+      this->DrawRoundedOutline(it->left, it->top, width, height, 0x23AEE8);
     } else {
-      DrawRoundedBorder(*this, it->left, it->top, width, height, 0x7EE2F7);
+      this->DrawRoundedOutline(it->left, it->top, width, height, 0x7EE2F7);
     }
   }
 }
@@ -323,14 +323,7 @@ void UIRoMapWnd::DrawDungeonLinks() {
     int y;
     int width;
     int height;
-    if (map->fields.empty()) {
-      isSelected = selected != nullptr && map->left == selected->left && map->right == selected->right && map->top == selected->top &&
-                   map->bottom == selected->bottom;
-      x = map->left;
-      y = map->top;
-      width = map->right - map->left;
-      height = map->bottom - map->top;
-    } else {
+    if (!map->fields.empty()) {
       const CWorldViewField* field = map->fields.front();
       isSelected = selected != nullptr && field->left == selected->left && field->right == selected->right && field->top == selected->top &&
                    field->bottom == selected->bottom;
@@ -344,14 +337,21 @@ void UIRoMapWnd::DrawDungeonLinks() {
       const float endY = static_cast<float>(mapHeight) * g_depthAverageHalf + static_cast<float>(map->top) + 1.0f;
       CTexture* const lineTexture = g_texMgr.Default();
       if (isSelected) {
-        DrawScreenLine(startX, startY, endX, endY, 1, lineTexture, (selectColor & 0xFFFFFF) - 0x1000000);
+        DrawScreenLine(ScreenPoint{startX, startY}, ScreenPoint{endX, endY}, 1, lineTexture, (selectColor & 0xFFFFFF) - 0x1000000);
       } else {
-        DrawScreenLine(startX, startY, endX, endY, 1, lineTexture, lineColor);
+        DrawScreenLine(ScreenPoint{startX, startY}, ScreenPoint{endX, endY}, 1, lineTexture, lineColor);
       }
 
       DrawTexturedRectangle(map->left, map->top, mapWidth, mapHeight, isSelected ? 0xFFFFFFFF : rectColor, positionTexture);
       x = field->left;
       y = field->top;
+    } else {
+      isSelected = selected != nullptr && map->left == selected->left && map->right == selected->right && map->top == selected->top &&
+                   map->bottom == selected->bottom;
+      x = map->left;
+      y = map->top;
+      width = map->right - map->left;
+      height = map->bottom - map->top;
     }
 
     DrawTexturedRectangle(x, y, width, height, isSelected ? 0xFFFFFFFF : rectColor, selectTexture);
@@ -380,7 +380,7 @@ void UIRoMapWnd::DrawMarks() {
         const float startY = static_cast<float>(previous[3] - previous[1]) * g_depthAverageHalf + static_cast<float>(previous[1]);
         const float endX = static_cast<float>(area[2] - area[0]) * g_depthAverageHalf + static_cast<float>(area[0]);
         const float endY = static_cast<float>(area[3] - area[1]) * g_depthAverageHalf + static_cast<float>(area[1]);
-        DrawScreenLine(startX, startY, endX, endY, 5, g_texMgr.Load("유저인터페이스\\worldview_interface\\wv_Airf2.bmp", 0, false, true, false), 0x99FFFFFF);
+        DrawScreenLine(ScreenPoint{startX, startY}, ScreenPoint{endX, endY}, 5, g_texMgr.Load("유저인터페이스\\worldview_interface\\wv_Airf2.bmp", 0, false, true, false), 0x99FFFFFF);
       }
     }
 
@@ -610,15 +610,15 @@ void UIRoMapWnd::DrawKafraMarkers(float elapsed) {
     RoMapMarker to = this->m_kafraMarkers.markers[i];
     targets.insert(std::pair<std::string, RoMapMarker>(to.name, to));
     if (to.name.size() == 10 && std::memcmp(to.name.c_str(), "izlude.rsw", 10) == 0) {
-      from.centerX = static_cast<float>(from.area.right);
-      to.centerX = to.width * 0.8f + static_cast<float>(to.area.left);
-      to.centerY = static_cast<float>(to.area.top);
+      from.center[0] = static_cast<float>(from.area.right);
+      to.center[0] = to.width * 0.8f + static_cast<float>(to.area.left);
+      to.center[1] = static_cast<float>(to.area.top);
     }
 
     CTexture* head = g_texMgr.Load("mapArrow_head.bmp", 0, true, true, false);
     CTexture* body = g_texMgr.Load("mapArrow_body.bmp", 1, true, true, false);
     this->DrawArrow(
-      from.centerX, from.centerY, to.centerX, to.centerY, static_cast<float>(from.area.left), static_cast<float>(from.area.top),
+      from.center[0], from.center[1], to.center[0], to.center[1], static_cast<float>(from.area.left), static_cast<float>(from.area.top),
       static_cast<float>(from.area.right), static_cast<float>(from.area.bottom), static_cast<float>(to.area.left), static_cast<float>(to.area.top),
       static_cast<float>(to.area.right), static_cast<float>(to.area.bottom), 10, body, 20, head, this->m_kafraMarkers.blend, 0xAAFFFFFF
     );
@@ -641,15 +641,15 @@ void UIRoMapWnd::DrawMapMarker(const RoMapMarker& marker, unsigned char skipSele
     }
   }
 
-  DrawRoundedBorder(*this, marker.area.left, marker.area.top, static_cast<int>(marker.width), static_cast<int>(marker.height), 0xFFFFFF);
+  this->DrawRoundedOutline(marker.area.left, marker.area.top, static_cast<int>(marker.width), static_cast<int>(marker.height), 0xFFFFFF);
   DrawAlphaRectangle(marker.area.left, marker.area.top, static_cast<int>(marker.width), static_cast<int>(marker.height), 0x66000000);
   std::string name = g_session.GetMapDisplayName(marker.name.c_str());
-  DrawOutlinedText(*this, marker.area.left + 2, marker.area.top + 5, name.c_str(), 0, 0xD2FF, 0, 0, 12, 1, 0);
+  this->DrawOutlinedText(marker.area.left + 2, marker.area.top + 5, name.c_str(), 0, 0xD2FF, 0, 0, 12, 1, 0);
 }
 
 // OFFSET: 0x009119B0
 // FUNCTION: fn_12522
-UIRoMapWnd::UIRoMapWnd() : UIFrameWnd(0), previewTexture(0) {
+UIRoMapWnd::UIRoMapWnd() : UIFrameWnd(0), previewTexture(nullptr) {
   g_session.m_hotkeyScript->Call("ReadKafraMoveMapServiceInfo", "");
   g_session.m_hotkeyScript->Call("ReadKafraMiniMapPosInfo", "");
   this->fieldNames.clear();
@@ -674,10 +674,10 @@ UIRoMapWnd::UIRoMapWnd() : UIFrameWnd(0), previewTexture(0) {
 
 // OFFSET: 0x009144B0
 // FUNCTION: fn_12541
-UIRoMapWnd::~UIRoMapWnd() {
-  delete reinterpret_cast<WorldViewArea*>(this->previewArea);
+__declspec(noinline) UIRoMapWnd::~UIRoMapWnd() {
+  delete this->previewArea;
   delete this->selectedRecord;
-  this->previewTexture = 0;
+  this->previewTexture = nullptr;
 }
 
 // OFFSET: 0x0091E4D0
@@ -710,10 +710,10 @@ void CFlyingShipRouteInfo::BuildRoute(const std::vector<std::string>& mapNames) 
       WorldViewArea area = {field->left, field->top, field->right, field->bottom, field->areaFlags};
       RoMapMarker marker;
       SetRoMapMarker(name, area, marker);
-      this->entries.push_back(reinterpret_cast<const FlyingShipRouteEntry&>(marker));
+      this->entries.push_back(marker);
     }
   }
-  reinterpret_cast<unsigned char*>(&this->routeState)[1] = 1;
+  this->m_routeBuilt = 1;
 }
 
 // OFFSET: 0x00938FF0
@@ -911,8 +911,8 @@ __forceinline void CFlyingShipRouteInfo::Update(UIRoMapWnd* wnd, float elapsed) 
       this->segmentIndex = index;
     }
 
-    const float dx = this->entries[index].screenPosition[0] - this->entries[index + 1].screenPosition[0];
-    const float dy = this->entries[index].screenPosition[1] - this->entries[index + 1].screenPosition[1];
+    const float dx = this->entries[index].center[0] - this->entries[index + 1].center[0];
+    const float dy = this->entries[index].center[1] - this->entries[index + 1].center[1];
     const float distance = SquareRoot(dx * dx + dy * dy);
     if (this->travelledDistance == 0.0f) {
       this->segmentLength = distance;
@@ -955,9 +955,9 @@ void UIRoMapWnd::DrawWorld() {
   const WorldViewRecord* selected = this->selectedRecord;
   if (selected != nullptr && this->previewArea != nullptr) {
     DrawAlphaRectangle(selected->left, selected->top, selected->right - selected->left, selected->bottom - selected->top, g_worldViewMgr.selectBoxColor);
-    if (this->previewTexture != 0) {
-      DrawAlphaRectangle(this->previewArea[0], this->previewArea[1], 130, 130, 0x88000000);
-      reinterpret_cast<CTexture*>(this->previewTexture)->Stretch(this->previewArea[0], this->previewArea[1], 130, 130);
+    if (this->previewTexture != nullptr) {
+      DrawAlphaRectangle(this->previewArea->left, this->previewArea->top, 130, 130, 0x88000000);
+      this->previewTexture->Stretch(this->previewArea->left, this->previewArea->top, 130, 130);
     }
   }
 

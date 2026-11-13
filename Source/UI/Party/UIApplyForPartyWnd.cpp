@@ -108,13 +108,13 @@ void UIApplyForPartyWnd::Paint() {
   this->DrawTextAt(60, 73, UIPartyInfoWnd::TypeName(this->info.type), 0, 0, 12, 0, 0, 0);
   this->DrawTextAt(10, 97, LookupMessage(MSI_JOB), 0, 0, 12, 0, 0, 0);
   this->DrawBitmap(60, 95, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-      Resolve(this->info.tanker ? "유저인터페이스\\UIadventurerAgency\\btn_job_def_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_def_off.bmp"))), false);
+      Resolve(this->info.tanker == true ? "유저인터페이스\\UIadventurerAgency\\btn_job_def_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_def_off.bmp"))), false);
   this->DrawBitmap(78, 95, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-      Resolve(this->info.healer ? "유저인터페이스\\UIadventurerAgency\\btn_job_heal_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_heal_off.bmp"))), false);
+      Resolve(this->info.healer == true ? "유저인터페이스\\UIadventurerAgency\\btn_job_heal_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_heal_off.bmp"))), false);
   this->DrawBitmap(96, 95, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-      Resolve(this->info.dealer ? "유저인터페이스\\UIadventurerAgency\\btn_job_atk_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_atk_off.bmp"))), false);
+      Resolve(this->info.dealer == true ? "유저인터페이스\\UIadventurerAgency\\btn_job_atk_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_atk_off.bmp"))), false);
   this->DrawBitmap(114, 95, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-      Resolve(this->info.assist ? "유저인터페이스\\UIadventurerAgency\\btn_job_buf_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_buf_off.bmp"))), false);
+      Resolve(this->info.assist == true ? "유저인터페이스\\UIadventurerAgency\\btn_job_buf_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_buf_off.bmp"))), false);
   this->DrawTextAt(10, 121, LookupMessage(MSI_ADVEN_DUNJUN), 0, 0, 12, 0, 0, 0);
   this->DrawTextAt(60, 121, this->info.memo.c_str(), 0, 0, 12, 0, 0, 0);
 }
@@ -173,7 +173,7 @@ int UIApplyForPartyWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
 
       const char* group = g_session.IsGuildMemberAccount(this->info.accountId) ? "GuildMember" : relationship;
       std::string code("");
-      code = ShortcutFilename(this->info.characterId);
+      code = g_session.ShortcutFilename(this->info.characterId);
       g_windowMgr.SendNotice(UIM_MAKE_WHISPER_WINDOW, reinterpret_cast<std::intptr_t>(name.c_str()), reinterpret_cast<std::intptr_t>(group), reinterpret_cast<std::intptr_t>(code.c_str()), 0, 0);
       break;
     }

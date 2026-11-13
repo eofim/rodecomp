@@ -78,7 +78,7 @@ CMsgEffect::CMsgEffect() {
 // FUNCTION: fn_24258
 CMsgEffect::~CMsgEffect() {
   if (this->m_owner != nullptr) {
-    this->m_owner->SendMsg(this, AM_MSGEFFECT_DEAD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->m_owner->SendMsg(this, AM_MSGEFFECT_DEAD, 0, 0, 0, 0, 0, 0);
   }
 }
 
@@ -335,16 +335,9 @@ bool CMsgEffect::OnProcess() {
       if (elapsed > 90.0f) {
         fade = static_cast<int>((elapsed - 90.0f) * 8.0f);
       }
-      int blue = -1;
-      int tint = -1;
-      if (fade <= 210) {
-        tint = 150;
-        blue = 255;
-      }
-      int alpha = 0;
-      if (fade <= 210) {
-        alpha = 210 - fade;
-      }
+      const int blue = fade <= 210 ? 255 : -1;
+      const int tint = fade <= 210 ? 150 : -1;
+      const int alpha = fade > 210 ? 0 : 210 - fade;
       this->SetColor(alpha, tint, tint, blue);
       if (this->render.scale < 2.0f) {
         this->render.scale = elapsed * 0.15f + this->render.scale;
@@ -464,7 +457,7 @@ bool CMsgEffect::OnProcess() {
       {
         const int frame = static_cast<int>(elapsed);
         if (frame % 34 == 0) {
-          this->m_owner->SendMsg(nullptr, 0x4D, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+          this->m_owner->SendMsg(nullptr, 0x4D, 0, 0, 0, 0, 0, 0);
         }
       }
       return true;
@@ -547,7 +540,7 @@ bool CSkill::OnProcess() {
   switch (this->GetEffectiveJob(-1)) {
   case UNT_MANHOLE:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x336, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_MANHOLE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -556,7 +549,7 @@ bool CSkill::OnProcess() {
 
   case UNT_EARTHSTRAIN:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x8E, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_HEAVENSDRIVE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -567,21 +560,21 @@ bool CSkill::OnProcess() {
   case UNT_EPICLESIS:
     if (!this->m_hasEffect) {
       this->m_hasEffect = true;
-      this->LaunchEffect(0x677, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      g_effectMgr->Spawn(this->render.accountId, 0x676, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      this->LaunchEffect(EF_NEW_EPICLESIS_AURA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      g_effectMgr->Spawn(this->render.accountId, EF_NEW_EPICLESIS, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     }
     break;
 
   case UNT_BENEDICTIO:
     if (this->m_effectTimer >= EffectLifetime(0x5B) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x5B, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BENEDICTIO, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_SANCTUARY:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x13F, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_SANC, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -590,7 +583,7 @@ bool CSkill::OnProcess() {
 
   case UNT_DEMONSTRATION:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x12E, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_DEMONSTRATION, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -599,7 +592,7 @@ bool CSkill::OnProcess() {
 
   case UNT_VOLCANO:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0xEF, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_VO, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -608,23 +601,23 @@ bool CSkill::OnProcess() {
 
   case UNT_POISONSMOKE:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x304, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_POISONSMOKE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
       int random = rand() % 100;
       random = random < 0 ? 0 : random;
       if (random == 1) {
-        g_effectMgr->Spawn(this->skillAid, 0x60A, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->skillAid, EF_NEW_POISONSMOKE_1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       } else if (random == 2) {
-        g_effectMgr->Spawn(this->skillAid, 0x60B, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->skillAid, EF_NEW_POISONSMOKE_2, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       }
     }
     break;
 
   case UNT_FOGWALL:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x195, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_FOGWALL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -633,7 +626,7 @@ bool CSkill::OnProcess() {
 
   case UNT_DELUGE:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0xF0, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_DE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -642,7 +635,7 @@ bool CSkill::OnProcess() {
 
   case UNT_SUITON:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x26C, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_SUITON, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -651,7 +644,7 @@ bool CSkill::OnProcess() {
 
   case UNT_VIOLENTGALE:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0xF1, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_VI, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -660,7 +653,7 @@ bool CSkill::OnProcess() {
 
   case UNT_LANDPROTECTOR:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0xF2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_LA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -669,7 +662,7 @@ bool CSkill::OnProcess() {
 
   case UNT_DARK_RUNNER:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x29F, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_RUNNER, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -678,7 +671,7 @@ bool CSkill::OnProcess() {
 
   case UNT_DARK_TRANSFER:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x2A0, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_TRANSFER, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -687,7 +680,7 @@ bool CSkill::OnProcess() {
 
   case UNT_BASILICA:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x176, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_BASILICA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -696,7 +689,7 @@ bool CSkill::OnProcess() {
 
   case UNT_SPIDERWEB:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x194, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_SPIDER, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -705,7 +698,7 @@ bool CSkill::OnProcess() {
 
   case UNT_HERMODE:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x205, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_HERMODE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -714,7 +707,7 @@ bool CSkill::OnProcess() {
 
   case UNT_GRAVITATION:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x20A, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_GRAVITATION, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -723,7 +716,7 @@ bool CSkill::OnProcess() {
 
   case UNT_NEUTRALBARRIER:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x30F, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_BARRIER, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -738,7 +731,7 @@ bool CSkill::OnProcess() {
 
   case UNT_GOSPEL:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x172, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_GOSPEL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -747,7 +740,7 @@ bool CSkill::OnProcess() {
 
   case UNT_STEALTHFIELD:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x310, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_STEALTH, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -756,7 +749,7 @@ bool CSkill::OnProcess() {
 
   case UNT_VENOMDUST:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0xAB, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_VENOMDUST2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -764,7 +757,7 @@ bool CSkill::OnProcess() {
     break;
 
   case UNT_CLOUD_KILL:
-    if (!this->m_hasEffect && g_effectMgr->Spawn(this->skillAid, 0x438, this->render.position, 0, -1, 0, 0)) {
+    if (!this->m_hasEffect && g_effectMgr->Spawn(this->skillAid, EF_CLOUD_KILL, this->render.position, 0, -1, 0, 0)) {
       this->m_hasEffect = true;
       this->m_effectId = 0x438;
     }
@@ -772,7 +765,7 @@ bool CSkill::OnProcess() {
 
   case UNT_MAGNUS:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x13E, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_MAG, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -782,14 +775,14 @@ bool CSkill::OnProcess() {
   case UNT_FIREPILLAR_ACTIVE:
     if (this->m_effectTimer >= EffectLifetime(0x61) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x61, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FIREPILLARBOMB, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_FIREPILLAR_WAITING:
   case UNT_WINDATTACK:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x8A, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_FIREPILLARON, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -800,7 +793,7 @@ bool CSkill::OnProcess() {
   case UNT_DEATHWAVE:
   case UNT_WATERATTACK:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x4A, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_ICEWALL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -811,9 +804,9 @@ bool CSkill::OnProcess() {
     if (this->m_effectTimer >= EffectLifetime(0x5F) - 20u) {
       this->m_effectTimer = 0;
       if (g_serviceOptions.Get(0xE5)) {
-        g_effectMgr->Spawn(0, 0x489, this->render.position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(0, EF_QUAGMIRE_VISUAL, this->render.position, 0, -1, 0, 0);
       } else {
-        this->LaunchEffect(0x5F, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+        this->LaunchEffect(EF_QUAGMIRE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
     }
     break;
@@ -821,42 +814,42 @@ bool CSkill::OnProcess() {
   case UNT_WARP_ACTIVE:
     if (this->m_effectTimer >= EffectLifetime(0x13C) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x13C, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_READYPORTAL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_WARP_WAITING:
     if (this->m_effectTimer >= EffectLifetime(0x13D) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x13D, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_PORTAL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_DIMENSIONDOOR:
     if (this->m_effectTimer >= EffectLifetime(0x339) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x339, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FORESTLIGHT6, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_CHAOSPANIC:
     if (this->m_effectTimer >= EffectLifetime(0x33B) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x33B, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BOTTOM_ANI, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_MAELSTROM:
     if (this->m_effectTimer >= EffectLifetime(0x33C) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x33C, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BOTTOM_MAELSTROM, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_REVERBERATION:
     if (this->m_effectTimer >= EffectLifetime(0x358) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x358, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BOT_REVERB, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\REVERBERATION.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -864,7 +857,7 @@ bool CSkill::OnProcess() {
   case UNT_NETHERWORLD:
     if (this->m_effectTimer >= EffectLifetime(0x35C) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x35C, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BOT_REVERB2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\POEMOFNETHERWORLD.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -880,21 +873,21 @@ bool CSkill::OnProcess() {
   case UNT_BLOODYLUST:
     if (this->m_effectTimer >= EffectLifetime(0x33D) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x33D, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BOTTOM_BLOODYLUST, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_CALLFAMILY:
     if (this->m_effectTimer >= EffectLifetime(0x155) - 8u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x155, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_PORTAL3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_SAFETYWALL:
     if (this->m_effectTimer >= EffectLifetime(0x13B) - 7u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x13B, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_GLASSWALL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
@@ -902,28 +895,28 @@ bool CSkill::OnProcess() {
   case UNT_FIRE_MANTLE:
     if (this->m_effectTimer >= EffectLifetime(0x19) - 7u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x19, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FIREWALL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_FIREWALK:
     if (this->m_effectTimer >= EffectLifetime(0x398) - 7u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x398, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FIREWALL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_ELECTRICWALK:
     if (this->m_effectTimer >= EffectLifetime(0x39E) - 7u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x39E, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_SHOCKWAVE2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_VACUUM_EXTREME:
     if (this->m_effectTimer >= EffectLifetime(0x399) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x399, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_VACUUM, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\S스펠피스트.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -931,14 +924,14 @@ bool CSkill::OnProcess() {
   case UNT_HELLS_PLANT:
     if (this->m_effectTimer >= EffectLifetime(0x397) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x397, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_HELLSPLANT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\G가시나무덫.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
 
   case UNT_TATAMIGAESHI:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x277, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_TATAMI, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -948,7 +941,7 @@ bool CSkill::OnProcess() {
   case UNT_KAEN:
     if (this->m_effectTimer >= EffectLifetime(0x27A) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x27A, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_KAEN, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
@@ -988,55 +981,55 @@ bool CSkill::OnProcess() {
   case UNT_GROUNDDRIFT_WIND:
     if (this->m_effectTimer >= EffectLifetime(0x27E) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x27E, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_LIGHTNING_S, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_GROUNDDRIFT_DARK:
     if (this->m_effectTimer >= EffectLifetime(0x27F) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x27F, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_BLIND_S, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_GROUNDDRIFT_POISON:
     if (this->m_effectTimer >= EffectLifetime(0x280) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x280, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_POISON_S, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_GROUNDDRIFT_WATER:
     if (this->m_effectTimer >= EffectLifetime(0x281) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x281, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FREEZING_S, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_GROUNDDRIFT_FIRE:
     if (this->m_effectTimer >= EffectLifetime(0x282) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x282, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FLARE_S, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_GROUNDDRIFT_NEUTRAL:
     if (this->m_effectTimer >= EffectLifetime(0x460) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x460, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_SU_LUNATIC_CARROT_BEAT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_WALLOFTHORN:
     if (this->m_effectTimer >= EffectLifetime(0x390) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x390, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_WALLOFTHORN, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_WATER_BARRIER:
     if (!this->m_effect) {
-      this->m_effect = this->LaunchEffect(0x3AB, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->m_effect = this->LaunchEffect(EF_BOTTOM_DE2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     if (this->m_effect) {
       this->m_effect->SetStateDuration(this->m_effect->GetDuration() + 21);
@@ -1046,14 +1039,14 @@ bool CSkill::OnProcess() {
   case UNT_ZEPHYR:
     if (this->m_effectTimer >= EffectLifetime(0x1D1) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x1D1, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_STORMKICK7, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_POWER_OF_GAIA:
     if (this->m_effectTimer >= EffectLifetime(0x440) - 1u) {
       this->m_effectTimer = 0;
-      g_effectMgr->Spawn(this->render.accountId, 0x440, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_POWER_OF_GAIA, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     }
     break;
 
@@ -1073,7 +1066,7 @@ bool CSkill::OnProcess() {
   case UNT_FIRE_INSIGNIA:
     if (this->m_effectTimer >= EffectLifetime(0x394) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x394, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_DEMONICFIRE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -1081,7 +1074,7 @@ bool CSkill::OnProcess() {
   case UNT_WATER_INSIGNIA:
     if (this->m_effectTimer >= EffectLifetime(0x394) - 1u) {
       this->m_effectTimer = 0;
-      CRagEffect* effect = this->LaunchEffect(0x394, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      CRagEffect* effect = this->LaunchEffect(EF_DEMONICFIRE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (effect) {
         effect->state.colorChannels[0] = 20;
@@ -1094,7 +1087,7 @@ bool CSkill::OnProcess() {
   case UNT_WIND_INSIGNIA:
     if (this->m_effectTimer >= EffectLifetime(0x394) - 1u) {
       this->m_effectTimer = 0;
-      CRagEffect* effect = this->LaunchEffect(0x394, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      CRagEffect* effect = this->LaunchEffect(EF_DEMONICFIRE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (effect) {
         effect->state.colorChannels[0] = 20;
@@ -1107,7 +1100,7 @@ bool CSkill::OnProcess() {
   case UNT_EARTH_INSIGNIA:
     if (this->m_effectTimer >= EffectLifetime(0x394) - 1u) {
       this->m_effectTimer = 0;
-      CRagEffect* effect = this->LaunchEffect(0x394, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      CRagEffect* effect = this->LaunchEffect(EF_DEMONICFIRE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (effect) {
         effect->state.colorChannels[0] = 40;
@@ -1120,7 +1113,7 @@ bool CSkill::OnProcess() {
   case UNT_FIRE_EXPANSION_SMOKE_POWDER:
     if (this->m_effectTimer >= EffectLifetime(0x395) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x395, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_DEMONICFIRE2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -1128,7 +1121,7 @@ bool CSkill::OnProcess() {
   case UNT_FIRE_EXPANSION_TEAR_GAS:
     if (this->m_effectTimer >= EffectLifetime(0x396) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x396, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_DEMONICFIRE3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -1136,7 +1129,7 @@ bool CSkill::OnProcess() {
   case UNT_WARMER:
     if (this->m_effectTimer >= EffectLifetime(0x3A1) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x3A1, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_DEMONICFIRE4, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\S워머.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
@@ -1168,7 +1161,7 @@ bool CSkill::OnProcess() {
   case UNT_ICEMINE:
     if (this->m_effectTimer >= EffectLifetime(0x402) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x402, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_ICEMINE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
@@ -1176,35 +1169,35 @@ bool CSkill::OnProcess() {
   case UNT_HELLBURNING:
     if (this->m_effectTimer >= EffectLifetime(0x19) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x19, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_FIREWALL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_KINGS_GRACE:
     if (this->m_effectTimer >= EffectLifetime(0x41B) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x41B, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_LG_KINGS_GRACE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_MAGMA_ERUPTION:
     if (this->m_effectTimer >= EffectLifetime(0x41A) - 1u) {
       this->m_effectTimer = 0;
-      this->LaunchEffect(0x41A, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_NC_MAGMA_ERUPTION, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
 
   case UNT_FIRE_RAIN:
     if (this->m_effectTimer >= EffectLifetime(0x428) - 1u) {
       this->m_effectTimer = 0;
-      g_effectMgr->Spawn(0, 0x428, this->render.position, 0, -1, 0, 0);
+      g_effectMgr->Spawn(0, EF_FIRE_RAIN, this->render.position, 0, -1, 0, 0);
     }
     break;
 
   case UNT_GLITTERING_GREED:
     if (!this->m_hasEffect) {
       this->m_hasEffect = true;
-      g_effectMgr->Spawn(0, 0x4FE, this->render.position, 0, -1, 0, 0);
+      g_effectMgr->Spawn(0, EF_TETRA_VORTEX_FIRE_SUB, this->render.position, 0, -1, 0, 0);
     }
     break;
 
@@ -1536,9 +1529,9 @@ void CMsgEffect::Render(int argument) {
 
 // OFFSET: 0x00E512B0
 // FUNCTION: fn_24301
-void CMsgEffect::SendMsg(CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int, int, int, int) {
-  const vector3d* position = reinterpret_cast<const vector3d*>(b);
-  switch (static_cast<std::int64_t>(a) << 32 | static_cast<std::uint32_t>(message)) {
+void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) {
+  const vector3d* position = reinterpret_cast<const vector3d*>(static_cast<std::intptr_t>(b));
+  switch (message) {
     case AM_REQ_ATTACK:
       if (this->m_type == 18) {
         this->m_velocity.x = (position->x - this->render.position.x) / 10.0f;
@@ -1610,9 +1603,9 @@ void CMsgEffect::SendMsg(CGameObject* sender, int message, int a, int b, int c, 
       return;
 
     case AM_SETMASTERGID:
-      this->m_type = d;
-      this->m_value = b;
-      switch (d) {
+      this->m_type = static_cast<int>(c);
+      this->m_value = static_cast<int>(b);
+      switch (static_cast<int>(c)) {
         case MET_CART:
         case 31:
           this->render.flatDepth = 0;
@@ -1699,14 +1692,14 @@ void CMsgEffect::SendMsg(CGameObject* sender, int message, int a, int b, int c, 
           break;
       }
 
-      this->render.curMotion = d;
+      this->render.curMotion = static_cast<int>(c);
       this->render.visible = 1;
-      if (d < 0 || d > 11) {
+      if (static_cast<int>(c) < 0 || static_cast<int>(c) > 11) {
         this->render.curMotion = 0;
       }
 
-      this->render.spriteOffsetX = f;
-      this->m_digit = f;
+      this->render.spriteOffsetX = static_cast<int>(d);
+      this->m_digit = static_cast<int>(d);
       this->render.scale = 5.0f;
       this->m_scale = 5.0f;
       this->render.depthLayer = static_cast<std::uint32_t>(-2);
@@ -1717,18 +1710,18 @@ void CMsgEffect::SendMsg(CGameObject* sender, int message, int a, int b, int c, 
     case AM_SETPOS: {
       this->render.visible = 1;
       this->render.motionStartTime = timeGetTime();
-      if ((static_cast<std::int64_t>(e) << 32 | static_cast<std::uint32_t>(d)) != 0) {
-        const std::string* names = reinterpret_cast<const std::string*>(d);
+      if (c != 0) {
+        const std::string* names = reinterpret_cast<const std::string*>(static_cast<std::intptr_t>(c));
         this->SetSpriteName(ResourceMgr::Instance(), names[0].c_str());
         this->SetActionName(ResourceMgr::Instance(), names[1].c_str());
       }
 
-      if ((static_cast<std::int64_t>(g) << 32 | static_cast<std::uint32_t>(f)) == 1000) {
+      if (d == 1000) {
         this->SetAction(10, 4, 0);
         this->render.state = 10000;
         this->render.color = 0xFFFF0000;
       } else {
-        this->SetAction(f, 4, 1);
+        this->SetAction(static_cast<unsigned>(d), 4, 1);
       }
 
       switch (this->m_type) {
@@ -1809,5 +1802,5 @@ void CMsgEffect::SendMsg(CGameObject* sender, int message, int a, int b, int c, 
     }
   }
 
-  this->EffectActor::SendMsg(sender, message, a, b, c, d, e, f, g, h, i, 0, 0, 0, 0);
+  this->EffectActor::SendMsg(sender, message, b, c, d, e, 0, 0);
 }

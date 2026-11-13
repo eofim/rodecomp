@@ -21,7 +21,7 @@ UIRequestJoinPartyMgr::UIRequestJoinPartyMgr() {
 
 // OFFSET: 0x007BB470
 // FUNCTION: fn_09281
-UIRequestJoinPartyMgr::~UIRequestJoinPartyMgr() = default;
+__declspec(noinline) UIRequestJoinPartyMgr::~UIRequestJoinPartyMgr() = default;
 
 // OFFSET: 0x007BBD50
 // FUNCTION: fn_09291
@@ -94,7 +94,7 @@ void UIRequestJoinPartyMgr::Advance() {
   }
 
   PartyJoinRequest request = *first;
-  if (std::find(this->m_blocked.begin(), this->m_blocked.end(), request.accountId) != this->m_blocked.end()) {
+  if (std::find_if(this->m_blocked.begin(), this->m_blocked.end(), [&](int accountId) { return request.accountId == accountId; }) != this->m_blocked.end()) {
     this->m_pending.pop_front();
     this->Advance();
     return;

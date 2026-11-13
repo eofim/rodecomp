@@ -1,4 +1,5 @@
 #include "Render/DeviceContext/DCSurface.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -100,8 +101,11 @@
 #include "Contents/Jobs/JobInheritance.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Resource/MSGSTRINGID.h"
+
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 // GLOBAL: gl_25153
 static const std::string s_messageBoxItemLinkOpening = "<ITEML>";
@@ -163,10 +167,10 @@ UIMakeCharWnd::UIMakeCharWnd()
   this->m_view.x = 70;
   this->m_view.y = 123;
 
-  this->m_view.actionNames[0].assign(GetBodyActionResourceName(this->m_info.job, this->m_info.sex, 0, 0));
+  this->m_view.actionNames[0].assign(g_session.GetBodyActionResourceName(this->m_info.job, this->m_info.sex, 0, 0));
   this->m_view.spriteNames[0].assign(g_session.GetBodySprName(this->m_info.job, this->m_info.sex, 0, 0));
 
-  if (this->m_info.sex == 1 && this->m_info.head == 13) {
+  if (this->m_info.sex == 1 && 13 == this->m_info.head) {
     this->m_info.head = 14;
   }
 
@@ -187,7 +191,7 @@ UIMakeCharWnd::UIMakeCharWnd()
     this->m_view.headPaletteName.assign(g_session.GetHeadPalName(head, this->m_info.job, this->m_info.sex, headPalette));
   }
 
-  this->m_view.imfName = GetBodyImfName(this->m_info.job, this->m_info.sex, this->m_info.head, this->m_info.bodyCostume);
+  this->m_view.imfName = g_session.GetBodyImfName(this->m_info.job, this->m_info.sex, this->m_info.head, this->m_info.bodyCostume);
   this->geometry.currentAlpha = 0x80;
   this->geometry.targetAlpha = 0xFF;
 }
@@ -336,7 +340,7 @@ void UIMakeCharWnd::Paint() {
 
     this->geometry.surface->DrawSurface(
       this->m_view.x + cell.x + offset.x, this->m_view.y + cell.y + offset.y, texture, static_cast<int>(record.u0 * 256.0f),
-      static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0, 0
+      static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
 }
@@ -529,7 +533,7 @@ void UIChatRoomWnd::Paint() {
   const int titleHeight = this->DrawTitleBar(false, "", 0);
   this->DrawPanelBackground(titleHeight, 0, "");
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 20, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(20, 6, red, green, blue);
   const int width = this->geometry.width;
   this->FillRegion(width - width * 56 / 280 - 2, 17, 1, this->geometry.height - 38, RGB(red, green, blue));
   this->DrawButtonBar(0, 0, 1);
@@ -582,7 +586,7 @@ void UIFrameWnd::DrawBorder(int x, int y, int width, int height) {
   bitmap = load("유저인터페이스\\sysbox_rd.bmp");
   this->DrawBitmap(x + width - bitmap->image.width, y + height - bitmap->image.height, bitmap, false);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(x + 14, y + 14, innerWidth, innerHeight, RGB(red, green, blue));
 }
 
@@ -631,7 +635,7 @@ void UIMessageBox::Configure(
   this->viewer = new UITextViewer();
   this->viewer->Configure(inset + 10, 22, width - inset - 20, height - 55, 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->viewer->backgroundColor = 0xFF000000u | RGB(red, green, blue);
   this->viewer->Invalidate();
   this->AddChild(this->viewer);
@@ -644,6 +648,18 @@ void UIMessageBox::Configure(
   int ids[3] = {184, 187, 188};
 
   switch (type) {
+  case 4: {
+    auto* button = new UIBitmapButton();
+    button->SetBitmap((prefix + names[2][0] + ".bmp").c_str(), 0, 0);
+    button->SetBitmap((prefix + names[2][1] + ".bmp").c_str(), 1, 0);
+    button->SetBitmap((prefix + names[2][2] + ".bmp").c_str(), 2, 0);
+    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    button->Move(width - 46, height - 24);
+    button->SetId(185);
+    this->AddChild(button);
+    this->m_message0 = 185;
+    break;
+  }
   case 0: {
     auto* button = new UIBitmapButton();
     button->SetBitmap((prefix + names[0][0] + ".bmp").c_str(), 0, 0);
@@ -674,18 +690,6 @@ void UIMessageBox::Configure(
 
     this->m_message0 = defaultAccept ? 187 : 188;
     this->m_message1 = 188;
-    break;
-  }
-  case 4: {
-    auto* button = new UIBitmapButton();
-    button->SetBitmap((prefix + names[2][0] + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + names[2][1] + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + names[2][2] + ".bmp").c_str(), 2, 0);
-    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-    button->Move(width - 46, height - 24);
-    button->SetId(185);
-    this->AddChild(button);
-    this->m_message0 = 185;
     break;
   }
   case 5: {
@@ -1020,7 +1024,7 @@ void UIReplayRECControlWnd::AnimateLoading() {
 // OFFSET: 0x008AE8A0
 // FUNCTION: fn_11741
 void UILoginOTPWnd::OnCreate(int, int) {
-  const auto prefixSource = CRYPT_NAME("유저인터페이스\\", 0x793F370985ED674FULL);
+  const auto prefixSource = OBFUSCATE_SOURCE("유저인터페이스\\", 0x793F370985ED674FULL);
   thread_local EncryptedName<sizeof(prefixSource), 0x793F370985ED674FULL> prefixName(prefixSource.data);
   const std::string prefix(prefixName.Text());
 
@@ -1069,23 +1073,11 @@ void UILoginOTPWnd::OnCreate(int, int) {
   this->AddChild(label);
 
   UIBmpTextButton* button = new UIBmpTextButton();
-  EncryptedName<49, 0xE55723712993051DULL>& normalName = []() -> EncryptedName<49, 0xE55723712993051DULL>& {
-    const char normalSource[] = CRYPT_CHARS(49, "유저인터페이스\\login_interface\\bt_otp_normal.bmp", 0xE55723712993051DULL);
-    thread_local EncryptedName<sizeof(normalSource), 0xE55723712993051DULL> name(normalSource);
-    return name;
-  }();
+  EncryptedName<49, 0xE55723712993051DULL>& normalName = OBFUSCATE_STRING("유저인터페이스\\login_interface\\bt_otp_normal.bmp", 0xE55723712993051DULL);
   button->SetBitmap(normalName.Text(), 0, 0);
-  EncryptedName<47, 0x7DE349D717D7F123ULL>& hoverName = []() -> EncryptedName<47, 0x7DE349D717D7F123ULL>& {
-    const char hoverSource[] = CRYPT_CHARS(47, "유저인터페이스\\login_interface\\bt_otp_over.bmp", 0x7DE349D717D7F123ULL);
-    thread_local EncryptedName<sizeof(hoverSource), 0x7DE349D717D7F123ULL> name(hoverSource);
-    return name;
-  }();
+  EncryptedName<47, 0x7DE349D717D7F123ULL>& hoverName = OBFUSCATE_STRING("유저인터페이스\\login_interface\\bt_otp_over.bmp", 0x7DE349D717D7F123ULL);
   button->SetBitmap(hoverName.Text(), 1, 0);
-  EncryptedName<48, 0x0F15B16B5BAFD57FULL>& pressedName = []() -> EncryptedName<48, 0x0F15B16B5BAFD57FULL>& {
-    const char pressedSource[] = CRYPT_CHARS(48, "유저인터페이스\\login_interface\\bt_otp_press.bmp", 0x0F15B16B5BAFD57FULL);
-    thread_local EncryptedName<sizeof(pressedSource), 0x0F15B16B5BAFD57FULL> name(pressedSource);
-    return name;
-  }();
+  EncryptedName<48, 0x0F15B16B5BAFD57FULL>& pressedName = OBFUSCATE_STRING("유저인터페이스\\login_interface\\bt_otp_press.bmp", 0x0F15B16B5BAFD57FULL);
   button->SetBitmap(pressedName.Text(), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(186, 92);
@@ -1106,10 +1098,7 @@ void UILoginOTPWnd::OnCreate(int, int) {
 // FUNCTION: fn_11764
 void UILoginOTPWnd::Paint() {
   auto& resources = ResourceMgr::Instance();
-  constexpr auto sourceText = CRYPT_NAME("유저인터페이스\\login_interface\\bg_newotp1.bmp", 0x2FEB8739E5975BD1ULL);
-  const auto& source = sourceText.data;
-  thread_local EncryptedName<sizeof(source), 0x2FEB8739E5975BD1ULL> name(source);
-  auto* background = static_cast<CBitmapRes*>(resources.Load(Resolve(name.Text())));
+  auto* background = static_cast<CBitmapRes*>(resources.Load(Resolve(OBFUSCATE_TEXT("유저인터페이스\\login_interface\\bg_newotp1.bmp", 0x2FEB8739E5975BD1ULL))));
   this->DrawBitmap(0, 0, background, false);
   this->DrawTitleBar(true, LookupMessage(MSI_PARTY_DO_YOU_WANT_BREAKING_UP), 280);
 }
@@ -1142,26 +1131,14 @@ void UILoginWnd::SaveLogin() {
     saveId = 0;
   }
 
-  EncryptedName<3, 0xC517FB932D95BB6DULL>& idName = []() -> EncryptedName<3, 0xC517FB932D95BB6DULL>& {
-    const char idSource[] = CRYPT_CHARS(3, "ID", 0xC517FB932D95BB6DULL);
-    thread_local EncryptedName<sizeof(idSource), 0xC517FB932D95BB6DULL> name(idSource);
-    return name;
-  }();
+  EncryptedName<3, 0xC517FB932D95BB6DULL>& idName = OBFUSCATE_STRING("ID", 0xC517FB932D95BB6DULL);
   RegSetValueExA(key, idName.Text(), 0, REG_SZ, reinterpret_cast<const BYTE*>(id), 51);
 
-  EncryptedName<10, 0x03772763F96D9DA5ULL>& checkName = []() -> EncryptedName<10, 0x03772763F96D9DA5ULL>& {
-    const char checkSource[] = CRYPT_CHARS(10, "CHECKSAVE", 0x03772763F96D9DA5ULL);
-    thread_local EncryptedName<sizeof(checkSource), 0x03772763F96D9DA5ULL> name(checkSource);
-    return name;
-  }();
+  EncryptedName<10, 0x03772763F96D9DA5ULL>& checkName = OBFUSCATE_STRING("CHECKSAVE", 0x03772763F96D9DA5ULL);
   RegSetValueExA(key, checkName.Text(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&saveId), 4);
 
   int bitwise = 1;
-  EncryptedName<8, 0x0B7109397F6B1387ULL>& bitwiseName = []() -> EncryptedName<8, 0x0B7109397F6B1387ULL>& {
-    const char bitwiseSource[] = CRYPT_CHARS(8, "BITWISE", 0x0B7109397F6B1387ULL);
-    thread_local EncryptedName<sizeof(bitwiseSource), 0x0B7109397F6B1387ULL> name(bitwiseSource);
-    return name;
-  }();
+  EncryptedName<8, 0x0B7109397F6B1387ULL>& bitwiseName = OBFUSCATE_STRING("BITWISE", 0x0B7109397F6B1387ULL);
   RegSetValueExA(key, bitwiseName.Text(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&bitwise), 4);
   RegCloseKey(key);
 }
@@ -1192,11 +1169,17 @@ void UIReplayRECControlWnd::ApplyMode() {
     this->filenameEdit->Move(-100, -100);
     this->recordStartButton->Move(110, 5);
     this->button_00C8->Move(136, 5);
-    this->button_00C8->SetDisabled(0);
-    this->button_00C8->Invalidate();
+    {
+      UIButton* button = this->button_00C8;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     this->button_00D0->Move(162, 5);
-    this->button_00D0->SetDisabled(0);
-    this->button_00D0->Invalidate();
+    {
+      UIButton* button = this->button_00D0;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     this->recordTimeText->Move(32, 12);
     this->tabs[0]->Move(6, 5);
   } else if (this->mode == 1) {
@@ -1221,11 +1204,17 @@ void UIReplayRECControlWnd::ApplyMode() {
     this->filenameEdit->Move(-100, -100);
     this->recordStopButton->Move(110, 5);
     this->button_00C8->Move(136, 5);
-    this->button_00C8->SetDisabled(1);
-    this->button_00C8->Invalidate();
+    {
+      UIButton* button = this->button_00C8;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     this->button_00D0->Move(162, 5);
-    this->button_00D0->SetDisabled(1);
-    this->button_00D0->Invalidate();
+    {
+      UIButton* button = this->button_00D0;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     this->recordTimeText->Move(32, 12);
     this->tabs[0]->Move(6, 5);
   } else if (this->mode == 2) {
@@ -1309,7 +1298,7 @@ void UINoticeWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(20, 17, this->geometry.width - 40, this->geometry.height - 38, RGB(red, green, blue));
   this->FillRegion(
     20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, (this->geometry.height - 38) % 32, RGB(red, green, blue)
@@ -1429,12 +1418,12 @@ void UIPayConfirmWnd::Configure(const std::string& text, int itemId) {
   this->viewer->SetBackgroundColor(0xFFFF00FF);
 
   auto accept = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == 187; });
-  if (accept != this->m_children.end()) {
+  if (this->m_children.end() != accept) {
     (*accept)->Move(0x59, 0x6D);
   }
 
   auto cancel = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == 188; });
-  if (cancel != this->m_children.end()) {
+  if (this->m_children.end() != cancel) {
     auto* button = static_cast<UIBitmapButton*>(*cancel);
     button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_off.bmp", 0, 0);
     button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_on.bmp", 1, 0);
@@ -1445,8 +1434,7 @@ void UIPayConfirmWnd::Configure(const std::string& text, int itemId) {
 
   std::string resource(FindItemDescription(itemId).identifiedResource);
   if (!resource.empty()) {
-    CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(std::format("유저인터페이스\\collection\\{}.bmp", resource)));
-    this->m_image = bitmap ? &bitmap->image : nullptr;
+    this->m_image = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(std::format("유저인터페이스\\collection\\{}.bmp", resource)));
   }
 }
 
@@ -1473,18 +1461,18 @@ void UIReplayControlWnd::Paint() {
 // FUNCTION: fn_11775
 void UIReplayRECControlWnd::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, 34, 0xF5B899);
-  DrawRoundedBorder(*this, 0, 0, this->geometry.width, 34, 0x945A63);
-  DrawRoundedBorder(*this, 1, 1, this->geometry.width - 2, 32, 0xF7C6AD);
-  DrawRoundedBorder(*this, 2, 2, this->geometry.width - 4, 30, 0xFFFFFF);
-  DrawRoundedBorder(*this, 3, 3, this->geometry.width - 6, 28, 0xAD7B84);
+  this->DrawFilledRoundedOutline(0, 0, this->geometry.width, 34, 0xF5B899);
+  this->DrawRoundedOutline(0, 0, this->geometry.width, 34, 0x945A63);
+  this->DrawRoundedOutline(1, 1, this->geometry.width - 2, 32, 0xF7C6AD);
+  this->DrawRoundedOutline(2, 2, this->geometry.width - 4, 30, 0xFFFFFF);
+  this->DrawRoundedOutline(3, 3, this->geometry.width - 6, 28, 0xAD7B84);
 
   if (this->mode == 2) {
-    DrawFilledRoundedBorder(*this, 0, 34, this->geometry.width, this->geometry.height - 34, 0xDEDEDE);
-    DrawFilledRoundedBorder(*this, 4, 38, this->geometry.width - 8, 95, 0xFFFFFF);
-    DrawFilledRoundedBorder(*this, 4, 138, this->geometry.width - 8, 57, 0xFFFFFF);
-    DrawOutlinedText(*this, 10, 42, LookupMessage(MSI_REPLAY_SETREPLAYSAVEDATA), 0, 0x7F3C00, 0xFFFFFF, 0, 12, 1, 0);
-    DrawOutlinedText(*this, 10, 142, LookupMessage(MSI_REPLAY_SETRECOPTION), 0, 0x7F3C00, 0xFFFFFF, 0, 12, 1, 0);
+    this->DrawFilledRoundedOutline(0, 34, this->geometry.width, this->geometry.height - 34, 0xDEDEDE);
+    this->DrawFilledRoundedOutline(4, 38, this->geometry.width - 8, 95, 0xFFFFFF);
+    this->DrawFilledRoundedOutline(4, 138, this->geometry.width - 8, 57, 0xFFFFFF);
+    this->DrawOutlinedText(10, 42, LookupMessage(MSI_REPLAY_SETREPLAYSAVEDATA), 0, 0x7F3C00, 0xFFFFFF, 0, 12, 1, 0);
+    this->DrawOutlinedText(10, 142, LookupMessage(MSI_REPLAY_SETRECOPTION), 0, 0x7F3C00, 0xFFFFFF, 0, 12, 1, 0);
   }
 }
 
@@ -2056,10 +2044,7 @@ void UILoginOTPWnd::OnProcess() {
 
   const unsigned remaining = static_cast<unsigned>(60.0 - (timeGetTime() - login->otpStarted) * 0.001);
   UIStaticText* timer = this->timerText;
-  constexpr auto sourceText = CRYPT_NAME("%02d : %02d", 0x7941D76335CFA14FULL);
-  const auto& source = sourceText.data;
-  thread_local EncryptedName<sizeof(source), 0x7941D76335CFA14FULL> format(source);
-  timer->SetText(FormatOwnedString(format.Text(), remaining / 60, remaining % 60).c_str(), 0);
+  timer->SetText(FormatOwnedString(OBFUSCATE_TEXT_NAMED("%02d : %02d", 0x7941D76335CFA14FULL, format), remaining / 60, remaining % 60).c_str(), 0);
   this->Invalidate();
 }
 
@@ -2108,7 +2093,7 @@ void UIMonsterInfoWnd::DrawResistance(int x, int y, const char* label, int value
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 22, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(22, 2, red, green, blue);
   this->FillRegion(x, y, 70, 16, border);
   this->FillRegion(x + 1, y + 1, 68, 14, fill);
   this->DrawTextAt((70 - this->TextWidth(text, 0, 0, 12, 0, 0)) / 2 + x, y + 2, text, 0, 0, 12, RGB(red, blue, green), 0, 0);
@@ -2120,12 +2105,12 @@ void UIMonsterInfoWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   const std::uint32_t fill = RGB(red, green, blue);
   this->ClearSurface(fill);
   this->DrawPanelBackground(this->DrawTitleBar(false, "", 0), 0, "");
   this->DrawButtonBar(2, 0, 1);
-  SkinPaletteChannels(ResourceMgr::Instance(), 22, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(22, 2, red, green, blue);
   const std::uint32_t border = RGB(red, green, blue);
 
   this->DrawTextAt(17, 3, LookupMessage(MSI_MONSTER_INFO_WINDOW), 0, 0, 12, 0xFFFFFF, 0, 0);
@@ -2315,29 +2300,28 @@ int UIReplayRECControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       return 0;
     case ID_CONFIRM_REPLAY_RECORDING_PATH: {
       auto* edit = static_cast<UIEditCtrl*>(this->filenameEdit);
-      int error;
-
       if (edit->Length() <= 0) {
-        error = 1972;
-      } else if (_mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
-                 _mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        error = 2812;
-      } else {
-        ReplayFileList::Instance().SetPath(edit->Text());
-        g_windowMgr.SetFocus(nullptr);
-        edit->SetText("");
-        g_modeMgr.gameMode->SendMsg(MM_START_REPLAY_RECORDING, 0, 0, 0, 0);
-
-        if (Replay::Instance().state == 1) {
-          return 0;
-        }
-
-        this->mode = 1;
-        this->ApplyMode();
+        g_windowMgr.Confirm(LookupMessage(1972), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
 
-      g_windowMgr.Confirm(LookupMessage(error), 0, true, false, 0, "Message", 280, 120, 0);
+      if (_mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
+          _mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
+        g_windowMgr.Confirm(LookupMessage(2812), 0, true, false, 0, "Message", 280, 120, 0);
+        return 0;
+      }
+
+      ReplayFileList::Instance().SetPath(edit->Text());
+      g_windowMgr.SetFocus(nullptr);
+      edit->SetText("");
+      g_modeMgr.gameMode->SendMsg(MM_START_REPLAY_RECORDING, 0, 0, 0, 0);
+
+      if (Replay::Instance().state == 1) {
+        return 0;
+      }
+
+      this->mode = 1;
+      this->ApplyMode();
       return 0;
     }
     case ID_REPLAY_RECORDING_OPTIONS:
@@ -2433,11 +2417,7 @@ void UILoginWnd::OnProcess() {
   if (g_windowMgr.GetHoverWindow() == this->idEdit) {
     this->idEdit->TextColor(0, 0, 0, 0xFFFFFFFF);
     if (this->idPlaceholder == true) {
-      EncryptedName<3, 0x2D51E3B7236175EDULL>& placeholder = []() -> EncryptedName<3, 0x2D51E3B7236175EDULL>& {
-        const char source[] = CRYPT_CHARS(3, "ID", 0x2D51E3B7236175EDULL);
-        thread_local EncryptedName<sizeof(source), 0x2D51E3B7236175EDULL> name(source);
-        return name;
-      }();
+      EncryptedName<3, 0x2D51E3B7236175EDULL>& placeholder = OBFUSCATE_STRING("ID", 0x2D51E3B7236175EDULL);
       if (std::strcmp(placeholder.Text(), this->idEdit->Text()) == 0) {
         this->idEdit->SetText("");
         goto password;
@@ -2449,11 +2429,7 @@ void UILoginWnd::OnProcess() {
       this->idEdit->TextColor(156, 156, 156, 0xFFFFFFFF);
       UIEditCtrl_Custom* edit = this->idEdit;
       this->idPlaceholder = true;
-      edit->SetText([]() -> EncryptedName<3, 0x0F41EBBDA32D1B17ULL>& {
-        const char source[] = CRYPT_CHARS(3, "ID", 0x0F41EBBDA32D1B17ULL);
-        thread_local EncryptedName<sizeof(source), 0x0F41EBBDA32D1B17ULL> name(source);
-        return name;
-      }().Text());
+      edit->SetText(OBFUSCATE_STRING("ID", 0x0F41EBBDA32D1B17ULL).Text());
     }
     if (this->idPlaceholder == false) {
       this->idEdit->TextColor(0, 0, 0, 0xFFFFFFFF);
@@ -2471,11 +2447,7 @@ password:
     ImmReleaseContext(hWnd, context);
     this->passwordEdit->TextColor(0, 0, 0, 0xFFFFFFFF);
     if (this->passwordPlaceholder == true) {
-      EncryptedName<9, 0x7115D9F973F913C9ULL>& placeholder = []() -> EncryptedName<9, 0x7115D9F973F913C9ULL>& {
-        const char source[] = CRYPT_CHARS(9, "PASSWORD", 0x7115D9F973F913C9ULL);
-        thread_local EncryptedName<sizeof(source), 0x7115D9F973F913C9ULL> name(source);
-        return name;
-      }();
+      EncryptedName<9, 0x7115D9F973F913C9ULL>& placeholder = OBFUSCATE_STRING("PASSWORD", 0x7115D9F973F913C9ULL);
       if (std::strcmp(placeholder.Text(), this->passwordEdit->Text()) == 0) {
         this->passwordEdit->SetText("");
         this->passwordEdit->mask = 0;
@@ -2488,11 +2460,7 @@ password:
       this->passwordPlaceholder = true;
       this->passwordEdit->TextColor(156, 156, 156, 0xFFFFFFFF);
       auto* edit = this->passwordEdit;
-      edit->SetText([]() -> EncryptedName<9, 0xCB1D253B7FE1F563ULL>& {
-        const char source[] = CRYPT_CHARS(9, "PASSWORD", 0xCB1D253B7FE1F563ULL);
-        thread_local EncryptedName<sizeof(source), 0xCB1D253B7FE1F563ULL> name(source);
-        return name;
-      }().Text());
+      edit->SetText(OBFUSCATE_STRING("PASSWORD", 0xCB1D253B7FE1F563ULL).Text());
       this->passwordEdit->mask = 0;
     }
     if (this->passwordPlaceholder != false) {
@@ -2609,22 +2577,14 @@ void UILoginWnd::LoadLogin() {
     DWORD type = REG_DWORD;
     DWORD size = 4;
     int saveId;
-    EncryptedName<10, 0xF14F79170939C7F1ULL>& checkName = []() -> EncryptedName<10, 0xF14F79170939C7F1ULL>& {
-      const char checkSource[] = CRYPT_CHARS(10, "CHECKSAVE", 0xF14F79170939C7F1ULL);
-      thread_local EncryptedName<sizeof(checkSource), 0xF14F79170939C7F1ULL> name(checkSource);
-      return name;
-    }();
+    EncryptedName<10, 0xF14F79170939C7F1ULL>& checkName = OBFUSCATE_STRING("CHECKSAVE", 0xF14F79170939C7F1ULL);
     RegQueryValueExA(key, checkName.Text(), nullptr, &type, reinterpret_cast<BYTE*>(&saveId), &size);
     if (saveId != 1) {
       saveId = 0;
     }
 
     int bitwise;
-    EncryptedName<8, 0xA5FD29D7AB6DC59FULL>& bitwiseName = []() -> EncryptedName<8, 0xA5FD29D7AB6DC59FULL>& {
-      const char bitwiseSource[] = CRYPT_CHARS(8, "BITWISE", 0xA5FD29D7AB6DC59FULL);
-      thread_local EncryptedName<sizeof(bitwiseSource), 0xA5FD29D7AB6DC59FULL> name(bitwiseSource);
-      return name;
-    }();
+    EncryptedName<8, 0xA5FD29D7AB6DC59FULL>& bitwiseName = OBFUSCATE_STRING("BITWISE", 0xA5FD29D7AB6DC59FULL);
     RegQueryValueExA(key, bitwiseName.Text(), nullptr, &type, reinterpret_cast<BYTE*>(&bitwise), &size);
 
     char id[52];
@@ -2632,21 +2592,13 @@ void UILoginWnd::LoadLogin() {
     char password[26] = {};
     type = REG_SZ;
     size = 25;
-    EncryptedName<9, 0xDD3913D5D7F97BE1ULL>& passwordName = []() -> EncryptedName<9, 0xDD3913D5D7F97BE1ULL>& {
-      const char passwordSource[] = CRYPT_CHARS(9, "PASSWORD", 0xDD3913D5D7F97BE1ULL);
-      thread_local EncryptedName<sizeof(passwordSource), 0xDD3913D5D7F97BE1ULL> name(passwordSource);
-      return name;
-    }();
+    EncryptedName<9, 0xDD3913D5D7F97BE1ULL>& passwordName = OBFUSCATE_STRING("PASSWORD", 0xDD3913D5D7F97BE1ULL);
     RegQueryValueExA(key, passwordName.Text(), nullptr, &type, reinterpret_cast<BYTE*>(password), &size);
     password[24] = 0;
 
     type = REG_SZ;
     size = 51;
-    EncryptedName<3, 0x050505679903579BULL>& idName = []() -> EncryptedName<3, 0x050505679903579BULL>& {
-      const char idSource[] = CRYPT_CHARS(3, "ID", 0x050505679903579BULL);
-      thread_local EncryptedName<sizeof(idSource), 0x050505679903579BULL> name(idSource);
-      return name;
-    }();
+    EncryptedName<3, 0x050505679903579BULL>& idName = OBFUSCATE_STRING("ID", 0x050505679903579BULL);
     RegQueryValueExA(key, idName.Text(), nullptr, &type, reinterpret_cast<BYTE*>(id), &size);
     id[50] = 0;
     password[24] = 0;
@@ -2656,11 +2608,7 @@ void UILoginWnd::LoadLogin() {
       unsigned char shade;
       bool placeholder = std::strcmp("", id) == 0;
       if (!placeholder) {
-        EncryptedName<3, 0x83EFBFBB37EDBDBDULL>& compareName = []() -> EncryptedName<3, 0x83EFBFBB37EDBDBDULL>& {
-          const char compareSource[] = CRYPT_CHARS(3, "ID", 0x83EFBFBB37EDBDBDULL);
-          thread_local EncryptedName<sizeof(compareSource), 0x83EFBFBB37EDBDBDULL> name(compareSource);
-          return name;
-        }();
+        EncryptedName<3, 0x83EFBFBB37EDBDBDULL>& compareName = OBFUSCATE_STRING("ID", 0x83EFBFBB37EDBDBDULL);
         placeholder = std::strcmp(compareName.Text(), id) == 0;
       }
 
@@ -2670,11 +2618,7 @@ void UILoginWnd::LoadLogin() {
       } else {
         this->idPlaceholder = true;
         UIEditCtrl_Custom* edit = this->idEdit;
-        EncryptedName<3, 0xBF2B4B31397FF5A7ULL>& textName = []() -> EncryptedName<3, 0xBF2B4B31397FF5A7ULL>& {
-          const char textSource[] = CRYPT_CHARS(3, "ID", 0xBF2B4B31397FF5A7ULL);
-          thread_local EncryptedName<sizeof(textSource), 0xBF2B4B31397FF5A7ULL> name(textSource);
-          return name;
-        }();
+        EncryptedName<3, 0xBF2B4B31397FF5A7ULL>& textName = OBFUSCATE_STRING("ID", 0xBF2B4B31397FF5A7ULL);
         edit->SetText(textName.Text());
         shade = 156;
       }
@@ -3118,7 +3062,7 @@ void UIPetInfoWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->ClearSurface(RGB(red, green, blue));
   this->DrawPanelBackground(this->DrawTitleBar(false, "", 0), 0, "");
 
@@ -3158,7 +3102,7 @@ void UIPetInfoWnd::Paint() {
 
   const int job = g_session.petJob;
 
-  if (job != -1 && ((job > 1000 && job < 3999) || static_cast<unsigned>(job - 20021) < 11979)) {
+  if (job != -1 && ((job > 1000 && job < 3999) || (job >= 20021 && job <= 31999))) {
     char illust[260];
     std::memset(illust, 0, sizeof(illust));
     g_session.GetPetIllustName(job, g_session.petAccessory, illust);
@@ -3250,8 +3194,11 @@ void UIMonsterInfoWnd::OnCreate(int, int) {
   this->AddChild(button);
   this->m_message0 = 184;
 
-  this->actorId = g_monsterInfoActorId;
-  this->name = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(g_monsterInfoActorId);
+  this->actorId = g_session.m_monsterInfoActorId;
+  {
+    const std::string actorName = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(g_session.m_monsterInfoActorId);
+    this->name = actorName;
+  }
   const std::size_t separator = this->name.find("#");
   if (separator != std::string::npos) {
     this->name.erase(separator, this->name.size());
@@ -3324,7 +3271,7 @@ UICntWnd::~UICntWnd() = default;
 
 // OFFSET: 0x008A5050
 // FUNCTION: fn_11679
-UILoginWnd::~UILoginWnd() = default;
+__declspec(noinline) UILoginWnd::~UILoginWnd() = default;
 
 // OFFSET: 0x008A54C0
 // FUNCTION: fn_11681
@@ -3337,7 +3284,7 @@ UIPetInfoWnd::~UIPetInfoWnd() {
 // OFFSET: 0x008A5CC0
 // FUNCTION: fn_11686
 EncryptedName<80, 0xF3CB6F7711A71B6DULL>& HangameJoinUrl::operator()() const {
-  constexpr auto sourceText = CRYPT_NAME("http://ro.hangame.com/login/loginstep.asp?prevURL=/NHNCommon/NHN/Memberjoin.asp", 0xF3CB6F7711A71B6DULL);
+  constexpr auto sourceText = OBFUSCATE_SOURCE("http://ro.hangame.com/login/loginstep.asp?prevURL=/NHNCommon/NHN/Memberjoin.asp", 0xF3CB6F7711A71B6DULL);
   const auto& source = sourceText.data;
   thread_local EncryptedName<sizeof(source), 0xF3CB6F7711A71B6DULL> name(source);
   return name;
@@ -3349,19 +3296,19 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
   switch (message) {
   case UM_COMBOBOX_SELECTED:
     if (sender == this->loginTypeCombo) {
-      if (a == 0) {
-        const char source[] = CRYPT_CHARS(5, "G000", 0x9FED7DA189490D5DULL);
-        thread_local EncryptedName<sizeof(source), 0x9FED7DA189490D5DULL> name(source);
-        this->loginExtra = name.Text();
-      } else if (a == 1) {
-        const char source[] = CRYPT_CHARS(5, "G007", 0xFBD599E117C547C1ULL);
-        thread_local EncryptedName<sizeof(source), 0xFBD599E117C547C1ULL> name(source);
-        this->loginExtra = name.Text();
-      } else {
-        const char source[] = CRYPT_CHARS(29, "unknown account class found!", 0x176F138D5DD7F365ULL);
-        thread_local EncryptedName<sizeof(source), 0x176F138D5DD7F365ULL> name(source);
-        g_windowMgr.Confirm(name.Text(), 0, false, false, 0, "Message", 280, 120, 0);
+      switch (a) {
+      case 0: {
+        this->loginExtra = OBFUSCATE_TEXT("G000", 0x9FED7DA189490D5DULL);
+        break;
+      }
+      case 1: {
+        this->loginExtra = OBFUSCATE_TEXT("G007", 0xFBD599E117C547C1ULL);
+        break;
+      }
+      default: {
+        g_windowMgr.Confirm(OBFUSCATE_TEXT("unknown account class found!", 0x176F138D5DD7F365ULL), 0, false, false, 0, "Message", 280, 120, 0);
         goto quit;
+      }
       }
     }
     return 0;
@@ -3372,9 +3319,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         if (g_session.m_channelCopId == 1) {
           g_modeMgr.Quit();
           const char* url = HangameJoinUrl()().Text();
-          const char verbSource[] = CRYPT_CHARS(5, "open", 0x839B27DF8F5967B3ULL);
-          thread_local EncryptedName<sizeof(verbSource), 0x839B27DF8F5967B3ULL> verbName(verbSource);
-          ShellExecuteA(hWnd, verbName.Text(), url, nullptr, nullptr, SW_SHOWNORMAL);
+          ShellExecuteA(hWnd, OBFUSCATE_TEXT_NAMED("open", 0x839B27DF8F5967B3ULL, verbName), url, nullptr, nullptr, SW_SHOWNORMAL);
           break;
         }
         if (g_windowMgr.Confirm(LookupMessage(MSI_SELECTCHARWND_RESERVE_TO_DEL_CHAR), 2, true, false, 0, "Message", 280, 120, 0) != 187) {
@@ -3385,9 +3330,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       this->OpenWebPage();
       break;
     case ID_LOGIN: {
-      const char soundSource[] = CRYPT_CHARS(13, "버튼소리.wav", 0x452FEF0D7FC95565ULL);
-      thread_local EncryptedName<sizeof(soundSource), 0x452FEF0D7FC95565ULL> soundName(soundSource);
-      g_soundMgr->PlayWave(soundName.Text(), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
+      g_soundMgr->PlayWave(OBFUSCATE_TEXT_NAMED("버튼소리.wav", 0x452FEF0D7FC95565ULL, soundName), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (this->passwordEdit->Length() >= 6 && this->idEdit->Length() >= 4) {
         g_modeMgr.gameMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
         StringFormat(g_launchAccountPassword, 24, static_cast<std::size_t>(-1), "%s", this->idEdit->Text());
@@ -3477,7 +3420,7 @@ int UILoginOTPWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 
     case 382: {
       CSoundMgr* const soundMgr = g_soundMgr;
-      constexpr auto soundSourceText = CRYPT_NAME("버튼소리.wav", 0x7321C3814F8799E1ULL);
+      constexpr auto soundSourceText = OBFUSCATE_SOURCE("버튼소리.wav", 0x7321C3814F8799E1ULL);
       const auto& soundSource = soundSourceText.data;
       thread_local EncryptedName<sizeof(soundSource), 0x7321C3814F8799E1ULL> soundName(soundSource);
       soundMgr->PlayWave(soundName.Text(), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
@@ -3509,7 +3452,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
   this->AddCloseButton("", 0);
   this->nameEdit = new UIEditCtrl2();
   this->nameEdit->SetSize(80, 16);
-  char* const name = reinterpret_cast<char*>(&g_session.spAndHomunculusStats[0x0C]);
+  char* const name = g_session.m_homunName;
   if (std::strcmp(name, "") == 0) {
     std::sprintf(name, g_session.GetJobName(g_session.m_homunJob, -1));
   }
@@ -3566,7 +3509,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
 
   this->hpBar = new UIBarGraphHomun();
   this->hpBar->SetValues([]() -> std::int64_t { return g_session.m_homunHp; },
-                         []() -> std::int64_t { return *reinterpret_cast<const int*>(g_session.homunMaxHp); });
+                         []() -> std::int64_t { return g_session.m_homunMaxHp; });
   this->hpBar->SetSize(157, 9);
   this->hpBar->Move(117, 73);
   this->AddChild(this->hpBar);
@@ -3615,7 +3558,7 @@ void UIHomunInfoWnd::Paint() {
   this->DrawTextAt(100, 131, LookupMessage(MSI_PET_HUNGRY), 0, 0, 12, 0, 0, 0);
   this->DrawTextAt(100, 159, LookupMessage(MSI_PET_FRIENDLY), 0, 0, 12, 0, 0, 0);
   this->DrawTextAt(140, 159, ":", 0, 0, 12, 0, 0, 0);
-  const int* const stats = reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0x2C]);
+  const int* const stats = g_session.m_homunStats;
   char number[12];
   int bytes = std::sprintf(number, "%d", stats[0]);
   this->DrawRightAlignedText(79, 24, number, bytes, 1, 14, 0, 0);
@@ -3634,7 +3577,7 @@ void UIHomunInfoWnd::Paint() {
   bytes = std::sprintf(number, "%d", (2000 - stats[7]) / 10);
   this->DrawRightAlignedText(79, 150, number, bytes, 1, 14, 0, 0);
   char level[12];
-  _itoa(*reinterpret_cast<const int*>(g_session.homunLevel), level, 10);
+  _itoa(g_session.m_homunLevel, level, 10);
   this->DrawTextAt(135, 47, level, 0, 0, 12, 0, 0, 0);
   if (g_session.m_homunJob == -1) {
     return;
@@ -3683,7 +3626,7 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
 
     switch (a) {
     case ID_OK: {
-      char* const name = reinterpret_cast<char*>(&g_session.spAndHomunculusStats[0x0C]);
+      char* const name = g_session.m_homunName;
       if (std::strlen(this->nameEdit->Text()) >= 24) {
         g_windowMgr.Confirm(LookupMessage(MSI_HOMUN_NAME_IN23), 0, true, false, 0, "Message", 280, 120, 0);
       } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
@@ -3823,14 +3766,14 @@ void UIPetInfoWnd::OnCreate(int, int) {
   this->UpdateFriendlyGauge();
   this->m_message0 = 201;
 
-  const int petEgg = std::atoi(LookupClientItemByIdentity(g_session.m_inventoryItems, g_session.petEggIndex).itemId.c_str());
+  const int petEgg = std::atoi(g_session.LookupClientItemByIdentity(g_session.petEggIndex).itemId.c_str());
   this->autoFeedAvailable = g_petEvolutionMgr->IsAutoFeeding(petEgg);
   if (this->autoFeedAvailable == true) {
     this->autoFeedCheck = new UICheckBox();
     this->autoFeedCheck->SetSize(12, 12);
     this->autoFeedCheck->Move(this->TextWidth(LookupMessage(MSI_PET_AUTO_FEEDING_OFF), 0, 0, 12, 0, 0) + 110, 159);
     this->autoFeedCheck->SetBitmaps("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp");
-    this->autoFeedCheck->SetChecked(g_petAutoFeed);
+    this->autoFeedCheck->SetChecked(g_session.m_petAutoFeed);
     this->AddChild(this->autoFeedCheck);
   }
 }
@@ -3874,7 +3817,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       if (g_session.m_petFriendly > 900) {
         g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
         UIWindow* window = g_windowMgr.EnsureWindow(WID_PETEVOLUTIONWND);
-        const int petEgg = LookupClientItemByIdentity(g_session.m_inventoryItems, g_session.petEggIndex).GetItemId();
+        const int petEgg = g_session.LookupClientItemByIdentity(g_session.petEggIndex).GetItemId();
         window->SendMsg(nullptr, UM_SET_PET_EVOLUTION_MATERIALS, petEgg, b, 0, 0);
         this->SendMsg(nullptr, UM_COMMAND, ID_CLOSE, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
@@ -3942,7 +3885,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(performance.c_str()), 468, 0, 0);
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(unequip.c_str()), 469, 0, 0);
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(returnToEgg.c_str()), 470, 0, 0);
-      const int petEgg = LookupClientItemByIdentity(g_session.m_inventoryItems, g_session.petEggIndex).GetItemId();
+      const int petEgg = g_session.LookupClientItemByIdentity(g_session.petEggIndex).GetItemId();
       const std::pair<bool, std::vector<int>> targets = g_petEvolutionMgr->GetEvolutionTargets(petEgg);
       if (targets.first == true) {
         for (auto it = targets.second.begin(); it != targets.second.end(); ++it) {
@@ -4136,7 +4079,7 @@ void UIFrameWnd::DrawSkinBox(const char* name, int x, int y, int width, int heig
     }
   } else {
     unsigned red, green, blue;
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(left, top, innerWidth, height - 28, RGB(red, green, blue));
   }
 
@@ -4210,7 +4153,7 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   this->viewer = new UITextViewer();
   this->viewer->Configure(10, 22, 260, 48, 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->viewer->backgroundColor = RGB(red, green, blue) | 0xFF000000u;
   this->viewer->Invalidate();
   this->AddChild(this->viewer);
@@ -4220,11 +4163,11 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   this->gauge->SetSize(240, 15);
   this->gauge->Move(20, this->geometry.height - 50);
   this->gauge->SetValue(0);
-  SkinPaletteChannels(ResourceMgr::Instance(), 18, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(18, 2, red, green, blue);
   this->gauge->m_backgroundRed = red;
   this->gauge->m_backgroundGreen = green;
   this->gauge->m_backgroundBlue = blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 22, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(22, 2, red, green, blue);
   this->gauge->m_fillRed = red;
   this->gauge->m_fillGreen = green;
   this->gauge->m_fillBlue = blue;
@@ -4373,7 +4316,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->m_view.actionNames[1].assign(g_session.GetHeadActName(this->m_info.job, sex, &head));
       this->m_view.spriteNames[1].assign(g_session.GetHeadSprName(this->m_info.job, sex, &head));
       this->m_info.head = static_cast<std::int16_t>(head);
-      this->m_view.imfName = GetBodyImfName(this->m_info.job, sex, this->m_info.head, this->m_info.bodyCostume);
+      this->m_view.imfName = g_session.GetBodyImfName(this->m_info.job, sex, this->m_info.head, this->m_info.bodyCostume);
       if (this->m_view.headPalette) {
         this->m_view.headPaletteName.assign(g_session.GetHeadPalName(head, this->m_info.job, sex, this->m_view.headPalette));
       }
@@ -4417,16 +4360,10 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 void UILoginWnd::OnCreate(int, int) {
   this->backgroundWindow = g_windowMgr.EnsureWindow(WID_RPIMAGEWND2);
   UIRPImageWnd2* backgroundWindow = static_cast<UIRPImageWnd2*>(this->backgroundWindow);
-  const char backgroundSource[] = CRYPT_CHARS(44, "유저인터페이스\\login_interface\\bg_login.tga", 0x13E33FA1A591AB67ULL);
-  thread_local EncryptedName<sizeof(backgroundSource), 0x13E33FA1A591AB67ULL> backgroundName(backgroundSource);
-  backgroundWindow->SetImage(backgroundName.Text(), 5);
+  backgroundWindow->SetImage(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bg_login.tga", 0x13E33FA1A591AB67ULL, backgroundName), 5);
 
-  const char uiPathSource[] = CRYPT_CHARS(16, "유저인터페이스\\", 0x17A9E5BF39AD4737ULL);
-  thread_local EncryptedName<sizeof(uiPathSource), 0x17A9E5BF39AD4737ULL> uiPathName(uiPathSource);
-  const std::string uiPath(uiPathName.Text());
-  const char loginPathSource[] = CRYPT_CHARS(32, "유저인터페이스\\login_interface\\", 0x9949BFD527532943ULL);
-  thread_local EncryptedName<sizeof(loginPathSource), 0x9949BFD527532943ULL> loginPathName(loginPathSource);
-  const std::string loginPath(loginPathName.Text());
+  const std::string uiPath(OBFUSCATE_TEXT_NAMED("유저인터페이스\\", 0x17A9E5BF39AD4737ULL, uiPathName));
+  const std::string loginPath(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\", 0x9949BFD527532943ULL, loginPathName));
   this->passwordPlaceholder = true;
 
   UIStaticText* label = new UIStaticText();
@@ -4439,15 +4376,9 @@ void UILoginWnd::OnCreate(int, int) {
 
   UIBmpTextButton* button;
   button = new UIBmpTextButton();
-  const char closeNormalSource[] = CRYPT_CHARS(51, "유저인터페이스\\login_interface\\bt_close_normal.bmp", 0xCD8F077123FB7D6FULL);
-  thread_local EncryptedName<sizeof(closeNormalSource), 0xCD8F077123FB7D6FULL> closeNormalName(closeNormalSource);
-  button->SetBitmap(closeNormalName.Text(), 0, 0);
-  const char closeOverSource[] = CRYPT_CHARS(49, "유저인터페이스\\login_interface\\bt_close_over.bmp", 0x637B959D55771F69ULL);
-  thread_local EncryptedName<sizeof(closeOverSource), 0x637B959D55771F69ULL> closeOverName(closeOverSource);
-  button->SetBitmap(closeOverName.Text(), 1, 0);
-  const char closePressSource[] = CRYPT_CHARS(50, "유저인터페이스\\login_interface\\bt_close_press.bmp", 0xD1413DBB01CD8B51ULL);
-  thread_local EncryptedName<sizeof(closePressSource), 0xD1413DBB01CD8B51ULL> closePressName(closePressSource);
-  button->SetBitmap(closePressName.Text(), 2, 0);
+  button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close_normal.bmp", 0xCD8F077123FB7D6FULL, closeNormalName), 0, 0);
+  button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close_over.bmp", 0x637B959D55771F69ULL, closeOverName), 1, 0);
+  button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close_press.bmp", 0xD1413DBB01CD8B51ULL, closePressName), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(13, 104);
   button->SetId(285);
@@ -4462,15 +4393,9 @@ void UILoginWnd::OnCreate(int, int) {
   this->AddChild(button);
 
   button = new UIBmpTextButton();
-  const char joinNormalSource[] = CRYPT_CHARS(50, "유저인터페이스\\login_interface\\bt_join_normal.bmp", 0x758F1D0B4F7705B9ULL);
-  thread_local EncryptedName<sizeof(joinNormalSource), 0x758F1D0B4F7705B9ULL> joinNormalName(joinNormalSource);
-  button->SetBitmap(joinNormalName.Text(), 0, 0);
-  const char joinOverSource[] = CRYPT_CHARS(48, "유저인터페이스\\login_interface\\bt_join_over.bmp", 0x891B232D09451965ULL);
-  thread_local EncryptedName<sizeof(joinOverSource), 0x891B232D09451965ULL> joinOverName(joinOverSource);
-  button->SetBitmap(joinOverName.Text(), 1, 0);
-  const char joinPressSource[] = CRYPT_CHARS(49, "유저인터페이스\\login_interface\\bt_join_press.bmp", 0xF161095D0DE18F95ULL);
-  thread_local EncryptedName<sizeof(joinPressSource), 0xF161095D0DE18F95ULL> joinPressName(joinPressSource);
-  button->SetBitmap(joinPressName.Text(), 2, 0);
+  button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_join_normal.bmp", 0x758F1D0B4F7705B9ULL, joinNormalName), 0, 0);
+  button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_join_over.bmp", 0x891B232D09451965ULL, joinOverName), 1, 0);
+  button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_join_press.bmp", 0xF161095D0DE18F95ULL, joinPressName), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(87, 104);
   button->SetId(267);
@@ -4486,30 +4411,18 @@ void UILoginWnd::OnCreate(int, int) {
 
   UIBitmapButton* bitmapButton;
   bitmapButton = new UIBitmapButton();
-  const char startNormalSource[] = CRYPT_CHARS(51, "유저인터페이스\\login_interface\\bt_start_normal.bmp", 0xEDC74F6D13DF71EFULL);
-  thread_local EncryptedName<sizeof(startNormalSource), 0xEDC74F6D13DF71EFULL> startNormalName(startNormalSource);
-  bitmapButton->SetBitmap(startNormalName.Text(), 0, 0);
-  const char startOverSource[] = CRYPT_CHARS(49, "유저인터페이스\\login_interface\\bt_start_over.bmp", 0x75ADC57D87EFBD8FULL);
-  thread_local EncryptedName<sizeof(startOverSource), 0x75ADC57D87EFBD8FULL> startOverName(startOverSource);
-  bitmapButton->SetBitmap(startOverName.Text(), 1, 0);
-  const char startPressSource[] = CRYPT_CHARS(50, "유저인터페이스\\login_interface\\bt_start_press.bmp", 0x2BAD156DE3E1F9D9ULL);
-  thread_local EncryptedName<sizeof(startPressSource), 0x2BAD156DE3E1F9D9ULL> startPressName(startPressSource);
-  bitmapButton->SetBitmap(startPressName.Text(), 2, 0);
+  bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_start_normal.bmp", 0xEDC74F6D13DF71EFULL, startNormalName), 0, 0);
+  bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_start_over.bmp", 0x75ADC57D87EFBD8FULL, startOverName), 1, 0);
+  bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_start_press.bmp", 0x2BAD156DE3E1F9D9ULL, startPressName), 2, 0);
   bitmapButton->SetSize(bitmapButton->BitmapWidth(), bitmapButton->BitmapHeight());
   bitmapButton->Move(192, 32);
   bitmapButton->SetId(186);
   this->AddChild(bitmapButton);
 
   bitmapButton = new UIBitmapButton();
-  const char exitNormalSource[] = CRYPT_CHARS(52, "유저인터페이스\\login_interface\\bt_close2_normal.bmp", 0x2FE993D1DDE1F197ULL);
-  thread_local EncryptedName<sizeof(exitNormalSource), 0x2FE993D1DDE1F197ULL> exitNormalName(exitNormalSource);
-  bitmapButton->SetBitmap(exitNormalName.Text(), 0, 0);
-  const char exitOverSource[] = CRYPT_CHARS(50, "유저인터페이스\\login_interface\\bt_close2_over.bmp", 0x39FF7FB50DEB998FULL);
-  thread_local EncryptedName<sizeof(exitOverSource), 0x39FF7FB50DEB998FULL> exitOverName(exitOverSource);
-  bitmapButton->SetBitmap(exitOverName.Text(), 1, 0);
-  const char exitPressSource[] = CRYPT_CHARS(51, "유저인터페이스\\login_interface\\bt_close2_press.bmp", 0x2F8B0F37118D157FULL);
-  thread_local EncryptedName<sizeof(exitPressSource), 0x2F8B0F37118D157FULL> exitPressName(exitPressSource);
-  bitmapButton->SetBitmap(exitPressName.Text(), 2, 0);
+  bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close2_normal.bmp", 0x2FE993D1DDE1F197ULL, exitNormalName), 0, 0);
+  bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close2_over.bmp", 0x39FF7FB50DEB998FULL, exitOverName), 1, 0);
+  bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close2_press.bmp", 0x2F8B0F37118D157FULL, exitPressName), 2, 0);
   bitmapButton->SetSize(bitmapButton->BitmapWidth(), bitmapButton->BitmapHeight());
   bitmapButton->Move(273, 15);
   bitmapButton->SetId(221);
@@ -4521,9 +4434,7 @@ void UILoginWnd::OnCreate(int, int) {
   this->passwordEdit->Move(15, 64);
   this->passwordEdit->labelAlignment = 2;
   this->passwordEdit->Background(255, 255, 255);
-  const char placeholderSource[] = CRYPT_CHARS(9, "PASSWORD", 0xAD075B8DB599F1CDULL);
-  thread_local EncryptedName<sizeof(placeholderSource), 0xAD075B8DB599F1CDULL> placeholderName(placeholderSource);
-  this->passwordEdit->SetText(placeholderName.Text());
+  this->passwordEdit->SetText(OBFUSCATE_TEXT_NAMED("PASSWORD", 0xAD075B8DB599F1CDULL, placeholderName));
   this->passwordEdit->TextColor(156, 156, 156, 0xFFFFFFFF);
   this->passwordEdit->mask = '*';
   this->AddChild(this->passwordEdit);
@@ -4538,12 +4449,8 @@ void UILoginWnd::OnCreate(int, int) {
   this->LoadLogin();
 
   UICheckBox* saveIdCheck = new UICheckBox();
-  const char checkedImageSource[] = CRYPT_CHARS(16, "checkbox_on.bmp", 0x4941FD9F21BBB9FDULL);
-  thread_local EncryptedName<sizeof(checkedImageSource), 0x4941FD9F21BBB9FDULL> checkedImageName(checkedImageSource);
-  const std::string checkedImage = loginPath + std::string(checkedImageName.Text());
-  const char uncheckedImageSource[] = CRYPT_CHARS(17, "checkbox_off.bmp", 0x35E5656B5DEDCD75ULL);
-  thread_local EncryptedName<sizeof(uncheckedImageSource), 0x35E5656B5DEDCD75ULL> uncheckedImageName(uncheckedImageSource);
-  const std::string uncheckedImage = loginPath + std::string(uncheckedImageName.Text());
+  const std::string checkedImage = loginPath + std::string(OBFUSCATE_TEXT_NAMED("checkbox_on.bmp", 0x4941FD9F21BBB9FDULL, checkedImageName));
+  const std::string uncheckedImage = loginPath + std::string(OBFUSCATE_TEXT_NAMED("checkbox_off.bmp", 0x35E5656B5DEDCD75ULL, uncheckedImageName));
   saveIdCheck->SetBitmaps(checkedImage.c_str(), uncheckedImage.c_str());
   saveIdCheck->SetSize(saveIdCheck->geometry.width, saveIdCheck->geometry.height);
   saveIdCheck->Move(56, 85);

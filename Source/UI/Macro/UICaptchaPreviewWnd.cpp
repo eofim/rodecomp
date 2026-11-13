@@ -37,7 +37,7 @@ void UICaptchaPreviewWnd::AddImageData(const void* data, int size) {
     uLongf length = 0x9AB0;
     Bytef* image = new (std::nothrow) Bytef[0x9AB0];
     uncompress(image, &length, this->m_imageData, this->m_imageReceived);
-    this->m_image->m_bitmap.image.DecodeBitmap(image, length, false);
+    this->m_image->m_bitmap.DecodeBitmap(image, length, false);
     if (image) {
       delete[] image;
     }
@@ -56,7 +56,7 @@ void UIMacroDetectorWnd::AddImageData(const void* data, int size) {
       uLongf length = 0x9AB0;
       Bytef* image = new (std::nothrow) Bytef[0x9AB0];
       uncompress(image, &length, this->m_imageData, this->m_imageReceived);
-      this->m_image->m_bitmap.image.DecodeBitmap(image, length, false);
+      this->m_image->m_bitmap.DecodeBitmap(image, length, false);
       if (image) {
         delete[] image;
       }
@@ -66,7 +66,7 @@ void UIMacroDetectorWnd::AddImageData(const void* data, int size) {
 
     MacroDetectorImageReceivedPacket packet;
     packet.id = 0xA5A;
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
   }
 }
 
@@ -126,7 +126,7 @@ void UIMacroDetectorWnd::Paint() {
   this->DrawTitleBar(false, "", 0);
   this->DrawButtonBar(0, 0, 1);
   this->FillRegion(0, 16, this->geometry.width, this->geometry.height - 36, 0xFFFFFFFF);
-  DrawRectangleBorder(*this, 0, 16, this->geometry.width, this->geometry.height - 36, 0xC6C6C6);
+  this->DrawRectOutline(0, 16, this->geometry.width, this->geometry.height - 36, 0xC6C6C6);
 
   this->DrawTextAt(25, 28, LookupMessage(MSI_MACRO_DETECTOR_REMAIN_COUNT), 0, 0, 12, 0, 1, 0);
   this->DrawTextAt(25, 45, LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_CHAR), 0, 0, 12, 0, 1, 0);
@@ -144,10 +144,7 @@ void UIMacroDetectorWnd::Paint() {
     this->FillRegion(60, 97, static_cast<int>(width), 30, 0xFF);
 
     unsigned int seconds = remaining / 1000;
-    {
-      std::string str = FormatOwnedString("%2d : %2d", seconds / 60, seconds);
-      this->DrawRightAlignedText(280, 138, str.c_str(), 0, 0, 13, 0xFF2323, 1);
-    }
+    this->DrawRightAlignedText(280, 138, FormatOwnedString("%2d : %2d", seconds / 60, seconds).c_str(), 0, 0, 13, 0xFF2323, 1);
     {
       std::string str = FormatOwnedString(LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_CHAR), this->remainingAttempts);
       this->DrawTextAt(60, 138, str.c_str(), 0, 0, 13, 0x2323FF, 1, 0);

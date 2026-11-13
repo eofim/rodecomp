@@ -39,8 +39,8 @@ __declspec(safebuffers) void CEffectPrim::RenderSpinSquares(matrix& wtm) {
 
     const int angle1 = slot.fullDisplayAngle;
     const int angle2 = angle1 + (angle1 < 270 ? 90 : -270);
-    const int angle3 = angle2 + (angle2 + 90 < 360 ? 90 : -270);
-    const int angle4 = angle3 + (angle3 + 90 < 360 ? 90 : -270);
+    const int angle3 = angle2 + (angle2 + 90 >= 360 ? -270 : 90);
+    const int angle4 = angle3 + (angle3 + 90 >= 360 ? -270 : 90);
     const float radius = slot.distance * g_sinTable[static_cast<int>(tilt)] * 0.05f + slot.distance;
     vec1.x = radius * g_cosTable[angle1];
     vec1.z = radius * g_sinTable[angle1];
@@ -114,11 +114,11 @@ __declspec(safebuffers) void CEffectPrim::RenderSpinSquare(
   vec3.y = 0.0f;
   vec4.y = 0.0f;
 
+  const float radius = slot.distance * g_sinTable[static_cast<int>(tilt)] * 0.05f + slot.distance * scale;
   const int angle1 = slot.fullDisplayAngle;
   const int angle2 = angle1 + (angle1 < 270 ? 90 : -270);
-  const int angle3 = angle2 + (angle2 + 90 < 360 ? 90 : -270);
-  const int angle4 = angle3 + (angle3 + 90 < 360 ? 90 : -270);
-  const float radius = slot.distance * g_sinTable[static_cast<int>(tilt)] * 0.05f + slot.distance * scale;
+  const int angle3 = angle2 + (angle2 + 90 >= 360 ? -270 : 90);
+  const int angle4 = angle3 + (angle3 + 90 >= 360 ? -270 : 90);
   vec1.x = radius * g_cosTable[angle1];
   vec1.z = radius * g_sinTable[angle1];
   vec2.x = radius * g_cosTable[angle2];
@@ -598,19 +598,17 @@ void CEffectPrim::RenderJitterSweeps(matrix& wtm) {
           if (ring > 0) {
             const int alpha = this->state.slots[layer].alphaB - i * 5;
             if (alpha > 0 && layer == 0) {
-              unsigned char green;
-              unsigned char blue;
               if (this->state.slots[0].fullDisplayAngle == 3) {
                 int rb = std::rand() % 26;
                 int rg = std::rand() % 51;
-                blue = static_cast<unsigned char>((rb >= 0 ? rb : 0) + 100);
-                green = static_cast<unsigned char>(rg >= 0 ? rg : 0);
+                this->RenderTeiRect(&count, static_cast<short>(alpha), currentBottom, currentTop, lastTop, lastBottom,
+                                    wtm, 0, 0, 1, 255, static_cast<unsigned char>(rg >= 0 ? rg : 0),
+                                    static_cast<unsigned char>((rb >= 0 ? rb : 0) + 100), 0.0f, 1.0f, 0.0f, 1.0f, 0);
               } else {
-                green = static_cast<unsigned char>(i * 3);
-                blue = green;
+                this->RenderTeiRect(&count, static_cast<short>(alpha), currentBottom, currentTop, lastTop, lastBottom,
+                                    wtm, 0, 0, 1, 255, static_cast<unsigned char>(i * 3), static_cast<unsigned char>(i * 3),
+                                    0.0f, 1.0f, 0.0f, 1.0f, 0);
               }
-              this->RenderTeiRect(&count, static_cast<short>(alpha), currentBottom, currentTop, lastTop, lastBottom,
-                                  wtm, 0, 0, 1, 255, green, blue, 0.0f, 1.0f, 0.0f, 1.0f, 0);
             }
           }
           lastBottom = currentBottom;

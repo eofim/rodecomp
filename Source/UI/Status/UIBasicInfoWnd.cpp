@@ -1,4 +1,5 @@
 #include "UI/Login/UINewSelectCharWnd.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Status/UIBasicInfoWnd.h"
@@ -36,19 +37,19 @@
 namespace {
 
 std::int64_t BaseExpCurrent() {
-  return *reinterpret_cast<const std::int64_t*>(&g_session.playerExperienceState[0x04]);
+  return g_session.m_exp;
 }
 
 std::int64_t BaseExpMaximum() {
-  return *reinterpret_cast<const std::int64_t*>(&g_session.playerExperienceState[0x0C]);
+  return g_session.m_nextExp;
 }
 
 std::int64_t JobExpCurrent() {
-  return *reinterpret_cast<const std::int64_t*>(&g_session.playerExperienceState[0x1C]);
+  return g_session.m_jobExp;
 }
 
 std::int64_t JobExpMaximum() {
-  return *reinterpret_cast<const std::int64_t*>(&g_session.playerExperienceState[0x14]);
+  return g_session.m_nextJobExp;
 }
 
 }
@@ -385,8 +386,8 @@ void UIBasicInfoWnd::DrawExpanded() {
     this->DrawTextAt(173, 51, FormatOwnedString("%d%%", percent).c_str(), 0, 1, 14, 0, 0, 0);
   }
 
-  const int sp = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0]);
-  const int spMax = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4]);
+  const int sp = g_session.m_sp;
+  const int spMax = g_session.m_maxSp;
   if (spMax > 0) {
     const std::int64_t percent = static_cast<std::int64_t>(sp) * 100 / spMax;
     this->DrawTextAt(173, 65, FormatOwnedString("%d%%", percent).c_str(), 0, 1, 14, 0, 0, 0);
@@ -428,7 +429,7 @@ void UIBasicInfoWnd::DrawExpanded() {
   }
 
   const int denominator = g_session.m_maxWeight < 1 ? 1 : g_session.m_maxWeight;
-  const std::uint32_t weightColor = 100 * g_session.m_weight / denominator >= g_overweightThresholdPercent ? 255 : 0;
+  const std::uint32_t weightColor = 100 * g_session.m_weight / denominator >= g_session.m_overweightThresholdPercent ? 255 : 0;
   this->DrawRightAlignedText(
     this->geometry.width - zenyWidth - 5, this->layoutOffset + 103, weightText.c_str(), 0, 1, 14, weightColor, 0
   );
@@ -441,9 +442,9 @@ void UIBasicInfoWnd::DrawCollapsed() {
     unsigned red;
     unsigned green;
     unsigned blue;
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(1, 17, this->geometry.width - 2, this->geometry.height - 18, RGB(red, green, blue));
-    SkinPaletteChannels(ResourceMgr::Instance(), 14, 6, red, green, blue);
+    g_skinInfo.PaletteChannels(14, 6, red, green, blue);
     DrawRoundedBorder(*this, 0, 14, this->geometry.width, this->geometry.height - 14, RGB(red, green, blue));
   }
   this->DrawTitleBar(false, "", 0);
@@ -511,8 +512,8 @@ void UIBasicInfoWnd::DrawCollapsed() {
     136, 36, FormatOwnedString("| %s %.1lf%%", LookupMessage(MSI_SIMPLECASH_P), percent).c_str(), 0, family, fontHeight, 0, 0, 0
   );
 
-  const int sp = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0]);
-  const int spMax = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4]);
+  const int sp = g_session.m_sp;
+  const int spMax = g_session.m_maxSp;
   std::uint32_t spColor = 0;
   if (spMax > 0) {
     spColor = 0.25f > static_cast<float>(sp) / static_cast<float>(spMax) ? 255 : 0;
@@ -555,8 +556,8 @@ void UIBasicInfoWnd::OnCreate(int width, int height) {
 
   this->spBar = new UIBarGraphPlayer();
   static_cast<UIBarGraphPlayer*>(this->spBar)->SetValues(
-    []() -> std::int64_t { return *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0]); },
-    []() -> std::int64_t { return *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4]); }
+    []() -> std::int64_t { return g_session.m_sp; },
+    []() -> std::int64_t { return g_session.m_maxSp; }
   );
   static_cast<UIBarGraphPlayer*>(this->spBar)->SetSize(135, 9);
   static_cast<UIBarGraphPlayer*>(this->spBar)->Move(-100, -100);
@@ -608,10 +609,10 @@ void UIBasicInfoWnd::Paint() {
       unsigned red;
       unsigned green;
       unsigned blue;
-      SkinPaletteChannels(ResourceMgr::Instance(), 14, 6, red, green, blue);
+      g_skinInfo.PaletteChannels(14, 6, red, green, blue);
       DrawRoundedBorder(*this, 0, 17, this->geometry.width, this->geometry.height - 17, RGB(red, green, blue));
       this->FillRegion(0, 17, this->geometry.width, 5, RGB(red, green, blue));
-      SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+      g_skinInfo.PaletteChannels(2, 2, red, green, blue);
       this->FillRegion(1, 17, this->geometry.width - 2, this->geometry.height - 19, RGB(red, green, blue));
       this->FillRegion(2, this->geometry.height - 2, this->geometry.width - 4, 1, RGB(red, green, blue));
     }
@@ -630,12 +631,12 @@ void UIBasicInfoWnd::Paint() {
     if (g_session.IsTreeGroupTwo(g_session.GetDisplayJob())) {
       maxLevel = g_session.m_maxLevel;
     } else if (g_session.IsSuperNovice2Job(g_session.GetDisplayJob())) {
-      maxLevel = *reinterpret_cast<const int*>(&g_session.jobLevelLimits[0]);
+      maxLevel = g_session.m_maxBaseLevelExtend2;
     } else if (g_session.IsExpandedJob(g_session.GetDisplayJob())) {
-      maxLevel = *reinterpret_cast<const int*>(&g_session.jobLevelLimits[4]);
+      maxLevel = g_session.m_maxBaseLevelUpperJob;
     } else {
-      maxLevel = g_session.IsDoramJob(g_session.GetDisplayJob()) == true ? *reinterpret_cast<const int*>(&g_session.jobLevelLimits[0x28])
-                                                                         : *reinterpret_cast<const int*>(g_session.maxBaseLevel);
+      maxLevel = g_session.IsDoramJob(g_session.GetDisplayJob()) == true ? g_session.m_maxBaseLevelDoram
+                                                                         : g_session.m_maxBaseLevel;
     }
 
     double percent;
@@ -704,8 +705,8 @@ void UIBasicInfoWnd::Paint() {
       this->DrawTextAt(offset + x, 36, text, length, 1, 14, 0, 0, 0);
     }
 
-    const int& sp = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0]);
-    const int& spMax = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4]);
+    const int& sp = g_session.m_sp;
+    const int& spMax = g_session.m_maxSp;
     if (spMax < 0) {
       return;
     }
@@ -750,9 +751,9 @@ void UIBasicInfoWnd::Paint() {
       this->DrawTextAt(173, 51, text, 0, 1, 14, 0, 0, 0);
     }
 
-    const int spMax = *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4]);
+    const int spMax = g_session.m_maxSp;
     if (spMax != 0) {
-      std::sprintf(text, "%d%%", *reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0]) * 100 / spMax);
+      std::sprintf(text, "%d%%", g_session.m_sp * 100 / spMax);
       this->DrawTextAt(173, 65, text, 0, 1, 14, 0, 0, 0);
     }
 
@@ -784,7 +785,7 @@ void UIBasicInfoWnd::Paint() {
     if (capacity < 1) {
       capacity = 1;
     }
-    const std::uint32_t color = g_session.m_weight * 100 / capacity >= g_overweightThresholdPercent ? 255 : 0;
+    const std::uint32_t color = g_session.m_weight * 100 / capacity >= g_session.m_overweightThresholdPercent ? 255 : 0;
     this->DrawRightAlignedText(this->geometry.width - zenyWidth - 10, this->layoutOffset + 103, text, std::strlen(text), 1, 14, color, 0);
   }
 }

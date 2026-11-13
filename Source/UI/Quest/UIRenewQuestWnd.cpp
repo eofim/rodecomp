@@ -125,7 +125,7 @@ void UINpcSprWnd::Paint() {
       }
 
       this->geometry.surface->DrawSurface(
-        0, 0, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored != 0, 1, 1, 0, 0
+        0, 0, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored != 0, 1, 1, 0
       );
     }
   }
@@ -1085,7 +1085,7 @@ int UIRenewQuestWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
           packet.questId = questId;
           packet.packetType = ID_CZ_ACTIVE_QUEST;
           packet.active = argument2 != 0;
-          GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
           return 0;
         }
       }

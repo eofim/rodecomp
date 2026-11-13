@@ -46,7 +46,7 @@ void CLevel99Orb2Effect::Close() {
 void CLevel99Orb2Effect::Open() {
   for (int row = 0; row < 4; ++row) {
     for (int column = 0; column < 4; ++column) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 13);
+      CParticle* particle = CreateParticle(&this->positionVector, 13);
       if (!particle) {
         continue;
       }
@@ -124,7 +124,8 @@ void CLevel99Orb2Effect::OnProcess() {
           this->offsets[index].x += speed * g_sinTable[static_cast<int>(particle->animationParameter)];
           this->offsets[index].z += speed * g_sinTable[static_cast<int>(angles[1])];
           if (this->offsets[index].y < -20.0f) {
-            particle->alpha = std::max(particle->alpha - 4, 0);
+            const int alpha = particle->alpha - 4;
+            particle->alpha = alpha >= 0 ? alpha : 0;
           } else if (particle->alpha != 255) {
             particle->alpha = 255;
           }

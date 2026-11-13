@@ -19,7 +19,7 @@ CSoulCollectEffect::CSoulCollectEffect() : CEffect(-1) {
 
 // OFFSET: 0x0072A2A0
 // FUNCTION: fn_07456
-CSoulCollectEffect::~CSoulCollectEffect() {
+__declspec(noinline) CSoulCollectEffect::~CSoulCollectEffect() {
 }
 
 // OFFSET: 0x0072A580
@@ -43,7 +43,7 @@ void CSoulCollectEffect::Open() {
   if (current < count) {
     for (int index = 0; index < this->effectLevel - current; ++index) {
       for (int layer = 0; layer < 2; ++layer) {
-        CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+        CParticle* particle = CreateParticle(&this->positionVector, 5);
         if (!particle) {
           continue;
         }
@@ -60,7 +60,7 @@ void CSoulCollectEffect::Open() {
         } else if (layer == 1) {
           particle->depthOffset = 0.00002f;
         }
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         this->particles.push_back(particle);
       }
     }
@@ -85,7 +85,7 @@ bool CSoulCollectEffect::IsAlive() {
 // OFFSET: 0x0072A800
 // FUNCTION: fn_07463
 void CSoulCollectEffect::OnProcess() {
-  float& rotation = reinterpret_cast<float&>(this->rotationParameter);
+  float& rotation = this->rotationParameter;
 
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
@@ -95,60 +95,62 @@ void CSoulCollectEffect::OnProcess() {
 
     const unsigned int pairs = this->particles.size() / 2;
     const int index = particle->columnIndex;
-    if (index < static_cast<int>(pairs - 5)) {
+    if (index >= static_cast<int>(pairs - 5)) {
+      int maxAlpha = 255;
+      const int group = index / 5;
+      switch (group) {
+      case 0:
+        particle->scale = 2.0f;
+        particle->SetColor(0, 255, 0);
+        maxAlpha = 150;
+        break;
+      case 1:
+        particle->scale = 3.5f;
+        particle->SetColor(0, 255, 0);
+        maxAlpha = 150;
+        break;
+      case 2:
+        particle->scale = 3.5f;
+        particle->SetColor(255, 0, 0);
+        maxAlpha = 255;
+        break;
+      case 3:
+        particle->scale = 5.5f;
+        particle->SetColor(255, 0, 0);
+        maxAlpha = 255;
+        break;
+      }
+
+      if (particle->rowIndex == 1) {
+        particle->scale *= 0.5f;
+        particle->SetColor(255, 255, 255);
+        maxAlpha = 255;
+      }
+
+      matrix rotationMatrix;
+      rotationMatrix.MakeZRotation(3.141592f);
+      rotationMatrix.AppendXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
+      matrix scaling;
+      scaling.SetScale(particle->scale, particle->scale, 1.0f);
+      matrix result;
+      result.Compose(scaling, rotationMatrix);
+
+      particle->alpha = std::min(maxAlpha, particle->alpha + 2);
+      particle->transform = result;
+
+      const int step = 360 / std::min(5u, pairs);
+      const float angle = (static_cast<float>(step * (index - group * 5)) + rotation) / 180.0f * 3.141592f;
+      const float cosine = ClientCos(angle) * 10.0f;
+      const float sine = ClientSin(angle) * 10.0f;
+      const float y = this->position[1] - 10.0f;
+      const float z = cosine + this->position[2];
+      const float x = sine + this->position[0];
+      particle->position.y = y;
+      particle->position.z = z;
+      particle->position.x = x;
+    } else {
       particle->alpha = 0;
-      continue;
     }
-
-    int maxAlpha = 255;
-    const int group = index / 5;
-    switch (group) {
-    case 0:
-      particle->scale = 2.0f;
-      particle->SetColor(0, 255, 0);
-      maxAlpha = 150;
-      break;
-    case 1:
-      particle->scale = 3.5f;
-      particle->SetColor(0, 255, 0);
-      maxAlpha = 150;
-      break;
-    case 2:
-      particle->scale = 3.5f;
-      particle->SetColor(255, 0, 0);
-      maxAlpha = 255;
-      break;
-    case 3:
-      particle->scale = 5.5f;
-      particle->SetColor(255, 0, 0);
-      maxAlpha = 255;
-      break;
-    }
-
-    if (particle->rowIndex == 1) {
-      particle->scale *= 0.5f;
-      particle->SetColor(255, 255, 255);
-      maxAlpha = 255;
-    }
-
-    matrix rotationMatrix;
-    rotationMatrix.MakeZRotation(3.141592f);
-    rotationMatrix.AppendXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
-    matrix scaling;
-    scaling.SetScale(particle->scale, particle->scale, 1.0f);
-    matrix result;
-    result.Compose(scaling, rotationMatrix);
-
-    particle->alpha = std::min(maxAlpha, particle->alpha + 2);
-    particle->transform = result;
-
-    const int step = 360 / std::min(5u, pairs);
-    const float angle = (static_cast<float>(step * (index - group * 5)) + rotation) / 180.0f * 3.141592f;
-    const float cosine = std::cos(angle) * 10.0f;
-    const float sine = std::sin(angle) * 10.0f;
-    particle->position.y = this->position[1] - 10.0f;
-    particle->position.z = cosine + this->position[2];
-    particle->position.x = sine + this->position[0];
   }
 
   rotation += 0.5f;

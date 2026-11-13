@@ -6,8 +6,12 @@
 #include "Contents/Actors/Pc.h"
 #include "Contents/World/World.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
+
+template __declspec(noinline) SessionRecord6178Entry* std::allocator<SessionRecord6178Entry>::allocate(std::size_t);
+template __declspec(noinline) std::vector<SessionRecord6178Entry>::~vector() noexcept;
 
 // OFFSET: 0x00E1D6B0
 // FUNCTION: fn_23850
@@ -34,13 +38,9 @@ int CSession::IsState291To303(int state) const {
 // OFFSET: 0x00E1D700
 // FUNCTION: fn_23851
 bool CSession::HasTrackedAchievement(int id) const {
-  auto it = this->trackedAchievements.begin();
-  for (; it != this->trackedAchievements.end(); ++it) {
-    const SessionRecord6178 record = *it;
-    if (id == record.id) {
-      break;
-    }
-  }
+  const auto it = std::find_if(this->trackedAchievements.begin(), this->trackedAchievements.end(), [id](SessionRecord6178 record) {
+    return id == record.id;
+  });
   return it != this->trackedAchievements.end();
 }
 
@@ -91,7 +91,7 @@ int CSession::IsHomunAid(std::uint32_t aid) const {
   if (aid == 0xFFFFFFFF) {
     return false;
   }
-  return aid == *reinterpret_cast<const std::uint32_t*>(&this->spAndHomunculusStats[8]);
+  return aid == this->m_homunAid;
 }
 
 // OFFSET: 0x00E1DE10
@@ -100,7 +100,7 @@ int CSession::IsMercenaryAid(std::uint32_t aid) const {
   if (aid == 0xFFFFFFFF) {
     return false;
   }
-  return aid == *reinterpret_cast<const std::uint32_t*>(&this->companionTargetState[8]);
+  return aid == this->m_mercenaryAid;
 }
 
 // OFFSET: 0x00E1DE30
@@ -109,8 +109,8 @@ int CSession::IsCompanionAid(std::uint32_t aid) const {
   if (aid == 0xFFFFFFFF) {
     return 0;
   }
-  if (aid == *reinterpret_cast<const std::uint32_t*>(&this->spAndHomunculusStats[8]) ||
-      aid == *reinterpret_cast<const std::uint32_t*>(&this->companionTargetState[8]) || aid == this->petGid ||
+  if (aid == this->m_homunAid ||
+      aid == this->m_mercenaryAid || aid == this->petGid ||
       aid == static_cast<std::uint32_t>(this->elementalGid)) {
     return 1;
   }

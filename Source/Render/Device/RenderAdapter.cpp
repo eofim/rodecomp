@@ -1,3 +1,4 @@
+#include "Contents/Configuration/ServiceOptions.h"
 #include "Render/DX9/DeviceOwnerDX9.h"
 #include "Render/DX9/RenderSystemDX9.h"
 #include "Render/Device/RenderAdapter.h"
@@ -48,7 +49,19 @@ RenderAdapter SelectedRenderAdapter() {
   selected.backend = g_configuredRenderBackend;
 
   if (selected.backend == 0) {
-    selected.backend = g_session.DefaultRenderBackend() == 1 ? 1 : 2;
+    int backend;
+    switch (g_session.DefaultRenderBackend()) {
+    case 1:
+      backend = 1;
+      break;
+    case 2:
+      backend = 2;
+      break;
+    default:
+      backend = 2;
+      break;
+    }
+    selected.backend = backend;
   }
 
   switch (selected.backend) {
@@ -106,8 +119,10 @@ HRESULT CRenderSystemDX9::Initialize(HWND window) {
   UINT ordinal = D3DADAPTER_DEFAULT;
 
   for (size_t i = 0; i < adapters.size(); ++i) {
-    if (adapters[i].Matches(selected)) {
-      ordinal = adapters[i].ordinal;
+    const RenderAdapter& adapter = adapters[i];
+
+    if (adapter.Matches(selected)) {
+      ordinal = adapter.ordinal;
       break;
     }
   }

@@ -38,6 +38,7 @@
 #include "Utility/Singleton.h"
 #include "Utility/Text/StringUtil.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Resource/MSGSTRINGID.h"
 #include "Network/Packets/PacketId.h"
@@ -45,6 +46,7 @@ extern "C" {
 #include <lua.h>
 }
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -523,9 +525,7 @@ bool CGameSettingsMgr::LoadSettings() {
 
   this->Init_Func();
 
-  constexpr std::array<char, 50> source = CRYPT_NAME("LuaFiles514\\Lua Files\\OptionInfo\\GameSettings.lub", 0x0F41EBBDA32D1B17ULL);
-  thread_local EncryptedName<sizeof(source), 0x0F41EBBDA32D1B17ULL> name(source);
-  if (!this->LoadFile(name.Text())) {
+  if (!this->LoadFile(OBFUSCATE_ARRAY_TEXT("LuaFiles514\\Lua Files\\OptionInfo\\GameSettings.lub", 0x0F41EBBDA32D1B17ULL, char))) {
     return false;
   }
   return this->ReadOptionTable();
@@ -533,8 +533,8 @@ bool CGameSettingsMgr::LoadSettings() {
 
 // OFFSET: 0x006C17A0
 // FUNCTION: fn_06318
-unsigned char ServiceOptions::Get(int id) const {
-  const auto entry = g_serviceOptions.values.find(static_cast<std::uint32_t>(id));
+unsigned char ServiceOptions::Get(int id) {
+  const auto entry = g_serviceOptions.values.find(id);
   return entry == g_serviceOptions.values.end() ? 0 : entry->second;
 }
 
@@ -625,7 +625,7 @@ bool GameSettings::ReadOptionTable() {
       }
       lua_pop(state, 1);
 
-      g_serviceOptions.values[static_cast<std::uint32_t>(option.id)] = option.defaultValue;
+      g_serviceOptions.values[option.id] = option.defaultValue;
     }
 
     lua_pushstring(state, "Title");
@@ -708,7 +708,7 @@ __declspec(noinline) int SetOption(const char* name, unsigned char value) {
     return 3;
   }
 
-  g_serviceOptions.values[static_cast<std::uint32_t>(optionId)] = value;
+  g_serviceOptions.values[optionId] = value;
   return optionId;
 }
 
@@ -722,7 +722,7 @@ std::pair<int, unsigned char> FindServiceOption(const char* name) {
   int optionId = 3;
   std::string strings[3];
   g_session.GetTalkType(name, &optionId, strings);
-  const auto entry = g_serviceOptions.values.find(static_cast<std::uint32_t>(optionId));
+  const auto entry = g_serviceOptions.values.find(optionId);
   if (entry == g_serviceOptions.values.end()) {
     return {3, 0};
   }
@@ -732,11 +732,11 @@ std::pair<int, unsigned char> FindServiceOption(const char* name) {
 // OFFSET: 0x006C2A80
 // FUNCTION: fn_06325
 bool ServiceOptions::Set(int id, unsigned char value) {
-  if (g_serviceOptions.values.find(static_cast<std::uint32_t>(id)) == g_serviceOptions.values.end()) {
+  if (g_serviceOptions.values.find(id) == g_serviceOptions.values.end()) {
     return false;
   }
 
-  g_serviceOptions.values[static_cast<std::uint32_t>(id)] = value;
+  g_serviceOptions.values[id] = value;
   return true;
 }
 
@@ -744,7 +744,7 @@ bool ServiceOptions::Set(int id, unsigned char value) {
 // FUNCTION: fn_06320
 __declspec(noinline) void GameSettings::ApplyScriptOption(int id, const char* key) {
   for (const GameSettingsOption& option : this->options) {
-    if (option.id != id) {
+    if (id != option.id) {
       continue;
     }
 
@@ -777,7 +777,7 @@ struct ConfigPacket {
 void SendServiceOptionPacket() {
   ServiceOptionPacket packet;
   packet.id = ID_CZ_NOCOSPLAY;
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
 }
 
 // OFFSET: 0x006C5E70
@@ -864,7 +864,7 @@ void SendConfigServiceOption(int id, unsigned char value, bool notify, int enabl
     packet.id = ID_CZ_CONFIG;
     packet.type = 1;
     packet.value = value;
-    GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
   }
 }
 #pragma inline_depth()
@@ -900,10 +900,8 @@ void ApplyServiceOption(int id, unsigned char value, bool notify, int enabledMes
 // OFFSET: 0x006C42B0
 // FUNCTION: fn_06354
 void ToggleSitStand() {
-  for (const ActiveSkillEffect& effect : g_activeSkillEffects) {
-    if (effect.id == 933) {
-      return;
-    }
+  if (std::find_if(g_activeSkillEffects.begin(), g_activeSkillEffects.end(), [](const ActiveSkillEffect& effect) { return effect.id == 933; }) != g_activeSkillEffects.end()) {
+    return;
   }
 
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
@@ -926,7 +924,7 @@ void ToggleSitStand() {
     times.pop_front();
     times.push_back(timeGetTime());
     const unsigned long elapsed = times.back() - times.front();
-    if (elapsed - 1501 <= 1498) {
+    if (elapsed > 1500 && elapsed < 3000) {
       mode->SendMsg(MM_DORIDORI, 0, 0, 0, 0);
       for (unsigned long& time : times) {
         time = 0;
@@ -1036,7 +1034,7 @@ void ApplyServiceOptionSessionFlag(int id, unsigned char value, bool notify, int
     }
   }
 
-  *reinterpret_cast<int*>(g_session.interactionFlags) = value;
+  g_session.m_serviceOption229 = value;
 }
 #pragma inline_depth()
 
@@ -1063,7 +1061,7 @@ void ApplyServiceOptionCursorClip(int id, unsigned char value, bool notify, int 
 // OFFSET: 0x006C5DF0
 // FUNCTION: fn_06369
 void ApplyServiceOptionAskOnDisable(int id, unsigned char value, bool notify, int enabledMessage, int disabledMessage) {
-  if (g_serviceOptions.Get(0x128) == value) {
+  if (value == g_serviceOptions.Get(0x128)) {
     return;
   }
 
@@ -1155,7 +1153,7 @@ void ApplyServiceOptionNotifyWindow(int id, unsigned char value, bool notify, in
     }
   }
 
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.minimapZoomWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.minimapZoomWnd)) {
     window->SendMsg(nullptr, UM_COMMAND, 0x1F6, 0, 0, 0);
   }
 }
@@ -1203,7 +1201,7 @@ void EnableWhisperBlock() {
   WhisperBlockPacket packet;
   packet.id = ID_CZ_SETTING_WHISPER_STATE;
   packet.enabled = 1;
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
 }
 
 // OFFSET: 0x006C63D0
@@ -1212,7 +1210,7 @@ void DisableWhisperBlock() {
   WhisperBlockPacket packet;
   packet.id = ID_CZ_SETTING_WHISPER_STATE;
   packet.enabled = 0;
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
 }
 
 // OFFSET: 0x006C6410
@@ -1220,7 +1218,7 @@ void DisableWhisperBlock() {
 void SendWhisperBlockPacket() {
   ServiceOptionPacket packet;
   packet.id = ID_CZ_REQ_WHISPER_LIST;
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
 }
 
 #pragma inline_depth(0)
@@ -1352,7 +1350,7 @@ void NotifyGameModeOptionFirst() {
 void RequestPlayerAction31() {
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
   if (CPlayer* player = mode->scene->player) {
-    player->SendMsg(nullptr, AM_REQ_SIT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    player->SendMsg(nullptr, AM_REQ_SIT, 0, 0, 0, 0, 0, 0);
   }
 }
 
@@ -1364,7 +1362,7 @@ void ShowPlayerLocation() {
     return;
   }
 
-  const auto* player = reinterpret_cast<const CRenderObject*>(mode->scene->player);
+  const auto* player = static_cast<const CRenderObject*>(mode->scene->player);
   if (!player) {
     return;
   }
@@ -1435,9 +1433,6 @@ void CGameSettingsMgr::Init_Func() {
   this->functions[0x98] = NotifyGameModeOptionAlt;
 }
 
-// GLOBAL: gl_25208
-bool g_showBattleFieldIcon;
-
 // GLOBAL: gl_25209
 int g_configuredOldWidth;
 
@@ -1466,7 +1461,7 @@ int g_viewportWidth = 1024;
 int g_viewportHeight = 768;
 
 // GLOBAL: gl_24767
-extern const GUID g_defaultDrawGuidDX7 = {};
+const GUID g_defaultDrawGuidDX7 = {};
 
 // OFFSET: 0x00DFE4E0
 // FUNCTION: fn_23604
@@ -1529,7 +1524,7 @@ void CSession::LoadOptionInfo() {
 
   g_skinInfo.m_name = this->GetOptionString("SkinName", "<Basic Skin>");
   this->monsterInfoEnabled = g_serviceOptions.Get(0x2E);
-  g_showBattleFieldIcon = this->GetOptionInteger("ShowBattleFieldIcon", 1) != 0;
+  g_session.m_showBattleFieldIcon = this->GetOptionInteger("ShowBattleFieldIcon", 1) != 0;
   Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(ConfineCursor, "MouseExclusive");
 
   const int resetPolicy = this->RenderSystemResetPolicy();
@@ -1668,7 +1663,7 @@ void CSession::SaveOptionInfo() {
   this->WriteOptionInteger(output, "Show_SkillDescript", this->m_showSkillDescription);
   this->WriteOptionInteger(output, "ChangeChatMode", g_windowMgr.chatModeChanged);
   this->WriteOptionInteger(output, "LockMouse", this->m_lockMouse);
-  this->WriteOptionInteger(output, "ShowBattleFieldIcon", g_showBattleFieldIcon);
+  this->WriteOptionInteger(output, "ShowBattleFieldIcon", g_session.m_showBattleFieldIcon);
   this->WriteOptionInteger(output, "MouseExclusive", g_serviceOptions.Get(ConfineCursor));
   this->WriteOptionInteger(output, "RenderSystemReset", g_renderSystemReset);
   this->WriteOptionInteger(output, "RENDERSYSTEM", g_configuredRenderBackend);

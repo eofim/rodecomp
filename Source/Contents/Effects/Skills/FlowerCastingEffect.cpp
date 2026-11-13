@@ -7,6 +7,7 @@
 #include "Contents/Effects/Core/EffectPoint.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Sound/SoundMgr.h"
+#include "Contents/Actors/Pc.h"
 #include "Contents/World/World.h"
 #include "Utility/Math/AffineMatrix.h"
 
@@ -17,7 +18,7 @@
 void CFlowerCastingEffect::AddRing(int kind) {
   for (int ring = 0; ring < 4; ++ring) {
     for (int segment = 0; segment < 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -30,7 +31,7 @@ void CFlowerCastingEffect::AddRing(int kind) {
       particle->angleParameter = 315;
       particle->alpha = 0;
 
-      float& baseAngle = *reinterpret_cast<float*>(&particle->angleBits);
+      float& baseAngle = particle->angle;
       if (kind == 0) {
         if (ring == 0) {
           particle->scale = 4.5f;
@@ -79,8 +80,8 @@ void CFlowerCastingEffect::AddRing(int kind) {
 
       particle->SetColor(100, 100, 255);
       particle->animationParameter = 0.0f;
-      *reinterpret_cast<float*>(particle->animationParameters) = particle->speedParameter;
-      InitParticleQuad(particle->vertices);
+      particle->animationParameters[0] = particle->speedParameter;
+      particle->InitParticleQuad(particle->vertices);
       this->particles.push_back(particle);
     }
   }
@@ -102,7 +103,7 @@ void CFlowerCastingEffect::Open() {
   this->effectLifetime = 400;
 
   CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
-  const vector3d& player = reinterpret_cast<const CRenderObject*>(world->player)->render.position;
+  const vector3d& player = world->player->render.position;
   g_soundMgr->PlayWave("effect\\T_안락한마법.wav", this->position[0] - player.x, 0.0f, this->position[2] - player.z, 250, 40, 1.0f, 0);
 
   this->AddRing(0);
@@ -119,13 +120,16 @@ bool CFlowerCastingEffect::IsAlive() {
 // FUNCTION: fn_19063
 void CFlowerCastingEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
-
     CParticle* particle = *it;
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
+
     if (particle && particle->elapsedFrames > 0) {
-      float radius = g_sinTable[particle->elapsedFrames % 90 * 4] * 2.5f + *reinterpret_cast<const float*>(particle->animationParameters);
+      int phase = particle->elapsedFrames;
+      phase %= 90;
+      float radius = g_sinTable[phase * 4] * 2.5f + particle->animationParameters[0];
       particle->speedParameter = radius;
 
       const int age = particle->elapsedFrames;
@@ -144,28 +148,30 @@ void CFlowerCastingEffect::OnProcess() {
       }
       radius = (std::max)(radius, 0.0f);
 
-      const float baseAngle = *reinterpret_cast<const float*>(&particle->angleBits);
+      const float baseAngle = particle->angle;
       const int angle = static_cast<int>(static_cast<int>(particle->angleParameter / 20.0f) * segment + baseAngle) % 360;
       const int tilt = particle->phaseParameter;
       const float spread = radius * g_cosTable[tilt];
       const float height = radius * g_sinTable[tilt];
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];
+      const float offsetX = spread * cosine;
+      const float offsetZ = spread * sine;
 
       EffectPoint points[2];
-      points[0].x = particle->scale * cosine;
-      points[0].y = 0.0f;
-      points[0].z = particle->scale * sine;
-      points[1].x = points[0].x + spread * cosine;
-      points[1].y = 0.0f - height;
-      points[1].z = points[0].z + spread * sine;
+      const float innerX = particle->scale * cosine;
+      const float innerY = 0.0f;
+      const float innerZ = particle->scale * sine;
+      const float outerX = innerX + offsetX;
+      const float outerY = 0.0f - height;
+      const float outerZ = innerZ + offsetZ;
 
-      particle->vertices[3].x = points[0].x;
-      particle->vertices[3].y = points[0].y;
-      particle->vertices[3].z = points[0].z;
-      particle->vertices[1].x = points[1].x;
-      particle->vertices[1].y = points[1].y;
-      particle->vertices[1].z = points[1].z;
+      particle->vertices[3].x = innerX;
+      particle->vertices[3].y = innerY;
+      particle->vertices[3].z = innerZ;
+      particle->vertices[1].x = outerX;
+      particle->vertices[1].y = outerY;
+      particle->vertices[1].z = outerZ;
 
       if (segment != 0) {
         particle->vertices[0].x = this->lastOuter.x;
@@ -176,12 +182,12 @@ void CFlowerCastingEffect::OnProcess() {
         particle->vertices[2].z = this->lastInner.z;
       }
 
-      this->lastInner.x = points[0].x;
-      this->lastInner.y = points[0].y;
-      this->lastInner.z = points[0].z;
-      this->lastOuter.x = points[1].x;
-      this->lastOuter.y = points[1].y;
-      this->lastOuter.z = points[1].z;
+      this->lastInner.x = innerX;
+      this->lastInner.y = innerY;
+      this->lastInner.z = innerZ;
+      this->lastOuter.x = outerX;
+      this->lastOuter.y = outerY;
+      this->lastOuter.z = outerZ;
     }
 
     ++(*it)->elapsedFrames;

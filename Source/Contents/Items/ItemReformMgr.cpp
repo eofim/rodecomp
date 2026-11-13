@@ -91,10 +91,12 @@ bool CItemReformMgr::HasItem(int itemId) {
   return this->m_reformItemList.end() != this->m_reformItemList.find(itemId);
 }
 
-static void EnsureItemDbMgr() {
+// INLINED
+static CItemDBToIDMgr* EnsureItemDbMgr() {
   if (g_itemDbToIdMgr == nullptr) {
     g_itemDbToIdMgr = new (std::nothrow) CItemDBToIDMgr;
   }
+  return g_itemDbToIdMgr;
 }
 
 // OFFSET: 0x005FA180
@@ -117,8 +119,7 @@ void CItemReformMgr::LoadReformInfo() {
       lua_pushstring(state, "BaseItem");
       lua_gettable(state, -2);
       if (lua_isstring(state, -1) != 0) {
-        EnsureItemDbMgr();
-        info.baseItem = g_itemDbToIdMgr->GetItemID(lua_tostring(state, -1));
+        info.baseItem = EnsureItemDbMgr()->GetItemID(lua_tostring(state, -1));
       } else {
         ShowErrorDialog(FormatOwnedString("ReformInfo[ %I64u ] : Can't find BaseItem", reformId).c_str(), 0);
       }
@@ -127,8 +128,7 @@ void CItemReformMgr::LoadReformInfo() {
       lua_pushstring(state, "ResultItem");
       lua_gettable(state, -2);
       if (lua_isstring(state, -1) != 0) {
-        EnsureItemDbMgr();
-        info.resultItem = g_itemDbToIdMgr->GetItemID(lua_tostring(state, -1));
+        info.resultItem = EnsureItemDbMgr()->GetItemID(lua_tostring(state, -1));
       } else {
         ShowErrorDialog(FormatOwnedString("ReformInfo[ %I64u ] : Can't find ResultItem", reformId).c_str(), 0);
       }
@@ -143,8 +143,7 @@ void CItemReformMgr::LoadReformInfo() {
             ShowErrorDialog(FormatOwnedString("Num of ReformInfo[ %I64u ].Material can't be more than %u", reformId, this->m_maxMaterials).c_str(), 0);
           }
 
-          EnsureItemDbMgr();
-          const int materialId = g_itemDbToIdMgr->GetItemID(lua_tostring(state, -2));
+          const int materialId = EnsureItemDbMgr()->GetItemID(lua_tostring(state, -2));
           info.materials[materialId] = static_cast<unsigned int>(lua_tointeger(state, -1));
           lua_pop(state, 1);
         }
@@ -279,8 +278,7 @@ void CItemReformMgr::LoadReformItemList() {
   lua_pushnil(state);
   while (lua_next(state, -2) != 0) {
     const std::string itemName(lua_tostring(state, -2));
-    EnsureItemDbMgr();
-    const int itemId = g_itemDbToIdMgr->GetItemID(itemName);
+    const int itemId = EnsureItemDbMgr()->GetItemID(itemName);
 
     lua_pushnil(state);
     while (lua_next(state, -2) != 0) {

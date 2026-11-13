@@ -2,6 +2,7 @@
 #include "Contents/Items/ItemInfo.h"
 #include "Contents/Items/ItemLink.h"
 #include "Network/TextEncoding.h"
+#include "UI/Edit/UIItemTagCtrl.h"
 #include "UI/Navigation/NavigationLink.h"
 #include "UI/Text/UITextViewer.h"
 
@@ -10,7 +11,7 @@
 namespace {
   // OFFSET: 0x0087A700
   // FUNCTION: fn_11236
-  int Number(std::string text) {
+  int __stdcall Number(std::string text) {
     char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     int result = 0;
     const int size = static_cast<int>(text.size()) + 1;
@@ -43,7 +44,7 @@ namespace {
   // OFFSET: 0x00893AE0
   // FUNCTION: fn_11507
   int DecodeCards(std::vector<std::int32_t>& fields, const char* text, int& position, const char& delimiter, const int& length, int field) {
-    std::string value;
+    std::string value("");
     std::vector<std::int32_t> cards;
     int count = 1;
 
@@ -76,7 +77,7 @@ namespace {
   // FUNCTION: fn_11506
   void DecodeOptions(std::vector<std::int32_t>& options, const char* text, int& position, const int& length, const char& separator,
                      const char& recordSeparator) {
-    std::string value;
+    std::string value("");
 
     while (++position < length + 1) {
       const char byte = text[position];
@@ -97,7 +98,7 @@ namespace {
 
 // OFFSET: 0x0087A810
 // FUNCTION: fn_11237
-std::string UITextViewer::ItemLinkNumberText(int value) {
+std::string UIItemTagCtrl::ItemLinkNumberText(int value) {
   char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   int base = 62;
   std::vector<char> reversed;

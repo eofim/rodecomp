@@ -3,6 +3,7 @@
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Camera/Camera.h"
+#include "Contents/Effects/Core/EffectMemoryMgr.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Math/Vector3d.h"
@@ -10,9 +11,6 @@
 #include <algorithm>
 #include <array>
 #include <string>
-
-CParticle* CreateEZ2STRParticle(const vector3d* position, int flags);
-void FreeParticle(CParticle* particle);
 
 namespace {
 // INLINED
@@ -77,7 +75,7 @@ void CTalismanMarkEffect::PlayEnd() {
     const int angle = particle->phaseParameter;
     FreeParticle(particle);
 
-    particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 13));
+    particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
     if (!particle) {
       *it = nullptr;
       continue;
@@ -87,7 +85,7 @@ void CTalismanMarkEffect::PlayEnd() {
     particle->columnIndex = index;
     particle->rowIndex = 0;
     particle->groupIndex = 1;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     particle->m_actorId = this->actor;
     particle->Load(s_talismanEndEffects.at(index));
     particle->phaseParameter = angle;
@@ -102,7 +100,7 @@ void CTalismanMarkEffect::Open() {
   this->retained = 1;
 
   for (int i = 0; i < std::min<unsigned int>(this->effectLevel, 4); ++i) {
-    CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 13));
+    CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
     if (!particle) {
       continue;
     }
@@ -111,7 +109,7 @@ void CTalismanMarkEffect::Open() {
     particle->columnIndex = i;
     particle->rowIndex = 0;
     particle->groupIndex = 1;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     particle->m_actorId = this->actor;
     particle->Load(s_talismanStartEffects.at(i));
     particle->phaseParameter = (i / 2 + i % 2 * 2) * 90;
@@ -129,7 +127,7 @@ void CTalismanMarkEffect::OnProcess() {
       continue;
     }
 
-    switch (particle->animationState) {
+    switch (static_cast<signed char>(particle->animationState)) {
     case 0:
       if (IsParticleActive(particle)) {
         break;
@@ -140,7 +138,7 @@ void CTalismanMarkEffect::OnProcess() {
         const int angle = particle->phaseParameter;
         FreeParticle(particle);
 
-        particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 13));
+        particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
         if (!particle) {
           *it = nullptr;
           continue;
@@ -150,7 +148,7 @@ void CTalismanMarkEffect::OnProcess() {
         particle->columnIndex = index;
         particle->rowIndex = 0;
         particle->groupIndex = 1;
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         particle->m_actorId = this->actor;
         particle->Load(s_talismanLoopEffects.at(index));
         particle->phaseParameter = angle;
@@ -195,11 +193,11 @@ void CTalismanMarkEffect::UpdateParticle(CEZ2STRParticle* particle) {
     return;
   }
 
-  const vector3d center = *reinterpret_cast<const vector3d*>(this->position);
+  const vector3d center = this->positionVector;
   const float* view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values;
-  const float viewX = center.y * view[3] + center.x * view[0] + center.z * view[6] + view[9];
-  const float viewY = center.y * view[4] + center.x * view[1] + center.z * view[7] + view[10];
-  const float viewZ = center.y * view[5] + center.x * view[2] + center.z * view[8] + view[11];
+  const float viewX = center.x * view[0] + center.y * view[3] + center.z * view[6] + view[9];
+  const float viewY = center.x * view[1] + center.y * view[4] + center.z * view[7] + view[10];
+  const float viewZ = center.x * view[2] + center.y * view[5] + center.z * view[8] + view[11];
 
   const float* inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse.values;
   int angle = particle->phaseParameter;

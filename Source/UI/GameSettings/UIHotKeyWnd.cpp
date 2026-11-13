@@ -265,8 +265,11 @@ void UIHotKeyWnd::OnLBtnDown(int x, int y) {
       this->ToScreen(screenX, screenY);
       const char* text = LookupMessage(MSI_HOTKEYWND_NOTICE1);
       this->m_balloon->SetText(text, 0x3C);
-      this->m_balloon->m_textColor = 0xFFFFFF;
-      this->m_balloon->m_outlineColor = 0;
+      {
+        UIBalloonText* balloon = this->m_balloon;
+        balloon->m_textColor = 0xFFFFFF;
+        balloon->m_outlineColor = 0;
+      }
       this->m_balloon->Move(
         (this->geometry.width - this->m_balloon->geometry.width) / 2 + screenX,
         (this->m_selectedRow % this->m_rowsPerPage - 1) * this->m_rowHeight + this->m_verticalMargin + this->m_tabHeight + screenY + this->m_titleHeight
@@ -451,11 +454,11 @@ void UIHotKeyWnd::Paint() {
       (this->m_prevButton->geometry.width - pagesWidth + 60) / 2 + this->m_prevButton->geometry.x;
 
     text = static_cast<const std::string&>(FormatOwnedString("%d", this->m_page));
-    DrawOutlinedText(*this, pageX, 25, text.c_str(), 0, 0x7F3CFF, 0xFFFFFF, 0, 11, 1, 0);
+    this->DrawOutlinedText(pageX, 25, text.c_str(), 0, 0x7F3CFF, 0xFFFFFF, 0, 11, 1, 0);
 
     const int currentWidth = this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
     text = static_cast<const std::string&>(FormatOwnedString(" / %d", this->m_pageCount));
-    DrawOutlinedText(*this, pageX + currentWidth, 25, text.c_str(), 0, 0x666666, 0xFFFFFF, 0, 11, 1, 0);
+    this->DrawOutlinedText(pageX + currentWidth, 25, text.c_str(), 0, 0x666666, 0xFFFFFF, 0, 11, 1, 0);
   }
 
   const int bottomY = this->m_titleHeight + this->m_tabHeight + this->m_verticalMargin;
@@ -539,8 +542,11 @@ bool UIHotKeyWnd::AssignSelectedHotkey(int mode) {
   const int balloonY =
     (this->m_selectedRow % this->m_rowsPerPage - 1) * this->m_rowHeight + this->m_verticalMargin + this->m_tabHeight + this->m_titleHeight;
   this->m_balloon->SetText(LookupMessage(MSI_HOTKEYWND_NOTICE1), 0x3C);
-  this->m_balloon->m_textColor = 0xFFFFFF;
-  this->m_balloon->m_outlineColor = 0;
+  {
+    UIBalloonText* balloon = this->m_balloon;
+    balloon->m_textColor = 0xFFFFFF;
+    balloon->m_outlineColor = 0;
+  }
   this->m_balloon->Move((this->geometry.width - this->m_balloon->geometry.width) / 2 + screenX, screenY + balloonY);
   this->Invalidate();
 
@@ -612,8 +618,11 @@ bool UIHotKeyWnd::AssignSelectedHotkey(int mode) {
   }
 
   this->m_balloon->SetText(LookupMessage(rejection), 0x3C);
-  this->m_balloon->m_textColor = 0xFFFF;
-  this->m_balloon->m_outlineColor = 0;
+  {
+    UIBalloonText* balloon = this->m_balloon;
+    balloon->m_textColor = 0xFFFF;
+    balloon->m_outlineColor = 0;
+  }
   this->m_balloon->Move((this->geometry.width - this->m_balloon->geometry.width) / 2 + screenX, screenY + balloonY);
   this->Invalidate();
   return false;

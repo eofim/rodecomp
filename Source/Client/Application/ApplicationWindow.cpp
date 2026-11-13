@@ -28,28 +28,27 @@
 HWND hWnd;
 
 #pragma optimize("y", on)
-
 // OFFSET: 0x03DE9F37
 // FUNCTION: fn_45411
 HWND __stdcall CreateApplicationWindow(
-  DWORD extendedStyle, const char* className, const char*, DWORD style, int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance,
+  DWORD extendedStyle, const char* className, const char*, volatile DWORD style, int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance,
   void* parameter
 ) {
   DWORD windowStyle = style | WS_SYSMENU;
   return CreateWindowExA(extendedStyle, className, "Ragnarok 2026", windowStyle, x, y, width, height, parent, menu, instance, parameter);
 }
-
 #pragma optimize("y", off)
 
 // OFFSET: 0x00E57DD0
 // FUNCTION: fn_24360
 BOOL ClipApplicationCursor(HWND window) {
+  (void)window;
   RECT rectangle;
-  GetClientRect(window, &rectangle);
+  GetClientRect(hWnd, &rectangle);
   POINT first{rectangle.left, rectangle.top};
   POINT last{rectangle.right, rectangle.bottom};
-  ClientToScreen(window, &first);
-  ClientToScreen(window, &last);
+  ClientToScreen(hWnd, &first);
+  ClientToScreen(hWnd, &last);
 
   RECT clip{first.x, first.y, last.x, last.y};
   return ClipCursor(&clip);
@@ -128,22 +127,23 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
       g_mouse.active = 1;
     }
 
-    if (!GetRenderSystemHolder()->IsWindowed()) {
+    if (GetRenderSystemHolder()->IsWindowed()) {
       if (g_isAppActive == 1) {
         g_restoreSurfaces = 1;
+        ShowWindow(window, SW_MAXIMIZE);
+        return 1;
+      }
+      CWebBrowser* browser = g_windowMgr.FindBrowser(reinterpret_cast<HWND>(lParam));
+      if (browser && browser->MatchesWindow(reinterpret_cast<HWND>(lParam))) {
+        SetApplicationActive(1);
+      } else {
+        ShowWindow(window, SW_MINIMIZE);
       }
       return 1;
     }
+
     if (g_isAppActive == 1) {
       g_restoreSurfaces = 1;
-      ShowWindow(window, SW_MAXIMIZE);
-      return 1;
-    }
-    CWebBrowser* browser = g_windowMgr.FindBrowser(reinterpret_cast<HWND>(lParam));
-    if (browser && browser->MatchesWindow(reinterpret_cast<HWND>(lParam))) {
-      SetApplicationActive(1);
-    } else {
-      ShowWindow(window, SW_MINIMIZE);
     }
     return 1;
   }

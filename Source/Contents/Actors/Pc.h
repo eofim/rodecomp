@@ -28,7 +28,6 @@ class UIWindow;
 
 int GetSlotLayer(int slot);
 bool IsReadyOrAttackAction(int action);
-std::string GetBodyImfName(int job, int sex, int head, int costumeJob);
 
 class CPc : public CGameActor {
 public:
@@ -36,7 +35,7 @@ public:
   ~CPc() override;
   bool OnProcess() override;
   void SendMsg(
-    CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m
+    CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   void Render(int argument) override;
 
@@ -117,8 +116,13 @@ public:
   /* 043C */ int headDir;
   /* 0440 */ int head;
   /* 0444 */ int headPalette;
-  /* 0448 */ int weapon;
-  /* 044C */ int secondaryWeapon;
+  union {
+    /* 0448 */ std::int64_t weaponPair;
+    struct {
+      /* 0448 */ int weapon;
+      /* 044C */ int secondaryWeapon;
+    };
+  };
   /* 0450 */ int accessory;
   /* 0454 */ int accessory2;
   /* 0458 */ int accessory3;
@@ -152,7 +156,7 @@ public:
   /* 04EC */ float extentRight;
   /* 04F0 */ float extentBottom;
   /* 04F4 */ int outlineColor;
-  /* 04F8 */ float destCellX;
+  union { /* 04F8 */ int destCellX; float motionY; };
   /* 04FC */ int destCellZ;
   /* 0500 */ int attackReqTime;
   /* 0504 */ std::uint32_t preMoveStartTick;
@@ -166,7 +170,7 @@ public:
   ~CBlurPC() override;
   bool OnProcess() override;
   void SendMsg(
-    CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m
+    CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   void Render(int argument) override;
 };
@@ -177,7 +181,7 @@ public:
   ~CHalluPC() override;
   bool OnProcess() override;
   void SendMsg(
-    CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m
+    CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   void Render(int argument) override;
 
@@ -191,7 +195,7 @@ public:
   ~CHalluPC2() override;
   bool OnProcess() override;
   void SendMsg(
-    CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m
+    CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   void Render(int argument) override;
 
@@ -204,7 +208,7 @@ public:
   CPlayer();
   bool OnProcess() override;
   void SendMsg(
-    CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m
+    CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   static int AngleToDirection(float angle);
 
@@ -243,7 +247,6 @@ static_assert(offsetof(CPlayer, proceedTargetGid) == 0x51C);
 static_assert(offsetof(CPlayer, skillEffect) == 0x544);
 #endif
 
-extern bool g_refreshWindow289;
 
 struct GrannyPcLight {
   /* 0000 */ vector3d direction;
@@ -257,7 +260,7 @@ class CGrannyPc : public CGameActor {
 public:
   bool OnProcess() override;
   void SendMsg(
-    CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m
+    CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   void Render(int argument) override;
   void SetAction(unsigned animation, int motion, int repeat) override;
@@ -296,8 +299,13 @@ public:
   /* 0434 */ int head;
   /* 0438 */ int headPalette;
   /* 043C */ unsigned char padding_043C[4];
-  /* 0440 */ int weapon;
-  /* 0444 */ int secondaryWeapon;
+  union {
+    /* 0440 */ std::int64_t weaponPair;
+    struct {
+      /* 0440 */ int weapon;
+      /* 0444 */ int secondaryWeapon;
+    };
+  };
   /* 0448 */ int accessory;
   /* 044C */ int accessory2;
   /* 0450 */ int accessory3;
@@ -339,9 +347,14 @@ public:
   /* 2550 */ granny_world_pose* worldPose;
   /* 2554 */ CTexture* shadowTexture;
   /* 2558 */ std::vector<vector3d> attachmentPositions;
-  /* 2564 */ int attachLayer;
-  /* 2568 */ int padding_2568;
-  /* 256C */ matrix attachTransform;
+  union {
+    /* 2564 */ GrannyHairPivot hairPivot;
+    struct {
+      /* 2564 */ int attachLayer;
+      /* 2568 */ int padding_2568;
+      /* 256C */ matrix attachTransform;
+    };
+  };
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

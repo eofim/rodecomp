@@ -8,11 +8,15 @@
 class CooldownOwner {
 public:
   CooldownOwner();
-  __declspec(noinline) ~CooldownOwner();
+  ~CooldownOwner();
   void Register(unsigned id, std::uint32_t duration, std::uint32_t start, std::uint32_t elapsed);
   void ClearReverseCommands();
 
-  CooldownState* Find(unsigned id);
+  // INLINED
+  CooldownState* Find(unsigned id) {
+    const auto entry = this->m_values.find(id);
+    return entry == this->m_values.end() ? nullptr : &entry->second;
+  }
   void Erase(unsigned id);
   // INLINED
   void Remove(unsigned id) {
@@ -26,7 +30,6 @@ public:
     return this->m_drawing;
   }
 
-private:
   /* 0000 */ bool m_initialized;
   /* 0004 */ CooldownDrawing m_drawing;
   /* 001C */ std::map<unsigned, CooldownState> m_values;
@@ -34,6 +37,7 @@ private:
 
 extern CooldownOwner* g_cooldownOwner;
 
+bool CreateCooldownOwner();
 void DestroyCooldownOwner();
 
 #if defined(_WIN32) && !defined(_WIN64)

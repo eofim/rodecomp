@@ -27,7 +27,7 @@ void CScatterEffect::Close() {
 // FUNCTION: fn_19170
 void CScatterEffect::Open() {
   for (int i = 0; i < 50; ++i) {
-    CSpriteParticle* particle = static_cast<CSpriteParticle*>(CreateSpriteParticle(reinterpret_cast<const vector3d*>(this->position), 1));
+    CSpriteParticle* particle = static_cast<CSpriteParticle*>(CreateSpriteParticle(&this->positionVector, 1));
     if (!particle) {
       continue;
     }
@@ -40,10 +40,14 @@ void CScatterEffect::Open() {
       this->effectLifetime = 300;
       particle->SetSprite("이팩트\\sakura01.spr");
       particle->SetAction("이팩트\\sakura01.act");
-      particle->scale = static_cast<float>(std::max(0, rand() % 6) + 22) / 70.0f;
-      particle->frameDelay = static_cast<float>(std::max(0, rand() % 3) + 2) * 0.15f;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(std::max(0, rand() % 360));
-      const int angle = std::max(0, rand() % 360);
+      const int scaleRoll = rand() % 6;
+      particle->scale = static_cast<float>((scaleRoll >= 0 ? scaleRoll : 0) + 22) / 70.0f;
+      const int delayRoll = rand() % 3;
+      particle->frameDelay = static_cast<float>((delayRoll >= 0 ? delayRoll : 0) + 2) * 0.15f;
+      const int spinRoll = rand() % 360;
+      particle->angle = static_cast<float>(spinRoll >= 0 ? spinRoll : 0);
+      const int angleRoll = rand() % 360;
+      const int angle = angleRoll >= 0 ? angleRoll : 0;
       particle->velocity.x = 0.0f;
       particle->velocity.y = 0.0f;
       particle->velocity.z = 0.0f;
@@ -66,16 +70,21 @@ bool CScatterEffect::IsAlive() {
 // FUNCTION: fn_19172
 void CScatterEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
-    if (CSpriteParticle* particle = *it) {
+    CSpriteParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
+    if (particle) {
       particle->alpha = std::ranges::max(particle->alpha - 3, 0);
 
       const int angle = particle->phaseParameter;
-      particle->velocity.y += particle->frameDelay;
-      particle->velocity.x += g_cosTable[angle] * 0.2f;
-      particle->velocity.z += g_sinTable[angle] * 0.2f;
+      const float rise = particle->frameDelay;
+      const float driftX = g_cosTable[angle] * 0.2f;
+      const float driftZ = g_sinTable[angle] * 0.2f;
+      particle->velocity.y += rise;
+      particle->velocity.x += driftX;
+      particle->velocity.z += driftZ;
 
       matrix translate;
       std::memcpy(translate.values, g_identityMatrix, sizeof(translate.values));

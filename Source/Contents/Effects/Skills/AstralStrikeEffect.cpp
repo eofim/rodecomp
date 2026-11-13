@@ -31,13 +31,13 @@ CAstralStrikeEffect::CAstralStrikeEffect() : CEffect(1768) {
 // OFFSET: 0x006F49D0
 // FUNCTION: fn_06830
 void CAstralStrikeEffect::Init() {
-  CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 13));
+  CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   bottom->Load(std::string("astralstrike\\astralstrike_bottom\\astralstrike_bottom.str"));
   this->emitters.push_back(bottom);
 
   this->AddEvent(0, "effect\\AG_ASTRAL_STRIKE1.wav", 0, 0);
 
-  CEZ2STRParticle* strike = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  CEZ2STRParticle* strike = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   strike->Load(std::string("astralstrike\\astralstrike\\astralstrike.str"));
   this->emitters.push_back(strike);
 }
@@ -48,7 +48,7 @@ void CAstralStrikeEffect::SpawnStrike() {
   const __int64 ranges[10] = {5, 5, 5, 7, 7, 7, 9, 9, 9, 11};
   const __int64 range = ranges[std::min<unsigned int>(this->effectLevel, 10) - 1] * 50;
 
-  vector3d position = *reinterpret_cast<const vector3d*>(this->position);
+  vector3d position = this->positionVector;
   const int span = static_cast<int>(range) + 1;
   const int offsetX = RandomIndex(span);
   const float half = static_cast<float>(range) * 0.5f;
@@ -56,7 +56,12 @@ void CAstralStrikeEffect::SpawnStrike() {
   const int offsetZ = RandomIndex(span);
   position.z += (static_cast<float>(offsetZ) - half) * 0.1f;
 
-  switch (RandomIndex(3)) {
+  int kind = rand() % 3;
+  if (kind < 0) {
+    kind = 0;
+  }
+
+  switch (kind) {
   case 0: {
     CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 13));
     bottom->Load(std::string("astralstrike\\astralstrike_sub_1_bottom\\astralstrike_sub_1_bottom.str"));

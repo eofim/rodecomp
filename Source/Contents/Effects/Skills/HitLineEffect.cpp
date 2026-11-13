@@ -31,27 +31,31 @@ void CHitLineEffect::Close() {
 void CHitLineEffect::Open() {
   for (int pass = 0; pass < 4; ++pass) {
     for (int line = 0; line < 4; ++line) {
-      const int delay = -std::max(0, rand() % 26);
-      const int brightness = std::max(0, rand() % 51) + 125;
-      const int angle = std::max(0, rand() % 360);
+      const int delayRoll = rand() % 26;
+      const int delay = -(delayRoll >= 0 ? delayRoll : 0);
+      const int brightnessRoll = rand() % 51;
+      const int brightness = (brightnessRoll >= 0 ? brightnessRoll : 0) + 125;
+      const int angleRoll = rand() % 360;
+      const int angle = angleRoll >= 0 ? angleRoll : 0;
       for (int segment = 0; segment < 20; ++segment) {
-        CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+        CParticle* particle = CreateParticle(&this->positionVector, 5);
         if (particle) {
           particle->SetTexture("effect\\white02.bmp");
+          const int id = this->id;
           particle->rowIndex = line;
-          particle->effectId = this->id;
+          particle->effectId = id;
           particle->columnIndex = segment;
           particle->groupIndex = 4;
           particle->elapsedFrames = delay;
           particle->scale = 0.1f;
-          *reinterpret_cast<int*>(particle->effectParameters) = brightness;
+          particle->effectParameter = brightness;
           particle->phaseParameter = angle;
           particle->speedParameter = 14.0f;
           for (int index = 0; index < 21; ++index) {
             (&particle->animationState)[index] = 0;
             (&particle->animationParameter)[index] = 0.0f;
           }
-          InitParticleQuad(particle->vertices);
+          particle->InitParticleQuad(particle->vertices);
           this->particles.push_back(particle);
         }
       }
@@ -70,11 +74,12 @@ bool CHitLineEffect::IsAlive() {
 void CHitLineEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle && particle->elapsedFrames > 0) {
-      int& brightness = *reinterpret_cast<int*>(particle->effectParameters);
+      int& brightness = particle->effectParameter;
       short level = static_cast<short>(brightness);
       if (particle->elapsedFrames > 35) {
         level -= 5;
@@ -105,7 +110,7 @@ void CHitLineEffect::OnProcess() {
 void CHitLineEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    if (!particle || *reinterpret_cast<int*>(particle->effectParameters) <= 0 || particle->elapsedFrames <= 0) {
+    if (!particle || particle->effectParameter <= 0 || particle->elapsedFrames <= 0) {
       continue;
     }
 
@@ -188,7 +193,7 @@ void CHitLineEffect::Render() {
         particle->vertices[2].x = this->previous[0].x;
         particle->vertices[2].y = this->previous[0].y;
         particle->vertices[2].z = this->previous[0].z;
-        const int alpha = *reinterpret_cast<int*>(particle->effectParameters) - segment * 5;
+        const int alpha = particle->effectParameter - segment * 5;
         if (alpha > 0) {
           particle->alpha = alpha;
           particle->SetColor(255, 200, static_cast<short>(segment * 7 + 10));
@@ -197,8 +202,12 @@ void CHitLineEffect::Render() {
       }
 
       ++corner;
-      this->previous[0] = edge[0];
-      this->previous[1] = edge[1];
+      this->previous[0].x = edge[0].x;
+      this->previous[0].y = edge[0].y;
+      this->previous[0].z = edge[0].z;
+      this->previous[1].x = edge[1].x;
+      this->previous[1].y = edge[1].y;
+      this->previous[1].z = edge[1].z;
     }
   }
 }

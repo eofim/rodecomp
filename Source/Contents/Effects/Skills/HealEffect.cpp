@@ -12,6 +12,12 @@
 #include <cstdlib>
 #include <string>
 
+// INLINED
+static int ClampedRandom(int range) {
+  const int value = rand() % range;
+  return value >= 0 ? value : 0;
+}
+
 // OFFSET: 0x00B67310
 // FUNCTION: fn_19065
 CHealEffect::CHealEffect() : CEffect(-1) {
@@ -22,7 +28,7 @@ CHealEffect::CHealEffect() : CEffect(-1) {
 // FUNCTION: fn_19067
 void CHealEffect::AddSparks(int kind) {
   for (int index = 0; index < 4; ++index) {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
     if (!particle) {
       continue;
     }
@@ -33,45 +39,46 @@ void CHealEffect::AddSparks(int kind) {
     particle->groupIndex = 1;
     particle->SetTexture("effect\\pok1.tga");
     particle->alpha = 0;
-    particle->angleBits = 0;
+    particle->angle = 0;
     particle->angleParameter = 0;
 
-    const int driftZ = (std::max)(rand() % 13, 0);
-    const int driftX = (std::max)(rand() % 13, 0);
-    particle->offsetY = 0.0f;
-    particle->offsetX = static_cast<float>(driftX - 6);
-    particle->offsetZ = static_cast<float>(driftZ - 6);
+    const int driftZ = ClampedRandom(13);
+    const int driftX = ClampedRandom(13);
+    const vector3d vectorValue = {static_cast<float>(driftX - 6), 0.0f, static_cast<float>(driftZ - 6)};
+    particle->offsetY = vectorValue.y;
+    particle->offsetX = vectorValue.x;
+    particle->offsetZ = vectorValue.z;
     particle->SetColor(220, 250, 220);
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     this->sparkParticles.push_back(particle);
 
     switch (kind) {
     case 0:
     case 3:
     case 6:
-      particle->scale = static_cast<float>((std::max)(rand() % 10, 0)) * 0.1f + 2.0f;
-      particle->animationParameter = static_cast<float>((std::max)(rand() % 40, 0)) * 0.01f + 0.4f;
+      particle->scale = static_cast<float>(ClampedRandom(10)) * 0.1f + 2.0f;
+      particle->animationParameter = static_cast<float>(ClampedRandom(40)) * 0.01f + 0.4f;
       break;
     case 1:
-      particle->scale = static_cast<float>((std::max)(rand() % 10, 0)) * 0.1f + 2.0f;
-      particle->animationParameter = static_cast<float>((std::max)(rand() % 40, 0)) * 0.01f + 0.6f;
+      particle->scale = static_cast<float>(ClampedRandom(10)) * 0.1f + 2.0f;
+      particle->animationParameter = static_cast<float>(ClampedRandom(40)) * 0.01f + 0.6f;
       break;
     case 2:
-      particle->scale = static_cast<float>((std::max)(rand() % 40, 0)) * 0.1f + 0.4f;
-      particle->animationParameter = static_cast<float>((std::max)(rand() % 40, 0)) * 0.01f + 0.4f;
+      particle->scale = static_cast<float>(ClampedRandom(40)) * 0.1f + 0.4f;
+      particle->animationParameter = static_cast<float>(ClampedRandom(40)) * 0.01f + 0.4f;
       break;
     case 4:
-      particle->scale = static_cast<float>((std::max)(rand() % 10, 0)) * 0.1f + 2.0f;
-      particle->animationParameter = static_cast<float>((std::max)(rand() % 40, 0)) * 0.01f + 0.3f;
+      particle->scale = static_cast<float>(ClampedRandom(10)) * 0.1f + 2.0f;
+      particle->animationParameter = static_cast<float>(ClampedRandom(40)) * 0.01f + 0.3f;
       break;
     case 7:
-      particle->scale = static_cast<float>((std::max)(rand() % 10, 0)) * 0.1f + 2.0f;
-      particle->animationParameter = static_cast<float>((std::max)(rand() % 40, 0)) * 0.01f + 0.4f;
+      particle->scale = static_cast<float>(ClampedRandom(10)) * 0.1f + 2.0f;
+      particle->animationParameter = static_cast<float>(ClampedRandom(40)) * 0.01f + 0.4f;
       particle->SetColor(0, 255, 255);
       break;
     case 8:
-      particle->scale = static_cast<float>((std::max)(rand() % 10, 0)) * 0.1f + 2.0f;
-      particle->animationParameter = static_cast<float>((std::max)(rand() % 40, 0)) * 0.01f + 0.4f;
+      particle->scale = static_cast<float>(ClampedRandom(10)) * 0.1f + 2.0f;
+      particle->animationParameter = static_cast<float>(ClampedRandom(40)) * 0.01f + 0.4f;
       particle->SetColor(255, 255, 0);
       break;
     }
@@ -81,11 +88,11 @@ void CHealEffect::AddSparks(int kind) {
 // OFFSET: 0x00B678F0
 // FUNCTION: fn_19068
 void CHealEffect::AddColumn(int kind) {
-  const float randomHeight = static_cast<float>((std::max)(rand() % 20, 0)) + 40.0f;
+  const float randomHeight = static_cast<float>(ClampedRandom(20)) + 40.0f;
   for (int row = 0, angle = 0; angle < 360; ++row, angle += 180) {
     const int randomAngle = (std::max)(rand() % 360, 0);
     for (int segment = 0; segment < 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -99,7 +106,7 @@ void CHealEffect::AddColumn(int kind) {
       particle->phaseParameter = 90;
       particle->animationParameter = 0.0f;
 
-      float& baseAngle = *reinterpret_cast<float*>(&particle->angleBits);
+      float& baseAngle = particle->angle;
       switch (kind) {
       case 0:
         particle->SetTexture("effect\\ring_white.tga");
@@ -129,7 +136,7 @@ void CHealEffect::AddColumn(int kind) {
         particle->SetTexture("effect\\alpha_down.tga");
         particle->speedParameter = randomHeight;
         baseAngle = static_cast<float>(randomAngle);
-        particle->scale = static_cast<float>((std::max)(rand() % 100, 0)) * 0.005f + 4.5f + static_cast<float>(row) * 0.2f;
+        particle->scale = static_cast<float>(ClampedRandom(100)) * 0.005f + 4.5f + static_cast<float>(row) * 0.2f;
         particle->SetColor(255, 255, 255);
         this->columnLifetime = 30;
         break;
@@ -175,7 +182,7 @@ void CHealEffect::AddColumn(int kind) {
         break;
       }
 
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->columnParticles.push_back(particle);
     }
   }
@@ -187,7 +194,7 @@ void CHealEffect::AddCone(int kind) {
   for (int row = 0, tilt = 50; tilt > 46; ++row, tilt -= 2) {
     const int randomAngle = (std::max)(rand() % 360, 0);
     for (int segment = 0; segment < 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -200,7 +207,7 @@ void CHealEffect::AddCone(int kind) {
       particle->alpha = 0;
       particle->animationParameter = 0.0f;
 
-      float& baseAngle = *reinterpret_cast<float*>(&particle->angleBits);
+      float& baseAngle = particle->angle;
       switch (kind) {
       case 0:
         particle->SetTexture("effect\\ring_white.tga");
@@ -240,7 +247,7 @@ void CHealEffect::AddCone(int kind) {
         break;
       }
 
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->coneParticles.push_back(particle);
     }
   }
@@ -436,7 +443,8 @@ void CHealEffect::OnProcess() {
           alpha = (std::min)(alpha + 5, 180);
         }
       } else {
-        alpha = (std::max)(alpha - 2, 0);
+        const int faded = alpha - 2;
+        alpha = faded >= 0 ? faded : 0;
       }
       particle->alpha = alpha;
 
@@ -447,13 +455,14 @@ void CHealEffect::OnProcess() {
       }
       height = (std::max)(height, 0.0f);
 
-      const float baseAngle = *reinterpret_cast<const float*>(&particle->angleBits);
+      const float baseAngle = particle->angle;
       const int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(particle->angleParameter) / 20.0f) * segment) + baseAngle) % 360;
       const float tiltCos = g_cosTable[particle->phaseParameter];
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];
       const float tiltSin = g_sinTable[particle->phaseParameter];
 
+      EffectPoint points[2];
       const float bottomX = particle->scale * cosine;
       const float bottomZ = particle->scale * sine;
       particle->vertices[3].x = bottomX;
@@ -488,9 +497,10 @@ void CHealEffect::OnProcess() {
 
   for (auto it = this->coneParticles.begin(); it != this->coneParticles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
       const int age = particle->elapsedFrames;
       int alpha = particle->alpha;
@@ -499,7 +509,8 @@ void CHealEffect::OnProcess() {
           alpha = (std::min)(alpha + 5, 180);
         }
       } else {
-        alpha = (std::max)(alpha - 2, 0);
+        const int faded = alpha - 2;
+        alpha = faded >= 0 ? faded : 0;
       }
       particle->alpha = alpha;
 
@@ -510,13 +521,14 @@ void CHealEffect::OnProcess() {
       }
       height = (std::max)(height, 0.0f);
 
-      const float baseAngle = *reinterpret_cast<const float*>(&particle->angleBits);
+      const float baseAngle = particle->angle;
       const int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(particle->angleParameter) / 20.0f) * segment) + baseAngle) % 360;
       const float tiltCos = g_cosTable[particle->phaseParameter];
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];
       const float tiltSin = g_sinTable[particle->phaseParameter];
 
+      EffectPoint points[2];
       const float bottomX = particle->scale * cosine;
       const float bottomZ = particle->scale * sine;
       particle->vertices[3].y = 0.0f;
@@ -551,9 +563,10 @@ void CHealEffect::OnProcess() {
 
   for (auto it = this->sparkParticles.begin(); it != this->sparkParticles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
       particle->angleParameter += particle->angleParameter - 5 >= 0 ? -5 : 355;
 
@@ -568,7 +581,8 @@ void CHealEffect::OnProcess() {
           particle->SetTexture("effect\\pok1.tga");
         }
       }
-      particle->alpha = (std::max)(alpha - 3, 0);
+      const int faded = alpha - 3;
+      particle->alpha = faded >= 0 ? faded : 0;
 
       particle->offsetX -= 0.0f;
       particle->offsetY -= particle->animationParameter;

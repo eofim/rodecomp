@@ -104,9 +104,7 @@ void CGameActor::ProcessDamageMessages() {
       }
 
       ActorDamageMessage& message = *it;
-      this->SendMsg(
-        nullptr, message.action, message.action >> 31, reinterpret_cast<int>(&message.targetAid), 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0);
+      this->SendMsg(nullptr, message.action, reinterpret_cast<std::uint32_t>(&message.targetAid), 0, 0, 0, 0, 0);
       it = this->willBeAttackedList.erase(it);
     } else {
       ++it;
@@ -165,7 +163,7 @@ bool CGameActor::ProcessState() {
       this->isCounter = 0;
       this->render.isMotionFreezed = false;
       this->SetState(0, 1);
-      this->SendMsg(nullptr, AM_DELETE_SKILL_RECHARGEGAGE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      this->SendMsg(nullptr, AM_DELETE_SKILL_RECHARGEGAGE, 0, 0, 0, 0, 0, 0);
     }
     this->ProcessMotion();
     this->lastProcessStateTime = timeGetTime();
@@ -501,13 +499,13 @@ void CGameActor::ResetState() {
   this->guildId = 0;
   this->freezeEndTick = 0;
   this->actorType = 0;
-  this->sceneNameWindow = 0;
-  this->actorTitleWindow = 0;
+  this->sceneNameWindow = nullptr;
+  this->actorTitleWindow = nullptr;
   this->isNeverAnimation = 0;
   this->isAsuraAttack = 0;
   this->isBladeStop = 0;
-  this->homunAI = 0;
-  this->merAI = 0;
+  this->homunAI = nullptr;
+  this->merAI = nullptr;
   this->objectType = 4;
   this->actorWindows[4] = 0;
   this->transformJobs[0] = -1;
@@ -525,15 +523,15 @@ void CGameActor::ResetState() {
   this->movementState[5] = 0;
   this->hasHp = 0;
   this->maxHp = 0;
-  this->hpGaugeWindow = 0;
+  this->hpGaugeWindow = nullptr;
   this->hpGaugeFlags = 0;
   this->hasSp = 0;
   this->spGaugeValue = 0;
   this->mountedState = 0;
   this->actorFlags = 0;
   this->emblemVersion = 0;
-  this->firstFollowerEffect = 0;
-  this->secondFollowerEffect = 0;
+  this->firstFollowerEffect = nullptr;
+  this->secondFollowerEffect = nullptr;
 
   this->maximumValue = 0;
 }
@@ -546,7 +544,7 @@ void CGameActor::UpdateGaugePositions() {
 
   if (this->actorWindows[0] != 0) {
     if (timeGetTime() < this->chatTick + 5000) {
-      UIWindow* window = reinterpret_cast<UIWindow*>(this->actorWindows[0]);
+      UIWindow* window = this->actorWindows[0];
       int x = this->render.screenX - this->chatWidth / 2;
       if (x < -3) {
         x = -3;
@@ -567,20 +565,20 @@ void CGameActor::UpdateGaugePositions() {
       }
       window->Move(x, y);
     } else {
-      g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[0]));
+      g_windowMgr.Schedule(this->actorWindows[0]);
       this->actorWindows[0] = 0;
     }
   }
 
   if (this->actorWindows[1] != 0) {
-    reinterpret_cast<UIWindow*>(this->actorWindows[1])->Move(
+    this->actorWindows[1]->Move(
       this->render.screenX - 70,
       static_cast<int>(static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale - 17.0f)
     );
   }
 
   if (this->actorWindows[2] != 0) {
-    reinterpret_cast<UIWindow*>(this->actorWindows[2])->Move(
+    this->actorWindows[2]->Move(
       this->render.screenX - 70,
       static_cast<int>(static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale - 17.0f - 17.0f)
     );
@@ -588,12 +586,12 @@ void CGameActor::UpdateGaugePositions() {
 
   if (this->actorWindows[3] != 0) {
     if (timeGetTime() > this->skillRechargeEndTick) {
-      this->SendMsg(nullptr, AM_DELETE_SKILL_RECHARGEGAGE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      this->SendMsg(nullptr, AM_DELETE_SKILL_RECHARGEGAGE, 0, 0, 0, 0, 0, 0);
       if (this->render.state == 8) {
         this->SetState(0, 1);
       }
     } else {
-      reinterpret_cast<UIWindow*>(this->actorWindows[3])->Move(
+      this->actorWindows[3]->Move(
         this->render.screenX - 30,
         static_cast<int>(static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale)
       );
@@ -602,12 +600,12 @@ void CGameActor::UpdateGaugePositions() {
       if (elapsed > total) {
         elapsed = total;
       }
-      reinterpret_cast<UIRechargeGage*>(this->actorWindows[3])->SetValues(elapsed, total);
+      static_cast<UIRechargeGage*>(this->actorWindows[3])->SetValues(elapsed, total);
     }
   }
 
   if (this->actorWindows[4] != 0) {
-    reinterpret_cast<UIWindow*>(this->actorWindows[4])->Move(
+    this->actorWindows[4]->Move(
       this->render.screenX - 70,
       static_cast<int>(static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale - 17.0f - 17.0f)
     );
@@ -623,62 +621,62 @@ CGameActor::~CGameActor() {
 // OFFSET: 0x00CAF260
 // FUNCTION: fn_21079
 void CGameActor::ReleaseAttachments() {
-  if (this->homunAI && reinterpret_cast<CMercenaryAI*>(this->homunAI)->state) {
-    reinterpret_cast<CMercenaryAI*>(this->homunAI)->Shutdown();
-    delete reinterpret_cast<CMercenaryAI*>(this->homunAI);
-    this->homunAI = 0;
+  if (this->homunAI && this->homunAI->state) {
+    this->homunAI->Shutdown();
+    delete this->homunAI;
+    this->homunAI = nullptr;
   }
 
-  if (this->merAI && reinterpret_cast<CMercenaryAI*>(this->merAI)->state) {
-    reinterpret_cast<CMercenaryAI*>(this->merAI)->Shutdown();
-    delete reinterpret_cast<CMercenaryAI*>(this->merAI);
-    this->merAI = 0;
+  if (this->merAI && this->merAI->state) {
+    this->merAI->Shutdown();
+    delete this->merAI;
+    this->merAI = nullptr;
   }
 
   if (this->actorWindows[0]) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[0]));
+    g_windowMgr.Schedule(this->actorWindows[0]);
     this->actorWindows[0] = 0;
   }
 
   if (this->actorWindows[1]) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[1]));
+    g_windowMgr.Schedule(this->actorWindows[1]);
     this->actorWindows[1] = 0;
   }
 
   if (this->actorWindows[2]) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[2]));
+    g_windowMgr.Schedule(this->actorWindows[2]);
     this->actorWindows[2] = 0;
   }
 
   if (this->actorWindows[3]) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[3]));
+    g_windowMgr.Schedule(this->actorWindows[3]);
     this->actorWindows[3] = 0;
   }
 
   if (this->actorWindows[4]) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[4]));
+    g_windowMgr.Schedule(this->actorWindows[4]);
     this->actorWindows[4] = 0;
   }
 
   if (this->hpGaugeWindow) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->hpGaugeWindow));
-    this->hpGaugeWindow = 0;
+    g_windowMgr.Schedule(this->hpGaugeWindow);
+    this->hpGaugeWindow = nullptr;
   }
 
   for (std::list<CGameObject*>::iterator it = this->msgEffectList.begin(); it != this->msgEffectList.end(); ++it) {
-    (*it)->SendMsg(nullptr, AM_MSGMASTER_DEAD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    (*it)->SendMsg(nullptr, AM_MSGMASTER_DEAD, 0, 0, 0, 0, 0, 0);
   }
   this->msgEffectList.erase(this->msgEffectList.begin(), this->msgEffectList.end());
 
   if (g_session.GetSiegeMode() && this->sceneNameWindow) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->RemoveNotificationWindow(this->sceneNameWindow);
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->sceneNameWindow));
-    this->sceneNameWindow = 0;
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->RemoveNotificationWindow(reinterpret_cast<int>(this->sceneNameWindow));
+    g_windowMgr.Schedule(this->sceneNameWindow);
+    this->sceneNameWindow = nullptr;
   }
 
   if (this->actorTitleWindow) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorTitleWindow));
-    this->actorTitleWindow = 0;
+    g_windowMgr.Schedule(this->actorTitleWindow);
+    this->actorTitleWindow = nullptr;
   }
 }
 
@@ -698,7 +696,7 @@ void CGameActor::UpdateStateEffects() {
   const std::uint64_t now = timeGetTime();
   if (StateFlag00(this->stateFlags) && static_cast<unsigned>(this->effectLaunchCnt) >= static_cast<unsigned>(EffectLifetime(22))) {
     this->effectLaunchCnt = 0;
-    CRagEffect* effect = this->LaunchEffect(22, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    CRagEffect* effect = this->LaunchEffect(EF_SIGHT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
       effect->SendMsg(nullptr, AM_SETCOUNT, 0, static_cast<std::int64_t>((now >> 4) % 10 + 1), 0, 0, 0, 0);
     }
@@ -706,7 +704,7 @@ void CGameActor::UpdateStateEffects() {
 
   if (StateFlag13(this->stateFlags) && static_cast<unsigned>(this->effectLaunchCnt) >= static_cast<unsigned>(EffectLifetime(33))) {
     this->effectLaunchCnt = 0;
-    CRagEffect* effect = this->LaunchEffect(33, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    CRagEffect* effect = this->LaunchEffect(EF_RUWACH, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
       effect->SendMsg(nullptr, AM_SETCOUNT, 0, static_cast<std::int64_t>((now >> 4) % 10 + 1), 0, 0, 0, 0);
     }
@@ -718,25 +716,25 @@ void CGameActor::UpdateStateEffects() {
 // OFFSET: 0x00CB03E0
 // FUNCTION: fn_21093
 void CGameActor::UpdateHpGauge() {
-  if (this->hpGaugeWindow == 0) {
+  if (this->hpGaugeWindow == nullptr) {
     return;
   }
 
-  if (g_serviceOptions.Get(0xD5) && reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->displayMode != 0 &&
+  if (g_serviceOptions.Get(0xD5) && this->hpGaugeWindow->displayMode != 0 &&
       !StateFlag01(this->stateFlags) && !StateFlag02(this->stateFlags) && !StateFlag06(this->stateFlags) &&
       g_windowMgr.windowVisibilityState != 2) {
-    reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->Show(1);
-    if (this->render.state == 3 && reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->current != 0) {
-      reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->SetValues(0, reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->maximum);
+    this->hpGaugeWindow->Show(1);
+    if (this->render.state == 3 && this->hpGaugeWindow->current != 0) {
+      this->hpGaugeWindow->SetValues(0, this->hpGaugeWindow->maximum);
     }
     const int y = static_cast<int>(static_cast<float>(ScaleByScreenHeight(12)) * this->render.distanceScale + static_cast<float>(this->render.screenY));
-    reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->Move(
-      this->render.screenX - reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->geometry.width / 2, y);
-    reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->Invalidate();
+    this->hpGaugeWindow->Move(
+      this->render.screenX - this->hpGaugeWindow->geometry.width / 2, y);
+    this->hpGaugeWindow->Invalidate();
     return;
   }
 
-  reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->Show(0);
+  this->hpGaugeWindow->Show(0);
 }
 
 // OFFSET: 0x00CB0A90
@@ -894,7 +892,7 @@ int __stdcall MountedJob(int job, std::uint32_t flags) {
 
 // OFFSET: 0x00CAD420
 // FUNCTION: fn_21051
-int CGameActor::GetEffectCounter(int effectId) {
+CGameObject* CGameActor::GetEffectCounter(int effectId) {
   switch (effectId) {
   case HT_BLITZBEAT:
   case SN_FALCONASSAULT:
@@ -908,7 +906,7 @@ int CGameActor::GetEffectCounter(int effectId) {
   case RA_WUGBITE:
     return this->statusEffects[1];
   }
-  return 0;
+  return nullptr;
 }
 
 // OFFSET: 0x00CAD4B0
@@ -1096,19 +1094,19 @@ __declspec(noinline) float CGameActor::GetElapsedFrames() {
 // OFFSET: 0x00CADAF0
 // FUNCTION: fn_21058
 int CGameActor::GetGaugeCurrent() {
-  if (this->hpGaugeWindow == 0) {
+  if (this->hpGaugeWindow == nullptr) {
     return -1;
   }
-  return reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->current;
+  return this->hpGaugeWindow->current;
 }
 
 // OFFSET: 0x00CADB10
 // FUNCTION: fn_21059
 int CGameActor::GetGaugeMaximum() {
-  if (this->hpGaugeWindow == 0) {
+  if (this->hpGaugeWindow == nullptr) {
     return -1;
   }
-  return reinterpret_cast<UIPcGage*>(this->hpGaugeWindow)->maximum;
+  return this->hpGaugeWindow->maximum;
 }
 
 // OFFSET: 0x00CADB30
@@ -1189,7 +1187,9 @@ void __stdcall CreateHallucinationPc(
   pc->SetBodyCostume(bodyPalette, 0);
 
   CHalluPC* hallu = new CHalluPC(pc);
-  hallu->render.position = *position;
+  hallu->render.position.x = position->x;
+  hallu->render.position.y = position->y;
+  hallu->render.position.z = position->z;
   unsigned char* const argb = reinterpret_cast<unsigned char*>(&hallu->render.color);
   if (alpha != -1) {
     argb[3] = static_cast<unsigned char>(alpha);
@@ -1197,14 +1197,12 @@ void __stdcall CreateHallucinationPc(
   *reinterpret_cast<std::uint16_t*>(argb + 1) = 0xFFFF;
   argb[0] = 0xFF;
 
-  CRenderObject* object = hallu;
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->objects.push_back(object);
+  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->objects.push_back(hallu);
   delete pc;
 }
 
 // OFFSET: 0x00AA20D0
 // FUNCTION: fn_17210
 bool CGameActor::HasActiveMercenaryAI() {
-  const int* entry = reinterpret_cast<const int*>(this->merAI);
-  return entry && entry[1] != 0;
+  return this->merAI && this->merAI->state;
 }

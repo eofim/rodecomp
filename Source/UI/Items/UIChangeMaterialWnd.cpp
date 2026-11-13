@@ -39,6 +39,11 @@
 #include <malloc.h>
 #include <string>
 
+template __declspec(noinline) std::vector<ChangeMaterialEntry>::vector(const std::vector<ChangeMaterialEntry>&);
+template __declspec(noinline) std::vector<ChangeMaterialProduct>::vector(const std::vector<ChangeMaterialProduct>&);
+template __declspec(noinline) std::vector<MaterialReq>::vector(const std::vector<MaterialReq>&);
+template __declspec(noinline) std::vector<MaterialResult>::vector(const std::vector<MaterialResult>&);
+
 // INLINED
 inline const MaterialListEntry* UIChangeMaterialWnd_List::GetEntry(unsigned int index) const {
   if (index >= this->m_items.size()) {
@@ -255,13 +260,14 @@ void UIChangeMaterialWnd_List::ApplyFilter(std::string text) {
   std::transform(filter.begin(), filter.end(), filter.begin(), [](unsigned char c) { return static_cast<char>(tolower(c)); });
 
   int index = 0;
-  for (auto entry = this->m_entries.begin(); entry != this->m_entries.end(); ++entry, ++index) {
-    std::string name = ItemDisplayName(entry->results.front().id);
+  for (const MaterialListEntry& entry : this->m_entries) {
+    std::string name = ItemDisplayName(entry.results.front().id);
     std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(tolower(c)); });
 
     if (name.find(filter) != std::string::npos) {
       this->m_items.push_back(index);
     }
+    ++index;
   }
 
   this->UpdateScrollBar();
@@ -362,6 +368,12 @@ int UIChangeMaterialWnd::SendMsg(
   UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4
 ) {
   switch (message) {
+  case UM_UPPUSH:
+    this->itemList->SendMsg(nullptr, UM_UPPUSH, 0, 0, 0, 0);
+    break;
+  case UM_DOWNPUSH:
+    this->itemList->SendMsg(nullptr, UM_DOWNPUSH, 0, 0, 0, 0);
+    break;
   case UM_DEFPUSH:
     if (sender == reinterpret_cast<UIWindow*>(this->searchEdit) && reinterpret_cast<UIWindow*>(this->searchEdit) == g_windowMgr.GetHoverWindow()) {
       this->itemList->SendMsg(nullptr, UM_COMMAND, ID_SEARCH, reinterpret_cast<std::intptr_t>(this->searchEdit->Text()), 0, 0);
@@ -369,6 +381,9 @@ int UIChangeMaterialWnd::SendMsg(
     break;
   case UM_COMMAND:
     switch (argument1) {
+    case 0x16c:
+      this->itemList->SortItems(argument2 > 0);
+      break;
     case ID_OK:
       this->SendChangeMaterial();
       break;
@@ -378,21 +393,12 @@ int UIChangeMaterialWnd::SendMsg(
     case ID_SEARCH:
       this->itemList->SendMsg(nullptr, UM_COMMAND, ID_SEARCH, reinterpret_cast<std::intptr_t>(this->searchEdit->Text()), 0, 0);
       break;
-    case 0x16c:
-      this->itemList->SortItems(argument2 > 0);
-      break;
     case 0x19f:
       this->itemList->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
       break;
     default:
       break;
     }
-    break;
-  case UM_UPPUSH:
-    this->itemList->SendMsg(nullptr, UM_UPPUSH, 0, 0, 0, 0);
-    break;
-  case UM_DOWNPUSH:
-    this->itemList->SendMsg(nullptr, UM_DOWNPUSH, 0, 0, 0, 0);
     break;
   case UM_REFRESHITEM:
     if (argument1 != 0) {
@@ -411,10 +417,7 @@ int UIChangeMaterialWnd::SendMsg(
         this->m_materials.push_back(info);
       }
 
-      if (entry->results.size() < 2) {
-        this->m_resultAmount = entry->results.front().amount;
-        this->m_resultText = "";
-      } else {
+      if (entry->results.size() > 1) {
         int total = 0;
         for (const MaterialResult& result : entry->results) {
           total += result.amount;
@@ -425,6 +428,9 @@ int UIChangeMaterialWnd::SendMsg(
         const std::string name = ItemDisplayName(first.id);
         const std::string text = FormatOwnedString(LookupMessage(MSI_IQ_POWERFUL_FAITH_ON), name.c_str(), first.quantity, last.quantity);
         this->m_resultText = text;
+      } else {
+        this->m_resultAmount = entry->results.front().amount;
+        this->m_resultText = "";
       }
 
       this->m_button->SetDisabled(entry->state != 1);
@@ -543,9 +549,8 @@ void UIChangeMaterialWnd::Paint() {
 
   {
     const std::string amount = FormatOwnedString(LookupMessage(MSI_IQ_POWERFUL_FAITH_OFF), this->m_resultAmount / 10);
-    const char* text = amount.c_str();
-    const int width = this->TextWidth(text, 0, 0x1D, 0x17, 1, 0);
-    DrawOutlinedText(*this, 0x4F + (0xC8 - width) / 2, 0x64, text, 0, 0x5082DC, 0x643C00, 0x1D, 0x17, 1, 0);
+    const int width = this->TextWidth(amount.c_str(), 0, 0x1D, 0x17, 1, 0);
+    this->DrawOutlinedText(0x4F + (0xC8 - width) / 2, 0x64, amount.c_str(), 0, 0x5082DC, 0x643C00, 0x1D, 0x17, 1, 0);
   }
 
   if (!this->m_resultText.empty()) {

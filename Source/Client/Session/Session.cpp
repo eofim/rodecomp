@@ -1,10 +1,11 @@
 #include "Client/Session/Session.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Contents/Actors/ActorEnums.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/CombatTypes.h"
-#include "Utility/Cipher/EncryptedName.h"
+#include "Contents/Actors/Resources/BodyResources.h"
 #include "Client/Mode/CGameMode.h"
 #include "Contents/Actors/RenderObject.h"
 #include "Contents/Effects/Core/EffectActor.h"
@@ -77,6 +78,8 @@
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
+
+template __declspec(noinline) void std::vector<SessionEntry5BD4>::_Destroy(SessionEntry5BD4*, SessionEntry5BD4*);
 
 // STATIC: 0x01732638
 // GLOBAL: gl_24474
@@ -715,16 +718,25 @@ int CSession::FindSkillFollowEffect(int key) const {
 // FUNCTION: fn_23363
 const char* CSession::GetEnemyHitWaveName(int element) {
   switch (element) {
-  case ELE_FIRE:
-    switch (std::max(std::rand() % 2, 0)) {
+  case ELE_FIRE: {
+    int roll = std::rand() % 2;
+    if (roll < 0) {
+      roll = 0;
+    }
+    switch (roll) {
     case 0:
       return "_enemy_hit_fire1.wav";
     case 1:
       return "_enemy_hit_fire2.wav";
     }
     break;
-  case ELE_WIND:
-    switch (std::max(std::rand() % 2, 0)) {
+  }
+  case ELE_WIND: {
+    int roll = std::rand() % 2;
+    if (roll < 0) {
+      roll = 0;
+    }
+    switch (roll) {
     case 0:
       return "_enemy_hit_wind1.wav";
     case 1:
@@ -732,8 +744,10 @@ const char* CSession::GetEnemyHitWaveName(int element) {
     }
     break;
   }
+  }
 
-  switch (std::max(std::rand() % 4, 0)) {
+  int roll = std::rand() % 4;
+  switch (roll >= 0 ? roll : 0) {
   case 0:
     return "_enemy_hit_normal1.wav";
   case 1:
@@ -973,13 +987,15 @@ ITEM_INFO CSession::GetItem1784At(int list, int index) const {
     return ITEM_INFO(0);
   }
 
-  if (static_cast<unsigned int>(list) < 11 && !this->inventoryCategories[list].empty()) {
+  if (static_cast<unsigned int>(list) < 11 && this->inventoryCategories[list].size() != 0) {
+    std::list<ITEM_INFO>::const_iterator it = this->inventoryCategories[list].begin();
     int position = 0;
-    for (const ITEM_INFO& item : this->inventoryCategories[list]) {
+    while (it != this->inventoryCategories[list].end()) {
       if (position == index) {
-        return item;
+        return *it;
       }
       ++position;
+      ++it;
     }
   }
 
@@ -1699,43 +1715,45 @@ int CSession::GetItem1738Quantity(std::uint32_t id) const {
 
 // OFFSET: 0x00DDB540
 // FUNCTION: fn_23353
-bool CSession::RemoveFriendByCharacterId(std::uint32_t characterId) {
-  for (std::list<MessengerMember>::iterator it = this->m_friends.begin(); it != this->m_friends.end(); ++it) {
+BOOL CSession::RemoveFriendByCharacterId(std::uint32_t characterId) {
+  using FriendList = std::list<MessengerMember>;
+  for (FriendList::iterator it = this->m_friends.begin(); it != this->m_friends.end(); ++it) {
     if (it->characterId == characterId) {
-      this->m_friends.erase(it);
-      return true;
+      FriendList::iterator (FriendList::*erase)(FriendList::const_iterator) = &FriendList::erase;
+      (this->m_friends.*erase)(it);
+      return 1;
     }
   }
 
-  return false;
+  return 0;
 }
 
 // OFFSET: 0x00DF9F10
 // FUNCTION: fn_23568
-bool CSession::IsGuildMemberAccount(std::uint32_t accountId) const {
+int CSession::IsGuildMemberAccount(std::uint32_t accountId) const {
   std::list<GuildInfo::Member> members;
   members = g_guildInfo.m_members;
   for (const GuildInfo::Member& member : members) {
     if (static_cast<std::uint32_t>(member.accountId) == accountId) {
-      return true;
+      return 1;
     }
   }
 
-  return false;
+  return 0;
 }
 
 // OFFSET: 0x00DFA030
 // FUNCTION: fn_23569
-bool CSession::IsGuildMemberCharacter(std::uint32_t characterId) const {
+int CSession::IsGuildMemberCharacter(std::uint32_t characterId) const {
   std::list<GuildInfo::Member> members;
   members = g_guildInfo.m_members;
   for (const GuildInfo::Member& member : members) {
     if (static_cast<std::uint32_t>(member.characterId) == characterId) {
-      return true;
+      return 1;
     }
   }
 
-  return false;
+  return 0;
 }
 
 // OFFSET: 0x00DFA150
@@ -1786,8 +1804,8 @@ void CSession::RemovePartyMemberByName(const char* name) {
     }
 
     CRenderObject* actor = mode->scene->GetGameActorByAidIncludeMe(it->accountId);
-    if (actor != nullptr && static_cast<EffectActor*>(actor)->HasId(160) == true) {
-      actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    if (actor != nullptr && static_cast<EffectActor*>(actor)->HasId(EF_PARTY) == true) {
+      actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_PARTY, 0, 0, 0, 0, 0);
     }
 
     this->m_partyMembers.erase(it);
@@ -1920,7 +1938,7 @@ void CSession::RefreshMessengerGroupWindow() {
 // OFFSET: 0x00DFF080
 // FUNCTION: fn_23607
 void CSession::RefreshItem1740Window() {
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
     window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
 }
@@ -2249,7 +2267,7 @@ ITEM_INFO CSession::GetSwapEquippedItem(int index) const {
 // FUNCTION: fn_24175
 ITEM_INFO CSession::GetSwapCostumeItem(int index) const {
   if (index == 15) {
-    return LookupClientItemByIdentity(this->m_inventoryItems, this->swapArrowIndex);
+    return this->LookupClientItemByIdentity(this->swapArrowIndex);
   }
 
   if (static_cast<unsigned int>(index) <= 9) {
@@ -2262,12 +2280,9 @@ ITEM_INFO CSession::GetSwapCostumeItem(int index) const {
 // OFFSET: 0x00E31DE0
 // FUNCTION: fn_24177
 bool CSession::IsRequestReady(int requestId) {
-  std::list<ShortcutCooldownRecord>::iterator it = this->m_requestTimers.begin();
-  for (; it != this->m_requestTimers.end(); ++it) {
-    if (requestId == it->id || it->id == 0x241) {
-      break;
-    }
-  }
+  std::list<ShortcutCooldownRecord>::iterator it = std::find_if(this->m_requestTimers.begin(), this->m_requestTimers.end(), [requestId](const ShortcutCooldownRecord& record) {
+    return requestId == record.id || record.id == 0x241;
+  });
   if (it != this->m_requestTimers.end() && it->end - 100 > timeGetTime()) {
     return false;
   }
@@ -2283,12 +2298,12 @@ void CSession::RefreshHpSpWindows() {
 
   if (g_windowMgr.basicInfoWnd) {
     if (this->maxHp < this->hp ||
-        *reinterpret_cast<const int*>(&this->spAndHomunculusStats[4]) < *reinterpret_cast<const int*>(&this->spAndHomunculusStats[0])) {
+        this->m_maxSp < this->m_sp) {
       return;
     }
 
-    reinterpret_cast<UIWindow*>(g_windowMgr.basicInfoWnd)->Invalidate();
-    reinterpret_cast<UIWindow*>(g_windowMgr.basicInfoWnd)->InvalidateChildren();
+    static_cast<UIWindow*>(g_windowMgr.basicInfoWnd)->Invalidate();
+    static_cast<UIWindow*>(g_windowMgr.basicInfoWnd)->InvalidateChildren();
   }
 
   static_cast<CGameMode*>(g_modeMgr.GetGameMode())->NotifyItemBounds();
@@ -2489,8 +2504,6 @@ void CSession::RefreshMerchantMyShopItems() {
   }
 }
 
-std::uint32_t __fastcall ItemCardColor(const ITEM_INFO* item);
-
 // OFFSET: 0x00DDD2C0
 // FUNCTION: fn_23383
 std::uint32_t CSession::GetItemNameColor(const ITEM_INFO& item) const {
@@ -2548,7 +2561,7 @@ void CSession::RefreshSkillTree() {
   }
 
   if (g_windowMgr.basicInfoWnd) {
-    UIBasicInfoWnd* info = reinterpret_cast<UIBasicInfoWnd*>(g_windowMgr.basicInfoWnd);
+    UIBasicInfoWnd* info = static_cast<UIBasicInfoWnd*>(g_windowMgr.basicInfoWnd);
     info->SetHeight(info->geometry.height);
   }
 }
@@ -2845,79 +2858,71 @@ void CSession::LoadExternalSettings() {
     break;
   }
 
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevel", &*reinterpret_cast<int*>(this->maxBaseLevel));
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevel", &this->m_maxBaseLevel);
   this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevel3rd", &this->m_maxLevel);
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelExtend2", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x00]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelUpperJob", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x04]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelHomun", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x08]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelNovice", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x0C]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelSuperNovice", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x10]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelBase", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x14]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevel2nd", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x18]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevel3rd", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x1C]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelExtend2", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x20]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelUpperJob", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x24]));
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelExtend2", &this->m_maxBaseLevelExtend2);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelUpperJob", &this->m_maxBaseLevelUpperJob);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelHomun", &this->m_maxBaseLevelHomun);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelNovice", &this->m_maxJobLevelNovice);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelSuperNovice", &this->m_maxJobLevelSuperNovice);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelBase", &this->m_maxJobLevelBase);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevel2nd", &this->m_maxJobLevel2nd);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevel3rd", &this->m_maxJobLevel3rd);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelExtend2", &this->m_maxJobLevelExtend2);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelUpperJob", &this->m_maxJobLevelUpperJob);
 
-  if (*reinterpret_cast<int*>(this->maxBaseLevel) == -1 ||
+  if (this->m_maxBaseLevel == -1 ||
       this->m_maxLevel == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x00]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x04]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x08]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x0C]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x10]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x14]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x18]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x1C]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x20]) == -1 ||
-      *reinterpret_cast<int*>(&this->jobLevelLimits[0x24]) == -1) {
-    constexpr std::array<char, 27> source = CRYPT_NAME("Error ExternSettings Value", 0x655DBD856D95E95BULL);
-    thread_local EncryptedName<sizeof(source), 0x655DBD856D95E95BULL> name(source);
-    ShowErrorDialog(name.Text(), 0);
+      this->m_maxBaseLevelExtend2 == -1 ||
+      this->m_maxBaseLevelUpperJob == -1 ||
+      this->m_maxBaseLevelHomun == -1 ||
+      this->m_maxJobLevelNovice == -1 ||
+      this->m_maxJobLevelSuperNovice == -1 ||
+      this->m_maxJobLevelBase == -1 ||
+      this->m_maxJobLevel2nd == -1 ||
+      this->m_maxJobLevel3rd == -1 ||
+      this->m_maxJobLevelExtend2 == -1 ||
+      this->m_maxJobLevelUpperJob == -1) {
+    ShowErrorDialog(OBFUSCATE_ARRAY_TEXT("Error ExternSettings Value", 0x655DBD856D95E95BULL, char), 0);
   }
 
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevel4th", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x74]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevel4th", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x78]));
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevel4th", &this->m_maxBaseLevel4th);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevel4th", &this->m_maxJobLevel4th);
 
-  if (*reinterpret_cast<int*>(&this->jobLevelLimits[0x74]) == -1 || *reinterpret_cast<int*>(&this->jobLevelLimits[0x78]) == -1) {
-    const std::array<char, 27> source = CRYPT_CHARS(27, "Error ExternSettings Value", 0x9DA96FE53B211987ULL);
-    thread_local EncryptedName<sizeof(source), 0x9DA96FE53B211987ULL> name(source);
-    ShowErrorDialog(name.Text(), 0);
+  if (this->m_maxBaseLevel4th == -1 || this->m_maxJobLevel4th == -1) {
+    ShowErrorDialog(OBFUSCATE_ARRAY_TEXT("Error ExternSettings Value", 0x9DA96FE53B211987ULL, char), 0);
   }
 
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelDoram", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x28]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelDoram", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x2C]));
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "BaseLevelDoram", &this->m_maxBaseLevelDoram);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelTable", "JobLevelDoram", &this->m_maxJobLevelDoram);
 
-  if (*reinterpret_cast<int*>(&this->jobLevelLimits[0x2C]) == -1) {
-    const std::array<char, 27> source = CRYPT_CHARS(27, "Error ExternSettings Value", 0xA78387FF5BD35BC1ULL);
-    thread_local EncryptedName<sizeof(source), 0xA78387FF5BD35BC1ULL> name(source);
-    ShowErrorDialog(name.Text(), 0);
+  if (this->m_maxJobLevelDoram == -1) {
+    ShowErrorDialog(OBFUSCATE_ARRAY_TEXT("Error ExternSettings Value", 0xA78387FF5BD35BC1ULL, char), 0);
   }
 
-  this->m_hotkeyScript->Call(std::string("GetTableBoolValueForC", 21), "ss>b", "MakeableRace", "Doram", &*reinterpret_cast<int*>(this->raceCreationOptions));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Default99LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x30]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Default99LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x34]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Baby99LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x38]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Baby99LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x3C]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "SecondHigh99LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x40]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "SecondHigh99LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x44]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Homun99LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x48]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Homun99LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x4C]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Boss99LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x50]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default150LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x54]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default150LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x58]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default160LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x5C]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default160LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x60]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "HomunMaxLvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x64]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "HomunMaxLvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x68]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default185LvAura", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x6C]));
-  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default185LvAura_sub", &*reinterpret_cast<int*>(&this->jobLevelLimits[0x70]));
+  this->m_hotkeyScript->Call(std::string("GetTableBoolValueForC", 21), "ss>b", "MakeableRace", "Doram", &this->m_makeableDoram);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Default99LvAura", &this->m_default99LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Default99LvAura_sub", &this->m_default99LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Baby99LvAura", &this->m_baby99LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Baby99LvAura_sub", &this->m_baby99LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "SecondHigh99LvAura", &this->m_secondHigh99LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "SecondHigh99LvAura_sub", &this->m_secondHigh99LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Homun99LvAura", &this->m_homun99LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Homun99LvAura_sub", &this->m_homun99LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "Level99AuraTable", "Boss99LvAura_sub", &this->m_boss99LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default150LvAura", &this->m_default150LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default150LvAura_sub", &this->m_default150LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default160LvAura", &this->m_default160LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default160LvAura_sub", &this->m_default160LvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "HomunMaxLvAura", &this->m_homunMaxLvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "HomunMaxLvAura_sub", &this->m_homunMaxLvAuraSub);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default185LvAura", &this->m_default185LvAura);
+  this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "Default185LvAura_sub", &this->m_default185LvAuraSub);
   this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "MaxLevelEffect4th", &this->m_maxLevelEffect4th);
   this->m_hotkeyScript->Call(std::string("GetTableIntValueForC", 20), "ss>d", "MaxLevelAuraTable", "MaxLevelEffect4th_sub", &this->m_maxLevelEffect4thSub);
 
   if (this->m_maxLevelEffect4th == -1 || this->m_maxLevelEffect4thSub == -1) {
-    const std::array<char, 27> source = CRYPT_CHARS(27, "Error ExternSettings Value", 0x81D175D33BC75123ULL);
-    thread_local EncryptedName<sizeof(source), 0x81D175D33BC75123ULL> name(source);
-    ShowErrorDialog(name.Text(), 0);
+    ShowErrorDialog(OBFUSCATE_ARRAY_TEXT("Error ExternSettings Value", 0x81D175D33BC75123ULL, char), 0);
   }
 }
 
@@ -2932,25 +2937,19 @@ void CSession::Init() {
   const char* fileName = std::strrchr(modulePath, '\\');
   std::strncpy(directory, modulePath, std::strlen(modulePath) - std::strlen(fileName + 1));
 
-  const std::array<char, 32> keySource = CRYPT_CHARS(32, "Software\\Gravity\\RagnarokOnline", 0x2FE993D1DDE1F197ULL);
-  thread_local EncryptedName<sizeof(keySource), 0x2FE993D1DDE1F197ULL> keyName(keySource);
   HKEY key;
-  if (RegCreateKeyExA(HKEY_CURRENT_USER, keyName.Text(), 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, nullptr) == ERROR_SUCCESS) {
-    const std::array<char, 8> pathSource = CRYPT_CHARS(8, "RagPath", 0xE7978FB5A94DD7FDULL);
-    thread_local EncryptedName<sizeof(pathSource), 0xE7978FB5A94DD7FDULL> pathName(pathSource);
-    std::string valueName = pathName.Text();
+  if (RegCreateKeyExA(HKEY_CURRENT_USER, OBFUSCATE_ARRAY_TEXT("Software\\Gravity\\RagnarokOnline", 0x2FE993D1DDE1F197ULL, char), 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, nullptr) == ERROR_SUCCESS) {
+    std::string valueName = OBFUSCATE_ARRAY_TEXT("RagPath", 0xE7978FB5A94DD7FDULL, char);
     if (g_serviceMode == 1) {
-      const std::array<char, 11> sakraySource = CRYPT_CHARS(11, "SakrayPath", 0xB7FD8F670FC7B96BULL);
-      thread_local EncryptedName<sizeof(sakraySource), 0xB7FD8F670FC7B96BULL> sakrayName(sakraySource);
-      std::string sakrayValueName = sakrayName.Text();
+      std::string sakrayValueName = OBFUSCATE_ARRAY_TEXT("SakrayPath", 0xB7FD8F670FC7B96BULL, char);
     }
 
     RegSetValueExA(key, valueName.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(directory), static_cast<DWORD>(std::strlen(directory)));
   }
 
   this->m_averagePing = 0;
-  *reinterpret_cast<int*>(&this->itemSendState[0x08]) = 0;
-  *reinterpret_cast<int*>(this->showEffects) = 1;
+  this->m_chatTarget = 0;
+  this->m_showEffects = 1;
   this->m_aid = 0;
 
   SYSTEMTIME systemTime;
@@ -2958,46 +2957,46 @@ void CSession::Init() {
   const int now =
     (((((static_cast<unsigned char>(systemTime.wYear) * 12 +systemTime.wMonth) * 31 + systemTime.wDay) * 24 + systemTime.wHour + 9) * 60 + systemTime.wMinute) * 60 + systemTime.wSecond) * 1000 +
     systemTime.wMilliseconds;
-  *reinterpret_cast<int*>(this->clientTimeOffset) = now - timeGetTime();
-  *reinterpret_cast<int*>(this->guildTargetCharacter) = 0;
-  *reinterpret_cast<int*>(&this->whisperOptions[0x00]) = 0;
-  *reinterpret_cast<int*>(&this->timeAttackState[0x04]) = 0;
-  *reinterpret_cast<int*>(&this->timeAttackState[0x00]) = 0;
-  *reinterpret_cast<int*>(&this->timeAttackState[0x0C]) = 0;
-  *reinterpret_cast<int*>(&this->timeAttackState[0x08]) = 0;
-  *reinterpret_cast<int*>(&this->interactionFlags[0x00]) = 0;
-  *reinterpret_cast<int*>(&this->interactionFlags[0x04]) = 0;
-  *reinterpret_cast<int*>(&this->interactionFlags[0x08]) = 0;
+  this->m_clientTimeOffset = now - timeGetTime();
+  this->m_guildTargetCharacter = 0;
+  this->m_whisperOption0 = 0;
+  this->m_timeAttackStart = 0;
+  this->m_timeAttackCountdown = 0;
+  this->unknown_07B0 = 0;
+  this->m_timeAttackVisible = 0;
+  this->m_serviceOption229 = 0;
+  this->m_isSiegeZone = 0;
+  this->m_isPvpZone = 0;
   this->partyBlocked = 0;
-  *reinterpret_cast<int*>(this->timeAttackMode) = 0;
+  this->m_timeAttackMode = 0;
   this->m_hotkeyPage = 0;
-  *reinterpret_cast<int*>(this->whisperRecordStorage) = 0;
+  this->m_whisperRecord = 0;
   this->mapPropertyId = 0;
   g_mapPropertyMgr->Clear();
   g_activeSkillEffects.clear();
 
-  *reinterpret_cast<int*>(&this->whisperOptions[0x04]) = 0;
-  *reinterpret_cast<int*>(this->petNameModified) = 0;
+  this->m_whisperOption1 = 0;
+  this->m_petNameModified = 0;
   this->petJob = -1;
   this->petLevel = 1;
   this->petHunger = 100;
-  *reinterpret_cast<int*>(this->petMaxHunger) = 100;
+  this->m_petMaxHunger = 100;
   this->m_petFriendly = 100;
   this->petEggIndex = -1;
   this->petPreviousHunger = 100;
-  this->monsterTalkState[0] = 0;
-  *reinterpret_cast<int*>(&this->monsterTalkState[0x04]) = -1;
+  this->m_petAutoFeed = 0;
+  this->m_monsterTalkId = -1;
   std::sprintf(this->petName, "");
 
-  std::sprintf(reinterpret_cast<char*>(&this->spAndHomunculusStats[0x0C]), "");
-  int* homunStats = reinterpret_cast<int*>(&this->spAndHomunculusStats[0x2C]);
+  std::sprintf(this->m_homunName, "");
+  int* homunStats = this->m_homunStats;
   for (int index = 0; index < 8; ++index) {
     homunStats[index] = 0;
   }
   this->m_homunJob = -1;
-  *reinterpret_cast<int*>(this->homunLevel) = 1;
+  this->m_homunLevel = 1;
   this->m_homunHp = 0;
-  *reinterpret_cast<int*>(this->homunMaxHp) = 999999;
+  this->m_homunMaxHp = 999999;
   this->m_homunSp = 0;
   this->homunMaxSp = 999999;
   this->m_homunExp = 0;
@@ -3009,8 +3008,8 @@ void CSession::Init() {
   this->homunAlive = 0;
   this->m_traceAi = 0;
   this->m_homunActionState = 0;
-  *reinterpret_cast<int*>(&this->companionTargetState[0x00]) = 0;
-  *reinterpret_cast<int*>(&this->companionTargetState[0x04]) = 0;
+  this->m_homunHungerNotified = 0;
+  this->m_homunAttackRange = 0;
   this->moveHomunEnemy = 0;
   this->selectHomunEnemy = 0;
   this->attackHomunEnemy = 0;
@@ -3031,15 +3030,15 @@ void CSession::Init() {
   this->m_mercenaryLoyalty = 0;
   this->m_mercenarySummons = 0;
   this->m_mercenaryKills = 0;
-  *reinterpret_cast<int*>(this->mercenaryAttackRange) = 0;
+  this->m_mercenaryAttackRange = 0;
   this->m_mercenaryExpiration = 0;
   this->m_mercenaryActionState = 0;
-  this->autoReplyState[0] = 0;
+  this->m_autoReplyEnabled = false;
 
-  *reinterpret_cast<DWORD*>(&this->itemSendState[0x04]) = GetTickCount();
-  *reinterpret_cast<int*>(&this->characterRenameData[0x01]) = 0;
-  std::sprintf(reinterpret_cast<char*>(&this->characterRenameData[0x05]), "");
-  reinterpret_cast<bool&>(this->replaySessionFlag) = false;
+  this->m_itemSendTick = GetTickCount();
+  this->m_renameGid = 0;
+  std::sprintf(this->m_renameName, "");
+  this->replaySessionFlag = 0;
   this->memorialWindowOpen = 0;
   this->memorialWindowX = -1;
   this->memorialWindowY = -1;
@@ -3048,7 +3047,7 @@ void CSession::Init() {
   this->memorialCreationTime = 0;
   this->memorialExpirationTime = 0;
   this->memorialDungeonState = 0;
-  *reinterpret_cast<int*>(this->equipmentViewState) = 0;
+  this->m_allowEquipView = 0;
   this->m_simplifiedSkillList = 0;
   this->m_showSkillDescription = 1;
   this->characterSlotState = 0;
@@ -3073,27 +3072,27 @@ void CSession::Init() {
   this->ClearPairValues(1, 1, 1);
 
   this->m_lockItemDrop = false;
-  for (std::list<ITEM_INFO>& items : this->inventoryCategories) {
-    items.erase(items.begin(), items.end());
+  for (int index = 0; index < 11; ++index) {
+    this->inventoryCategories[index].erase(this->inventoryCategories[index].begin(), this->inventoryCategories[index].end());
   }
 
   this->replayPacketMode = 0;
-  *reinterpret_cast<int*>(&this->sellSoundState[0x03]) = 0;
+  this->m_monsterInfoActorId = 0;
   this->m_skipPriceWarning = true;
-  *reinterpret_cast<int*>(&this->itemSelectionState[0x00]) = 0;
-  *reinterpret_cast<int*>(&this->itemSelectionState[0x04]) = 0;
-  *reinterpret_cast<int*>(&this->itemSelectionState[0x08]) = 0;
+  this->m_buyingStoreMode = 0;
+  this->m_buyingStoreDbNumber = 0;
+  this->m_buyingStoreNoPermission = 0;
   this->mainShortcutRow = 0;
   this->alternateShortcutRow = 0;
-  for (ITEM_INFO& item : this->selectionItems) {
-    item.Reset();
+  for (int index = 0; index < 5; ++index) {
+    this->selectionItems[index].Reset();
   }
 
   this->achievementResult = 0;
-  *reinterpret_cast<int*>(&this->itemDropState[0x02]) = 0;
-  *reinterpret_cast<int*>(&this->itemDropState[0x06]) = 0;
-  *reinterpret_cast<int*>(&this->itemDropState[0x0A]) = 0;
-  *reinterpret_cast<int*>(&this->itemDropState[0x0E]) = 1;
+  this->m_mileageWndActive = 0;
+  this->m_mileageWndPoint = 0;
+  this->m_mileageWndElapsed = 0;
+  this->m_mileageWndBonus = 1;
   this->m_muteSellSound = true;
   this->ClearAchievements();
   this->playerAppearanceState = 0;
@@ -3103,21 +3102,21 @@ void CSession::Init() {
   this->automaticSkillHotkey = 0;
   this->m_currentHotkey = 0;
   this->petGid = 0xFFFFFFFF;
-  *reinterpret_cast<int*>(&this->spAndHomunculusStats[0x08]) = -1;
-  *reinterpret_cast<int*>(&this->companionTargetState[0x08]) = -1;
+  this->m_homunAid = -1;
+  this->m_mercenaryAid = -1;
   this->m_guildMemberListSort = true;
   this->m_blockPrivateTab = false;
-  this->swapEquipmentFlag[0] = 0;
+  this->m_sortPrivateTab = false;
   this->m_itemDefaultSort = false;
   this->m_itemAscendingOrder = false;
   this->m_itemDescendingOrder = false;
   this->m_showMenuIcon = true;
   this->m_homunculusAutoFeed = false;
-  *reinterpret_cast<int*>(&this->homunculusFeedOptions[0x03]) = -1;
-  *reinterpret_cast<int*>(&this->homunculusFeedOptions[0x07]) = 50;
-  this->homunculusFeedOptions[0x0B] = 0;
+  this->unknown_7F80 = -1;
+  this->m_overweightThresholdPercent = 50;
+  this->m_loginModeFlag = false;
   this->m_showRankingSchedule = -1;
-  *reinterpret_cast<int*>(this->feedOptions) = 0;
+  this->m_hideCostumes = 0;
 }
 
 // OFFSET: 0x00DF7C40
@@ -3125,13 +3124,12 @@ void CSession::Init() {
 void CSession::ResetCharacterState() {
   *reinterpret_cast<float*>(&this->m_navigationPlayerMap[0x18]) = SquareRoot(50.0f);
 
-  const int randomValue = std::max(0, std::rand() % 1024) + 1;
+  const int roll = std::rand() % 1024;
+  const int randomValue = (roll >= 0 ? roll : 0) + 1;
 
   this->m_zeny = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x04]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x08]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x1C]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x20]) = 0;
+  this->m_exp = 0;
+  this->m_jobExp = 0;
   this->m_maxWeight = 0;
   this->m_weight = 0;
 
@@ -3158,48 +3156,44 @@ void CSession::ResetCharacterState() {
   this->agilityBonus = 0;
   this->vitalityBonus = 0;
 
-  *reinterpret_cast<int*>(&this->combatStats[0x00]) = 2;
-  *reinterpret_cast<int*>(&this->combatStats[0x04]) = 2;
-  *reinterpret_cast<int*>(&this->combatStats[0x14]) = 2;
-  *reinterpret_cast<int*>(&this->combatStats[0x08]) = 2;
-  *reinterpret_cast<int*>(&this->combatStats[0x0C]) = 2;
-  *reinterpret_cast<int*>(&this->combatStats[0x10]) = 2;
+  this->m_statusPointCost[0] = 2;
+  this->m_statusPointCost[1] = 2;
+  this->m_statusPointCost[5] = 2;
+  this->m_statusPointCost[2] = 2;
+  this->m_statusPointCost[3] = 2;
+  this->m_statusPointCost[4] = 2;
 
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x28]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x1C]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x30]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x34]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x38]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x28]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x2C]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x20]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x3C]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x40]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x44]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x4C]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x48]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x18]) = 0;
-  *reinterpret_cast<int*>(&this->combatStats[0x24]) = 0;
+  this->m_statusPoint = 0;
+  this->m_atk1 = 0;
+  this->m_atk2 = 0;
+  this->m_matk1 = 0;
+  this->m_matk2 = 0;
+  this->m_def1 = 0;
+  this->m_def2 = 0;
+  this->m_mdef1 = 0;
+  this->m_mdef2 = 0;
+  this->m_hit = 0;
+  this->m_flee1 = 0;
+  this->m_flee2 = 0;
+  this->m_critical = 0;
+  this->m_aspd = 0;
+  this->m_sp36 = 0;
 
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x04]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x08]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x1C]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x20]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x0C]) = 999999;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x10]) = 0;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x14]) = 999999;
-  *reinterpret_cast<int*>(&this->playerExperienceState[0x18]) = 0;
+  this->m_exp = 0;
+  this->m_jobExp = 0;
+  this->m_nextExp = 999999;
+  this->m_nextJobExp = 999999;
 
   this->cartCount = 0;
   this->cartMaxCount = 0;
   this->cartWeight = 0;
   this->cartMaxWeight = 0;
-  *reinterpret_cast<int*>(&this->storeSlotCounts[0x00]) = 13;
-  *reinterpret_cast<int*>(&this->storeSlotCounts[0x04]) = 5;
+  this->m_vendingSlotCount = 13;
+  this->m_buyingStoreSlotCount = 5;
   this->playerTeam[0] = 0;
   this->m_score1 = -1;
   this->m_score2 = -1;
-  this->chatFont[0] = 0;
+  this->chatFont = 0;
   this->storeItemLimit = 20;
   this->selectedCharacterSlot = 0;
 
@@ -3212,10 +3206,10 @@ void CSession::ResetCharacterState() {
   this->battleChat = 0;
   this->quitAllowed = 0;
   this->sessionFlag = 0;
-  *reinterpret_cast<int*>(&g_session.mapTransitionFlag[0x00]) = 0;
-  *reinterpret_cast<std::uint16_t*>(&this->playerStatusFlags[0x08]) = 0;
+  g_session.m_mapTransitionFlag = 0;
+  this->unknown_5564 = 0;
   this->adoptionSkillAvailable = 0;
-  this->loginOptions[0] = 1;
+  this->m_randomLoadingScreen = 1;
   this->guildLeader = 0;
   this->showTimer = 0;
   this->mouseAndChannelOptions[0] = 1;
@@ -3283,8 +3277,8 @@ void CSession::ClearItemContainers() {
   if (mode != nullptr) {
     for (std::list<MessengerMember>::iterator it = this->m_partyMembers.begin(); it != this->m_partyMembers.end(); ++it) {
       CRenderObject* actor = mode->scene->GetGameActorByAidIncludeMe(it->accountId);
-      if (actor != nullptr && static_cast<EffectActor*>(actor)->HasId(160) == true) {
-        actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      if (actor != nullptr && static_cast<EffectActor*>(actor)->HasId(EF_PARTY) == true) {
+        actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_PARTY, 0, 0, 0, 0, 0);
       }
     }
   }
@@ -3424,7 +3418,7 @@ bool CSession::LoadMapViewParameters() {
 // OFFSET: 0x00DF8670
 // FUNCTION: fn_23510
 void CSession::InitWeaponHitWaveNames() {
-  std::vector<std::string>& weaponWaves = reinterpret_cast<std::vector<std::string>&>(this->weaponSoundTables[0x18]);
+  std::vector<std::string>& weaponWaves = this->m_weaponHitWaves;
   weaponWaves.clear();
   weaponWaves.resize(105, "_hit_mace.wav");
   for (int weapon = 0; weapon < 105; ++weapon) {
@@ -3924,8 +3918,7 @@ void CSession::InitCommandTables() {
                    [](const std::pair<const char*, int>& left, const std::pair<const char*, int>& right) {
                      return std::strcmp(left.first, right.first) < 0;
                    });
-  std::vector<std::pair<const char*, int>>& chatCommands =
-    reinterpret_cast<std::vector<std::pair<const char*, int>>&>(this->commandTables[0x00]);
+  std::vector<std::pair<const char*, int>>& chatCommands = this->m_chatCommands;
   chatCommands.push_back({"/taekwon", 152});
   chatCommands.push_back({"/hi", 151});
   chatCommands.push_back({"/blacksmith", 146});
@@ -3945,8 +3938,7 @@ void CSession::InitCommandTables() {
   chatCommands.push_back({"/ex", 15});
   chatCommands.push_back({"/inall", 17});
   chatCommands.push_back({"/exall", 16});
-  std::vector<std::pair<const char*, int>>& windowCommands =
-    reinterpret_cast<std::vector<std::pair<const char*, int>>&>(this->commandTables[0x0C]);
+  std::vector<std::pair<const char*, int>>& windowCommands = this->m_windowCommands;
   if (g_serviceType == 12) {
     windowCommands.push_back({"Sala de Chat", 67});
     windowCommands.push_back({"Atributos", 65});
@@ -3984,7 +3976,7 @@ void CSession::InitCommandTables() {
     windowCommands.push_back({"EmotionList", 76});
     windowCommands.push_back({"PetInfo", 74});
   }
-  std::vector<const char*>& shortcutCommands = reinterpret_cast<std::vector<const char*>&>(this->commandTables[0x18]);
+  std::vector<const char*>& shortcutCommands = this->m_shortcutCommands;
   shortcutCommands.push_back("Alt + C");
   shortcutCommands.push_back("Alt + A");
   shortcutCommands.push_back("Alt + D");
@@ -4004,734 +3996,6 @@ void CSession::InitCommandTables() {
   shortcutCommands.push_back("Alt + J");
 }
 
-template <>
-const char* EncryptedName<14, 0x072D2D872D259D5BULL>::Text();
-template <>
-const char* EncryptedName<18, 0x9BE3EF737387AD79ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xB96B77B7255F8569ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x11CB35636377DD07ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x4755C1355575FD37ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x9D8F2D37BFFD61B7ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x79DF094DD9616575ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x038535BB092533B7ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xFB2BC75769E777D3ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xB5D7B5AF4FEDFF57ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x9B9D51AD3515F779ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xB5F3F779237315F3ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x67DD5BAB1919D9D1ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x91493751EF33B5FDULL>::Text();
-template <>
-const char* EncryptedName<10, 0x6BC977B3B5993503ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xB7A76BF9CD41F99FULL>::Text();
-template <>
-const char* EncryptedName<10, 0x732B390D63FD47D7ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x1FDB81175D1557E3ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xE3FB23537D2785BFULL>::Text();
-template <>
-const char* EncryptedName<14, 0x8BBF792B47E72173ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xB3CF9BEB7963DB89ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x71A509DB43792991ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xDD69EDFFA18F537DULL>::Text();
-template <>
-const char* EncryptedName<10, 0xFFBF43D1FFD5FF49ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xEB3D4FAB0FC183DBULL>::Text();
-template <>
-const char* EncryptedName<18, 0x8F3F2FA959977F9FULL>::Text();
-template <>
-const char* EncryptedName<14, 0xE51B29334D353B81ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x8B3FA35B5BDDDF89ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x7FE563BD3FB7F925ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x5D6B3B1DEB2397B1ULL>::Text();
-template <>
-const char* EncryptedName<28, 0x7DB1050779034DE7ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x01E7898D9D235DDFULL>::Text();
-template <>
-const char* EncryptedName<10, 0x0DF5B33D9F21EB79ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x9DEFC105A1EB2F71ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x6961FF056999A303ULL>::Text();
-template <>
-const char* EncryptedName<18, 0xBD3F430159B551FDULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC7FB6DF18577D34BULL>::Text();
-template <>
-const char* EncryptedName<10, 0x5B832361BDA77197ULL>::Text();
-template <>
-const char* EncryptedName<34, 0x2B477F9B5B39B301ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x2B8725D7E95325F5ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x899D11BB83695B0DULL>::Text();
-template <>
-const char* EncryptedName<14, 0xBDADDD87C5A50B6BULL>::Text();
-template <>
-const char* EncryptedName<10, 0x7989830DE73B9DBDULL>::Text();
-template <>
-const char* EncryptedName<10, 0xA7471985F93F9BDFULL>::Text();
-template <>
-const char* EncryptedName<10, 0xF535E561137F138DULL>::Text();
-template <>
-const char* EncryptedName<10, 0xD3E5516F89F161D1ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x45E3F103CBB5F157ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x07112F85A39F4FABULL>::Text();
-template <>
-const char* EncryptedName<14, 0x2D33791F67AD47DFULL>::Text();
-template <>
-const char* EncryptedName<10, 0x936F3D2FFDFD87F5ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x2F2701A7E56D3D89ULL>::Text();
-template <>
-const char* EncryptedName<28, 0x6B3301E1A3079125ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x71B7691737C5A1AFULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC39FB559A17D3963ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xFF7D83CB791339D9ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xED5143E7C1B39315ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x393D916561BDC391ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x31956551B311FD95ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x8741152D8FB34B4FULL>::Text();
-template <>
-const char* EncryptedName<34, 0x955D4DF94DE9BB07ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xC399B7091589B50BULL>::Text();
-template <>
-const char* EncryptedName<18, 0xB739073FE921AD6FULL>::Text();
-template <>
-const char* EncryptedName<18, 0x17FFC98B398FAF61ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x9B5B959B954D9333ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xAFA5617F178B6185ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x078143534999254DULL>::Text();
-template <>
-const char* EncryptedName<10, 0x3F5315DFE32B4FAFULL>::Text();
-template <>
-const char* EncryptedName<14, 0xE50B2935073DD3E9ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x7D750DADBDE9C3F1ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x33832D4D3FDFBDBFULL>::Text();
-template <>
-const char* EncryptedName<28, 0x1BF915E1F37DFDFDULL>::Text();
-template <>
-const char* EncryptedName<28, 0x01FF9313695DD9DFULL>::Text();
-template <>
-const char* EncryptedName<28, 0x6DED3DD1CF75AD9BULL>::Text();
-template <>
-const char* EncryptedName<28, 0x49C3759B77DBD3C1ULL>::Text();
-template <>
-const char* EncryptedName<28, 0xD1538513DF975701ULL>::Text();
-template <>
-const char* EncryptedName<28, 0x91E147EBBD47C39FULL>::Text();
-template <>
-const char* EncryptedName<28, 0x4F1791FB1503C713ULL>::Text();
-template <>
-const char* EncryptedName<28, 0xA1A55B4D1597EDD3ULL>::Text();
-template <>
-const char* EncryptedName<28, 0x0753A7E1EFA9E139ULL>::Text();
-template <>
-const char* EncryptedName<28, 0x7FC1015DFFCF6D19ULL>::Text();
-template <>
-const char* EncryptedName<28, 0xCB3FBD4183DB8323ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x7FCD77F9C7CBD14DULL>::Text();
-template <>
-const char* EncryptedName<18, 0x5B8F49AF09390D1BULL>::Text();
-template <>
-const char* EncryptedName<14, 0x3B915119EFD523EFULL>::Text();
-template <>
-const char* EncryptedName<14, 0x474DC581D5E98357ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x3F557BE333F95F6DULL>::Text();
-template <>
-const char* EncryptedName<14, 0x8B3FEB5B8BD5C3C3ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x0BEB63A5C905B3A7ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x078333BB9725B7C9ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x8F1B5BFD5F6175B5ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x69FD1D9733D3CFC1ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xF5657D1F3DE5CDC7ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x8B65CD61012B5931ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xF7530137154D8FE5ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x61FF87ED7BF39BE1ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x7D993F650D2785FFULL>::Text();
-template <>
-const char* EncryptedName<14, 0x2D394DBD0F332733ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x151F77EBEBBB2147ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xC7912587FFF31B71ULL>::Text();
-template <>
-const char* EncryptedName<34, 0x69D345DB950F336DULL>::Text();
-template <>
-const char* EncryptedName<34, 0x9B17C9EFDBB39F2FULL>::Text();
-template <>
-const char* EncryptedName<34, 0x2D3B15774149D5DDULL>::Text();
-template <>
-const char* EncryptedName<10, 0xD98F03A52D35636DULL>::Text();
-template <>
-const char* EncryptedName<10, 0x0F0F8B6B8F9D19D1ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xD3755DD95F47A909ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x31D7C1EDA345E36DULL>::Text();
-template <>
-const char* EncryptedName<10, 0x3FAF85D995034FD7ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x490FFB43A12F0DB9ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x91651D81F559F971ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x73D1674B61DF7B0BULL>::Text();
-template <>
-const char* EncryptedName<10, 0x2FF3C5036D070127ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x17359BF953C367B3ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC52FB5FBB94FF917ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x93E7A3A1F587CDC5ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x59278F63D79F3DA1ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x812BE72BCD5707B7ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x3375B1C7DBB5FD55ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x1D6D75EDE7CD311FULL>::Text();
-template <>
-const char* EncryptedName<14, 0xCBD1F3239BBBEDF7ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x7DBBD74FA36F3BCBULL>::Text();
-template <>
-const char* EncryptedName<22, 0x4917EB6D71B701ABULL>::Text();
-template <>
-const char* EncryptedName<14, 0xFD4F85BBA7E37D4FULL>::Text();
-template <>
-const char* EncryptedName<10, 0x51C57BB9F1DD9B0FULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC733B7A333F9F571ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x7D61612937C1592DULL>::Text();
-template <>
-const char* EncryptedName<18, 0x8F4B518D839D1581ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xCBD7DDAFDF87F549ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x39E7F13755252F8FULL>::Text();
-template <>
-const char* EncryptedName<14, 0x3D075BD5256F9B6FULL>::Text();
-template <>
-const char* EncryptedName<14, 0xEB074B7FBDA3BFD5ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x03014749B127914FULL>::Text();
-template <>
-const char* EncryptedName<18, 0x251761D7370BA5C3ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x2B034DCBB1812785ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x85FB93CF2F494179ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x894FEDABAFCF45E3ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x8B03E17DA967E943ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x190B8705C141D1CFULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC98BB32777F94371ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xA5F51F3989DBB99FULL>::Text();
-template <>
-const char* EncryptedName<10, 0xB3D5C99B2B05FFEFULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC71BB3CDEB499DD1ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x3939079FF3395587ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xCF391B0F8B9D95DBULL>::Text();
-template <>
-const char* EncryptedName<10, 0x6967633B9D89092BULL>::Text();
-template <>
-const char* EncryptedName<10, 0xAFCD4F69FBDFE157ULL>::Text();
-template <>
-const char* EncryptedName<22, 0x85D9CFCF0FBB71ABULL>::Text();
-template <>
-const char* EncryptedName<22, 0x795383DD11AF7DA7ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xD9FF511B2BB921E7ULL>::Text();
-template <>
-const char* EncryptedName<16, 0x978B51F50DC5FD25ULL>::Text();
-template <>
-const char* EncryptedName<12, 0xC757D96143298511ULL>::Text();
-template <>
-const char* EncryptedName<16, 0xE1F181F923B759E7ULL>::Text();
-template <>
-const char* EncryptedName<12, 0x37D76D8F495113C3ULL>::Text();
-template <>
-const char* EncryptedName<20, 0x7BAD7791F50F5D8DULL>::Text();
-template <>
-const char* EncryptedName<18, 0x2F1337956DC3CFD5ULL>::Text();
-template <>
-const char* EncryptedName<23, 0xC91F9D493F75FDA3ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x1F01A13D8D915327ULL>::Text();
-template <>
-const char* EncryptedName<23, 0xF33D3D3B0BD9C53DULL>::Text();
-template <>
-const char* EncryptedName<10, 0xC74BB3BB110FB10FULL>::Text();
-template <>
-const char* EncryptedName<10, 0x0B5F6D6B23D5AFA7ULL>::Text();
-template <>
-const char* EncryptedName<16, 0x2B7BAB0B6971E3E9ULL>::Text();
-template <>
-const char* EncryptedName<12, 0x8773593DB181D573ULL>::Text();
-template <>
-const char* EncryptedName<16, 0xFBDBDB13A77191BFULL>::Text();
-template <>
-const char* EncryptedName<12, 0x19BBC5910555FB97ULL>::Text();
-template <>
-const char* EncryptedName<18, 0xBBD983C7FD611FE3ULL>::Text();
-template <>
-const char* EncryptedName<18, 0xA1ED494BF319772DULL>::Text();
-template <>
-const char* EncryptedName<18, 0x798B394FF5FF434DULL>::Text();
-template <>
-const char* EncryptedName<18, 0x410DD52D6731BFFDULL>::Text();
-template <>
-const char* EncryptedName<18, 0x07B733370F612D0FULL>::Text();
-template <>
-const char* EncryptedName<14, 0x113DC179F1C795C9ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x31F5C32DD5C53779ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x2F9B717365C1250FULL>::Text();
-template <>
-const char* EncryptedName<10, 0x4FE54379493FB5D5ULL>::Text();
-template <>
-const char* EncryptedName<20, 0x656FAB972B3D21BBULL>::Text();
-template <>
-const char* EncryptedName<20, 0x33CD2BDD5B3927EDULL>::Text();
-template <>
-const char* EncryptedName<18, 0xD97BB73901ED99BFULL>::Text();
-template <>
-const char* EncryptedName<14, 0x5D6B8FCBE3FB97A1ULL>::Text();
-template <>
-const char* EncryptedName<18, 0xE5FDE3151BED831FULL>::Text();
-template <>
-const char* EncryptedName<14, 0x8971CB79C18D8B27ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x8DC5D10DAB1585BDULL>::Text();
-template <>
-const char* EncryptedName<18, 0x21156F4141E35DD9ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x51EB99CBCB075F35ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x1B3B756FE399E1D9ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x3B6D9BFD27A7C7F7ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x451FD72783630709ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x73C32959FDFFA51BULL>::Text();
-template <>
-const char* EncryptedName<14, 0xA15B555BE9CD2B81ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xD9115915B1919533ULL>::Text();
-template <>
-const char* EncryptedName<14, 0xB3F1A10745C1F105ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x99157F159BB99BD9ULL>::Text();
-template <>
-const char* EncryptedName<23, 0x7959FFBF652D07BFULL>::Text();
-template <>
-const char* EncryptedName<25, 0x01C9FBA7819FFBD7ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xABED6971354375C3ULL>::Text();
-template <>
-const char* EncryptedName<29, 0x6BA557130BDFE997ULL>::Text();
-template <>
-const char* EncryptedName<18, 0xFBAD074BDB2B77A1ULL>::Text();
-template <>
-const char* EncryptedName<25, 0x6D05D5271B5D65C3ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x050DF16FC75B25B9ULL>::Text();
-template <>
-const char* EncryptedName<25, 0x0789EBC9F5C1C59FULL>::Text();
-template <>
-const char* EncryptedName<22, 0x3D8387EF97A37DCFULL>::Text();
-template <>
-const char* EncryptedName<29, 0x07A7D947CF7323BFULL>::Text();
-template <>
-const char* EncryptedName<12, 0xD97DC927AFE911F1ULL>::Text();
-template <>
-const char* EncryptedName<26, 0x8BA52B970DD531ADULL>::Text();
-template <>
-const char* EncryptedName<16, 0x47B7BF55EB471557ULL>::Text();
-template <>
-const char* EncryptedName<30, 0xCFB9671DEF4BD9E7ULL>::Text();
-template <>
-const char* EncryptedName<35, 0x2F2103792383718BULL>::Text();
-template <>
-const char* EncryptedName<28, 0x999F5191852D2F6BULL>::Text();
-template <>
-const char* EncryptedName<42, 0x4349ADE96FEB27E5ULL>::Text();
-template <>
-const char* EncryptedName<44, 0xA55B7BEF3D7377E3ULL>::Text();
-template <>
-const char* EncryptedName<30, 0x31E3CF9D358D8705ULL>::Text();
-template <>
-const char* EncryptedName<44, 0x79A58B0F2173CF49ULL>::Text();
-template <>
-const char* EncryptedName<46, 0xF5496753BDE7C5BDULL>::Text();
-template <>
-const char* EncryptedName<26, 0x795787B7779D19DBULL>::Text();
-template <>
-const char* EncryptedName<33, 0x6B3917C939150B9BULL>::Text();
-template <>
-const char* EncryptedName<26, 0x29AB0B59651BDFD5ULL>::Text();
-template <>
-const char* EncryptedName<33, 0xF9B1EF9F7961EFF5ULL>::Text();
-template <>
-const char* EncryptedName<24, 0xA1DFCDAD555BB16DULL>::Text();
-template <>
-const char* EncryptedName<25, 0xAFF9332FD397533FULL>::Text();
-template <>
-const char* EncryptedName<31, 0x194F8339AF753FADULL>::Text();
-template <>
-const char* EncryptedName<26, 0x7DC10333F96DE3E7ULL>::Text();
-template <>
-const char* EncryptedName<33, 0xE9FBAB53D5A1BB17ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x51372B6F4BA14B23ULL>::Text();
-template <>
-const char* EncryptedName<25, 0xB70319D3A78D39CDULL>::Text();
-template <>
-const char* EncryptedName<18, 0x1F79132B518FD389ULL>::Text();
-template <>
-const char* EncryptedName<25, 0xC1FD95811D1F4FA1ULL>::Text();
-template <>
-const char* EncryptedName<24, 0x35F59F6F3DD1C965ULL>::Text();
-template <>
-const char* EncryptedName<31, 0xD7BBEB2DDB295D11ULL>::Text();
-template <>
-const char* EncryptedName<26, 0xBF0F412941076FADULL>::Text();
-template <>
-const char* EncryptedName<33, 0x8DFF0B4B67D9FDE1ULL>::Text();
-template <>
-const char* EncryptedName<30, 0xB59BADC5B365617DULL>::Text();
-template <>
-const char* EncryptedName<37, 0x77D925073D6F19B9ULL>::Text();
-template <>
-const char* EncryptedName<12, 0x91E7A7DFA58F9B6BULL>::Text();
-template <>
-const char* EncryptedName<12, 0x2529F16B0375530DULL>::Text();
-template <>
-const char* EncryptedName<14, 0x91DF1F5D3B014D45ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x0D7FA94DD32361A9ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x2F371DDDADDD53CFULL>::Text();
-template <>
-const char* EncryptedName<9, 0xA5C5D1A3B9457B53ULL>::Text();
-template <>
-const char* EncryptedName<11, 0x61F59D5D41E76519ULL>::Text();
-template <>
-const char* EncryptedName<13, 0x4B670715D543C1C3ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x7155E5EF0DFB0D03ULL>::Text();
-template <>
-const char* EncryptedName<14, 0x4B1D078937DB892BULL>::Text();
-template <>
-const char* EncryptedName<14, 0x875FCDF1E7A1795FULL>::Text();
-template <>
-const char* EncryptedName<14, 0x5FFD7FABB5D1EF57ULL>::Text();
-
-EncryptedName<14, 0x072D2D872D259D5BULL>& WizardBodyPath1();
-EncryptedName<18, 0x9BE3EF737387AD79ULL>& PriestBodyPath1();
-EncryptedName<14, 0xB96B77B7255F8569ULL>& AssassinBodyPath1();
-EncryptedName<14, 0x11CB35636377DD07ULL>& SageBodyPath1();
-EncryptedName<10, 0x4755C1355575FD37ULL>& BardBodyPath1();
-EncryptedName<10, 0x9D8F2D37BFFD61B7ULL>& DancerBodyPath1();
-EncryptedName<10, 0x79DF094DD9616575ULL>& MonkBodyPath1();
-EncryptedName<18, 0x038535BB092533B7ULL>& AlchemistBodyPath1();
-EncryptedName<10, 0xFB2BC75769E777D3ULL>& RogueBodyPath1();
-EncryptedName<14, 0xB5D7B5AF4FEDFF57ULL>& NoviceBodyPath1();
-EncryptedName<10, 0x9B9D51AD3515F779ULL>& SwordmanBodyPath1();
-EncryptedName<14, 0xB5F3F779237315F3ULL>& MagicianBodyPath1();
-EncryptedName<10, 0x67DD5BAB1919D9D1ULL>& ArcherBodyPath1();
-EncryptedName<14, 0x91493751EF33B5FDULL>& AcolyteBodyPath1();
-EncryptedName<10, 0x6BC977B3B5993503ULL>& MerchantBodyPath1();
-EncryptedName<10, 0xB7A76BF9CD41F99FULL>& ThiefBodyPath1();
-EncryptedName<10, 0x732B390D63FD47D7ULL>& ThiefBodyPath2();
-EncryptedName<14, 0x1FDB81175D1557E3ULL>& NoviceBodyPath2();
-EncryptedName<10, 0xE3FB23537D2785BFULL>& SwordmanBodyPath2();
-EncryptedName<14, 0x8BBF792B47E72173ULL>& MagicianBodyPath2();
-EncryptedName<10, 0xB3CF9BEB7963DB89ULL>& ArcherBodyPath2();
-EncryptedName<14, 0x71A509DB43792991ULL>& AcolyteBodyPath2();
-EncryptedName<10, 0xDD69EDFFA18F537DULL>& MerchantBodyPath2();
-EncryptedName<10, 0xFFBF43D1FFD5FF49ULL>& ThiefBodyPath3();
-EncryptedName<10, 0xEB3D4FAB0FC183DBULL>& KnightBodyPath1();
-EncryptedName<18, 0x8F3F2FA959977F9FULL>& PriestBodyPath2();
-EncryptedName<14, 0xE51B29334D353B81ULL>& WizardBodyPath2();
-EncryptedName<14, 0x8B3FA35B5BDDDF89ULL>& BlacksmithBodyPath1();
-EncryptedName<10, 0x7FE563BD3FB7F925ULL>& HunterBodyPath1();
-EncryptedName<14, 0x5D6B3B1DEB2397B1ULL>& AssassinBodyPath2();
-EncryptedName<28, 0x7DB1050779034DE7ULL>& PecoKnightBodyPath1();
-EncryptedName<22, 0x01E7898D9D235DDFULL>& CrusaderBodyPath1();
-EncryptedName<10, 0x0DF5B33D9F21EB79ULL>& MonkBodyPath2();
-EncryptedName<14, 0x9DEFC105A1EB2F71ULL>& SageBodyPath2();
-EncryptedName<10, 0x6961FF056999A303ULL>& RogueBodyPath2();
-EncryptedName<18, 0xBD3F430159B551FDULL>& AlchemistBodyPath2();
-EncryptedName<10, 0xC7FB6DF18577D34BULL>& BardBodyPath2();
-EncryptedName<10, 0x5B832361BDA77197ULL>& DancerBodyPath2();
-EncryptedName<34, 0x2B477F9B5B39B301ULL>& NewPecoCrusaderBodyPath1();
-EncryptedName<14, 0x2B8725D7E95325F5ULL>& NoviceBodyPath3();
-EncryptedName<10, 0x899D11BB83695B0DULL>& SwordmanBodyPath3();
-EncryptedName<14, 0xBDADDD87C5A50B6BULL>& MagicianBodyPath3();
-EncryptedName<10, 0x7989830DE73B9DBDULL>& ArcherBodyPath3();
-EncryptedName<10, 0xA7471985F93F9BDFULL>& MerchantBodyPath3();
-EncryptedName<10, 0xF535E561137F138DULL>& ThiefBodyPath4();
-EncryptedName<10, 0xD3E5516F89F161D1ULL>& KnightBodyPath2();
-EncryptedName<18, 0x45E3F103CBB5F157ULL>& PriestBodyPath3();
-EncryptedName<14, 0x07112F85A39F4FABULL>& WizardBodyPath3();
-EncryptedName<14, 0x2D33791F67AD47DFULL>& BlacksmithBodyPath2();
-EncryptedName<10, 0x936F3D2FFDFD87F5ULL>& HunterBodyPath2();
-EncryptedName<14, 0x2F2701A7E56D3D89ULL>& AssassinBodyPath3();
-EncryptedName<28, 0x6B3301E1A3079125ULL>& PecoKnightBodyPath2();
-EncryptedName<22, 0x71B7691737C5A1AFULL>& CrusaderBodyPath2();
-EncryptedName<10, 0xC39FB559A17D3963ULL>& MonkBodyPath3();
-EncryptedName<14, 0xFF7D83CB791339D9ULL>& SageBodyPath3();
-EncryptedName<10, 0xED5143E7C1B39315ULL>& RogueBodyPath3();
-EncryptedName<18, 0x393D916561BDC391ULL>& AlchemistBodyPath3();
-EncryptedName<10, 0x31956551B311FD95ULL>& BardBodyPath3();
-EncryptedName<10, 0x8741152D8FB34B4FULL>& DancerBodyPath3();
-EncryptedName<34, 0x955D4DF94DE9BB07ULL>& OldPecoCrusaderBodyPath1();
-EncryptedName<14, 0xC399B7091589B50BULL>& NoviceBodyPath4();
-EncryptedName<18, 0xB739073FE921AD6FULL>& TaekwonBodyPath1();
-EncryptedName<18, 0x17FFC98B398FAF61ULL>& TaekwonBodyPath2();
-EncryptedName<18, 0x9B5B959B954D9333ULL>& TaekwonBodyPath3();
-EncryptedName<14, 0xAFA5617F178B6185ULL>& WizardBodyPath4();
-EncryptedName<14, 0x078143534999254DULL>& AcolyteBodyPath3();
-EncryptedName<10, 0x3F5315DFE32B4FAFULL>& KnightBodyPath3();
-EncryptedName<14, 0xE50B2935073DD3E9ULL>& SageBodyPath4();
-EncryptedName<10, 0x7D750DADBDE9C3F1ULL>& KnightBodyPath4();
-EncryptedName<10, 0x33832D4D3FDFBDBFULL>& KnightBodyPath5();
-EncryptedName<28, 0x1BF915E1F37DFDFDULL>& PecoKnightBodyPath3();
-EncryptedName<28, 0x01FF9313695DD9DFULL>& PecoKnightBodyPath4();
-EncryptedName<28, 0x6DED3DD1CF75AD9BULL>& PecoKnightBodyPath5();
-EncryptedName<28, 0x49C3759B77DBD3C1ULL>& PecoKnightBodyPath6();
-EncryptedName<28, 0xD1538513DF975701ULL>& PecoKnightBodyPath7();
-EncryptedName<28, 0x91E147EBBD47C39FULL>& PecoKnightBodyPath8();
-EncryptedName<28, 0x4F1791FB1503C713ULL>& PecoKnightBodyPath9();
-EncryptedName<28, 0xA1A55B4D1597EDD3ULL>& PecoKnightBodyPath10();
-EncryptedName<28, 0x0753A7E1EFA9E139ULL>& PecoKnightBodyPath11();
-EncryptedName<28, 0x7FC1015DFFCF6D19ULL>& PecoKnightBodyPath12();
-EncryptedName<28, 0xCB3FBD4183DB8323ULL>& PecoKnightBodyPath13();
-EncryptedName<18, 0x7FCD77F9C7CBD14DULL>& PriestBodyPath4();
-EncryptedName<18, 0x5B8F49AF09390D1BULL>& PriestBodyPath5();
-EncryptedName<14, 0x3B915119EFD523EFULL>& WizardBodyPath5();
-EncryptedName<14, 0x474DC581D5E98357ULL>& WizardBodyPath6();
-EncryptedName<14, 0x3F557BE333F95F6DULL>& BlacksmithBodyPath3();
-EncryptedName<14, 0x8B3FEB5B8BD5C3C3ULL>& BlacksmithBodyPath4();
-EncryptedName<18, 0x0BEB63A5C905B3A7ULL>& MadogearBodyPath1();
-EncryptedName<18, 0x078333BB9725B7C9ULL>& MadogearBodyPath2();
-EncryptedName<18, 0x8F1B5BFD5F6175B5ULL>& MadogearBodyPath3();
-EncryptedName<10, 0x69FD1D9733D3CFC1ULL>& HunterBodyPath3();
-EncryptedName<10, 0xF5657D1F3DE5CDC7ULL>& HunterBodyPath4();
-EncryptedName<22, 0x8B65CD61012B5931ULL>& RangerWolfBodyPath1();
-EncryptedName<22, 0xF7530137154D8FE5ULL>& RangerWolfBodyPath2();
-EncryptedName<22, 0x61FF87ED7BF39BE1ULL>& RangerWolfBodyPath3();
-EncryptedName<14, 0x7D993F650D2785FFULL>& AssassinBodyPath4();
-EncryptedName<14, 0x2D394DBD0F332733ULL>& AssassinBodyPath5();
-EncryptedName<22, 0x151F77EBEBBB2147ULL>& CrusaderBodyPath3();
-EncryptedName<22, 0xC7912587FFF31B71ULL>& CrusaderBodyPath4();
-EncryptedName<34, 0x69D345DB950F336DULL>& NewPecoCrusaderBodyPath2();
-EncryptedName<34, 0x9B17C9EFDBB39F2FULL>& NewPecoCrusaderBodyPath3();
-EncryptedName<34, 0x2D3B15774149D5DDULL>& NewPecoCrusaderBodyPath4();
-EncryptedName<10, 0xD98F03A52D35636DULL>& MonkBodyPath4();
-EncryptedName<10, 0x0F0F8B6B8F9D19D1ULL>& MonkBodyPath5();
-EncryptedName<14, 0xD3755DD95F47A909ULL>& SageBodyPath5();
-EncryptedName<14, 0x31D7C1EDA345E36DULL>& SageBodyPath6();
-EncryptedName<10, 0x3FAF85D995034FD7ULL>& RogueBodyPath4();
-EncryptedName<10, 0x490FFB43A12F0DB9ULL>& RogueBodyPath5();
-EncryptedName<18, 0x91651D81F559F971ULL>& AlchemistBodyPath4();
-EncryptedName<18, 0x73D1674B61DF7B0BULL>& AlchemistBodyPath5();
-EncryptedName<10, 0x2FF3C5036D070127ULL>& DancerBodyPath4();
-EncryptedName<10, 0x17359BF953C367B3ULL>& DancerBodyPath5();
-EncryptedName<10, 0xC52FB5FBB94FF917ULL>& BardBodyPath4();
-EncryptedName<10, 0x93E7A3A1F587CDC5ULL>& BardBodyPath5();
-EncryptedName<10, 0x59278F63D79F3DA1ULL>& KnightBodyPath6();
-EncryptedName<14, 0x812BE72BCD5707B7ULL>& WizardBodyPath7();
-EncryptedName<10, 0x3375B1C7DBB5FD55ULL>& HunterBodyPath5();
-EncryptedName<18, 0x1D6D75EDE7CD311FULL>& PriestBodyPath6();
-EncryptedName<14, 0xCBD1F3239BBBEDF7ULL>& BlacksmithBodyPath5();
-EncryptedName<14, 0x7DBBD74FA36F3BCBULL>& AssassinBodyPath6();
-EncryptedName<22, 0x4917EB6D71B701ABULL>& CrusaderBodyPath5();
-EncryptedName<14, 0xFD4F85BBA7E37D4FULL>& SageBodyPath7();
-EncryptedName<10, 0x51C57BB9F1DD9B0FULL>& BardBodyPath6();
-EncryptedName<10, 0xC733B7A333F9F571ULL>& DancerBodyPath6();
-EncryptedName<10, 0x7D61612937C1592DULL>& MonkBodyPath6();
-EncryptedName<18, 0x8F4B518D839D1581ULL>& AlchemistBodyPath6();
-EncryptedName<10, 0xCBD7DDAFDF87F549ULL>& RogueBodyPath6();
-EncryptedName<14, 0x39E7F13755252F8FULL>& NoviceBodyPath5();
-EncryptedName<14, 0x3D075BD5256F9B6FULL>& NoviceBodyPath6();
-EncryptedName<14, 0xEB074B7FBDA3BFD5ULL>& NoviceBodyPath7();
-EncryptedName<14, 0x03014749B127914FULL>& NoviceBodyPath8();
-EncryptedName<18, 0x251761D7370BA5C3ULL>& PriestBodyPath7();
-EncryptedName<14, 0x2B034DCBB1812785ULL>& WizardBodyPath8();
-EncryptedName<14, 0x85FB93CF2F494179ULL>& BlacksmithBodyPath6();
-EncryptedName<14, 0x894FEDABAFCF45E3ULL>& BlacksmithBodyPath7();
-EncryptedName<14, 0x8B03E17DA967E943ULL>& BlacksmithBodyPath8();
-EncryptedName<10, 0x190B8705C141D1CFULL>& HunterBodyPath6();
-EncryptedName<10, 0xC98BB32777F94371ULL>& HunterBodyPath7();
-EncryptedName<10, 0xA5F51F3989DBB99FULL>& KnightBodyPath7();
-EncryptedName<10, 0xB3D5C99B2B05FFEFULL>& KnightBodyPath8();
-EncryptedName<10, 0xC71BB3CDEB499DD1ULL>& KnightBodyPath9();
-EncryptedName<22, 0x3939079FF3395587ULL>& CrusaderBodyPath6();
-EncryptedName<22, 0xCF391B0F8B9D95DBULL>& CrusaderBodyPath7();
-EncryptedName<10, 0x6967633B9D89092BULL>& KnightBodyPath10();
-EncryptedName<10, 0xAFCD4F69FBDFE157ULL>& KnightBodyPath11();
-EncryptedName<22, 0x85D9CFCF0FBB71ABULL>& CrusaderBodyPath8();
-EncryptedName<22, 0x795383DD11AF7DA7ULL>& CrusaderBodyPath9();
-EncryptedName<22, 0xD9FF511B2BB921E7ULL>& CrusaderBodyPath10();
-EncryptedName<16, 0x978B51F50DC5FD25ULL>& KagerouBodyPath1();
-EncryptedName<12, 0xC757D96143298511ULL>& OboroBodyPath1();
-EncryptedName<16, 0xE1F181F923B759E7ULL>& KagerouBodyPath2();
-EncryptedName<12, 0x37D76D8F495113C3ULL>& OboroBodyPath2();
-EncryptedName<20, 0x7BAD7791F50F5D8DULL>& RebellionBodyPath1();
-EncryptedName<18, 0x2F1337956DC3CFD5ULL>& SummonerBodyPath1();
-EncryptedName<23, 0xC91F9D493F75FDA3ULL>& SummonerCartBodyPath1();
-EncryptedName<18, 0x1F01A13D8D915327ULL>& SummonerBodyPath2();
-EncryptedName<23, 0xF33D3D3B0BD9C53DULL>& SummonerCartBodyPath2();
-EncryptedName<10, 0xC74BB3BB110FB10FULL>& NinjaBodyPath1();
-EncryptedName<10, 0x0B5F6D6B23D5AFA7ULL>& NinjaBodyPath2();
-EncryptedName<16, 0x2B7BAB0B6971E3E9ULL>& KagerouBodyPath3();
-EncryptedName<12, 0x8773593DB181D573ULL>& OboroBodyPath3();
-EncryptedName<16, 0xFBDBDB13A77191BFULL>& KagerouBodyPath4();
-EncryptedName<12, 0x19BBC5910555FB97ULL>& OboroBodyPath4();
-EncryptedName<18, 0xBBD983C7FD611FE3ULL>& TaekwonBodyPath4();
-EncryptedName<18, 0xA1ED494BF319772DULL>& TaekwonBodyPath5();
-EncryptedName<18, 0x798B394FF5FF434DULL>& TaekwonBodyPath6();
-EncryptedName<18, 0x410DD52D6731BFFDULL>& TaekwonBodyPath7();
-EncryptedName<18, 0x07B733370F612D0FULL>& TaekwonBodyPath8();
-EncryptedName<14, 0x113DC179F1C795C9ULL>& WizardBodyPath9();
-EncryptedName<14, 0x31F5C32DD5C53779ULL>& WizardBodyPath10();
-EncryptedName<10, 0x2F9B717365C1250FULL>& GunslingerBodyPath1();
-EncryptedName<10, 0x4FE54379493FB5D5ULL>& GunslingerBodyPath2();
-EncryptedName<20, 0x656FAB972B3D21BBULL>& RebellionBodyPath2();
-EncryptedName<20, 0x33CD2BDD5B3927EDULL>& RebellionBodyPath3();
-EncryptedName<18, 0xD97BB73901ED99BFULL>& TaekwonBodyPath9();
-EncryptedName<14, 0x5D6B8FCBE3FB97A1ULL>& WizardBodyPath11();
-EncryptedName<18, 0xE5FDE3151BED831FULL>& TaekwonBodyPath10();
-EncryptedName<14, 0x8971CB79C18D8B27ULL>& WizardBodyPath12();
-EncryptedName<18, 0x8DC5D10DAB1585BDULL>& TaekwonBodyPath11();
-EncryptedName<18, 0x21156F4141E35DD9ULL>& TaekwonBodyPath12();
-EncryptedName<18, 0x51EB99CBCB075F35ULL>& TaekwonBodyPath13();
-EncryptedName<14, 0x1B3B756FE399E1D9ULL>& WizardBodyPath13();
-EncryptedName<18, 0x3B6D9BFD27A7C7F7ULL>& TaekwonBodyPath14();
-EncryptedName<14, 0x451FD72783630709ULL>& WizardBodyPath14();
-EncryptedName<14, 0x73C32959FDFFA51BULL>& WizardBodyPath15();
-EncryptedName<14, 0xA15B555BE9CD2B81ULL>& WizardBodyPath16();
-EncryptedName<14, 0xD9115915B1919533ULL>& SageBodyPath8();
-EncryptedName<14, 0xB3F1A10745C1F105ULL>& SageBodyPath9();
-EncryptedName<18, 0x99157F159BB99BD9ULL>& WindhawkBodyPath1();
-EncryptedName<23, 0x7959FFBF652D07BFULL>& WolfWindhawkBodyPath1();
-EncryptedName<25, 0x01C9FBA7819FFBD7ULL>& WindhawkRidingBodyPath1();
-EncryptedName<22, 0xABED6971354375C3ULL>& TroubadourBodyPath1();
-EncryptedName<29, 0x6BA557130BDFE997ULL>& TroubadourRidingBodyPath1();
-EncryptedName<18, 0xFBAD074BDB2B77A1ULL>& TrouvereBodyPath1();
-EncryptedName<25, 0x6D05D5271B5D65C3ULL>& TrouvereRidingBodyPath1();
-EncryptedName<18, 0x050DF16FC75B25B9ULL>& CardinalBodyPath1();
-EncryptedName<25, 0x0789EBC9F5C1C59FULL>& CardinalRidingBodyPath1();
-EncryptedName<22, 0x3D8387EF97A37DCFULL>& InquisitorBodyPath1();
-EncryptedName<29, 0x07A7D947CF7323BFULL>& InquisitorRidingBodyPath1();
-EncryptedName<12, 0xD97DC927AFE911F1ULL>& BioloBodyPath1();
-EncryptedName<26, 0x8BA52B970DD531ADULL>& BioloRidingBodyPath1();
-EncryptedName<16, 0x47B7BF55EB471557ULL>& MeisterBodyPath1();
-EncryptedName<30, 0xCFB9671DEF4BD9E7ULL>& MeisterRidingBodyPath1();
-EncryptedName<35, 0x2F2103792383718BULL>& MeisterMadogear1BodyPath1();
-EncryptedName<28, 0x999F5191852D2F6BULL>& DragonKnightBodyPath1();
-EncryptedName<42, 0x4349ADE96FEB27E5ULL>& DragonKnightRidingBodyPath1();
-EncryptedName<44, 0xA55B7BEF3D7377E3ULL>& DragonKnightChickenBodyPath1();
-EncryptedName<30, 0x31E3CF9D358D8705ULL>& ImperialGuardBodyPath1();
-EncryptedName<44, 0x79A58B0F2173CF49ULL>& ImperialGuardRidingBodyPath1();
-EncryptedName<46, 0xF5496753BDE7C5BDULL>& ImperialGuardChickenBodyPath1();
-EncryptedName<26, 0x795787B7779D19DBULL>& ShadowCrossBodyPath1();
-EncryptedName<33, 0x6B3917C939150B9BULL>& ShadowCrossRidingBodyPath1();
-EncryptedName<26, 0x29AB0B59651BDFD5ULL>& AbyssChaserBodyPath1();
-EncryptedName<33, 0xF9B1EF9F7961EFF5ULL>& AbyssChaserRidingBodyPath1();
-EncryptedName<24, 0xA1DFCDAD555BB16DULL>& SkyEmperorBodyPath1();
-EncryptedName<25, 0xAFF9332FD397533FULL>& SkyEmperor2BodyPath1();
-EncryptedName<31, 0x194F8339AF753FADULL>& SkyEmperorRidingBodyPath1();
-EncryptedName<26, 0x7DC10333F96DE3E7ULL>& SoulAsceticBodyPath1();
-EncryptedName<33, 0xE9FBAB53D5A1BB17ULL>& SoulAsceticRidingBodyPath1();
-EncryptedName<18, 0x51372B6F4BA14B23ULL>& ShinkiroBodyPath1();
-EncryptedName<25, 0xB70319D3A78D39CDULL>& ShinkiroRidingBodyPath1();
-EncryptedName<18, 0x1F79132B518FD389ULL>& ShiranuiBodyPath1();
-EncryptedName<25, 0xC1FD95811D1F4FA1ULL>& ShiranuiRidingBodyPath1();
-EncryptedName<24, 0x35F59F6F3DD1C965ULL>& NightWatchBodyPath1();
-EncryptedName<31, 0xD7BBEB2DDB295D11ULL>& NightWatchRidingBodyPath1();
-EncryptedName<26, 0xBF0F412941076FADULL>& HyperNoviceBodyPath1();
-EncryptedName<33, 0x8DFF0B4B67D9FDE1ULL>& HyperNoviceRidingBodyPath1();
-EncryptedName<30, 0xB59BADC5B365617DULL>& SpiritHandlerBodyPath1();
-EncryptedName<37, 0x77D925073D6F19B9ULL>& SpiritHandlerRidingBodyPath1();
-EncryptedName<12, 0x91E7A7DFA58F9B6BULL>& DruidBodyPath1();
-EncryptedName<12, 0x2529F16B0375530DULL>& DruidBodyPath2();
-EncryptedName<14, 0x91DF1F5D3B014D45ULL>& KarnosBodyPath1();
-EncryptedName<14, 0x0D7FA94DD32361A9ULL>& KarnosBodyPath2();
-EncryptedName<14, 0x2F371DDDADDD53CFULL>& AliteaBodyPath1();
-EncryptedName<6, 0x2F3D75DFCF678FF3ULL>& DruidJobName1();
-EncryptedName<6, 0x3BBB5F0F8F216F31ULL>& DruidJobName2();
-EncryptedName<7, 0x6F9D21B96D71C1FFULL>& KarnosJobName1();
-EncryptedName<7, 0xED730315539785C7ULL>& KarnosJobName2();
-EncryptedName<7, 0x8F61434F0F79DDD7ULL>& AliteaJobName1();
-EncryptedName<9, 0xA5C5D1A3B9457B53ULL>& WerewolfJobName1();
-EncryptedName<11, 0x61F59D5D41E76519ULL>& WereRaptorJobName1();
-EncryptedName<13, 0x4B670715D543C1C3ULL>& DruidRidingName();
-EncryptedName<14, 0x7155E5EF0DFB0D03ULL>& KarnosRidingName();
-EncryptedName<14, 0x4B1D078937DB892BULL>& AliteaRidingName();
-
 // OFFSET: 0x00DC2710
 // FUNCTION: fn_22757
 SessionTraits::SessionTraits() {
@@ -4741,7 +4005,8 @@ SessionTraits::SessionTraits() {
 // FUNCTION: fn_22763
 CSession::CSession() {
   this->m_priorityClass = 32;
-  *reinterpret_cast<std::uint16_t*>(&this->feedOptions[4]) = 0x100;
+  this->m_genderChangeBlocked = false;
+  this->m_itemSlotActive = true;
   this->sessionIndex = -1;
   this->skyMapNames.clear();
 
@@ -4749,62 +4014,42 @@ CSession::CSession() {
   CSpecialPopupMgr::Create();
   CRuneSystemMgr::Create();
   if (!CUserHotkeyMgr::Initialize()) {
-    const std::array<char, 6> captionSource = CRYPT_CHARS(6, "Error", 0xED796785D1DF137FULL);
-    thread_local EncryptedName<sizeof(captionSource), 0xED796785D1DF137FULL> caption(captionSource);
-    const char* captionText = caption.Text();
-    const std::array<char, 33> textSource = CRYPT_CHARS(33, "CUserHotkeyMgr::CreateInstance()", 0xF14F79170939C7F1ULL);
-    thread_local EncryptedName<sizeof(textSource), 0xF14F79170939C7F1ULL> text(textSource);
-    MessageBoxA(nullptr, text.Text(), captionText, MB_OK);
+    const char* captionText = OBFUSCATE_ARRAY_TEXT("Error", 0xED796785D1DF137FULL, char);
+    MessageBoxA(nullptr, OBFUSCATE_ARRAY_TEXT("CUserHotkeyMgr::CreateInstance()", 0xF14F79170939C7F1ULL, char), captionText, MB_OK);
   }
   if (!CBarterMarketItemMgr::CreateInstance()) {
-    const std::array<char, 6> captionSource = CRYPT_CHARS(6, "Error", 0xBF2B4B31397FF5A7ULL);
-    thread_local EncryptedName<sizeof(captionSource), 0xBF2B4B31397FF5A7ULL> caption(captionSource);
-    const char* captionText = caption.Text();
-    const std::array<char, 47> textSource = CRYPT_CHARS(47, "InstanceCBarterMarketItemMgr::CreateInstance()", 0xD97D5DBDBB2F2709ULL);
-    thread_local EncryptedName<sizeof(textSource), 0xD97D5DBDBB2F2709ULL> text(textSource);
-    MessageBoxA(nullptr, text.Text(), captionText, MB_OK);
+    const char* captionText = OBFUSCATE_ARRAY_TEXT("Error", 0xBF2B4B31397FF5A7ULL, char);
+    MessageBoxA(nullptr, OBFUSCATE_ARRAY_TEXT("InstanceCBarterMarketItemMgr::CreateInstance()", 0xD97D5DBDBB2F2709ULL, char), captionText, MB_OK);
   }
   if (!CExpandedBarterMarketItemMgr::CreateInstance()) {
-    const std::array<char, 6> captionSource = CRYPT_CHARS(6, "Error", 0x050505679903579BULL);
-    thread_local EncryptedName<sizeof(captionSource), 0x050505679903579BULL> caption(captionSource);
-    const char* captionText = caption.Text();
-    const std::array<char, 48> textSource = CRYPT_CHARS(48, "InstanceCBarterMarketItem2Mgr::CreateInstance()", 0x83EFBFBB37EDBDBDULL);
-    thread_local EncryptedName<sizeof(textSource), 0x83EFBFBB37EDBDBDULL> text(textSource);
-    MessageBoxA(nullptr, text.Text(), captionText, MB_OK);
+    const char* captionText = OBFUSCATE_ARRAY_TEXT("Error", 0x050505679903579BULL, char);
+    MessageBoxA(nullptr, OBFUSCATE_ARRAY_TEXT("InstanceCBarterMarketItem2Mgr::CreateInstance()", 0x83EFBFBB37EDBDBDULL, char), captionText, MB_OK);
   }
   if (!CPetEvolutionMgr::Create()) {
-    const std::array<char, 6> captionSource = CRYPT_CHARS(6, "Error", 0xAD075B8DB599F1CDULL);
-    thread_local EncryptedName<sizeof(captionSource), 0xAD075B8DB599F1CDULL> caption(captionSource);
-    const char* captionText = caption.Text();
-    const std::array<char, 27> textSource = CRYPT_CHARS(27, "CPetEvolutionMgr file Init", 0xDD3913D5D7F97BE1ULL);
-    thread_local EncryptedName<sizeof(textSource), 0xDD3913D5D7F97BE1ULL> text(textSource);
-    MessageBoxA(nullptr, text.Text(), captionText, MB_OK);
+    const char* captionText = OBFUSCATE_ARRAY_TEXT("Error", 0xAD075B8DB599F1CDULL, char);
+    MessageBoxA(nullptr, OBFUSCATE_ARRAY_TEXT("CPetEvolutionMgr file Init", 0xDD3913D5D7F97BE1ULL, char), captionText, MB_OK);
   }
   if (!CAchievementMgr::CreateInstance()) {
-    const std::array<char, 6> captionSource = CRYPT_CHARS(6, "Error", 0x39FF7FB50DEB998FULL);
-    thread_local EncryptedName<sizeof(captionSource), 0x39FF7FB50DEB998FULL> caption(captionSource);
-    const char* captionText = caption.Text();
-    const std::array<char, 26> textSource = CRYPT_CHARS(26, "CAchievementMgr file init", 0x2F8B0F37118D157FULL);
-    thread_local EncryptedName<sizeof(textSource), 0x2F8B0F37118D157FULL> text(textSource);
-    MessageBoxA(nullptr, text.Text(), captionText, MB_OK);
+    const char* captionText = OBFUSCATE_ARRAY_TEXT("Error", 0x39FF7FB50DEB998FULL, char);
+    MessageBoxA(nullptr, OBFUSCATE_ARRAY_TEXT("CAchievementMgr file init", 0x2F8B0F37118D157FULL, char), captionText, MB_OK);
   }
 
   this->m_newRobeDrawOnTop = false;
   this->m_localMapMove = 0;
   this->m_swapEquipmentMode = 0;
-  this->raceCreationOptions[0] = 1;
-  *reinterpret_cast<int*>(&this->raceCreationOptions[4]) = 0;
+  this->m_makeableDoram = 1;
+  this->m_swapEquipmentTick = 0;
   CPrivateAirplaneMgr::Create();
   CCheckAttendanceMgr::Create();
-  *reinterpret_cast<int*>(&this->equipmentViewState[0x28]) = 0;
+  this->m_equipViewLook[9] = 0;
   this->extraInventorySlots = 0;
   CMapInfoMgr::Create();
   this->madogearType = 0;
-  *reinterpret_cast<int*>(&this->jobLevelLimits[0x74]) = 0;
-  *reinterpret_cast<int*>(&this->jobLevelLimits[0x78]) = 0;
+  this->m_maxBaseLevel4th = 0;
+  this->m_maxJobLevel4th = 0;
   CChangeMaterialMgr::CreateInstance();
   this->m_options.Clear();
-  *reinterpret_cast<int*>(&this->webServiceLoginData[0x18]) = 0;
+  this->m_limitedSaleRequestTick = 0;
   this->m_damageSkinIndex = 0;
   this->m_damageSkinMode = 0;
   this->m_damageMillionUnit = 0;
@@ -4839,7 +4084,7 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\jobName_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\jobName", true, false);
   {
-    const std::array<char, 27> source = CRYPT_CHARS(27, "Lua Files\\DataInfo\\PetInfo", 0x35E5656B5DEDCD75ULL);
+    const std::array<char, 27> source = OBFUSCATE_SOURCE_CHARS(27, "Lua Files\\DataInfo\\PetInfo", 0x35E5656B5DEDCD75ULL);
     thread_local EncryptedName<sizeof(source), 0x35E5656B5DEDCD75ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -4858,12 +4103,12 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\jobinheritlist", true, false);
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\SkillID", true, false);
   {
-    const std::array<char, 35> source = CRYPT_CHARS(35, "Lua Files\\SkillInfoz\\SkillInfoList", 0x4941FD9F21BBB9FDULL);
+    const std::array<char, 35> source = OBFUSCATE_SOURCE_CHARS(35, "Lua Files\\SkillInfoz\\SkillInfoList", 0x4941FD9F21BBB9FDULL);
     thread_local EncryptedName<sizeof(source), 0x4941FD9F21BBB9FDULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
   {
-    const std::array<char, 35> source = CRYPT_CHARS(35, "Lua Files\\SkillInfoz\\SkillDescript", 0x891B232D09451965ULL);
+    const std::array<char, 35> source = OBFUSCATE_SOURCE_CHARS(35, "Lua Files\\SkillInfoz\\SkillDescript", 0x891B232D09451965ULL);
     thread_local EncryptedName<sizeof(source), 0x891B232D09451965ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -4872,7 +4117,7 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\skilltreeview", true, false);
   this->m_hotkeyScript->Load("Lua Files\\StateIcon\\EFSTIDs", true, false);
   {
-    const std::array<char, 34> source = CRYPT_CHARS(34, "Lua Files\\StateIcon\\StateIconInfo", 0x758F1D0B4F7705B9ULL);
+    const std::array<char, 34> source = OBFUSCATE_SOURCE_CHARS(34, "Lua Files\\StateIcon\\StateIconInfo", 0x758F1D0B4F7705B9ULL);
     thread_local EncryptedName<sizeof(source), 0x758F1D0B4F7705B9ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -4918,7 +4163,7 @@ void CSession::LoadLuaDataFiles() {
   this->LoadNavigationScripts();
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\HelpMsgStr", true, false);
   {
-    const std::array<char, 36> source = CRYPT_CHARS(36, "Lua Files\\EntryQueue\\EntryQueueList", 0xD1413DBB01CD8B51ULL);
+    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\EntryQueue\\EntryQueueList", 0xD1413DBB01CD8B51ULL);
     thread_local EncryptedName<sizeof(source), 0xD1413DBB01CD8B51ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -4952,7 +4197,7 @@ void CSession::LoadLuaDataFiles() {
 
   this->m_hotkeyScript->Load("Lua Files\\SignBoardList_F", true, false);
   {
-    const std::array<char, 24> source = CRYPT_CHARS(24, "Lua Files\\SignBoardList", 0x637B959D55771F69ULL);
+    const std::array<char, 24> source = OBFUSCATE_SOURCE_CHARS(24, "Lua Files\\SignBoardList", 0x637B959D55771F69ULL);
     thread_local EncryptedName<sizeof(source), 0x637B959D55771F69ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -4962,12 +4207,12 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\OffsetItemPos\\OffsetItemPos_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\OffsetItemPos\\OffsetItemPos", true, false);
   {
-    const std::array<char, 37> source = CRYPT_CHARS(37, "Lua Files\\datainfo\\LapineDdukDDakBox", 0x2BAD156DE3E1F9D9ULL);
+    const std::array<char, 37> source = OBFUSCATE_SOURCE_CHARS(37, "Lua Files\\datainfo\\LapineDdukDDakBox", 0x2BAD156DE3E1F9D9ULL);
     thread_local EncryptedName<sizeof(source), 0x2BAD156DE3E1F9D9ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
   {
-    const std::array<char, 36> source = CRYPT_CHARS(36, "Lua Files\\datainfo\\LapineUpgradeBox", 0x75ADC57D87EFBD8FULL);
+    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\datainfo\\LapineUpgradeBox", 0x75ADC57D87EFBD8FULL);
     thread_local EncryptedName<sizeof(source), 0x75ADC57D87EFBD8FULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -4979,28 +4224,28 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\datainfo\\tb_cashshop_banner", true, false);
   this->m_hotkeyScript->Load("Lua Files\\datainfo\\tb_stoveshop_banner", true, false);
   {
-    const std::array<char, 26> source = CRYPT_CHARS(26, "Lua Files\\Agit\\AgitConfig", 0xEDC74F6D13DF71EFULL);
+    const std::array<char, 26> source = OBFUSCATE_SOURCE_CHARS(26, "Lua Files\\Agit\\AgitConfig", 0xEDC74F6D13DF71EFULL);
     thread_local EncryptedName<sizeof(source), 0xEDC74F6D13DF71EFULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
   {
-    const std::array<char, 28> source = CRYPT_CHARS(28, "Lua Files\\Agit\\AgitConfig_F", 0xF161095D0DE18F95ULL);
+    const std::array<char, 28> source = OBFUSCATE_SOURCE_CHARS(28, "Lua Files\\Agit\\AgitConfig_F", 0xF161095D0DE18F95ULL);
     thread_local EncryptedName<sizeof(source), 0xF161095D0DE18F95ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
   this->m_hotkeyScript->Load("Lua Files\\datainfo\\tb_checkAttendance_banner", true, false);
   {
-    const std::array<char, 36> source = CRYPT_CHARS(36, "Lua Files\\DamageSkin\\DamageSkinList", 0x0B7109397F6B1387ULL);
+    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\DamageSkin\\DamageSkinList", 0x0B7109397F6B1387ULL);
     thread_local EncryptedName<sizeof(source), 0x0B7109397F6B1387ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
   {
-    const std::array<char, 36> source = CRYPT_CHARS(36, "Lua Files\\DamageSkin\\DamageSkinInfo", 0x03772763F96D9DA5ULL);
+    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\DamageSkin\\DamageSkinInfo", 0x03772763F96D9DA5ULL);
     thread_local EncryptedName<sizeof(source), 0x03772763F96D9DA5ULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
   {
-    const std::array<char, 38> source = CRYPT_CHARS(38, "Lua Files\\DamageSkin\\DamageSkinInfo_F", 0xC517FB932D95BB6DULL);
+    const std::array<char, 38> source = OBFUSCATE_SOURCE_CHARS(38, "Lua Files\\DamageSkin\\DamageSkinInfo_F", 0xC517FB932D95BB6DULL);
     thread_local EncryptedName<sizeof(source), 0xC517FB932D95BB6DULL> name(source);
     this->m_hotkeyScript->Load(name.Text(), true, false);
   }
@@ -5011,7 +4256,7 @@ void CSession::LoadLuaDataFiles() {
 // OFFSET: 0x00DE98B0
 // FUNCTION: fn_23502
 void CSession::InitResourceNameTables() {
-  std::vector<const char*>& bodyJobNames = reinterpret_cast<std::vector<const char*>&>(this->m_bodyJobNames);
+  std::vector<const char*>& bodyJobNames = this->m_bodyJobNames;
   bodyJobNames.resize(28053, "초보자");
   bodyJobNames[0] = "초보자";
   bodyJobNames[26] = "산타";
@@ -5344,7 +4589,7 @@ void CSession::InitResourceNameTables() {
   bodyJobNames[408] = OBFUSCATE_ARRAY("DRUID_RIDING", 0x2FEB8739E5975BD1ULL, char).Text();
   bodyJobNames[409] = OBFUSCATE_ARRAY("KARNOS_RIDING", 0x39A39F87DD5F535BULL, char).Text();
   bodyJobNames[410] = OBFUSCATE_ARRAY("ALITEA_RIDING", 0x6FE153231D879777ULL, char).Text();
-  std::vector<const char*>& imfNames = reinterpret_cast<std::vector<const char*>&>(this->m_imfNames);
+  std::vector<const char*>& imfNames = this->m_imfNames;
   imfNames.resize(28053, "초보자");
   imfNames[1] = "검사";
   imfNames[2] = "마법사";
@@ -5678,11 +4923,11 @@ void CSession::InitResourceNameTables() {
   imfNames[408] = "DRUID_RIDING";
   imfNames[409] = "KARNOS_RIDING";
   imfNames[410] = "ALITEA_RIDING";
-  std::vector<const char*>& sexNames = reinterpret_cast<std::vector<const char*>&>(this->m_sexNames);
+  std::vector<const char*>& sexNames = this->m_sexNames;
   sexNames.resize(2, "여");
   sexNames[0] = "여";
   sexNames[1] = "남";
-  std::vector<const char*>& humanMaleHeadNames = reinterpret_cast<std::vector<const char*>&>(this->m_humanMaleHeadNames);
+  std::vector<const char*>& humanMaleHeadNames = this->m_humanMaleHeadNames;
   humanMaleHeadNames.resize(46, "2");
   humanMaleHeadNames[0] = "2";
   humanMaleHeadNames[1] = "2";
@@ -5730,7 +4975,7 @@ void CSession::InitResourceNameTables() {
   humanMaleHeadNames[43] = "43";
   humanMaleHeadNames[44] = "44";
   humanMaleHeadNames[45] = "45";
-  std::vector<const char*>& humanFemaleHeadNames = reinterpret_cast<std::vector<const char*>&>(this->m_humanFemaleHeadNames);
+  std::vector<const char*>& humanFemaleHeadNames = this->m_humanFemaleHeadNames;
   humanFemaleHeadNames.resize(46, "2");
   humanFemaleHeadNames[0] = "2";
   humanFemaleHeadNames[1] = "2";
@@ -5778,7 +5023,7 @@ void CSession::InitResourceNameTables() {
   humanFemaleHeadNames[43] = "43";
   humanFemaleHeadNames[44] = "44";
   humanFemaleHeadNames[45] = "45";
-  std::vector<const char*>& doramMaleHeadNames = reinterpret_cast<std::vector<const char*>&>(this->m_doramMaleHeadNames);
+  std::vector<const char*>& doramMaleHeadNames = this->m_doramMaleHeadNames;
   doramMaleHeadNames.resize(11, "1");
   doramMaleHeadNames[1] = "1";
   doramMaleHeadNames[2] = "2";
@@ -5790,7 +5035,7 @@ void CSession::InitResourceNameTables() {
   doramMaleHeadNames[8] = "8";
   doramMaleHeadNames[9] = "9";
   doramMaleHeadNames[10] = "10";
-  std::vector<const char*>& doramFemaleHeadNames = reinterpret_cast<std::vector<const char*>&>(this->m_doramFemaleHeadNames);
+  std::vector<const char*>& doramFemaleHeadNames = this->m_doramFemaleHeadNames;
   doramFemaleHeadNames.resize(11, "1");
   doramFemaleHeadNames[1] = "1";
   doramFemaleHeadNames[2] = "2";
@@ -5811,7 +5056,7 @@ void CSession::InitResourceNameTables() {
       accessoryNames[index] = name;
     }
   }
-  std::vector<const char*>& shieldJobNames = reinterpret_cast<std::vector<const char*>&>(this->m_shieldJobNames);
+  std::vector<const char*>& shieldJobNames = this->m_shieldJobNames;
   shieldJobNames.resize(28053, OBFUSCATE_ARRAY("초보자\\초보자", 0x234977DDB54BC71DULL, char).Text());
   shieldJobNames[0] = OBFUSCATE_ARRAY("초보자\\초보자", 0xEF6D1D893F2B2DC5ULL, char).Text();
   shieldJobNames[1] = OBFUSCATE_ARRAY("검사\\검사", 0xE55723712993051DULL, char).Text();
@@ -6138,11 +5383,11 @@ void CSession::InitResourceNameTables() {
   shieldJobNames[403] = KarnosBodyPath1().Text();
   shieldJobNames[404] = KarnosBodyPath2().Text();
   shieldJobNames[405] = AliteaBodyPath1().Text();
-  std::vector<const char*>& femaleSuffixNames = reinterpret_cast<std::vector<const char*>&>(this->additionalSpriteNames[0x08]);
+  std::vector<const char*>& femaleSuffixNames = this->m_femaleSuffixNames;
   femaleSuffixNames.resize(2, "f");
   femaleSuffixNames[0] = "f";
   femaleSuffixNames[1] = "";
-  std::vector<const char*>& weaponNames = reinterpret_cast<std::vector<const char*>&>(this->m_weaponNamesBegin);
+  std::vector<const char*>& weaponNames = this->m_weaponNames;
   weaponNames.resize(105, "");
   for (int index = 0; index < 105; ++index) {
     const char* name = nullptr;
@@ -6682,7 +5927,7 @@ void CSession::LoadSessionTables() {
   Sub7739F0();
   g_simpleStringMgr->Init();
 
-  constexpr std::array<char, 15> source = CRYPT_NAME("Ragnarok Setup", 0x9171997D6963C9F7ULL);
+  constexpr std::array<char, 15> source = OBFUSCATE_SOURCE("Ragnarok Setup", 0x9171997D6963C9F7ULL);
   thread_local EncryptedName<sizeof(source), 0x9171997D6963C9F7ULL> setupName(source);
   if (HWND window = FindWindowA(nullptr, setupName.Text())) {
     ShowErrorDialog(LookupMessage(MSI_TAREN_LOGINREFUSE_FAIL_PASSWORD), 0);
@@ -6722,253 +5967,10 @@ void CSession::LoadSessionTables() {
   session->InitPetActionTable();
 }
 
-template <>
-EncryptedName<14, 0xB5F3F779237315F3ULL>::EncryptedName(const char (&source)[14]);
-template <>
-const char* EncryptedName<14, 0x6BC977B3B5993503ULL>::Text();
-EncryptedName<14, 0x6BC977B3B5993503ULL>& PoringSuperNovice2SpriteName();
-EncryptedName<14, 0x91493751EF33B5FDULL>& PoringSuperNovice2BabySpriteName();
-template <>
-const char* EncryptedName<18, 0x0DF5B33D9F21EB79ULL>::Text();
-EncryptedName<18, 0x0DF5B33D9F21EB79ULL>& SheepPriestBabySpriteName();
-template <>
-const char* EncryptedName<14, 0x01E7898D9D235DDFULL>::Text();
-EncryptedName<14, 0x01E7898D9D235DDFULL>& FoxWizardBabySpriteName();
-template <>
-const char* EncryptedName<14, 0x6961FF056999A303ULL>::Text();
-EncryptedName<14, 0x6961FF056999A303ULL>& PigBlacksmithBabySpriteName();
-EncryptedName<14, 0x9DEFC105A1EB2F71ULL>& PigMechanicSpriteName();
-template <>
-const char* EncryptedName<14, 0xC7FB6DF18577D34BULL>::Text();
-EncryptedName<14, 0xC7FB6DF18577D34BULL>& PigMechanicBabySpriteName();
-template <>
-const char* EncryptedName<14, 0xBD3F430159B551FDULL>::Text();
-EncryptedName<14, 0xBD3F430159B551FDULL>& OstrichRangerSpriteName();
-template <>
-const char* EncryptedName<14, 0x2B477F9B5B39B301ULL>::Text();
-EncryptedName<14, 0x2B477F9B5B39B301ULL>& OstrichRangerBabySpriteName();
-EncryptedName<10, 0x5B832361BDA77197ULL>& LionKnightSpriteName();
-EncryptedName<10, 0xEB3D4FAB0FC183DBULL>& LionKnightBabySpriteName();
-EncryptedName<10, 0xFFBF43D1FFD5FF49ULL>& LionKnightHighSpriteName();
-template <>
-const char* EncryptedName<18, 0xE51B29334D353B81ULL>::Text();
-EncryptedName<18, 0xE51B29334D353B81ULL>& LionRoyalGuardSpriteName();
-EncryptedName<18, 0x8F3F2FA959977F9FULL>& LionRoyalGuardBabySpriteName();
-template <>
-const char* EncryptedName<18, 0x7FE563BD3FB7F925ULL>::Text();
-EncryptedName<18, 0x7FE563BD3FB7F925ULL>& LionRuneKnightSpriteName();
-template <>
-const char* EncryptedName<18, 0x8B3FA35B5BDDDF89ULL>::Text();
-EncryptedName<18, 0x8B3FA35B5BDDDF89ULL>& LionRuneKnightBabySpriteName();
-template <>
-const char* EncryptedName<22, 0x7DB1050779034DE7ULL>::Text();
-EncryptedName<22, 0x7DB1050779034DE7ULL>& LionCrusaderSpriteName();
-template <>
-const char* EncryptedName<22, 0x5D6B3B1DEB2397B1ULL>::Text();
-EncryptedName<22, 0x5D6B3B1DEB2397B1ULL>& LionCrusaderBabySpriteName();
-template <>
-const char* EncryptedName<22, 0x07112F85A39F4FABULL>::Text();
-EncryptedName<22, 0x07112F85A39F4FABULL>& LionCrusaderHighSpriteName();
-template <>
-const char* EncryptedName<16, 0x45E3F103CBB5F157ULL>::Text();
-EncryptedName<16, 0x45E3F103CBB5F157ULL>& KagerouSpriteName();
-template <>
-const char* EncryptedName<12, 0x936F3D2FFDFD87F5ULL>::Text();
-EncryptedName<12, 0x936F3D2FFDFD87F5ULL>& OboroSpriteName();
-template <>
-const char* EncryptedName<16, 0x2D33791F67AD47DFULL>::Text();
-EncryptedName<16, 0x2D33791F67AD47DFULL>& FrogKagerouSpriteName();
-template <>
-const char* EncryptedName<12, 0x6B3301E1A3079125ULL>::Text();
-EncryptedName<12, 0x6B3301E1A3079125ULL>& FrogOboroSpriteName();
-template <>
-const char* EncryptedName<20, 0x2F2701A7E56D3D89ULL>::Text();
-EncryptedName<20, 0x2F2701A7E56D3D89ULL>& RebellionSpriteName();
-template <>
-const char* EncryptedName<18, 0xC39FB559A17D3963ULL>::Text();
-EncryptedName<18, 0xC39FB559A17D3963ULL>& DoramSummonerSpriteName();
-template <>
-const char* EncryptedName<23, 0x71B7691737C5A1AFULL>::Text();
-EncryptedName<23, 0x71B7691737C5A1AFULL>& DoramCartSummonerSpriteName();
-template <>
-const char* EncryptedName<18, 0x899D11BB83695B0DULL>::Text();
-EncryptedName<18, 0x899D11BB83695B0DULL>& DoramSummonerBabySpriteName();
-template <>
-const char* EncryptedName<23, 0x2B8725D7E95325F5ULL>::Text();
-EncryptedName<23, 0x2B8725D7E95325F5ULL>& DoramCartSummonerBabySpriteName();
-EncryptedName<10, 0x7989830DE73B9DBDULL>& NinjaBabySpriteName();
-template <>
-const char* EncryptedName<10, 0xBDADDD87C5A50B6BULL>::Text();
-EncryptedName<10, 0xBDADDD87C5A50B6BULL>& FrogNinjaBabySpriteName();
-template <>
-const char* EncryptedName<16, 0xA7471985F93F9BDFULL>::Text();
-EncryptedName<16, 0xA7471985F93F9BDFULL>& KagerouBabySpriteName();
-template <>
-const char* EncryptedName<12, 0x5FFD7FABB5D1EF57ULL>::Text();
-EncryptedName<12, 0x5FFD7FABB5D1EF57ULL>& OboroBabySpriteName();
-template <>
-const char* EncryptedName<16, 0xD3E5516F89F161D1ULL>::Text();
-EncryptedName<16, 0xD3E5516F89F161D1ULL>& FrogKagerouBabySpriteName();
-template <>
-const char* EncryptedName<12, 0xF535E561137F138DULL>::Text();
-EncryptedName<12, 0xF535E561137F138DULL>& FrogOboroBabySpriteName();
-template <>
-const char* EncryptedName<18, 0xABED6971354375C3ULL>::Text();
-EncryptedName<18, 0xABED6971354375C3ULL>& TaekwonBabySpriteName();
-template <>
-const char* EncryptedName<18, 0x01C9FBA7819FFBD7ULL>::Text();
-EncryptedName<18, 0x01C9FBA7819FFBD7ULL>& PoringTaekwonBabySpriteName();
-template <>
-const char* EncryptedName<10, 0xFBAD074BDB2B77A1ULL>::Text();
-EncryptedName<10, 0xFBAD074BDB2B77A1ULL>& StarGladiatorBabySpriteName();
-template <>
-const char* EncryptedName<10, 0x6BA557130BDFE997ULL>::Text();
-EncryptedName<10, 0x6BA557130BDFE997ULL>& StarGladiator2BabySpriteName();
-template <>
-const char* EncryptedName<10, 0x050DF16FC75B25B9ULL>::Text();
-EncryptedName<10, 0x050DF16FC75B25B9ULL>& PoringStarGladiatorBabySpriteName();
-template <>
-const char* EncryptedName<18, 0x6D05D5271B5D65C3ULL>::Text();
-EncryptedName<18, 0x6D05D5271B5D65C3ULL>& SoulLinkerBabySpriteName();
-template <>
-const char* EncryptedName<18, 0x3D8387EF97A37DCFULL>::Text();
-EncryptedName<18, 0x3D8387EF97A37DCFULL>& FrogSoulLinkerBabySpriteName();
-template <>
-const char* EncryptedName<10, 0x0789EBC9F5C1C59FULL>::Text();
-template <>
-const char* EncryptedName<10, 0x451FD72783630709ULL>::Text();
-template <>
-const char* EncryptedName<20, 0x3B6D9BFD27A7C7F7ULL>::Text();
-template <>
-const char* EncryptedName<20, 0xA15B555BE9CD2B81ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x73C32959FDFFA51BULL>::Text();
-template <>
-const char* EncryptedName<18, 0xB3F1A10745C1F105ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xD9115915B1919533ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x7959FFBF652D07BFULL>::Text();
-template <>
-const char* EncryptedName<10, 0x99157F159BB99BD9ULL>::Text();
-template <>
-const char* EncryptedName<10, 0x31E3CF9D358D8705ULL>::Text();
-template <>
-const char* EncryptedName<10, 0xA55B7BEF3D7377E3ULL>::Text();
-template <>
-const char* EncryptedName<18, 0xF5496753BDE7C5BDULL>::Text();
-template <>
-const char* EncryptedName<10, 0x79A58B0F2173CF49ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x6B3917C939150B9BULL>::Text();
-template <>
-const char* EncryptedName<18, 0x795787B7779D19DBULL>::Text();
-template <>
-const char* EncryptedName<23, 0xF9B1EF9F7961EFF5ULL>::Text();
-template <>
-const char* EncryptedName<25, 0x29AB0B59651BDFD5ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xD97DC927AFE911F1ULL>::Text();
-template <>
-const char* EncryptedName<18, 0x47B7BF55EB471557ULL>::Text();
-template <>
-const char* EncryptedName<25, 0x8BA52B970DD531ADULL>::Text();
-template <>
-const char* EncryptedName<20, 0x2F2103792383718BULL>::Text();
-template <>
-const char* EncryptedName<27, 0xCFB9671DEF4BD9E7ULL>::Text();
-template <>
-const char* EncryptedName<32, 0x4349ADE96FEB27E5ULL>::Text();
-template <>
-const char* EncryptedName<39, 0x999F5191852D2F6BULL>::Text();
-template <>
-const char* EncryptedName<18, 0x35F59F6F3DD1C965ULL>::Text();
-template <>
-const char* EncryptedName<22, 0xBF0F412941076FADULL>::Text();
-template <>
-const char* EncryptedName<29, 0xD7BBEB2DDB295D11ULL>::Text();
-template <>
-const char* EncryptedName<12, 0xB59BADC5B365617DULL>::Text();
-template <>
-const char* EncryptedName<26, 0x8DFF0B4B67D9FDE1ULL>::Text();
-template <>
-const char* EncryptedName<16, 0x91E7A7DFA58F9B6BULL>::Text();
-template <>
-const char* EncryptedName<30, 0x77D925073D6F19B9ULL>::Text();
-template <>
-const char* EncryptedName<35, 0xAFF9332FD397533FULL>::Text();
-template <>
-const char* EncryptedName<26, 0xA1DFCDAD555BB16DULL>::Text();
-template <>
-const char* EncryptedName<33, 0x7DC10333F96DE3E7ULL>::Text();
-template <>
-const char* EncryptedName<26, 0x194F8339AF753FADULL>::Text();
-template <>
-const char* EncryptedName<33, 0x51372B6F4BA14B23ULL>::Text();
-template <>
-const char* EncryptedName<28, 0xE9FBAB53D5A1BB17ULL>::Text();
-template <>
-const char* EncryptedName<42, 0x1F79132B518FD389ULL>::Text();
-template <>
-const char* EncryptedName<44, 0xB70319D3A78D39CDULL>::Text();
-template <>
-const char* EncryptedName<30, 0xA5C5D1A3B9457B53ULL>::Text();
-template <>
-const char* EncryptedName<44, 0x8F61434F0F79DDD7ULL>::Text();
-template <>
-const char* EncryptedName<46, 0x4B670715D543C1C3ULL>::Text();
-template <>
-const char* EncryptedName<24, 0x61F59D5D41E76519ULL>::Text();
-template <>
-const char* EncryptedName<24, 0x4B1D078937DB892BULL>::Text();
-template <>
-const char* EncryptedName<31, 0x7155E5EF0DFB0D03ULL>::Text();
-template <>
-const char* EncryptedName<26, 0xD51953E763B94747ULL>::Text();
-template <>
-const char* EncryptedName<33, 0x17FB0F6BFF3BE93FULL>::Text();
-template <>
-const char* EncryptedName<18, 0x91DF1F5D3B014D45ULL>::Text();
-template <>
-const char* EncryptedName<25, 0x2529F16B0375530DULL>::Text();
-template <>
-const char* EncryptedName<18, 0x2F371DDDADDD53CFULL>::Text();
-template <>
-const char* EncryptedName<25, 0x0D7FA94DD32361A9ULL>::Text();
-template <>
-const char* EncryptedName<24, 0x3BBB5F0F8F216F31ULL>::Text();
-EncryptedName<24, 0x3BBB5F0F8F216F31ULL>& NightWatchBodyPath2();
-template <>
-const char* EncryptedName<31, 0x2F3D75DFCF678FF3ULL>::Text();
-EncryptedName<31, 0x2F3D75DFCF678FF3ULL>& NightWatchRidingBodyPath2();
-template <>
-const char* EncryptedName<26, 0xED730315539785C7ULL>::Text();
-EncryptedName<26, 0xED730315539785C7ULL>& HyperNoviceBodyPath2();
-template <>
-const char* EncryptedName<33, 0x6F9D21B96D71C1FFULL>::Text();
-EncryptedName<33, 0x6F9D21B96D71C1FFULL>& HyperNoviceRidingBodyPath2();
-template <>
-const char* EncryptedName<30, 0x39E7F13755252F8FULL>::Text();
-EncryptedName<30, 0x39E7F13755252F8FULL>& SpiritHandlerBodyPath2();
-template <>
-const char* EncryptedName<37, 0xCBD7DDAFDF87F549ULL>::Text();
-EncryptedName<37, 0xCBD7DDAFDF87F549ULL>& SpiritHandlerRidingBodyPath2();
-template <>
-const char* EncryptedName<12, 0xEB074B7FBDA3BFD5ULL>::Text();
-EncryptedName<12, 0xEB074B7FBDA3BFD5ULL>& DruidBodyPath3();
-template <>
-const char* EncryptedName<12, 0x3D075BD5256F9B6FULL>::Text();
-EncryptedName<12, 0x3D075BD5256F9B6FULL>& DruidBodyPath4();
-template <>
-const char* EncryptedName<14, 0x251761D7370BA5C3ULL>::Text();
-EncryptedName<14, 0x251761D7370BA5C3ULL>& KarnosBodyPath3();
-EncryptedName<14, 0x03014749B127914FULL>& KarnosBodyPath4();
-EncryptedName<14, 0x85FB93CF2F494179ULL>& AliteaBodyPath2();
-
 // OFFSET: 0x00E31E30
 // FUNCTION: fn_24178
 void CSession::InitJobSpriteNames() {
-  std::vector<const char*>& jobSpriteNames = reinterpret_cast<std::vector<const char*>&>(this->m_jobSpriteNames);
+  std::vector<const char*>& jobSpriteNames = this->m_jobSpriteNames;
   jobSpriteNames.resize(28053, OBFUSCATE_ARRAY("초보자\\초보자", 0x114901C7E37F6D49ULL, char).Text());
   jobSpriteNames[0] = OBFUSCATE_ARRAY("초보자\\초보자", 0xDF8117FF49CFF551ULL, char).Text();
   jobSpriteNames[1] = OBFUSCATE_ARRAY("검사\\검사", 0xADC51BF9C98B413DULL, char).Text();
@@ -7190,9 +6192,7 @@ void CSession::InitJobSpriteNames() {
   jobSpriteNames[158] = OBFUSCATE_ARRAY("로그\\로그", 0xB5D7B5AF4FEDFF57ULL, char).Text();
   jobSpriteNames[240] = OBFUSCATE_ARRAY("초보자\\초보자", 0x67DD5BAB1919D9D1ULL, char).Text();
   {
-    constexpr std::array<char, 14> source = CRYPT_NAME("초보자\\초보자", 0xB5F3F779237315F3ULL);
-    thread_local EncryptedName<sizeof(source), 0xB5F3F779237315F3ULL> name(source);
-    jobSpriteNames[241] = name.Text();
+    jobSpriteNames[241] = OBFUSCATE_ARRAY_TEXT("초보자\\초보자", 0xB5F3F779237315F3ULL, char);
   }
   jobSpriteNames[242] = PoringSuperNovice2SpriteName().Text();
   jobSpriteNames[243] = PoringSuperNovice2BabySpriteName().Text();

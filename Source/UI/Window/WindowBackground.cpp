@@ -1,4 +1,5 @@
 #include "Client/Session/Session.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "Contents/Skills/ClientSkills.h"
 #include "Render/DeviceContext/DCSurface.h"
@@ -38,11 +39,11 @@ void UIWindow::DrawPanelBackground(int y, int width, const char* bitmapName) {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 14, 6, red, green, blue);
-  DrawRoundedBorder(*this, 0, y, width, this->geometry.height - y, RGB(red, green, blue));
+  g_skinInfo.PaletteChannels(14, 6, red, green, blue);
+  this->DrawRoundedOutline(0, y, width, this->geometry.height - y, RGB(red, green, blue));
   this->FillRegion(0, y, width, 5, RGB(red, green, blue));
 
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(1, y, width - 2, this->geometry.height - y - 2, RGB(red, green, blue));
   this->FillRegion(2, this->geometry.height - 2, width - 4, 1, RGB(red, green, blue));
 }
@@ -66,12 +67,12 @@ void UIWindow::DrawPanelBackgroundAt(int x, int y, int width, const char* bitmap
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 14, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(14, 6, red, green, blue);
   COLORREF color = RGB(red, green, blue);
-  DrawRoundedBorder(*this, x, y, width, height - y, color);
+  this->DrawRoundedOutline(x, y, width, height - y, color);
   this->FillRegion(x, y, width, 5, color);
 
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   color = RGB(red, green, blue);
   this->FillRegion(x + 1, y, width - 2, height - y - 2, color);
   this->FillRegion(x + 2, height - 2, width - 4, 1, color);
@@ -125,6 +126,6 @@ void UIWindow::DrawRobeSprite(int job, int sex, int robe, int x, int y, bool ove
 
   this->geometry.surface->DrawSurface(
     x + cell.x, y + cell.y, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f), image->width, image->height,
-    cell.mirrored != 0, static_cast<short>(image->doubleWidth) + 1, static_cast<short>(image->doubleHeight) + 1, 0, 0
+    cell.mirrored != 0, static_cast<short>(image->doubleWidth) + 1, static_cast<short>(image->doubleHeight) + 1, 0
   );
 }

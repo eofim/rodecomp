@@ -48,7 +48,7 @@ namespace {
   // INLINED
   int CardId(const ITEM_INFO& item, int index) {
     int id;
-    std::memcpy(&id, &item.cards[index * sizeof(id)], sizeof(id));
+    std::memcpy(&id, &item.cards[index], sizeof(id));
     return id;
   }
 
@@ -363,7 +363,7 @@ std::string ITEM_INFO::DisplayName(unsigned char detailed) const {
       }
     }
   } else {
-    AppendText(result, text, ItemUnidentifiedName(*this, text, capacity, 0));
+    AppendText(result, text, this->UnidentifiedName(text, capacity, 0));
   }
 
   return result;
@@ -465,8 +465,9 @@ int ItemSlotsCount(const ITEM_INFO& item) {
 
 // OFFSET: 0x006D7760
 // FUNCTION: fn_06594
-int ItemUnidentifiedName(const ITEM_INFO& item, char* output, int& capacity, unsigned char consume) {
-  const char* name = FindItemDescription(std::atoi(item.itemId.c_str())).unidentifiedName;
+int ITEM_INFO::UnidentifiedName(char* output, int& capacity, unsigned char consume) const {
+  const int id = std::atoi(this->itemId.c_str());
+  const char* name = FindItemDescription(id, g_itemDescriptions).unidentifiedName;
   return CopyText(output, capacity, consume, name ? name : " ");
 }
 
@@ -822,7 +823,7 @@ std::uint32_t __fastcall ItemCardColor(const ITEM_INFO* item) {
 // OFFSET: 0x006D6AA0
 // FUNCTION: fn_06583
 int ITEM_INFO::Element(char* output, int& capacity, unsigned char consume) const {
-  switch (this->cards[4]) {
+  switch (reinterpret_cast<const unsigned char*>(this->cards)[4]) {
   case 0: {
     const int id = std::atoi(this->itemId.c_str());
     if (id == 2634 || id == 2635) {
@@ -846,7 +847,7 @@ int ITEM_INFO::Element(char* output, int& capacity, unsigned char consume) const
 // OFFSET: 0x006D6B90
 // FUNCTION: fn_06584
 int ITEM_INFO::Star(char* output, int& capacity, unsigned char consume) const {
-  switch (this->cards[5]) {
+  switch (reinterpret_cast<const unsigned char*>(this->cards)[5]) {
   case 5:
     return CopyText(output, capacity, consume, LookupMessage(MSI_ONE_STARPIECE));
   case 10:

@@ -21,7 +21,7 @@ void CMapChainEffect::CreateChainParticles(int param) {
   int local8 = 0;
   for (int localC = 0; localC < 360; localC += 60, ++local8) {
     for (int i = 0; i < 21; ++i) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(&this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle != nullptr) {
         particle->rowIndex = local8;
         particle->effectId = this->id;
@@ -29,14 +29,14 @@ void CMapChainEffect::CreateChainParticles(int param) {
         particle->groupIndex = 1;
         particle->speedParameter = 10.0f;
         particle->scale = 14.0f;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(localC);
+        particle->angle = static_cast<float>(localC);
         particle->phaseParameter = param;
         particle->alpha = 255;
         particle->angleParameter = 60;
         particle->animationParameter = -14.0f;
-        *reinterpret_cast<float*>(particle->animationParameters) = 1.0f;
+        particle->animationParameters[0] = 1.0f;
         particle->destinationBlend = 6;
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         particle->SetTexture("effect\\hero_005.tga");
         this->particles.push_back(particle);
       }
@@ -46,7 +46,7 @@ void CMapChainEffect::CreateChainParticles(int param) {
   int localC2 = 6;
   for (int local82 = 0; local82 < 360; local82 += 60, ++localC2) {
     for (int i = 0; i < 21; ++i) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(&this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle != nullptr) {
         particle->rowIndex = localC2;
         particle->effectId = this->id;
@@ -54,15 +54,15 @@ void CMapChainEffect::CreateChainParticles(int param) {
         particle->groupIndex = 1;
         particle->speedParameter = 10.0f;
         particle->scale = 14.0f;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(local82);
+        particle->angle = static_cast<float>(local82);
         particle->phaseParameter = param;
         particle->alpha = 255;
         particle->angleParameter = 60;
         particle->animationParameter = -14.0f;
-        *reinterpret_cast<float*>(particle->animationParameters) = 1.0f;
+        particle->animationParameters[0] = 1.0f;
         particle->sourceBlend = 5;
         particle->destinationBlend = 7;
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         particle->SetTexture("effect\\hero_005.tga");
         this->particles.push_back(particle);
       }
@@ -104,10 +104,10 @@ void CMapChainEffect::ResetParticles() {
     particle->scale = *reinterpret_cast<const float*>(base + 0x48);
     particle->alpha = *reinterpret_cast<const int*>(base + 0x54);
     particle->animationParameter = *reinterpret_cast<const float*>(base + 0x5C);
-    *reinterpret_cast<float*>(particle->animationParameters) = *reinterpret_cast<const float*>(base + 0x60);
+    particle->animationParameters[0] = *reinterpret_cast<const float*>(base + 0x60);
     particle->sourceBlend = 5;
     particle->destinationBlend = 7;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     particle->elapsedFrames = 0;
   }
 }
@@ -122,16 +122,17 @@ bool CMapChainEffect::IsAlive() {
 // FUNCTION: fn_18952
 void CMapChainEffect::OnProcess() {
   for (std::vector<CParticle*>::iterator it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
     CParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
     if (particle) {
-      float angle = *reinterpret_cast<const float*>(particle->animationParameters) + *reinterpret_cast<float*>(&particle->angleBits);
+      float angle = *static_cast<const float*>(particle->animationParameters) + particle->angle;
       if (angle >= 360.0f) {
         angle -= 360.0f;
       }
-      *reinterpret_cast<float*>(&particle->angleBits) = angle;
+      particle->angle = angle;
 
       if (particle->rowIndex > 5) {
         int delta = -3;
@@ -145,14 +146,13 @@ void CMapChainEffect::OnProcess() {
         particle->alpha = alpha > 0 ? alpha : 0;
       }
 
-      const CView* view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera;
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
-      rotation.MakeYRotation(view->camera.yaw / -180.0f * 3.141592f);
+      rotation.MakeYRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw / -180.0f * 3.141592f);
       particle->transform = rotation;
 
       const int segment = particle->columnIndex;
-      const int index = static_cast<int>(static_cast<float>(static_cast<int>(particle->angleParameter / 20.0f) * segment) + *reinterpret_cast<float*>(&particle->angleBits)) % 360;
+      const int index = static_cast<int>(static_cast<float>(static_cast<int>(particle->angleParameter / 20.0f) * segment) + particle->angle) % 360;
 
       MapChainPoint points[4];
 

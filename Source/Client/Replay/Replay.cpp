@@ -19,6 +19,9 @@
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Messenger/MessengerMember.h"
 
+template __declspec(noinline) void std::vector<unsigned char>::assign<const unsigned char*, 0>(const unsigned char*, const unsigned char*);
+template __declspec(noinline) void std::list<ITEM_INFO>::_Construct_range_unchecked<ITEM_INFO*>(ITEM_INFO*, ITEM_INFO*);
+
 // GLOBAL: gl_24549
 int g_replayAnimationScaling = 0;
 
@@ -171,7 +174,15 @@ Replay::Replay() : cipherIndex(0), cipherBase(0), cipherKey(0), recordingState(0
   this->speed = 1.0f;
   std::memset(&this->header, 0, sizeof(this->header));
   std::memset(&this->header.options, 1, sizeof(this->header.options));
-  this->ResetFile();
+  const ReplayOptions savedOptions = this->header.options;
+  std::memset(&this->header, 0, sizeof(this->header));
+  this->header.options = savedOptions;
+  this->header.signature = 0x52414705;
+  this->header.closingSignature = 0x52414705;
+  this->records = 0;
+  this->fileMode = -1;
+  this->file = nullptr;
+  this->fileOffset = 0;
   this->previousTick = timeGetTime();
   this->playbackState = 0;
   this->recordingState = 0;
@@ -453,11 +464,10 @@ std::vector<unsigned char> Replay::ReadSection(int id) {
 
   const int index = this->FindSection(id);
   if (index != -1 && this->sections[index].fileOffset != 0 && this->sections[index].bytes != 0) {
-    const ReplaySection& section = this->sections[index];
-    data.resize(section.bytes, 0);
-    std::fseek(this->file, static_cast<long>(section.fileOffset), SEEK_SET);
-    std::fread(data.data(), section.bytes, 1, this->file);
-    this->Cipher(section.bytes, data.data());
+    data.resize(this->sections[index].bytes, 0);
+    std::fseek(this->file, static_cast<long>(this->sections[index].fileOffset), SEEK_SET);
+    std::fread(data.data(), this->sections[index].bytes, 1, this->file);
+    this->Cipher(this->sections[index].bytes, data.data());
   }
 
   return data;
@@ -637,28 +647,28 @@ __declspec(noinline) void ReplayFileList::Clear() {
 
 // OFFSET: 0x00B84B60
 // FUNCTION: fn_19321
-void ReplayFileList::Refresh() {
+bool ReplayFileList::Refresh() {
   this->Clear();
 
+  BOOL more = TRUE;
   char directory[260] = {};
   GetCurrentDirectoryA(sizeof(directory), directory);
 
-  std::string pattern(directory, std::strlen(directory));
+  std::string pattern(directory);
   pattern.append("\\Replay\\*.rrf", 13);
 
   WIN32_FIND_DATAA found;
   HANDLE search = FindFirstFileA(pattern.c_str(), &found);
 
   if (search != INVALID_HANDLE_VALUE) {
-    BOOL more = TRUE;
-
     while (more) {
       if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
-        const std::size_t length = std::strlen(found.cFileName);
-        const char* extension = found.cFileName + length - 4;
+        const char* extension = found.cFileName + std::strlen(found.cFileName) - 4;
+        const BOOL isReplay = extension[3] == 'f' && extension[2] == 'r' && extension[1] == 'r' && extension[0] == '.';
 
-        if (extension[0] == '.' && extension[1] == 'r' && extension[2] == 'r' && extension[3] == 'f') {
+        if (isReplay) {
           ReplayFileEntry entry = {};
+          const std::size_t length = std::strlen(found.cFileName);
           std::memcpy(entry.name, found.cFileName, length);
           entry.name[length] = '\0';
           entry.index = 0;
@@ -678,6 +688,7 @@ void ReplayFileList::Refresh() {
   }
 
   FindClose(search);
+  return true;
 }
 
 // OFFSET: 0x00B84300
@@ -754,40 +765,43 @@ int ReplayFileList::Open(int mode, int argument1, int argument2) {
     std::memset(this->path, 0, sizeof(this->path));
     std::memcpy(this->path, name.data(), name.size());
 
-    this->replay->fileMode = 0x20;
-    this->replay->file = std::fopen(this->path, "rb");
+    Replay* replay = this->replay;
+    replay->fileMode = 0x20;
+    replay->file = std::fopen(this->path, "rb");
 
-    if (this->replay->file) {
-      std::fseek(this->replay->file, 100, SEEK_SET);
-      std::memset(&this->replay->header, 0, 0xC);
-      std::fread(&this->replay->header, 0xC, 1, this->replay->file);
+    if (replay->file) {
+      std::fseek(replay->file, 100, SEEK_SET);
+      std::memset(&replay->header, 0, 0xC);
+      std::fread(&replay->header, 0xC, 1, replay->file);
 
-      if (this->replay->header.signature == 0x52414705u || this->replay->header.signature == 0x51404605u) {
+      if (replay->header.signature == 0x52414705u || replay->header.signature == 0x51404605u) {
         for (int index = 0; index <= 0x1A; ++index) {
           ReplaySection section = {};
-          std::fread(&section, sizeof(section), 1, this->replay->file);
+          std::fread(&section, sizeof(section), 1, replay->file);
 
-          if (section.id > 0x1A) {
+          if (section.id < 0 || section.id > 0x1A) {
             break;
           }
 
-          this->replay->sections[section.id] = section;
+          replay->sections[section.id].id = section.id;
+          replay->sections[section.id].bytes = section.bytes;
+          replay->sections[section.id].fileOffset = section.fileOffset;
         }
 
-        if (this->replay->ParseMetadata(this->replay->ReadSection(2)) != 0xFFFFFFFFu) {
+        if (replay->ParseMetadata(replay->ReadSection(2)) != 0xFFFFFFFFu) {
           return 1;
         }
 
-        std::memset(&this->replay->header, 0, sizeof(this->replay->header));
+        std::memset(&replay->header, 0, sizeof(replay->header));
       }
 
-      if (this->replay->file) {
-        std::fclose(this->replay->file);
-        this->replay->file = nullptr;
+      if (replay->file) {
+        std::fclose(replay->file);
+        replay->file = nullptr;
       }
 
-      std::memset(&this->replay->header, 0, sizeof(this->replay->header));
-      std::memset(this->replay->sections, 0, sizeof(this->replay->sections));
+      std::memset(&replay->header, 0, sizeof(replay->header));
+      std::memset(replay->sections, 0, sizeof(replay->sections));
     }
 
     return 0;
@@ -995,14 +1009,12 @@ std::vector<unsigned char> CSession::BuildSkillListReplayPacket(short id) {
 // OFFSET: 0x00B86440
 // FUNCTION: fn_19329
 void Replay::CachePacket(std::uint16_t id, std::uint16_t size, const unsigned char* data) {
-  if (size == 0 || id > 3142 || data == nullptr) {
-    return;
+  if (0 < size && 3142 >= id && data != nullptr) {
+    if (this->cachedPackets[static_cast<short>(id)].enabled) {
+      this->cachedPackets[static_cast<short>(id)].bytes.resize(size);
+      this->cachedPackets[static_cast<short>(id)].bytes.assign(data, data + size);
+    }
   }
-  if (!this->cachedPackets[static_cast<short>(id)].enabled) {
-    return;
-  }
-  this->cachedPackets[static_cast<short>(id)].bytes.resize(size);
-  this->cachedPackets[static_cast<short>(id)].bytes.assign(data, data + size);
 }
 
 // OFFSET: 0x00E42EB0
@@ -1047,20 +1059,20 @@ std::vector<unsigned char> CSession::BuildItemReplayRecords() {
 std::vector<unsigned char> CSession::BuildCompanionReplayRecords() {
   std::vector<unsigned char> records;
   AppendRecord(records, MakeReplayRecord(5000, nullptr, 0));
-  AppendRecord(records, MakeReplayRecord(5101, &this->spAndHomunculusStats[0x08], 4));
-  AppendRecord(records, MakeReplayRecord(5102, &this->spAndHomunculusStats[0x0C], 32));
-  AppendRecord(records, MakeReplayRecord(5103, &this->spAndHomunculusStats[0x2C], 4));
-  AppendRecord(records, MakeReplayRecord(5104, &this->spAndHomunculusStats[0x30], 4));
-  AppendRecord(records, MakeReplayRecord(5105, &this->spAndHomunculusStats[0x34], 4));
-  AppendRecord(records, MakeReplayRecord(5106, &this->spAndHomunculusStats[0x38], 4));
-  AppendRecord(records, MakeReplayRecord(5107, &this->spAndHomunculusStats[0x3C], 4));
-  AppendRecord(records, MakeReplayRecord(5108, &this->spAndHomunculusStats[0x40], 4));
-  AppendRecord(records, MakeReplayRecord(5109, &this->spAndHomunculusStats[0x44], 4));
-  AppendRecord(records, MakeReplayRecord(5110, &this->spAndHomunculusStats[0x48], 4));
+  AppendRecord(records, MakeReplayRecord(5101, &this->m_homunAid, sizeof(this->m_homunAid)));
+  AppendRecord(records, MakeReplayRecord(5102, this->m_homunName, sizeof(this->m_homunName)));
+  AppendRecord(records, MakeReplayRecord(5103, &this->m_homunStats[0], sizeof(this->m_homunStats[0])));
+  AppendRecord(records, MakeReplayRecord(5104, &this->m_homunStats[1], sizeof(this->m_homunStats[1])));
+  AppendRecord(records, MakeReplayRecord(5105, &this->m_homunStats[2], sizeof(this->m_homunStats[2])));
+  AppendRecord(records, MakeReplayRecord(5106, &this->m_homunStats[3], sizeof(this->m_homunStats[3])));
+  AppendRecord(records, MakeReplayRecord(5107, &this->m_homunStats[4], sizeof(this->m_homunStats[4])));
+  AppendRecord(records, MakeReplayRecord(5108, &this->m_homunStats[5], sizeof(this->m_homunStats[5])));
+  AppendRecord(records, MakeReplayRecord(5109, &this->m_homunStats[6], sizeof(this->m_homunStats[6])));
+  AppendRecord(records, MakeReplayRecord(5110, &this->m_homunStats[7], sizeof(this->m_homunStats[7])));
   AppendRecord(records, MakeReplayRecord(5111, &this->m_homunJob, sizeof(this->m_homunJob)));
-  AppendRecord(records, MakeReplayRecord(5112, this->homunLevel, 4));
+  AppendRecord(records, MakeReplayRecord(5112, &this->m_homunLevel, sizeof(this->m_homunLevel)));
   AppendRecord(records, MakeReplayRecord(5113, &this->m_homunHp, sizeof(this->m_homunHp)));
-  AppendRecord(records, MakeReplayRecord(5114, this->homunMaxHp, 4));
+  AppendRecord(records, MakeReplayRecord(5114, &this->m_homunMaxHp, sizeof(this->m_homunMaxHp)));
   AppendRecord(records, MakeReplayRecord(5115, &this->m_homunSp, sizeof(this->m_homunSp)));
   AppendRecord(records, MakeReplayRecord(5116, &this->homunMaxSp, sizeof(this->homunMaxSp)));
   AppendRecord(records, MakeReplayRecord(5117, &this->homunFriendly, sizeof(this->homunFriendly)));
@@ -1079,9 +1091,9 @@ std::vector<unsigned char> CSession::BuildCompanionReplayRecords() {
   AppendRecord(records, MakeReplayRecord(5130, &this->homunAlive, sizeof(this->homunAlive)));
   AppendRecord(records, MakeReplayRecord(5131, &this->m_traceAi, sizeof(this->m_traceAi)));
   AppendRecord(records, MakeReplayRecord(5132, &this->m_homunActionState, sizeof(this->m_homunActionState)));
-  AppendRecord(records, MakeReplayRecord(5133, &this->companionTargetState[0x0], 4));
-  AppendRecord(records, MakeReplayRecord(5134, &this->companionTargetState[0x4], 4));
-  AppendRecord(records, MakeReplayRecord(5201, &this->companionTargetState[0x8], 4));
+  AppendRecord(records, MakeReplayRecord(5133, &this->m_homunHungerNotified, sizeof(this->m_homunHungerNotified)));
+  AppendRecord(records, MakeReplayRecord(5134, &this->m_homunAttackRange, sizeof(this->m_homunAttackRange)));
+  AppendRecord(records, MakeReplayRecord(5201, &this->m_mercenaryAid, sizeof(this->m_mercenaryAid)));
   AppendRecord(records, MakeReplayRecord(5202, this->m_mercenaryName, sizeof(this->m_mercenaryName)));
   AppendRecord(records, MakeReplayRecord(5203, &this->m_mercenaryStats[0], sizeof(this->m_mercenaryStats[0])));
   AppendRecord(records, MakeReplayRecord(5204, &this->m_mercenaryStats[1], sizeof(this->m_mercenaryStats[1])));
@@ -1100,7 +1112,7 @@ std::vector<unsigned char> CSession::BuildCompanionReplayRecords() {
   AppendRecord(records, MakeReplayRecord(5217, &this->m_mercenaryLoyalty, sizeof(this->m_mercenaryLoyalty)));
   AppendRecord(records, MakeReplayRecord(5218, &this->m_mercenarySummons, sizeof(this->m_mercenarySummons)));
   AppendRecord(records, MakeReplayRecord(5219, &this->m_mercenaryKills, sizeof(this->m_mercenaryKills)));
-  AppendRecord(records, MakeReplayRecord(5220, this->mercenaryAttackRange, 4));
+  AppendRecord(records, MakeReplayRecord(5220, &this->m_mercenaryAttackRange, sizeof(this->m_mercenaryAttackRange)));
   AppendRecord(records, MakeReplayRecord(5221, &this->m_mercenaryExpiration, sizeof(this->m_mercenaryExpiration)));
   AppendRecord(records, MakeReplayRecord(5222, &this->mercenaryEnemyGid, sizeof(this->mercenaryEnemyGid)));
   AppendRecord(records, MakeReplayRecord(5223, &this->mercenaryEnemyX, sizeof(this->mercenaryEnemyX)));
@@ -1111,7 +1123,7 @@ std::vector<unsigned char> CSession::BuildCompanionReplayRecords() {
   AppendRecord(records, MakeReplayRecord(5228, &this->mercenaryAlive, sizeof(this->mercenaryAlive)));
   AppendRecord(records, MakeReplayRecord(5229, &this->m_mercenaryActionState, sizeof(this->m_mercenaryActionState)));
   AppendRecord(records, MakeReplayRecord(5301, &this->petGid, sizeof(this->petGid)));
-  AppendRecord(records, MakeReplayRecord(5302, this->petNameModified, 4));
+  AppendRecord(records, MakeReplayRecord(5302, &this->m_petNameModified, sizeof(this->m_petNameModified)));
   AppendRecord(records, MakeReplayRecord(5303, this->petName, 32));
   AppendRecord(records, MakeReplayRecord(5304, &this->petAccessory, sizeof(this->petAccessory)));
   AppendRecord(records, MakeReplayRecord(5305, &this->petJob, sizeof(this->petJob)));
@@ -1179,85 +1191,85 @@ std::vector<unsigned char> CSession::BuildCharacterReplayRecords() {
   AppendRecord(records, MakeReplayRecord(1012, &this->m_navigationPlayerMap[0x14], 4));
   AppendRecord(records, MakeReplayRecord(1013, &this->m_navigationPlayerMap[0x18], 4));
   AppendRecord(records, MakeReplayRecord(1014, &this->m_job, sizeof(this->m_job)));
-  AppendRecord(records, MakeReplayRecord(1015, &this->playerExperienceState[0x4], 8));
+  AppendRecord(records, MakeReplayRecord(1015, &this->m_exp, 8));
   AppendRecord(records, MakeReplayRecord(1016, &this->m_level, sizeof(this->m_level)));
-  AppendRecord(records, MakeReplayRecord(1017, this->statusPoints, 4));
-  AppendRecord(records, MakeReplayRecord(1018, &this->playerExperienceState[0xC], 8));
+  AppendRecord(records, MakeReplayRecord(1017, &this->m_statusPoint, sizeof(this->m_statusPoint)));
+  AppendRecord(records, MakeReplayRecord(1018, &this->m_nextExp, 8));
   AppendRecord(records, MakeReplayRecord(1019, &this->m_jobLevel, sizeof(this->m_jobLevel)));
   AppendRecord(records, MakeReplayRecord(1020, &this->m_skillPoint, 4));
   AppendRecord(records, MakeReplayRecord(1021, &this->m_guildSkillPoint, sizeof(this->m_guildSkillPoint)));
-  AppendRecord(records, MakeReplayRecord(1022, this->companionSkillPoints, 4));
-  AppendRecord(records, MakeReplayRecord(1023, &this->companionSkillPoints[0x4], 4));
+  AppendRecord(records, MakeReplayRecord(1022, &this->m_homunSkillPoint, sizeof(this->m_homunSkillPoint)));
+  AppendRecord(records, MakeReplayRecord(1023, &this->m_mercenarySkillPoint, sizeof(this->m_mercenarySkillPoint)));
   AppendRecord(records, MakeReplayRecord(1024, &this->m_standardStats[0], sizeof(this->m_standardStats[0])));
   AppendRecord(records, MakeReplayRecord(1025, &this->m_standardStats[1], sizeof(this->m_standardStats[1])));
   AppendRecord(records, MakeReplayRecord(1026, &this->m_standardStats[2], sizeof(this->m_standardStats[2])));
   AppendRecord(records, MakeReplayRecord(1027, &this->m_standardStats[3], sizeof(this->m_standardStats[3])));
   AppendRecord(records, MakeReplayRecord(1028, &this->m_standardStats[4], sizeof(this->m_standardStats[4])));
   AppendRecord(records, MakeReplayRecord(1029, &this->m_standardStats[5], sizeof(this->m_standardStats[5])));
-  AppendRecord(records, MakeReplayRecord(1030, this->combatStats, 4));
-  AppendRecord(records, MakeReplayRecord(1031, &this->combatStats[0x4], 4));
-  AppendRecord(records, MakeReplayRecord(1032, &this->combatStats[0x8], 4));
-  AppendRecord(records, MakeReplayRecord(1033, &this->combatStats[0xC], 4));
-  AppendRecord(records, MakeReplayRecord(1034, &this->combatStats[0x10], 4));
-  AppendRecord(records, MakeReplayRecord(1035, &this->combatStats[0x14], 4));
-  AppendRecord(records, MakeReplayRecord(1036, &this->combatStats[0x18], 4));
-  AppendRecord(records, MakeReplayRecord(1037, &this->combatStats[0x1C], 4));
-  AppendRecord(records, MakeReplayRecord(1038, &this->combatStats[0x20], 4));
-  AppendRecord(records, MakeReplayRecord(1039, &this->combatStats[0x24], 4));
-  AppendRecord(records, MakeReplayRecord(1040, &this->combatStats[0x28], 4));
-  AppendRecord(records, MakeReplayRecord(1041, &this->combatStats[0x2C], 4));
-  AppendRecord(records, MakeReplayRecord(1042, &this->combatStats[0x30], 4));
-  AppendRecord(records, MakeReplayRecord(1043, &this->combatStats[0x34], 4));
-  AppendRecord(records, MakeReplayRecord(1044, &this->combatStats[0x38], 4));
-  AppendRecord(records, MakeReplayRecord(1045, &this->combatStats[0x3C], 4));
-  AppendRecord(records, MakeReplayRecord(1046, &this->combatStats[0x40], 4));
-  AppendRecord(records, MakeReplayRecord(1047, &this->combatStats[0x44], 4));
-  AppendRecord(records, MakeReplayRecord(1048, &this->combatStats[0x48], 4));
-  AppendRecord(records, MakeReplayRecord(1049, &this->combatStats[0x4C], 4));
+  AppendRecord(records, MakeReplayRecord(1030, &this->m_statusPointCost[0], sizeof(this->m_statusPointCost[0])));
+  AppendRecord(records, MakeReplayRecord(1031, &this->m_statusPointCost[1], sizeof(this->m_statusPointCost[1])));
+  AppendRecord(records, MakeReplayRecord(1032, &this->m_statusPointCost[2], sizeof(this->m_statusPointCost[2])));
+  AppendRecord(records, MakeReplayRecord(1033, &this->m_statusPointCost[3], sizeof(this->m_statusPointCost[3])));
+  AppendRecord(records, MakeReplayRecord(1034, &this->m_statusPointCost[4], sizeof(this->m_statusPointCost[4])));
+  AppendRecord(records, MakeReplayRecord(1035, &this->m_statusPointCost[5], sizeof(this->m_statusPointCost[5])));
+  AppendRecord(records, MakeReplayRecord(1036, &this->m_aspd, sizeof(this->m_aspd)));
+  AppendRecord(records, MakeReplayRecord(1037, &this->m_atk1, sizeof(this->m_atk1)));
+  AppendRecord(records, MakeReplayRecord(1038, &this->m_mdef1, sizeof(this->m_mdef1)));
+  AppendRecord(records, MakeReplayRecord(1039, &this->m_sp36, sizeof(this->m_sp36)));
+  AppendRecord(records, MakeReplayRecord(1040, &this->m_def1, sizeof(this->m_def1)));
+  AppendRecord(records, MakeReplayRecord(1041, &this->m_def2, sizeof(this->m_def2)));
+  AppendRecord(records, MakeReplayRecord(1042, &this->m_atk2, sizeof(this->m_atk2)));
+  AppendRecord(records, MakeReplayRecord(1043, &this->m_matk1, sizeof(this->m_matk1)));
+  AppendRecord(records, MakeReplayRecord(1044, &this->m_matk2, sizeof(this->m_matk2)));
+  AppendRecord(records, MakeReplayRecord(1045, &this->m_mdef2, sizeof(this->m_mdef2)));
+  AppendRecord(records, MakeReplayRecord(1046, &this->m_hit, sizeof(this->m_hit)));
+  AppendRecord(records, MakeReplayRecord(1047, &this->m_flee1, sizeof(this->m_flee1)));
+  AppendRecord(records, MakeReplayRecord(1048, &this->m_critical, sizeof(this->m_critical)));
+  AppendRecord(records, MakeReplayRecord(1049, &this->m_flee2, sizeof(this->m_flee2)));
   AppendRecord(records, MakeReplayRecord(1050, &this->equippedArrowIndex, sizeof(this->equippedArrowIndex)));
   AppendRecord(records, MakeReplayRecord(1051, &this->m_zeny, sizeof(this->m_zeny)));
-  AppendRecord(records, MakeReplayRecord(1052, this->healthPoints, 4));
-  AppendRecord(records, MakeReplayRecord(1053, &this->healthPoints[0x4], 4));
-  AppendRecord(records, MakeReplayRecord(1054, &this->playerExperienceState[0x14], 4));
-  AppendRecord(records, MakeReplayRecord(1055, &this->playerExperienceState[0x1C], 4));
-  AppendRecord(records, MakeReplayRecord(1056, this->optionFlags, 4));
+  AppendRecord(records, MakeReplayRecord(1052, &this->m_moveSpeed, sizeof(this->m_moveSpeed)));
+  AppendRecord(records, MakeReplayRecord(1053, &this->m_manner, sizeof(this->m_manner)));
+  AppendRecord(records, MakeReplayRecord(1054, &this->m_nextJobExp, 4));
+  AppendRecord(records, MakeReplayRecord(1055, &this->m_jobExp, 4));
+  AppendRecord(records, MakeReplayRecord(1056, &this->m_karma, sizeof(this->m_karma)));
   AppendRecord(records, MakeReplayRecord(1057, &this->monsterInfoEnabled, sizeof(this->monsterInfoEnabled)));
-  AppendRecord(records, MakeReplayRecord(1058, this->clientTimeOffset, 4));
-  AppendRecord(records, MakeReplayRecord(1059, &this->characterLoginData[0x30], 4));
+  AppendRecord(records, MakeReplayRecord(1058, &this->m_clientTimeOffset, sizeof(this->m_clientTimeOffset)));
+  AppendRecord(records, MakeReplayRecord(1059, &this->m_characterFlags, sizeof(this->m_characterFlags)));
   AppendRecord(records, MakeReplayRecord(1060, &this->m_head, sizeof(this->m_head)));
-  AppendRecord(records, MakeReplayRecord(1061, &this->weaponAppearance[0x4], 8));
-  AppendRecord(records, MakeReplayRecord(1062, &this->weaponAppearance[0xC], 4));
+  AppendRecord(records, MakeReplayRecord(1061, &this->m_weaponLook, sizeof(this->m_weaponLook)));
+  AppendRecord(records, MakeReplayRecord(1062, &this->m_shield, sizeof(this->m_shield)));
   AppendRecord(records, MakeReplayRecord(1063, &this->m_bodyStyle, sizeof(this->m_bodyStyle)));
   AppendRecord(records, MakeReplayRecord(1064, &this->m_headPalette, sizeof(this->m_headPalette)));
-  AppendRecord(records, MakeReplayRecord(1065, this->accessoryAppearance, 4));
-  AppendRecord(records, MakeReplayRecord(1066, &this->accessoryAppearance[0x4], 4));
-  AppendRecord(records, MakeReplayRecord(1067, &this->accessoryAppearance[0x8], 4));
-  AppendRecord(records, MakeReplayRecord(1068, this->statusLevelEffects, 4));
-  AppendRecord(records, MakeReplayRecord(1069, &this->statusLevelEffects[0x4], 4));
+  AppendRecord(records, MakeReplayRecord(1065, &this->m_accessory, sizeof(this->m_accessory)));
+  AppendRecord(records, MakeReplayRecord(1066, &this->m_accessory2, sizeof(this->m_accessory2)));
+  AppendRecord(records, MakeReplayRecord(1067, &this->m_accessory3, sizeof(this->m_accessory3)));
+  AppendRecord(records, MakeReplayRecord(1068, &this->m_bodyState, sizeof(this->m_bodyState)));
+  AppendRecord(records, MakeReplayRecord(1069, &this->m_effectState, sizeof(this->m_effectState)));
   AppendRecord(records, MakeReplayRecord(1070, &this->m_jobFlags, sizeof(this->m_jobFlags)));
   AppendRecord(records, MakeReplayRecord(1071, &this->m_robe, sizeof(this->m_robe)));
-  AppendRecord(records, MakeReplayRecord(1072, &this->equipmentViewState[0x4], 4));
-  AppendRecord(records, MakeReplayRecord(1073, &this->equipmentViewState[0x8], 4));
-  AppendRecord(records, MakeReplayRecord(1074, &this->equipmentViewState[0xC], 4));
-  AppendRecord(records, MakeReplayRecord(1075, &this->equipmentViewState[0x10], 4));
-  AppendRecord(records, MakeReplayRecord(1076, &this->equipmentViewState[0x14], 4));
-  AppendRecord(records, MakeReplayRecord(1077, &this->equipmentViewState[0x18], 4));
-  AppendRecord(records, MakeReplayRecord(1078, &this->equipmentViewState[0x1C], 4));
-  AppendRecord(records, MakeReplayRecord(1079, &this->equipmentViewState[0x20], 4));
-  AppendRecord(records, MakeReplayRecord(1080, &this->equipmentViewState[0x24], 4));
-  AppendRecord(records, MakeReplayRecord(1081, &this->equipmentViewState[0x2C], 0x18));
+  AppendRecord(records, MakeReplayRecord(1072, &this->m_equipViewLook[0], 4));
+  AppendRecord(records, MakeReplayRecord(1073, &this->m_equipViewLook[1], 4));
+  AppendRecord(records, MakeReplayRecord(1074, &this->m_equipViewLook[2], 4));
+  AppendRecord(records, MakeReplayRecord(1075, &this->m_equipViewLook[3], 4));
+  AppendRecord(records, MakeReplayRecord(1076, &this->m_equipViewLook[4], 4));
+  AppendRecord(records, MakeReplayRecord(1077, &this->m_equipViewLook[5], 4));
+  AppendRecord(records, MakeReplayRecord(1078, &this->m_equipViewLook[6], 4));
+  AppendRecord(records, MakeReplayRecord(1079, &this->m_equipViewLook[7], 4));
+  AppendRecord(records, MakeReplayRecord(1080, &this->m_equipViewLook[8], 4));
+  AppendRecord(records, MakeReplayRecord(1081, this->m_equipViewName, 0x18));
   AppendRecord(records, MakeReplayRecord(1082, this->playerTeam, 1));
   AppendRecord(records, MakeReplayRecord(1083, &this->m_score1, sizeof(this->m_score1)));
   AppendRecord(records, MakeReplayRecord(1084, &this->m_score2, sizeof(this->m_score2)));
-  AppendRecord(records, MakeReplayRecord(1085, this->chatFont, 1));
+  AppendRecord(records, MakeReplayRecord(1085, &this->chatFont, 1));
   AppendRecord(records, MakeReplayRecord(1086, &this->cartCount, sizeof(this->cartCount)));
   AppendRecord(records, MakeReplayRecord(1087, &this->cartMaxCount, sizeof(this->cartMaxCount)));
   AppendRecord(records, MakeReplayRecord(1088, &this->cartWeight, sizeof(this->cartWeight)));
   AppendRecord(records, MakeReplayRecord(1089, &this->cartMaxWeight, sizeof(this->cartMaxWeight)));
-  AppendRecord(records, MakeReplayRecord(1090, this->storeSlotCounts, 4));
-  AppendRecord(records, MakeReplayRecord(1091, &this->storeSlotCounts[0x4], 4));
-  AppendRecord(records, MakeReplayRecord(1092, &this->itemSendState[0x8], 4));
-  AppendRecord(records, MakeReplayRecord(1093, &this->itemSendState[0xC], 4));
+  AppendRecord(records, MakeReplayRecord(1090, &this->m_vendingSlotCount, 4));
+  AppendRecord(records, MakeReplayRecord(1091, &this->m_buyingStoreSlotCount, 4));
+  AppendRecord(records, MakeReplayRecord(1092, &this->m_chatTarget, sizeof(this->m_chatTarget)));
+  AppendRecord(records, MakeReplayRecord(1093, &this->unknown_549C, sizeof(this->unknown_549C)));
   AppendRecord(records, MakeReplayRecord(1094, &this->partyExpShare, sizeof(this->partyExpShare)));
   AppendRecord(records, MakeReplayRecord(1095, &this->partyItemCollect, sizeof(this->partyItemCollect)));
   AppendRecord(records, MakeReplayRecord(1096, &this->partyItemDistribute, sizeof(this->partyItemDistribute)));
@@ -1281,7 +1293,8 @@ std::vector<unsigned char> CSession::BuildShopReplayRecords() {
     value.padding_0000 = 0;
     value.shopId = it->second;
     std::memset(value.name, 0, sizeof(value.name));
-    std::memcpy(value.name, it->first.c_str(), (std::min)(it->first.size(), sizeof(value.name)));
+    const std::size_t length = it->first.size();
+    std::memcpy(value.name, it->first.c_str(), length > sizeof(value.name) ? sizeof(value.name) : length);
     AppendRecord(records, MakeReplayRecord(7502, &value, sizeof(value)));
   }
   for (auto shop = this->m_shops.begin(); shop != this->m_shops.end(); ++shop) {
@@ -1350,8 +1363,8 @@ std::vector<unsigned char> CSession::BuildStatsReplayRecords() {
   AppendRecord(records, BuildReplayTaggedRecord(2028, this->minimapTokenStorage, 0x30));
   AppendRecord(records, BuildReplayTaggedRecord(2029, &this->hp, sizeof(this->hp)));
   AppendRecord(records, BuildReplayTaggedRecord(2030, &this->maxHp, sizeof(this->maxHp)));
-  AppendRecord(records, BuildReplayTaggedRecord(2031, &this->spAndHomunculusStats[0], 4));
-  AppendRecord(records, BuildReplayTaggedRecord(2032, &this->spAndHomunculusStats[4], 4));
+  AppendRecord(records, BuildReplayTaggedRecord(2031, &this->m_sp, sizeof(this->m_sp)));
+  AppendRecord(records, BuildReplayTaggedRecord(2032, &this->m_maxSp, sizeof(this->m_maxSp)));
   AppendRecord(records, BuildReplayTaggedRecord(2033, &this->m_prohibitionTarget, sizeof(this->m_prohibitionTarget)));
   AppendRecord(records, BuildReplayTaggedRecord(2034, &this->quitBlocked, sizeof(this->quitBlocked)));
   AppendRecord(records, BuildReplayTaggedRecord(2035, &this->battleChat, sizeof(this->battleChat)));

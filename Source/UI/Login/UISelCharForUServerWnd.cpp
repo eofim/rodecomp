@@ -6,6 +6,7 @@
 #include "Client/Session/Session.h"
 #include "Contents/Actors/Pc.h"
 #include "Contents/Sprites/SpriteRidingOffset.h"
+#include "Contents/Tables/MessageTable.h"
 #include "Client/Session/Session.h"
 #include "Network/Connection/Connection.h"
 #include "Network/Packets/PacketLengths.h"
@@ -22,9 +23,6 @@
 #include <cstring>
 #include <string>
 #include <timeapi.h>
-
-extern const char* LookupMessage(int id);
-
 
 #pragma pack(push, 1)
 struct PACKET_CZ_SELECT_CHARACTERS {
@@ -97,7 +95,7 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
     this->m_slots[slotIndex].action = 0;
     this->m_slots[slotIndex].frame = 0;
 
-    this->m_slots[slotIndex].actionNames[0] = static_cast<const std::string&>(GetBodyActionResourceName(info->job, g_session.GetCurrentSex(), info->bodyCostume, 0));
+    this->m_slots[slotIndex].actionNames[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(info->job, g_session.GetCurrentSex(), info->bodyCostume, 0));
     this->m_slots[slotIndex].spriteNames[0] = static_cast<const std::string&>(g_session.GetBodySprName(info->job, g_session.GetCurrentSex(), info->bodyCostume, 0));
 
     int head = info->head;
@@ -128,7 +126,7 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
       this->m_slots[slotIndex].headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(head, info->job, g_session.GetCurrentSex(), this->m_slots[slotIndex].headPalette));
     }
 
-    this->m_slots[slotIndex].imfName = GetBodyImfName(info->job, g_session.GetCurrentSex(), info->head, info->bodyCostume);
+    this->m_slots[slotIndex].imfName = g_session.GetBodyImfName(info->job, g_session.GetCurrentSex(), info->head, info->bodyCostume);
   }
 }
 
@@ -163,7 +161,7 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
       packet.accountId = g_session.m_aid;
       packet.count = count;
       std::memcpy(packet.characterIds, characterIds, sizeof(packet.characterIds));
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       g_windowMgr.Schedule(this);
       return 0;
     }
@@ -172,8 +170,9 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
     break;
   }
   case ID_CHECK:
-    this->m_checkedCount += sender->geometry.state != 0 ? 1 : -1;
-    if (this->m_checkedCount > 9) {
+    const int checkedCount = this->m_checkedCount + (sender->geometry.state != 0 ? 1 : -1);
+    this->m_checkedCount = checkedCount;
+    if (checkedCount > 9) {
       g_windowMgr.Confirm(LookupMessage(MSI_ERROR_SELECT_CHARACTERS), 0, true, true, 0, "Message", 280, 120, 0);
       static_cast<UICheckBox*>(sender)->SetChecked(0);
     }

@@ -92,7 +92,7 @@ CSkill::CSkill(std::uint32_t aid) {
 // FUNCTION: fn_24259
 CSkill::~CSkill() {
   if (this->actorWindows[0] != 0) {
-    g_windowMgr.Schedule(reinterpret_cast<UIWindow*>(this->actorWindows[0]));
+    g_windowMgr.Schedule(this->actorWindows[0]);
     this->actorWindows[0] = 0;
   }
 
@@ -321,12 +321,12 @@ __declspec(safebuffers) void CSkill::ShowModel(const char* modelName) {
 
 // OFFSET: 0x00E51BD0
 // FUNCTION: fn_24302
-void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g, int h, int i, int, int, int, int) {
+void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) {
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
 
-  switch (static_cast<std::int64_t>(a) << 32 | static_cast<std::uint32_t>(message)) {
+  switch (message) {
   case AM_CHAT: {
-    const char* text = reinterpret_cast<const char*>(b);
+    const char* text = reinterpret_cast<const char*>(static_cast<std::intptr_t>(b));
     if (std::strlen(text) == 0) {
       return;
     }
@@ -335,12 +335,12 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
     if (this->actorWindows[0] == 0) {
       UITransBalloonText* balloon =
         new UITransBalloonText();
-      this->actorWindows[0] = reinterpret_cast<int>(balloon);
+      this->actorWindows[0] = balloon;
       balloon->SetSize(8, 8);
-      g_windowMgr.AddRenderedFront(reinterpret_cast<UIWindow*>(this->actorWindows[0]));
+      g_windowMgr.AddRenderedFront(this->actorWindows[0]);
     }
 
-    UITransBalloonText* balloon = reinterpret_cast<UITransBalloonText*>(this->actorWindows[0]);
+    UITransBalloonText* balloon = static_cast<UITransBalloonText*>(this->actorWindows[0]);
     balloon->SetText(text, 35);
     balloon->SetColors(0xFF8080, 0);
     this->chatWidth = balloon->geometry.width;
@@ -349,7 +349,7 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
     return;
   }
   case AM_SKILL: {
-    const SkillHitMessage* hit = reinterpret_cast<const SkillHitMessage*>(b);
+    const SkillHitMessage* hit = reinterpret_cast<const SkillHitMessage*>(static_cast<std::intptr_t>(b));
     const int skillId = hit->skillId;
     const int monsterValue = hit->monsterValue;
     const int cellX = hit->cellX;
@@ -456,13 +456,13 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
 
       const int address = reinterpret_cast<int>(&damageMessage);
       int total = damage;
-      target->SendMsg(this, AM_WILL_BE_ATTACKED, 0, address, address >> 31, total, total >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+      target->SendMsg(this, AM_WILL_BE_ATTACKED, address, total, 0, 0, 0, 0);
       for (int index = 0; index < hitCount - 1;) {
         ++index;
         damageMessage.time += g_multiHitInterval;
         total += damage;
         damageMessage.skillTarget = index;
-        target->SendMsg(this, AM_WILL_BE_ATTACKED, 0, address, address >> 31, total, total >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+        target->SendMsg(this, AM_WILL_BE_ATTACKED, address, total, 0, 0, 0, 0);
       }
     }
 
@@ -472,7 +472,7 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
     return;
   }
   case AM_SKILLSTANDENTRY: {
-    const SkillUnitMessage* unit = reinterpret_cast<const SkillUnitMessage*>(b);
+    const SkillUnitMessage* unit = reinterpret_cast<const SkillUnitMessage*>(static_cast<std::intptr_t>(b));
     this->range = unit->range;
     this->skillAid = unit->aid;
     this->render.accountId = unit->aid;
@@ -543,8 +543,8 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
       this->m_effectId = 0x6B;
       this->render.visibilityOptions[1] = 0;
       this->ShowModel(this->GetTrapModelName());
-      if (!this->HasId(0x91)) {
-        this->LaunchEffect(0x91, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      if (!this->HasId(EF_SHOCKWAVE)) {
+        this->LaunchEffect(EF_SHOCKWAVE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
       return;
     case UNT_FIRINGTRAP:
@@ -614,14 +614,14 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
     case UNT_SHOCKWAVE:
       this->render.visibilityOptions[1] = 1;
       this->ShowModel(this->GetTrapModelName());
-      if (this->render.enabled && !this->HasId(0x91)) {
-        this->LaunchEffect(0x91, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      if (this->render.enabled && !this->HasId(EF_SHOCKWAVE)) {
+        this->LaunchEffect(EF_SHOCKWAVE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
       return;
     case UNT_FEINTBOMB: {
       CPc* source;
       if (unit->owner == g_session.m_aid) {
-        source = reinterpret_cast<CPc*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
+        source = static_cast<CPc*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
       } else {
         source = static_cast<CPc*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(this->sourceActorId));
       }
@@ -646,20 +646,20 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
       return;
     }
     case UNT_PNEUMA:
-      g_effectMgr->Spawn(this->render.accountId, 0x8D, position, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_PNEUMA, position, 0, -1, 0, 0);
       return;
     case UNT_B_TRAP:
       switch (unit->level) {
       case 1:
-        g_effectMgr->Spawn(this->render.accountId, 0x42D, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_BIND_TRAP1, position, 0, -1, 0, 0);
         return;
       case 2:
       case 3:
-        g_effectMgr->Spawn(this->render.accountId, 0x42E, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_BIND_TRAP2, position, 0, -1, 0, 0);
         return;
       case 4:
       case 5:
-        g_effectMgr->Spawn(this->render.accountId, 0x42F, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_BIND_TRAP3, position, 0, -1, 0, 0);
         return;
       }
       return;
@@ -669,11 +669,11 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
     case UNT_NYANGGRASS: {
       const vector3d& player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.position;
       g_soundMgr->PlayWave("effect\\su_nyanggrass.wav", position.x - player.x, 0.0f, position.z - player.z, 250, 40, 1.0f, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x465, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_SU_LOPE, position, 0, unit->level, 0, 0);
       return;
     }
     case UNT_CREATINGSTAR: {
-      g_effectMgr->Spawn(this->render.accountId, 0x4B0, position, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_THUNDER_PLAZMA_BLAST, position, 0, -1, 0, 0);
       const vector3d& player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.position;
       g_soundMgr->PlayWave("effect\\g카트토네이도.wav", position.x - player.x, 0.0f, position.z - player.z, 250, 40, 1.0f, 0);
       return;
@@ -708,7 +708,7 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
       return;
     case UNT_VIOLENT_QUAKE:
       g_effectMgr->Retire(this->render.accountId, 0x701);
-      g_effectMgr->Spawn(this->render.accountId, 0x701, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_VIOLENT_QUAKE_BOTTOM, position, 0, unit->level, 0, 0);
       return;
     case UNT_ASTRAL_STRIKE:
       if (!g_effectMgr->Has(this->render.accountId, 0x6E8)) {
@@ -720,23 +720,23 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
       if (!g_effectMgr->Has(this->render.accountId, 0x6EC)) {
         g_effectMgr->Retire(this->render.accountId, 0x6EC);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x6EC, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_MYSTERY_ILLUSION_BOTTOM, position, 0, unit->level, 0, 0);
       return;
     case UNT_TORNADO_STORM:
       if (!g_effectMgr->Has(this->render.accountId, 0x6F0)) {
         g_effectMgr->Retire(this->render.accountId, 0x6F0);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x6F0, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_TORNADO_STORM, position, 0, unit->level, 0, 0);
       if (!g_effectMgr->Has(this->render.accountId, 0x6F1)) {
         g_effectMgr->Retire(this->render.accountId, 0x6F1);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x6F1, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_TORNADO_STORM_BOTTOM, position, 0, unit->level, 0, 0);
       return;
     case UNT_ALL_BLOOM:
       g_effectMgr->Retire(this->render.accountId, 0x702);
-      g_effectMgr->Spawn(this->render.accountId, 0x702, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ALL_BLOOM, position, 0, unit->level, 0, 0);
       g_effectMgr->Retire(this->render.accountId, 0x703);
-      g_effectMgr->Spawn(this->render.accountId, 0x703, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ALL_BLOOM_BOTTOM, position, 0, unit->level, 0, 0);
       return;
     case UNT_FLORAL_FLARE_ROAD:
       g_effectMgr->Retire(this->render.accountId, 0x70C);
@@ -758,79 +758,79 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
       if (!g_effectMgr->Has(this->render.accountId, 0x7EF)) {
         g_effectMgr->Retire(this->render.accountId, 0x7EF);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x7EF, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_VENOM_SWAMP_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_LIGHTNING_LAND:
       if (!g_effectMgr->Has(this->render.accountId, 0x7FA)) {
         g_effectMgr->Retire(this->render.accountId, 0x7FA);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x7FA, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_LIGHTNING_LAND_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (!g_effectMgr->Has(this->render.accountId, 0x7F9)) {
         g_effectMgr->Retire(this->render.accountId, 0x7F9);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x7F9, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_LIGHTNING_LAND, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_CONFLAGRATION:
       if (!g_effectMgr->Has(this->render.accountId, 0x808)) {
         g_effectMgr->Retire(this->render.accountId, 0x808);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x808, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_CONFLAGRATION_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (!g_effectMgr->Has(this->render.accountId, 0x807)) {
         g_effectMgr->Retire(this->render.accountId, 0x807);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x807, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_CONFLAGRATION, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_ABYSS_SQUARE:
-      g_effectMgr->Spawn(this->render.accountId, 0x852, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x851, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ABYSS_SQUARE_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ABYSS_SQUARE, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_ACIDIFIED_ZONE_FIRE: {
-      g_effectMgr->Spawn(this->render.accountId, 0x8A0, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x8A1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, 0x8A2, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_FIRE_START, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_FIRE_START_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_FIRE_LOOP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
-      effect = g_effectMgr->Spawn(this->render.accountId, 0x8A3, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_FIRE_LOOP_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
       return;
     }
     case UNT_ACIDIFIED_ZONE_WATER: {
-      g_effectMgr->Spawn(this->render.accountId, 0x8A8, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x8A9, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, 0x8AA, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WATER_START, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WATER_START_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WATER_LOOP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
-      effect = g_effectMgr->Spawn(this->render.accountId, 0x8AB, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WATER_LOOP_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
       return;
     }
     case UNT_ACIDIFIED_ZONE_WIND: {
-      g_effectMgr->Spawn(this->render.accountId, 0x8B0, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x8B1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, 0x8B2, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WIND_START, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WIND_START_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WIND_LOOP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
-      effect = g_effectMgr->Spawn(this->render.accountId, 0x8B3, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_WIND_LOOP_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
       return;
     }
     case UNT_ACIDIFIED_ZONE_GROUND: {
-      g_effectMgr->Spawn(this->render.accountId, 0x8B8, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x8B9, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, 0x8BA, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_GROUND_START, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_GROUND_START_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      CEffect* effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_GROUND_LOOP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
-      effect = g_effectMgr->Spawn(this->render.accountId, 0x8BB, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect = g_effectMgr->Spawn(this->render.accountId, EF_ACIDIFIED_ZONE_GROUND_LOOP_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       if (effect != nullptr) {
         effect->SetDelay(10);
       }
@@ -843,28 +843,28 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
       this->render.visibilityOptions[1] = 1;
       this->ShowModel(this->GetTrapModelName());
       if (this->render.enabled) {
-        g_effectMgr->Spawn(this->render.accountId, 0x752, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_DEEP_BLIND_TRAP, position, 0, -1, 0, 0);
       }
       return;
     case UNT_SWIFTTRAP:
       this->render.visibilityOptions[1] = 1;
       this->ShowModel(this->GetTrapModelName());
       if (this->render.enabled) {
-        g_effectMgr->Spawn(this->render.accountId, 0x756, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_SWIFT_TRAP, position, 0, -1, 0, 0);
       }
       return;
     case UNT_SOLIDTRAP:
       this->render.visibilityOptions[1] = 1;
       this->ShowModel(this->GetTrapModelName());
       if (this->render.enabled) {
-        g_effectMgr->Spawn(this->render.accountId, 0x75A, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_SOLID_TRAP, position, 0, -1, 0, 0);
       }
       return;
     case UNT_FLAMETRAP:
       this->render.visibilityOptions[1] = 1;
       this->ShowModel(this->GetTrapModelName());
       if (this->render.enabled) {
-        g_effectMgr->Spawn(this->render.accountId, 0x77F, position, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_FLAME_TRAP, position, 0, -1, 0, 0);
       }
       return;
     default: {
@@ -879,7 +879,7 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
     }
   }
   case AM_SETJOB:
-    this->SetActorJob(b);
+    this->SetActorJob(static_cast<int>(b));
     switch (this->GetEffectiveJob(-1)) {
     case UNT_WARP_WAITING: {
       const vector3d& player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.position;
@@ -923,27 +923,27 @@ void CSkill::SendMsg(CGameObject* sender, int message, int a, int b, int c, int 
 
     this->render.enabled = 1;
     this->ShowModel(this->GetTrapModelName());
-    if (this->GetEffectiveJob(-1) == UNT_SHOCKWAVE && !this->HasId(0x91)) {
-      this->LaunchEffect(0x91, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    if (this->GetEffectiveJob(-1) == UNT_SHOCKWAVE && !this->HasId(EF_SHOCKWAVE)) {
+      this->LaunchEffect(EF_SHOCKWAVE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
 
     switch (this->GetEffectiveJob(-1)) {
     case UNT_DEEPBLINDTRAP:
-      g_effectMgr->Spawn(this->render.accountId, 0x752, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_DEEP_BLIND_TRAP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_SOLIDTRAP:
-      g_effectMgr->Spawn(this->render.accountId, 0x75A, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_SOLID_TRAP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_SWIFTTRAP:
-      g_effectMgr->Spawn(this->render.accountId, 0x756, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_SWIFT_TRAP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_FLAMETRAP:
-      g_effectMgr->Spawn(this->render.accountId, 0x77F, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_FLAME_TRAP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     }
     return;
   default:
-    this->CGameActor::SendMsg(sender, message, a, b, c, d, e, f, g, h, i, 0, 0, 0, 0);
+    this->CGameActor::SendMsg(sender, message, b, c, d, e, 0, 0);
     return;
   }
 }

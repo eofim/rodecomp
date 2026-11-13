@@ -141,7 +141,7 @@ void SpriteLayerRenderer::Render(const float* matrix, int blendMode, char blendV
     if (sound.first == true) {
       this->pc->isPlayHitWave = 1;
       std::string name = sound.second;
-      char* buffer = reinterpret_cast<char*>(this->pc->hitWaveName);
+      char* buffer = this->pc->hitWaveName;
       StringFormat(buffer, 0x80, static_cast<std::size_t>(-1), "%s", name.size() == 0 ? buffer : name.c_str());
     }
 
@@ -596,7 +596,12 @@ std::pair<bool, std::string> SpriteLayerRenderer::GetLayerSound(int layer, CActR
 void SpriteLayerRenderer::DrawLayer(
   int index, int layer, const ActionFrame* frame, CSprRes* sprite, CActRes* action, int animation, int frameIndex, bool replaced
 ) {
-  int cellIndex = GetSlotLayer(g_session.IsSpecialMonsterJob(this->layerViews[layer]) ? 1 : layer);
+  int cellIndex;
+  if (g_session.IsSpecialMonsterJob(this->layerViews[layer])) {
+    cellIndex = GetSlotLayer(1);
+  } else {
+    cellIndex = GetSlotLayer(layer);
+  }
   for (int i = 0; i < frame->cellCount; ++i) {
     if (layer == 7) {
       cellIndex = i;
@@ -654,7 +659,7 @@ void SpriteLayerRenderer::DrawLayer(
     quad.image = resolved.image;
     const std::uint32_t* palette = this->GetPalette(layer, sprite, action);
     int effect = 0xA6;
-    this->pc->SendMsg(nullptr, AM_IS_HAVE_EFFECT, 0, reinterpret_cast<int>(&effect), reinterpret_cast<int>(&effect) >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->pc->SendMsg(nullptr, AM_IS_HAVE_EFFECT, reinterpret_cast<int>(&effect), 0, 0, 0, 0, 0);
 
     int blend;
     switch (layer) {

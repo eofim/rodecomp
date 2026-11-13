@@ -12,6 +12,8 @@
 #include <cmath>
 #include <new>
 
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 // INLINED
 NamedBinkMovie::NamedBinkMovie() : decoder(nullptr), radius(150.0f) {
 }
@@ -60,9 +62,9 @@ BinkMovies::BinkMovies() = default;
 // OFFSET: 0x007AFED0
 // FUNCTION: fn_09162
 BinkMovies::~BinkMovies() {
-  for (NamedBinkMovie* movie : this->m_movies) {
+  std::for_each(this->m_movies.begin(), this->m_movies.end(), [](NamedBinkMovie* movie) {
     delete movie;
-  }
+  });
 }
 
 // OFFSET: 0x007B00F0
@@ -125,13 +127,14 @@ void BinkMovies::Update() {
         const float y = position->y - playerPosition[1];
         const float z = position->z - playerPosition[2];
         const float distance = SquareRoot((y * y + x * x) + z * z);
-        nearest = distance < nearest ? distance : nearest;
+        nearest = std::min(nearest, distance);
       }
 
-      const int attenuation = movie->radius > nearest
-        ? static_cast<int>((static_cast<float>(g_soundMgr->sampleVolume) / movie->radius) * (movie->radius - nearest)) * 256
-        : 0;
-      BinkSetVolume(movie->decoder->Handle(), 0, attenuation);
+      if (movie->radius > nearest) {
+        BinkSetVolume(movie->decoder->Handle(), 0, static_cast<int>((static_cast<float>(g_soundMgr->sampleVolume) / movie->radius) * (movie->radius - nearest)) * 256);
+      } else {
+        BinkSetVolume(movie->decoder->Handle(), 0, 0);
+      }
     }
   }
 }

@@ -1,4 +1,5 @@
 #include "UI/EntryQueue/UIEntryQueueWnd.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 
@@ -30,6 +31,8 @@
 #include <string>
 #include <utility>
 #include <windows.h>
+
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 // OFFSET: 0x00BA3920
 // FUNCTION: fn_19677
@@ -124,7 +127,7 @@ bool UIEntryQueueRequestWnd::Create() {
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 280, 305, 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->m_viewer->backgroundColor = 0xFF000000u | (blue << 16) | (green << 8) | red;
   this->m_viewer->Invalidate();
   this->AddChild(this->m_viewer);
@@ -253,9 +256,8 @@ bool UIEntryQueueStandByWnd::Create() {
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 260, 65, 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = 0xFF000000u | (blue << 16) | (green << 8) | red;
-  this->m_viewer->Invalidate();
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  this->m_viewer->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
   this->AddChild(this->m_viewer);
 
   const std::string path = "유저인터페이스\\";
@@ -645,7 +647,7 @@ void UIEntryQueueHelpWnd::OnCreate(int width, int height) {
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 270, 225, 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->m_viewer->backgroundColor = 0xFF000000u | (blue << 16) | (green << 8) | red;
   this->m_viewer->Invalidate();
   this->AddChild(this->m_viewer);

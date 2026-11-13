@@ -1,9 +1,9 @@
-#include "Contents/UserData/AccountService.h"
 #include "Contents/Async/AsyncWorkMgr.h"
 #include "Contents/Emblems/EmblemDataMgr.h"
 #include "Client/Session/Session.h"
 #include "Network/Connection/Connection.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Utility/Cipher/EncryptedName.h"
 
@@ -55,28 +55,19 @@ void CEmblemDataMgr::Shutdown() {
 
 // OFFSET: 0x005EB580
 // FUNCTION: fn_03974
-void CEmblemDataMgr::RefreshUrls(LuaScript& settings, LuaScript& tables, const char* host, const char* port, const char* overrideKey) {
-  const std::string base = ResolveAccountServiceBase(settings, tables, host, port, overrideKey);
+void CEmblemDataMgr::RefreshUrls() {
+  const std::string base = g_session.ResolveAccountServiceBase();
 
   if (!base.empty()) {
-    {
-      constexpr std::array<std::uint8_t, 15> sourceArray = CRYPT_NAME("/emblem/upload", 0x2FF3C5036D070127ULL);
-      const std::uint8_t (&source)[15] = sourceArray._Elems;
-      thread_local EncryptedName<sizeof(source), 0x2FF3C5036D070127ULL> name(source);
-      this->m_uploadUrl = base + name.Text();
-    }
-    {
-      const std::uint8_t source[] = CRYPT_BYTES(17, "/emblem/download", 0x93E7A3A1F587CDC5ULL);
-      thread_local EncryptedName<sizeof(source), 0x93E7A3A1F587CDC5ULL> name(source);
-      this->m_downloadUrl = base + name.Text();
-    }
+    this->m_uploadUrl = base + OBFUSCATE_TEXT("/emblem/upload", 0x2FF3C5036D070127ULL);
+    this->m_downloadUrl = base + OBFUSCATE_TEXT("/emblem/download", 0x93E7A3A1F587CDC5ULL);
   }
 }
 
 // OFFSET: 0x005EB260
 // FUNCTION: fn_03972
 void CEmblemDataMgr::Download(std::uint32_t guildId, std::uint32_t version) {
-  const std::string token(reinterpret_cast<const char*>(&g_session.webServiceLoginData[0x08]), 16);
+  const std::string token(g_session.m_webAuthToken, 16);
   g_asyncWorkMgr->DownloadEmblem(this->m_downloadUrl, g_session.m_aid, token, g_session.m_accountName, guildId, version);
 }
 
@@ -88,7 +79,7 @@ bool CEmblemDataMgr::Upload(std::uint32_t guildId, std::string path) {
   }
 
   std::string token;
-  token.assign(reinterpret_cast<const char*>(&g_session.webServiceLoginData[0x08]), 16);
+  token.assign(g_session.m_webAuthToken, 16);
   g_asyncWorkMgr->UploadEmblem(this->m_uploadUrl, g_session.m_aid, token, g_session.m_accountName, guildId, path);
 
   return true;

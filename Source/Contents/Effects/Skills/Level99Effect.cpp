@@ -42,7 +42,7 @@ void CLevel99Effect::AddRings() {
   int tilt = 55;
   do {
     for (int segment = 0; segment <= 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 13);
+      CParticle* particle = CreateParticle(&this->positionVector, 13);
       if (!particle) {
         continue;
       }
@@ -54,19 +54,19 @@ void CLevel99Effect::AddRings() {
       particle->groupIndex = 3;
       particle->alpha = 120;
       particle->SetColor(100, 100, 255);
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(startAngle);
+      particle->angle = static_cast<float>(startAngle);
       particle->angleParameter = 315;
       particle->speedParameter = 15.0f - static_cast<float>(row) * 2.0f;
       particle->scale = static_cast<float>(row) * 0.2f + 3.9f;
       particle->phaseParameter = tilt;
       particle->animationParameter = 0.0f;
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->sprites.push_back(particle);
 
       if (particle) {
         const int index = particle->columnIndex;
         const float radius = g_sinTable[index * 9] * particle->speedParameter;
-        const float baseAngle = *reinterpret_cast<const float*>(&particle->angleBits);
+        const float baseAngle = particle->angle;
         const int angle = static_cast<int>(static_cast<int>(particle->angleParameter / 20.0f) * index + baseAngle) % 360;
         const int ringTilt = particle->phaseParameter;
         const float spread = radius * g_cosTable[ringTilt];
@@ -75,19 +75,19 @@ void CLevel99Effect::AddRings() {
         const float height = radius * g_sinTable[ringTilt];
 
         EffectPoint points[2];
-        points[0].x = particle->scale * cosine;
-        points[0].y = 0.0f;
-        points[0].z = particle->scale * sine;
-        points[1].x = points[0].x + spread * cosine;
-        points[1].y = 0.0f - height;
-        points[1].z = points[0].z + spread * sine;
+        const float innerX = particle->scale * cosine;
+        const float innerY = 0.0f;
+        const float innerZ = particle->scale * sine;
+        const float outerX = innerX + spread * cosine;
+        const float outerY = 0.0f - height;
+        const float outerZ = innerZ + spread * sine;
 
-        particle->vertices[3].x = points[0].x;
-        particle->vertices[3].y = points[0].y;
-        particle->vertices[3].z = points[0].z;
-        particle->vertices[1].x = points[1].x;
-        particle->vertices[1].y = points[1].y;
-        particle->vertices[1].z = points[1].z;
+        particle->vertices[3].x = innerX;
+        particle->vertices[3].y = innerY;
+        particle->vertices[3].z = innerZ;
+        particle->vertices[1].x = outerX;
+        particle->vertices[1].y = outerY;
+        particle->vertices[1].z = outerZ;
 
         if (index != 0) {
           particle->vertices[0].x = this->previousRingPoints[1].x;
@@ -98,12 +98,12 @@ void CLevel99Effect::AddRings() {
           particle->vertices[2].z = this->previousRingPoints[0].z;
         }
 
-        this->previousRingPoints[0].x = points[0].x;
-        this->previousRingPoints[0].y = points[0].y;
-        this->previousRingPoints[0].z = points[0].z;
-        this->previousRingPoints[1].x = points[1].x;
-        this->previousRingPoints[1].y = points[1].y;
-        this->previousRingPoints[1].z = points[1].z;
+        this->previousRingPoints[0].x = innerX;
+        this->previousRingPoints[0].y = innerY;
+        this->previousRingPoints[0].z = innerZ;
+        this->previousRingPoints[1].x = outerX;
+        this->previousRingPoints[1].y = outerY;
+        this->previousRingPoints[1].z = outerZ;
       }
     }
 
@@ -134,7 +134,7 @@ void CLevel99Effect::Open() {
   int tilt = 0;
   int angle = 0;
   do {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 13);
+    CParticle* particle = CreateParticle(&this->positionVector, 13);
     if (particle) {
       particle->SetTexture("effect\\pikapika2.bmp");
       particle->effectId = this->id;
@@ -142,10 +142,10 @@ void CLevel99Effect::Open() {
       particle->rowIndex = 0;
       particle->groupIndex = 1;
       particle->alpha = 200;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(angle);
+      particle->angle = static_cast<float>(angle);
       particle->phaseParameter = tilt;
       particle->scale = 9.0f;
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->sparkles.push_back(particle);
     }
 
@@ -167,14 +167,16 @@ bool CLevel99Effect::IsAlive() {
 // FUNCTION: fn_19087
 void CLevel99Effect::OnProcess() {
   for (auto it = this->sparkles.begin(); it != this->sparkles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
+    CParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
 
-    if (CParticle* particle = *it) {
+    if (particle) {
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
-      rotation.MakeZRotation(*reinterpret_cast<const float*>(&particle->angleBits) / 180.0f * 3.141592f);
+      rotation.MakeZRotation(particle->angle / 180.0f * 3.141592f);
       rotation.AppendXRotation(1.570796f);
 
       int phase = particle->phaseParameter + 3;
@@ -192,16 +194,18 @@ void CLevel99Effect::OnProcess() {
       result.Compose(scale, rotation);
       particle->transform = result;
     }
-    ++(*it)->elapsedFrames;
+    ++particle->elapsedFrames;
   }
 
   for (auto it = this->sprites.begin(); it != this->sprites.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
+    CParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
 
-    if (CParticle* particle = *it) {
-      float& baseAngle = *reinterpret_cast<float*>(&particle->angleBits);
+    if (particle) {
+      float& baseAngle = particle->angle;
       const float degrees = static_cast<float>(static_cast<int>(static_cast<float>(particle->rowIndex) + baseAngle + 3.0f));
       baseAngle = degrees;
 
@@ -210,7 +214,7 @@ void CLevel99Effect::OnProcess() {
       rotation.MakeYRotation(degrees / 180.0f * 3.141592f);
       particle->transform = rotation;
     }
-    ++(*it)->elapsedFrames;
+    ++particle->elapsedFrames;
   }
 }
 

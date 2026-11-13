@@ -101,7 +101,7 @@ public:
   void RemoveChild(UIWindow* child, unsigned char destroy);
 
   void InvalidateChildren();
-  bool Contains(const UIWindow* window) const;
+  int Contains(const UIWindow* window) const;
   bool IsDescendantOf(const UIWindow* ancestor) const;
   void BroadcastMsg4();
   void BroadcastMsg3();
@@ -123,6 +123,11 @@ public:
   void DrawBitmap(int x, int y, CBitmapRes* bitmap, bool transparent);
   void DrawAlignedText(int x, int y, std::string text, int width, int align, std::uint32_t color, int arg7, int arg8, int arg9, int arg10, unsigned char bold);
   void FillRegion(int x, int y, int width, int height, std::uint32_t color);
+  std::string FitTextToWidth(const std::string& text, int width);
+  void DrawRectOutline(int x, int y, int width, int height, std::uint32_t color);
+  void DrawRoundedOutline(int x, int y, int width, int height, std::uint32_t color);
+  void DrawFilledRoundedOutline(int x, int y, int width, int height, std::uint32_t color);
+  void FillTriangleRegion(int x0, int y0, int x1, int y1, int x2, int y2, std::uint32_t color);
   int TextWidth(const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic);
   void WrapPixelText(const char* text, std::vector<std::string>& lines, int width);
   int ColoredTextWidth(const char* text, unsigned bytes, int family, int height, unsigned char bold);
@@ -131,6 +136,18 @@ public:
   );
   void DrawVerticalText(int x, int y, const char* text, unsigned bytes, int family, int height, std::uint32_t color, unsigned char bold);
   void DrawCenteredText(int x, int y, const char* text, int width, int family, int height, std::uint32_t color, unsigned char bold);
+  void DrawColoredText(int x, int y, const char* text, unsigned bytes, std::uint32_t& color, int family, int height, bool shadow);
+  void DrawStyledColoredText(
+    int x, int y, const char* text, unsigned bytes, std::uint32_t& color, int family, int height, unsigned char bold, unsigned char italic,
+    bool shadow
+  );
+  void DrawOutlinedText(
+    int x, int y, const char* text, unsigned bytes, std::uint32_t color, std::uint32_t outline, int family, int height, unsigned char bold,
+    unsigned char italic
+  );
+  void DrawOutlinedColoredText(
+    int x, int y, const char* text, unsigned bytes, std::uint32_t& color, std::uint32_t outline, int family, int height, unsigned char bold
+  );
   void DrawRightOutlinedText(
     int right, int y, const char* text, int bytes, std::uint32_t color, std::uint32_t outline, int family,
     int height, unsigned char bold
@@ -159,10 +176,10 @@ public:
     int x, int y, int width, const std::vector<char*>& breaks, const char* text, const char* highlight, std::uint32_t highlightColor,
     std::uint32_t color, int unused, int lineHeight
   );
-  void DrawBitmapScaled(int x, int y, int width, int height, const BitmapImage* image, int option);
+  void DrawBitmapScaled(int x, int y, int width, int height, const CBitmapRes* bitmap, int option);
   void DrawBitmapRegion(int x, int y, CBitmapRes* bitmap, bool transparent, bool whole, int left, int top, int right, int bottom);
-  void DrawAuxiliaryScaled(int mode, int x, int y, int width, int height, BitmapImage* image, int option, bool rebuild);
-  void DrawAuxiliary(int mode, int x, int y, BitmapImage* image, bool transparent, bool rebuild);
+  void DrawAuxiliaryScaled(int mode, int x, int y, int width, int height, CBitmapRes* bitmap, int option, bool rebuild);
+  void DrawAuxiliary(int mode, int x, int y, CBitmapRes* bitmap, bool transparent, bool rebuild);
   void DrawAmount(int amount, std::string text, int x, int y);
   int TextHeight(const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic);
   int VerticalTextHeight(const char* text, unsigned bytes, int family, int height, unsigned char bold);

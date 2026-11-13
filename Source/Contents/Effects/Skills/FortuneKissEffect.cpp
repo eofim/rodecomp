@@ -20,7 +20,7 @@ void CFortuneKiss::Close() {
 // OFFSET: 0x00701560
 // FUNCTION: fn_06995
 void CFortuneKiss::Open() {
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+  CParticle* particle = CreateParticle(&this->positionVector, 5);
   if (!particle) {
     return;
   }
@@ -31,13 +31,14 @@ void CFortuneKiss::Open() {
   particle->rowIndex = 0;
   particle->groupIndex = 1;
   particle->alpha = 255;
-  particle->angleBits = 0;
+  particle->angle = 0;
   particle->phaseParameter = 0;
   particle->scale = 1.0f;
   const int drift = rand() % 5;
-  *reinterpret_cast<float*>(particle->animationParameters) = 0.0f;
-  particle->animationParameter = -5.0f - static_cast<float>(drift);
-  InitParticleQuad(particle->vertices);
+  float* values = &particle->animationParameter;
+  values[1] = 0.0f;
+  values[0] = -5.0f - static_cast<float>(drift);
+  particle->InitParticleQuad(particle->vertices);
   this->angle = rand() % 359;
   this->particles.push_back(particle);
 }
@@ -52,17 +53,19 @@ bool CFortuneKiss::IsAlive() {
 // FUNCTION: fn_06997
 void CFortuneKiss::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
-    if (CParticle* particle = *it) {
+    CParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
+    if (particle) {
       ++this->angle;
       if (this->angle > 360) {
         this->angle = 0;
       }
 
-      float& offset = *reinterpret_cast<float*>(&particle->effectParameters[0xC]);
-      float& width = *reinterpret_cast<float*>(&particle->effectParameters[0x10]);
+      float& offset = particle->animationParameter;
+      float& width = particle->animationParameters[0];
       const float cosine = g_cosTable[this->angle];
       const float newOffset = offset - cosine * 0.05;
       const float newWidth = cosine * 0.02 + width;
@@ -84,7 +87,7 @@ void CFortuneKiss::OnProcess() {
       result.Compose(first, translate);
       particle->transform = result;
     }
-    ++(*it)->elapsedFrames;
+    ++particle->elapsedFrames;
   }
 }
 

@@ -75,7 +75,7 @@ void CAsyncWorkMgr::Shutdown() {
 // OFFSET: 0x00573DB0
 // FUNCTION: fn_02499
 void CAsyncWorkMgr::LoadAccount(std::uint32_t accountId, std::string world, std::string url) {
-  NAsyncWorkPtr work(this->m_pools, "AccountLinkedUserData_Load");
+  NAsyncWorkPtr work(this->m_pools, g_accountLinkedUserDataLoadPoolName);
 
   if (work.Get()) {
     static_cast<CAccountLinkedUserDataLoadAsyncWork*>(work.Get())->Bind(accountId, world, url);
@@ -86,7 +86,7 @@ void CAsyncWorkMgr::LoadAccount(std::uint32_t accountId, std::string world, std:
 // OFFSET: 0x00573EC0
 // FUNCTION: fn_02500
 void CAsyncWorkMgr::SaveAccount(std::uint32_t accountId, std::string world, std::string url, std::string token, std::string data) {
-  NAsyncWorkPtr work(this->m_pools, "AccountLinkedUserData_Save");
+  NAsyncWorkPtr work(this->m_pools, g_accountLinkedUserDataSavePoolName);
 
   if (work.Get()) {
     static_cast<CAccountLinkedUserDataSaveAsyncWork*>(work.Get())->Bind(accountId, world, url, token, data);
@@ -100,7 +100,7 @@ void CAsyncWorkMgr::ChangePartyMaster(
   std::uint32_t accountId, std::uint32_t characterId, std::string characterName, std::uint32_t targetAccountId, std::uint32_t targetCharacterId,
   std::string targetName, std::string world, std::string url, std::string token
 ) {
-  NAsyncWorkPtr work(this->m_pools, "Change_PartyMaster");
+  NAsyncWorkPtr work(this->m_pools, g_changePartyMasterPoolName);
 
   if (work.Get()) {
     static_cast<CChangePartyMasterAsyncWork*>(work.Get())
@@ -114,7 +114,7 @@ void CAsyncWorkMgr::ChangePartyMaster(
 void CAsyncWorkMgr::LoadCharacter(
   std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token
 ) {
-  NAsyncWorkPtr work(this->m_pools, "CharacterLinkedUserData_Load");
+  NAsyncWorkPtr work(this->m_pools, g_characterLinkedUserDataLoadPoolName);
 
   if (work.Get()) {
     static_cast<CCharacterLinkedUserDataLoadAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token);
@@ -125,7 +125,7 @@ void CAsyncWorkMgr::LoadCharacter(
 // OFFSET: 0x005742D0
 // FUNCTION: fn_02503
 void CAsyncWorkMgr::SaveCharacter(std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, std::string data) {
-  NAsyncWorkPtr work(this->m_pools, "CharacterLinkedUserData_Save");
+  NAsyncWorkPtr work(this->m_pools, g_characterLinkedUserDataSavePoolName);
 
   if (work.Get()) {
     static_cast<CCharacterLinkedUserDataSaveAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token, data);
@@ -138,7 +138,7 @@ void CAsyncWorkMgr::SaveCharacter(std::uint32_t accountId, std::uint32_t charact
 void CAsyncWorkMgr::DownloadEmblem(
   std::string url, std::uint32_t accountId, std::string token, std::string world, std::uint32_t guildId, std::uint32_t version
 ) {
-  NAsyncWorkPtr work(this->m_pools, "Emblem_Download");
+  NAsyncWorkPtr work(this->m_pools, g_emblemDataDownloadPoolName);
 
   if (work.Get()) {
     static_cast<CEmblemDataDownloadAsyncWork*>(work.Get())->Bind(url, accountId, token, world, guildId, version);
@@ -149,7 +149,7 @@ void CAsyncWorkMgr::DownloadEmblem(
 // OFFSET: 0x00574570
 // FUNCTION: fn_02505
 void CAsyncWorkMgr::UploadEmblem(std::string url, std::uint32_t accountId, std::string token, std::string world, std::uint32_t guildId, std::string path) {
-  NAsyncWorkPtr work(this->m_pools, "Emblem_Upload");
+  NAsyncWorkPtr work(this->m_pools, g_emblemDataUploadPoolName);
 
   if (work.Get()) {
     static_cast<CEmblemDataUploadAsyncWork*>(work.Get())->Bind(url, accountId, token, world, guildId, path);
@@ -160,7 +160,7 @@ void CAsyncWorkMgr::UploadEmblem(std::string url, std::uint32_t accountId, std::
 // OFFSET: 0x005746D0
 // FUNCTION: fn_02506
 void CAsyncWorkMgr::LoadMyParty(std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token) {
-  NAsyncWorkPtr work(this->m_pools, "MyParty_Load");
+  NAsyncWorkPtr work(this->m_pools, g_loadMyPartyPoolName);
 
   if (work.Get()) {
     static_cast<CLoadMyPartyAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token);
@@ -173,7 +173,7 @@ void CAsyncWorkMgr::LoadMyParty(std::uint32_t accountId, std::uint32_t character
 void CAsyncWorkMgr::LoadPartyInfo(
   std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, std::uint32_t queryAccountId
 ) {
-  NAsyncWorkPtr work(this->m_pools, "PartyInfo_Load");
+  NAsyncWorkPtr work(this->m_pools, g_loadPartyInfoPoolName);
 
   if (work.Get()) {
     static_cast<CLoadPartyInfoAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token, queryAccountId);
@@ -184,13 +184,12 @@ void CAsyncWorkMgr::LoadPartyInfo(
 // OFFSET: 0x00574950
 // FUNCTION: fn_02508
 void CAsyncWorkMgr::LoadPartyList(
-  std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, int search, CAdvenPartyInfo filter, int page,
-  WindowManagerWindows& windows
+  std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, int search, CAdvenPartyInfo filter, int page
 ) {
-  NAsyncWorkPtr work(this->m_pools, "PartyList_Load");
+  NAsyncWorkPtr work(this->m_pools, g_loadPartyListPoolName);
 
   if (work.Get()) {
-    static_cast<CLoadPartyListAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token, filter, search, page, windows);
+    static_cast<CLoadPartyListAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token, filter, search, page);
     this->Submit(work);
   }
 }
@@ -200,7 +199,7 @@ void CAsyncWorkMgr::LoadPartyList(
 void CAsyncWorkMgr::LoadStore(
   std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, int type
 ) {
-  NAsyncWorkPtr work(this->m_pools, "MerchantStoreInformation_Load");
+  NAsyncWorkPtr work(this->m_pools, g_mcStoreInfoBackupLoadPoolName);
 
   if (work.Get()) {
     static_cast<CMCStoreInfoBackupLoadAsyncWork*>(work.Get())->Bind(url, accountId, characterId, world, token, type);
@@ -213,7 +212,7 @@ void CAsyncWorkMgr::LoadStore(
 void CAsyncWorkMgr::SaveStore(
   std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, std::string data, int type
 ) {
-  NAsyncWorkPtr work(this->m_pools, "MerchantStoreInformation_Save");
+  NAsyncWorkPtr work(this->m_pools, g_mcStoreInfoBackupSavePoolName);
 
   if (work.Get()) {
     static_cast<CMCStoreInfoBackupSaveAsyncWork*>(work.Get())->Bind(url, accountId, characterId, world, token, data, type);
@@ -226,7 +225,7 @@ void CAsyncWorkMgr::SaveStore(
 void CAsyncWorkMgr::RegisterParty(
   std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, CAdvenPartyInfo info
 ) {
-  NAsyncWorkPtr work(this->m_pools, "Register_Party");
+  NAsyncWorkPtr work(this->m_pools, g_registerPartyPoolName);
 
   if (work.Get()) {
     static_cast<CRegisterPartyAsyncWork*>(work.Get())->Bind(accountId, characterId, world, url, token, info);
@@ -237,7 +236,7 @@ void CAsyncWorkMgr::RegisterParty(
 // OFFSET: 0x00574F40
 // FUNCTION: fn_02512
 void CAsyncWorkMgr::StopRecruiting(std::uint32_t accountId, std::string world, std::string url, std::string token, std::uint32_t masterAccountId) {
-  NAsyncWorkPtr work(this->m_pools, "Stop_Recruiting");
+  NAsyncWorkPtr work(this->m_pools, g_stopRecruitingPoolName);
 
   if (work.Get()) {
     static_cast<CStopRecruitingAsyncWork*>(work.Get())->Bind(accountId, world, url, token, masterAccountId);

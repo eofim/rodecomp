@@ -211,10 +211,13 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
   switch (message) {
   case UM_COMMAND:
     switch (argument1) {
+    case ID_CHECK:
+      this->m_matchOption = argument2 != 0;
+      break;
     case ID_CLOSE: {
       SearchStoreRequestHeader packet;
       packet.packetType = ID_CZ_CLOSE_SEARCH_STORE_INFO;
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
       g_session.storeSearchX = -1;
       g_session.storeSearchY = -1;
       g_session.storeSearchOwnerAid = 0xFFFFFFFF;
@@ -222,26 +225,22 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       g_windowMgr.CloseWindow(WID_SEARCH_STORE_INFO);
       break;
     }
-    case ID_CHECK:
-      this->m_matchOption = argument2 != 0;
-      break;
     case ID_RADIOBTN:
       for (int index = 0; index < 2; ++index) {
         this->m_radios[index]->Invalidate();
-        int checked;
         if (sender == this->m_radios[index]) {
           this->m_searchType = index;
-          checked = 1;
+          this->m_radios[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
         } else {
-          checked = 0;
+          this->m_radios[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
         }
-        this->m_radios[index]->SendMsg(this, UM_SETSTATE, checked, 0, 0, 0);
       }
       break;
     case 365: {
       this->m_searchPending = 1;
-      this->m_findButton->SetDisabled(1);
-      this->m_findButton->Invalidate();
+      UIBitmapButton* findButton = this->m_findButton;
+      findButton->SetDisabled(1);
+      findButton->Invalidate();
       std::string cardName = this->m_edits[0]->Text();
       std::string itemName = this->m_edits[1]->Text();
       if (itemName.size() == 0) {
@@ -299,30 +298,32 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
             if (length > 0x800) {
               this->m_searchPending = 0;
             } else if (this->m_searchPending != 0) {
-              SearchStoreQueryPacket packet;
-              packet.maxPrice = maximum;
-              packet.packetType = ID_CZ_SEARCH_STORE_INFO;
-              packet.packetLength = length;
-              packet.searchType = searchType;
-              packet.minPrice = minimum;
-              packet.itemCount = static_cast<unsigned char>(itemIds.size());
-              packet.cardCount = static_cast<unsigned char>(cardIds.size());
-              int* id = packet.ids;
+              char buffer[0x800];
+              SearchStoreQueryPacket* packet = reinterpret_cast<SearchStoreQueryPacket*>(buffer);
+              packet->maxPrice = maximum;
+              packet->packetType = ID_CZ_SEARCH_STORE_INFO;
+              packet->packetLength = length;
+              packet->searchType = searchType;
+              packet->minPrice = minimum;
+              packet->itemCount = static_cast<unsigned char>(itemIds.size());
+              packet->cardCount = static_cast<unsigned char>(cardIds.size());
+              int* id = packet->ids;
               for (std::list<int>::iterator it = itemIds.begin(); it != itemIds.end(); ++it) {
                 *id++ = *it;
               }
-              id = packet.ids + itemIds.size();
+              id = packet->ids + itemIds.size();
               for (std::list<int>::iterator it = cardIds.begin(); it != cardIds.end(); ++it) {
                 *id++ = *it;
               }
-              GetRagConnection().Send(static_cast<short>(count * 4 + 15), &packet);
+              GetRagConnection().Send(static_cast<short>(count * 4 + 15), buffer);
             }
           }
         }
       }
       if (this->m_searchPending == 0) {
-        this->m_findButton->SetDisabled(0);
-        this->m_findButton->Invalidate();
+        UIBitmapButton* findButton = this->m_findButton;
+        findButton->SetDisabled(0);
+        findButton->Invalidate();
         this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
       }
       break;
@@ -340,7 +341,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       case SSI_FAILED_NOTHING_SEARCH_ITEM:
         this->m_page = 1;
         g_session.storeSearchResults.clear();
-        reinterpret_cast<unsigned char*>(&g_session.storeSearchPageFlags)[1] = 0;
+        g_session.m_storeSearchHasNext = 0;
         this->m_statusText = LookupMessage(MSI_SSI_FAILED_SEARCH_STORE);
         --g_session.storeSearchCount;
         break;
@@ -361,13 +362,18 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         return 0;
       }
       this->m_searchPending = 0;
-      this->m_findButton->SetDisabled(0);
-      this->m_findButton->Invalidate();
+      UIBitmapButton* findButton = this->m_findButton;
+      findButton->SetDisabled(0);
+      findButton->Invalidate();
     } else if (g_session.storeSearchResults.empty() && this->m_searchPending != 0) {
       this->m_statusText = LookupMessage(MSI_SEARCHING_ITEM);
     }
-    this->m_prevButton->Enable(this->m_page != 1);
-    this->m_nextButton->Enable(reinterpret_cast<unsigned char*>(&g_session.storeSearchPageFlags)[1]);
+    if (this->m_page == 1) {
+      this->m_prevButton->Enable(0);
+    } else {
+      this->m_prevButton->Enable(1);
+    }
+    this->m_nextButton->Enable(g_session.m_storeSearchHasNext);
     if (static_cast<unsigned int>(this->m_page * 10) < g_session.storeSearchResults.size()) {
       this->m_nextButton->Enable(1);
     }
@@ -392,11 +398,11 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
         return 0;
       }
-      if (reinterpret_cast<unsigned char*>(&g_session.storeSearchPageFlags)[1] != 0) {
+      if (g_session.m_storeSearchHasNext != 0) {
         this->m_page = page + 1;
         SearchStoreRequestHeader packet;
         packet.packetType = ID_CZ_SEARCH_STORE_INFO_NEXT_PAGE;
-        GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
         return 0;
       }
       break;
@@ -430,7 +436,7 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
     return;
   }
 
-  if (reinterpret_cast<std::int16_t*>(&g_session.storeSearchPageFlags)[1] != 0 &&
+  if (g_session.m_storeSearchPage != 0 &&
       g_windowMgr.Confirm(LookupMessage(MSI_OPEN_SEARCH_STORE), 2, true, false, 0, "Message", 0x118, 0x78, 0) != 0xBB) {
     return;
   }
@@ -446,6 +452,6 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
   packet.accountId = entry->accountId;
   packet.storeId = entry->storeId;
   packet.itemId = entry->item.GetItemId();
-  GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
   g_session.storeSearchOwnerAid = entry->accountId;
 }

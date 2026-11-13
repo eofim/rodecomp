@@ -1,10 +1,13 @@
 #include "UI/Window/UIEnums.h"
 #include "Contents/Configuration/ServiceOptions.h"
+#include "Render/Textures/Surface.h"
 #include "UI/Layout/SnapMgr.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
 
 #include <algorithm>
+
+template __declspec(noinline) std::_Tree_find_result<std::map<UIWindow*, SnapRectangle>::_Mybase::_Nodeptr> std::map<UIWindow*, SnapRectangle>::_Mybase::_Find_lower_bound<UIWindow*>(UIWindow* const&) const;
 
 // OFFSET: 0x00AA2C90
 // FUNCTION: fn_17219
@@ -45,7 +48,10 @@ void UIWindowMgr::Destroy(UIWindow* window) {
 
   if (rendered != this->rendered.end()) {
     if (snappingEnabled && g_serviceOptions.Get(141) != 0) {
-      this->snapRectangles.erase(window);
+      const auto snap = this->snapRectangles.find(window);
+      if (snap != this->snapRectangles.end()) {
+        this->snapRectangles.erase(snap);
+      }
     }
 
     g_snapMgr.Remove(*rendered);

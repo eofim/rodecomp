@@ -1,4 +1,5 @@
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/GameActor.h"
@@ -16,12 +17,14 @@
 
 class CSkillAction_MT_SPARK_BLASTER : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
 };
 
 class CSkillAction_MT_TRIPLE_LASER : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
@@ -29,12 +32,14 @@ public:
 
 class CSkillAction_MT_MIGHTY_SMASH : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   bool KeepSkillAttackSpeed() override;
 };
 
 class CSkillAction_MT_ENERGY_CANNONADE : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
@@ -43,12 +48,14 @@ public:
 
 class CSkillAction_MT_RUSH_STRIKE : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
 };
 
 class CSkillAction_MT_POWERFUL_SWING : public CSkillAction {
 public:
+  int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
   void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
 };
@@ -60,11 +67,17 @@ public:
   void OnEfstUpdate(int efstId, int value, int argument3, int argument4, CRenderObject* actor) override;
 };
 
+// OFFSET: 0x0078CC40
+// FUNCTION: fn_08651
+int CSkillAction_MT_SPARK_BLASTER::GetSkillAttackMotion() {
+  return 2;
+}
+
 // OFFSET: 0x0078CC50
 // FUNCTION: fn_08652
 void CSkillAction_MT_SPARK_BLASTER::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(1938, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_NEW_BATTLE_W_ENTITY, level / 16);
   }
 }
 
@@ -79,11 +92,17 @@ void CSkillAction_MT_SPARK_BLASTER::OnSkillEffect(int level, CGameActor* source,
   }
 }
 
+// OFFSET: 0x0078CEF0
+// FUNCTION: fn_08654
+int CSkillAction_MT_TRIPLE_LASER::GetSkillAttackMotion() {
+  return 2;
+}
+
 // OFFSET: 0x0078CF00
 // FUNCTION: fn_08655
 void CSkillAction_MT_TRIPLE_LASER::OnSkillCast(int level, CGameActor* source) {
   if (source) {
-    static_cast<EffectActor*>(source)->LaunchEffect(1938, level / 16);
+    static_cast<EffectActor*>(source)->LaunchEffect(EF_NEW_BATTLE_W_ENTITY, level / 16);
   }
 }
 
@@ -101,6 +120,12 @@ void CSkillAction_MT_TRIPLE_LASER::OnSkillHit(int level, CGameActor* source, CGa
   }
 }
 
+// OFFSET: 0x0078D0A0
+// FUNCTION: fn_08658
+int CSkillAction_MT_MIGHTY_SMASH::GetSkillAttackMotion() {
+  return 2;
+}
+
 // OFFSET: 0x0078D0B0
 // FUNCTION: fn_08659
 void CSkillAction_MT_MIGHTY_SMASH::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
@@ -114,6 +139,12 @@ void CSkillAction_MT_MIGHTY_SMASH::OnSkillEffect(int level, CGameActor* source, 
 // FUNCTION: fn_08660
 bool CSkillAction_MT_MIGHTY_SMASH::KeepSkillAttackSpeed() {
   return true;
+}
+
+// OFFSET: 0x0078D220
+// FUNCTION: fn_08661
+int CSkillAction_MT_ENERGY_CANNONADE::GetSkillAttackMotion() {
+  return 2;
 }
 
 // OFFSET: 0x0078D230
@@ -168,6 +199,12 @@ void CSkillAction_MT_ENERGY_CANNONADE::OnSkillDamage(int level, CGameActor* sour
   }
 }
 
+// OFFSET: 0x0078D990
+// FUNCTION: fn_08666
+int CSkillAction_MT_RUSH_STRIKE::GetSkillAttackMotion() {
+  return 2;
+}
+
 // OFFSET: 0x0078D9A0
 // FUNCTION: fn_08667
 void CSkillAction_MT_RUSH_STRIKE::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
@@ -175,7 +212,7 @@ void CSkillAction_MT_RUSH_STRIKE::OnSkillEffect(int level, CGameActor* source, C
     return;
   }
 
-  if (CRagEffect* ragEffect = static_cast<EffectActor*>(source)->LaunchEffect(1568, vector3d{0.0f, 0.0f, 0.0f}, 0.0f)) {
+  if (CRagEffect* ragEffect = static_cast<EffectActor*>(source)->LaunchEffect(EF_NEW_CROSSIMPACT_HIT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f)) {
     ragEffect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&target->render.position), 0, 0, 0, 0);
   }
   EffectLists* effects = g_effectMgr;
@@ -194,6 +231,12 @@ void CSkillAction_MT_RUSH_STRIKE::OnSkillDamage(int level, CGameActor* source, C
     EffectLists* effects = g_effectMgr;
     effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("rush_strike_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
+}
+
+// OFFSET: 0x0078DE10
+// FUNCTION: fn_08669
+int CSkillAction_MT_POWERFUL_SWING::GetSkillAttackMotion() {
+  return 2;
 }
 
 // OFFSET: 0x0078DE20
@@ -230,7 +273,7 @@ void CSkillAction_MT_POWERFUL_SWING::OnSkillDamage(int level, CGameActor* source
 // FUNCTION: fn_08672
 void CEfstAction_GRADUAL_GRAVITY::OnEfstBegin(int efstId, int value, int argument3, int argument4, CRenderObject* actor, bool argument6) {
   if (actor) {
-    static_cast<EffectActor*>(actor)->LaunchEffect(779, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    static_cast<EffectActor*>(actor)->LaunchEffect(EF_AGIUP3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
   }
 }
 
@@ -238,8 +281,8 @@ void CEfstAction_GRADUAL_GRAVITY::OnEfstBegin(int efstId, int value, int argumen
 // FUNCTION: fn_08673
 void CEfstAction_GRADUAL_GRAVITY::OnEfstEnd(int efstId, int argument2, int argument3, int argument4, CRenderObject* actor) {
   if (actor) {
-    while (static_cast<EffectActor*>(actor)->HasId(779)) {
-      actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0, 779, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    while (static_cast<EffectActor*>(actor)->HasId(EF_AGIUP3)) {
+      actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_AGIUP3, 0, 0, 0, 0, 0);
     }
   }
 }
@@ -249,3 +292,18 @@ void CEfstAction_GRADUAL_GRAVITY::OnEfstEnd(int efstId, int argument2, int argum
 void CEfstAction_GRADUAL_GRAVITY::OnEfstUpdate(int efstId, int value, int argument3, int argument4, CRenderObject* actor) {
   this->OnEfstBegin(efstId, value, 0, 0, actor, false);
 }
+
+// GLOBAL: gl_25815
+static SkillActionRegistrar s_skillAction6508(6508, NewAction<CSkillAction_MT_ENERGY_CANNONADE, CSkillAction>);
+// GLOBAL: gl_25816
+static SkillActionRegistrar s_skillAction6004(6004, NewAction<CSkillAction_MT_MIGHTY_SMASH, CSkillAction>);
+// GLOBAL: gl_25817
+static SkillActionRegistrar s_skillAction6507(6507, NewAction<CSkillAction_MT_POWERFUL_SWING, CSkillAction>);
+// GLOBAL: gl_25818
+static SkillActionRegistrar s_skillAction6506(6506, NewAction<CSkillAction_MT_RUSH_STRIKE, CSkillAction>);
+// GLOBAL: gl_25819
+static SkillActionRegistrar s_skillAction6002(6002, NewAction<CSkillAction_MT_SPARK_BLASTER, CSkillAction>);
+// GLOBAL: gl_25820
+static SkillActionRegistrar s_skillAction6003(6003, NewAction<CSkillAction_MT_TRIPLE_LASER, CSkillAction>);
+// GLOBAL: gl_25821
+static EfstActionRegistrar s_efstAction1014(1014, NewAction<CEfstAction_GRADUAL_GRAVITY, CEfstAction>);

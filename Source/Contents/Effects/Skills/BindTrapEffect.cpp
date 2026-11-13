@@ -19,7 +19,7 @@ CBindTrapEffect::CBindTrapEffect() : CEffect(-1), particles() {
 // OFFSET: 0x006FB4E0
 // FUNCTION: fn_06906
 void CBindTrapEffect::AddParticle(int index) {
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+  CParticle* particle = CreateParticle(&this->positionVector, 5);
   if (!particle) {
     return;
   }
@@ -30,10 +30,10 @@ void CBindTrapEffect::AddParticle(int index) {
   particle->rowIndex = 0;
   particle->groupIndex = 1;
   particle->alpha = 255;
-  particle->angleBits = 0;
+  particle->angle = 0;
   particle->phaseParameter = 0;
   particle->scale = static_cast<float>(index) * 6.0f + 9.0f;
-  InitParticleQuad(particle->vertices);
+  particle->InitParticleQuad(particle->vertices);
   this->particles.push_back(particle);
 }
 
@@ -74,10 +74,10 @@ bool CBindTrapEffect::IsAlive() {
 void CBindTrapEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
-
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
     if (particle) {
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));

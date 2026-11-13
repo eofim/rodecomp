@@ -8,6 +8,7 @@
 #include "Contents/Effects/Core/EffectPoint.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Sound/SoundMgr.h"
+#include "Contents/Actors/Pc.h"
 #include "Contents/World/World.h"
 #include "Utility/Math/AffineMatrix.h"
 
@@ -16,7 +17,7 @@
 void CSaintCastingEffect::AddRing(const char* texture, int alpha) {
   for (int ring = 0; ring < 4; ++ring) {
     for (int segment = 0; segment < 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -32,7 +33,7 @@ void CSaintCastingEffect::AddRing(const char* texture, int alpha) {
       particle->phaseParameter = 80;
       particle->animationParameter = 0.0f;
       const int row = particle->rowIndex;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>((row + 2) * 90 % 360);
+      particle->angle = static_cast<float>((row + 2) * 90 % 360);
 
       switch (this->id) {
       case EF_COUPLECASTING:
@@ -77,7 +78,7 @@ void CSaintCastingEffect::AddRing(const char* texture, int alpha) {
         break;
       }
 
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->particles.push_back(particle);
     }
   }
@@ -97,7 +98,7 @@ void CSaintCastingEffect::Close() {
 // FUNCTION: fn_19163
 void CSaintCastingEffect::Open() {
   CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
-  const vector3d& player = reinterpret_cast<const CRenderObject*>(world->player)->render.position;
+  const vector3d& player = world->player->render.position;
 
   switch (this->id) {
   case EF_BEGINSPELL:
@@ -169,22 +170,25 @@ bool CSaintCastingEffect::IsAlive() {
 // FUNCTION: fn_19165
 void CSaintCastingEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
-
     CParticle* particle = *it;
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
     if (particle && particle->elapsedFrames > 0) {
-      const int previousTilt = particle->phaseParameter - 1;
+      int tilt = particle->phaseParameter - 1;
       float scale = particle->scale + 0.07f;
-      int tilt = previousTilt < 10 ? 10 : previousTilt;
-      int alpha = previousTilt >= 10 ? particle->alpha : 0;
+      int alpha = particle->alpha;
+      if (tilt < 10) {
+        tilt = 10;
+        alpha = 0;
+      }
 
       if (scale >= 4.0f) {
         alpha -= 3;
         if (alpha <= 0) {
           alpha = 0;
-          if (particle->elapsedFrames < this->effectLifetime - 30) {
+          if (this->effectLifetime - 30 > particle->elapsedFrames) {
             tilt = this->id == EF_AURABLADE ? 64 : 74;
             scale = 3.37f;
           }
@@ -208,7 +212,7 @@ void CSaintCastingEffect::OnProcess() {
       const float spread = radius * g_cosTable[tilt];
       const int angle =
         static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(particle->angleParameter) / 20.0f) * segment) +
-                         *reinterpret_cast<const float*>(&particle->angleBits)) %
+                         particle->angle) %
         360;
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];

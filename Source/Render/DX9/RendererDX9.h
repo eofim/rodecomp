@@ -31,11 +31,11 @@ public:
   bool SaveJpeg(const char* filename, CBitmapRes* overlay) override;
   void CleanupTextures() override;
   bool SaveLogo(std::string filename) override;
-  bool LockBackBuffer() override;
+  int LockBackBuffer() override;
   HRESULT UnlockBackBuffer() override;
 
   void SetTextureMode(int mode);
-  void DrawDepthQueue(std::vector<DepthPrimitive>& queue, bool sort);
+  void DrawDepthQueue(bool sort, std::vector<DepthPrimitive>& queue);
   void DrawOpaqueQueues(RenderQueues& queues);
   void DrawGroundQueues();
   void DrawAlphaQueues(RenderQueues& queues, unsigned char twoPass);

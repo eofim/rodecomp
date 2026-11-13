@@ -1,6 +1,7 @@
 #include "Contents/Effects/Particles/CharacterParticleBundle.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
@@ -35,7 +36,7 @@ CharacterParticleBundle::CharacterParticleBundle() : CEffect(-1), startTime(0), 
 
 // OFFSET: 0x005A31F0
 // FUNCTION: fn_03126
-CharacterParticleBundle::~CharacterParticleBundle() {
+__declspec(noinline) CharacterParticleBundle::~CharacterParticleBundle() {
 }
 
 // OFFSET: 0x005A3360
@@ -44,7 +45,7 @@ void CChopChopClawMarks::UpdateParticlePosition(CEZ2STRParticle* particle) {
   if (particle) {
     const float* view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values;
     const float* inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse.values;
-    const vector3d origin = *reinterpret_cast<const vector3d*>(this->position);
+    const vector3d origin = this->positionVector;
     const float x = origin.x;
     const float y = origin.y;
     const float z = origin.z;
@@ -63,28 +64,33 @@ void CChopChopClawMarks::UpdateParticlePosition(CEZ2STRParticle* particle) {
 // OFFSET: 0x005A34E0
 // FUNCTION: fn_03131
 void CChopChopClawMarks::SpawnParticle() {
-  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (particle) {
     const std::vector<RadialGridPoint>& ring = this->GetRing(3);
     RadialGridPoint point;
     do {
       const int positiveX = std::ranges::max(rand() % 2, 0);
       const int x = std::max(rand() % 4, 1);
-      point.x = static_cast<float>(positiveX ? x : -x);
+      int signedX = -x;
+      if (positiveX) {
+        signedX = x;
+      }
+      point.x = static_cast<float>(signedX);
       const int positiveY = std::ranges::max(rand() % 2, 0);
       const int y = std::max(rand() % 4, 1);
-      point.y = static_cast<float>(positiveY ? y : -y);
-    } while (std::find_if(ring.begin(), ring.end(), [&point](const RadialGridPoint& candidate) {
+      int signedY = -y;
+      if (positiveY) {
+        signedY = y;
+      }
+      point.y = static_cast<float>(signedY);
+    } while (ring.end() == std::find_if(ring.begin(), ring.end(), [&point](const RadialGridPoint& candidate) {
       return candidate.x == point.x && candidate.y == point.y;
-    }) == ring.end());
+    }));
 
     const float x = point.x * 5.0f;
     const float y = point.y * 5.0f;
-    constexpr auto bytesText = CRYPT_NAME("DRUID\\KR_CHOP_CHOP\\chop_chop\\chop_chop.str", 0x1D6D75EDE7CD311FULL);
-    const auto& bytes = bytesText.data;
     // GLOBAL: gl_24875
-    thread_local EncryptedName<sizeof(bytes), 0x1D6D75EDE7CD311FULL> name(bytes);
-    particle->Load(name.Text());
+    particle->Load(OBFUSCATE_TEXT("DRUID\\KR_CHOP_CHOP\\chop_chop\\chop_chop.str", 0x1D6D75EDE7CD311FULL));
     particle->offsetX = x;
     particle->offsetY = y;
     particle->offsetZ = 0.0f;
@@ -141,12 +147,7 @@ const std::vector<RadialGridPoint>& CChopChopClawMarks::GetRing(int radius) {
 // OFFSET: 0x005A3C70
 // FUNCTION: fn_03135
 void CChopChopClawMarks::OnInit() {
-  const int id = CEZ2STREffectMgr::GetInstance()->EffectId([] {
-    constexpr std::array<std::uint8_t, 10> bytesArray = CRYPT_NAME("chop_chop", 0x59278F63D79F3DA1ULL);
-    const std::uint8_t (&bytes)[10] = bytesArray._Elems;
-    thread_local EncryptedName<sizeof(bytes), 0x59278F63D79F3DA1ULL> name(bytes);
-    return name.Text();
-  }());
+  const int id = CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_ARRAY_TEXT("chop_chop", 0x59278F63D79F3DA1ULL, std::uint8_t));
   if (EZ2STREffectInfo* info = CEZ2STREffectMgr::GetInstance()->FindById(id)) {
     this->offsetX = info->offsetX;
     this->offsetY = info->offsetY;

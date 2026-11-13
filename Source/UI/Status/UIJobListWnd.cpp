@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Status/UIJobListWnd.h"
 #include "UI/Window/UIEnums.h"
 
@@ -67,7 +68,7 @@ void UIJobListWnd::OnCreate(int width, int height) {
 void UIJobListWnd::Paint() {
   this->DrawTitleBar(true, "", 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
   this->DrawButtonBar(2, 0, 1);
 }
@@ -132,7 +133,7 @@ int UIJobListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       return 0;
     }
 
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
   }
     [[fallthrough]];
   case ID_CLOSE:

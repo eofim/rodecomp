@@ -1,4 +1,6 @@
 #include "UI/Window/WindowId.h"
+#include "Client/Session/Session.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Client/Mode/CMode.h"
 #include "UI/Window/UIEnums.h"
@@ -65,9 +67,8 @@ void UIExchangeAcceptWnd::OnCreate(int width, int height) {
   this->viewer = new UITextViewer();
   this->viewer->Configure(10, 22, width - 20, height - 55, 0);
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
-  this->viewer->backgroundColor = 0xFF000000u | RGB(red, green, blue);
-  this->viewer->Invalidate();
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  this->viewer->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
   this->AddChild(this->viewer);
   this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>("deal"), 38, 0, 0);
 }
@@ -76,23 +77,10 @@ void UIExchangeAcceptWnd::OnCreate(int width, int height) {
 // FUNCTION: fn_12343
 int UIExchangeAcceptWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
-  case UM_COMMAND:
-    this->RecordResponse(static_cast<int>(a), b, c, d);
-    switch (a) {
-    case ID_OK:
-      g_windowMgr.CloseWindow(WID_EXCHANGEACCEPTWND);
-      g_modeMgr.gameMode->SendMsg(MM_ACK_EXCHANGE_ITEM, 3, 0, 0, 0);
-      return 0;
-    case ID_CANCEL:
-      g_windowMgr.CloseWindow(WID_EXCHANGEACCEPTWND);
-      g_modeMgr.gameMode->SendMsg(MM_ACK_EXCHANGE_ITEM, 4, 0, 0, 0);
-      return 0;
-    }
-    return 0;
   case UM_SETINFO:
-    this->saved = reinterpret_cast<NormalItemSlotWindow*>(a);
-    if (!reinterpret_cast<ExchangeAcceptWndInfo*>(this->saved)->IsValid()) {
-      reinterpret_cast<ExchangeAcceptWndInfo*>(this->saved)->Reset();
+    this->saved = reinterpret_cast<ExchangeAcceptWndInfo*>(a);
+    if (!this->saved->IsValid()) {
+      this->saved->Reset();
     }
     this->Move(this->saved->x, this->saved->y);
     return 0;
@@ -107,6 +95,19 @@ int UIExchangeAcceptWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(code.c_str()), 138, 0, 0);
     return 0;
   }
+  case UM_COMMAND:
+    this->RecordResponse(static_cast<int>(a), b, c, d);
+    switch (a) {
+    case ID_OK:
+      g_windowMgr.CloseWindow(WID_EXCHANGEACCEPTWND);
+      g_modeMgr.gameMode->SendMsg(MM_ACK_EXCHANGE_ITEM, 3, 0, 0, 0);
+      return 0;
+    case ID_CANCEL:
+      g_windowMgr.CloseWindow(WID_EXCHANGEACCEPTWND);
+      g_modeMgr.gameMode->SendMsg(MM_ACK_EXCHANGE_ITEM, 4, 0, 0, 0);
+      return 0;
+    }
+    return 0;
   case UM_REPLAY_FRAMED_DATA: {
     const auto* bytes = reinterpret_cast<const unsigned char*>(a);
     ExchangeRecordHeader header = {};

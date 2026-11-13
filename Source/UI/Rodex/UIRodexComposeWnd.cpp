@@ -192,7 +192,7 @@ void UIRodexComposeWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAtPoint(x, y);
   if (item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->drag.BeginItem(g_windowMgr, 15, item, item.quantity, -1);
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(15, item, item.quantity, -1);
   }
 }
 
@@ -268,7 +268,7 @@ void UIRodexComposeWnd::SetRecipient(int id, unsigned short job, unsigned short 
   this->m_recipientJobText->SetTextWithinWidth(g_session.GetJobName(job, 99), 0);
   this->m_recipientJobText->Show(1);
   this->m_recipientId = id;
-  this->m_recipientIdText->SetTextWithinWidth(ShortcutFilename(id).c_str(), 0);
+  this->m_recipientIdText->SetTextWithinWidth(g_session.ShortcutFilename(id).c_str(), 0);
   this->m_recipientIdText->Show(1);
   this->m_recipientEdit->Show(0);
   this->m_confirmRecipientButton->Enable(0);
@@ -333,7 +333,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
         } else {
           packet.known = g_session.IsKnownName(packet.name);
         }
-        GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
         return 0;
       }
 
@@ -469,7 +469,7 @@ void UIRodexComposeWnd::Paint() {
 
   this->DrawBitmap(19, 342, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\icon_zeny.bmp"))), true);
 
-  this->DrawTextAt(135, 350, "Zeny", 0, 0, 11, 0x737373, 0, 0);
+  this->DrawTextAt(135, 350, "/", 0, 0, 11, 0x737373, 0, 0);
 
   char zenyBuf[260] = {};
   FormatGroupedInteger(static_cast<std::int64_t>(g_session.m_zeny), zenyBuf, sizeof(zenyBuf));

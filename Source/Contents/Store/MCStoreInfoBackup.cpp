@@ -1,5 +1,4 @@
 #include "UI/Window/UIEnums.h"
-#include "Contents/UserData/AccountService.h"
 #include "Contents/Async/AsyncWorkMgr.h"
 #include "Contents/Store/MCStoreInfoBackup.h"
 #include "Contents/Tables/MessageTable.h"
@@ -74,11 +73,11 @@ std::string CMCStoreInfoBackup::SaveUrl() const {
 
 // OFFSET: 0x006070E0
 // FUNCTION: fn_04237
-void CMCStoreInfoBackup::Reset(LuaScript& settings, LuaScript& tables, const char* host, const char* port, const char* overrideKey) {
+void CMCStoreInfoBackup::Reset() {
   this->loaded = false;
   this->title = "";
   this->items.clear();
-  const std::string base = ResolveAccountServiceBase(settings, tables, host, port, overrideKey);
+  const std::string base = g_session.ResolveAccountServiceBase();
 
   if (!base.empty()) {
     this->saveUrl = base + "/MerchantStore/save";
@@ -151,8 +150,9 @@ void CMCStoreInfoBackup::Load(
     return;
   }
 
-  g_asyncWorkMgr->LoadStore(accountId, characterId, accountName, this->LoadUrl(),
-                            std::string(reinterpret_cast<const char*>(&g_session.webServiceLoginData[0x08]), 16), type);
+  CAsyncWorkMgr* mgr = g_asyncWorkMgr;
+  mgr->LoadStore(accountId, characterId, accountName, this->LoadUrl(),
+                            std::string(g_session.m_webAuthToken, 16), type);
 }
 
 // OFFSET: 0x00606EB0
@@ -163,12 +163,12 @@ void CMCStoreInfoBackup::Save(int type) {
   Json::Value data;
   this->ExportData(data);
 
-  if (!data.isNull()) {
+  if (data.isNull() != true) {
     root["data"] = data;
     Json::StyledWriter writer;
     const std::string response = writer.write(root);
     g_asyncWorkMgr->SaveStore(g_session.m_aid, g_session.m_gid, std::string(g_session.m_accountName.c_str()), this->SaveUrl(),
-                              std::string(reinterpret_cast<const char*>(&g_session.webServiceLoginData[8]), 16), response, this->type);
+                              std::string(g_session.m_webAuthToken, 16), response, this->type);
 
     ++this->pendingSaves;
   }

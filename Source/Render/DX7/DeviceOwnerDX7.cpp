@@ -66,21 +66,22 @@ namespace {
 
   // INLINED
   __forceinline void ChannelMask(DeviceOwnerDX7::Channel& channel, DWORD mask) {
-    channel = {0, 8};
+    while (mask) {
+      if (mask & 1) {
+        DWORD expansion = 8;
 
-    if (!mask) {
-      return;
-    }
+        do {
+          --expansion;
+          mask >>= 1;
+        } while (mask);
 
-    while (!(mask & 1)) {
+        channel.expansion = expansion;
+        return;
+      }
+
       ++channel.shift;
       mask >>= 1;
     }
-
-    do {
-      --channel.expansion;
-      mask >>= 1;
-    } while (mask);
   }
 
   // INLINED
@@ -232,10 +233,14 @@ HRESULT DeviceOwnerDX7::CreateSurfaces(const DDSURFACEDESC2* mode, DWORD flags) 
   this->greenMask = format.dwGBitMask;
   this->blueMask = format.dwBBitMask;
   this->alphaMask = format.dwRGBAlphaBitMask;
-  ChannelMask(this->red, this->redMask);
-  ChannelMask(this->green, this->greenMask);
-  ChannelMask(this->blue, this->blueMask);
-  ChannelMask(this->alpha, this->alphaMask);
+  this->red = {0, 8};
+  this->green = {0, 8};
+  this->blue = {0, 8};
+  this->alpha = {0, 8};
+  ChannelMask(this->red, format.dwRBitMask);
+  ChannelMask(this->green, format.dwGBitMask);
+  ChannelMask(this->blue, format.dwBBitMask);
+  ChannelMask(this->alpha, format.dwRGBAlphaBitMask);
   this->renderTarget = (flags & 2) ? this->backBuffer : this->primary;
   this->renderTarget->AddRef();
   SurfaceDescription(&description, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT, 0);
@@ -542,33 +547,23 @@ HRESULT DeviceOwnerDX7::Present(bool wait) {
 // OFFSET: 0x005494C0
 // FUNCTION: fn_01890
 void DeviceOwnerDX7::AdjustTextureDimensions(std::uint32_t& width, std::uint32_t& height) const {
-  std::uint32_t selectedWidth = 1;
+  DWORD selectedWidth = 1;
 
   while (selectedWidth < width) {
     selectedWidth *= 2;
   }
 
-  if (selectedWidth < this->minTextureWidth) {
-    selectedWidth = this->minTextureWidth;
-  }
+  selectedWidth = std::max(selectedWidth, this->minTextureWidth);
+  selectedWidth = std::min(selectedWidth, this->maxTextureWidth);
 
-  if (selectedWidth > this->maxTextureWidth) {
-    selectedWidth = this->maxTextureWidth;
-  }
-
-  std::uint32_t selectedHeight = 1;
+  DWORD selectedHeight = 1;
 
   while (selectedHeight < height) {
     selectedHeight *= 2;
   }
 
-  if (selectedHeight < this->minTextureHeight) {
-    selectedHeight = this->minTextureHeight;
-  }
-
-  if (selectedHeight > this->maxTextureHeight) {
-    selectedHeight = this->maxTextureHeight;
-  }
+  selectedHeight = std::max(selectedHeight, this->minTextureHeight);
+  selectedHeight = std::min(selectedHeight, this->maxTextureHeight);
 
   const auto aspect = this->maxTextureAspectRatio;
 

@@ -30,19 +30,20 @@ void CRotateItemEffect::Close() {
 // FUNCTION: fn_19149
 void CRotateItemEffect::Open() {
   for (int index = 0; index < 4; ++index) {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
     if (!particle) {
       continue;
     }
 
     particle->effectId = this->id;
-    particle->columnIndex = index;
-    particle->rowIndex = 0;
-    particle->groupIndex = 1;
+    int* indices = &particle->groupIndex;
+    indices[1] = index;
+    indices[2] = 0;
+    indices[0] = 1;
     particle->SetTexture("유저인터페이스\\item\\쿠나이_독.bmp");
     particle->scale = 2.5f;
     particle->SetColor(255, 200, 255);
-    *reinterpret_cast<float*>(&particle->angleBits) = 360.0f;
+    particle->angle = 360.0f;
     particle->speedParameter = 0.4f;
     particle->alpha = 255;
     particle->animationParameter = 13.0f;
@@ -66,7 +67,7 @@ void CRotateItemEffect::OnProcess() {
     (*it)->position.z = this->position[2];
     if (CParticle* particle = *it) {
       if (this->frame >= 5) {
-        float& particleAngle = *reinterpret_cast<float*>(&particle->angleBits);
+        float& particleAngle = particle->angle;
         if (particle->columnIndex == 0) {
           particleAngle = static_cast<float>(static_cast<int>(particle->speedParameter * 45.0f + particleAngle) % 360);
           if (this->id != 984) {
@@ -75,7 +76,7 @@ void CRotateItemEffect::OnProcess() {
             }
           }
         } else {
-          this->alpha -= particle->columnIndex == 1 ? 150 : 25;
+          this->alpha -= particle->columnIndex != 1 ? 25 : 150;
           particle->alpha = this->alpha;
           particleAngle = this->angle;
         }

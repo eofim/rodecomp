@@ -20,8 +20,8 @@ struct SpriteFrameCell;
 struct SpriteRleImage;
 
 struct SpriteLayerResources {
-  /* 0000 */ CSprRes* sprite;
-  /* 0004 */ CActRes* action;
+  /* 0000 */ CSprRes* sprite = nullptr;
+  /* 0004 */ CActRes* action = nullptr;
 };
 
 struct SpriteLayerCell {
@@ -40,7 +40,7 @@ struct SpriteLayerQuad {
 class SpriteLayerRenderer {
 public:
   // INLINED
-  explicit SpriteLayerRenderer(CPc* pc) : pc(pc), position(), depthScale(1.0f), depthBias(0.0f) {
+  explicit SpriteLayerRenderer(CPc* pc) : pc(pc), position{0.0f, 0.0f, 0.0f}, depthScale(1.0f), depthBias(0.0f) {
   }
 
   void Render(const float* matrix, int padding_0030, char blendVariant);

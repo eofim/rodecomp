@@ -35,7 +35,7 @@ void CFuumaShouakuEffect::Close() {
 // FUNCTION: fn_07010
 void CFuumaShouakuEffect::Open() {
   this->retained = 1;
-  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   this->first = particle;
   if (!particle) {
     return;
@@ -50,10 +50,13 @@ void CFuumaShouakuEffect::Open() {
   const float dz = target[2] - origin[2];
   this->travelFrames = static_cast<int>(SquareRoot(dy * dy + dx * dx + dz * dz) * g_depthAverageHalf);
 
-  this->velocityX = target[0] - origin[0];
-  this->velocityY = target[1] - origin[1];
-  this->velocityZ = target[2] - origin[2];
-  const float scale = 1.0f / SquareRoot(this->velocityX * this->velocityX + this->velocityY * this->velocityY + this->velocityZ * this->velocityZ);
+  const float velocityX = target[0] - origin[0];
+  const float velocityY = target[1] - origin[1];
+  const float velocityZ = target[2] - origin[2];
+  this->velocityX = velocityX;
+  this->velocityY = velocityY;
+  this->velocityZ = velocityZ;
+  const float scale = 1.0f / SquareRoot(velocityX * velocityX + velocityY * velocityY + velocityZ * velocityZ);
   this->velocityX = scale * this->velocityX * 2.0f;
   this->velocityY = scale * this->velocityY * 2.0f;
   this->velocityZ = scale * this->velocityZ * 2.0f;
@@ -77,7 +80,7 @@ void CFuumaShouakuEffect::OnProcess() {
         this->first = nullptr;
       }
 
-      this->second = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->sourcePosition), 5));
+      this->second = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->sourcePositionVector, 5));
       if (this->second) {
         this->second->Load(std::string("SHINKIRO_SHIRANUI\\SS_FUUMASHOUAKU\\fuumashouaku_00\\fuumashouaku_00.str"));
         this->second->m_loop = true;

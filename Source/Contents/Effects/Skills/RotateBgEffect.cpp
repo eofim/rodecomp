@@ -29,14 +29,16 @@ void CRotateBgEffect::Close() {
 // FUNCTION: fn_19142
 void CRotateBgEffect::Open() {
   for (int ring = 0; ring < 2; ++ring) {
-    const int start = std::max(rand() % 360, 0);
+    const int startRoll = rand() % 360;
+    const int start = startRoll >= 0 ? startRoll : 0;
     for (int index = 0; index < 10; ++index) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle) {
         particle->effectId = this->id;
-        particle->columnIndex = index;
-        particle->rowIndex = ring;
-        particle->groupIndex = 1;
+        int* indices = &particle->groupIndex;
+        indices[1] = index;
+        indices[2] = ring;
+        indices[0] = 1;
         particle->SetTexture("effect\\storm2.tga");
         particle->alpha = 0;
         particle->scale = 2.0f;
@@ -53,17 +55,19 @@ void CRotateBgEffect::Open() {
 
   int layer = 0;
   for (int angle = 0; angle < 360; angle += 90) {
-    const int span = std::max(rand() % 21, 0) + 80;
+    const int spanRoll = rand() % 21;
+    const int span = (spanRoll >= 0 ? spanRoll : 0) + 80;
     for (int index = 0; index < 21; ++index) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle) {
         particle->effectId = this->id;
-        particle->columnIndex = index;
-        particle->rowIndex = layer;
-        particle->groupIndex = 2;
+        int* indices2 = &particle->groupIndex;
+        indices2[1] = index;
+        indices2[2] = layer;
+        indices2[0] = 2;
         particle->SetTexture("effect\\cloud11.tga");
         particle->angleParameter = 30;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(angle);
+        particle->angle = static_cast<float>(angle);
         particle->alpha = 0;
         particle->phaseParameter = span;
         particle->animationParameter = 28.0f - static_cast<float>(layer) * 5.0f;
@@ -144,13 +148,14 @@ void CRotateBgEffect::OnProcess() {
   }
 
   for (auto it = this->segmentParticles.begin(); it != this->segmentParticles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
     CParticle* particle = *it;
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
       if (particle->columnIndex == 0) {
-        this->segmentAngle = static_cast<int>(*reinterpret_cast<float*>(&particle->angleBits));
+        this->segmentAngle = static_cast<int>(particle->angle);
         this->segmentSpan = particle->angleParameter;
         this->segmentAlpha = particle->alpha;
         this->segmentScale = particle->scale;
@@ -161,7 +166,7 @@ void CRotateBgEffect::OnProcess() {
       }
 
       this->segmentAngle += 5;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(this->segmentAngle % 360);
+      particle->angle = static_cast<float>(this->segmentAngle % 360);
       this->segmentSpan += 3;
       if (this->segmentSpan > 180) {
         this->segmentSpan = 180;
@@ -185,7 +190,7 @@ void CRotateBgEffect::OnProcess() {
 
       const int index = particle->columnIndex;
       const int span = particle->angleParameter;
-      const float rotation = *reinterpret_cast<float*>(&particle->angleBits);
+      const float rotation = particle->angle;
       int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(span) / 21.0f) * index) + rotation) % 360;
       if (span == 360 && index == 20) {
         angle = static_cast<int>(rotation);

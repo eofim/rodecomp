@@ -8,6 +8,7 @@
 #include "Utility/Hash/XxHash3.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include <algorithm>
 #include <atomic>
@@ -178,13 +179,8 @@ bool CGPak::Open(CPakFile* file) {
 
   this->m_file = file;
   const std::uint8_t* bytes = file->Read(0, sizeof(PakHeaderFile));
-  EncryptedName<14, 0x050505679903579BULL>& eventHorizon = []() -> EncryptedName<14, 0x050505679903579BULL>& {
-    constexpr auto sourceText = CRYPT_NAME("Event Horizon", 0x050505679903579BULL);
-    const auto& source = sourceText.data;
-    // GLOBAL: gl_25504
-    thread_local EncryptedName<sizeof(source), 0x050505679903579BULL> name(source);
-    return name;
-  }();
+  // GLOBAL: gl_25504
+  EncryptedName<14, 0x050505679903579BULL>& eventHorizon = OBFUSCATE_STRING("Event Horizon", 0x050505679903579BULL);
 
   if (std::memcmp(bytes, eventHorizon.Text(), 14) == 0) {
     const PakFileHeader* header = reinterpret_cast<const PakFileHeader*>(bytes);
@@ -192,13 +188,8 @@ bool CGPak::Open(CPakFile* file) {
     this->m_entryCount = header->entryCount;
     this->m_tableOffset = header->tableOffset + sizeof(PakFileHeader);
   } else {
-    EncryptedName<16, 0x83EFBFBB37EDBDBDULL>& masterOfMagic = []() -> EncryptedName<16, 0x83EFBFBB37EDBDBDULL>& {
-      constexpr auto sourceText = CRYPT_NAME("Master of Magic", 0x83EFBFBB37EDBDBDULL);
-      const auto& source = sourceText.data;
-      // GLOBAL: gl_25505
-      thread_local EncryptedName<sizeof(source), 0x83EFBFBB37EDBDBDULL> name(source);
-      return name;
-    }();
+    // GLOBAL: gl_25505
+    EncryptedName<16, 0x83EFBFBB37EDBDBDULL>& masterOfMagic = OBFUSCATE_STRING("Master of Magic", 0x83EFBFBB37EDBDBDULL);
 
     if (std::memcmp(bytes, masterOfMagic.Text(), 16) != 0) {
       return false;
@@ -327,15 +318,15 @@ bool CGPak::ReadTableV2() {
     return false;
   }
 
-  this->m_entries.resize(this->m_entryCount);
   const std::uint8_t* cursor = decoded.empty() ? nullptr : &decoded[0];
+  this->m_entries.resize(this->m_entryCount);
   std::uint32_t maximum = 0;
 
   for (std::uint32_t i = 0; i < this->m_entryCount; ++i) {
     const char* name = reinterpret_cast<const char*>(cursor);
-    const std::uint8_t* metadata = cursor + std::strlen(name) + 1;
-    const PakEntryFile* fileEntry = reinterpret_cast<const PakEntryFile*>(metadata);
-    cursor = metadata + sizeof(PakEntryFile);
+    cursor += std::strlen(name);
+    const PakEntryFile* fileEntry = reinterpret_cast<const PakEntryFile*>(cursor + 1);
+    cursor += sizeof(PakEntryFile) + 1;
 
     myGPack::PakEntry& entry = this->m_entries[i];
     entry.compressedSize = fileEntry->compressedSize;
@@ -366,15 +357,15 @@ bool CGPak::ReadTableV3() {
     return false;
   }
 
-  this->m_entries.resize(this->m_entryCount);
   const std::uint8_t* cursor = decoded.data();
+  this->m_entries.resize(this->m_entryCount);
   std::uint32_t maximum = 0;
 
   for (std::uint32_t i = 0; i < this->m_entryCount; ++i) {
     const char* name = reinterpret_cast<const char*>(cursor);
-    const std::uint8_t* metadata = cursor + std::strlen(name) + 1;
-    const PakEntryFileV3* fileEntry = reinterpret_cast<const PakEntryFileV3*>(metadata);
-    cursor = metadata + sizeof(PakEntryFileV3);
+    cursor += std::strlen(name);
+    const PakEntryFileV3* fileEntry = reinterpret_cast<const PakEntryFileV3*>(cursor + 1);
+    cursor += sizeof(PakEntryFileV3) + 1;
 
     myGPack::PakEntry& entry = this->m_entries[i];
     entry.compressedSize = fileEntry->compressedSize;
@@ -415,7 +406,7 @@ void CGPak::ReadAuxiliary(std::vector<std::uint8_t>& output, std::uint64_t* iden
     *identifier = UINT64_MAX;
   }
 
-  output.erase(output.begin(), output.end());
+  output.resize(0);
 
   std::uint32_t size;
   std::uint64_t offset;
@@ -458,7 +449,7 @@ myGPack::CGPakUpdate::CGPakUpdate() {
 
 // OFFSET: 0x00E55940
 // FUNCTION: fn_24308
-myGPack::CGPakUpdate::~CGPakUpdate() {
+__declspec(noinline) myGPack::CGPakUpdate::~CGPakUpdate() {
   this->Close();
 }
 

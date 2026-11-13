@@ -19,7 +19,7 @@ void CRichManKim::Close() {
 // OFFSET: 0x0070B1A0
 // FUNCTION: fn_07115
 void CRichManKim::Open() {
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+  CParticle* particle = CreateParticle(&this->positionVector, 5);
   if (!particle) {
     return;
   }
@@ -30,13 +30,14 @@ void CRichManKim::Open() {
   particle->rowIndex = 0;
   particle->groupIndex = 1;
   particle->alpha = 200;
-  particle->angleBits = 0;
+  particle->angle = 0;
   particle->phaseParameter = 0;
   particle->scale = 1.0f;
-  particle->animationParameter = -5.0f - static_cast<float>(rand() % 5);
-  *reinterpret_cast<float*>(particle->animationParameters) = 0.0f;
+  float* values = &particle->animationParameter;
+  values[0] = -5.0f - static_cast<float>(rand() % 5);
+  values[1] = 0.0f;
   particle->SetColor(200, 200, 200);
-  InitParticleQuad(particle->vertices);
+  particle->InitParticleQuad(particle->vertices);
   this->angleIndex = rand() % 359;
   this->particles.push_back(particle);
 }
@@ -52,18 +53,19 @@ bool CRichManKim::IsAlive() {
 void CRichManKim::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
-
+    vector3d& position = (*it)->position;
+    position.x = this->position[0];
+    position.y = this->position[1];
+    position.z = this->position[2];
     if (particle) {
-      int index = ++this->angleIndex;
+      int index = this->angleIndex + 1;
+      this->angleIndex = index;
       if (index > 360) {
         this->angleIndex = 0;
         index = 0;
       }
 
-      float& width = *reinterpret_cast<float*>(particle->animationParameters);
+      float& width = particle->animationParameters[0];
       const float height = static_cast<float>(static_cast<double>(particle->animationParameter) - static_cast<double>(g_cosTable[index]) * 0.08);
       const float stretch = static_cast<float>(static_cast<double>(g_cosTable[index]) * 0.003 + static_cast<double>(width));
       particle->animationParameter = height;

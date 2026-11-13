@@ -102,8 +102,11 @@ void UIRefiningWnd::OnCreate(int width, int height) {
   refining->Resize(refining->BitmapWidth(), refining->BitmapHeight());
   this->refiningButton->Move(84, 262);
   this->refiningButton->SetId(184);
-  this->refiningButton->SetDisabled(1);
-  this->refiningButton->Invalidate();
+  {
+    auto* refiningButton = this->refiningButton;
+    refiningButton->SetDisabled(1);
+    refiningButton->Invalidate();
+  }
   this->AddChild(this->refiningButton);
 
   this->returnButton = new UIRefining_BtnReturn();
@@ -445,7 +448,7 @@ void UIRefiningWnd::OnLBtnDown(int x, int y) {
   }
 
   if (this->state == 1 && this->item.identity[1] > 0 && static_cast<unsigned>(x - 109) <= 46 && static_cast<unsigned>(y - 201) <= 46) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->drag.BeginItem(g_windowMgr, 28, this->item, 1, -1);
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(28, this->item, 1, -1);
   }
 }
 
@@ -609,10 +612,16 @@ void UIRefiningWnd::OnProcess() {
 
   if (this->state == 1 && this->refiningButton->Disabled() == 1 && this->item.identity[1] > 0 && this->selectedMaterial >= 0 &&
       static_cast<unsigned>(this->selectedMaterial) < this->materials.size()) {
-    this->refiningButton->SetDisabled(0);
-    this->refiningButton->Invalidate();
-    this->refiningButton->cost = this->SelectedMaterialValue();
-    this->refiningButton->Invalidate();
+    {
+      auto* refiningButton = this->refiningButton;
+      refiningButton->SetDisabled(0);
+      refiningButton->Invalidate();
+    }
+    {
+      auto* refiningButton = this->refiningButton;
+      refiningButton->cost = this->SelectedMaterialValue();
+      refiningButton->Invalidate();
+    }
     this->Invalidate();
   }
 
@@ -812,7 +821,7 @@ int UIRefiningWnd::SendMsg(
             packet.index = static_cast<std::uint16_t>(index);
             packet.materialId = this->materials[this->selectedMaterial].itemId;
             packet.useCatalyst = this->catalystEnabled;
-            GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+            GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
           }
         }
       }
@@ -822,7 +831,7 @@ int UIRefiningWnd::SendMsg(
       if (this->state != 2) {
         RefiningClosePacket packet;
         packet.id = ID_CZ_CLOSE_REFINING_UI;
-        GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
         g_windowMgr.CloseWindow(WID_REFININGWND);
       }
       break;
@@ -843,7 +852,7 @@ int UIRefiningWnd::SendMsg(
     break;
   case UM_REFRESHITEM:
     if (this->state == 0 || this->state == 1) {
-      const ITEM_INFO info = LookupClientItemByIdentity(g_session.m_inventoryItems, argument1);
+      const ITEM_INFO info = g_session.LookupClientItemByIdentity(argument1);
       if (g_session.HasSwapEquipmentItem(info.identity[1]) == 1) {
         g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         return -1;
@@ -854,7 +863,7 @@ int UIRefiningWnd::SendMsg(
           RefiningSelectPacket packet;
           packet.id = ID_CZ_REFINING_SELECT_ITEM;
           packet.index = static_cast<std::uint16_t>(argument1);
-          GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
         } else {
           this->notice->SetNotice(LookupMessage(MSI_RETURN), 3000, 1);
         }
@@ -877,7 +886,7 @@ void UIRefiningWnd::ApplyItem(int id, int count, RefiningMaterial* materials, in
       return;
     }
 
-    ITEM_INFO found = LookupClientItemByIdentity(g_session.m_inventoryItems, id);
+    ITEM_INFO found = g_session.LookupClientItemByIdentity(id);
     if (found.identity[1] == 0) {
       return;
     }
@@ -906,14 +915,20 @@ void UIRefiningWnd::ApplyItem(int id, int count, RefiningMaterial* materials, in
     this->stateTick = timeGetTime();
     this->frame = 0;
     if (this->cancelButton) {
-      this->cancelButton->SetDisabled(0);
-      this->cancelButton->Invalidate();
+      {
+        auto* cancelButton = this->cancelButton;
+        cancelButton->SetDisabled(0);
+        cancelButton->Invalidate();
+      }
     }
 
     this->result = 7;
     this->refiningButton->Enable(1);
-    this->refiningButton->SetDisabled(1);
-    this->refiningButton->Invalidate();
+    {
+      auto* refiningButton = this->refiningButton;
+      refiningButton->SetDisabled(1);
+      refiningButton->Invalidate();
+    }
     this->returnButton->Enable(0);
     this->againButton->Enable(0);
     this->Invalidate();
@@ -929,7 +944,7 @@ void UIRefiningWnd::ApplyItem(int id, int count, RefiningMaterial* materials, in
       return;
     }
 
-    ITEM_INFO found = LookupClientItemByIdentity(g_session.m_inventoryItems, id);
+    ITEM_INFO found = g_session.LookupClientItemByIdentity(id);
     if (found.identity[1] == 0) {
       return;
     }
@@ -1136,7 +1151,7 @@ __declspec(safebuffers) void UIRefiningWnd::Paint() {
 
   if (this->item.identity[1] > 0) {
     DrawItemIcon(*this, ResourceMgr::Instance(), 120, 212, this->item, 0);
-    if (this->item.grade > 0) {
+    if (0 < this->item.grade) {
       this->DrawBitmap(120, 224,
         static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", this->item.grade).c_str()))),
         true);

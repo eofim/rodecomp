@@ -1,5 +1,7 @@
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/WindowId.h"
+#include "Network/Packets/ActorNamePacket.h"
 #include "Client/Mode/CGameMode.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMessage.h"
@@ -80,6 +82,7 @@
 #include "UI/Monster/UIMonsterInfoWnd.h"
 #include "Contents/Clan/ClanInfo.h"
 #include "Contents/Actors/ActorStateFlags.h"
+#include "Contents/Actors/MercenaryAI.h"
 #include "Contents/Items/SelectPackageItemMgr.h"
 #include "Contents/Jobs/JobNames.h"
 #include "Contents/Navigation/NavigationManager.h"
@@ -100,6 +103,7 @@
 #include "Resource/MSGSTRINGID.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 extern "C" long long _Xtime_get_ticks();
 
@@ -132,6 +136,8 @@ struct GameModePacketText40 {
   /* 0002 */ char text[40];
 };
 #pragma pack(pop)
+
+template __declspec(noinline) std::vector<char>::vector(const std::size_t, const char&, const std::allocator<char>&);
 
 namespace {
 struct RodexSendMailRequest {
@@ -443,7 +449,7 @@ std::string CGameMode::LocationText() {
 
   int column;
   int row;
-  const auto* player = reinterpret_cast<const CRenderObject*>(this->scene->player);
+  const auto* player = static_cast<const CRenderObject*>(this->scene->player);
   this->WorldCell(player->render.position.x, player->render.position.z, column, row);
 
   std::string name = this->mapName;
@@ -452,7 +458,8 @@ std::string CGameMode::LocationText() {
   }
 
   std::sprintf(text, "Location: %s ( %d , %d )", name.c_str(), column, row);
-  return text;
+  std::string result(text);
+  return result;
 }
 
 // OFFSET: 0x00CD5800
@@ -498,14 +505,14 @@ bool CGameMode::HasResurrectionItem() {
 // FUNCTION: fn_21287
 void CGameMode::SendMousePointerState(int value) {
   if (this->mousePointer) {
-    this->mousePointer->SendMsg(nullptr, AM_HIDEMOUSE, 0, value, value >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->mousePointer->SendMsg(nullptr, AM_HIDEMOUSE, value, 0, 0, 0, 0, 0);
   }
 }
 
 // OFFSET: 0x00CECE00
 // FUNCTION: fn_21360
 void CGameMode::ClearGroundAlphaCheck() {
-  *reinterpret_cast<int*>(reinterpret_cast<char*>(this) + 0x458) = 0;
+  this->checkGroundAlpha = 0;
 }
 
 // OFFSET: 0x00CECE10
@@ -619,9 +626,10 @@ std::string CGameMode::GetActiveSkillEffectTimeText(int skillId, int* activeSkil
       output = buffer;
     }
 
+    int secondsPerMinute = 60;
     const int remainder = remainingSeconds - hours * 3600;
-    const int minutes = remainder / 60;
-    const int seconds = remainder % 60;
+    const int minutes = remainder / secondsPerMinute;
+    const int seconds = remainder % secondsPerMinute;
     if (minutes != 0) {
       std::sprintf(buffer, " %d %s", minutes, LookupMessage(MSI_MINUTE));
       output = output + buffer;
@@ -853,53 +861,53 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_ITEMTHROW:
       if (!this->IsMenuWindowOpen() &&
-          *reinterpret_cast<const std::uint32_t*>(&this->equipmentRequestState[4]) + 2000U <= timeGetTime() &&
-          this->waitingUseItemAck == 0 && *reinterpret_cast<int*>(this->waitingItemThrowAck) == 0 && argument1 != 0 &&
+          this->waitingWearEquipAck + 2000U <= timeGetTime() &&
+          this->waitingUseItemAck == 0 && this->waitingItemThrowAck == 0 && argument1 != 0 &&
           this->isPlayerDead == 0) {
-        *reinterpret_cast<int*>(this->waitingItemThrowAck) = 1;
+        this->waitingItemThrowAck = 1;
         const std::uint16_t packet[3] = {
           0x363, static_cast<std::uint16_t>(argument1), static_cast<std::uint16_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet[0]), packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet[0]), packet);
       }
       this->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
       return 0;
     case MM_DISCONNECT_CHARACTER: {
       const GameModePacketDword packet{0xCC, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_DISCONNECT_ALL_CHARACTER: {
       const std::uint16_t packet = 0xCE;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_REQ_NEXT_SCRIPT: {
       const GameModePacketDword packet{0xB9, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CHOOSE_MENU: {
       const GameModePacketDwordByte packet{
         0xB8, static_cast<std::uint32_t>(argument2), static_cast<std::uint8_t>(argument1)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_RESTART: {
       const GameModePacketByte packet{0xB2, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_NUM_USER: {
       const std::uint16_t packet = 0xC1;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_REQ_EXIT_ROOM:
       if (g_windowMgr.chatRoomWnd != nullptr) {
         const std::uint16_t packet = 0xE3;
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       }
       return 0;
     case MM_PROCESS_TALK_TYPE:
@@ -912,7 +920,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       packet.packetId = ID_CZ_REQ_ROLE_CHANGE;
       packet.argument = static_cast<std::uint32_t>(argument2);
       std::memcpy(packet.payload, text, sizeof(text));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_EXPEL_MEMBER: {
@@ -921,61 +929,61 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       GameModePacketPayload24 packet;
       packet.packetId = ID_CZ_REQ_EXPEL_MEMBER;
       std::memcpy(packet.payload, text, sizeof(text));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CONCLUDE_EXCHANGE_ITEM: {
       const std::uint16_t packet = 0xEB;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_CANCEL_EXCHANGE_ITEM: {
       const std::uint16_t packet = 0xED;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_EXEC_EXCHANGE_ITEM: {
       const std::uint16_t packet = 0xEF;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_ADD_ITEM_TO_STORE: {
       g_session.FlagInventoryItem(static_cast<std::uint32_t>(argument1));
       const GameModePacketWordDword packet{
-        g_buyingStoreMode != 0 ? 0x9E1 : 0x364,
+        g_session.m_buyingStoreMode != 0 ? 0x9E1 : 0x364,
         static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MOVE_ITEM_FROM_STORE_TO_BODY: {
       g_session.FlagCartItem(static_cast<std::uint32_t>(argument1));
       const GameModePacketWordDword packet{
-        g_buyingStoreMode != 0 ? 0x9E2 : 0x365,
+        g_session.m_buyingStoreMode != 0 ? 0x9E2 : 0x365,
         static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CLOSE_STORE: {
-      const std::uint16_t packet = g_buyingStoreMode != 0 ? 0x9BE : 0x193;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      const std::uint16_t packet = g_session.m_buyingStoreMode != 0 ? 0x9BE : 0x193;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_CANCEL_LOCKON: {
       const std::uint16_t packet = 0x118;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_SELECT_WARPPOINT: {
       GameModePacketWordText16 packet{0x11B, static_cast<std::uint16_t>(argument2), {}};
       std::strncpy(packet.text, reinterpret_cast<const char*>(argument1), sizeof(packet.text));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REMEMBER_WARPPOINT: {
       const std::uint16_t packet = 0x11D;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_MOVE_ITEM_FROM_BODY_TO_CART:
@@ -984,7 +992,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketWordDword packet{
           0x126, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_MOVE_ITEM_FROM_CART_TO_BODY:
@@ -993,43 +1001,43 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketWordDword packet{
           0x127, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_MOVE_ITEM_FROM_STORE_TO_CART:
       if (!this->IsMenuWindowOpen()) {
         g_session.FlagCartItem(static_cast<std::uint32_t>(argument1));
         const GameModePacketWordDword packet{
-          g_buyingStoreMode != 0 ? 0x9E4 : 0x128,
+          g_session.m_buyingStoreMode != 0 ? 0x9E4 : 0x128,
           static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_MOVE_ITEM_FROM_CART_TO_STORE:
       if (!this->IsMenuWindowOpen()) {
         g_session.FlagMerchantShopItem(static_cast<std::uint32_t>(argument1));
         const GameModePacketWordDword packet{
-          g_buyingStoreMode != 0 ? 0x9E3 : 0x129,
+          g_session.m_buyingStoreMode != 0 ? 0x9E3 : 0x129,
           static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_REQ_CARTOFF: {
       const GameModePacketByte packet{0xB35, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_CLOSESTORE: {
       const std::uint16_t packet = 0x12E;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_UPGRADE_SKILLLEVEL: {
-      *reinterpret_cast<int*>(&this->equipmentRequestState[0x0C]) = 1;
+      this->isReqUpgradeSkillLevel = 1;
       const GameModePacketWord packet{0x112, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MOVETO_MAP: {
@@ -1037,19 +1045,19 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         0x140, {}, static_cast<std::uint16_t>(argument2), static_cast<std::uint16_t>(argument3)
       };
       std::strncpy(packet.text, reinterpret_cast<const char*>(argument1), sizeof(packet.text));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_WEAR_EQUIP_ARROW:
       if (!this->IsMenuWindowOpen() &&
-          *reinterpret_cast<const std::uint32_t*>(&this->equipmentRequestState[4]) + 2000U <= timeGetTime() &&
+          this->waitingWearEquipAck + 2000U <= timeGetTime() &&
           this->isPlayerDead == 0) {
-        *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[4]) = timeGetTime();
+        this->waitingWearEquipAck = timeGetTime();
         const GameModePacketWordDword packet{
           static_cast<std::uint16_t>(ID_CZ_REQ_WEAR_EQUIP_V5), static_cast<std::uint16_t>(argument1),
           static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_CLOSE_DIALOG: {
@@ -1057,7 +1065,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       g_windowMgr.CloseWindow(WID_SAYDIALOGWND);
       g_windowMgr.CloseWindow(WID_CHOOSEWND);
       const GameModePacketDword packet{0x146, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REFRESH_MUSIC:
@@ -1082,29 +1090,29 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_CHANGE_GROUPEXPOPTION: {
       const GameModePacketDword packet{0x102, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_GUILD_MENU: {
       const GameModePacketDword packet{0x14F, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_OPEN_MEMBER_INFO: {
       const GameModePacketDword packet{0x157, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_JOIN_GUILD: {
       const GameModePacketDwordDword packet{
         0x16B, static_cast<std::uint32_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_GUILD_MENUINTERFACE: {
       const std::uint16_t packet = 0x14D;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_TESTPACKET: {
@@ -1124,7 +1132,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           0x149, static_cast<std::uint32_t>(argument1), static_cast<std::uint8_t>(argument2),
           static_cast<std::uint16_t>(duration)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_GUILD_NOTICE: {
@@ -1142,49 +1150,49 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       packet.firstText[0x3B] = 0;
       packet.secondText[0x77] = 0;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_ITEMIDENTIFY: {
       const GameModePacketWord packet{0x178, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_DISCONNECT: {
       const std::uint16_t packet[2] = {0x18A, 0};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet[0]), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet[0]), packet);
       return 0;
     }
     case MM_REQ_ITEMCOMPOSITION: {
       const GameModePacketWordWord packet{
         0x17C, static_cast<std::uint16_t>(argument1), static_cast<std::uint16_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_HOSTILE_GUILD: {
       const GameModePacketDword packet{0x180, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_ITEMCOMPOSITION_LIST: {
-      *reinterpret_cast<int*>(this->cardAndSkillBalloonIds) = argument1;
+      this->cardItemIndex = argument1;
       const GameModePacketWord packet{0x17A, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_ALLY_GUILD: {
       const GameModePacketDwordDword packet{
         0x172, static_cast<std::uint32_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_DELETE_RELATED_GUILD: {
       const GameModePacketDwordDword packet{
         0x183, static_cast<std::uint32_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_MAKING_ITEM: {
@@ -1195,7 +1203,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         packet.secondArgument = static_cast<std::uint32_t>(std::atoi(materials[1].itemId.c_str()));
         packet.thirdArgument = static_cast<std::uint32_t>(std::atoi(materials[2].itemId.c_str()));
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_BEGIN_DRAG_FROM_METALPROCESSWND: {
@@ -1208,7 +1216,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_ITEMPICKUP: {
       const GameModePacketDword packet{0x362, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQUEST_ACT:
@@ -1218,7 +1226,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketDwordByte packet{
           0x437, static_cast<std::uint32_t>(argument2), static_cast<std::uint8_t>(argument1)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_REQUEST_MOVE:
@@ -1230,14 +1238,14 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
                                     (static_cast<std::uint32_t>(argument1) << 6)),
           static_cast<std::uint8_t>(static_cast<std::uint32_t>(argument2) << 4)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_CHANGE_DIRECTION: {
       const GameModePacketByteWord packet{
         0x361, static_cast<std::uint16_t>(argument2), static_cast<std::uint8_t>(argument1)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_RESET_PARAMETER: {
@@ -1245,7 +1253,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_session.m_skillBundle.ResetFirstLevelChange();
       }
       const std::uint16_t packet = 0x197;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_REQ_CHANGE_MAPTYPE: {
@@ -1253,12 +1261,12 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         0x198, static_cast<std::uint16_t>(argument1), static_cast<std::uint16_t>(argument2),
         static_cast<std::uint16_t>(argument3 != 0)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CHANGE_EFFECTSTATE: {
       const GameModePacketDword packet{0x19D, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_PET_RENAME: {
@@ -1272,22 +1280,22 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::memcpy(packet.payload, text, sizeof(packet.payload) - 1);
         packet.payload[sizeof(packet.payload) - 1] = 0;
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_PETEGG_SELECT_FROM_LIST: {
       const GameModePacketWord packet{0x1A7, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_PETEGG_INFO: {
       const GameModePacketWord packet{0x1A8, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_PETDECEIVE_SHOOT: {
       const GameModePacketDword packet{0x19F, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_GIVE_MANNER_POINT_PLUS:
@@ -1300,7 +1308,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_ARROW_FROM_LIST: {
       const GameModePacketDword packet{0x1AE, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_SELECT_CART:
@@ -1308,78 +1316,78 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketDwordByte packet{
           0x980, static_cast<std::uint32_t>(argument2), static_cast<std::uint8_t>(argument1)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       } else {
         const GameModePacketWord packet{0x1AF, static_cast<std::uint16_t>(argument1)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_REMOVE_TO_AID: {
       const GameModePacketDword packet{
         0x843, static_cast<std::uint32_t>(std::atoi(reinterpret_cast<const char*>(argument1)))
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_SHIFT_TO_GID: {
       GameModePacketPayload24 packet{0x1BB, {}};
       std::strcpy(reinterpret_cast<char*>(packet.payload), reinterpret_cast<const char*>(argument1));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_RECALL_AID: {
       const GameModePacketDword packet{
         0x842, static_cast<std::uint32_t>(std::atoi(reinterpret_cast<const char*>(argument1)))
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_RECALL_GID: {
       GameModePacketPayload24 packet{0x1BD, {}};
       std::strcpy(reinterpret_cast<char*>(packet.payload), reinterpret_cast<const char*>(argument1));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_SKILL_SELECT_RESPONSE: {
       const GameModePacketDwordWord packet{
         0x443, static_cast<std::uint32_t>(argument2), static_cast<std::uint16_t>(argument1)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_OPEN_EQUIPEDITEM_CHANGE: {
       const GameModePacketDwordDword packet{0x2D8, 0, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_BILLING_INFO: {
       const std::uint16_t packet = 0x1C0;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_SELECT_SPELL: {
       const GameModePacketDword packet{0x1CE, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_JOIN_COUPLE: {
       const GameModePacketDwordDwordDword packet{
         0x1E3,
-        *reinterpret_cast<const std::uint32_t*>(&this->lastCoupleIds[0]),
-        *reinterpret_cast<const std::uint32_t*>(&this->lastCoupleIds[4]),
+        this->lastCoupleIds[0],
+        this->lastCoupleIds[1],
         static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_JOIN_BABY: {
       const GameModePacketDwordDwordDword packet{
         0x1F7,
-        *reinterpret_cast<const std::uint32_t*>(&this->lastCoupleIds[0]),
-        *reinterpret_cast<const std::uint32_t*>(&this->lastCoupleIds[4]),
+        this->lastCoupleIds[0],
+        this->lastCoupleIds[1],
         static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REPAIRITEM_SELECT_FROM_LIST: {
@@ -1391,12 +1399,12 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       } else {
         std::memcpy(packet.payload, reinterpret_cast<const void*>(argument1), sizeof(packet.payload));
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_DORIDORI: {
       const std::uint16_t packet = 0x1E7;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_SEND_TEXT_TO_NPC:
@@ -1410,7 +1418,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         static_cast<std::uint32_t>(*reinterpret_cast<const int*>(argument3)),
         static_cast<std::uint8_t>(argument2 != 0)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_PARTY_REQ_MASTER_TO_JOIN: {
@@ -1418,7 +1426,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         0xAE6, static_cast<std::uint32_t>(*reinterpret_cast<const int*>(argument2)),
         static_cast<std::uint32_t>(*reinterpret_cast<const int*>(argument1))
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_OPEN_SEEKPARTY_MEMBER:
@@ -1432,13 +1440,13 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         0x7D7, static_cast<std::uint32_t>(argument1), static_cast<std::uint8_t>(argument2),
         static_cast<std::uint8_t>(argument3)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_GROUP_CHANGE_MASTER: {
       g_adventurerAgencyMgr->RequestStop();
       const GameModePacketDword packet{0x7DA, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_PAUSE_REPLAY:
@@ -1469,77 +1477,77 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_REQ_CLOSE_BUYING_STORE: {
       const std::uint16_t packet = 0x815;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_TRYCOLLECTION: {
       const GameModePacketDword packet{0x8B5, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_RANKING: {
       const GameModePacketWord packet{0x97C, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CANCEL_VENDING_MAKE: {
       const std::uint16_t packet = 0xA8C;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_CLOSE_OFFLINE_STORE: {
       const GameModePacketDword packet{0xA80, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MEMORIALDUNGEON_COMMAND: {
       const GameModePacketDword packet{0x2CF, 3};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_RESET_SKILL: {
       g_session.m_skillBundle.ResetFirstLevelChange();
       const GameModePacketByte packet{0xBB1, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_OPEN_MAIL: {
       const GameModePacketByteInt64 packet{
         0x9EA, static_cast<std::uint8_t>(argument2), static_cast<std::int64_t>(argument1)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_DELETE_MAIL: {
       const GameModePacketByteInt64 packet{
         0x9F5, static_cast<std::uint8_t>(argument2), static_cast<std::int64_t>(argument1)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CONFIG_CALL: {
       const GameModePacketDwordDword packet{
         0x2D8, 5, argument1 == 0 ? 0x3C00u : 0u
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_JOIN_BABY: {
       const GameModePacketDword packet{0x1F9, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_DELETE_FRIEND: {
       const GameModePacketDwordDword packet{
         0x203, static_cast<std::uint32_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CHECK_ID: {
       GameModePacketPayload24 packet{0x213, {}};
       std::memcpy(packet.payload, reinterpret_cast<const void*>(argument1), sizeof(packet.payload));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       char text[256];
       std::sprintf(text, "[ %s ]", reinterpret_cast<const char*>(packet.payload));
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x6EFA9B, 0, 0, 0);
@@ -1548,17 +1556,17 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     case MM_RC_ID: {
       GameModePacketPayload24 packet{0x212, {}};
       std::memcpy(packet.payload, reinterpret_cast<const void*>(argument1), sizeof(packet.payload));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REFINEITEM_SELECT_FROM_LIST: {
       const GameModePacketDword packet{0x222, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_COMMAND_HOMUN: {
       const GameModePacketByte packet{0x22D, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MER_RENAME: {
@@ -1572,75 +1580,75 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::memcpy(packet.payload, text, sizeof(packet.payload) - 1);
         packet.payload[sizeof(packet.payload) - 1] = 0;
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_COMMAND_MER: {
       const GameModePacketByte packet{0x29F, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_STARPLACE_ACCEPT: {
       const GameModePacketByte packet{0x254, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_GET_MAIL_LIST: {
       const std::uint16_t packet = 0x23F;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_RESET_MAIL_ITEM: {
       const GameModePacketWord packet{0x246, static_cast<std::uint16_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_RETURN_MAIL: {
       GameModePacketDwordPayload24 packet{0x273, static_cast<std::uint32_t>(argument1), {}};
       std::memcpy(packet.payload, reinterpret_cast<const void*>(argument2), sizeof(packet.payload));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_GET_MAIL_ITEM: {
       const GameModePacketDword packet{0x244, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_ITEM_FROM_LIST: {
       const GameModePacketDwordWord packet{
         0x25B, static_cast<std::uint32_t>(argument1), static_cast<std::uint16_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CANCEL_BUYING_STORE_MAKE: {
       const std::uint16_t packet = 0xA94;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_REQ_OPEN_MSGBOX_EXTEND_BODYITEM_SIZE: {
       const std::uint16_t packet = 0xB14;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_REQ_EXTEND_BODYITEM_SIZE: {
       const std::uint16_t packet = 0xB16;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_CLOSE_MSGBOX_EXTEND_BODYITEM_SIZE: {
       const std::uint16_t packet = 0xB19;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_OPEN_ACCOUNT_LIMITED_TOOL: {
       const std::uint16_t packet = 0xB4F;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_CLOSE_ACCOUNT_LIMITED_TOOL: {
       const std::uint16_t packet = 0xB51;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_ADVANCED_STATUS_CHANGE:
@@ -1649,24 +1657,24 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketWordWord packet{
           0xB24, static_cast<std::uint16_t>(argument1), static_cast<std::uint16_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_REQ_MOVE_GUILD_AGIT:
       if (argument1 != 0) {
         const GameModePacketByte packet{0xB28, static_cast<std::uint8_t>(argument1)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_REQ_AGIT_INVESTMENT:
       if (argument1 != 0) {
         const GameModePacketByte packet{0xB2C, static_cast<std::uint8_t>(argument1)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_REBIRTH: {
       const std::uint16_t packet = 0x292;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_RELEASE_QUEST_SH:
@@ -1680,14 +1688,14 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_REQ_HUNTING: {
       const std::uint16_t packet = 0x279;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_SETLOCKONMOUSE:
       this->lockOnMouse = argument1;
       if (argument1 == 0) {
-        *reinterpret_cast<int*>(this->lastActorIds) = 0;
-        *reinterpret_cast<int*>(&this->lastActorIds[4]) = 0;
+        this->lastPcGid = 0;
+        this->lastMonGid = 0;
       }
       return 0;
     case MM_REQ_STATUS:
@@ -1695,7 +1703,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         this->waitingReqStatusAck = 1;
         if (this->isPlayerDead == 0) {
           const std::uint16_t packet = 0xBA;
-          GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
         }
       }
       return 0;
@@ -1706,7 +1714,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           const GameModePacketBB packet{
             0xBB, static_cast<std::uint16_t>(argument1), static_cast<std::uint8_t>(argument2)
           };
-          GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
         }
       }
       return 0;
@@ -1721,18 +1729,18 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     case MM_QUERYRSWNAME:
       return reinterpret_cast<int>(this->mapName);
     case MM_PLAYER_EMOTION_END:
-      this->requestTimers[0x16] = 0;
+      this->isEmotionRequested = 0;
       return 0;
     case MM_ACK_SELL:
       if (this->isPlayerDead == 0) {
         const GameModePacketC5 packet{0xC5, static_cast<std::uint32_t>(argument1), 1};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_ACK_BUY:
       if (this->isPlayerDead == 0) {
         const GameModePacketC5 packet{0xC5, static_cast<std::uint32_t>(argument1), 0};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_DELETEPARTYPOSALL:
@@ -1756,7 +1764,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketDwordDword packet{
           0x143, static_cast<std::uint32_t>(argument1), static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_INITWHISPERMENU:
@@ -1782,7 +1790,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_CANCEL_WRITE_RODEX: {
       const std::uint16_t packet = 0xA03;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       g_session.RestoreSelectionItems();
       g_session.ClearItemQuantities();
       return 0;
@@ -1806,14 +1814,14 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         const GameModePacketDword packet{
           static_cast<std::uint16_t>(ID_CZ_SE_CASHSHOP_OPEN_V2), static_cast<std::uint32_t>(value)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_INVENTORY_TAB: {
       const GameModePacketBB packet{
         0x907, static_cast<std::uint16_t>(argument1), static_cast<std::uint8_t>(argument2 == 1)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MOVE_ITEM_TO_PERSONAL_FROM_STORAGE:
@@ -1823,7 +1831,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           static_cast<std::uint16_t>(ID_CZ_MOVE_ITEM_TO_PERSONAL), 2, static_cast<std::uint16_t>(argument1),
           static_cast<std::uint32_t>(argument2)
         };
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     case MM_ITEMTHROW_THROUGH_DROPCNTWND:
@@ -1945,14 +1953,14 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
             if (this->recordChat[9] == last && this->recordChat[7] == first &&
                 this->scene->player->render.state != 3) {
               if ((g_session.IsSuperNoviceJob(g_session.GetDisplayJob()) &&
-                   g_session.m_level >= *reinterpret_cast<const int*>(g_session.maxBaseLevel)) ||
+                   g_session.m_level >= g_session.m_maxBaseLevel) ||
                   (g_session.IsSuperNovice2Job(g_session.GetDisplayJob()) &&
-                   g_session.m_level >= *reinterpret_cast<const int*>(g_session.jobLevelLimits))) {
+                   g_session.m_level >= g_session.m_maxBaseLevelExtend2)) {
                 g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MSG_SUPERNOVICE_CHOPOKGI_CAPPEDLEVEL)), 0xFF, 0, 0, 0);
                 break;
               }
               const std::uint16_t packet = 0x1ED;
-              GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+              GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
             }
           }
         }
@@ -2050,10 +2058,10 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         case 4: {
           std::uint32_t target;
           if (g_session.IsHomunculusSkill(skill->id)) {
-            target = *reinterpret_cast<const std::uint32_t*>(&g_session.spAndHomunculusStats[8]);
+            target = g_session.m_homunAid;
           } else {
             const bool mercenary = g_session.IsMercenarySkill(skill->id) != 0;
-            target = mercenary ? *reinterpret_cast<const std::uint32_t*>(&g_session.companionTargetState[8]) : g_session.m_aid;
+            target = mercenary ? g_session.m_mercenaryAid : g_session.m_aid;
           }
           this->SendMsg(MM_USE_SKILL, skill->id, target, argument2, argument3);
           this->SendMsg(MM_HANG_USE_SKILL, 0, 0, 0, 0);
@@ -2080,7 +2088,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const GameModePacketDwordDwordDword packet{
         0x168, static_cast<std::uint32_t>(argument1), g_session.m_aid, g_session.m_gid
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_JOIN_GUILD2: {
@@ -2095,7 +2103,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       GameModePacketPayload24 packet;
       packet.packetId = ID_CZ_REQ_JOIN_GUILD2;
       std::strncpy(reinterpret_cast<char*>(packet.payload), name, sizeof(packet.payload));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       const std::string notice = FormatOwnedString(LookupMessage(MSI_REQ_JOIN_GUILD), name);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(notice.c_str()), 0xFFFF00, 0, 0, 0);
       return 0;
@@ -2132,7 +2140,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       this->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
       g_session.ClearTradeItems();
       const GameModePacketByte packet{0xE6, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_JOIN_GROUP: {
@@ -2144,7 +2152,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       GameModePacketPayload24 packet;
       packet.packetId = ID_CZ_PARTY_JOIN_REQ;
       std::strncpy(reinterpret_cast<char*>(packet.payload), name, sizeof(packet.payload));
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       if (g_session.partyLeader != 0) {
         const std::string message = std::string(name) + LookupMessage(MSI_CHARACTER_PARTY_INVITATION_TO_JOIN);
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message.c_str()), 0xFFFF00, 0, 0, 0);
@@ -2155,7 +2163,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       if (g_guildInfo.isMaster == 0) {
         return 0;
       }
-      auto& positions = reinterpret_cast<std::map<int, GuildPositionEntry>&>(g_guildInfo.pendingPositionChanges);
+      auto& positions = g_guildInfo.pendingPositionChanges;
       const std::int16_t length = static_cast<std::int16_t>(4U + 40U * positions.size());
       if (length > 0x800) {
         return 0;
@@ -2201,7 +2209,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::strncpy(reinterpret_cast<char*>(packet + 2), g_session.partyRequestName.c_str(), 24);
       packet[26] = static_cast<std::uint8_t>(argument2);
       packet[27] = static_cast<std::uint8_t>(argument3);
-      GetRagConnection().Send(g_packetLengths.FixedLength(packetId), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packetId), packet);
       return 0;
     }
     case MM_REQ_TRADE_BUYING_STORE: {
@@ -2365,7 +2373,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       if (this->drag.source == 1) {
         if (!g_session.HasInventoryItem(this->drag.id) ||
-            *reinterpret_cast<const std::uint32_t*>(&this->equipmentRequestState[4]) + 2000U > timeGetTime()) {
+            this->waitingWearEquipAck + 2000U > timeGetTime()) {
           this->drag.source = 0;
           return 0;
         }
@@ -2457,7 +2465,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_REQ_ENTER_ROOM: {
       UIWindow* window = g_windowMgr.chatRoomWnd;
-      std::uint32_t& lastTick = *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0xE]);
+      std::uint32_t& lastTick = this->chatRoomRequestTick;
       if (timeGetTime() > lastTick + 1000U) {
         this->isWaitingEnterRoom = 0;
       }
@@ -2477,7 +2485,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         packet.secondArgument = 0;
         packet.thirdArgument = 0;
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_JOIN_GROUP: {
@@ -2487,7 +2495,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.EnsureWindow(WID_MESSENGERGROUPWND);
       }
       const GameModePacketDwordByte packet{0x2C7, static_cast<std::uint32_t>(argument1), static_cast<std::uint8_t>(argument2 != 0)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_USESKILL_LEVEL_PLUS: {
@@ -2518,7 +2526,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.Confirm(LookupMessage(MSI_DISORGANIZE_GUILD_FAILURE), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_COMMAND_PET: {
@@ -2542,7 +2550,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         }
       }
       const GameModePacketByte packet{0x1A1, static_cast<std::uint8_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_CANCEL_ITEMLISTWIN: {
@@ -2624,7 +2632,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.CloseWindow(WID_PARTYINVITATIONTOWND);
       }
       const std::uint16_t packet = 0x100;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_USE_SKILL: {
@@ -2655,7 +2663,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       if (argument1 == 20000) {
         const GameModePacketDword packet{0x1E5, static_cast<std::uint32_t>(argument2)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
         return 0;
       }
       if (argument1 == 20001) {
@@ -2663,7 +2671,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::sprintf(message, "[ (val1 == 20001) ]");
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message), 0x6E96FF, 0, 0, 0);
         const GameModePacketDword packet{0x1F9, static_cast<std::uint32_t>(argument2)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
         return 0;
       }
       if (argument1 == 40000) {
@@ -2698,7 +2706,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       if (argument1 == 154 || argument1 == 41) {
-        if (*reinterpret_cast<const int*>(g_session.spAndHomunculusStats) < (argument1 == 154 ? 40 : 30)) {
+        if (g_session.m_sp < (argument1 == 154 ? 40 : 30)) {
           char message[256];
           std::sprintf(message, LookupMessage(MSI_USESKILL_FAIL_SP_INSUFFICIENT));
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message), 0xFF, 11, 0, 0);
@@ -2727,9 +2735,9 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet + 4, &id, sizeof(id));
       std::memcpy(packet + 6, &argument2, sizeof(argument2));
       if (id == 0x5D) {
-        g_monsterInfoActorId = argument2;
+        g_session.m_monsterInfoActorId = argument2;
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packetId), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packetId), packet);
       return 0;
     }
     case MM_SHOW_IMAGE: {
@@ -2784,15 +2792,15 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_SWAP_EQUIPMENT: {
-      if (timeGetTime() - g_swapEquipmentTick < 10000U) {
+      if (timeGetTime() - g_session.m_swapEquipmentTick < 10000U) {
         const char* suffix = LookupMessage(MSI_CONNECT_SNS_FAIL_CONNECT);
-        const std::string message = FormatOwnedString("%d%s", 10U - (timeGetTime() - g_swapEquipmentTick) / 1000U, suffix);
+        const std::string message = FormatOwnedString("%d%s", 10U - (timeGetTime() - g_session.m_swapEquipmentTick) / 1000U, suffix);
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message.c_str()), 0xC8FF00, 7, 0, 0);
         return 0;
       }
-      g_swapEquipmentTick = timeGetTime();
+      g_session.m_swapEquipmentTick = timeGetTime();
       const std::uint16_t packet = 0xA9C;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_STOVE_AUTHENTICATION: {
@@ -2807,7 +2815,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const unsigned long long member = std::stoull(memberNumber, nullptr, 10);
       std::memcpy(packet + 2, &member, sizeof(member));
       StringFormat(reinterpret_cast<char*>(packet + 10), 600, static_cast<std::size_t>(-1), g_stoveMgr->GetAccessToken());
-      GetRagConnection().Send(g_packetLengths.FixedLength(packetId), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packetId), packet);
       return 0;
     }
     case MM_TAKE_OFF_EQUIP: {
@@ -2816,7 +2824,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       if (this->IsMenuWindowOpen() ||
-          *reinterpret_cast<const std::uint32_t*>(&this->equipmentRequestState[8]) + 2000U > timeGetTime() ||
+          this->waitingTakeoffEquipAck + 2000U > timeGetTime() ||
           this->isPlayerDead != 0) {
         return 0;
       }
@@ -2825,9 +2833,9 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       if (item.identity[1] == 0 || item.quantity <= 0) {
         return 0;
       }
-      *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[8]) = timeGetTime();
+      this->waitingTakeoffEquipAck = timeGetTime();
       const GameModePacketWord packet{0xAB, static_cast<std::uint16_t>(item.identity[1])};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 1;
     }
     case MM_TOGGLE_PLAYERGAGE: {
@@ -2843,8 +2851,8 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         [] { return static_cast<std::int64_t>(g_session.maxHp); }
       );
       gauge->SetSecondValues(
-        [] { return static_cast<std::int64_t>(*reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0])); },
-        [] { return static_cast<std::int64_t>(*reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4])); }
+        [] { return static_cast<std::int64_t>(g_session.m_sp); },
+        [] { return static_cast<std::int64_t>(g_session.m_maxSp); }
       );
       if (g_session.IsTreeGroupThree(g_session.GetDisplayJob()) == true) {
         gauge->SetFourthValues(
@@ -2921,7 +2929,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::strcat(text, " !!  ");
         std::strcat(text, LookupMessage(MSI_LOVE_SKILL));
         const int address = reinterpret_cast<int>(text);
-        actor->SendMsg(nullptr, AM_CHAT, 0, address, address >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        actor->SendMsg(nullptr, AM_CHAT, address, 0, 0, 0, 0, 0);
         return 0;
       }
       if (argument1 == WE_CALLPARTNER) {
@@ -2933,7 +2941,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::strcat(text, " !!  ");
         std::strcat(text, skillName);
         const int address = reinterpret_cast<int>(text);
-        actor->SendMsg(nullptr, AM_CHAT, 0, address, address >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        actor->SendMsg(nullptr, AM_CHAT, address, 0, 0, 0, 0, 0);
         return 0;
       }
       if (argument1 == DC_SCREAM || argument1 == BA_FROSTJOKER || argument1 == ITEM_ENCHANTARMS ||
@@ -2943,7 +2951,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::strcpy(skillName, CSkillInfo::DisplayName(*g_session.m_hotkeyScript, argument1));
       std::strcat(skillName, " !!");
       const int address = reinterpret_cast<int>(skillName);
-      actor->SendMsg(nullptr, AM_CHAT, 0, address, address >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      actor->SendMsg(nullptr, AM_CHAT, address, 0, 0, 0, 0, 0);
       return 0;
     }
     case MM_REQ_CHANGE_MEMBERPOS: {
@@ -2970,7 +2978,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const GameModePacketDwordDwordDword packet{
         0x170, static_cast<std::uint32_t>(argument1), g_session.m_aid, g_session.m_gid
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_ADD_MAIL_ITEM: {
@@ -2980,8 +2988,8 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const GameModePacketWordWord packet{
         0xA04, static_cast<std::uint16_t>(argument1), static_cast<std::uint16_t>(argument2)
       };
-      *reinterpret_cast<int*>(&g_session.commandTables[0x24]) = static_cast<std::int16_t>(argument2);
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      g_session.m_requestedCommandValue = static_cast<std::int16_t>(argument2);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_OPEN_WRITE_RODEX: {
@@ -2994,7 +3002,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         }
         std::memcpy(packet.payload, text.c_str(), 24);
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_WEAR_EQUIP: {
@@ -3009,7 +3017,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LIMIT_HAVE_ITEM_CNT)), 255, 0, 0, 0);
         return 0;
       }
-      if (*reinterpret_cast<const std::uint32_t*>(&this->equipmentRequestState[4]) + 2000U > timeGetTime() || this->isPlayerDead != 0) {
+      if (this->waitingWearEquipAck + 2000U > timeGetTime() || this->isPlayerDead != 0) {
         return 0;
       }
       const EquipSlots slots = g_session.GetEquipSlots(argument2);
@@ -3024,12 +3032,12 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, static_cast<std::uint32_t>(argument1));
       if (item.bindOnEquip == 1) {
         UIWindow* window = g_windowMgr.EnsureWindow(WID_YOURITEMWND);
-        *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[4]) = timeGetTime();
+        this->waitingWearEquipAck = timeGetTime();
         window->SendMsg(nullptr, UM_SET_BABY_MSG, argument1, argument2, 0, 0);
       } else {
-        *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[4]) = timeGetTime();
+        this->waitingWearEquipAck = timeGetTime();
         const GameModePacketWordDword packet{0x998, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     }
@@ -3048,7 +3056,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       if (!name.empty()) {
         this->exchangeName = name;
         const GameModePacketDword packet{0xE4, static_cast<std::uint32_t>(argument1)};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     }
@@ -3065,7 +3073,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       const GameModePacketDword packet{0x1A9, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_NPC_MARKET_PURCHASE_V2: {
@@ -3109,13 +3117,13 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           static_cast<std::uint32_t>(argument1) == g_session.m_aid || g_windowMgr.buyingShopItemsWnd != nullptr) {
         return 0;
       }
-      std::uint32_t& lastRequest = *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x12]);
+      std::uint32_t& lastRequest = this->merchantShopRequestTick;
       if (timeGetTime() <= lastRequest + 1000U) {
         return 0;
       }
       lastRequest = timeGetTime();
       const GameModePacketDword packet{0x817, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_PRISON_USER: {
@@ -3131,7 +3139,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       packet[0] = 0xB34;
       std::strncpy(reinterpret_cast<char*>(packet + 1), g_session.DecodePlayerName(), 24);
       std::strncpy(reinterpret_cast<char*>(packet + 13), name, 24);
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet[0]), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet[0]), packet);
       return 0;
     }
     case MM_CHAT_ALLY: {
@@ -3201,7 +3209,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           this->sameChatRepeatCount = 0;
         }
       }
-      if (g_windowToggleFlag == 0 && this->ShowRestrictedNotice(this->sameChatRepeatCount)) {
+      if (g_session.m_autoReplyEnabled == 0 && this->ShowRestrictedNotice(this->sameChatRepeatCount)) {
         return 0;
       }
       this->lastChat.assign(text, std::strlen(text));
@@ -3313,7 +3321,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::strncpy(text, reinterpret_cast<const char*>(argument2), 0x27);
       }
       text[0x27] = 0;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packetId), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packetId), packet);
       return 0;
     }
     case MM_JOIN_FRIEND: {
@@ -3324,12 +3332,12 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         0x208, static_cast<std::uint32_t>(argument1), static_cast<std::uint32_t>(argument2),
         static_cast<std::uint32_t>(argument3)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_HOMUN_WAIT: {
       CGameActor* actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(
-          *reinterpret_cast<const std::uint32_t*>(&g_session.spAndHomunculusStats[8])));
+          g_session.m_homunAid));
       if (actor != nullptr && actor->HasActiveHomunculusAI()) {
         const int message[6] = {9, 0, 0, 0, 0, 0};
         actor->SetMsg2AI(reinterpret_cast<const float*>(message), 0);
@@ -3396,7 +3404,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANT_USE_WHEN_OPENED_EXCHANGEWND)), 0xFF, 0, 0, 0);
         return 0;
       }
-      if (this->IsMenuWindowOpen() || this->waitingUseItemAck != 0 || *reinterpret_cast<int*>(this->waitingItemThrowAck) != 0 || argument1 == 0 || this->isPlayerDead != 0) {
+      if (this->IsMenuWindowOpen() || this->waitingUseItemAck != 0 || this->waitingItemThrowAck != 0 || argument1 == 0 || this->isPlayerDead != 0) {
         return 0;
       }
       ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, argument1);
@@ -3432,7 +3440,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GENDER_CHANGE_MESSAGE_OK)), 0xFF, 0, 0, 0);
           return 0;
         }
-        if (g_session.feedOptions[4] != 0) {
+        if (g_session.m_genderChangeBlocked) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GENDER_CHANGE_MESSAGE_CANCEL)), 0xFF, 0, 0, 0);
           return 0;
         }
@@ -3450,7 +3458,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       this->waitingUseItemAck = 1;
       const GameModePacketWordDword packet{0x439, static_cast<std::uint16_t>(argument1), g_session.m_aid};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MAKE_GROUP: {
@@ -3484,7 +3492,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::strncpy(reinterpret_cast<char*>(packet.payload), reinterpret_cast<const char*>(argument1), 24);
       const MessengerMember member = g_session.PartyByName(reinterpret_cast<const char*>(argument1));
       packet.argument = member.accountId;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_USE_SKILL_TOGROUND_WITH_TALKBOX: {
@@ -3512,7 +3520,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       if (packet[1] == 0) {
         packet[1] = static_cast<std::uint16_t>(g_session.m_skillBundle.Lookup(packet[2]).level);
       }
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet[0]), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet[0]), packet);
       return 0;
     }
     case MM_CHAT_BATTLEFIELD: {
@@ -3554,20 +3562,20 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       const GameModePacketWordWord packet{0xA06, static_cast<std::uint16_t>(argument1), static_cast<std::uint16_t>(argument2)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_SWAP_EQUIPMENT_BY_INDEX: {
-      if (timeGetTime() - g_swapEquipmentTick < 10000U) {
+      if (timeGetTime() - g_session.m_swapEquipmentTick < 10000U) {
         const char* suffix = LookupMessage(MSI_CONNECT_SNS_FAIL_CONNECT);
-        const unsigned remaining = 10U - (timeGetTime() - g_swapEquipmentTick) / 1000U;
+        const unsigned remaining = 10U - (timeGetTime() - g_session.m_swapEquipmentTick) / 1000U;
         const std::string text = FormatOwnedString("%d%s", remaining, suffix);
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text.c_str()), 0xC8FF00, 7, 0, 0);
         return 0;
       }
       const auto* request = reinterpret_cast<const std::uint16_t*>(argument1);
       const GameModePacketWord packet{0xACE, request[2]};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_SHORTCUT_KEY_CHANGE: {
@@ -3589,7 +3597,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::memcpy(packet + 3, slot, 7);
       }
       packet[2] = static_cast<std::uint16_t>(argument1);
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet[0]), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet[0]), packet);
       return 0;
     }
     case MM_CASH_EMOTION: {
@@ -3717,7 +3725,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           }
           return 0;
         case MENUID_HOMUN_FOLLOW: {
-          auto* actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(*reinterpret_cast<std::uint32_t*>(&g_session.spAndHomunculusStats[8])));
+          auto* actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(g_session.m_homunAid));
           if (actor && actor->HasActiveHomunculusAI()) {
             float value[6] = {};
             const int type = 9;
@@ -3733,8 +3741,8 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           }
           return 0;
         case MENUID_MER_FOLLOW: {
-          auto* actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(*reinterpret_cast<std::uint32_t*>(&g_session.companionTargetState[8])));
-          if (actor && actor->merAI && *reinterpret_cast<int*>(actor->merAI + 4)) {
+          auto* actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(g_session.m_mercenaryAid));
+          if (actor && actor->merAI && actor->merAI->state) {
             float value[6] = {};
             const int type = 9;
             std::memcpy(value, &type, sizeof(type));
@@ -3750,7 +3758,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           }
           const GameModePacketDword packet{static_cast<std::uint16_t>(action == 42 ? 0x2D6 : action == 44 ? 0x7F5 : 0xAF9),
             static_cast<std::uint32_t>(this->menuTargetAid)};
-          GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
           return 0;
         }
         case 57: {
@@ -3780,8 +3788,8 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
     }
     case MM_REQ_EMOTION: {
-      auto& tick = *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0xA]);
-      if (this->requestTimers[0x16] || timeGetTime() <= tick + 2500U) {
+      auto& tick = this->emotionRequestTick;
+      if (this->isEmotionRequested || timeGetTime() <= tick + 2500U) {
         return 0;
       }
       const bool doram = g_session.IsDoramJob(g_session.GetDisplayJob());
@@ -3799,8 +3807,8 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       const GameModePacketWordWord packet{0xBE9, static_cast<std::uint16_t>(argument2), static_cast<std::uint16_t>(argument1)};
       tick = timeGetTime();
-      this->requestTimers[0x16] = 1;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      this->isEmotionRequested = 1;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_OPENSTORE: {
@@ -3851,7 +3859,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         std::strncpy(text, reinterpret_cast<const char*>(argument1), 39);
       }
       text[39] = 0;
-      GetRagConnection().Send(g_packetLengths.FixedLength(ID_CZ_REQ_LEAVE_GUILD), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(ID_CZ_REQ_LEAVE_GUILD), packet);
       return 0;
     }
     case MM_REQ_MAKE_GUILD: {
@@ -3891,7 +3899,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       packet.argument = g_session.m_gid;
       std::strncpy(reinterpret_cast<char*>(packet.payload), name, 23);
       packet.payload[23] = 0;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_DELETEGUILDPOS: {
@@ -3922,12 +3930,12 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       item = argument2 ? g_session.GetSwapEquippedItem(argument1) : g_session.GetSwapCostumeItem(argument1);
       if (item.identity[1] && item.quantity > 0) {
         const GameModePacketWord packet{0xA99, static_cast<std::uint16_t>(item.identity[1])};
-        GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       }
       return 0;
     }
     case MM_GET_ACCOUNT_LIMITED_SALE_LIST: {
-      auto& tick = *reinterpret_cast<std::uint32_t*>(&g_session.webServiceLoginData[0x18]);
+      auto& tick = g_session.m_limitedSaleRequestTick;
       if (timeGetTime() - tick < 5000U) {
         const char* message = LookupMessage(MSI_CONNECT_SNS_FAIL_CONNECT);
         const std::string text = FormatOwnedString("%d%s", 5U - (timeGetTime() - tick) / 1000U, message);
@@ -3936,14 +3944,14 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       tick = timeGetTime();
       const std::uint16_t packet = 0xB4C;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
       return 0;
     }
     case MM_USE_PACKAGEITEM: {
       int message = 0;
       if (g_windowMgr.LookupWindow(WID_EXCHANGEUI)) {
         message = 0x6A3;
-      } else if (this->IsMenuWindowOpen() || this->waitingUseItemAck || *reinterpret_cast<int*>(this->waitingItemThrowAck)) {
+      } else if (this->IsMenuWindowOpen() || this->waitingUseItemAck || this->waitingItemThrowAck) {
         message = 0xF84;
       } else if (this->isPlayerDead) {
         message = 0xBB7;
@@ -3973,7 +3981,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       *reinterpret_cast<std::uint32_t*>(packet + 4) = g_session.m_aid;
       *reinterpret_cast<std::uint32_t*>(packet + 8) = static_cast<std::uint32_t>(argument2);
       *reinterpret_cast<std::uint32_t*>(packet + 12) = static_cast<std::uint32_t>(argument3);
-      GetRagConnection().Send(g_packetLengths.FixedLength(ID_CZ_USE_PACKAGEITEM), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(ID_CZ_USE_PACKAGEITEM), packet);
       g_windowMgr.CloseWindow(WID_SELECTPACKAGEITEMBOX);
       return 0;
     }
@@ -3988,16 +3996,16 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MAXEXCHANGE_IS_10_KIND)), 0xFF, 0, 0, 0);
         return 0;
       }
-      if (*reinterpret_cast<int*>(this->equipmentRequestState) != 0) {
+      if (this->isWaitingAddExchangeItem != 0) {
         return 0;
       }
-      *reinterpret_cast<int*>(this->equipmentRequestState) = 1;
+      this->isWaitingAddExchangeItem = 1;
       const GameModePacketWordDword packet{0xE8, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)};
-      *reinterpret_cast<int*>(&this->equipmentRequestState[0x10]) = argument2;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      this->exchangeItemCnt = argument2;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       if (Replay::Instance().state == 2) {
         std::uint16_t record[5] = {0x08AE, 0x0387, 10};
-        std::memcpy(record + 3, &this->equipmentRequestState[0x10], sizeof(int));
+        std::memcpy(record + 3, &this->exchangeItemCnt, sizeof(int));
         Replay::Instance().Record(10, record, 0x2A, 0);
       }
       return 0;
@@ -4033,13 +4041,13 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       if (static_cast<std::uint32_t>(argument1) == g_session.m_aid || g_windowMgr.merchantItemShopWnd != nullptr) {
         return 0;
       }
-      auto& previousTick = *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x12]);
+      auto& previousTick = this->merchantShopRequestTick;
       if (timeGetTime() <= previousTick + 1000U) {
         return 0;
       }
       previousTick = timeGetTime();
       const GameModePacketDword packet{0x130, static_cast<std::uint32_t>(argument1)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_SEND_MAIL: {
@@ -4175,17 +4183,17 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           }
         }
       }
-      *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[4]) = timeGetTime();
+      this->waitingWearEquipAck = timeGetTime();
       const GameModePacketWordDword packet{0xA97, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_MOVE_ITEM_TO_PERSONAL: {
       g_session.FlagCartItem(static_cast<std::uint32_t>(argument1));
       const GameModePacketDwordWordDword packet{
-        0xC22, g_buyingStoreMode != 0 ? 1U : 0U, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
+        0xC22, g_session.m_buyingStoreMode != 0 ? 1U : 0U, static_cast<std::uint16_t>(argument1), static_cast<std::uint32_t>(argument2)
       };
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_REQ_PURCHASE: {
@@ -4387,8 +4395,8 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         [] { return static_cast<std::int64_t>(g_session.maxHp); }
       );
       gauge->SetSecondValues(
-        [] { return static_cast<std::int64_t>(*reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[0])); },
-        [] { return static_cast<std::int64_t>(*reinterpret_cast<const int*>(&g_session.spAndHomunculusStats[4])); }
+        [] { return static_cast<std::int64_t>(g_session.m_sp); },
+        [] { return static_cast<std::int64_t>(g_session.m_maxSp); }
       );
       if (g_session.IsTreeGroupThree(g_session.GetDisplayJob())) {
         gauge->SetFourthValues(
@@ -4446,7 +4454,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_CONTACTNPC: {
       if (this->scene->player != nullptr) {
-        this->scene->player->SendMsg(nullptr, AM_FREEZE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        this->scene->player->SendMsg(nullptr, AM_FREEZE, 0, 0, 0, 0, 0, 0);
       }
       const auto* request = reinterpret_cast<const std::uint32_t*>(argument1);
       if (request[1] == 0x2D) {
@@ -4457,7 +4465,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         this->noMoveStartTick = timeGetTime();
       }
       const GameModePacketDwordByte packet{0x90, request[0], *reinterpret_cast<const std::uint8_t*>(request + 2)};
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetId), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetId), &packet);
       return 0;
     }
     case MM_USE_SKILL_TOGROUND: {
@@ -4487,7 +4495,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       unsigned char packet[11];
       std::memcpy(packet, words, sizeof(words));
       packet[10] = static_cast<unsigned char>(argument2);
-      GetRagConnection().Send(g_packetLengths.FixedLength(words[0]), packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(words[0]), packet);
       return 0;
     }
     case MM_SEND_GUILD_EMBLEM: {
@@ -4579,7 +4587,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::strncpy(reinterpret_cast<char*>(packet + 4), reinterpret_cast<const char*>(argument1), 0x4F);
       packet[0x53] = 0;
       if (g_windowMgr.merchantShopMakeWnd != nullptr) {
-        const auto* shop = reinterpret_cast<const UIMerchantShopMakeWnd*>(g_windowMgr.merchantShopMakeWnd);
+        const auto* shop = static_cast<const UIMerchantShopMakeWnd*>(g_windowMgr.merchantShopMakeWnd);
         std::memcpy(packet + 0x54, &shop->selectedRow, 2);
         std::memcpy(packet + 0x56, &shop->selectedColumn, 2);
       }
@@ -4661,7 +4669,7 @@ void CGameMode::RequestAdminStatus() {
   packet.accountId = static_cast<std::uint32_t>(g_session.m_aid);
   packet.requestType = 2;
   packet.requestValue = 0xA;
-  GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(ID_CZ_REQ_GIVE_MANNER_POINT), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(ID_CZ_REQ_GIVE_MANNER_POINT), &packet);
 }
 
 // OFFSET: 0x00D06BD0
@@ -4677,7 +4685,7 @@ void SetPlayerName(std::uint32_t id, std::string name) {
 
 // OFFSET: 0x00CDD350
 // FUNCTION: fn_21316
-void CGameMode::PlaceWindowAtActor(UIWindow* window, CGameActor* actor) {
+void CGameMode::PlaceWindowAtActor(UIWindow* window, CRenderObject* actor) {
   const int width = window->geometry.width;
   const int height = window->geometry.height;
   const bool raised = g_serviceOptions.Get(0x5C) != 0;
@@ -4687,10 +4695,6 @@ void CGameMode::PlaceWindowAtActor(UIWindow* window, CGameActor* actor) {
   case NAME_BALLOON_BOTTOM:
     offsetX = -(width / 2);
     offsetY = static_cast<int>(static_cast<float>(g_renderer->viewport.height * 20 / 480) * actor->render.distanceScale);
-    break;
-  case NAME_BALLOON_TOP:
-    offsetX = -(width / 2);
-    offsetY = static_cast<int>(static_cast<float>(g_renderer->viewport.height * -100 / 480) * actor->render.distanceScale);
     break;
   case NAME_BALLOON_LEFT:
     offsetX = static_cast<int>(
@@ -4707,6 +4711,10 @@ void CGameMode::PlaceWindowAtActor(UIWindow* window, CGameActor* actor) {
     offsetY = static_cast<int>(
       static_cast<float>(g_renderer->viewport.height * -25 / 480) * actor->render.distanceScale - static_cast<float>(height / 2)
     );
+    break;
+  case NAME_BALLOON_TOP:
+    offsetX = -(width / 2);
+    offsetY = static_cast<int>(static_cast<float>(g_renderer->viewport.height * -100 / 480) * actor->render.distanceScale);
     break;
   }
 
@@ -4741,7 +4749,7 @@ std::uint64_t CGameMode::LaunchDummyEffect(const vector3d* position, int effectI
     CDummyEffectLauncher* launcher = new CDummyEffectLauncher;
     if (launcher != nullptr) {
       const int address = reinterpret_cast<int>(position);
-      launcher->SendMsg(nullptr, AM_SETPOS, 0, address, address >> 31, effectId, effectId >> 31, lifeFrames, lifeFrames >> 31, value, value >> 31, 0, 0, 0, 0);
+      launcher->SendMsg(nullptr, AM_SETPOS, address, effectId, lifeFrames, value, 0, 0);
       this->scene->objects.push_back(launcher);
       return launcher->identity;
     }
@@ -4767,12 +4775,12 @@ void CGameMode::RequestPlayerAction(int target, int argument) {
 
   switch (reinterpret_cast<std::intptr_t>(this->skillUseType)) {
   case SUT_NOSKILL:
-    this->scene->player->SendMsg(nullptr, AM_PROCEEDATTACK, 0, target, 0, argument, argument >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->scene->player->SendMsg(nullptr, AM_PROCEEDATTACK, static_cast<std::uint32_t>(target), argument, 0, 0, 0, 0);
     break;
   case SUT_TO_CHARACTER:
   case SUT_TO_ALL:
-    this->scene->player->SendMsg(nullptr, AM_PROCEEDSKILL, 0, target, 0, value, value >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
-    this->scene->player->SendMsg(nullptr, AM_SET_SKILL_USE_LEVEL, 0, this->skillUseLevel, this->skillUseLevel >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->scene->player->SendMsg(nullptr, AM_PROCEEDSKILL, static_cast<std::uint32_t>(target), value, 0, 0, 0, 0);
+    this->scene->player->SendMsg(nullptr, AM_SET_SKILL_USE_LEVEL, this->skillUseLevel, 0, 0, 0, 0, 0);
     break;
   }
 }
@@ -4815,7 +4823,7 @@ void CGameMode::SendMousePointerPosition(float x, float y, int value) {
   position[0] = x;
   position[1] = y;
   const std::intptr_t address = reinterpret_cast<std::intptr_t>(position);
-  this->mousePointer->SendMsg(nullptr, AM_SETPOSMOUSE, 0, address, address >> 31, value, value >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+  this->mousePointer->SendMsg(nullptr, AM_SETPOSMOUSE, address, value, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x00CED330
@@ -4886,7 +4894,7 @@ bool CGameMode::IsEffectId994Group(int id) {
 // FUNCTION: fn_21419
 bool CGameMode::ConfirmDraggedItemUse() {
   if (g_session.equippedArrowIndex == this->drag.id) {
-    ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, this->drag.id);
+    ITEM_INFO item = g_session.LookupClientItemByIdentity(this->drag.id);
     if (item.identity[1] > 0) {
       if (g_replayAnimationScaling) {
         this->replayDragState[0] = 0;
@@ -5580,13 +5588,6 @@ void CPingLiveSchedule::Process(const std::uint64_t& now) {
 
 namespace {
 
-// INLINED
-template <std::uint64_t Key, std::size_t Length>
-const char* DecryptGameModeName(const char (&source)[Length]) {
-  thread_local EncryptedName<Length, Key> name(source);
-  return name.Text();
-}
-
 }
 
 // OFFSET: 0x00CDEF00
@@ -5621,10 +5622,7 @@ int CGameMode::Run() {
       g_modeMgr.Quit();
       std::string message = g_nProtectGameGuardMgr->ErrorMessage();
       if (!message.empty()) {
-        constexpr auto sourceText = CRYPT_NAME("nProtect GameGuard", 0xADC51BF9C98B413DULL);
-        const auto& source = sourceText.data;
-        thread_local EncryptedName<sizeof(source), 0xADC51BF9C98B413DULL> name(source);
-        MessageBoxA(hWnd, message.c_str(), name.Text(), 0);
+        MessageBoxA(hWnd, message.c_str(), OBFUSCATE_TEXT("nProtect GameGuard", 0xADC51BF9C98B413DULL), 0);
       }
     }
 
@@ -5681,7 +5679,7 @@ void CGameMode::TargetActorByAid(int aid) {
 
   if (allowed && g_mouse.buttons[0] == 1 && force != 0 && !HIBYTE(GetAsyncKeyState(VK_MENU))) {
     this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
-    *reinterpret_cast<int*>(&this->leftBtnClickTick[0x20]) = 0;
+    this->isAutoMoveClickOn = 0;
     if (g_session.GetSiegeMode() == 0 && (HIBYTE(GetAsyncKeyState(VK_CONTROL)) || forceOption != 0)) {
       this->RequestPlayerAction(aid, 0);
       this->forcedAttack = 1;
@@ -5933,7 +5931,7 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
       }
     }
 
-    UIChatRoomTitle* room = reinterpret_cast<UIChatRoomTitle*>(static_cast<CGameActor*>(*it)->actorWindows[1]);
+    UIChatRoomTitle* room = static_cast<UIChatRoomTitle*>(static_cast<CGameActor*>(*it)->actorWindows[1]);
     if (room != nullptr) {
       scratch.resize(sizeof(ChatRoomEntryPacket), 0);
       auto* packet = reinterpret_cast<ChatRoomEntryPacket*>(scratch.data());
@@ -5960,7 +5958,7 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
       stored->job = actor->GetEffectiveJob(-1);
       stored->sex = static_cast<unsigned char>(actor->sex);
       stored->cellX = static_cast<std::uint16_t>(actor->movementState[5]);
-      stored->cellY = static_cast<std::uint16_t>(*reinterpret_cast<const int*>(actor->destinationAndSpeed));
+      stored->cellY = static_cast<std::uint16_t>(actor->destCellY);
       stored->head = static_cast<std::uint16_t>(pc->head);
       const std::int64_t value = actor->GetWeapon();
       stored->weapon = static_cast<int>(value);
@@ -5981,7 +5979,7 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
       data.insert(data.end(), chunk.begin(), chunk.end());
     }
 
-    UIMerchantShopTitle* shop = reinterpret_cast<UIMerchantShopTitle*>(static_cast<CGameActor*>(*it)->actorWindows[2]);
+    UIMerchantShopTitle* shop = static_cast<UIMerchantShopTitle*>(static_cast<CGameActor*>(*it)->actorWindows[2]);
     if (shop != nullptr) {
       scratch.resize(sizeof(ShopEntryPacket), 0);
       auto* packet = reinterpret_cast<ShopEntryPacket*>(scratch.data());
@@ -6004,7 +6002,7 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
       data.insert(data.end(), chunk.begin(), chunk.end());
     }
 
-    UIMerchantShopTitle* buyingShop = reinterpret_cast<UIMerchantShopTitle*>(static_cast<CGameActor*>(*it)->actorWindows[4]);
+    UIMerchantShopTitle* buyingShop = static_cast<UIMerchantShopTitle*>(static_cast<CGameActor*>(*it)->actorWindows[4]);
     if (buyingShop != nullptr) {
       scratch.resize(sizeof(ShopEntryPacket), 0);
       auto* packet = reinterpret_cast<ShopEntryPacket*>(scratch.data());
@@ -6188,7 +6186,7 @@ void CGameMode::ProcessUiMessage(unsigned char* message) {
     break;
   }
   case 903:
-    *reinterpret_cast<int*>(&this->equipmentRequestState[0x10]) = values->values[0];
+    this->exchangeItemCnt = values->values[0];
     break;
   case 904: {
     char buffer[200];
@@ -6446,7 +6444,7 @@ void __stdcall OpenWordDisplay(CGameActor* actor) {
   UIWordDisplayWnd* window = new UIWordDisplayWnd();
   window->SendMsg(nullptr, AM_UPDATEGAGE, actor->render.accountId, 0, 0, 0);
   g_windowMgr.AddRendered(window);
-  actor->actorTitleWindow = reinterpret_cast<int>(window);
+  actor->actorTitleWindow = window;
 }
 
 // OFFSET: 0x00CFF070
@@ -6470,7 +6468,7 @@ void CGameMode::ShowNoticeBalloon(const std::vector<std::string>* lines) {
 
   BroadcastBalloonMessage message;
   for (std::vector<std::string>::const_iterator it = lines->begin(); it != lines->end(); ++it) {
-    message.lines.push_back(BroadcastBalloonLine{*it, 0xFFFF, 0});
+    message.lines.emplace_back(*it, 0xFFFF, 0);
   }
   balloon->AddMessage(2, message);
 }
@@ -6521,7 +6519,7 @@ void CGameMode::ChangeZoneServer(std::string mapName, int x, int y, int ip, int 
 
   this->noMove = 1;
   this->noMoveStartTick = timeGetTime();
-  this->scene->player->SendMsg(nullptr, AM_FREEZE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  this->scene->player->SendMsg(nullptr, AM_FREEZE, 0, 0, 0, 0, 0, 0);
   if (g_screenShakeDuration > 0) {
     g_screenShakeDuration = g_screenShakeMode == 2 ? 10001 : g_screenShakeDuration;
   }
@@ -6545,9 +6543,9 @@ void CGameMode::ChangeZoneServer(std::string mapName, int x, int y, int ip, int 
     packet.clientTime = timeGetTime();
     packet.aid = g_session.m_aid;
     packet.gid = g_session.m_gid;
-    packet.authCode = *reinterpret_cast<const int*>(&g_session.characterLoginData[0x04]);
+    packet.authCode = g_session.m_authCode;
     packet.sex = static_cast<unsigned char>(g_session.GetCurrentSex());
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
     g_session.SetOption(17, 1, 0);
     GetRagConnection().SetBlock(1);
   }
@@ -6560,18 +6558,18 @@ void CGameMode::ChangeZoneServer(std::string mapName, int x, int y, int ip, int 
 // FUNCTION: fn_21333
 void CGameMode::UpdateBalloons() {
   if (this->nameBalloon) {
-    if (*reinterpret_cast<int*>(&this->balloonDisplayState[0x0C]) == 0) {
-      *reinterpret_cast<int*>(&this->balloonDisplayState[0x0C]) = 1;
+    if (this->isNameBalloonPlaced == 0) {
+      this->isNameBalloonPlaced = 1;
       if (this->balloonActorId == g_session.m_aid) {
-        this->PlaceWindowAtActor(this->nameBalloon, reinterpret_cast<CGameActor*>(this->scene->player));
+        this->PlaceWindowAtActor(this->nameBalloon, this->scene->player);
       } else {
         CRenderObject* actor = this->scene->GetGameActorByAID(this->balloonActorId);
         if (actor) {
-          this->PlaceWindowAtActor(this->nameBalloon, reinterpret_cast<CGameActor*>(actor));
+          this->PlaceWindowAtActor(this->nameBalloon, actor);
         } else {
           CItem* item = this->scene->GetItemByAID(this->balloonActorId);
           if (item) {
-            this->PlaceWindowAtActor(this->nameBalloon, reinterpret_cast<CGameActor*>(item));
+            this->PlaceWindowAtActor(this->nameBalloon, item);
           }
         }
       }
@@ -6582,18 +6580,18 @@ void CGameMode::UpdateBalloons() {
   }
 
   if (this->itemNameBalloon) {
-    if (*reinterpret_cast<int*>(&this->balloonDisplayState[0x10]) == 0) {
-      *reinterpret_cast<int*>(&this->balloonDisplayState[0x10]) = 1;
+    if (this->isItemNameBalloonPlaced == 0) {
+      this->isItemNameBalloonPlaced = 1;
       if (this->balloonActorId == g_session.m_aid) {
-        this->PlaceWindowAtActor(this->itemNameBalloon, reinterpret_cast<CGameActor*>(this->scene->player));
+        this->PlaceWindowAtActor(this->itemNameBalloon, this->scene->player);
       } else {
         CRenderObject* actor = this->scene->GetGameActorByAID(this->balloonActorId);
         if (actor) {
-          this->PlaceWindowAtActor(this->itemNameBalloon, reinterpret_cast<CGameActor*>(actor));
+          this->PlaceWindowAtActor(this->itemNameBalloon, actor);
         } else {
           CItem* item = this->scene->GetItemByAID(this->balloonActorId);
           if (item) {
-            this->PlaceWindowAtActor(this->itemNameBalloon, reinterpret_cast<CGameActor*>(item));
+            this->PlaceWindowAtActor(this->itemNameBalloon, item);
           }
         }
       }
@@ -6603,9 +6601,9 @@ void CGameMode::UpdateBalloons() {
     }
   }
 
-  UIWindow*& skillBalloon = *reinterpret_cast<UIWindow**>(&this->balloonDisplayState[0x00]);
-  UIWindow*& hintBalloon = *reinterpret_cast<UIWindow**>(&this->balloonDisplayState[0x04]);
-  int& shownSkill = *reinterpret_cast<int*>(&this->cardAndSkillBalloonIds[0x04]);
+  UIWindow*& skillBalloon = this->skillBalloon;
+  UIWindow*& hintBalloon = this->skillHintBalloon;
+  int& shownSkill = this->shownSkillId;
   if (this->skillUseType == nullptr) {
     if (skillBalloon) {
       g_windowMgr.Schedule(skillBalloon);
@@ -6628,25 +6626,15 @@ void CGameMode::UpdateBalloons() {
       shownSkill = this->skillId;
       std::string text;
       if (shownSkill == 10000) {
-        constexpr auto sourceText = CRYPT_NAME("Capture Monster", 0x3FA3AFA7035DE3FFULL);
-        const auto& source = sourceText.data;
-        text.assign(DecryptGameModeName<0x3FA3AFA7035DE3FFULL>(source));
+        text.assign(OBFUSCATE_TEXT("Capture Monster", 0x3FA3AFA7035DE3FFULL));
       } else if (shownSkill == 20000) {
-        constexpr auto sourceText = CRYPT_NAME("Please Marry Me", 0xDB27CB557D038759ULL);
-        const auto& source = sourceText.data;
-        text = DecryptGameModeName<0xDB27CB557D038759ULL>(source);
+        text = OBFUSCATE_TEXT("Please Marry Me", 0xDB27CB557D038759ULL);
       } else if (shownSkill == 20001) {
-        constexpr auto sourceText = CRYPT_NAME("Be my Baby", 0x51BB39B763BBBD8DULL);
-        const auto& source = sourceText.data;
-        text = DecryptGameModeName<0x51BB39B763BBBD8DULL>(source);
+        text = OBFUSCATE_TEXT("Be my Baby", 0x51BB39B763BBBD8DULL);
       } else if (shownSkill == 40000) {
-        constexpr auto sourceText = CRYPT_NAME("Capture Monster", 0x87E3D1C50D572DEFULL);
-        const auto& source = sourceText.data;
-        text = DecryptGameModeName<0x87E3D1C50D572DEFULL>(source);
+        text = OBFUSCATE_TEXT("Capture Monster", 0x87E3D1C50D572DEFULL);
       } else if (g_session.IsState291To303(shownSkill)) {
-        constexpr auto sourceText = CRYPT_NAME("????", 0xB7AFBD2FD9FD7501ULL);
-        const auto& source = sourceText.data;
-        text = DecryptGameModeName<0xB7AFBD2FD9FD7501ULL>(source);
+        text = OBFUSCATE_TEXT("????", 0xB7AFBD2FD9FD7501ULL);
       } else {
         text = CSkillInfo::DisplayName(*g_session.m_hotkeyScript, shownSkill);
       }
@@ -6665,8 +6653,11 @@ void CGameMode::UpdateBalloons() {
       g_windowMgr.AddRendered(hintBalloon);
       static_cast<UITransBalloonText*>(hintBalloon)->SetText(LookupMessage(MSI_SELECTTARGET), 35);
       hintBalloon->Move((g_renderer->viewport.width - 640) / 2 - hintBalloon->geometry.width / 2 + 320, 400 * g_renderer->viewport.height / 480);
-      static_cast<UITransBalloonText*>(hintBalloon)->m_textColor = 0x32FF32;
-      static_cast<UITransBalloonText*>(hintBalloon)->m_outlineColor = 0;
+      {
+        UITransBalloonText* hint = static_cast<UITransBalloonText*>(hintBalloon);
+        hint->m_textColor = 0x32FF32;
+        hint->m_outlineColor = 0;
+      }
     }
   }
 
@@ -6978,7 +6969,7 @@ void CGameMode::PlayItemUseEffect(int itemId, std::uint32_t aid) {
     effectId = 0x1FB;
     break;
   case Durian:
-    static_cast<EffectActor*>(actor)->LaunchEffect(0x105, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    static_cast<EffectActor*>(actor)->LaunchEffect(EF_GUMGANG2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     effectId = 0xDC;
     break;
   case RAMADAN:
@@ -7077,8 +7068,8 @@ void CGameMode::PlayItemUseEffect(int itemId, std::uint32_t aid) {
     effectId = 0x253;
     break;
   case Assumptio_5_Scroll:
-    static_cast<EffectActor*>(actor)->LaunchEffect(0x177, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-    static_cast<EffectActor*>(actor)->LaunchEffect(0x1B8, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    static_cast<EffectActor*>(actor)->LaunchEffect(EF_ASSUMPTIO, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    static_cast<EffectActor*>(actor)->LaunchEffect(EF_ASSUMPTIO2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     break;
   case Spray_Of_Flowers:
   case Large_Spray_Of_Flowers:
@@ -7167,7 +7158,7 @@ void CGameMode::PlayItemUseEffect(int itemId, std::uint32_t aid) {
 
   if (effectId > 0) {
     while (static_cast<EffectActor*>(actor)->HasId(effectId)) {
-      actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0, effectId, effectId >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      actor->SendMsg(nullptr, AM_DELETE_EFFECT, effectId, 0, 0, 0, 0, 0);
     }
     if (g_effectMgr->HasAllocator(effectId)) {
       g_effectMgr->Spawn(actor->render.accountId, effectId, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
@@ -7178,7 +7169,7 @@ void CGameMode::PlayItemUseEffect(int itemId, std::uint32_t aid) {
 
   if (secondEffectId > 0) {
     while (static_cast<EffectActor*>(actor)->HasId(secondEffectId)) {
-      actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0, secondEffectId, secondEffectId >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      actor->SendMsg(nullptr, AM_DELETE_EFFECT, secondEffectId, 0, 0, 0, 0, 0);
     }
     if (g_effectMgr->HasAllocator(secondEffectId)) {
       g_effectMgr->Spawn(actor->render.accountId, secondEffectId, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
@@ -7264,12 +7255,12 @@ void CGameMode::InitializeState() {
     g_windowMgr.EnsureWindow(WID_SEEKPARTYWND);
   }
 
-  if (g_searchStoreInfoCreated) {
+  if (g_session.m_searchStoreInfoCreated) {
     g_windowMgr.EnsureWindow(WID_SEARCH_STORE_INFO);
   }
 
   g_windowMgr.EnsureWindow(WID_OPENROULLETTEWND);
-  if (g_refreshWindow289) {
+  if (g_session.showCameraInfo) {
     g_windowMgr.EnsureWindow(WID_VIEWCAMERAINFOWND);
   }
 
@@ -7291,53 +7282,53 @@ void CGameMode::InitializeState() {
   this->fadeInRequested = 1;
   this->cursorOffsetX = 0.0f;
   this->cursorOffsetY = 0.0f;
-  *reinterpret_cast<int*>(this->leftBtnClickTick) = 0;
-  *reinterpret_cast<int*>(&this->leftBtnClickTick[4]) = g_mouse.x;
-  *reinterpret_cast<int*>(&this->leftBtnClickTick[8]) = g_mouse.y;
+  this->leftBtnClickTick = 0;
+  this->oldMouseX = g_mouse.x;
+  this->oldMouseY = g_mouse.y;
   this->rBtnClickX = g_mouse.x;
   this->rBtnClickY = g_mouse.y;
   this->noMove = 0;
   this->isOnQuest = 0;
   this->isPlayerDead = 0;
-  *reinterpret_cast<int*>(&this->coupleName[0x18]) = 0;
-  *reinterpret_cast<int*>(&this->coupleName[0x1C]) = 0;
-  *reinterpret_cast<int*>(this->balloonDisplayState) = 0;
-  *reinterpret_cast<int*>(&this->balloonDisplayState[4]) = 0;
-  *reinterpret_cast<int*>(&this->balloonDisplayState[8]) = 0;
+  this->nameBalloon = nullptr;
+  this->itemNameBalloon = nullptr;
+  this->skillBalloon = nullptr;
+  this->skillHintBalloon = nullptr;
+  this->unknown_02C0 = 0;
   this->itemWindow = nullptr;
   this->statusIconTooltip = nullptr;
   this->hoveredStatusIconId = -1;
   this->balloonActorId = 0;
-  *reinterpret_cast<int*>(this->nameBalloonSize) = 0;
-  *reinterpret_cast<int*>(&this->nameBalloonSize[4]) = 0;
-  *reinterpret_cast<int*>(&this->balloonDisplayState[0x0C]) = 1;
-  *reinterpret_cast<int*>(&this->balloonDisplayState[0x10]) = 1;
+  this->nameBalloonWidth = 0;
+  this->nameBalloonHeight = 0;
+  this->isNameBalloonPlaced = 1;
+  this->isItemNameBalloonPlaced = 1;
   this->waitingUseItemAck = 0;
-  *reinterpret_cast<int*>(this->waitingItemThrowAck) = 0;
+  this->waitingItemThrowAck = 0;
   this->waitingReqStatusAck = 0;
   this->drag.Clear();
   this->lastNaid = 0;
   this->menuTargetAid = 0;
-  *reinterpret_cast<int*>(this->lastActorIds) = 0;
-  *reinterpret_cast<int*>(&this->lastActorIds[4]) = 0;
-  *reinterpret_cast<int*>(&this->lastActorIds[8]) = 0;
+  this->lastPcGid = 0;
+  this->lastMonGid = 0;
+  this->lastLockOnMonGid = 0;
   this->isAutoMoveClickOn = 1;
   this->isWaitingEnterRoom = 0;
-  *reinterpret_cast<int*>(this->equipmentRequestState) = 0;
-  *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[0x04]) = timeGetTime() - 2000;
-  *reinterpret_cast<std::uint32_t*>(&this->equipmentRequestState[0x08]) = timeGetTime() - 2000;
-  *reinterpret_cast<int*>(&this->equipmentRequestState[0x0C]) = 0;
-  *reinterpret_cast<int*>(&this->equipmentRequestState[0x10]) = 0;
-  *reinterpret_cast<int*>(&this->equipmentRequestState[0x14]) = 0;
+  this->isWaitingAddExchangeItem = 0;
+  this->waitingWearEquipAck = timeGetTime() - 2000;
+  this->waitingTakeoffEquipAck = timeGetTime() - 2000;
+  this->isReqUpgradeSkillLevel = 0;
+  this->exchangeItemCnt = 0;
+  this->isWaitingCancelExchangeItem = 0;
   this->sameChatRepeatCount = 0;
   this->serverTimeSyncCount = 0;
   this->lastChat = "";
   this->skillUseType = nullptr;
   this->skillId = 0;
   g_pickInvert = 0;
-  *reinterpret_cast<int*>(this->cardAndSkillBalloonIds) = 0;
+  this->cardItemIndex = 0;
   this->miniMapTooltipId = -1;
-  *reinterpret_cast<int*>(&this->cardAndSkillBalloonIds[4]) = -1;
+  this->shownSkillId = -1;
 
   char subKey[512];
   std::strcpy(subKey, g_subKey);
@@ -7359,19 +7350,19 @@ void CGameMode::InitializeState() {
   }
 
   g_mouse.Reset();
-  *reinterpret_cast<int*>(&this->requestTimers[0x02]) = 1;
-  this->requestTimers[0x16] = 0;
-  *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x06]) = timeGetTime();
-  *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x0A]) = timeGetTime();
+  this->syncAcknowledged = 1;
+  this->isEmotionRequested = 0;
+  this->syncRequestTick = timeGetTime();
+  this->emotionRequestTick = timeGetTime();
   this->noMoveStartTick = timeGetTime();
-  *reinterpret_cast<std::uint32_t*>(this->windowInvalidateTick) = timeGetTime();
+  this->windowInvalidateTick = timeGetTime();
   this->broadcastBalloon = nullptr;
-  *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x0E]) = timeGetTime();
-  *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x12]) = timeGetTime();
+  this->chatRoomRequestTick = timeGetTime();
+  this->merchantShopRequestTick = timeGetTime();
   this->inventoryChanged = 1;
   std::memset(&this->replayDragState[1], 0, 6);
-  *reinterpret_cast<int*>(&this->replayDragState[0x08]) = 0;
-  *reinterpret_cast<int*>(&this->replayDragState[0x0C]) = 0;
+  this->mouseRollCount = 0;
+  this->mouseRollMax = 0;
   g_soundMgr->SetListenerYaw(this->camera->camera.desiredYaw);
   this->SendMsg(MM_TOGGLE_PLAYERGAGE, 0, 0, 0, 0);
 
@@ -7380,7 +7371,7 @@ void CGameMode::InitializeState() {
     g_guildInfo.Init();
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LIST_COMMAND)), 0xFFE6E6, 0, 0, 0);
-    inet_ntoa(*reinterpret_cast<const in_addr*>(&g_session.characterLoginData[0x0C]));
+    inet_ntoa(*reinterpret_cast<const in_addr*>(&g_session.m_lastLoginIp));
     if (!g_accountLinkedUserDataMgr->m_loaded) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_OFFER_GUILD_EXP_MAX_RATE)), 255, 0, 0, 0);
     }
@@ -7412,7 +7403,7 @@ void CGameMode::InitializeState() {
   }
 
   SendGameTick(
-    true, *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x02]), *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x06]), g_gameTickInterval,
+    true, this->syncAcknowledged, this->syncRequestTick, g_gameTickInterval,
     GetRagConnection(), g_packetLengths, g_pingLogEnabled, g_pingLogFirstTick, g_pingLogTicks
   );
   g_weatherEffect.ResetEffect();
@@ -7434,10 +7425,10 @@ void CGameMode::InitializeState() {
     g_weatherEffect.Fireworks();
   }
 
-  *reinterpret_cast<int*>(&g_session.spAndHomunculusStats[0x08]) = -1;
+  g_session.m_homunAid = -1;
   g_session.homunAlive = 0;
   g_session.ClearHomunStatus();
-  *reinterpret_cast<int*>(&g_session.companionTargetState[0x08]) = -1;
+  g_session.m_mercenaryAid = -1;
   g_session.mercenaryAlive = 0;
   g_session.ResetMercenaryStats();
   g_windowMgr.FocusWindow01C8Edit();
@@ -7461,10 +7452,10 @@ void CGameMode::InitializeState() {
   }
 
   g_navigationManager.ResumeRoute();
-  if (g_mileageWndActive) {
+  if (g_session.m_mileageWndActive) {
     UIWindow* mileage = g_windowMgr.EnsureWindow(WID_MILEAGEWND);
     if (mileage) {
-      mileage->SendMsg(nullptr, UM_SETINFO, g_mileageWndActive, g_mileageWndPoint, g_mileageWndElapsed, g_mileageWndBonus);
+      mileage->SendMsg(nullptr, UM_SETINFO, g_session.m_mileageWndActive, g_session.m_mileageWndPoint, g_session.m_mileageWndElapsed, g_session.m_mileageWndBonus);
     }
   }
 
@@ -7667,7 +7658,7 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
 
   if (g_serviceOptions.Get(0x79)) {
     UIShortCutWnd* shortcuts = static_cast<UIShortCutWnd*>(g_windowMgr.shortCutWnd);
-    *reinterpret_cast<int*>(&g_session.mapTransitionFlag[0x00]) = 1;
+    g_session.m_mapTransitionFlag = 1;
     AutomaticSkills* automatic = &g_session.m_automaticSkills;
     if (g_mouse.wheel > 0) {
       if (!shortcuts) {
@@ -7707,7 +7698,7 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
       g_cameraDistance = static_cast<float>(this->viewParameters[0]);
     }
     maxDistance = static_cast<float>(this->viewParameters[1] + this->viewParameters[0]);
-  } else if (zoomSkill.level <= 0 && this->scene->player->render.state == 6 && !this->scene->player->HasId(0x14E)) {
+  } else if (zoomSkill.level <= 0 && this->scene->player->render.state == 6 && !this->scene->player->HasId(EF_BLIND)) {
     switch (g_session.m_job) {
     case JT_STAR:
     case JT_STAR_B:
@@ -7891,7 +7882,7 @@ void CGameMode::Initialize(const char* name) {
   this->strikeCount = 0;
   this->periodicTicks.resize(6);
 
-  if (*reinterpret_cast<const int*>(g_session.whisperRecordStorage) && g_session.IsAdminSubMode(7)) {
+  if (g_session.m_whisperRecord && g_session.IsAdminSubMode(7)) {
     char message[256];
     std::sprintf(message, "Now Auto chat Save System is ENABLED.");
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message), 0xFFFF, 0, 0, 0);
@@ -7913,7 +7904,7 @@ void CGameMode::Initialize(const char* name) {
       g_stoveMgr->FetchAllProducts();
     } else {
       std::int16_t packet = 0x8C9;
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
     }
   }
 
@@ -7966,7 +7957,7 @@ void CGameMode::Initialize(const char* name) {
   }
 
   if (g_screenShakeMode == 2) {
-    this->scene->player->SendMsg(nullptr, AM_STATUS_CHANGE, 0, 0x22, 0, g_screenShakeDuration <= 10000 && g_screenShakeDuration != 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->scene->player->SendMsg(nullptr, AM_STATUS_CHANGE, 0x22, g_screenShakeDuration <= 10000 && g_screenShakeDuration != 0, 0, 0, 0, 0);
   }
 
   if (g_session.GetOption(6) > 0) {
@@ -8014,9 +8005,9 @@ void CGameMode::ReceiveSkillList(int packetType, const std::vector<SkillListEntr
       skill.spCost = entry->spCost;
       skill.upgradable = entry->upgradable;
       skill.range = entry->range;
-      skill.name = skill.IdName(*g_session.m_hotkeyScript);
+      skill.name = skill.IdName();
       skill.learnedLevel = entry->learnedLevel;
-      skill.apCost = skill.UseApAmount(*g_session.m_hotkeyScript, entry->level);
+      skill.apCost = skill.UseApAmount(entry->level);
       g_session.m_skillBundle.ApplyLevelChange(skill);
 
       if (packetType == 0x10F || packetType == 0xB32) {
@@ -8048,7 +8039,7 @@ void CGameMode::ReceiveSkillList(int packetType, const std::vector<SkillListEntr
 void CGameMode::ReceiveSkillUpdate(
   std::uint16_t id, std::int16_t level, std::int16_t spCost, unsigned char upgradable, std::int16_t range, int type, std::int16_t learnedLevel
 ) {
-  *reinterpret_cast<int*>(&this->equipmentRequestState[0x0C]) = 0;
+  this->isReqUpgradeSkillLevel = 0;
 
   CSkillInfo skill = g_session.LookupSkill(id);
   skill.level = level;
@@ -8080,7 +8071,7 @@ void CGameMode::ShowActorNameBalloon(std::uint32_t id) {
     return;
   }
 
-  int& placed = *reinterpret_cast<int*>(&this->balloonDisplayState[0x0C]);
+  int& placed = this->isNameBalloonPlaced;
   if (this->balloonActorId != id && this->balloonActorId != 0) {
     this->balloonActorId = id;
     placed = 1;
@@ -8105,7 +8096,7 @@ void CGameMode::ShowActorNameBalloon(std::uint32_t id) {
 
   if (id == g_session.m_aid) {
     placed = 0;
-    this->UpdateNameBalloon(reinterpret_cast<CGameActor*>(this->scene->player));
+    this->UpdateNameBalloon(static_cast<CGameActor*>(this->scene->player));
     return;
   }
 
@@ -8118,9 +8109,9 @@ void CGameMode::ShowActorNameBalloon(std::uint32_t id) {
     this->nameBalloon->SetIcon("", 0);
     this->nameBalloon->m_textColor = 0x95EFFF;
     this->nameBalloon->m_outlineColor = 0;
-    *reinterpret_cast<int*>(&this->nameBalloonSize[0]) = this->nameBalloon->geometry.width;
-    *reinterpret_cast<int*>(&this->nameBalloonSize[4]) = this->nameBalloon->geometry.height;
-    this->PlaceWindowAtActor(this->nameBalloon, reinterpret_cast<CGameActor*>(item));
+    this->nameBalloonWidth = this->nameBalloon->geometry.width;
+    this->nameBalloonHeight = this->nameBalloon->geometry.height;
+    this->PlaceWindowAtActor(this->nameBalloon, item);
   }
 }
 
@@ -8156,8 +8147,8 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
     attack = 1;
   }
 
-  const std::uint32_t& homunAid = *reinterpret_cast<const std::uint32_t*>(&g_session.spAndHomunculusStats[8]);
-  const std::uint32_t& mercenaryAid = *reinterpret_cast<const std::uint32_t*>(&g_session.companionTargetState[8]);
+  const std::uint32_t& homunAid = g_session.m_homunAid;
+  const std::uint32_t& mercenaryAid = g_session.m_mercenaryAid;
   if (g_session.homunAlive != 0) {
     if (g_mouse.buttons[1] == 1 && HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
@@ -8168,18 +8159,18 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
           message.target = actor->render.accountId;
           homun->SetResMsg2AI(reinterpret_cast<const float*>(&message), 0);
         }
-      } else if (g_session.attackHomunEnemy != 0 && g_groundMarkAid == actor->render.accountId) {
+      } else if (g_session.attackHomunEnemy != 0 && g_session.homunEnemyGid == actor->render.accountId) {
         CGameActor* homun = static_cast<CGameActor*>(this->scene->GetGameActorByAID(homunAid));
         if (homun && homun->HasActiveHomunculusAI()) {
           AiMessage message = {};
           message.type = 3;
-          message.target = g_groundMarkAid;
+          message.target = g_session.homunEnemyGid;
           homun->SetMsg2AI(reinterpret_cast<const float*>(&message), 0);
         }
         g_session.attackHomunEnemy = 0;
       } else {
         this->SetCursorAction(11);
-        g_groundMarkAid = actor->render.accountId;
+        g_session.homunEnemyGid = actor->render.accountId;
         g_session.homunEnemyX = 0;
         g_session.homunEnemyY = 0;
         g_session.moveHomunEnemy = 0;
@@ -8211,18 +8202,18 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
         message.target = actor->render.accountId;
         mercenary->SetResMsg2AI(reinterpret_cast<const float*>(&message), 1);
       }
-    } else if (g_session.attackMercenaryEnemy != 0 && g_groundMarkAltAid == actor->render.accountId) {
+    } else if (g_session.attackMercenaryEnemy != 0 && g_session.mercenaryEnemyGid == actor->render.accountId) {
       CGameActor* mercenary = static_cast<CGameActor*>(this->scene->GetGameActorByAID(mercenaryAid));
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
         message.type = 3;
-        message.target = g_groundMarkAltAid;
+        message.target = g_session.mercenaryEnemyGid;
         mercenary->SetMsg2AI(reinterpret_cast<const float*>(&message), 1);
       }
       g_session.attackMercenaryEnemy = 0;
     } else {
       this->SetCursorAction(11);
-      g_groundMarkAltAid = actor->render.accountId;
+      g_session.mercenaryEnemyGid = actor->render.accountId;
       g_session.mercenaryEnemyX = 0;
       g_session.mercenaryEnemyY = 0;
       g_session.moveMercenaryEnemy = 0;
@@ -8231,7 +8222,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
     g_session.selectMercenaryEnemy = 1;
   }
 
-  int& targetAid = *reinterpret_cast<int*>(&this->lastActorIds[0x04]);
+  int& targetAid = this->lastMonGid;
   int& forced = this->forcedAttack;
   if (attack != 0 && g_session.mercenaryAlive != 0 && g_mouse.buttons[0] == 1 && g_session.IsMercenarySkill(this->skillId)) {
     CGameActor* mercenary = static_cast<CGameActor*>(this->scene->GetGameActorByAID(mercenaryAid));
@@ -8248,7 +8239,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
 
   if (g_mouse.buttons[0] == 1 && attack != 0 && !HIBYTE(GetAsyncKeyState(VK_MENU))) {
     this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
-    *reinterpret_cast<int*>(&this->lastActorIds[0x08]) = targetAid;
+    this->lastLockOnMonGid = targetAid;
     this->isAutoMoveClickOn = 0;
     if (g_session.GetSiegeMode() == 0 && (HIBYTE(GetAsyncKeyState(VK_CONTROL)) || forceOption != 0)) {
       this->RequestPlayerAction(targetAid, 0);
@@ -8295,49 +8286,44 @@ int g_hoverActorGid;
 __forceinline void CGameMode::ShowHoverActorName(CGameActor* actor) {
   this->EnsureNameBalloon(this->itemNameBalloon);
   CActorNameCard card = this->nameCard.Lookup(actor->render.accountId);
-  if (!card.received) {
-    return;
-  }
+  if (card.received) {
+    actor->hasHp == 1 && (this->scene->isPKZone == 1 || this->scene->isSiegeMode == 1)
+        ? card.name = "??????"
+        : card.name = static_cast<const std::string&>(this->nameCard.Name(actor->render.accountId));
 
-  if (actor->hasHp == 1 && (this->scene->isPKZone == 1 || this->scene->isSiegeMode == 1)) {
-    card.name = "??????";
-  } else {
-    const std::string name = this->nameCard.Name(actor->render.accountId);
-    card.name = name;
-  }
-
-  if (g_session.IsMonsterActor(actor) == 1) {
-    UINameBalloonText* balloon = this->itemNameBalloon;
-    unsigned char monsterType;
-    if (actor->GetEffectiveJob(-1) == 20269) {
-      monsterType = 0;
+    if (g_session.IsMonsterActor(actor) == 1) {
+      UINameBalloonText* balloon = this->itemNameBalloon;
+      unsigned char monsterType;
+      if (actor->GetEffectiveJob(-1) == 20269) {
+        monsterType = 0;
+      } else {
+        monsterType = actor->hpGaugeFlags;
+      }
+      balloon->SetName(card, actor->IsPlayerClass(actor->GetEffectiveJob(-1)) == 0, monsterType);
     } else {
-      monsterType = actor->hpGaugeFlags;
+      this->itemNameBalloon->SetName(card, actor->IsPlayerClass(actor->GetEffectiveJob(-1)) == 0, 0);
     }
-    balloon->SetName(card, actor->IsPlayerClass(actor->GetEffectiveJob(-1)) == 0, monsterType);
-  } else {
-    this->itemNameBalloon->SetName(card, actor->IsPlayerClass(actor->GetEffectiveJob(-1)) == 0, 0);
-  }
 
-  const unsigned char showEmblem = g_serviceOptions.Get(0x40);
-  if ((g_session.IsNpcJob(actor->GetEffectiveJob(-1)) || g_session.IsMonsterActor(actor)) && card.groupIconId) {
-    this->itemNameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
-  } else if (g_session.IsAllyActor(actor->render.accountId, actor->GetEffectiveJob(-1)) && card.groupIconId) {
-    this->nameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
-  } else if (actor->GetGdid() && showEmblem) {
-    std::string emblem = g_guildMgr->GetEmblemFilename(actor->GetGdid());
-    const unsigned char framedEmblem = g_serviceOptions.Get(0xF3);
-    this->itemNameBalloon->SetIcon(emblem.c_str(), static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->isSiegeMode == 1 && framedEmblem ? 1 : 0);
-  } else {
-    this->itemNameBalloon->SetIcon("", 0);
-  }
+    const unsigned char showEmblem = g_serviceOptions.Get(0x40);
+    if ((g_session.IsNpcJob(actor->GetEffectiveJob(-1)) || g_session.IsMonsterActor(actor)) && card.groupIconId) {
+      this->itemNameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
+    } else if (g_session.IsAllyActor(actor->render.accountId, actor->GetEffectiveJob(-1)) && card.groupIconId) {
+      this->nameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
+    } else if (actor->GetGdid() && showEmblem) {
+      std::string emblem = g_guildMgr->GetEmblemFilename(actor->GetGdid());
+      const unsigned char framedEmblem = g_serviceOptions.Get(0xF3);
+      this->itemNameBalloon->SetIcon(emblem.c_str(), static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->isSiegeMode == 1 && framedEmblem ? 1 : 0);
+    } else {
+      this->itemNameBalloon->SetIcon("", 0);
+    }
 
-  UINameBalloonText* balloon = this->itemNameBalloon;
-  if (balloon) {
-    balloon->m_textColor = this->ActorNameColor(actor->GetEffectiveJob(-1), actor->render.accountId);
-    balloon->m_outlineColor = 0;
+    UINameBalloonText* balloon = this->itemNameBalloon;
+    if (balloon) {
+      balloon->m_textColor = this->ActorNameColor(actor->GetEffectiveJob(-1), actor->render.accountId);
+      balloon->m_outlineColor = 0;
+    }
+    this->PlaceWindowAtActor(this->itemNameBalloon, actor);
   }
-  this->PlaceWindowAtActor(this->itemNameBalloon, actor);
 }
 
 // OFFSET: 0x00CDFE10
@@ -8356,8 +8342,8 @@ int CGameMode::ProcessMousePick(int result, ActorPickInfo* pick) {
   }
 
   int& lockedPick = this->forcedAttack;
-  int& pickTarget = *reinterpret_cast<int*>(&this->lastActorIds[0x00]);
-  int& clickTarget = *reinterpret_cast<int*>(&this->lastActorIds[0x04]);
+  int& pickTarget = this->lastPcGid;
+  int& clickTarget = this->lastMonGid;
 
   if (this->lockOnMouse == 0) {
     if (!pick) {
@@ -8469,9 +8455,9 @@ int CGameMode::ProcessGroundClick(int result) {
     }
   }
 
-  UIMerchantShopMakeWnd* shop = reinterpret_cast<UIMerchantShopMakeWnd*>(g_windowMgr.merchantShopMakeWnd);
+  UIMerchantShopMakeWnd* shop = static_cast<UIMerchantShopMakeWnd*>(g_windowMgr.merchantShopMakeWnd);
   if (!shop && g_windowMgr.buyingShopMakeWnd) {
-    shop = reinterpret_cast<UIMerchantShopMakeWnd*>(g_windowMgr.buyingShopMakeWnd);
+    shop = static_cast<UIMerchantShopMakeWnd*>(g_windowMgr.buyingShopMakeWnd);
   }
 
   bool shopSuspended = false;
@@ -8507,8 +8493,8 @@ int CGameMode::ProcessGroundClick(int result) {
     return result;
   }
 
-  const std::uint32_t& homunAid = *reinterpret_cast<const std::uint32_t*>(&g_session.spAndHomunculusStats[8]);
-  const std::uint32_t& mercenaryAid = *reinterpret_cast<const std::uint32_t*>(&g_session.companionTargetState[8]);
+  const std::uint32_t& homunAid = g_session.m_homunAid;
+  const std::uint32_t& mercenaryAid = g_session.m_mercenaryAid;
   if (g_session.homunAlive != 0) {
     if (HIBYTE(GetAsyncKeyState(VK_MENU)) && g_mouse.buttons[1] == 1) {
       if (g_session.selectHomunEnemy != 0) {
@@ -8530,7 +8516,7 @@ int CGameMode::ProcessGroundClick(int result) {
 
       g_session.homunEnemyX = column;
       g_session.homunEnemyY = row;
-      g_groundMarkAid = 0;
+      g_session.homunEnemyGid = 0;
       g_session.attackHomunEnemy = 0;
       if (homun && homun->HasActiveHomunculusAI()) {
         AiMessage message = {};
@@ -8569,7 +8555,7 @@ int CGameMode::ProcessGroundClick(int result) {
 
       g_session.mercenaryEnemyX = column;
       g_session.mercenaryEnemyY = row;
-      g_groundMarkAltAid = 0;
+      g_session.mercenaryEnemyGid = 0;
       g_session.attackMercenaryEnemy = 0;
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
@@ -8626,9 +8612,9 @@ int CGameMode::ProcessGroundClick(int result) {
 
     if (this->scene->player) {
       const int skill = this->skillId;
-      this->scene->player->SendMsg(nullptr, AM_PROCEEDGROUNDSKILL, 0, skill, skill >> 31, column, column >> 31, row, row >> 31, 0, 0, 0, 0, 0, 0);
+      this->scene->player->SendMsg(nullptr, AM_PROCEEDGROUNDSKILL, skill, column, row, 0, 0, 0);
       const int level = this->skillUseLevel;
-      this->scene->player->SendMsg(nullptr, AM_SET_SKILL_USE_LEVEL, 0, level, level >> 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      this->scene->player->SendMsg(nullptr, AM_SET_SKILL_USE_LEVEL, level, 0, 0, 0, 0, 0);
     }
   }
 
@@ -8645,7 +8631,7 @@ int CGameMode::ProcessGroundClick(int result) {
     return result;
   }
 
-  if (*reinterpret_cast<const int*>(g_session.showEffects) != 0) {
+  if (g_session.m_showEffects != 0) {
     g_groundOverlayA = column;
     g_groundOverlayB = row;
     g_groundOverlaySkip = 0;
@@ -8662,7 +8648,7 @@ int CGameMode::ProcessGroundClick(int result) {
     g_groundOverlaySkip = shopSuspended == true ? 1 : skip;
   }
 
-  std::uint32_t& clickTick = *reinterpret_cast<std::uint32_t*>(&this->leftBtnClickTick[0]);
+  std::uint32_t& clickTick = this->leftBtnClickTick;
   const bool elapsed = timeGetTime() > clickTick + 600;
   if (this->scene->player->proceedType == 0 && g_mouse.buttons[0] == 2) {
     if (!elapsed) {
@@ -8683,7 +8669,7 @@ int CGameMode::ProcessGroundClick(int result) {
   g_windowMgr.UpdateNavigationList();
   clickTick = timeGetTime();
   if (HIBYTE(GetAsyncKeyState(VK_SHIFT)) || g_windowMgr.chatRoomWnd || this->scene->player->render.state == 6) {
-    this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, 0, column, column >> 31, row, row >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, column, row, 0, 0, 0, 0);
     return result;
   }
 
@@ -8691,7 +8677,7 @@ int CGameMode::ProcessGroundClick(int result) {
   CPlayer* player = this->scene->player;
   const TerrainHeightCell* cell = this->scene->terrain->CellAt(column, row);
   if (cell && cell->type != 1 && cell->type != 5 &&
-      (column != *reinterpret_cast<const int*>(&player->destCellX) || row != player->destCellZ)) {
+      (column != player->destCellX || row != player->destCellZ)) {
     int startColumn;
     int startRow;
     int startSubColumn;
@@ -8710,7 +8696,7 @@ int CGameMode::ProcessGroundClick(int result) {
     g_windowMgr.CloseWindow(WID_MENUWND);
   }
   if (this->scene->player) {
-    this->scene->player->SendMsg(nullptr, AM_REQ_MOVE, 0, column, column >> 31, row, row >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+    this->scene->player->SendMsg(nullptr, AM_REQ_MOVE, column, row, 0, 0, 0, 0);
   }
   return result;
 }
@@ -8758,7 +8744,7 @@ void CGameMode::Update() {
     g_playerNameDictionary->Update();
     this->nameCard.ProcessRequests();
     g_guildMgr->UpdateEmblemRequests(
-      *g_emblemDataMgr, g_session.m_aid, g_session.m_accountName, reinterpret_cast<const char*>(&g_session.webServiceLoginData[0x08]), GetRagConnection(),
+      *g_emblemDataMgr, g_session.m_aid, g_session.m_accountName, g_session.m_webAuthToken, GetRagConnection(),
       *g_asyncWorkMgr
     );
     g_asyncWorkMgr->Update(1000);
@@ -8785,7 +8771,7 @@ void CGameMode::Update() {
           if (timeGetTime() - g_followUpdateTick > 1000) {
             g_followUpdateTick = timeGetTime();
             int x = actor->movementState[5];
-            int y = *reinterpret_cast<const int*>(actor->destinationAndSpeed);
+            int y = actor->destCellY;
             int cellX = x;
             int cellY = y;
             if (g_windowMgr.chatRoomWnd == nullptr && this->scene->player->render.state != 6) {
@@ -8799,10 +8785,10 @@ void CGameMode::Update() {
                 if (g_windowMgr.menuWnd != nullptr) {
                   g_windowMgr.CloseWindow(WID_MENUWND);
                 }
-                this->scene->player->SendMsg(nullptr, AM_REQ_MOVE, 0, x, x >> 31, y, y >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+                this->scene->player->SendMsg(nullptr, AM_REQ_MOVE, x, y, 0, 0, 0, 0);
               }
             } else {
-              this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, 0, x, x >> 31, y, y >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+              this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, x, y, 0, 0, 0, 0);
             }
           }
         }
@@ -8823,13 +8809,13 @@ void CGameMode::Update() {
 
     g_nProtectGameGuardMgr->Stop();
     g_ggHashMgr->VerifyPendingFiles();
-    if (g_session.characterRenameEnabled) {
+    if (g_session.m_launchPassCommandLine) {
       Base_RunCallback();
     }
 
     if (g_updateTick > 0) {
       SendGameTick(
-        false, *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x02]), *reinterpret_cast<std::uint32_t*>(&this->requestTimers[0x06]), g_gameTickInterval,
+        false, this->syncAcknowledged, this->syncRequestTick, g_gameTickInterval,
         GetRagConnection(), g_packetLengths, g_pingLogEnabled, g_pingLogFirstTick, g_pingLogTicks
       );
       if (timeGetTime() > g_spriteAtlasClearTick) {
@@ -8873,13 +8859,13 @@ void CGameMode::Update() {
     this->DrawMiniMap();
     g_windowMgr.DrawCenteredBackground();
     g_windowMgr.DrawWindows();
-    g_mapInfoMgr->DrawMapName(*GetRenderSystemHolder()->system);
-    if (this->scene->isPKZone != 0 || *reinterpret_cast<const int*>(&g_session.interactionFlags[0x08]) != 0) {
+    g_mapInfoMgr->DrawMapName();
+    if (this->scene->isPKZone != 0 || g_session.m_isPvpZone != 0) {
       this->DrawMiniMapCoordinates();
       this->DrawTimeAttackTimer();
     }
-    if (*reinterpret_cast<const int*>(&g_session.timeAttackState[0x08]) != 0) {
-      this->DrawTimeAttackCountdown(*reinterpret_cast<const std::uint32_t*>(&g_session.timeAttackState[0x00]), *reinterpret_cast<const int*>(g_session.timeAttackMode));
+    if (g_session.m_timeAttackVisible != 0) {
+      this->DrawTimeAttackCountdown(g_session.m_timeAttackCountdown, g_session.m_timeAttackMode);
     }
 
     if (this->drag.source != 0 && (g_windowMgr.itemDropCntWnd == nullptr || g_windowMgr.itemDropCntWnd->geometry.visible == 0)) {
@@ -8931,7 +8917,7 @@ void CGameMode::Update() {
     }
     packet.amount = 1;
     if (this->isPlayerDead == 0) {
-      GetRagConnection().Send(g_packetLengths.FixedLength(packet.packetType), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
       --pending;
     }
   }
@@ -8948,9 +8934,9 @@ void CGameMode::ProcessInput() {
   this->ProcessRightButtonDrag();
   this->ProcessMouseWheel(handled);
 
-  if (timeGetTime() > *reinterpret_cast<std::uint32_t*>(this->windowInvalidateTick) + 1000) {
+  if (timeGetTime() > this->windowInvalidateTick + 1000) {
     g_windowMgr.InvalidateRegisteredWindows();
-    *reinterpret_cast<std::uint32_t*>(this->windowInvalidateTick) = timeGetTime();
+    this->windowInvalidateTick = timeGetTime();
   }
 
   if (handled == 2) {
@@ -8958,19 +8944,19 @@ void CGameMode::ProcessInput() {
   }
 
   if (this->skillUseType != nullptr) {
-    if (*reinterpret_cast<int*>(&g_session.mapTransitionFlag[0x00]) == 0) {
+    if (g_session.m_mapTransitionFlag == 0) {
       if (g_mouse.wheel > 0) {
         this->SendMsg(MM_USESKILL_LEVEL_PLUS, 1, 0, 0, 0);
       } else if (g_mouse.wheel < 0) {
         this->SendMsg(MM_USESKILL_LEVEL_MINUS, 1, 0, 0, 0);
       }
     }
-    *reinterpret_cast<int*>(&g_session.mapTransitionFlag[0x00]) = 0;
+    g_session.m_mapTransitionFlag = 0;
   }
 
   if (g_mouse.buttons[0] == 3) {
     if (this->scene->player) {
-      this->scene->player->SendMsg(nullptr, AM_ATTACKCLICKUP, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      this->scene->player->SendMsg(nullptr, AM_ATTACKCLICKUP, 0, 0, 0, 0, 0, 0);
     }
     this->SendMsg(MM_DROP, g_mouse.x, g_mouse.y, 0, 0);
     UIMenuWnd* menu = static_cast<UIMenuWnd*>(g_windowMgr.menuWnd);
@@ -9037,7 +9023,7 @@ void CGameMode::ProcessInput() {
     if (timeGetTime() > this->noMoveStartTick + 5000) {
       this->noMove = 0;
     }
-    *reinterpret_cast<std::uint32_t*>(this->leftBtnClickTick) = timeGetTime();
+    this->leftBtnClickTick = timeGetTime();
   }
 
   const bool statusIcons = g_serviceOptions.Get(0xC9) != 0;
@@ -9084,13 +9070,13 @@ void CGameMode::UpdateHoverNameBalloon() {
       return;
     }
 
-    actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(*reinterpret_cast<std::uint32_t*>(&this->lastActorIds[8])));
+    actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(this->lastLockOnMonGid));
     if (!actor) {
       return;
     }
 
     if (!actor->objectType && actor->render.visible == 1 && actor->render.enabled == 1 && !StateFlag02(actor->GetStateFlags())) {
-      *reinterpret_cast<int*>(&this->balloonDisplayState[0x10]) = 0;
+      this->isItemNameBalloonPlaced = 0;
       this->ShowHoverActorName(actor);
     }
   }
@@ -9109,7 +9095,6 @@ void CGameMode::UpdateHoverNameBalloon() {
 #include <direct.h>
 #include <format>
 #include <io.h>
-#include "Utility/StdStringCompare.h"
 
 #pragma pack(push, 1)
 struct TalkWhisperSettingPacket {
@@ -9178,7 +9163,7 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     packet.id = ID_CZ_SETTING_WHISPER_PC;
     StringFormat(packet.name, 0x18, static_cast<std::size_t>(-1), "%s", this->refuseWhisperName.c_str());
     packet.type = 0;
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_REQ_WHISPER_PC_IN: {
@@ -9191,7 +9176,7 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     packet.id = ID_CZ_SETTING_WHISPER_PC;
     StringFormat(packet.name, 0x18, static_cast<std::size_t>(-1), "%s", this->refuseWhisperName.c_str());
     packet.type = 1;
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_REQ_SAVE_CHAT_FROM_CHATROOM:
@@ -9278,7 +9263,7 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
       this->SendMsg(MM_CHAT_BATTLEFIELD, 0, 0, 0, 0);
       break;
     }
-    const int sendMode = *reinterpret_cast<const int*>(&g_session.itemSendState[8]);
+    const int sendMode = g_session.m_chatTarget;
     if (sendMode == 2 && g_guildInfo.m_guildId != 0) {
       this->SendMsg(alternate ? MM_CHATMSG : MM_CHAT_GUILD, 0, 0, 0, 0);
       break;
@@ -9341,11 +9326,11 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     break;
   case TT_RANDOM_LOADING_SCREEN_ON_OFF: {
     const char* text;
-    if (g_randomLoadingScreen) {
-      g_randomLoadingScreen = false;
+    if (g_session.m_randomLoadingScreen) {
+      g_session.m_randomLoadingScreen = false;
       text = "RANDOM LOADING SCREEN ON";
     } else {
-      g_randomLoadingScreen = true;
+      g_session.m_randomLoadingScreen = true;
       text = "RANDOM LOADING SCREEN OFF";
     }
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x6E96FF, 0, 0, 0);
@@ -9413,9 +9398,9 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(g_session.battleChat ? 0x555 : 0x556)), 0x64FFFF, 0, 0, 0);
     break;
   case TT_AUTO_MSG_ON_OFF:
-    g_windowToggleFlag = !g_windowToggleFlag;
+    g_session.m_autoReplyEnabled = !g_session.m_autoReplyEnabled;
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    if (g_windowToggleFlag) {
+    if (g_session.m_autoReplyEnabled) {
       g_windowMgr.EnsureWindow(WID_AUTOMESSAGEWND);
     } else {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_AUTO_MSG_OFF)), 0x64FFFF, 0, 0, 0);
@@ -9868,11 +9853,11 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     TalkConfigPacket packet;
     packet.value = talkType != TT_REQ_ACCEPT_INVITE_PARTY;
     packet.id = ID_CZ_PARTY_CONFIG;
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_REQ_OPEN_EQUIPEDITEM_ONOFF:
-    this->SendMsg(MM_OPEN_EQUIPEDITEM_CHANGE, *reinterpret_cast<int*>(g_session.equipmentViewState) == 0, 0, 0, 0);
+    this->SendMsg(MM_OPEN_EQUIPEDITEM_CHANGE, g_session.m_allowEquipView == 0, 0, 0, 0);
     break;
   case TT_SHOW_WEB_ADDRESSBAR: {
     CWebBrowser* browser = g_windowMgr.activeBrowser;
@@ -9965,14 +9950,14 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     TalkConfigPacket packet;
     packet.value = talkType == TT_MACRO_REGISTER ? 2 : 3;
     packet.id = ID_CZ_UI_OPEN;
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_MACRO_PREVIEW: {
     TalkIntPacket packet;
     packet.id = ID_CZ_REQ_PREVIEW_MACRO_DETECTOR;
     packet.value = std::atoi(parts[0].c_str());
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_VIEW_CAMERAINFO_ON_OFF: {
@@ -10013,7 +9998,7 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
   case TT_RESET_COOLTIME: {
     TalkConfigPacket packet;
     packet.id = ID_CZ_CMD_RESETCOOLTIME;
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_ADVEN_PARTY_BOARD:
@@ -10033,14 +10018,14 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
       packet.enabled = 0;
       packet.value = 0;
     }
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_MACRO_CHECKER_MAP: {
     TalkNamePacket packet;
     packet.id = ID_CZ_GM_CHECKER;
     strncpy_s(packet.name, sizeof(packet.name), parts[0].c_str(), _TRUNCATE);
-    GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
   case TT_PROBABILITY_TEST: {
@@ -10183,7 +10168,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
         }
         }
       } else if (pick->healthState != 0 || scene->isPKZone != 0 || scene->isEventPVPMode != 0 ||
-                 *reinterpret_cast<const int*>(&g_session.interactionFlags[4]) != 0) {
+                 g_session.m_isSiegeZone != 0) {
         if (!g_session.IsPartyMember(actor->render.accountId, true)) {
           attack = 1;
         }
@@ -10204,8 +10189,8 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     this->SetCursorAction(0);
   }
 
-  const std::uint32_t& homunAid = *reinterpret_cast<const std::uint32_t*>(&g_session.spAndHomunculusStats[8]);
-  const std::uint32_t& mercenaryAid = *reinterpret_cast<const std::uint32_t*>(&g_session.companionTargetState[8]);
+  const std::uint32_t& homunAid = g_session.m_homunAid;
+  const std::uint32_t& mercenaryAid = g_session.m_mercenaryAid;
   if ((attack || this->scene->isSiegeMode != 0) && actor->render.state != 3 && !skillMode && g_session.homunAlive != 0 && g_mouse.buttons[1] == 1 && HIBYTE(GetAsyncKeyState(VK_MENU))) {
     if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       CGameActor* homun = static_cast<CGameActor*>(this->scene->GetGameActorByAID(homunAid));
@@ -10215,18 +10200,18 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
         message.target = actor->render.accountId;
         homun->SetResMsg2AI(reinterpret_cast<const float*>(&message), 0);
       }
-    } else if (g_session.attackHomunEnemy != 0 && g_groundMarkAid == actor->render.accountId) {
+    } else if (g_session.attackHomunEnemy != 0 && g_session.homunEnemyGid == actor->render.accountId) {
       CGameActor* homun = static_cast<CGameActor*>(this->scene->GetGameActorByAID(homunAid));
       if (homun && homun->HasActiveHomunculusAI()) {
         AiMessage message = {};
         message.type = 3;
-        message.target = g_groundMarkAid;
+        message.target = g_session.homunEnemyGid;
         homun->SetMsg2AI(reinterpret_cast<const float*>(&message), 0);
       }
       g_session.attackHomunEnemy = 0;
     } else {
       this->SetCursorAction(11);
-      g_groundMarkAid = actor->render.accountId;
+      g_session.homunEnemyGid = actor->render.accountId;
       g_session.homunEnemyX = 0;
       g_session.homunEnemyY = 0;
       g_session.moveHomunEnemy = 0;
@@ -10257,18 +10242,18 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
         message.target = actor->render.accountId;
         mercenary->SetResMsg2AI(reinterpret_cast<const float*>(&message), 1);
       }
-    } else if (g_session.attackMercenaryEnemy != 0 && g_groundMarkAltAid == actor->render.accountId) {
+    } else if (g_session.attackMercenaryEnemy != 0 && g_session.mercenaryEnemyGid == actor->render.accountId) {
       CGameActor* mercenary = static_cast<CGameActor*>(this->scene->GetGameActorByAID(mercenaryAid));
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
         message.type = 3;
-        message.target = g_groundMarkAltAid;
+        message.target = g_session.mercenaryEnemyGid;
         mercenary->SetMsg2AI(reinterpret_cast<const float*>(&message), 1);
       }
       g_session.attackMercenaryEnemy = 0;
     } else {
       this->SetCursorAction(11);
-      g_groundMarkAltAid = actor->render.accountId;
+      g_session.mercenaryEnemyGid = actor->render.accountId;
       g_session.mercenaryEnemyX = 0;
       g_session.mercenaryEnemyY = 0;
       g_session.moveMercenaryEnemy = 0;
@@ -10293,8 +10278,8 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
   int& forced = this->forcedAttack;
   if (g_mouse.buttons[0] == 1 && attack != 0 && !HIBYTE(GetAsyncKeyState(VK_MENU))) {
     this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
-    *reinterpret_cast<std::uint32_t*>(&this->lastActorIds[0x08]) = actor->render.accountId;
-    *reinterpret_cast<int*>(&this->lastActorIds[0x0C]) = 0;
+    this->lastLockOnMonGid = actor->render.accountId;
+    this->isAutoMoveClickOn = 0;
     if (g_session.GetSiegeMode() == 0 && (HIBYTE(GetAsyncKeyState(VK_CONTROL)) || forceOption != 0)) {
       this->RequestPlayerAction(actor->render.accountId, 0);
       if (!skillMode) {
@@ -10312,10 +10297,10 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     }
     this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
     g_hoverActorGid = actor->GetPkState();
-    *reinterpret_cast<int*>(&this->lastActorIds[0x0C]) = 0;
+    this->isAutoMoveClickOn = 0;
   }
 
-  int& balloonAid = *reinterpret_cast<int*>(&this->lastActorIds[0x00]);
+  int& balloonAid = this->lastPcGid;
   if (this->oldMouseX == g_mouse.x && this->oldMouseY == g_mouse.y) {
     this->ShowActorNameBalloon(balloonAid);
     return;
@@ -10372,7 +10357,7 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
     return;
   }
 
-  const int id = g_statusIconIds[slot];
+  const int id = g_session.m_statusIconIds[slot];
   if (id == -1) {
     hoveredId = -1;
     if (this->statusIconTooltip) {
@@ -10505,9 +10490,9 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
 int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
   const unsigned char selfTargetOption = g_serviceOptions.Get(0x69);
   const unsigned char forceOption = g_serviceOptions.Get(0x6D);
-  const int& siegeMode = *reinterpret_cast<const int*>(&g_session.interactionFlags[4]);
-  const std::uint32_t& homunAid = *reinterpret_cast<const std::uint32_t*>(&g_session.spAndHomunculusStats[8]);
-  const std::uint32_t& mercenaryAid = *reinterpret_cast<const std::uint32_t*>(&g_session.companionTargetState[8]);
+  const int& siegeMode = g_session.m_isSiegeZone;
+  const std::uint32_t& homunAid = g_session.m_homunAid;
+  const std::uint32_t& mercenaryAid = g_session.m_mercenaryAid;
   GuildInfo* guildInfo = &g_guildInfo;
 
   if (pick->accountId != g_session.m_aid) {
@@ -10585,12 +10570,12 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           if (attack && state != 3) {
             this->SetCursorAction(skillMode ? 11 : 5);
             result = 1;
-            *reinterpret_cast<int*>(&this->lastActorIds[0]) = pick->accountId;
+            this->lastPcGid = pick->accountId;
           } else {
             this->SetCursorAction(skillMode && state != 3 ? 10 : 0);
             result = 0;
-            if (g_mouse.buttons[0] == 0 && this->lockOnMouse == 0 && *reinterpret_cast<int*>(&this->lastActorIds[4]) == 0) {
-              *reinterpret_cast<int*>(&this->lastActorIds[0]) = pick->accountId;
+            if (g_mouse.buttons[0] == 0 && this->lockOnMouse == 0 && this->lastMonGid == 0) {
+              this->lastPcGid = pick->accountId;
             }
           }
         } else if (g_session.IsNpcJob(pick->job) == true) {
@@ -10641,7 +10626,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           }
 
           if (g_mouse.buttons[0] == 0 && this->lockOnMouse == 0) {
-            *reinterpret_cast<int*>(&this->lastActorIds[4]) = pick->accountId;
+            this->lastMonGid = pick->accountId;
           }
           if (g_mouse.buttons[0] == 2 || g_mouse.buttons[1] == 2) {
             result = 2;
@@ -10746,7 +10731,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           if (actor->objectType == 8 && this->skillId == 0xE7) {
             result = 1;
             this->SetCursorAction(11);
-            *reinterpret_cast<int*>(&this->lastActorIds[4]) = pick->accountId;
+            this->lastMonGid = pick->accountId;
           }
         } else {
           CWorld* scene = this->scene;
@@ -10759,7 +10744,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
             }
             result = 1;
             this->SetCursorAction(5);
-            *reinterpret_cast<int*>(&this->lastActorIds[4]) = pick->accountId;
+            this->lastMonGid = pick->accountId;
           }
         }
       }
@@ -10791,7 +10776,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       int column;
       int row;
       this->WorldCell(actor->render.position.x, actor->render.position.z, column, row);
-      this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, 0, column, column >> 31, row, row >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+      this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, column, row, 0, 0, 0, 0);
       if (g_windowMgr.HasPendingDialog() == true) {
         g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_VIEW_CHANGE_EQUIPMENT_PROPERTIES_MSG)), 255, 25, 0, 0);
@@ -10802,7 +10787,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       packet.packetType = ID_CZ_CONTACTNPC;
       packet.npcId = pick->accountId;
       packet.type = 1;
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
       return result;
     }
 
@@ -10833,18 +10818,18 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
             message.target = pick->accountId;
             homun->SetResMsg2AI(reinterpret_cast<const float*>(&message), 0);
           }
-        } else if (g_session.attackHomunEnemy != 0 && g_groundMarkAid == pick->accountId) {
+        } else if (g_session.attackHomunEnemy != 0 && g_session.homunEnemyGid == pick->accountId) {
           CGameActor* homun = static_cast<CGameActor*>(this->scene->GetGameActorByAID(homunAid));
           if (homun != nullptr && homun->HasActiveHomunculusAI()) {
             AiMessage message = {};
             message.type = 3;
-            message.target = g_groundMarkAid;
+            message.target = g_session.homunEnemyGid;
             homun->SetMsg2AI(reinterpret_cast<const float*>(&message), 0);
           }
           g_session.attackHomunEnemy = 0;
         } else {
           this->SetCursorAction(11);
-          g_groundMarkAid = pick->accountId;
+          g_session.homunEnemyGid = pick->accountId;
           g_session.homunEnemyX = 0;
           g_session.homunEnemyY = 0;
           g_session.moveHomunEnemy = 0;
@@ -10877,18 +10862,18 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
             message.target = pick->accountId;
             mercenary->SetResMsg2AI(reinterpret_cast<const float*>(&message), 1);
           }
-        } else if (g_session.attackMercenaryEnemy != 0 && g_groundMarkAltAid == pick->accountId) {
+        } else if (g_session.attackMercenaryEnemy != 0 && g_session.mercenaryEnemyGid == pick->accountId) {
           CGameActor* mercenary = static_cast<CGameActor*>(this->scene->GetGameActorByAID(mercenaryAid));
           if (mercenary != nullptr && mercenary->HasActiveMercenaryAI()) {
             AiMessage message = {};
             message.type = 3;
-            message.target = g_groundMarkAltAid;
+            message.target = g_session.mercenaryEnemyGid;
             mercenary->SetMsg2AI(reinterpret_cast<const float*>(&message), 1);
           }
           g_session.attackMercenaryEnemy = 0;
         } else {
           this->SetCursorAction(11);
-          g_groundMarkAltAid = pick->accountId;
+          g_session.mercenaryEnemyGid = pick->accountId;
           g_session.mercenaryEnemyX = 0;
           g_session.mercenaryEnemyY = 0;
           g_session.moveMercenaryEnemy = 0;
@@ -10914,8 +10899,8 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
 
       if (g_mouse.buttons[0] == 1 && attack && !HIBYTE(GetAsyncKeyState(VK_MENU))) {
         this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
-        *reinterpret_cast<int*>(&this->lastActorIds[8]) = pick->accountId;
-        *reinterpret_cast<int*>(&this->lastActorIds[4]) = pick->accountId;
+        this->lastLockOnMonGid = pick->accountId;
+        this->lastMonGid = pick->accountId;
         this->isAutoMoveClickOn = 0;
         if (g_session.GetSiegeMode() == 0 && (HIBYTE(GetAsyncKeyState(VK_CONTROL)) || forceOption != 0)) {
           this->RequestPlayerAction(pick->accountId, 0);
@@ -10928,7 +10913,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       }
 
       if (this->forcedAttack == 0 && g_mouse.buttons[0] == 3) {
-        *reinterpret_cast<int*>(&this->lastActorIds[4]) = 0;
+        this->lastMonGid = 0;
       }
       return result;
     }
@@ -10994,8 +10979,8 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
     }
 
     this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
-    *reinterpret_cast<int*>(&this->lastActorIds[8]) = pick->accountId;
-    *reinterpret_cast<int*>(&this->lastActorIds[4]) = pick->accountId;
+    this->lastLockOnMonGid = pick->accountId;
+    this->lastMonGid = pick->accountId;
     this->isAutoMoveClickOn = 0;
     if (g_session.GetSiegeMode() == 0 && (HIBYTE(GetAsyncKeyState(VK_CONTROL)) || forceOption != 0)) {
       this->RequestPlayerAction(pick->accountId, 0);
@@ -11027,10 +11012,10 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       this->isAutoMoveClickOn = 0;
       const int skillUse = reinterpret_cast<int>(&this->skillUseType);
       if (!HIBYTE(GetAsyncKeyState(VK_CONTROL)) && forceOption == 0) {
-        this->scene->player->SendMsg(nullptr, AM_PROCEEDTOUCHSKILL, 0, pick->accountId, 0, skillUse, skillUse >> 31, 1, 0, 0, 0, 0, 0, 0, 0);
+        this->scene->player->SendMsg(nullptr, AM_PROCEEDTOUCHSKILL, pick->accountId, skillUse, 1, 0, 0, 0);
         this->forcedAttack = 0;
       } else {
-        this->scene->player->SendMsg(nullptr, AM_PROCEEDTOUCHSKILL, 0, pick->accountId, 0, skillUse, skillUse >> 31, 0, 0, 0, 0, 0, 0, 0, 0);
+        this->scene->player->SendMsg(nullptr, AM_PROCEEDTOUCHSKILL, pick->accountId, skillUse, 0, 0, 0, 0);
         this->forcedAttack = 1;
       }
       return result;
@@ -11038,7 +11023,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
     default:
       if (reinterpret_cast<std::intptr_t>(this->skillUseType) == 5) {
         const long long skillUse = static_cast<long long>(reinterpret_cast<int>(this)) + offsetof(CGameMode, skillUseType);
-        this->scene->player->SendMsg(nullptr, AM_PROCEEDTOUCHSKILL, 0, pick->accountId, 0, static_cast<int>(skillUse), static_cast<int>(skillUse >> 32), 0, 0, 0, 0, 0, 0, 0, 0);
+        this->scene->player->SendMsg(nullptr, AM_PROCEEDTOUCHSKILL, pick->accountId, skillUse, 0, 0, 0, 0);
       }
       return result;
     }
@@ -11047,7 +11032,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
     return 0;
   case 1:
     if (g_mouse.buttons[0] == 1 && reinterpret_cast<std::intptr_t>(this->skillUseType) == 0) {
-      this->scene->player->SendMsg(nullptr, AM_PROCEEDPICKUPITEM, 0, pick->accountId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      this->scene->player->SendMsg(nullptr, AM_PROCEEDPICKUPITEM, pick->accountId, 0, 0, 0, 0, 0);
     }
     break;
   case 4: {

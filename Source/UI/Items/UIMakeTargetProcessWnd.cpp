@@ -56,13 +56,13 @@ void UIMakeTargetProcessWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     }
 
     if (emptySlot < 3) {
-      ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, drag->id);
+      ITEM_INFO item = g_session.LookupClientItemByIdentity(drag->id);
       if (item.identity[1] > 0 && item.IsForgeMaterial() && (!hasElementalStone || !item.IsElementalStone())) {
         this->materials[emptySlot] = item;
         this->materials[emptySlot].quantity = 1;
         g_session.RemoveInventoryItem(item.identity[1], 1);
         if (g_windowMgr.itemWnd) {
-          reinterpret_cast<UIWindow*>(g_windowMgr.itemWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+          static_cast<UIWindow*>(g_windowMgr.itemWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
         }
         this->Invalidate();
       }
@@ -216,7 +216,7 @@ int UIMakeTargetProcessWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
       }
 
       if (g_windowMgr.itemWnd) {
-        reinterpret_cast<UIWindow*>(g_windowMgr.itemWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+        static_cast<UIWindow*>(g_windowMgr.itemWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
       }
 
       g_windowMgr.CloseWindow(WID_MAKETARGETPROCESSWND);

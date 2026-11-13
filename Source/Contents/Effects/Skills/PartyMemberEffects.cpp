@@ -1,4 +1,5 @@
 #include "Contents/Effects/Core/RagEffect.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Actors/ActorEnums.h"
 #include "Contents/Effects/Core/EffectActor.h"
 #include "Contents/Effects/Skills/PartyMemberEffects.h"
@@ -15,6 +16,8 @@
 #include "Utility/Math/AffineMatrix.h"
 
 #include <cstring>
+
+template __declspec(noinline) std::_Tree_find_result<std::map<int, std::int64_t>::_Mybase::_Nodeptr> std::map<int, std::int64_t>::_Mybase::_Find_lower_bound<int>(const int&) const;
 
 namespace {
   struct CRollingCutterRagEffect : CRagEffect {
@@ -81,7 +84,8 @@ bool CRollingCutterRagEffect::OnProcess() {
 
   if (this->elapsed == 0) {
     const vector3d& player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.position;
-    g_soundMgr->PlayWave("effect\\EF_BeginSpell.wav", this->render.position.x - player.x, -100.0f, this->render.position.z - player.z, 250, 40, 1.0f, 0);
+    const vector3d soundPosition = {this->render.position.x - player.x, -100.0f, this->render.position.z - player.z};
+    g_soundMgr->PlayWave("effect\\EF_BeginSpell.wav", soundPosition.x, soundPosition.y, soundPosition.z, 250, 40, 1.0f, 0);
   }
 
   this->state.parent->render.angle += 12.0f;
@@ -190,8 +194,8 @@ bool PartyMemberEffects::Enabled() const {
 // INLINED
 void PartyMemberEffects::EnsurePartyEffect(std::uint32_t accountId) {
   EffectActor* actor = static_cast<EffectActor*>(this->mode->scene->GetGameActorByAID(accountId));
-  if (actor && !actor->HasId(160)) {
-    actor->LaunchEffect(160, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+  if (actor && !actor->HasId(EF_PARTY)) {
+    actor->LaunchEffect(EF_PARTY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
   }
 }
 

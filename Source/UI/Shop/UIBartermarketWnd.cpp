@@ -1,4 +1,5 @@
 #include "UI/Shop/UIBartermarketWnd.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -32,6 +33,8 @@
 #include <map>
 #include <new>
 #include <string>
+
+template __declspec(noinline) std::map<int, int>::map(const std::map<int, int>&);
 
 // OFFSET: 0x00844BE0
 // FUNCTION: fn_10567
@@ -276,7 +279,7 @@ std::pair<bool, BarterMarketEntry> UIExpandedBarterItemPurchaseWnd::GetEntryAt(i
   for (std::list<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it, ++index) {
     if (index >= this->firstRow) {
       if (visible == row) {
-        return std::make_pair(true, *it);
+        return std::pair<bool, BarterMarketEntry>(true, *it);
       }
       ++visible;
     }
@@ -296,7 +299,7 @@ std::pair<bool, BarterMarketEntry> UIExpandedBartermarketWnd::GetEntryAt(int x, 
   for (std::list<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it, ++index) {
     if (index >= this->firstRow) {
       if (visible == (y - 17) / 64) {
-        return std::make_pair(true, *it);
+        return std::pair<bool, BarterMarketEntry>(true, *it);
       }
       ++visible;
     }
@@ -366,14 +369,14 @@ std::pair<bool, BarterMarketEntry> UIExpandedBartermarketWnd::GetEntryOrChunkAt(
               char buffer[16] = {};
               entry.name = _itoa(chunk->field_0, buffer, 10);
               entry.field_0 = chunk->field_c;
-              return std::make_pair(true, entry);
+              return std::pair<bool, BarterMarketEntry>(true, entry);
             }
             right += 42;
           }
         }
         if (x > 40 && x < 72) {
           entry = *it;
-          return std::make_pair(true, entry);
+          return std::pair<bool, BarterMarketEntry>(true, entry);
         }
       }
       ++visible;
@@ -501,7 +504,7 @@ int UIExpandedBarterItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std:
 
     found.second.value = mode->drag.quantity;
     for (std::vector<BarterChunk16>::iterator chunk = found.second.chunks.begin(); chunk != found.second.chunks.end(); ++chunk) {
-      ITEM_INFO owned = LookupClientItemByIdentity(g_session.m_inventoryItems, chunk->field_0);
+      ITEM_INFO owned = g_session.LookupClientItemByIdentity(chunk->field_0);
       if (owned.identity[1] > 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
@@ -904,7 +907,7 @@ void UIExpandedBarterItemPurchaseWnd::OnLBtnDown(int x, int y) {
   std::pair<bool, BarterMarketEntry> found = this->GetEntryAt(x, y);
   if (found.first == true) {
     if (CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) {
-      mode->drag.BeginBarterEntry(32, found.second, found.second.value, -1);
+      mode->BeginDragBarterEntry(32, found.second, found.second.value, -1);
     }
   }
 }
@@ -948,7 +951,7 @@ void UIExpandedBartermarketWnd::OnLBtnDown(int x, int y) {
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_INVENTORY_EXTEND_OF_BODYITEM)), 255, 0, 0, 0);
     } else if (CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) {
-      mode->drag.BeginBarterEntry(31, found.second, 1, -1);
+      mode->BeginDragBarterEntry(31, found.second, 1, -1);
     }
   }
 }
@@ -1410,10 +1413,11 @@ int UIBarterItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_
   }
 
   case UM_REFRESHITEM: {
-    this->items.clear();
+    this->items.erase(this->items.begin(), this->items.end());
     std::list<BarterMarketItem>* items = g_barterMarketItemMgr->GetAllItems();
     for (std::list<BarterMarketItem>::iterator it = items->begin(); it != items->end(); ++it) {
-      this->items.push_back(it->ToItemInfo());
+      ITEM_INFO info = it->ToItemInfo();
+      this->items.push_back(info);
     }
     this->Invalidate();
     this->UpdateScrollBar();
@@ -1424,7 +1428,7 @@ int UIBarterItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_
     break;
   }
 
-  return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
+  return UIItemBaseWnd::SendMsg(sender, message, a, b, c, d);
 }
 
 // OFFSET: 0x00846FB0
@@ -1535,10 +1539,11 @@ int UIBartermarketWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   }
 
   case UM_REFRESHITEM: {
-    this->items.clear();
+    this->items.erase(this->items.begin(), this->items.end());
     std::list<BarterMarketItem>* items = g_barterMarketItemMgr->GetItems();
     for (std::list<BarterMarketItem>::iterator it = items->begin(); it != items->end(); ++it) {
-      this->items.push_back(it->ToItemInfo());
+      ITEM_INFO info = it->ToItemInfo();
+      this->items.push_back(info);
     }
     this->Invalidate();
     this->UpdateScrollBar();
@@ -1549,7 +1554,7 @@ int UIBartermarketWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     break;
   }
 
-  return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
+  return UIItemBaseWnd::SendMsg(sender, message, a, b, c, d);
 }
 
 // OFFSET: 0x00842570
@@ -1664,13 +1669,15 @@ void UIBarterItemPurchaseWnd::Paint() {
     return;
   }
 
-  const int borderHeight = this->geometry.height - 38;
-  const int borderTiles = borderHeight / 8 + (borderHeight % 8 != 0);
-  for (int tile = 0, y = 17; tile < borderTiles; ++tile, y += 8) {
+  const int leftHeight = this->geometry.height - 38;
+  const int leftTiles = leftHeight / 8 + (leftHeight % 8 != 0);
+  for (int tile = 0, y = 17; tile < leftTiles; ++tile, y += 8) {
     auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
     this->DrawBitmap(0, y, bitmap, false);
   }
-  for (int tile = 0, y = 17; tile < borderTiles; ++tile, y += 8) {
+  const int rightHeight = this->geometry.height - 38;
+  const int rightTiles = rightHeight / 8 + (rightHeight % 8 != 0);
+  for (int tile = 0, y = 17; tile < rightTiles; ++tile, y += 8) {
     auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
     this->DrawBitmap(this->geometry.width - bitmap->image.width, y, bitmap, false);
   }
@@ -1678,22 +1685,15 @@ void UIBarterItemPurchaseWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
-  const std::uint32_t background = RGB(red, green, blue);
-  int rightRemainder = (this->geometry.width - 60) % 32;
-  if (rightRemainder < 0) {
-    rightRemainder += 32;
-  }
-  int bottomRemainder = (this->geometry.height - 38) % 32;
-  if (bottomRemainder < 0) {
-    bottomRemainder += 32;
-  }
-  this->FillRegion(20, 17, rightRemainder, this->geometry.height - 38, background);
-  this->FillRegion(20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, bottomRemainder, background);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  const int rightRemainder = (this->geometry.width - 60) % 32;
+  this->FillRegion(20, 17, rightRemainder, this->geometry.height - 38, RGB(red, green, blue));
+  const int bottomRemainder = (this->geometry.height - 38) % 32;
+  this->FillRegion(20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, bottomRemainder, RGB(red, green, blue));
   this->DrawButtonBar(2, 0, 1);
 
   const int rows = (this->geometry.height - 38) / 32;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(40, 17, this->geometry.width - 50, rows * 32, RGB(red, green, blue));
 
   for (int row = 0; row < rows; ++row) {
@@ -1713,7 +1713,7 @@ void UIBarterItemPurchaseWnd::Paint() {
     const int x = column * 32;
     const int y = row * 32;
     if (this->hovered == index) {
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, red, green, blue);
+      g_skinInfo.PaletteChannels(6, 2, red, green, blue);
       this->FillRegion(x + 72, y + 19, 0xBF, 0x1C, RGB(red, green, blue));
     }
 
@@ -1759,10 +1759,11 @@ void UIBartermarketWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
-  this->FillRegion(20, 17, (this->geometry.width - 60) % 32, this->geometry.height - this->bottomPadding - 17, RGB(red, green, blue));
-  const int contentHeight = this->geometry.height - this->bottomPadding - 17;
-  this->FillRegion(20, contentHeight / 32 * 32 + 17, this->geometry.width - 24, contentHeight % 32, RGB(red, green, blue));
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  const int rightRemainder = (this->geometry.width - 60) % 32;
+  this->FillRegion(20, 17, rightRemainder, this->geometry.height - this->bottomPadding - 17, RGB(red, green, blue));
+  const int bottomRemainder = (this->geometry.height - this->bottomPadding - 17) % 32;
+  this->FillRegion(20, (this->geometry.height - this->bottomPadding - 17) / 32 * 32 + 17, this->geometry.width - 24, bottomRemainder, RGB(red, green, blue));
   this->DrawButtonBar(2, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
@@ -1773,7 +1774,7 @@ void UIBartermarketWnd::Paint() {
   unsigned slotRed;
   unsigned slotGreen;
   unsigned slotBlue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, slotRed, slotGreen, slotBlue);
+  g_skinInfo.PaletteChannels(2, 2, slotRed, slotGreen, slotBlue);
   this->FillRegion(72, 17, columns * 32 - 32, rows * 32, RGB(slotRed, slotGreen, slotBlue));
 
   int visible = 0;
@@ -1792,7 +1793,7 @@ void UIBartermarketWnd::Paint() {
       unsigned hoverRed;
       unsigned hoverGreen;
       unsigned hoverBlue;
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, hoverRed, hoverGreen, hoverBlue);
+      g_skinInfo.PaletteChannels(6, 2, hoverRed, hoverGreen, hoverBlue);
       this->FillRegion(x + 72, y + 19, this->geometry.width - 0x58, 0x1C, RGB(hoverRed, hoverGreen, hoverBlue));
     }
 
@@ -1842,7 +1843,7 @@ void UIExpandedBarterItemPurchaseWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(20, 17, this->geometry.width - 40, this->geometry.height - 46, RGB(red, green, blue));
   this->DrawButtonBar(2, 0, 1);
 
@@ -1862,7 +1863,7 @@ void UIExpandedBarterItemPurchaseWnd::Paint() {
       unsigned hoverRed;
       unsigned hoverGreen;
       unsigned hoverBlue;
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, hoverRed, hoverGreen, hoverBlue);
+      g_skinInfo.PaletteChannels(6, 2, hoverRed, hoverGreen, hoverBlue);
       this->FillRegion(72, y + 19, this->geometry.width - 0x5A, 0x3C, RGB(hoverRed, hoverGreen, hoverBlue));
     }
 
@@ -1875,7 +1876,7 @@ void UIExpandedBarterItemPurchaseWnd::Paint() {
     if (it->field_28 > 0) {
       std::uint32_t color = 0xFFFFFF;
       const std::string quantity = std::format("+{}", it->field_28);
-      DrawOutlinedColoredText(*this, 50, y + 18, quantity.c_str(), quantity.size(), color, 200, 0, 12, 1);
+      this->DrawOutlinedColoredText(50, y + 18, quantity.c_str(), quantity.size(), color, 200, 0, 12, 1);
     }
 
     int chunkIndex = 0;
@@ -1892,7 +1893,7 @@ void UIExpandedBarterItemPurchaseWnd::Paint() {
         char chunkAmount[16] = {};
         StringFormat(chunkAmount, sizeof(chunkAmount), static_cast<std::size_t>(-1), "+%d", chunkItem.refiningLevel);
         std::uint32_t color = 0xFFFFFF;
-        DrawOutlinedColoredText(*this, chunkX, y + 49, chunkAmount, std::strlen(chunkAmount), color, 200, 0, 12, 1);
+        this->DrawOutlinedColoredText(chunkX, y + 49, chunkAmount, std::strlen(chunkAmount), color, 200, 0, 12, 1);
       }
       ++chunkIndex;
     }
@@ -1936,7 +1937,7 @@ void UIExpandedBartermarketWnd::Paint() {
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(20, 17, this->geometry.width - 40, this->geometry.height - 46, RGB(red, green, blue));
   this->DrawButtonBar(2, 0, 1);
 
@@ -1956,7 +1957,7 @@ void UIExpandedBartermarketWnd::Paint() {
       unsigned hoverRed;
       unsigned hoverGreen;
       unsigned hoverBlue;
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, hoverRed, hoverGreen, hoverBlue);
+      g_skinInfo.PaletteChannels(6, 2, hoverRed, hoverGreen, hoverBlue);
       this->FillRegion(72, y + 19, this->geometry.width - 0x5A, 0x3C, RGB(hoverRed, hoverGreen, hoverBlue));
     }
 
@@ -1974,7 +1975,7 @@ void UIExpandedBartermarketWnd::Paint() {
     if (it->field_28 > 0) {
       std::uint32_t color = 0xFFFFFF;
       const std::string quantity = std::format("+{}", it->field_28);
-      DrawOutlinedColoredText(*this, 50, y + 18, quantity.c_str(), quantity.size(), color, 200, 0, 12, 1);
+      this->DrawOutlinedColoredText(50, y + 18, quantity.c_str(), quantity.size(), color, 200, 0, 12, 1);
     }
 
     int chunkIndex = 0;
@@ -1995,7 +1996,7 @@ void UIExpandedBartermarketWnd::Paint() {
         char chunkAmount[16] = {};
         StringFormat(chunkAmount, sizeof(chunkAmount), static_cast<std::size_t>(-1), "+%d", chunkItem.refiningLevel);
         std::uint32_t color = 0xFFFFFF;
-        DrawOutlinedColoredText(*this, chunkX + 8, y + 49, chunkAmount, std::strlen(chunkAmount), color, 200, 0, 12, 1);
+        this->DrawOutlinedColoredText(chunkX + 8, y + 49, chunkAmount, std::strlen(chunkAmount), color, 200, 0, 12, 1);
       }
       ++chunkIndex;
     }

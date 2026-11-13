@@ -17,7 +17,7 @@ UIBroadcastBalloon::UIBroadcastBalloon() : UIWindow(0) {
 // OFFSET: 0x007C2D70
 // FUNCTION: fn_09333
 void UIBroadcastBalloon::AddMessage(int category, const BroadcastBalloonMessage& message) {
-  std::list<BroadcastBalloonMessage>& messages = this->m_messages[category];
+  std::list<BroadcastBalloonMessage>& messages = this->m_messages[static_cast<int>(category)];
   messages.push_back(message);
 
   unsigned int limit = 3;
@@ -26,7 +26,7 @@ void UIBroadcastBalloon::AddMessage(int category, const BroadcastBalloonMessage&
     limit = 1;
     break;
   }
-  if (messages.size() > limit) {
+  if (limit < messages.size()) {
     messages.pop_front();
   }
 
@@ -93,7 +93,7 @@ void UIBroadcastBalloon::Paint() {
     for (const BroadcastBalloonMessage& message : entry.second) {
       if (message.lines.size() != 0) {
         int x = (this->geometry.width - message.width) / 2;
-        DrawRoundedBorder(*this, x, y, message.width, message.height, 0xFF5C5C5C);
+        this->DrawRoundedOutline(x, y, message.width, message.height, 0xFF5C5C5C);
         y += 4;
         for (const BroadcastBalloonLine& line : message.lines) {
           this->DrawShadowedText(x + 6, y, line.text.c_str(), 0, line.color, line.outlineColor, 0, message.fontHeight, 0);

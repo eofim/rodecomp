@@ -24,7 +24,7 @@ CLightSphereEffect::CLightSphereEffect() : CEffect(-1), spheres(), rays() {
 void CLightSphereEffect::CreateRayParticles(int param) {
   for (int c = 0; c < 4; ++c) {
     for (int i = 0; i < 80; ++i) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(&this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle != nullptr) {
         particle->SetTexture("effect\\white02.bmp");
         particle->effectId = this->id;
@@ -35,16 +35,19 @@ void CLightSphereEffect::CreateRayParticles(int param) {
         particle->scale = 1.0f;
 
         int r1 = std::rand() % 360;
-        particle->phaseParameter = r1 < 0 ? 0 : r1;
+        if (r1 < 0) {
+          r1 = 0;
+        }
+        particle->phaseParameter = r1;
 
         int r2 = std::rand() % 360;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(r2 < 0 ? 0 : r2);
+        particle->angle = static_cast<float>(std::ranges::max(r2, 0));
 
         int r3 = std::rand() % 360;
         particle->angleParameter = r3 < 0 ? 0 : r3;
 
         particle->animationParameter = 10.0f;
-        *reinterpret_cast<float*>(particle->animationParameters) = static_cast<float>(param);
+        particle->animationParameters[0] = static_cast<float>(param);
 
         switch (this->id) {
         case EF_LIGHTSPHERE_SUN: {
@@ -97,7 +100,7 @@ void CLightSphereEffect::CreateRayParticles(int param) {
         }
         }
 
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         this->rays.push_back(particle);
       }
     }
@@ -122,7 +125,7 @@ void CLightSphereEffect::Close() {
 // FUNCTION: fn_19107
 void CLightSphereEffect::Open() {
   for (int i = 0; i < 4; ++i) {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(&this->position), 5);
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
     if (particle != nullptr) {
       particle->SetTexture("effect\\thunder_center.bmp");
       particle->effectId = this->id;
@@ -132,7 +135,7 @@ void CLightSphereEffect::Open() {
       particle->scale = 3.5f;
       particle->alpha = 1;
       particle->animationParameter = -10.0f;
-      *reinterpret_cast<float*>(particle->animationParameters) = 0.0f;
+      particle->animationParameters[0] = 0.0f;
 
       switch (this->id) {
       case EF_LIGHTSPHERE_SUN:
@@ -146,7 +149,7 @@ void CLightSphereEffect::Open() {
         break;
       }
 
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       this->spheres.push_back(particle);
     }
   }
@@ -195,7 +198,7 @@ void CLightSphereEffect::OnProcess() {
         particle->alpha = alpha < 0 ? 0 : alpha;
       }
 
-      float& phase = *reinterpret_cast<float*>(particle->animationParameters);
+      float& phase = particle->animationParameters[0];
       const int spin = (static_cast<int>(phase) + 2) % 360;
       phase = static_cast<float>(spin);
       const float scale = particle->scale * g_sinTable[spin] * 0.05f + particle->scale;
@@ -226,7 +229,7 @@ void CLightSphereEffect::OnProcess() {
   for (std::vector<CParticle*>::iterator it = this->rays.begin(); it != this->rays.end(); ++it) {
     CParticle* particle = *it;
 
-    vector3d& position = particle->position;
+    vector3d& position = (*it)->position;
     position.x = this->position[0];
     position.y = this->position[1];
     position.z = this->position[2];
@@ -240,10 +243,7 @@ void CLightSphereEffect::OnProcess() {
 
       int alpha = particle->alpha;
       if (particle->elapsedFrames > 500) {
-        --alpha;
-        if (alpha < 0) {
-          alpha = 0;
-        }
+        alpha = std::max(alpha - 1, 0);
       }
       particle->alpha = alpha;
 
@@ -254,40 +254,46 @@ void CLightSphereEffect::OnProcess() {
       EffectPoint points[3];
       const float radius = particle->scale * g_sinTable[phase] + particle->scale;
       const int pitch = particle->phaseParameter;
-      const int yaw = static_cast<int>(*reinterpret_cast<float*>(&particle->angleBits));
+      const int yaw = static_cast<int>(particle->angle);
       const float flat = radius * g_cosTable[pitch];
-      points[0].x = flat * g_cosTable[yaw];
-      points[0].y = radius * g_sinTable[pitch] - particle->animationParameter;
-      points[0].z = flat * g_sinTable[yaw];
+      float corner0X = flat * g_cosTable[yaw];
+      float corner0Y = radius * g_sinTable[pitch] - particle->animationParameter;
+      float corner0Z = flat * g_sinTable[yaw];
 
-      if (*reinterpret_cast<float*>(particle->animationParameters) == 0.0f) {
-        points[1].x = -0.5f;
-        points[1].y = -particle->animationParameter;
-        points[1].z = 0.0f;
-        points[2].x = 0.5f;
-        points[2].y = -particle->animationParameter;
-        points[2].z = 0.0f;
+      float corner1X;
+      float corner1Y;
+      float corner1Z;
+      float corner2X;
+      float corner2Y;
+      float corner2Z;
+      if (0.0f == particle->animationParameters[0]) {
+        corner1X = -0.5f;
+        corner1Y = -particle->animationParameter;
+        corner1Z = 0.0f;
+        corner2X = 0.5f;
+        corner2Y = -particle->animationParameter;
+        corner2Z = 0.0f;
       } else {
-        points[1].x = 0.0f;
-        points[1].y = -particle->animationParameter;
-        points[1].z = -0.5f;
-        points[2].x = 0.0f;
-        points[2].y = -particle->animationParameter;
-        points[2].z = 0.5f;
+        corner1X = 0.0f;
+        corner1Y = -particle->animationParameter;
+        corner1Z = -0.5f;
+        corner2X = 0.0f;
+        corner2Y = -particle->animationParameter;
+        corner2Z = 0.5f;
       }
 
-      particle->vertices[0].x = points[0].x;
-      particle->vertices[0].y = points[0].y;
-      particle->vertices[0].z = points[0].z;
-      particle->vertices[1].x = points[0].x;
-      particle->vertices[1].y = points[0].y;
-      particle->vertices[1].z = points[0].z;
-      particle->vertices[2].x = points[1].x;
-      particle->vertices[2].y = points[1].y;
-      particle->vertices[2].z = points[1].z;
-      particle->vertices[3].x = points[2].x;
-      particle->vertices[3].y = points[2].y;
-      particle->vertices[3].z = points[2].z;
+      particle->vertices[0].x = corner0X;
+      particle->vertices[0].y = corner0Y;
+      particle->vertices[0].z = corner0Z;
+      particle->vertices[1].x = corner0X;
+      particle->vertices[1].y = corner0Y;
+      particle->vertices[1].z = corner0Z;
+      particle->vertices[2].x = corner1X;
+      particle->vertices[2].y = corner1Y;
+      particle->vertices[2].z = corner1Z;
+      particle->vertices[3].x = corner2X;
+      particle->vertices[3].y = corner2Y;
+      particle->vertices[3].z = corner2Z;
     }
 
     ++particle->elapsedFrames;

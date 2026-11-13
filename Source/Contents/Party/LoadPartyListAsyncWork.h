@@ -15,8 +15,7 @@ public:
   bool Execute() override;
   void Complete() override;
   void Bind(
-    std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, CAdvenPartyInfo filter, int search, int page,
-    WindowManagerWindows& windows
+    std::uint32_t accountId, std::uint32_t characterId, std::string world, std::string url, std::string token, CAdvenPartyInfo filter, int search, int page
   );
 
 protected:
@@ -32,6 +31,8 @@ protected:
   /* 0118 */ int m_search;
   WindowManagerWindows* m_windows;
 };
+
+extern const char* g_loadPartyListPoolName;
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(CLoadPartyListAsyncWork) == 288);

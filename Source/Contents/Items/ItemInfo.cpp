@@ -1,5 +1,6 @@
 #include "UI/Window/UIEnums.h"
 #include "Contents/Items/ItemInfo.h"
+#include "Client/Mode/ModeDragState.h"
 #include "Contents/Items/ItemId.h"
 #include "Client/Session/Session.h"
 #include "Client/Input/InputCharset.h"
@@ -13,6 +14,10 @@
 #include <cstring>
 #include <list>
 #include <vector>
+
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 namespace {
 #pragma pack(push, 1)
@@ -135,21 +140,21 @@ __declspec(noinline) ITEM_INFO& ITEM_INFO::operator=(const ITEM_INFO& other) {
 
 // OFFSET: 0x006D5550
 // FUNCTION: fn_06573
-std::uint32_t ITEM_INFO::Assign(const RawItemData& item) {
+std::uint32_t ITEM_INFO::Assign(const ModeDragState& item) {
   this->identity[0] = item.type;
-  this->identity[1] = item.index;
+  this->identity[1] = item.id;
   this->quantity = item.quantity;
-  this->prices[0] = item.price;
-  this->prices[1] = item.realPrice;
+  this->prices[0] = item.itemValue;
+  this->prices[1] = item.price;
 
   for (int index = 0; index < 4; ++index) {
-    std::memcpy(this->cards + index * 4, &item.cards[index], sizeof(item.cards[index]));
+    std::memcpy(&this->cards[index], &item.cards[index], sizeof(item.cards[index]));
   }
 
-  this->itemId = item.itemId;
+  this->itemId = item.name;
 
   this->identified = item.identified;
-  this->refiningLevel = item.refiningLevel;
+  this->refiningLevel = item.refine;
 
   this->optionCount = item.optionCount > 5 ? 0 : item.optionCount;
 
@@ -158,9 +163,9 @@ std::uint32_t ITEM_INFO::Assign(const RawItemData& item) {
   }
 
   this->grade = item.grade;
-  this->flags[3] = item.hasIndex;
-  this->identity[2] = item.location;
-  this->sprite = item.sprite;
+  this->flags[3] = item.uniqueItem;
+  this->identity[2] = item.equipmentLocation;
+  this->sprite = static_cast<std::uint32_t>(item.viewId);
 
   return this->sprite;
 }
@@ -186,9 +191,7 @@ void ITEM_INFO::Reset() {
   this->priceFactor = 0;
   this->sprite = 0;
   this->optionCount = 0;
-  for (int index = 0; index < 25; ++index) {
-    this->options[index] = 0;
-  }
+  SecureZeroMemory(this->options, sizeof(this->options));
   for (int index = 0; index < 4; ++index) {
     this->flags[index] = 0;
   }
@@ -217,6 +220,23 @@ ITEM_INFO LookupClientItem(const std::list<ITEM_INFO>& values, int id, unsigned 
 
 // OFFSET: 0x00DDD5A0
 // FUNCTION: fn_23387
+ITEM_INFO CSession::LookupClientItemByIdentity(std::uint32_t id) const {
+  const std::list<ITEM_INFO>& values = this->m_inventoryItems;
+  if (values.empty()) {
+    return ITEM_INFO(0);
+  }
+
+  auto it = values.begin();
+  for (; it != values.end(); ++it) {
+    if (it->identity[1] == id) {
+      break;
+    }
+  }
+
+  return it != values.end() ? *it : ITEM_INFO(0);
+}
+
+// INLINED
 ITEM_INFO LookupClientItemByIdentity(const std::list<ITEM_INFO>& values, std::uint32_t id) {
   if (values.empty()) {
     return ITEM_INFO(0);
@@ -323,52 +343,51 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
   std::uint32_t offset = 6;
   ItemRecordHeader header;
   header.Read(data.data());
-  if (header.id != 281) {
+  if (281 != header.id) {
     return 0xFFFFFFFF;
   }
 
-  while (offset < data.size()) {
+  while (data.size() > offset) {
     header.Read(data.data() + offset);
     offset += 6;
-    const unsigned char* source = data.data() + offset;
     switch (header.id) {
     case 282:
       return offset;
     case 283:
-      std::memcpy(&this->identity[0], source, header.bytes);
-      offset += header.bytes;
-      break;
-    case 284:
-      std::memcpy(&this->identity[2], source, header.bytes);
+      std::memcpy(&this->identity[0], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 285:
-      std::memcpy(&this->identity[1], source, header.bytes);
+      std::memcpy(&this->identity[1], data.data() + offset, header.bytes);
+      offset += header.bytes;
+      break;
+    case 284:
+      std::memcpy(&this->identity[2], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 286:
-      std::memcpy(&this->identity[3], source, header.bytes);
+      std::memcpy(&this->identity[3], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 287:
-      std::memcpy(&this->quantity, source, header.bytes);
+      std::memcpy(&this->quantity, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 288:
-      std::memcpy(&this->prices[0], source, header.bytes);
+      std::memcpy(&this->prices[0], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 289:
-      std::memcpy(&this->prices[1], source, header.bytes);
+      std::memcpy(&this->prices[1], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 290:
-      std::memcpy(this->cards, source, header.bytes);
+      std::memcpy(this->cards, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 291: {
       int id = 0;
-      std::memcpy(&id, source, header.bytes);
+      std::memcpy(&id, data.data() + offset, header.bytes);
       offset += header.bytes;
       char buffer[16] = {};
       this->itemId = _itoa(id, buffer, 10);
@@ -383,39 +402,39 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
       break;
     }
     case 293:
-      std::memcpy(&this->identified, source, header.bytes);
+      std::memcpy(&this->identified, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 294:
-      std::memcpy(&this->damaged, source, header.bytes);
+      std::memcpy(&this->damaged, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 295:
-      std::memcpy(&this->refiningLevel, source, header.bytes);
+      std::memcpy(&this->refiningLevel, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 296:
-      std::memcpy(&this->bindOnEquip, source, header.bytes);
+      std::memcpy(&this->bindOnEquip, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 297:
-      std::memcpy(&this->expireTime, source, header.bytes);
+      std::memcpy(&this->expireTime, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 298:
-      std::memcpy(&this->sprite, source, header.bytes);
+      std::memcpy(&this->sprite, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 299:
-      std::memcpy(&this->grade, source, header.bytes);
+      std::memcpy(&this->grade, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 300:
-      std::memcpy(&this->optionCount, source, header.bytes);
+      std::memcpy(&this->optionCount, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 301:
-      std::memcpy(this->options, source, header.bytes);
+      std::memcpy(this->options, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     default:
@@ -432,7 +451,7 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
 bool CSession::HasRequiredItems() const {
   for (auto it = this->storageItems.begin(); it != this->storageItems.end(); ++it) {
     const ITEM_INFO& required = *it;
-    const ITEM_INFO owned = LookupClientItemByIdentity(this->m_inventoryItems, required.identity[1]);
+    const ITEM_INFO owned = this->LookupClientItemByIdentity(required.identity[1]);
     if (owned.identity[1] <= 0 || owned.quantity < required.quantity) {
       return false;
     }
@@ -472,7 +491,7 @@ bool CSession::HasInventoryItem(std::uint32_t id) const {
 // OFFSET: 0x00DFBE40
 // FUNCTION: fn_23591
 bool CSession::HasItemId(int itemId) const {
-  const ITEM_INFO owned = LookupClientItemByIdentity(this->m_inventoryItems, this->equippedArrowIndex);
+  const ITEM_INFO owned = this->LookupClientItemByIdentity(this->equippedArrowIndex);
   if (owned.identity[1] > 0 && std::atoi(owned.itemId.c_str()) == itemId) {
     return true;
   }
@@ -489,7 +508,7 @@ bool CSession::HasItemId(int itemId) const {
 // OFFSET: 0x00DFBF70
 // FUNCTION: fn_23592
 bool CSession::HasItemCount(int itemId, int count) const {
-  const ITEM_INFO owned = LookupClientItemByIdentity(this->m_inventoryItems, this->equippedArrowIndex);
+  const ITEM_INFO owned = this->LookupClientItemByIdentity(this->equippedArrowIndex);
   if (owned.identity[1] != 0 && std::atoi(owned.itemId.c_str()) == itemId) {
     return true;
   }
@@ -579,7 +598,7 @@ void ITEM_INFO::SetOption(ItemOption option, const int& index) {
 // FUNCTION: fn_06613
 void ITEM_INFO::SetCard(const int& card, const int& index) {
   if (index < 4) {
-    std::memcpy(this->cards + index * 4, &card, sizeof(card));
+    std::memcpy(&this->cards[index], &card, sizeof(card));
   }
 }
 

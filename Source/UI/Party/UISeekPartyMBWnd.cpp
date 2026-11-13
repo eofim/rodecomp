@@ -93,7 +93,7 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
           PACKET_CZ_PARTY_BOOKING_REQ_REGISTER packet;
           packet.packetType = ID_CZ_PARTY_BOOKING_REQ_REGISTER;
           packet.detail = this->m_registration.detail;
-          GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
         }
       } else {
         char text[260];
@@ -103,11 +103,6 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       break;
     }
-    case ID_CANCEL:
-    case ID_CLOSE:
-      g_windowMgr.CloseWindow(WID_SEEKPARTYMBWND);
-      g_windowMgr.CloseWindow(WID_JOBLISTWND);
-      break;
     case ID_MINI:
       if (this->m_minimized) {
         this->Resize(this->geometry.width, this->m_restoreHeight);
@@ -118,6 +113,11 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
 
       this->m_minimized = !this->m_minimized;
       this->Invalidate();
+      break;
+    case ID_CANCEL:
+    case ID_CLOSE:
+      g_windowMgr.CloseWindow(WID_SEEKPARTYMBWND);
+      g_windowMgr.CloseWindow(WID_JOBLISTWND);
       break;
     }
     break;
@@ -270,7 +270,7 @@ UISeekPartyMBWnd::UISeekPartyMBWnd()
 
 // OFFSET: 0x009146D0
 // FUNCTION: fn_12542
-UISeekPartyMBWnd::~UISeekPartyMBWnd() = default;
+__declspec(noinline) UISeekPartyMBWnd::~UISeekPartyMBWnd() = default;
 
 // OFFSET: 0x009273B0
 // FUNCTION: fn_12650

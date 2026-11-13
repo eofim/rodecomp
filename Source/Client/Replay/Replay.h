@@ -2,6 +2,8 @@
 #define RAGNAROK_SOURCE_CLIENT_REPLAY_REPLAY_H
 #include "Client/Replay/ReplayRecordOption.h"
 
+#include <windows.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -18,8 +20,15 @@ struct ReplayCachedPacket {
   /* 0000 */ bool enabled;
   /* 0004 */ std::vector<unsigned char> bytes;
 
-  ReplayCachedPacket() = default;
+  // INLINED
+  ReplayCachedPacket() {
+    this->enabled = false;
+  }
   ReplayCachedPacket(const ReplayCachedPacket& other);
+  // INLINED
+  ~ReplayCachedPacket() {
+    this->bytes.clear();
+  }
 };
 
 #pragma pack(push, 1)
@@ -192,15 +201,13 @@ public:
     this->selected = -1;
     this->files.clear();
     this->fileState = 0;
-    for (std::size_t index = 0; index < sizeof(this->buffer); ++index) {
-      this->buffer[index] = 0;
-    }
+    SecureZeroMemory(this->buffer, sizeof(this->buffer));
     this->selectionState = 0;
     this->dialogState = 0;
   }
 
   void Clear();
-  void Refresh();
+  bool Refresh();
   const char* FileName(int index) const;
   char* SetPath(const char* value);
   bool Select(int index);

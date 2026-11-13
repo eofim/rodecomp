@@ -12,7 +12,7 @@ template __declspec(noinline) void std::vector<std::string>::resize(size_type, c
 // FUNCTION: fn_23395
 const char* CSession::GetHitWaveName(int job) {
   if (!((job >= 31 && job < 1000) || job < 0 || (job > 1000 && job < 3999) || static_cast<unsigned int>(job - 20021) <= 11978)) {
-    const std::vector<std::string>& jobWaves = reinterpret_cast<const std::vector<std::string>&>(this->weaponSoundTables[0x0C]);
+    const std::vector<std::string>& jobWaves = this->m_jobHitWaves;
     if (job > 3950) {
       return jobWaves.begin()[job - 3950].c_str();
     }
@@ -21,7 +21,8 @@ const char* CSession::GetHitWaveName(int job) {
 
   const int weapon = g_session.GetRealWeaponId(-1);
   if (weapon == -1) {
-    switch (std::max(std::rand() % 4, 0)) {
+    const int roll = std::rand() % 4;
+    switch (roll >= 0 ? roll : 0) {
     case 0:
       return "_enemy_hit_normal1.wav";
     case 1:
@@ -33,7 +34,7 @@ const char* CSession::GetHitWaveName(int job) {
     }
   }
 
-  const std::vector<std::string>& weaponWaves = reinterpret_cast<const std::vector<std::string>&>(this->weaponSoundTables[0x18]);
+  const std::vector<std::string>& weaponWaves = this->m_weaponHitWaves;
   if (weaponWaves.empty() || weaponWaves.size() <= static_cast<unsigned int>(weapon)) {
     return nullptr;
   }
@@ -43,7 +44,8 @@ const char* CSession::GetHitWaveName(int job) {
   }
 
   if (weapon == 0) {
-    switch (std::max(std::rand() % 4, 0)) {
+    const int roll = std::rand() % 4;
+    switch (roll >= 0 ? roll : 0) {
     case 0:
       return "_hit_fist1.wav";
     case 1:
@@ -63,7 +65,8 @@ const char* CSession::GetHitWaveName(int job) {
 const char* CSession::GetWeaponHitWaveName(int weapon) {
   const int realWeapon = g_session.GetRealWeaponId(weapon);
   if (realWeapon == -1) {
-    switch (std::max(std::rand() % 4, 0)) {
+    const int roll = std::rand() % 4;
+    switch (roll >= 0 ? roll : 0) {
     case 0:
       return "_enemy_hit_normal1.wav";
     case 1:
@@ -75,7 +78,7 @@ const char* CSession::GetWeaponHitWaveName(int weapon) {
     }
   }
 
-  const std::vector<std::string>& weaponWaves = reinterpret_cast<const std::vector<std::string>&>(this->weaponSoundTables[0x18]);
+  const std::vector<std::string>& weaponWaves = this->m_weaponHitWaves;
   if (weaponWaves.empty() || weaponWaves.size() <= static_cast<unsigned int>(realWeapon)) {
     return nullptr;
   }
@@ -85,7 +88,8 @@ const char* CSession::GetWeaponHitWaveName(int weapon) {
   }
 
   if (realWeapon == 0) {
-    switch (std::max(std::rand() % 4, 0)) {
+    const int roll = std::rand() % 4;
+    switch (roll >= 0 ? roll : 0) {
     case 0:
       return "_hit_fist1.wav";
     case 1:
@@ -103,7 +107,7 @@ const char* CSession::GetWeaponHitWaveName(int weapon) {
 // OFFSET: 0x00DE5BD0
 // FUNCTION: fn_23494
 void CSession::InitJobHitWaveNames() {
-  std::vector<std::string>& jobWaves = reinterpret_cast<std::vector<std::string>&>(this->weaponSoundTables[0x0C]);
+  std::vector<std::string>& jobWaves = this->m_jobHitWaves;
   jobWaves.clear();
   jobWaves.resize(28053, "player_clothes.wav");
   jobWaves[0] = "player_clothes.wav";

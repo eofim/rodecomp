@@ -14,9 +14,6 @@
 
 #include <string>
 
-// GLOBAL: gl_25184
-bool g_searchStoreInfoCreated;
-
 // OFFSET: 0x00AA1350
 // FUNCTION: fn_17208
 UIWindow* UIWindowMgr::CreateLayoutWindow(int id) {
@@ -43,15 +40,15 @@ UIWindow* UIWindowMgr::CreateLayoutWindow(int id) {
     case WID_JOINTO_BATTLEFIELDWND:
       window = new UIEntryQueueWnd();
       break;
+    case WID_ENTRYQUEUESTANDBYWND:
+      window = new UIEntryQueueStandByWnd();
+      break;
     case WID_QUIKSLOTWND:
       window = new UIQuickSlotWnd();
       break;
     case WID_SEARCH_STORE_INFO:
       window = new UISerachStoreInfoWnd();
-      g_searchStoreInfoCreated = true;
-      break;
-    case WID_ENTRYQUEUESTANDBYWND:
-      window = new UIEntryQueueStandByWnd();
+      g_session.m_searchStoreInfoCreated = true;
       break;
     }
 
@@ -77,9 +74,9 @@ UIWindow* UIWindowMgr::CreateLayoutWindow(int id) {
     window->Move(x, y);
     this->rendered.push_back(window);
     if (id == 0x9F) {
-      window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(this->hotkeyPlacement), 0, 0, 0);
+      window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&this->quickSlotWndInfo), 0, 0, 0);
     } else if (id == 0x9D) {
-      window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(this->battlefieldPlacement), 0, 0, 0);
+      window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&this->entryQueueWndInfo), 0, 0, 0);
     } else if (id == 0xD4) {
       window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(this->entryQueueStandbyPlacement), 0, 0, 0);
     }

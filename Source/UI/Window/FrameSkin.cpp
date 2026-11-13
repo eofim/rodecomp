@@ -49,8 +49,8 @@ void CUIFrameWnd::RefreshSkinColors() {
   }
 
   if (this->m_hasSkinColors) {
-    this->m_backgroundColor = SkinPaletteColor(ResourceMgr::Instance(), this->m_backgroundCell, this->m_resolveSkin);
-    this->m_borderColor = SkinPaletteColor(ResourceMgr::Instance(), this->m_borderCell, this->m_resolveSkin);
+    this->m_backgroundColor = SkinPaletteColor(this->m_backgroundCell, this->m_resolveSkin);
+    this->m_borderColor = SkinPaletteColor(this->m_borderCell, this->m_resolveSkin);
   }
 
   for (UIWindow* child : this->m_children) {
@@ -64,7 +64,7 @@ void CUIFrameWnd::Paint() {
   if (this->m_hasSkinColors) {
     this->ClearSurface(0xFFFF00FF);
     this->FillRegion(1, 1, this->geometry.width - 2, this->geometry.height - 2, this->m_backgroundColor);
-    DrawRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, this->m_borderColor);
+    this->DrawRoundedOutline(0, 0, this->geometry.width, this->geometry.height, this->m_borderColor);
   }
 
   if (this->m_buttonBarStyle > 0) {
@@ -81,6 +81,6 @@ void CUIFrameWnd::SetSkinColors(int backgroundColumn, int backgroundRow, int bor
   this->m_borderCell.row = borderRow;
   this->m_hasSkinColors = true;
 
-  this->m_backgroundColor = SkinPaletteColor(ResourceMgr::Instance(), this->m_backgroundCell, this->m_resolveSkin);
-  this->m_borderColor = SkinPaletteColor(ResourceMgr::Instance(), this->m_borderCell, this->m_resolveSkin);
+  this->m_backgroundColor = SkinPaletteColor(this->m_backgroundCell, this->m_resolveSkin);
+  this->m_borderColor = SkinPaletteColor(this->m_borderCell, this->m_resolveSkin);
 }

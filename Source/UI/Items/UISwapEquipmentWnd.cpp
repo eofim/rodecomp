@@ -39,9 +39,6 @@
 #include <new>
 #include <string>
 
-// GLOBAL: gl_24874
-unsigned long g_swapEquipmentTick;
-
 // OFFSET: 0x0082F560
 // FUNCTION: fn_10387
 UISwapEquipmentWnd::UISwapEquipmentWnd()
@@ -64,7 +61,7 @@ void UISwapEquipmentWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   unsigned char equipped = 0;
   switch (drag->source) {
   case 1:
-    item = LookupClientItemByIdentity(g_session.m_inventoryItems, drag->id);
+    item = g_session.LookupClientItemByIdentity(drag->id);
     break;
   case 2:
     equipped = 1;
@@ -128,11 +125,12 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
           const int iconY = row * 26 + 48;
           DrawItemIcon(*this, ResourceMgr::Instance(), xCoords[slot / 4 + 2], iconY, item, 0);
           this->DrawItemName(xCoords[slot / 4], yCoords[row], 70, &item, 0, 0, 12);
-          if (item.grade > 0) {
-            CBitmapRes* gradeBitmap = static_cast<CBitmapRes*>(
-              ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))
+          if (0 < item.grade) {
+            this->DrawBitmap(
+              xCoords[slot / 4 + 2], iconY + 12,
+              static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))),
+              true
             );
-            this->DrawBitmap(xCoords[slot / 4 + 2], iconY + 12, gradeBitmap, true);
           }
         } else {
           DrawItemIcon(*this, ResourceMgr::Instance(), xCoords[row + 2], 22, item, 0);
@@ -156,14 +154,15 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
             CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
             const int row = slot & 3;
             if (bitmap) {
-              this->DrawAuxiliary(1, iconX, row * 26 + 48, &bitmap->image, true, false);
+              this->DrawAuxiliary(1, iconX, row * 26 + 48, bitmap, true, false);
             }
             this->DrawItemName(xCoords[slot / 4], yCoords[row], 70, &item, 0, 0, 12);
-            if (item.grade > 0) {
-              CBitmapRes* gradeBitmap = static_cast<CBitmapRes*>(
-                ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))
+            if (0 < item.grade) {
+              this->DrawBitmap(
+                iconX, row * 26 + 60,
+                static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))),
+                true
               );
-              this->DrawBitmap(iconX, row * 26 + 60, gradeBitmap, true);
             }
           } else {
             const char* id = item.itemId.c_str();
@@ -172,7 +171,7 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
             g_session.IconPath(path, id, 1);
             CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
             if (bitmap) {
-              this->DrawAuxiliary(1, iconX, 22, &bitmap->image, true, false);
+              this->DrawAuxiliary(1, iconX, 22, bitmap, true, false);
             }
             this->DrawItemName(xCoords[slot - 8], 30, 70, &item, 0, 0, 12);
           }
@@ -307,14 +306,12 @@ ITEM_INFO UISwapEquipmentWnd::GetSlotItem(int slot) {
 // OFFSET: 0x00830760
 // FUNCTION: fn_10394
 void UISwapEquipmentWnd::OnCreate(int width, int height) {
-  this->m_swapButton = new (std::nothrow) UISwapBitmapButton();
+  this->m_swapButton = new (std::nothrow) UISwapBitmapButton;
   this->m_swapButton->SetBitmap("유저인터페이스\\swap_equipment\\btn_change2_normal.bmp", 0, 0);
   this->m_swapButton->SetBitmap("유저인터페이스\\swap_equipment\\btn_change2_over.bmp", 1, 0);
   this->m_swapButton->SetBitmap("유저인터페이스\\swap_equipment\\btn_change2_press.bmp", 2, 0);
   this->m_swapButton->SetSize(this->m_swapButton->BitmapWidth(), this->m_swapButton->BitmapHeight());
-  UISwapBitmapButton* button = this->m_swapButton;
-  const std::string label = LookupMessage(MSI_DESC_VIT2);
-  button->label = label;
+  this->m_swapButton->SetLabel(LookupMessage(MSI_DESC_VIT2));
   this->m_swapButton->m_textColor = 0x172842;
   this->m_swapButton->Move(0x51, 0x9B);
   this->m_swapButton->SetId(0x1FC);
@@ -331,10 +328,10 @@ void UISwapEquipmentWnd::OnCreate(int width, int height) {
 // FUNCTION: fn_10395
 void UISwapBitmapButton::Paint() {
   UIBitmapButton::Paint();
-  const unsigned long elapsed = timeGetTime() - g_swapEquipmentTick;
-  this->SetBitmap(elapsed < 10000 ? "유저인터페이스\\swap_equipment\\btn_change2_disable.bmp" : "유저인터페이스\\swap_equipment\\btn_change2_normal.bmp", 0, 0);
-  this->SetBitmap(elapsed < 10000 ? "유저인터페이스\\swap_equipment\\btn_change2_disable.bmp" : "유저인터페이스\\swap_equipment\\btn_change2_over.bmp", 1, 0);
-  this->SetBitmap(elapsed < 10000 ? "유저인터페이스\\swap_equipment\\btn_change2_disable.bmp" : "유저인터페이스\\swap_equipment\\btn_change2_press.bmp", 2, 0);
+  const unsigned long elapsed = timeGetTime() - g_session.m_swapEquipmentTick;
+  this->SetBitmap(elapsed >= 10000 ? "유저인터페이스\\swap_equipment\\btn_change2_normal.bmp" : "유저인터페이스\\swap_equipment\\btn_change2_disable.bmp", 0, 0);
+  this->SetBitmap(elapsed >= 10000 ? "유저인터페이스\\swap_equipment\\btn_change2_over.bmp" : "유저인터페이스\\swap_equipment\\btn_change2_disable.bmp", 1, 0);
+  this->SetBitmap(elapsed >= 10000 ? "유저인터페이스\\swap_equipment\\btn_change2_press.bmp" : "유저인터페이스\\swap_equipment\\btn_change2_disable.bmp", 2, 0);
   this->m_textColor = elapsed < 10000 ? 0x969696 : 0x172842;
   this->DrawCenteredText(this->geometry.width / 2, this->geometry.height / 2 - 5, this->label.c_str(), this->label.size(), 0, 12, this->m_textColor, 0);
 }
@@ -350,8 +347,7 @@ void UISwapEquipmentWnd::Paint() {
     background = "유저인터페이스\\swap_equipment\\equipwin_special_change.bmp";
   }
 
-  const char* resolved = Resolve(background.c_str());
-  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(resolved));
+  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background.c_str())));
   if (bitmap) {
     this->DrawBitmap(0, 0, bitmap, false);
   }
@@ -360,31 +356,33 @@ void UISwapEquipmentWnd::Paint() {
 
   this->DrawEquipmentSlots();
 
-  FuncDrawWNDChar drawer(
-    this,
-    this->geometry.width / 2 + 1,
-    this->geometry.height - 53,
-    g_session.GetCurrentSex(),
-    static_cast<short>(g_session.m_job),
-    g_session.m_job,
-    static_cast<short>(g_session.m_bodyCostume),
-    static_cast<short>(g_session.m_head),
-    static_cast<short>(this->topAccessory),
-    static_cast<short>(this->midAccessory),
-    static_cast<short>(this->bottomAccessory),
-    this->weaponView,
-    0,
-    0,
-    g_session.m_bodyStyle,
-    g_session.m_headPalette,
-    0,
-    0,
-    this->previewTick
-  );
-  drawer.Draw(false);
+  {
+    FuncDrawWNDChar drawer(
+      this,
+      this->geometry.width / 2 + 1,
+      this->geometry.height - 53,
+      g_session.GetCurrentSex(),
+      static_cast<short>(g_session.m_job),
+      g_session.m_job,
+      static_cast<short>(g_session.m_bodyCostume),
+      static_cast<short>(g_session.m_head),
+      static_cast<short>(this->topAccessory),
+      static_cast<short>(this->midAccessory),
+      static_cast<short>(this->bottomAccessory),
+      this->weaponView,
+      0,
+      0,
+      g_session.m_bodyStyle,
+      g_session.m_headPalette,
+      0,
+      0,
+      this->previewTick
+    );
+    drawer.Draw(false);
+  }
 
   if (g_session.swapArrowIndex != 0) {
-    ITEM_INFO dragItem = LookupClientItemByIdentity(g_session.m_inventoryItems, g_session.swapArrowIndex);
+    ITEM_INFO dragItem = g_session.LookupClientItemByIdentity(g_session.swapArrowIndex);
     if (dragItem.identity[1] > 0) {
       DrawItemIcon(*this, ResourceMgr::Instance(), this->geometry.width / 2 - 24, 27, dragItem, 0);
       this->DrawFittedItemName(this->geometry.width / 2 - 24, 51, &dragItem, 0, 0, 12, 0);
@@ -426,13 +424,13 @@ void UISwapEquipmentWnd::OnLBtnDown(int x, int y) {
   if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
     if (g_windowMgr.GetHoverWindow() && item.identified != 0) {
       if (g_windowMgr.GetHoverWindow()->geometry.id == 492) {
-        reinterpret_cast<UINpcTextEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->InsertItemTag(item);
+        static_cast<UINpcTextEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->InsertItemTag(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 490) {
         static_cast<UIChatEditCtrl*>(g_windowMgr.GetHoverWindow())->InsertItemLink(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 493) {
-        reinterpret_cast<UIChatEditCtrl*>(ChatWindow()->m_chatEdit)->InsertItemLink(item);
+        static_cast<UIChatEditCtrl*>(ChatWindow()->m_chatEdit)->InsertItemLink(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 491) {
-        reinterpret_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->InsertItemTag(item);
+        static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->InsertItemTag(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 494) {
         static_cast<UIChatEditCtrl*>(g_windowMgr.GetHoverWindow())->InsertItemLink(item);
       }

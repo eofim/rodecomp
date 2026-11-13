@@ -5,6 +5,9 @@
 #include "Utility/Text/FormatString.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
+
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 extern "C" {
 #include <lauxlib.h>
@@ -171,16 +174,20 @@ int CAchievementMgr::GetCompletedCount(int group, int index) {
   } else if (index == -1) {
     for (int i = 0; i < this->groupWidth; ++i) {
       int key = this->groupWidth * group + i;
-      for (std::vector<int>::iterator it = this->groups[key].begin(); it != this->groups[key].end(); ++it) {
-        if (IsAchievementCompleted(*it)) {
+      for (std::vector<int>::iterator it = this->groups[key].begin(); it != this->groups[key].end();) {
+        const int id = *it;
+        ++it;
+        if (IsAchievementCompleted(id)) {
           ++count;
         }
       }
     }
   } else {
     int key = this->groupWidth * group + index;
-    for (std::vector<int>::iterator it = this->groups[key].begin(); it != this->groups[key].end(); ++it) {
-      if (IsAchievementCompleted(*it)) {
+    for (std::vector<int>::iterator it = this->groups[key].begin(); it != this->groups[key].end();) {
+      const int id = *it;
+      ++it;
+      if (IsAchievementCompleted(id)) {
         ++count;
       }
     }
@@ -219,10 +226,7 @@ bool CAchievementMgr::LoadAchievementInfo() {
     lua_register(lua.GetState(), "InsertAchieveRewardBuff", CAchievementMgr::L_InsertAchieveRewardBuff);
     lua_register(lua.GetState(), "InsertAchieveUIType", CAchievementMgr::L_InsertAchieveUIType);
     lua_register(lua.GetState(), "SetAchieveIDByTab", CAchievementMgr::L_SetAchieveIDByTab);
-    constexpr auto sourceText = CRYPT_NAME("system\\Achievement_list.lub", 0x490FFB43A12F0DB9ULL);
-    const auto& source = sourceText.data;
-    thread_local EncryptedName<sizeof(source), 0x490FFB43A12F0DB9ULL> path(source);
-    if (luaL_loadfile(lua.GetState(), path.Text()) != 0 || lua_pcall(lua.GetState(), 0, 0, 0) != 0) {
+    if (luaL_loadfile(lua.GetState(), OBFUSCATE_TEXT_NAMED("system\\Achievement_list.lub", 0x490FFB43A12F0DB9ULL, path)) != 0 || lua_pcall(lua.GetState(), 0, 0, 0) != 0) {
       MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CAchievementMgr", 0);
     } else {
       lua_getglobal(lua.GetState(), "main");
@@ -379,8 +383,9 @@ int CAchievementMgr::L_InsertAchieveInfo(lua_State* state) {
     const std::string title = lua_tostring(state, -4);
     const std::string summaryText = lua_tostring(state, -3);
     const std::string description = lua_tostring(state, -2);
-    const std::pair<bool, std::string> result =
-      g_achievementMgr->InsertAchieveInfo(id, title, summaryText, description, static_cast<int>(lua_tonumber(state, -1)));
+    const double value = lua_tonumber(state, -1);
+    CAchievementMgr* const manager = g_achievementMgr;
+    const std::pair<bool, std::string> result = manager->InsertAchieveInfo(id, title, summaryText, description, static_cast<int>(value));
     if (!result.first) {
       lua_pushboolean(state, 0);
       lua_pushstring(state, FormatString("InsertAchieveInfo : %s", result.second.c_str()));
@@ -411,8 +416,9 @@ int CAchievementMgr::L_InsertAchieveResource(lua_State* state) {
     const int id = static_cast<int>(lua_tonumber(state, -4));
     const std::string text = lua_tostring(state, -3);
     const int targetCount = static_cast<int>(lua_tonumber(state, -2));
+    CAchievementMgr* const manager = g_achievementMgr;
     const std::pair<bool, std::string> result =
-      g_achievementMgr->InsertAchieveResource(id, text, targetCount, static_cast<int>(lua_tonumber(state, -1)));
+      manager->InsertAchieveResource(id, text, targetCount, static_cast<int>(lua_tonumber(state, -1)));
     if (!result.first) {
       lua_pushboolean(state, 0);
       lua_pushstring(state, FormatString("InsertAchieveResource : %s", result.second.c_str()));
@@ -509,7 +515,8 @@ int CAchievementMgr::L_InsertAchieveUIType(lua_State* state) {
     const int id = static_cast<int>(lua_tonumber(state, -3));
     const lua_Number type = lua_tonumber(state, -2);
     const std::string text = lua_tostring(state, -1);
-    const std::pair<bool, std::string> result = g_achievementMgr->InsertAchieveUIType(id, static_cast<int>(type), text);
+    CAchievementMgr* const manager = g_achievementMgr;
+    const std::pair<bool, std::string> result = manager->InsertAchieveUIType(id, static_cast<int>(type), text);
     if (!result.first) {
       lua_pushboolean(state, 0);
       lua_pushstring(state, FormatString("InsertAchieveUIType : %s", result.second.c_str()));

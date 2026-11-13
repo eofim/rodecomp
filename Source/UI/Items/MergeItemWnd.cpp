@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Render/Text/FontCache.h"
 #include "UI/Window/UIEnums.h"
 #include "Render/Text/TextContext.h"
@@ -87,7 +88,7 @@ CMergeItemWnd::~CMergeItemWnd() {
 // OFFSET: 0x007DF3D0
 // FUNCTION: fn_09663
 int CMergeItemWnd::ItemIdOf(int id) {
-  return std::atoi(LookupClientItemByIdentity(g_session.m_inventoryItems, id).itemId.c_str());
+  return std::atoi(g_session.LookupClientItemByIdentity(id).itemId.c_str());
 }
 
 // OFFSET: 0x007DF580
@@ -134,7 +135,7 @@ void CMergeItemWnd::OnCreate(int, int) {
 // FUNCTION: fn_09666
 void CMergeItemWnd::Paint() {
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->DrawTitleBar(true, LookupMessage(MSI_MERGE_ITEM_FAILED_NOT_MERGE), 0);
   this->FillRegion(0, 17, this->geometry.width, this->geometry.height, RGB(red, green, blue));
 
@@ -196,7 +197,7 @@ void CMergeItemWnd::OnMouseHover(int x, int y) {
   const int id = this->ItemAt(x, y);
   int screenX = x;
   int screenY = y;
-  ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, id);
+  ITEM_INFO item = g_session.LookupClientItemByIdentity(id);
   if (item.identity[1] != 0) {
     this->ToScreen(screenX, screenY);
     std::string text = FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity);
@@ -351,7 +352,7 @@ int CMergeItemWnd::SendMsg(UIWindow*, int message, std::intptr_t argument1, std:
     break;
   }
   case UM_REFRESH: {
-    ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, argument1);
+    ITEM_INFO item = g_session.LookupClientItemByIdentity(argument1);
     g_session.RemoveInventoryItem(item.identity[1], item.quantity);
     item.quantity = argument2;
     g_session.AddInventoryItem(item, 1);
@@ -366,7 +367,7 @@ int CMergeItemWnd::SendMsg(UIWindow*, int message, std::intptr_t argument1, std:
     case ID_CLOSE: {
       MergeItemCancelPacket packet;
       packet.id = ID_CZ_CANCEL_MERGE_ITEM;
-      GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       g_windowMgr.CloseWindow(WID_MERGEITEMWND);
       break;
     }

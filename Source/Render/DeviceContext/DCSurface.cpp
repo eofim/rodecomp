@@ -20,6 +20,11 @@ std::shared_ptr<CSurface> RenderSystemHolder::BackBufferSurface() const {
   return nullptr;
 }
 
+// OFFSET: 0x005699A0
+// FUNCTION: fn_02268
+RenderSystemHolder::RenderSystemHolder() : system(nullptr) {
+}
+
 // OFFSET: 0x00569C90
 // FUNCTION: fn_02270
 RenderSystemHolder::~RenderSystemHolder() noexcept {
@@ -141,9 +146,13 @@ HRESULT RenderSystemHolder::Initialize(int backend, HWND window) {
   }
 
   if (backend == 0) {
-    backend = 1;
-    if (g_session.DefaultRenderBackend() != 1) {
+    switch (g_session.DefaultRenderBackend()) {
+    case 1:
+      backend = 1;
+      break;
+    default:
       backend = 2;
+      break;
     }
   }
 
@@ -261,7 +270,7 @@ void CDCSurface::DrawRleSprite(int, int, const CSprRes&, const ActionFrame&, con
 
 // OFFSET: 0x00549240
 // FUNCTION: fn_01871
-void CDCSurface::DrawSurface(int, int, CSurface*, int, int, int, int, bool, int, int, int, int) {
+void CDCSurface::DrawSurface(int, int, CSurface*, int, int, int, int, bool, int, int, int) {
 }
 
 // OFFSET: 0x00549220

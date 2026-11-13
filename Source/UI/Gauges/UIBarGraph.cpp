@@ -1,4 +1,5 @@
 #include "UI/Gauges/UIBarGraph.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/ResourceMgr.h"
 #include "Resource/Bitmap/SkinPalette.h"
@@ -8,6 +9,8 @@
 #include <cstdio>
 #include <string>
 #include <windows.h>
+
+template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
 
 // OFFSET: 0x0086C190
 // FUNCTION: fn_11022
@@ -38,7 +41,7 @@ UIBarGraphPlayer::UIBarGraphPlayer() : UIWindow(0) {
 
 // OFFSET: 0x0086FFA0
 // FUNCTION: fn_11097
-UIBarGraph3::~UIBarGraph3() = default;
+__declspec(noinline) UIBarGraph3::~UIBarGraph3() = default;
 
 // OFFSET: 0x008700F0
 // FUNCTION: fn_11098
@@ -79,9 +82,9 @@ void UIBarGraph4::Paint() {
   }
 
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 26, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(26, 2, red, green, blue);
   this->ClearSurface(RGB(red, green, green));
-  SkinPaletteChannels(ResourceMgr::Instance(), 30, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(30, 2, red, green, blue);
   this->FillRegion(1, 1, this->geometry.width - 2, this->geometry.height - 2, RGB(red, green, blue));
 
   if (*this->m_maximum == 0) {
@@ -89,11 +92,11 @@ void UIBarGraph4::Paint() {
   }
 
   const float ratio = static_cast<float>(*this->m_current) / static_cast<float>(*this->m_maximum);
-  if (ratio == 0.0f) {
+  if (0.0f == ratio) {
     return;
   }
 
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 6, red, green, blue);
   if (!this->m_plainColor && ratio * 100.0f < 25.0f) {
     red = 255;
     green = 0;
@@ -139,7 +142,7 @@ void UIBarGraphHomun::Paint() {
 
   const std::int64_t current = this->m_current();
   const std::int64_t maximum = this->m_maximum();
-  if (current > maximum) {
+  if (maximum < current) {
     return;
   }
 
@@ -155,12 +158,12 @@ void UIBarGraphHomun::Paint() {
     this->DrawBitmap(this->geometry.width - backRight->image.width, 0, backRight, false);
   }
 
-  if (maximum == 0) {
+  if (0 == maximum) {
     return;
   }
 
   const double ratio = static_cast<double>(current) / static_cast<double>(maximum);
-  if (ratio == 0.0) {
+  if (0.0 == ratio) {
     return;
   }
 
@@ -193,12 +196,13 @@ void UIBarGraphPlayer::Paint() {
 
   const std::int64_t current = this->m_current();
   const std::int64_t maximum = this->m_maximum();
-  if (current > maximum) {
+  if (maximum < current) {
     return;
   }
 
-  this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\gze_bg1.bmp"))), false);
-  if (maximum == 0) {
+  CBitmapRes* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\gze_bg1.bmp")));
+  this->DrawBitmap(0, 0, background, false);
+  if (0 == maximum) {
     return;
   }
 
@@ -232,16 +236,17 @@ void UIBarGraphPlayerAP::Paint() {
 
   const std::int64_t current = this->m_current();
   const std::int64_t maximum = this->m_maximum();
-  if (current > maximum) {
+  if (maximum < current) {
     return;
   }
 
-  this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\gze_bg1.bmp"))), false);
+  CBitmapRes* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\gze_bg1.bmp")));
+  this->DrawBitmap(0, 0, background, false);
   if (maximum > 0) {
     const double ratio = static_cast<double>(current) / static_cast<double>(maximum);
     if (ratio > 0.0) {
       std::string color = "blue";
-      if (ratio == 1.0) {
+      if (1.0 == ratio) {
         color = "red";
       }
 

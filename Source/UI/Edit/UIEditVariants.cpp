@@ -24,6 +24,8 @@
 #include <windows.h>
 #include <timeapi.h>
 
+template __declspec(noinline) std::vector<bool>::iterator std::vector<bool>::erase(std::vector<bool>::const_iterator) noexcept;
+
 // OFFSET: 0x0084F250
 // FUNCTION: fn_10657
 UIEditCtrl2::UIEditCtrl2() : UIEditCtrl() {
@@ -543,7 +545,7 @@ void UIEditCtrl3::PaintText() {
       const int windowWidth = this->geometry.width;
       if (left < windowWidth && span > 0) {
         unsigned red, green, blue;
-        SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, red, green, blue);
+        g_skinInfo.PaletteChannels(6, 2, red, green, blue);
         this->FillRegion(left, y, left + span <= windowWidth ? span : windowWidth - left, 14, RGB(red, green, blue));
       }
     }
@@ -1113,16 +1115,20 @@ void UIWhisperEditCtrl::SetText(const char* value) {
 // OFFSET: 0x00864D20
 // FUNCTION: fn_10916
 int UIEditCtrl_OldList::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
+  int step;
   switch (message) {
   case UM_UPPUSH:
-    this->RecallHistory(-1);
-    return 0;
+    step = -1;
+    break;
   case UM_DOWNPUSH:
-    this->RecallHistory(1);
-    return 0;
+    step = 1;
+    break;
   default:
     return UIEditCtrl::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
+
+  this->RecallHistory(step);
+  return 0;
 }
 
 // OFFSET: 0x00886F90
@@ -1170,9 +1176,11 @@ void UIEditCtrl3::ClearLineState() {
   }
   this->wrappedLines.clear();
 
-  while (!this->lineBreaks.empty()) {
-    this->lineBreaks.pop_back();
+  auto lineBreak = this->lineBreaks.begin();
+  while (lineBreak != this->lineBreaks.end()) {
+    lineBreak = this->lineBreaks.erase(lineBreak);
   }
+  this->lineBreaks.clear();
 
   if (this->previousLineText) {
     delete[] this->previousLineText;
@@ -1194,9 +1202,6 @@ UIShowAndEditTimeCtrl::UIShowAndEditTimeCtrl() : UIWindow(0) {
 
 #include "UI/Edit/UIItemTagCtrl.h"
 #include "UI/Edit/UIEditPaint.inl"
-
-extern template void std::vector<unsigned int>::_Tidy() noexcept;
-#include "Utility/StdTraitsFind.h"
 
 // OFFSET: 0x0085C4F0
 // FUNCTION: fn_10801

@@ -43,7 +43,7 @@ void CCherryBlossomEffect::Close() {
 void CCherryBlossomEffect::Open() {
   for (int row = 0; row < 4; ++row) {
     for (int column = 0; column < 4; ++column) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle) {
         particle->SetTexture("effect\\cherry_circle.bmp");
         particle->effectId = this->id;
@@ -75,23 +75,24 @@ void CCherryBlossomEffect::Open() {
 // FUNCTION: fn_18887
 void CCherryBlossomEffect::OnProcess() {
   for (std::vector<CParticle*>::iterator it = this->petals.begin(); it != this->petals.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
     CParticle* particle = *it;
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
       const int index = particle->columnIndex + particle->rowIndex * 4;
       const float speed = particle->speedParameter;
-      EffectPoint& offset = this->offsets[index];
-      if (offset.y < 0.0f) {
-        if (offset.y < -30.0f) {
-          offset.x = 0.0f;
-          offset.y = static_cast<float>(Random(100));
-          offset.z = 0.0f;
+      if (this->offsets[index].y < 0.0f) {
+        if (this->offsets[index].y < -30.0f) {
+          const float height = static_cast<float>(Random(100));
+          this->offsets[index].x = 0.0f;
+          this->offsets[index].y = height;
+          this->offsets[index].z = 0.0f;
 
-          float* angles = &particle->animationParameter;
+          float* angle = &particle->animationParameter;
           for (int i = 0; i < 4; ++i) {
-            angles[i] = static_cast<float>(Random(360));
+            *angle++ = static_cast<float>(Random(360));
           }
 
           particle->alpha = 0;
@@ -102,28 +103,26 @@ void CCherryBlossomEffect::OnProcess() {
             const int delta = static_cast<int>(angles[i + 2]) - current;
             angles[i] = static_cast<float>(current + (delta > 0 ? 3 : -2));
             if (std::abs(delta) < 3) {
-              int target;
               if (delta > 0) {
-                target = Random(current);
+                angles[i + 2] = static_cast<float>(Random(current));
               } else {
-                target = 359 - Random(current);
+                angles[i + 2] = static_cast<float>(359 - Random(current));
               }
-
-              angles[i + 2] = static_cast<float>(target);
             }
           }
 
-          offset.x += speed * g_sinTable[static_cast<int>(angles[0])];
-          offset.z += speed * g_sinTable[static_cast<int>(angles[1])];
-          if (offset.y < -20.0f) {
-            particle->alpha = std::max(particle->alpha - 4, 0);
+          this->offsets[index].x += speed * g_sinTable[static_cast<int>(angles[0])];
+          this->offsets[index].z += speed * g_sinTable[static_cast<int>(angles[1])];
+          if (this->offsets[index].y < -20.0f) {
+            const int alpha = particle->alpha - 4;
+            particle->alpha = alpha >= 0 ? alpha : 0;
           } else if (particle->alpha != 255) {
             particle->alpha = 255;
           }
         }
       }
 
-      offset.y -= speed;
+      this->offsets[index].y -= speed;
 
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
@@ -132,7 +131,7 @@ void CCherryBlossomEffect::OnProcess() {
 
       matrix translation;
       std::memcpy(translation.values, g_identityMatrix, sizeof(translation.values));
-      translation.MakeTranslate(offset.x, offset.y, offset.z);
+      translation.MakeTranslate(this->offsets[index].x, this->offsets[index].y, this->offsets[index].z);
 
       matrix scale;
       std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));

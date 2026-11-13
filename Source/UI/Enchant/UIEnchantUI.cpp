@@ -20,8 +20,6 @@
 #include <new>
 #include <vector>
 
-extern template std::vector<int>::~vector();
-
 // GLOBAL: gl_24882
 template <>
 CEnchantMgr* Singleton<CEnchantMgr>::s_instance = nullptr;
@@ -51,13 +49,6 @@ template void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::ClearItems();
 template int CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::AddData(const EnchantUI::CEnchantItemData&, bool);
 template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::ClearData();
 template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::UpdateScrollBar();
-
-template <>
-__declspec(noinline) void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::AddNewItem();
-template <>
-__declspec(noinline) void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::AddNewItem();
-template <>
-__declspec(noinline) CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::CUIListBoxEx();
 
 // OFFSET: 0x009F93D0
 // FUNCTION: fn_14806
@@ -133,13 +124,12 @@ void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::AddNe
 // FUNCTION: fn_14839
 template <>
 void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (EnchantUI::CUIEnchantItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -230,13 +220,12 @@ void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::AddNewItem() {
 // FUNCTION: fn_14840
 template <>
 void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (EnchantUI::CUITargetItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -266,7 +255,7 @@ CEnchantMgr* Singleton<CEnchantMgr>::GetInstance() {
 
 // OFFSET: 0x00A04860
 // FUNCTION: fn_14958
-CUIEnchantUI::~CUIEnchantUI() {
+__declspec(noinline) CUIEnchantUI::~CUIEnchantUI() {
   CEnchantMgr::GetInstance()->SendCloseEnchant();
 }
 
@@ -856,7 +845,7 @@ int CUIEnchantPage::FindEmptySlot() {
       return true;
     }
     int card;
-    std::memcpy(&card, item.cards + slot * 4, sizeof(card));
+    std::memcpy(&card, &item.cards[slot], sizeof(card));
     return card == 0;
   });
   if (it != slots.end()) {
@@ -1115,7 +1104,7 @@ void CUIEnchantUI::SetEnchantGroup(uint64_t group) {
       if (g_session.HasSwapEquipmentItem(index)) {
         continue;
       }
-      const ITEM_INFO target = LookupClientItemByIdentity(g_session.m_inventoryItems, index);
+      const ITEM_INFO target = g_session.LookupClientItemByIdentity(index);
       if (static_cast<std::uint32_t>(target.refiningLevel) < this->enchantInfo->condition1) {
         continue;
       }
@@ -1417,7 +1406,7 @@ bool CUIReset::LoadEnchantList() {
       return false;
     }
     int card;
-    std::memcpy(&card, item.cards + slot * 4, sizeof(card));
+    std::memcpy(&card, &item.cards[slot], sizeof(card));
     return card != 0;
   });
   if (empty) {
@@ -1442,7 +1431,7 @@ bool CUIEnchantPage::SetItem(const ITEM_INFO& item) {
     CUISlot* slot = entry.second;
     int card = 0;
     if (entry.first < 4) {
-      std::memcpy(&card, item.cards + entry.first * 4, sizeof(card));
+      std::memcpy(&card, &item.cards[entry.first], sizeof(card));
     }
     if (card > 0) {
       ITEM_INFO cardInfo;

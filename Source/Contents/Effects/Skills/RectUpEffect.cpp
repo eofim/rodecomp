@@ -74,7 +74,7 @@ void CRectUpEffect::Render() {
     CParticle* particle = *it;
     if (particle) {
       const int previous = particle->columnIndex;
-      const int angle = static_cast<int>(*reinterpret_cast<float*>(&particle->angleBits)) % 360;
+      const int angle = static_cast<int>(particle->angle) % 360;
       const float x = particle->scale * g_cosTable[angle];
       const float z = particle->scale * g_sinTable[angle];
 
@@ -119,7 +119,7 @@ void CRectUpEffect::Render() {
 void CRectUpEffect::ProcessParticle(CParticle* particle) {
   if (particle && this->id == 1088) {
     particle->phaseParameter += particle->phaseParameter + 1 < 360 ? 1 : -359;
-    const int base = *reinterpret_cast<int*>(particle->effectParameters);
+    const int base = particle->effectParameter;
     particle->SetColor(255, 255, static_cast<short>(g_sinTable[particle->phaseParameter] * 100.0f + static_cast<float>(base)));
   }
 }
@@ -153,7 +153,7 @@ void CRectUpEffect::Open() {
     for (int x = -5; x < 10; x += 5) {
       int index = 0;
       for (int angle = 45; angle <= 405; angle += 90, ++index) {
-        CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+        CParticle* particle = CreateParticle(&this->positionVector, 5);
         if (!particle) {
           continue;
         }
@@ -166,18 +166,18 @@ void CRectUpEffect::Open() {
         particle->rowIndex = 0;
         particle->groupIndex = 1;
         particle->angleParameter = ClampedRandom(360);
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(angle);
+        particle->angle = static_cast<float>(angle);
         particle->animationParameter = 0.0f;
         if (this->id == 1088) {
           particle->speedParameter = 16.0f;
           particle->alpha = 120;
           particle->scale = 3.5f;
           const int shade = ClampedRandom(50) + 100;
-          std::memcpy(particle->effectParameters, &shade, sizeof(shade));
+          particle->effectParameter = shade;
           particle->phaseParameter = 0;
         }
         this->InitParticle(particle);
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         this->particles.push_back(particle);
       }
     }

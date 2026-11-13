@@ -16,6 +16,8 @@
 #include <cstring>
 #include <string>
 
+template __declspec(noinline) std::string::basic_string(const std::string&);
+
 // OFFSET: 0x00B43050
 // FUNCTION: fn_18874
 CCellRangeEffect::CCellRangeEffect() : CEffect(-1), cellSize(5.0f) {
@@ -78,7 +80,7 @@ void CCellRangeEffect::Open() {
   const int range = owner->range;
   for (int row = -range; row <= range; ++row) {
     for (int column = -range; column <= range; ++column) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle) {
         particle->effectId = this->id;
         particle->columnIndex = column;

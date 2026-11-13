@@ -191,19 +191,25 @@ void UIMacroUserInfoWnd::OnCreate(int, int) {
 // FUNCTION: fn_09848
 void UIMacroReporterWnd::Paint() {
   if (this->m_mode == 0 || this->m_mode == 1) {
-    if (this->m_entries.empty()) {
-      this->m_reportButton->SetDisabled(1);
+    if (this->m_entries.size() == 0) {
+      UIButton* button = this->m_reportButton;
+      button->SetDisabled(1);
+      button->Invalidate();
     } else {
-      this->m_reportButton->SetDisabled(0);
+      UIButton* button = this->m_reportButton;
+      button->SetDisabled(0);
+      button->Invalidate();
     }
-    this->m_reportButton->Invalidate();
   } else if (this->m_mode == 2 || this->m_mode == 3) {
     if (this->m_namesValid == 1 && this->m_targetValid == 1) {
-      this->m_reportButton->SetDisabled(0);
+      UIButton* button = this->m_reportButton;
+      button->SetDisabled(0);
+      button->Invalidate();
     } else {
-      this->m_reportButton->SetDisabled(1);
+      UIButton* button = this->m_reportButton;
+      button->SetDisabled(1);
+      button->Invalidate();
     }
-    this->m_reportButton->Invalidate();
   }
   DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xFFFFFFFF);
   this->DrawTitleBar(true, "", 0);
@@ -226,7 +232,7 @@ void UIMacroReporterWnd::Paint() {
 
   y = 57;
   for (unsigned int index = this->m_firstRow; static_cast<int>(index) < this->m_firstRow + this->m_visibleRows; ++index, y += 22) {
-    if (index >= this->m_rows.size()) {
+    if (this->m_rows.size() <= index) {
       return;
     }
 
@@ -459,8 +465,7 @@ void UIMacroReporterWnd::SendMacroUserInfoPacket(std::uint16_t first, std::uint1
   } packet{0x0A6C, first, second, third};
 
   CRagConnection* connection = &GetRagConnection();
-  const PacketLengths& lengths = reinterpret_cast<const PacketLengths&>(GetRagConnection());
-  const int length = lengths.FixedLength(packet.id);
+  const int length = GetRagConnection().GetPacketSize(packet.id);
   connection->Send(length, &packet);
 }
 
@@ -698,7 +703,7 @@ int UIMacroReporterWnd::SendMsg(
             PACKET_CZ_MACRO_REPORT_ACCOUNT packet;
             packet.packetType = ID_CZ_REQ_APPLY_MACRO_DETECTOR;
             packet.accountId = *it;
-            GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+            GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
           }
           this->m_entries.clear();
           for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {

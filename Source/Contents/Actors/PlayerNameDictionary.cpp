@@ -10,6 +10,8 @@
 #include <windows.h>
 #include <timeapi.h>
 
+template __declspec(noinline) void std::deque<std::uint32_t>::pop_front() noexcept;
+
 #pragma pack(push, 1)
 struct PACKET_CZ_REQNAME_BYGID2 {
   /* 0000 */ std::int16_t packetType;
@@ -28,7 +30,7 @@ CPlayerNameDictionary::CPlayerNameDictionary() {
 
 // OFFSET: 0x0060A9D0
 // FUNCTION: fn_04256
-CPlayerNameDictionary::~CPlayerNameDictionary() {
+__declspec(noinline) CPlayerNameDictionary::~CPlayerNameDictionary() {
 }
 
 // OFFSET: 0x0060B010
@@ -46,10 +48,14 @@ std::string CPlayerNameDictionary::Lookup(std::uint32_t id) {
   return LookupMessage(MSI_NAMELESS_USER);
 }
 
+// INLINED
+inline CPlayerNameDictionary::Entry::Entry(std::string value) : name(value), tick(timeGetTime()) {
+}
+
 // OFFSET: 0x0060ABB0
 // FUNCTION: fn_04258
 void CPlayerNameDictionary::Set(std::uint32_t id, std::string name) {
-  this->m_names[id] = Entry{name, timeGetTime()};
+  this->m_names[id] = Entry(name);
   const auto request = std::find_if(this->m_requests.begin(), this->m_requests.end(), [&](const Request& value) { return value.id == id; });
   if (request != this->m_requests.end()) {
     this->m_requests.erase(request);

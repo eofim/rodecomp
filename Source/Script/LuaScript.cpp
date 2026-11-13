@@ -39,6 +39,9 @@ extern "C" {
 #include <vector>
 #include <windows.h>
 
+template __declspec(noinline) SubChatWndInfo& std::map<int, SubChatWndInfo>::operator[](int&&);
+template __declspec(noinline) std::vector<std::string>& std::map<std::string, std::vector<std::string>>::operator[](const std::string&);
+
 struct MiniMapPosition {
   MiniMapPosition() {
   }
@@ -46,6 +49,8 @@ struct MiniMapPosition {
   /* 0000 */ float x;
   /* 0004 */ float y;
 };
+
+template __declspec(noinline) MiniMapPosition& std::map<std::string, MiniMapPosition>::operator[](const std::string&);
 
 // GLOBAL: gl_24913
 std::map<std::string, MiniMapPosition> g_exceptionMiniMapPosList;
@@ -121,10 +126,10 @@ int SetSubChatWndList(lua_State* state) {
   int index;
   if (type == "On") {
     index = static_cast<int>(g_session.m_noSubChatWnds.size());
-    g_session.m_noSubChatWnds[index] = info;
+    g_session.m_noSubChatWnds[static_cast<int>(g_session.m_noSubChatWnds.size())] = info;
   } else {
     index = static_cast<int>(g_session.m_subChatWnds.size());
-    g_session.m_subChatWnds[index] = info;
+    g_session.m_subChatWnds[static_cast<int>(g_session.m_subChatWnds.size())] = info;
   }
 
   lua_pushnumber(state, index);
@@ -171,8 +176,7 @@ int SetCmdOnOffList(lua_State* state) {
   const int optionId = SetOption(name, enabled);
   if (optionId != 3) {
     if (optionId == 229) {
-      const int value = enabled;
-      std::memcpy(g_session.interactionFlags, &value, sizeof(value));
+      g_session.m_serviceOption229 = enabled;
     }
     g_session.m_commandOptions.emplace_back(name, optionId);
   }
@@ -245,10 +249,22 @@ int SetEmitterInfo(lua_State* state) {
     break;
   }
   case MSG_SET_COLOR: {
-    const int red = (std::min)(static_cast<int>(luaL_checknumber(state, 3)), 255);
-    const int green = (std::min)(static_cast<int>(luaL_checknumber(state, 4)), 255);
-    const int blue = (std::min)(static_cast<int>(luaL_checknumber(state, 5)), 255);
-    const int alpha = (std::min)(static_cast<int>(luaL_checknumber(state, 6)), 255);
+    int red = static_cast<int>(luaL_checknumber(state, 3));
+    if (red > 255) {
+      red = 255;
+    }
+    int green = static_cast<int>(luaL_checknumber(state, 4));
+    if (green > 255) {
+      green = 255;
+    }
+    int blue = static_cast<int>(luaL_checknumber(state, 5));
+    if (blue > 255) {
+      blue = 255;
+    }
+    int alpha = static_cast<int>(luaL_checknumber(state, 6));
+    if (alpha > 255) {
+      alpha = 255;
+    }
     effect->red = red;
     effect->green = green;
     effect->blue = blue;
@@ -277,18 +293,22 @@ int SetEmitterInfo(lua_State* state) {
     effect->SetTexture(texture);
     break;
   }
-  case MSG_SET_SPEED:
-    effect->SetParticleSpeed(static_cast<float>(luaL_checknumber(state, 3)));
+  case MSG_SET_SPEED: {
+    const float speed = static_cast<float>(luaL_checknumber(state, 3));
+    effect->SetParticleSpeed(speed);
     break;
+  }
   case MSG_SET_SRCMODE:
     effect->sourceBlend = luaL_checknumber(state, 3);
     break;
   case MSG_SET_DESTMODE:
     effect->destinationBlend = luaL_checknumber(state, 3);
     break;
-  case MSG_SET_MAXPARTICLE:
-    effect->SetCount(static_cast<int>(luaL_checknumber(state, 3)));
+  case MSG_SET_MAXPARTICLE: {
+    const int count = static_cast<int>(luaL_checknumber(state, 3));
+    effect->SetCount(count);
     break;
+  }
   case MSG_SET_ZENABLE:
     effect->depth = static_cast<int>(luaL_checknumber(state, 3)) != 0;
     break;
@@ -339,19 +359,19 @@ int SetMagicFloorInfo(lua_State* state) {
     *reinterpret_cast<float*>(&effect->areaParameters[8]) = static_cast<float>(luaL_checknumber(state, 3));
     break;
   case MSG_SET_SIZE2:
-    reinterpret_cast<float&>(effect->scaleParameter) = static_cast<float>(luaL_checknumber(state, 3));
+    effect->scaleParameter = static_cast<float>(luaL_checknumber(state, 3));
     break;
   case MSG_SET_ANGLE:
-    *reinterpret_cast<int*>(effect->angleParameter) = luaL_checknumber(state, 3);
+    effect->baseAngle = luaL_checknumber(state, 3);
     break;
   case MSG_SET_RISEANGLE:
-    reinterpret_cast<float&>(effect->rotationParameter) = static_cast<float>(static_cast<int>(luaL_checknumber(state, 3)));
+    effect->rotationParameter = static_cast<float>(static_cast<int>(luaL_checknumber(state, 3)));
     break;
   case MSG_SET_ALPHA:
-    *reinterpret_cast<int*>(&effect->alphaParameters[0]) = luaL_checknumber(state, 3);
+    effect->baseAlpha = luaL_checknumber(state, 3);
     break;
   case MSG_SET_FDA:
-    *reinterpret_cast<int*>(&effect->alphaParameters[4]) = luaL_checknumber(state, 3);
+    effect->fadeAlpha = luaL_checknumber(state, 3);
     break;
   case MSG_SET_HEIGHT0:
   case MSG_SET_HEIGHT1:
@@ -374,7 +394,7 @@ int SetMagicFloorInfo(lua_State* state) {
   case MSG_SET_HEIGHT18:
   case MSG_SET_HEIGHT19:
   case MSG_SET_HEIGHT20:
-    reinterpret_cast<float*>(&effect->alphaParameters[8])[key - 21] = static_cast<float>(static_cast<int>(luaL_checknumber(state, 3)));
+    effect->heights[key - 21] = static_cast<float>(static_cast<int>(luaL_checknumber(state, 3)));
     break;
   }
 
@@ -436,19 +456,19 @@ int SetOtherEffectInfo(lua_State* state) {
     *reinterpret_cast<float*>(&effect->areaParameters[8]) = static_cast<float>(luaL_checknumber(state, 4));
     break;
   case MSG_SET_SIZE2:
-    reinterpret_cast<float&>(effect->scaleParameter) = static_cast<float>(luaL_checknumber(state, 4));
+    effect->scaleParameter = static_cast<float>(luaL_checknumber(state, 4));
     break;
   case MSG_SET_ANGLE:
-    *reinterpret_cast<int*>(effect->angleParameter) = luaL_checknumber(state, 4);
+    effect->baseAngle = luaL_checknumber(state, 4);
     break;
   case MSG_SET_RISEANGLE:
-    reinterpret_cast<float&>(effect->rotationParameter) = static_cast<float>(static_cast<int>(luaL_checknumber(state, 4)));
+    effect->rotationParameter = static_cast<float>(static_cast<int>(luaL_checknumber(state, 4)));
     break;
   case MSG_SET_ALPHA:
-    *reinterpret_cast<int*>(&effect->alphaParameters[0]) = luaL_checknumber(state, 4);
+    effect->baseAlpha = luaL_checknumber(state, 4);
     break;
   case MSG_SET_FDA:
-    *reinterpret_cast<int*>(&effect->alphaParameters[4]) = luaL_checknumber(state, 4);
+    effect->fadeAlpha = luaL_checknumber(state, 4);
     break;
   case MSG_SET_HEIGHT0:
   case MSG_SET_HEIGHT1:
@@ -471,7 +491,7 @@ int SetOtherEffectInfo(lua_State* state) {
   case MSG_SET_HEIGHT18:
   case MSG_SET_HEIGHT19:
   case MSG_SET_HEIGHT20:
-    reinterpret_cast<float*>(&effect->alphaParameters[8])[key - 21] = static_cast<float>(static_cast<int>(luaL_checknumber(state, 4)));
+    effect->heights[key - 21] = static_cast<float>(static_cast<int>(luaL_checknumber(state, 4)));
     break;
   }
 
@@ -524,10 +544,22 @@ int SetAnimatedEmitterInfo(lua_State* state) {
     break;
   }
   case MSG_SET_COLOR: {
-    const int red = (std::min)(static_cast<int>(luaL_checknumber(state, 3)), 255);
-    const int green = (std::min)(static_cast<int>(luaL_checknumber(state, 4)), 255);
-    const int blue = (std::min)(static_cast<int>(luaL_checknumber(state, 5)), 255);
-    const int alpha = (std::min)(static_cast<int>(luaL_checknumber(state, 6)), 255);
+    int red = static_cast<int>(luaL_checknumber(state, 3));
+    if (red > 255) {
+      red = 255;
+    }
+    int green = static_cast<int>(luaL_checknumber(state, 4));
+    if (green > 255) {
+      green = 255;
+    }
+    int blue = static_cast<int>(luaL_checknumber(state, 5));
+    if (blue > 255) {
+      blue = 255;
+    }
+    int alpha = static_cast<int>(luaL_checknumber(state, 6));
+    if (alpha > 255) {
+      alpha = 255;
+    }
     effect->red = red;
     effect->green = green;
     effect->blue = blue;
@@ -556,18 +588,22 @@ int SetAnimatedEmitterInfo(lua_State* state) {
     effect->SetTexture(texture);
     break;
   }
-  case MSG_SET_SPEED:
-    effect->SetParticleSpeed(static_cast<float>(luaL_checknumber(state, 3)));
+  case MSG_SET_SPEED: {
+    const float speed = static_cast<float>(luaL_checknumber(state, 3));
+    effect->SetParticleSpeed(speed);
     break;
+  }
   case MSG_SET_SRCMODE:
     effect->sourceBlend = luaL_checknumber(state, 3);
     break;
   case MSG_SET_DESTMODE:
     effect->destinationBlend = luaL_checknumber(state, 3);
     break;
-  case MSG_SET_MAXPARTICLE:
-    effect->SetCount(static_cast<int>(luaL_checknumber(state, 3)));
+  case MSG_SET_MAXPARTICLE: {
+    const int count = static_cast<int>(luaL_checknumber(state, 3));
+    effect->SetCount(count);
     break;
+  }
   case MSG_SET_ZENABLE:
     effect->depth = static_cast<int>(luaL_checknumber(state, 3)) != 0;
     break;

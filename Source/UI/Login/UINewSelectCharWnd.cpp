@@ -47,8 +47,6 @@
 unsigned char g_selectedSlotIndex;
 
 
-extern const char* LookupMessage(int id);
-
 #pragma pack(push, 1)
 struct BlockedCharacterEntry {
   /* 0000 */ std::uint32_t gid;
@@ -421,7 +419,7 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
     }
     slotInfo.frame = 0;
 
-    slotInfo.actionNames[0] = GetBodyActionResourceName(character->job, character->sex, character->bodyCostume, 0);
+    slotInfo.actionNames[0] = g_session.GetBodyActionResourceName(character->job, character->sex, character->bodyCostume, 0);
     slotInfo.spriteNames[0] = g_session.GetBodySprName(character->job, character->sex, character->bodyCostume, 0);
     int head = character->head;
     slotInfo.actionNames[1] = g_session.GetHeadActName(character->job, character->sex, &head);
@@ -445,7 +443,7 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
       slotInfo.headPaletteName = g_session.GetHeadPalName(head, character->job, character->sex, slotInfo.headPalette);
     }
 
-    slotInfo.imfName = GetBodyImfName(character->job, character->sex, character->head, character->bodyCostume);
+    slotInfo.imfName = g_session.GetBodyImfName(character->job, character->sex, character->head, character->bodyCostume);
   }
 
   for (int index = 0; index < this->m_totalSlots; ++index) {
@@ -653,14 +651,14 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       CharacterGidPacket packet;
       packet.id = ID_CH_DELETE_CHAR3_RESERVED;
       packet.gid = info->gid;
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       break;
     }
     case 0x198: {
       CharacterGidPacket packet;
       packet.id = ID_CH_DELETE_CHAR3_CANCEL;
       packet.gid = this->m_slotMap[static_cast<unsigned char>(g_selectedSlotIndex)];
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       break;
     }
     case ID_DELETE: {
@@ -774,11 +772,11 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     case ID_CHANGE_NAME_SUCCESS: {
       CharacterInfo* info =
         reinterpret_cast<CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, static_cast<unsigned char>(g_selectedSlotIndex), 0, 0, 0));
-      if (info->gid != g_renameGid) {
+      if (info->gid != g_session.m_renameGid) {
         break;
       }
 
-      std::memcpy(info->name, g_renameName, sizeof(info->name));
+      std::memcpy(info->name, g_session.m_renameName, sizeof(info->name));
       const int column = static_cast<unsigned char>(g_selectedSlotIndex) - this->m_slotsPerPage * this->m_page;
       this->m_characterWindows[column]->SetTextFitted(info->name);
       UIStaticText* name = this->m_characterWindows[column];
@@ -800,7 +798,7 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       CharacterGidPacket packet;
       packet.id = ID_CH_AVAILABLE_SECOND_PASSWD;
       packet.gid = g_session.m_aid;
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       break;
     }
     case 0x1B2:
@@ -828,7 +826,7 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
           packet.from = static_cast<std::int16_t>(this->m_slotMoveSource);
           packet.to = selected;
           packet.count = static_cast<std::int16_t>(info->slotChangeCount);
-          GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
         }
       }
       this->m_slotMoveSource = -1;

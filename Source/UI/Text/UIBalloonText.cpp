@@ -20,6 +20,10 @@
 #include <string>
 #include <utility>
 
+template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
+
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 // GLOBAL: gl_24926
 int g_nameBalloonFontHeight = 12;
 
@@ -213,8 +217,8 @@ void UINameBalloonText::Paint() {
 
 lines:
   for (auto line = this->m_lines.begin(); line != this->m_lines.end(); ++line) {
-    DrawOutlinedText(
-      *this, x, y, line->c_str(), static_cast<unsigned>(line->size()), this->m_textColor, this->m_outlineColor, 0, g_nameBalloonFontHeight,
+    this->DrawOutlinedText(
+      x, y, line->c_str(), static_cast<unsigned>(line->size()), this->m_textColor, this->m_outlineColor, 0, g_nameBalloonFontHeight,
       g_serviceFlag06, 0
     );
     y += g_nameBalloonFontHeight + 2;

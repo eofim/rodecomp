@@ -815,23 +815,23 @@ void UIWindow::RemoveChild(UIWindow* child, unsigned char destroy) {
 
 // OFFSET: 0x00A81CC0
 // FUNCTION: fn_16986
-bool UIWindow::Contains(const UIWindow* window) const {
+int UIWindow::Contains(const UIWindow* window) const {
   if (!window) {
-    return false;
+    return 0;
   }
 
   if (window == this) {
-    return true;
+    return 1;
   }
 
   for (auto it = this->m_children.begin(); it != this->m_children.end(); ++it) {
     UIWindow* child = *it;
     if (child->Contains(window)) {
-      return true;
+      return 1;
     }
   }
 
-  return false;
+  return 0;
 }
 
 // OFFSET: 0x00A7B3F0
@@ -1177,12 +1177,12 @@ void UIWindow::FillSurface(std::uint32_t color, const RECT* rectangle) {
 
 // OFFSET: 0x00A7BB20
 // FUNCTION: fn_16934
-void UIWindow::DrawBitmapScaled(int x, int y, int width, int height, const BitmapImage* image, int option) {
-  if (!this->geometry.surface || !image) {
+void UIWindow::DrawBitmapScaled(int x, int y, int width, int height, const CBitmapRes* bitmap, int option) {
+  if (!this->geometry.surface || !bitmap) {
     return;
   }
 
-  this->geometry.surface->ScaleCopy(x, y, image->width, image->height, width, height, image->pixels, option);
+  this->geometry.surface->ScaleCopy(x, y, bitmap->image.width, bitmap->image.height, width, height, bitmap->image.pixels, option);
 }
 
 // OFFSET: 0x00A7BBB0
@@ -1202,35 +1202,37 @@ void UIWindow::DrawBitmapRegion(int x, int y, CBitmapRes* bitmap, bool transpare
 
 // OFFSET: 0x00A7BDD0
 // FUNCTION: fn_16939
-void UIWindow::DrawAuxiliaryScaled(int mode, int x, int y, int width, int height, BitmapImage* image, int option, bool rebuild) {
-  if (!this->geometry.surface || !image) {
+void UIWindow::DrawAuxiliaryScaled(int mode, int x, int y, int width, int height, CBitmapRes* bitmap, int option, bool rebuild) {
+  if (!this->geometry.surface || !bitmap) {
     return;
   }
 
   if (rebuild) {
-    image->ClearAuxiliary();
+    bitmap->ClearAuxiliary();
   }
 
-  image->CreateAuxiliary(mode);
-  if (image->auxiliary) {
-    this->geometry.surface->ScaleCopy(x, y, image->width, image->height, width, height, static_cast<const std::uint32_t*>(image->auxiliary), option);
+  bitmap->CreateAuxiliary(mode);
+  if (bitmap->image.auxiliary) {
+    this->geometry.surface->ScaleCopy(
+      x, y, bitmap->image.width, bitmap->image.height, width, height, static_cast<const std::uint32_t*>(bitmap->image.auxiliary), option
+    );
   }
 }
 
 // OFFSET: 0x00A7BE30
 // FUNCTION: fn_16940
-void UIWindow::DrawAuxiliary(int mode, int x, int y, BitmapImage* image, bool transparent, bool rebuild) {
-  if (!this->geometry.surface || !image) {
+void UIWindow::DrawAuxiliary(int mode, int x, int y, CBitmapRes* bitmap, bool transparent, bool rebuild) {
+  if (!this->geometry.surface || !bitmap) {
     return;
   }
 
   if (rebuild) {
-    image->ClearAuxiliary();
+    bitmap->ClearAuxiliary();
   }
 
-  image->CreateAuxiliary(mode);
-  if (image->auxiliary) {
-    this->geometry.surface->Copy(x, y, image->width, image->height, static_cast<const std::uint32_t*>(image->auxiliary), transparent);
+  bitmap->CreateAuxiliary(mode);
+  if (bitmap->image.auxiliary) {
+    this->geometry.surface->Copy(x, y, bitmap->image.width, bitmap->image.height, static_cast<const std::uint32_t*>(bitmap->image.auxiliary), transparent);
   }
 }
 
@@ -1451,36 +1453,23 @@ std::string UIWindow::FitDisplayText(int width, const char* text, int family, in
   display = std::move(navigation);
   display = DisplayQuestTextTag(display);
 
-  const auto textWidth = [this, family, height, bold](const char* value) {
-    if (!value) {
-      return 0;
-    }
+  const int textWidth = this->TextWidth(display.c_str(), 0, family, height, bold, 0);
+  const int ellipsisWidth = this->TextWidth("...", 3, family, height, bold, 0);
 
-    const unsigned bytes = static_cast<unsigned>(std::strlen(value));
-    if (!bytes) {
-      return 0;
-    }
-
-    TextContext context(*this->geometry.surface);
-    context.SetFont(family, height, bold, 0);
-    return static_cast<int>(context.Measure(value, bytes).cx);
-  };
-
-  const int extent = textWidth(display.c_str());
-  {
-    TextContext context(*this->geometry.surface);
-    context.SetFont(family, height, bold, 0);
-    context.Measure("...", 3);
-  }
-
-  if (extent <= width) {
+  if (textWidth <= width) {
     return display;
   }
 
   std::string fitted(display);
   std::wstring remaining(ATL::CA2WEX<128>(display.c_str(), CP_THREAD_ACP));
 
-  while (remaining.size() > 1) {
+  int extent;
+  do {
+    if (remaining.size() <= 1) {
+      fitted = std::string(ATL::CW2AEX<128>(remaining.c_str(), CP_THREAD_ACP)) + "...";
+      break;
+    }
+
     if (remaining.size() >= 2) {
       std::size_t length = remaining.size() - 1;
 
@@ -1491,16 +1480,10 @@ std::string UIWindow::FitDisplayText(int width, const char* text, int family, in
       remaining.resize(length);
     }
 
-    ATL::CW2AEX<128> converted(remaining.c_str(), CP_THREAD_ACP);
-    fitted = std::string(converted) + "...";
+    fitted = std::string(ATL::CW2AEX<128>(remaining.c_str(), CP_THREAD_ACP)) + "...";
+    extent = this->TextWidth(fitted.c_str(), 0, family, height, bold, 0);
+  } while (width < extent);
 
-    if (textWidth(fitted.c_str()) <= width) {
-      return fitted;
-    }
-  }
-
-  ATL::CW2AEX<128> converted(remaining.c_str(), CP_THREAD_ACP);
-  fitted = std::string(converted) + "...";
   return fitted;
 }
 
@@ -2242,7 +2225,7 @@ void UIListBox_NaviSearch::Paint() {
     }
 
     const std::string& line = this->lines[index];
-    DrawColoredText(*this, x, y, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false);
+    this->DrawColoredText(x, y, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false);
   }
 }
 
@@ -2489,8 +2472,8 @@ void UINavigationV4Wnd::Paint() {
     this->DrawMapTexture(3, 0x2e, 0x10a);
     CNaviInfo* info = static_cast<CNaviInfo*>(g_navigationManager.GetCurrentTarget().object);
     if (info) {
-      DrawOutlinedText(*this, 9, 0x32, info->GetTitle(), 0, 0xffffff, 0, 0, 0xb, 1, 0);
-      DrawOutlinedText(*this, 9, 0x41, info->GetName(), 0, 0xffffff, 0, 0, 0xb, 1, 0);
+      this->DrawOutlinedText(9, 0x32, info->GetTitle(), 0, 0xffffff, 0, 0, 0xb, 1, 0);
+      this->DrawOutlinedText(9, 0x41, info->GetName(), 0, 0xffffff, 0, 0, 0xb, 1, 0);
     }
 
     if (static_cast<DWORD>(this->noticeUntil) > timeGetTime()) {
@@ -2514,7 +2497,7 @@ void UINavigationV4Wnd::Paint() {
       WrapPlainText(message.c_str(), lines, 0x26);
       int y = (0x29 - static_cast<int>(lines.size())) * 7;
       for (unsigned int index = 0; index < lines.size(); ++index) {
-        DrawOutlinedText(*this, 0x2a, y, lines[index].c_str(), 0, 0xffffff, 0, 0, 0xb, 1, 0);
+        this->DrawOutlinedText(0x2a, y, lines[index].c_str(), 0, 0xffffff, 0, 0, 0xb, 1, 0);
         y += 0xe;
       }
     }
@@ -3403,7 +3386,7 @@ void UINavigationV4Wnd::SelectRouteNode(int node) {
   list->selected = g_navigationManager.selectedPathNode;
   list->Invalidate();
   if (g_windowMgr.modal) {
-    reinterpret_cast<UINavigationWnd*>(g_windowMgr.modal)->RefreshWorldMapSelection();
+    static_cast<UINavigationWnd*>(g_windowMgr.modal)->RefreshWorldMapSelection();
   }
   this->Invalidate();
 }
@@ -3520,7 +3503,8 @@ void UIPrivateAirplaneWnd::OnCreate(int, int) {
   this->AddBaseButton();
   this->AddCloseButton("", 0);
 
-  for (int index = 0, y = 26; index < static_cast<int>(g_privateAirplaneItems->m_needItems.size()); ++index, y += 26) {
+  for (int index = 0; index < static_cast<int>(g_privateAirplaneItems->m_needItems.size()); ++index) {
+    const int y = 26 * (index + 1);
     const int itemId = g_privateAirplaneItems->GetNeedItem(index);
     ITEM_INFO item;
     item.SetItemId(itemId);
@@ -3534,8 +3518,7 @@ void UIPrivateAirplaneWnd::OnCreate(int, int) {
     }
 
     UIBasicButton* button = new UIBasicButton();
-    const std::string text = FormatOwnedString(LookupMessage(MSI_PRIVATE_AIRPLANE_FAILED_ISNOT_ENDABLE_MAP), name);
-    button->Configure(0xc0, text.c_str());
+    button->Configure(0xc0, FormatOwnedString(LookupMessage(MSI_PRIVATE_AIRPLANE_FAILED_ISNOT_ENDABLE_MAP), name).c_str());
     button->Move(8, y);
     button->SetId(500);
     button->m_argument = itemId;
@@ -3629,7 +3612,7 @@ void UINavigationV4Wnd::DrawTargetSprite(int x, int y, int width, int height, co
   int offsetX = 0;
   int offsetY = 0;
   float scale = 1.0f;
-  actions[0] = static_cast<CActRes*>(ResourceMgr::Instance().Load(GetBodyActionResourceName(look.job, look.sex, look.job, 0)));
+  actions[0] = static_cast<CActRes*>(ResourceMgr::Instance().Load(g_session.GetBodyActionResourceName(look.job, look.sex, look.job, 0)));
   sprites[0] = static_cast<CSprRes*>(ResourceMgr::Instance().Load(g_session.GetBodySprName(look.job, look.sex, look.job, 0)));
   if (!sprites[0] || !actions[0]) {
     return;

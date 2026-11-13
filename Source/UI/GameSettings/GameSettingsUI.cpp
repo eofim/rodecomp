@@ -47,6 +47,10 @@
 #include <string>
 #include <vector>
 
+template __declspec(noinline) std::list<RenderAdapter>::~list() noexcept;
+template __declspec(noinline) std::list<DisplayMode>::~list() noexcept;
+template __declspec(noinline) std::list<RenderBackend>::~list() noexcept;
+
 namespace {
   struct RodexSpamOptionPacket {
     /* 0000 */ int id;
@@ -75,45 +79,6 @@ bool g_restartClient;
 // FUNCTION: fn_15905
 RenderAdapter::RenderAdapter() : backend(0), ordinal(0), drawGuid{}, renderGuid{}, deviceGuid{} {
 }
-
-template <>
-__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::SelectItem(CUIListItem* item);
-template <>
-__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::SelectItem(CUIListItem* item);
-template <>
-__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::SelectItem(CUIListItem* item);
-template <>
-__declspec(noinline) void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::SelectItem(CUIListItem* item);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::AddNewItem();
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::AddNewItem();
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::AddNewItem();
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::AddNewItem();
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::AddNewItem();
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::LoadSkin(bool resolveSkin);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::LoadSkin(bool resolveSkin);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::LoadSkin(bool resolveSkin);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::LoadSkin(bool resolveSkin);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::LoadSkin(bool resolveSkin);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::Resize(int width, int height);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::Resize(int width, int height);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::Resize(int width, int height);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::Resize(int width, int height);
-template <>
-void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::Resize(int width, int height);
 
 // OFFSET: 0x00A2C3C0
 // FUNCTION: fn_15400
@@ -154,7 +119,7 @@ void GameSettingsUI::CUIGroupSkin::OnCreate(int width, int height) {
 // FUNCTION: fn_15410
 template <class T, class D> void CUIComboBox<T, D>::Paint() {
   this->ClearSurface(0xFFFFFFFF);
-  DrawRectangleBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xC6C6C6);
+  this->DrawRectOutline(0, 0, this->geometry.width, this->geometry.height, 0xC6C6C6);
 }
 
 template void CUIComboBox<GameSettingsUI::CUIComboItem, std::string>::Paint();
@@ -412,13 +377,12 @@ void CUICheckBox::SetOnCheck(std::function<void(bool)> callback) {
 // FUNCTION: fn_15427
 template <>
 void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (GameSettingsUI::CUIComboItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -426,13 +390,12 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::LoadSkin(bool re
 // FUNCTION: fn_15428
 template <>
 void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (GameSettingsUI::CUIComboItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -440,13 +403,12 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::LoadSkin(bool reso
 // FUNCTION: fn_15429
 template <>
 void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (GameSettingsUI::CUIComboItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -454,13 +416,12 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::LoadSkin(bool re
 // FUNCTION: fn_15430
 template <>
 void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (GameSettingsUI::CUIComboItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -468,13 +429,12 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::LoadSkin(bool reso
 // FUNCTION: fn_15431
 template <>
 void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::LoadSkin(bool resolveSkin) {
-  CResPtr<CBitmapRes>* images = reinterpret_cast<CResPtr<CBitmapRes>*>(reinterpret_cast<std::uint8_t*>(this) + 0x80);
-  images[0] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
-  images[1] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
-  images[2] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
-  images[3] = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
+  this->normalImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[0], resolveSkin));
+  this->hoverImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[1], resolveSkin));
+  this->pressedImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->imageNames[2], resolveSkin));
+  this->disabledImage = CResPtr<CBitmapRes>(this->LoadBitmapResource(this->disabledName, resolveSkin));
   for (GameSettingsUI::CUIOptionItem* item : this->items) {
-    item->SetImageResources(images[0], images[1], images[2], images[3]);
+    item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   }
 }
 
@@ -1293,7 +1253,7 @@ void CUIGroupLogInOut::Apply() {
 // FUNCTION: fn_15974
 void CUIGroupRodexSpam::Apply() {
   RodexSpamOptionPacket packet = {0x0B93, 1, 1};
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(static_cast<std::int16_t>(packet.id)), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(static_cast<std::int16_t>(packet.id)), &packet);
 }
 
 // OFFSET: 0x00A40550
@@ -1332,7 +1292,7 @@ void CUIGroupTextureDetailLevel::Paint() {
 // FUNCTION: fn_15982
 void CUIListPage::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  DrawRectangleBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xCECECE);
+  this->DrawRectOutline(0, 0, this->geometry.width, this->geometry.height, 0xCECECE);
 }
 
 // OFFSET: 0x00A40BF0
@@ -1345,7 +1305,7 @@ void CUIOptionItem::Paint() {
 // FUNCTION: fn_15984
 void CUIPage::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  DrawRectangleBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xCECECE);
+  this->DrawRectOutline(0, 0, this->geometry.width, this->geometry.height, 0xCECECE);
 }
 
 // OFFSET: 0x00A40030
@@ -1387,11 +1347,9 @@ void CUIGroupGraphics::LoadAdapters() {
 
   CUIListBoxEx<CUIComboItem, RenderAdapter>* list = this->m_adapterCombo->listBox;
   list->scrollBar->SetPosition(list->rowHeight * index);
-  for (CUIComboItem* item : list->items) {
-    if (item->index == index) {
-      list->SelectItem(item);
-      break;
-    }
+  const auto item = std::find_if(list->items.begin(), list->items.end(), [index](CUIComboItem* candidate) { return index == candidate->index; });
+  if (item != list->items.end()) {
+    list->SelectItem(*item);
   }
 }
 
@@ -1425,11 +1383,9 @@ void CUIGroupGraphics::LoadModes() {
 
   CUIListBoxEx<CUIComboItem, DisplayMode>* list = this->m_modeCombo->listBox;
   list->scrollBar->SetPosition(list->rowHeight * index);
-  for (CUIComboItem* item : list->items) {
-    if (item->index == index) {
-      list->SelectItem(item);
-      break;
-    }
+  const auto item = std::find_if(list->items.begin(), list->items.end(), [index](CUIComboItem* candidate) { return index == candidate->index; });
+  if (item != list->items.end()) {
+    list->SelectItem(*item);
   }
 }
 
@@ -1467,16 +1423,14 @@ void CUIGroupGraphicsAPI::LoadBackends() {
     return;
   }
 
-  const auto found = std::find_if(data.begin(), data.end(), [this](const RenderBackend& backend) { return backend.identity == this->m_pendingBackend; });
+  const auto found = std::find_if(data.begin(), data.end(), [this](const RenderBackend& backend) { return this->m_pendingBackend == backend.identity; });
   const int index = found != data.end() ? static_cast<int>(std::distance(data.begin(), found)) : 0;
 
   CUIListBoxEx<CUIComboItem, RenderBackend>* list = this->m_combo->listBox;
   list->scrollBar->SetPosition(list->rowHeight * index);
-  for (CUIComboItem* item : list->items) {
-    if (item->index == index) {
-      list->SelectItem(item);
-      break;
-    }
+  const auto item = std::find_if(list->items.begin(), list->items.end(), [index](CUIComboItem* candidate) { return index == candidate->index; });
+  if (item != list->items.end()) {
+    list->SelectItem(*item);
   }
 }
 
@@ -1598,11 +1552,12 @@ void CUIGroupSound::OnBgmMute(bool muted) {
 // OFFSET: 0x00A3F6D0
 // FUNCTION: fn_15949
 void CUIGroupSound::OnEffectMute(bool muted) {
-  this->m_effectSlider->SetTransparent(muted);
+  const bool enabled = !muted;
+  this->m_effectSlider->SetTransparent(!enabled);
   CUIVScrollBar* const slider = this->m_effectSlider;
-  slider->dragging = muted;
+  slider->dragging = !enabled;
   slider->Invalidate();
-  g_serviceOptions.Set(0xB, !muted);
+  g_serviceOptions.Set(0xB, enabled);
 }
 
 // OFFSET: 0x00A401C0
@@ -1660,7 +1615,7 @@ void CUIGroupProcessPriority::OnSelect(CUIRadioButton* button) {
 // FUNCTION: fn_16007
 void CUIGroupRodexSpam::OnSelect(CUIRadioButton* button) {
   RodexSpamOptionPacket packet = {0x0B93, 1, this->m_offButton != button};
-  GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(static_cast<std::int16_t>(packet.id)), &packet);
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(static_cast<std::int16_t>(packet.id)), &packet);
 }
 
 // OFFSET: 0x00A42FE0
@@ -1725,10 +1680,10 @@ void CUIGroupProcessPriority::Refresh() {
 // FUNCTION: fn_16038
 void CUIGroupRodexSpam::Refresh() {
   auto* const onButton = this->m_onButton;
-  onButton->checked = g_gameOptionFlag;
+  onButton->checked = g_session.m_gameOptionFlag;
   onButton->Invalidate();
   auto* const offButton = this->m_offButton;
-  offButton->checked = !g_gameOptionFlag;
+  offButton->checked = !g_session.m_gameOptionFlag;
   offButton->Invalidate();
 }
 
@@ -1909,7 +1864,7 @@ void GameSettingsUI::CUIGroupGraphicsAPI::Apply() {
 
 // OFFSET: 0x00A404D0
 // FUNCTION: fn_15973
-void SetNormalProcessPriority() {
+void GameSettingsUI::CUIGroupProcessPriority::Apply() {
   g_session.m_priorityClass = NORMAL_PRIORITY_CLASS;
   HANDLE process = GetCurrentProcess();
   SetPriorityClass(process, NORMAL_PRIORITY_CLASS);
@@ -2143,7 +2098,7 @@ bool GameSettingsUI::CUIListPage::SetOptionChecked(int id) {
 __declspec(noinline) void CUIGameSettingsUI::RefreshOption(int id) {
   for (GameSettingsUI::CUIListPage* page : this->m_pages) {
     for (GameSettingsUI::CUIOptionItem* item : page->m_optionList->items) {
-      if (item->m_optionId == id) {
+      if (id == item->m_optionId) {
         CUICheckBox* check = item->m_check;
         check->checked = IsServiceOption(id) ^ g_serviceOptions.Get(id);
         check->Invalidate();
@@ -2327,16 +2282,17 @@ void GameSettingsUI::CUIGroupSound::Apply() {
   this->SetBgmEnabled(g_session.GetDefaultOptionValue(OBFUSCATE_SOURCE_TEXT("/bgm", 0xC517FB932D95BB6DULL), 1) != 0);
   this->SetEffectVolume(g_session.GetDefaultOptionValue(OBFUSCATE_SOURCE_TEXT("Effect_Volume", 0x23BBD58F8B5FF5C9ULL), 100));
   const int effect = g_session.GetDefaultOptionValue(OBFUSCATE_SOURCE_TEXT("/sound", 0x0B7109397F6B1387ULL), 1);
-  const bool muted = effect == 0;
-  this->m_effectSlider->SetTransparent(muted);
-  this->m_effectSlider->dragging = muted;
-  this->m_effectSlider->Invalidate();
-  g_serviceOptions.Set(0xB, effect != 0);
+  const bool enabled = effect != 0;
+  this->m_effectSlider->SetTransparent(!enabled);
+  CUIVScrollBar* const slider = this->m_effectSlider;
+  slider->dragging = !enabled;
+  slider->Invalidate();
+  g_serviceOptions.Set(0xB, enabled);
 }
 
 // OFFSET: 0x00A19C60
 // FUNCTION: fn_15346
-inline CUIButton::CUIButton() : CUIControl(), state(0), disabled(0), tooltip(), clickWindow(nullptr), hoverWindow(nullptr) {
+inline CUIButton::CUIButton() : CUIControl(), state(0), disabled(0), tooltip(), onClick(), onHover() {
 }
 
 // OFFSET: 0x00A19D30

@@ -85,28 +85,28 @@ namespace myGPack {
       switch (value) {
       case 0x00:
         return 0x2B;
-      case 0x01:
-        return 0x68;
       case 0x2B:
         return 0x00;
-      case 0x48:
-        return 0x77;
-      case 0x60:
-        return 0xFF;
-      case 0x68:
-        return 0x01;
-      case 0x6C:
-        return 0x80;
-      case 0x77:
-        return 0x48;
-      case 0x80:
-        return 0x6C;
       case 0xB9:
         return 0xC0;
       case 0xC0:
         return 0xB9;
       case 0xEB:
         return 0xFE;
+      case 0x6C:
+        return 0x80;
+      case 0x80:
+        return 0x6C;
+      case 0x01:
+        return 0x68;
+      case 0x68:
+        return 0x01;
+      case 0x77:
+        return 0x48;
+      case 0x48:
+        return 0x77;
+      case 0x60:
+        return 0xFF;
       case 0xFE:
         return 0xEB;
       case 0xFF:
@@ -180,6 +180,7 @@ namespace myGPack {
 
       std::memset(this->m_roundKeys[round], 0, sizeof(this->m_roundKeys[round]));
 
+      unsigned bitsPerGroup = 6;
       for (unsigned i = 0; i < 48; ++i) {
         std::uint8_t bit = s_keyCompression[i] - 1;
         unsigned byte;
@@ -191,7 +192,7 @@ namespace myGPack {
         }
 
         if (halves[byte] & s_bitMasks[bit & 7]) {
-          this->m_roundKeys[round][i / 6] |= s_bitMasks[i % 6];
+          this->m_roundKeys[round][i / bitsPerGroup] |= s_bitMasks[i % bitsPerGroup];
         }
       }
     }
@@ -366,7 +367,7 @@ namespace myGPack {
 
   // OFFSET: 0x00AE9260
   // FUNCTION: fn_18104
-  int InitialPermutation(std::uint8_t* block) {
+  int __stdcall InitialPermutation(std::uint8_t* block) {
     Block64 result;
     result.words[0] = result.words[1] = 0;
 
@@ -377,13 +378,15 @@ namespace myGPack {
       }
     }
 
-    std::memcpy(block, &result, sizeof(result));
-    return result.words[1];
+    Block64* destination = reinterpret_cast<Block64*>(block);
+    destination->words[0] = result.words[0];
+    destination->words[1] = result.words[1];
+    return static_cast<int>(result.words[1]);
   }
 
   // OFFSET: 0x00AE91D0
   // FUNCTION: fn_18103
-  int FinalPermutation(std::uint8_t* block) {
+  int __stdcall FinalPermutation(std::uint8_t* block) {
     Block64 result;
     result.words[0] = result.words[1] = 0;
 
@@ -394,8 +397,10 @@ namespace myGPack {
       }
     }
 
-    std::memcpy(block, &result, sizeof(result));
-    return result.words[1];
+    Block64* destination = reinterpret_cast<Block64*>(block);
+    destination->words[0] = result.words[0];
+    destination->words[1] = result.words[1];
+    return static_cast<int>(result.words[1]);
   }
 
   // OFFSET: 0x00AE9020

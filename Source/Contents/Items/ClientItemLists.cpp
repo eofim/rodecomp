@@ -1,4 +1,5 @@
 #include "Network/Packets/NoticeEnums.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMessage.h"
@@ -139,8 +140,8 @@ namespace {
 #pragma pack(pop)
 
   bool IsSameItem(const ITEM_INFO& value, const ITEM_INFO& item) {
-    const auto* valueCards = reinterpret_cast<const std::uint32_t*>(value.cards);
-    const auto* itemCards = reinterpret_cast<const std::uint32_t*>(item.cards);
+    const auto* valueCards = value.cards;
+    const auto* itemCards = item.cards;
 
     if (value.itemId != item.itemId || valueCards[0] != itemCards[0] || valueCards[1] != itemCards[1] ||
         valueCards[2] != itemCards[2] || valueCards[3] != itemCards[3] || value.identified != item.identified ||
@@ -188,8 +189,6 @@ static_assert(sizeof(ItemAddGradePacket) == 0x3A);
 static_assert(sizeof(ItemListRecord) == 0x22);
 #endif
 
-int GetEquipLocationIndex(const int& mask);
-
 namespace EquipmentProperties {
 class CEquipment {
 public:
@@ -236,7 +235,7 @@ static_assert(sizeof(EquipmentProperties::CEquipmentPropertiesMgr) == 0x1FC);
 // FUNCTION: fn_17229
 void __fastcall RefreshItemWindows(UIWindowMgr* mgr) {
   if (mgr->itemWnd) {
-    reinterpret_cast<UIWindow*>(mgr->itemWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+    static_cast<UIWindow*>(mgr->itemWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
   if (mgr->shortCutWnd) {
     mgr->shortCutWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
@@ -273,7 +272,7 @@ static __forceinline void AddCartPacketItem(std::int16_t index, int amount, int 
   item.damaged = damaged;
   item.refiningLevel = refine;
   item.identity[0] = type;
-  std::uint32_t* cards = reinterpret_cast<std::uint32_t*>(item.cards);
+  std::uint32_t* cards = item.cards;
   cards[0] = card1;
   cards[1] = card2;
   cards[2] = card3;
@@ -300,7 +299,7 @@ static __forceinline void AddMerchantShopPacketItem(std::int16_t index, int amou
   item.damaged = damaged;
   item.refiningLevel = refine;
   item.identity[0] = type;
-  std::uint32_t* cards = reinterpret_cast<std::uint32_t*>(item.cards);
+  std::uint32_t* cards = item.cards;
   cards[0] = card1;
   cards[1] = card2;
   cards[2] = card3;
@@ -367,7 +366,7 @@ static __forceinline void AddExchangePacketItem(int itemId, unsigned char type, 
   item.damaged = damaged;
   item.identified = identified;
   item.refiningLevel = refine;
-  std::uint32_t* cards = reinterpret_cast<std::uint32_t*>(item.cards);
+  std::uint32_t* cards = item.cards;
   cards[0] = card1;
   cards[1] = card2;
   cards[2] = card3;
@@ -601,8 +600,8 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
       }
 
       if (g_session.IsPetEgg(std::atoi(item.itemId.c_str())) && item.damaged) {
-        const int petEgg = std::atoi(LookupClientItemByIdentity(g_session.m_inventoryItems, g_session.petEggIndex).itemId.c_str());
-        if (!g_petEvolutionMgr->IsAutoFeeding(petEgg) && g_petAutoFeed == true) {
+        const int petEgg = std::atoi(g_session.LookupClientItemByIdentity(g_session.petEggIndex).itemId.c_str());
+        if (!g_petEvolutionMgr->IsAutoFeeding(petEgg) && g_session.m_petAutoFeed == true) {
           g_session.SendPetAutoFeedOption(0);
         }
 
@@ -648,15 +647,15 @@ void CGameMode::ReceiveItemListPart(unsigned char listType, int count, const uns
     item.refiningLevel = 0;
     item.flags[0] = (record->flags >> 1) & 1;
     switch (listType) {
+    case INVTYPE_STORAGE:
+    case INVTYPE_GUILD_STORAGE:
+      g_session.AddCartItem(item, 0);
+      break;
     case INVTYPE_INVENTORY:
       g_session.UpdateInventoryItem(item, 0);
       break;
     case INVTYPE_CART:
       g_session.AddMerchantShopItem(item);
-      break;
-    case INVTYPE_STORAGE:
-    case INVTYPE_GUILD_STORAGE:
-      g_session.AddCartItem(item, 0);
       break;
     }
   }
@@ -740,7 +739,7 @@ bool CSession::AddMerchantPurchaseSavedItem(const ITEM_INFO& item, unsigned char
       if (!alternate) {
         value.quantity += item.quantity;
         if (refresh == 1) {
-          if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.merchantShopMakeWnd)) {
+          if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.merchantShopMakeWnd)) {
             window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
           }
         }
@@ -751,7 +750,7 @@ bool CSession::AddMerchantPurchaseSavedItem(const ITEM_INFO& item, unsigned char
 
   this->merchantPurchaseSavedItems.push_back(item);
   if (refresh == 1) {
-    UIWindow* window = reinterpret_cast<UIWindow*>(alternate ? g_windowMgr.buyingShopMakeWnd : g_windowMgr.merchantShopMakeWnd);
+    UIWindow* window = static_cast<UIWindow*>(alternate ? g_windowMgr.buyingShopMakeWnd : g_windowMgr.merchantShopMakeWnd);
     if (window) {
       window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
     }
@@ -765,7 +764,7 @@ bool CSession::AddMerchantShopItem(const ITEM_INFO& item) {
   for (ITEM_INFO& value : this->merchantShopItems) {
     if (value.identity[1] == item.identity[1]) {
       value.quantity += item.quantity;
-      if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
+      if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
         window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
       }
       return false;
@@ -773,7 +772,7 @@ bool CSession::AddMerchantShopItem(const ITEM_INFO& item) {
   }
 
   this->merchantShopItems.push_back(item);
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
     window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
   return true;
@@ -940,7 +939,7 @@ void CSession::MergePurchaseItem(const ITEM_INFO& item) {
 // OFFSET: 0x00DD7890
 // FUNCTION: fn_23296
 void CSession::AddStorageItem(const ITEM_INFO& item) {
-  const ITEM_INFO owned = LookupClientItemByIdentity(this->m_inventoryItems, item.identity[1]);
+  const ITEM_INFO owned = this->LookupClientItemByIdentity(item.identity[1]);
   if (owned.identity[1] > 0) {
     for (ITEM_INFO& value : this->storageItems) {
       if (value.identity[1] == item.identity[1]) {
@@ -962,8 +961,8 @@ void CSession::AddStorageItem(const ITEM_INFO& item) {
 // FUNCTION: fn_23297
 void CSession::AddShopItem(const RawItemBasic& item, int mode) {
   if (mode != 0) {
-    const ITEM_INFO owned = LookupClientItemByIdentity(this->m_inventoryItems, item.id);
-    if (owned.identity[1] != 0) {
+    const ITEM_INFO owned = this->LookupClientItemByIdentity(item.id);
+    if (owned.identity[1] > 0) {
       ITEM_INFO value(owned);
       value.AssignBasic(item);
       value.SetItemId(std::atoi(value.itemId.c_str()));
@@ -1079,7 +1078,7 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
   if (item.identity[3] != 0x8000) {
     this->RemoveInventoryItem(item.identity[1], 1);
   }
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.itemParamChangeDisplayWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.itemParamChangeDisplayWnd)) {
     window->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
   }
   return true;
@@ -1089,7 +1088,7 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
 // FUNCTION: fn_23598
 bool CSession::UnequipItem(int location, std::uint32_t identity) {
   if (location == 0x8000) {
-    const ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, identity);
+    const ITEM_INFO item = g_session.LookupClientItemByIdentity(identity);
     if (item.identity[1] != 0) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s%s", item.DisplayName(0).c_str(), LookupMessage(MSI_ITEM_IS_REMOVED)).c_str()), 0xFF, 7, 0, 0);
     }
@@ -1098,12 +1097,7 @@ bool CSession::UnequipItem(int location, std::uint32_t identity) {
 
     CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
     if (mode != nullptr) {
-      auto it = g_activeSkillEffects.begin();
-      for (; it != g_activeSkillEffects.end(); ++it) {
-        if (it->id == 0x2B7) {
-          break;
-        }
-      }
+      auto it = std::find_if(g_activeSkillEffects.begin(), g_activeSkillEffects.end(), [](const ActiveSkillEffect& effect) { return effect.id == 0x2B7; });
       if (it != g_activeSkillEffects.end()) {
         g_activeSkillEffects.erase(it);
       }
@@ -1313,8 +1307,8 @@ void CSession::ClearPartyMembers() {
   if (mode) {
     for (auto member = this->m_partyMembers.begin(); member != this->m_partyMembers.end(); ++member) {
       CRenderObject* actor = mode->scene->GetGameActorByAidIncludeMe(member->accountId);
-      if (actor && static_cast<EffectActor*>(actor)->HasId(160) == true) {
-        actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      if (actor && static_cast<EffectActor*>(actor)->HasId(EF_PARTY) == true) {
+        actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_PARTY, 0, 0, 0, 0, 0);
       }
     }
   }
@@ -1404,7 +1398,7 @@ __declspec(noinline) int CSession::IsDifferentName(const char* name, const char*
   std::sprintf(second, "%s", other);
   const short secondLength = static_cast<short>(std::strlen(second));
 
-  const short difference = firstLength >= secondLength ? firstLength - secondLength : secondLength - firstLength;
+  const short difference = firstLength < secondLength ? secondLength - firstLength : firstLength - secondLength;
   const short length = firstLength >= secondLength ? secondLength : firstLength;
 
   if (firstLength >= secondLength + 2 && firstLength <= secondLength + 4) {
@@ -1504,7 +1498,7 @@ void CSession::RemoveInventoryItem(std::uint32_t id, int quantity) {
 // OFFSET: 0x00DFF0E0
 // FUNCTION: fn_23609
 void CSession::RefreshItem1768Window(unsigned char alternate, int argument) {
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(alternate ? g_windowMgr.buyingShopMakeWnd : g_windowMgr.merchantShopMakeWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(alternate ? g_windowMgr.buyingShopMakeWnd : g_windowMgr.merchantShopMakeWnd)) {
     window->SendMsg(nullptr, UM_REFRESHITEM, argument, 0, 0, 0);
   }
 }
@@ -1550,13 +1544,13 @@ bool CSession::RemoveMerchantShopItem(const ITEM_INFO& item) {
           break;
         }
       }
-      if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
+      if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
         window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
       }
       return true;
     }
   }
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.merchantItemWnd)) {
     window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
   return false;
@@ -1726,7 +1720,7 @@ ITEM_INFO CSession::FindItemByIdentity(std::uint32_t identity, int location) {
     return ITEM_INFO(0);
   }
 
-  ITEM_INFO item = LookupClientItemByIdentity(this->m_inventoryItems, identity);
+  ITEM_INFO item = this->LookupClientItemByIdentity(identity);
   if (item.identity[1] > 0) {
     return item;
   }
@@ -1760,7 +1754,7 @@ ITEM_INFO CSession::FindItemByIdentity(std::uint32_t identity, int location) {
 void CSession::SetMerchantMyShopItems(int count, const short* ids) {
   this->ClearMerchantMyShopItems();
   for (int i = 0; i < count; ++i) {
-    const ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, ids[i]);
+    const ITEM_INFO item = g_session.LookupClientItemByIdentity(ids[i]);
     if (item.identity[1] > 0) {
       this->merchantMyShopItems.push_back(item);
     }

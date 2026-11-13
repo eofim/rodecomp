@@ -10,17 +10,17 @@ void CMagnumBreak::AddRings() {
   const float growth = -(1.75f / static_cast<float>(this->effectLifetime)) * 0.5f;
 
   for (int index = 0; index < 10; ++index) {
-    CParticle* ring = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 0x201);
+    CParticle* ring = CreateParticle(&this->positionVector, 0x201);
     ring->effectId = this->id;
     ring->columnIndex = index;
     ring->rowIndex = 0;
     ring->groupIndex = 1;
-    *reinterpret_cast<float*>(&ring->angleBits) = static_cast<float>(index) * 36.0f;
+    ring->angle = static_cast<float>(index) * 36.0f;
     ring->scale = 0.0f;
     ring->speedParameter = 1.75f;
-    *reinterpret_cast<float*>(&ring->effectParameters[0x0C]) = growth;
-    *reinterpret_cast<float*>(&ring->effectParameters[0x10]) = 12.0f;
-    *reinterpret_cast<float*>(&ring->effectParameters[0x14]) = 0.0f;
+    ring->animationParameter = growth;
+    ring->animationParameters[0] = 12.0f;
+    ring->animationParameters[1] = 0.0f;
     ring->SetTexture("effect\\ring_yellow.tga");
     this->rings.push_back(ring);
   }
@@ -32,16 +32,16 @@ void CMagnumBreak::AddWaves() {
 
   for (int tilt = -90; tilt <= 54; tilt += 36) {
     for (int angle = 0; angle <= 324; angle += 36) {
-      CParticle* wave = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 1);
+      CParticle* wave = CreateParticle(&this->positionVector, 1);
       wave->effectId = this->id;
       wave->columnIndex = angle;
       wave->rowIndex = tilt;
       wave->groupIndex = 1;
       wave->scale = 0.0f;
       wave->speedParameter = 1.15f;
-      *reinterpret_cast<float*>(&wave->effectParameters[0x0C]) = growth;
-      *reinterpret_cast<float*>(&wave->effectParameters[0x10]) = 3.0f;
-      *reinterpret_cast<float*>(&wave->effectParameters[0x14]) = 0.0f;
+      wave->animationParameter = growth;
+      wave->animationParameters[0] = 3.0f;
+      wave->animationParameters[1] = 0.0f;
       wave->SetTexture("effect\\대폭발.tga");
       this->waves.push_back(wave);
     }
@@ -81,9 +81,9 @@ bool CMagnumBreak::IsAlive() {
 void CMagnumBreak::OnProcess() {
   for (std::vector<CParticle*>::iterator it = this->rings.begin(); it != this->rings.end(); ++it) {
     CParticle* ring = *it;
-    float& growth = *reinterpret_cast<float*>(&ring->effectParameters[0x0C]);
-    float& maximum = *reinterpret_cast<float*>(&ring->effectParameters[0x10]);
-    float& spin = *reinterpret_cast<float*>(&ring->effectParameters[0x14]);
+    float& growth = ring->animationParameter;
+    float& maximum = ring->animationParameters[0];
+    float& spin = ring->animationParameters[1];
     const float angle = spin;
     float speed = growth + ring->speedParameter;
     speed = 0.0f > speed ? 0.0f : speed;
@@ -101,11 +101,11 @@ void CMagnumBreak::OnProcess() {
 
   for (std::vector<CParticle*>::iterator it = this->waves.begin(); it != this->waves.end(); ++it) {
     CParticle* wave = *it;
-    const float speed = *reinterpret_cast<float*>(&wave->effectParameters[0x0C]) + wave->speedParameter;
+    const float speed = wave->animationParameter + wave->speedParameter;
     wave->speedParameter = speed;
     wave->scale = speed + wave->scale;
-    *reinterpret_cast<float*>(&wave->effectParameters[0x14]) =
-        *reinterpret_cast<float*>(&wave->effectParameters[0x10]) + *reinterpret_cast<float*>(&wave->effectParameters[0x14]);
+    wave->animationParameters[1] =
+        wave->animationParameters[0] + wave->animationParameters[1];
     ++wave->elapsedFrames;
     wave->alpha = this->alpha;
   }
@@ -131,8 +131,8 @@ void CMagnumBreak::OnProcess() {
 void CMagnumBreak::Render() {
   for (std::vector<CParticle*>::iterator it = this->rings.begin(); it != this->rings.end(); ++it) {
     CParticle* ring = *it;
-    const int angle = static_cast<int>(*reinterpret_cast<float*>(&ring->angleBits));
-    const float outer = *reinterpret_cast<float*>(&ring->effectParameters[0x14]);
+    const int angle = static_cast<int>(ring->angle);
+    const float outer = ring->animationParameters[1];
     const float inner = outer - ring->scale;
     const float cos0 = g_cosTable[angle];
     const float sin0 = g_sinTable[angle];
@@ -154,14 +154,13 @@ void CMagnumBreak::Render() {
     ring->vertices[3].x = outerEnd.x;
     ring->vertices[3].y = outerEnd.y;
     ring->vertices[3].z = outerEnd.z;
-    const float column = static_cast<float>(ring->columnIndex % 4);
     ParticleQuad quad;
     quad.billboard = false;
     quad.unused = false;
     quad.depth = true;
     quad.top = 1.0f;
     quad.bottom = 0.0f;
-    quad.left = column * 0.25f;
+    quad.left = static_cast<float>(ring->columnIndex % 4) * 0.25f;
     quad.right = quad.left + 0.25f;
     ring->Render(quad);
   }
@@ -186,7 +185,7 @@ void CMagnumBreak::Render() {
 // OFFSET: 0x00B4A590
 // FUNCTION: fn_18944
 void CMagnumBreak::UpdateWave(CParticle* particle) {
-  const int spin = static_cast<int>(*reinterpret_cast<float*>(&particle->effectParameters[0x14]));
+  const int spin = static_cast<int>(particle->animationParameters[1]);
   const int yaw = particle->columnIndex;
   const int pitch = particle->rowIndex;
   const float yaw0 = GetRadian(spin + yaw);

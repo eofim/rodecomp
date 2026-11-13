@@ -52,6 +52,8 @@
 #include "UI/Rodex/UIRodexComposeWnd.h"
 #include "UI/Text/TextFitting.h"
 #include "Resource/MSGSTRINGID.h"
+
+template __declspec(noinline) std::string std::operator+(const char* const, const std::string&);
 // OFFSET: 0x0086DDA0
 // FUNCTION: fn_11059
 UIListBoxTitle::UIListBoxTitle() {
@@ -821,20 +823,17 @@ void UIBasicItemCtrl::DrawItemIcon(int x, int y, int, bool compact) {
 
   const std::string count = FormatOwnedString("%d", this->m_item.quantity);
   FontCache& fonts = g_fontCache;
-  int textY;
   if (compact) {
-    textY = y + 20;
-    x += 16;
+    this->DrawTextAt(x + 16, y + 20, count.c_str(), 0, 0, 11, 0, 0, 0);
   } else {
-    textY = y + 15;
+    const int textY = y + 15;
     x += this->m_item.quantity < 1000 ? 14 : 0;
     this->DrawTextAt(x + 1, textY, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
     this->DrawTextAt(x - 1, textY, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
     this->DrawTextAt(x, y + 16, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
     this->DrawTextAt(x, y + 14, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
+    this->DrawTextAt(x, textY, count.c_str(), 0, 0, 11, 0, 0, 0);
   }
-
-  this->DrawTextAt(x, textY, count.c_str(), 0, 0, 11, 0, 0, 0);
 }
 
 // OFFSET: 0x008900D0
@@ -935,7 +934,7 @@ void UIScrollBar::SetRange(int maximum, int visible, int total) {
 void UIBasicItemCtrl::DragAndDrop(int, int, std::intptr_t argument3) {
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(argument3);
   if (!drag->skill && drag->identified == this->m_identified) {
-    this->m_item = LookupClientItemByIdentity(g_session.m_inventoryItems, drag->id);
+    this->m_item = g_session.LookupClientItemByIdentity(drag->id);
     if ((this->m_itemType == 21 && g_session.IsConsumableItemType(this->m_item.identity[0])) ||
         (this->m_itemType == 22 && g_session.IsEquipItemType(this->m_item.identity[0])) ||
         (this->m_itemType == 23 && g_session.IsMiscItemType(this->m_item.identity[0])) || this->m_item.identity[0] == this->m_itemType ||
@@ -1448,9 +1447,14 @@ void UIChatHisBox::Paint() {
 // FUNCTION: fn_11563
 int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
-  case UM_DEFPUSH:
-    if (sender == this->edit && this->editNode) {
-      this->SendMsg(nullptr, UM_CHANGE_TVITEM_TEXT, 0, 1, 0, 0);
+  case UM_UPPUSH:
+    if (this->verticalOverflow) {
+      this->SendMsg(this->verticalBar, UM_SCROLLVERT, -1, 0, 0, 0);
+    }
+    break;
+  case UM_DOWNPUSH:
+    if (this->verticalOverflow) {
+      this->SendMsg(this->verticalBar, UM_SCROLLVERT, 1, 0, 0, 0);
     }
     break;
   case UM_SCROLLVERT:
@@ -1482,16 +1486,6 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
     }
     return this->scrollRow - previous;
   }
-  case UM_UPPUSH:
-    if (this->verticalOverflow) {
-      this->SendMsg(this->verticalBar, UM_SCROLLVERT, -1, 0, 0, 0);
-    }
-    break;
-  case UM_DOWNPUSH:
-    if (this->verticalOverflow) {
-      this->SendMsg(this->verticalBar, UM_SCROLLVERT, 1, 0, 0, 0);
-    }
-    break;
   case UM_TEXT_LBTN_DblClk:
     this->selectedNode = reinterpret_cast<UITreeNode*>(a);
     if (a) {
@@ -1620,6 +1614,11 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       }
       this->editNode->labelButton->Move(x, y);
       this->editNode = nullptr;
+    }
+    break;
+  case UM_DEFPUSH:
+    if (sender == this->edit && this->editNode) {
+      this->SendMsg(nullptr, UM_CHANGE_TVITEM_TEXT, 0, 1, 0, 0);
     }
     break;
   default:
@@ -1941,7 +1940,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
       }
 
       UIItemTagButton* button = new (std::nothrow) UIItemTagButton();
-      reinterpret_cast<ITEM_INFO&>(button->itemPayload) = item;
+      button->item = item;
       button->Configure(label.c_str(), 0x82F2E1, 0, 12, 0, 0);
       button->SetTooltip(item.DisplayName(0).c_str());
       button->m_hoverColor = 0x82F2E1;
@@ -1953,7 +1952,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
       const std::string namelessUserName = LookupMessage(MSI_NAMELESS_USER);
       if (label.find(namelessUserName) != std::string::npos) {
         std::uint32_t creator[2];
-        std::memcpy(creator, item.cards + 8, sizeof(creator));
+        std::memcpy(creator, &item.cards[2], sizeof(creator));
         button->tipId = creator[0] + (creator[1] << 16);
         g_session.AddPendingActorName(button->tipId);
       }
@@ -2145,7 +2144,7 @@ void UIChatHisBox::AddItemLinkLine(const char* text, int& color, int& mode) {
   std::string source = text;
   for (unsigned int line = 0; line < wrapped.size(); ++line) {
     wrapped[line] = this->RenderItemLinks(wrapped[line].c_str(), source);
-    if (line != 0) {
+    if (line > 0) {
       this->lineColors.push_back(color);
       this->history.push_back(std::string());
     }
@@ -2185,7 +2184,7 @@ UIListBoxID::UIListBoxID()
   this->bottomMargin = 0;
   this->transparent = 0;
   this->lineHeight = 16;
-  int* background = reinterpret_cast<int*>(this->backgroundChannels);
+  int* background = this->backgroundColor;
   background[0] = 255;
   background[1] = 255;
   background[2] = 255;

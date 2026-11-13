@@ -38,7 +38,7 @@ void UIEscOptionWnd::OnCreate(int, int) {
 // OFFSET: 0x0092BDE0
 // FUNCTION: fn_12662
 void UIEscOptionWnd::Paint() {
-  this->m_titleHeight = this->DrawTitleBar(true, FormatOwnedString("%s (%s)", LookupMessage(MSI_ESC_OPTIONWND), ShortcutFilename(g_session.m_gid).c_str()).c_str(), 0);
+  this->m_titleHeight = this->DrawTitleBar(true, FormatOwnedString("%s (%s)", LookupMessage(MSI_ESC_OPTIONWND), g_session.ShortcutFilename(g_session.m_gid).c_str()).c_str(), 0);
 
   this->DrawPanelBackground(this->m_titleHeight, 0, "");
 }
@@ -73,17 +73,11 @@ void UIEscOptionWnd::LayoutButtons() {
 UIEscOptionWnd::UIEscOptionWnd()
     : UIFrameWnd(0), m_titleHeight(17) {
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-  int escMode;
   if (mode->isPlayerDead != 0) {
-    if (!mode->HasResurrectionItem() && !g_session.HasSkillEffect(580)) {
-      escMode = 1;
-    } else {
-      escMode = 2;
-    }
+    this->m_mode = !mode->HasResurrectionItem() && !g_session.HasSkillEffect(580) ? 1 : 2;
   } else {
-    escMode = 0;
+    this->m_mode = 0;
   }
-  this->m_mode = escMode;
 }
 
 #include "Contents/Party/AdventurerAgencyMgr.h"

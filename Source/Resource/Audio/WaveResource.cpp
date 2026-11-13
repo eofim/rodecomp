@@ -9,6 +9,12 @@
 #include <new>
 #include <string>
 
+extern "C" __declspec(dllimport) void __stdcall AIL_mem_free_lock(void* ptr);
+extern "C" __declspec(dllimport) int __stdcall AIL_file_type(const void* data, unsigned int size);
+extern "C" __declspec(dllimport) int __stdcall AIL_WAV_info(const void* data, MilesSoundInfo* info);
+extern "C" __declspec(dllimport) int __stdcall AIL_decompress_ADPCM(const MilesSoundInfo* info, void** out, unsigned int* outSize);
+extern "C" __declspec(dllimport) int __stdcall AIL_decompress_ASI(const void* data, unsigned int size, const char* name, void** out, unsigned int* outSize, void* fn);
+
 // OFFSET: 0x007618D0
 // FUNCTION: fn_08070
 CWave::CWave() : data(nullptr), milesAllocated(0) {
@@ -37,27 +43,26 @@ bool CWave::Load(const char* name) {
   const std::uint32_t size = file.GetSize();
   this->Unload();
 
-  void* raw = ::operator new(size);
+  char* raw = new char[size];
   file.Read(raw, size);
   file.Close();
 
-  auto& miles = MilesRuntime::Get();
-  const int type = miles.fileType(raw, size);
+  const int type = AIL_file_type(raw, size);
 
   if (type == 2) {
     MilesSoundInfo info;
     this->milesAllocated = 1;
-    miles.wavInfo(raw, &info);
-    miles.decompressADPCM(&info, &this->data, nullptr);
-    std::free(raw);
+    AIL_WAV_info(raw, &info);
+    AIL_decompress_ADPCM(&info, &this->data, nullptr);
+    delete[] raw;
 
     return true;
   }
 
   if (type == 13) {
     this->milesAllocated = 1;
-    miles.decompressASI(raw, size, name, &this->data, nullptr, nullptr);
-    std::free(raw);
+    AIL_decompress_ASI(raw, size, name, &this->data, nullptr, nullptr);
+    delete[] raw;
 
     return true;
   }
@@ -71,12 +76,12 @@ bool CWave::Load(const char* name) {
 void CWave::Unload() {
   if (this->data != nullptr) {
     if (this->milesAllocated != 0) {
-      MilesRuntime::Get().freeLocked(this->data);
+      AIL_mem_free_lock(this->data);
       this->milesAllocated = 0;
       return;
     }
 
-    std::free(this->data);
+    delete[] static_cast<char*>(this->data);
   }
 
   this->milesAllocated = 0;

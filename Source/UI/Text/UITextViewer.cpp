@@ -1,4 +1,5 @@
 #include "Render/DeviceContext/DeviceContext.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Window/UIEnums.h"
 #include "Render/Text/TextContext.h"
 #include "Resource/Bitmap/BitmapResource.h"
@@ -21,6 +22,8 @@
 #include <algorithm>
 #include <new>
 
+template __declspec(noinline) std::string::basic_string(const std::string&);
+
 // OFFSET: 0x0086F0A0
 // FUNCTION: fn_11086
 UITextViewer::UITextViewer() : UIListBox(), splitTipLinks(0), outline(0), bold(0) {
@@ -28,9 +31,8 @@ UITextViewer::UITextViewer() : UIListBox(), splitTipLinks(0), outline(0), bold(0
   unsigned red;
   unsigned green;
   unsigned blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 18, 2, red, green, blue);
-  this->backgroundColor = 0xFF000000u | RGB(red, green, blue);
-  this->Invalidate();
+  g_skinInfo.PaletteChannels(18, 2, red, green, blue);
+  this->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
 
   this->plainTextMode = 0;
 }
@@ -213,11 +215,11 @@ void UITextViewer::Paint() {
     const auto bytes = static_cast<unsigned>(line.size());
 
     if (plain) {
-      DrawOutlinedText(*this, 3, y, line.c_str(), bytes, 0, 0xFFFFFF, 0, 12, 0, 0);
+      this->DrawOutlinedText(3, y, line.c_str(), bytes, 0, 0xFFFFFF, 0, 12, 0, 0);
     } else if (this->outline != 0) {
-      DrawOutlinedColoredText(*this, 3, y, line.c_str(), bytes, color, this->backgroundColor, 0, 12, this->bold);
+      this->DrawOutlinedColoredText(3, y, line.c_str(), bytes, color, this->backgroundColor, 0, 12, this->bold);
     } else {
-      DrawColoredText(*this, 3, y, line.c_str(), bytes, color, 0, 12, false);
+      this->DrawColoredText(3, y, line.c_str(), bytes, color, 0, 12, false);
     }
   }
 }
@@ -265,7 +267,7 @@ void UIItemTagCtrl::AddTagButton(UIWindow* button) {
 // OFFSET: 0x00874E10
 // FUNCTION: fn_11195
 void UIItemTagOnMail::AddTagButton(UIWindow* button) {
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.rodexComposeWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.rodexComposeWnd)) {
     window->AddChild(button);
   }
 }
@@ -273,7 +275,7 @@ void UIItemTagOnMail::AddTagButton(UIWindow* button) {
 // OFFSET: 0x00874E30
 // FUNCTION: fn_11196
 void UIItemTagOnMegaPhone::AddTagButton(UIWindow* button) {
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.npcTextEditDialogWnd)) {
+  if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.npcTextEditDialogWnd)) {
     window->AddChild(button);
   }
 }
@@ -357,7 +359,7 @@ std::string UIItemTagCtrl::AddSkillTag(int tagId, unsigned int color) {
   this->AddTagButton(button);
 
   std::string link = "00000T";
-  const std::string number = reinterpret_cast<UITextViewer*>(this)->ItemLinkNumberText(tagId);
+  const std::string number = this->ItemLinkNumberText(tagId);
   link += number;
   link += "%0&0'0(1)0";
 

@@ -1,4 +1,5 @@
 #include "Render/Text/FontCache.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -44,6 +45,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 
 
@@ -207,7 +210,7 @@ void UIParaResultWnd::OnRBtnDown(int x, int y) {
   }
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
-  if (item.identity[1] != 0) {
+  if (item.identity[1] > 0) {
     g_modeMgr.GetGameMode();
     UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
     window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
@@ -234,33 +237,30 @@ void UIParaResultWnd::OnCreate(int width, int height) {
   this->title->shadow = 1;
   this->AddChild(this->title);
 
-  UIResizer* resizer = new UIResizer();
-  this->resizer = resizer;
-  resizer->SetSize(16, 16);
-  resizer->SetDirection(7);
-  resizer->SetBitmapName("유저인터페이스\\btn_resize.bmp");
-  resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
-  resizer->SetColors(0xFFFF00FF, 0xFFFF00FF);
-  this->AddChild(resizer);
+  this->resizer = new UIResizer();
+  this->resizer->SetSize(16, 16);
+  static_cast<UIResizer*>(this->resizer)->SetDirection(7);
+  static_cast<UIResizer*>(this->resizer)->SetBitmapName("유저인터페이스\\btn_resize.bmp");
+  this->resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
+  static_cast<UIResizer*>(this->resizer)->SetColors(0xFFFF00FF, 0xFFFF00FF);
+  this->AddChild(this->resizer);
 
-  UIScrollBar* scrollBar = new UIScrollBar();
-  this->scrollBar = scrollBar;
-  scrollBar->Configure(this->geometry.width - 15, 14, 1, this->geometry.height - this->headerHeight - this->footerHeight - 17);
-  this->AddChild(scrollBar);
+  this->scrollBar = new UIScrollBar();
+  static_cast<UIScrollBar*>(this->scrollBar)->Configure(this->geometry.width - 15, 14, 1, this->geometry.height - this->headerHeight - this->footerHeight - 17);
+  this->AddChild(this->scrollBar);
 
   {
     const std::string prefix = "유저인터페이스\\";
     const int x = this->geometry.width - 61;
     const int y = this->geometry.height - 24;
-    UIBitmapButton* button = new UIBitmapButton();
-    this->buttons[0] = button;
-    button->SetBitmap((prefix + "btn_ok.bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + "btn_ok_a.bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + "btn_ok_b.bmp").c_str(), 2, 0);
-    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-    button->Move(x, y);
-    button->SetId(184);
-    this->AddChild(button);
+    this->buttons[0] = new UIBitmapButton();
+    static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap((prefix + "btn_ok.bmp").c_str(), 0, 0);
+    static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap((prefix + "btn_ok_a.bmp").c_str(), 1, 0);
+    static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap((prefix + "btn_ok_b.bmp").c_str(), 2, 0);
+    this->buttons[0]->SetSize(static_cast<UIBitmapButton*>(this->buttons[0])->BitmapWidth(), static_cast<UIBitmapButton*>(this->buttons[0])->BitmapHeight());
+    this->buttons[0]->Move(x, y);
+    this->buttons[0]->SetId(184);
+    this->AddChild(this->buttons[0]);
   }
 
   this->visibleRows = (height - this->headerHeight - this->footerHeight - 17) / 32;
@@ -309,7 +309,7 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     }
 
     ITEM_INFO item;
-    item.Assign(reinterpret_cast<const RawItemData&>(drag));
+    item.Assign(drag);
     const int total = g_session.GetItem1720Total();
     const int price = drag.price;
     const bool affordable = g_session.m_zeny >= static_cast<long long>(price) * drag.quantity + total;
@@ -510,7 +510,7 @@ int UIParaItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   case UM_DROP:
     if (a == 0) {
       CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-      const RawItemData& drag = reinterpret_cast<const RawItemData&>(mode->drag);
+      const ModeDragState& drag = mode->drag;
       ITEM_INFO item;
       item.Assign(drag);
       CSession* lists = &g_session;
@@ -676,7 +676,7 @@ void UIParaItemShopWnd::Paint() {
 
   const int barHeight = this->DrawButtonBar(this->alternateButtonBar != 1 ? 0 : 2, 0, 1);
   unsigned red = 0xFF, green = 0xFF, blue = 0xFF;
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   const int height = this->geometry.height - barHeight - titleHeight;
   this->FillRegion(0, titleHeight, this->geometry.width, height, RGB(red, green, blue));
 
@@ -721,7 +721,7 @@ void UIParaItemShopWnd::Paint() {
     const int top = visible * 32 + titleHeight;
     if (this->hovered == index) {
       unsigned hoverRed = 0xFF, hoverGreen = 0xFF, hoverBlue = 0xFF;
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, hoverRed, hoverGreen, hoverBlue);
+      g_skinInfo.PaletteChannels(6, 2, hoverRed, hoverGreen, hoverBlue);
       this->FillRegion(72, top + 2, 191, 28, RGB(hoverRed, hoverGreen, hoverBlue));
     }
 
@@ -776,13 +776,13 @@ void UIParaItemShopWnd::Paint() {
   if (this->showFooter == 1) {
     std::string text;
     if (g_serviceType == 0 && g_session.m_channelCopId == 1) {
-      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_POINT_SHOP_NHN), this->ClipTextToWidth(g_session.DecodePlayerName(), 100, 0, 12, 0), g_pendingAid));
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_POINT_SHOP_NHN), this->ClipTextToWidth(g_session.DecodePlayerName(), 100, 0, 12, 0), g_session.m_pendingAid));
     } else {
-      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_POINT_SHOP), this->ClipTextToWidth(g_session.DecodePlayerName(), 100, 0, 12, 0), g_pendingAid));
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_POINT_SHOP), this->ClipTextToWidth(g_session.DecodePlayerName(), 100, 0, 12, 0), g_session.m_pendingAid));
     }
     this->DrawTextAt(12, this->geometry.height - 21, text.c_str(), text.size(), 0, 12, 0, 0, 0);
 
-    text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_POINT_SHOP2), this->ClipTextToWidth(g_session.DecodePlayerName(), 100, 0, 12, 0), g_pendingGid));
+    text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_POINT_SHOP2), this->ClipTextToWidth(g_session.DecodePlayerName(), 100, 0, 12, 0), g_session.m_pendingGid));
     this->DrawTextAt(12, this->geometry.height - barHeight - 21, text.c_str(), text.size(), 0, 12, 0, 0, 0);
   }
 }
@@ -796,21 +796,20 @@ void UIParaResultWnd::Paint() {
     return;
   }
 
-  int rows = (this->geometry.height - this->footerHeight - 17) / 8 + ((this->geometry.height - this->footerHeight - 17) % 8 != 0);
-  for (int y = 17; rows > 0; --rows, y += 8) {
+  const int rows = (this->geometry.height - this->footerHeight - 17) / 8 + ((this->geometry.height - this->footerHeight - 17) % 8 != 0);
+  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
     this->DrawBitmap(0, y, left, false);
   }
 
-  rows = (this->geometry.height - this->footerHeight - 17) / 8 + ((this->geometry.height - this->footerHeight - 17) % 8 != 0);
-  for (int y = 17; rows > 0; --rows, y += 8) {
+  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
     this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
   }
 
   {
     unsigned red = 0, green = 0, blue = 0;
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     const int listHeight = this->geometry.height - this->footerHeight - 17;
     this->FillRegion(20, 17, (this->geometry.width - 60) % 32, listHeight, RGB(red, green, blue));
     this->FillRegion(20, listHeight / 32 * 32 + 17, this->geometry.width - 24, listHeight % 32, RGB(red, green, blue));
@@ -825,7 +824,7 @@ void UIParaResultWnd::Paint() {
 
   {
     unsigned red = 0, green = 0, blue = 0;
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(72, 17, columns * 32 - 32, slots * 32, RGB(red, green, blue));
   }
 
@@ -845,7 +844,7 @@ void UIParaResultWnd::Paint() {
     const int top = visible / this->columns * 32;
     if (this->hovered == index) {
       unsigned hoverRed = 0, hoverGreen = 0, hoverBlue = 0;
-      SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, hoverRed, hoverGreen, hoverBlue);
+      g_skinInfo.PaletteChannels(6, 2, hoverRed, hoverGreen, hoverBlue);
       this->FillRegion(column + 72, top + 19, 191, 28, RGB(hoverRed, hoverGreen, hoverBlue));
     }
 

@@ -29,7 +29,7 @@ CEmitterEffect::CEmitterEffect()
 
 // OFFSET: 0x00B4FD90
 // FUNCTION: fn_19009
-CEmitterEffect::~CEmitterEffect() {
+__declspec(noinline) CEmitterEffect::~CEmitterEffect() {
 }
 
 // OFFSET: 0x00B50010
@@ -47,7 +47,7 @@ void CEmitterEffect::Close() {
 // FUNCTION: fn_19012
 void CEmitterEffect::Open() {
   for (int i = 0; i < this->count; ++i) {
-    CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
     if (particle) {
       particle->speedParameter = this->particleSpeed;
       this->InitParticle(particle);
@@ -182,7 +182,7 @@ void CEmitterEffect::UpdateParticle(CParticle* particle) {
 
         if (60.0f > particle->life * 60.0f - static_cast<float>(age)) {
           const int faded = static_cast<int>(value - fade);
-          particle->alpha = faded < 0 ? 0 : faded;
+          particle->alpha = faded >= 0 ? faded : 0;
         } else {
           const int raised = static_cast<int>(fade + value);
           particle->alpha = raised > 255 ? 255 : raised;
@@ -197,9 +197,9 @@ void CEmitterEffect::UpdateParticle(CParticle* particle) {
       particle->position.y += particle->offsetY;
       particle->position.z += particle->offsetZ;
       particle->position.x += particle->offsetX;
-      particle->motionVelocity.x += step * this->acceleration.x;
-      particle->motionVelocity.y += step * this->acceleration.y;
-      particle->motionVelocity.z += step * this->acceleration.z;
+      particle->motionVelocity.x += this->timeScale * this->acceleration.x;
+      particle->motionVelocity.y += this->timeScale * this->acceleration.y;
+      particle->motionVelocity.z += this->timeScale * this->acceleration.z;
 
       if (this->billboard == 1) {
         matrix transform;
@@ -261,10 +261,4 @@ void CEmitterEffect::CheckRange() {
   if (this->pool.active == 0) {
     this->outsideRange = 1;
   }
-}
-
-// OFFSET: 0x00B7F9C0
-// FUNCTION: fn_19246
-void CEmitterEffect::SetTexture(std::string name) {
-  this->texture = name;
 }

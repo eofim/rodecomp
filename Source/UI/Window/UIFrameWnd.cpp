@@ -63,9 +63,6 @@
 
 template __declspec(noinline) std::string& std::string::erase(std::size_t, std::size_t);
 
-// GLOBAL: gl_24747
-std::uint32_t g_monsterInfoActorId;
-
 // OFFSET: 0x008A3700
 // FUNCTION: fn_11657
 UIFrameWnd::UIFrameWnd(unsigned char cached)
@@ -132,11 +129,10 @@ void UIFrameWnd::OnLBtnDown(int x, int y) {
 
   RaiseWindow(this);
   g_windowMgr.SetCapture(this);
-  int screenX = x;
-  int screenY = y;
-  this->ToScreen(screenX, screenY);
-  this->m_dragX = screenX;
-  this->m_dragY = screenY;
+  int screen[2] = {x, y};
+  this->ToScreen(screen[0], screen[1]);
+  this->m_dragX = screen[0];
+  this->m_dragY = screen[1];
   this->m_originX = this->geometry.x;
   this->m_originY = this->geometry.y;
   this->geometry.targetAlpha = 128;
@@ -452,7 +448,7 @@ void UIMonsterInfoWnd::OnMouseHover(int x, int y) {
   int screenX = 0;
   int screenY = 0;
   this->ToScreen(screenX, screenY);
-  std::string name = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(g_monsterInfoActorId);
+  std::string name = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(g_session.m_monsterInfoActorId);
   const std::size_t mark = name.find("#", 0);
   if (mark != std::string::npos) {
     name.erase(mark, name.size());
@@ -548,7 +544,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       packet.amount = static_cast<int>(amount);
       packet.id = 0x9A7;
       packet.aid = g_session.m_aid;
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       this->m_status.clear();
     }
     return 0;
@@ -573,7 +569,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       packet.amount = static_cast<int>(amount);
       packet.id = 0x9A9;
       packet.aid = g_session.m_aid;
-      GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       this->m_status.clear();
     }
     return 0;

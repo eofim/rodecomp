@@ -121,11 +121,7 @@ void UICheckAttendanceWnd::OnCreate(int, int) {
   __time32_t now;
   _time32(&now);
   __time32_t remaining = _mktime32(&end) - now;
-  if (remaining < 1) {
-    this->m_daysLeft = 0;
-  } else {
-    this->m_daysLeft = _localtime32(&remaining)->tm_yday;
-  }
+  this->m_daysLeft = remaining > 0 ? _localtime32(&remaining)->tm_yday : 0;
 
   this->m_notice = new UIBmpTextButton();
   this->m_notice->SetBitmap("유저인터페이스\\check_attendance\\bt_ok_normal.bmp", 0, 0);
@@ -382,7 +378,9 @@ int UICheckAttendanceWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     }
     this->m_checkedDays = argument1 / 10;
     this->m_blinking = argument1 == this->m_checkedDays * 10;
-    this->m_blinking = this->m_checkedDays < this->m_rewardCount && this->m_blinking;
+    if (this->m_rewardCount <= this->m_checkedDays) {
+      this->m_blinking = false;
+    }
     this->Invalidate();
     break;
   case UM_COMMAND:
@@ -390,7 +388,7 @@ int UICheckAttendanceWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     case ID_OK:
       if (this->m_blinking) {
         CheckAttendanceRequestPacket packet = {0xAEF};
-        GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
       break;
     case ID_CLOSE:

@@ -33,6 +33,8 @@
 #include "Resource/MSGSTRINGID.h"
 #include <timeapi.h>
 
+template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
+
 namespace {
   constexpr char prefix[] = "유저인터페이스\\";
 
@@ -73,9 +75,13 @@ void UIComboBoxDefWnd::OnCreate(int, int) {
   this->list->Move(0, this->button->BitmapHeight());
   this->AddChild(this->list);
 
-  this->label = new UIStaticText();
-  this->label->SetSize((this->geometry.width - this->button->BitmapWidth()), this->button->BitmapHeight());
-  this->label->SetText("(NO SELECT)", 0);
+  {
+    char text[12] = {};
+    std::sprintf(text, "(NO SELECT)");
+    this->label = new UIStaticText();
+    this->label->SetSize((this->geometry.width - this->button->BitmapWidth()), this->button->BitmapHeight());
+    this->label->SetText(text, 0);
+  }
   this->label->Move(2, 3);
   this->label->shadow = 1;
   this->AddChild(this->label);
@@ -505,7 +511,7 @@ void UIString::ParseTags(std::string text) {
 // FUNCTION: fn_11630
 void UIDescriptRace::DrawRaceDescription() {
   if (this->m_race == 1) {
-    if (!g_doramCreationEnabled) {
+    if (!g_session.m_makeableDoram) {
       return;
     }
 
@@ -539,15 +545,15 @@ void UIDescriptRace::DrawRaceDescription() {
     CImfRes* imf = nullptr;
     switch (layer) {
       case 0:
-        act = static_cast<CActRes*>(ResourceMgr::Instance().Load(GetBodyActionResourceName(job, g_session.m_sex, job, 0)));
+        act = static_cast<CActRes*>(ResourceMgr::Instance().Load(g_session.GetBodyActionResourceName(job, g_session.m_sex, job, 0)));
         sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(g_session.GetBodySprName(job, g_session.m_sex, job, 0)));
-        imf = static_cast<CImfRes*>(ResourceMgr::Instance().Load(GetBodyImfName(job, g_session.m_sex, 1, job).c_str()));
+        imf = static_cast<CImfRes*>(ResourceMgr::Instance().Load(g_session.GetBodyImfName(job, g_session.m_sex, 1, job).c_str()));
         break;
       case 1: {
         int head = 1;
         act = static_cast<CActRes*>(ResourceMgr::Instance().Load(g_session.GetHeadActName(job, g_session.m_sex, &head).c_str()));
         sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(g_session.GetHeadSprName(job, g_session.m_sex, &head).c_str()));
-        imf = static_cast<CImfRes*>(ResourceMgr::Instance().Load(GetBodyImfName(job, g_session.m_sex, head, job).c_str()));
+        imf = static_cast<CImfRes*>(ResourceMgr::Instance().Load(g_session.GetBodyImfName(job, g_session.m_sex, head, job).c_str()));
         break;
       }
     }
@@ -568,7 +574,7 @@ void UIDescriptRace::DrawRaceDescription() {
     const std::uint32_t* palette = sprite->palette;
     POINT point = imf->GetLongPoint(layer, action, frame);
     if (layer == 1) {
-      const ActionFrame* body = &static_cast<CActRes*>(ResourceMgr::Instance().Load(GetBodyActionResourceName(job, g_session.m_sex, job, 0)))->Frame(action, frame);
+      const ActionFrame* body = &static_cast<CActRes*>(ResourceMgr::Instance().Load(g_session.GetBodyActionResourceName(job, g_session.m_sex, job, 0)))->Frame(action, frame);
       if (actionFrame->anchorCount != 0 && body->anchorCount != 0 && actionFrame->anchors[0].attachmentId == body->anchors[0].attachmentId) {
         point.x += body->anchors[0].x - actionFrame->anchors[0].x;
         point.y += body->anchors[0].y - actionFrame->anchors[0].y;
@@ -594,7 +600,7 @@ void UIDescriptRace::DrawRaceDescription() {
 
     this->geometry.surface->DrawSurface(
       cell.x + point.x + 60, cell.y + point.y + 140, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f), image->width,
-      image->height, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0, 0
+      image->height, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
 }

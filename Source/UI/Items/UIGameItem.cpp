@@ -57,20 +57,20 @@ void CUIGameItem::Paint() {
     return;
   }
 
-  if (this->scale != 100) {
+  if (100 != this->scale) {
     if (this->transparent) {
-      this->DrawAuxiliaryScaled(1, 0, 0, this->geometry.width, this->geometry.height, &this->image->image, 1, false);
+      this->DrawAuxiliaryScaled(1, 0, 0, this->geometry.width, this->geometry.height, this->image, 1, false);
     } else {
-      this->DrawBitmapScaled(0, 0, this->geometry.width, this->geometry.height, &this->image->image, 0);
+      this->DrawBitmapScaled(0, 0, this->geometry.width, this->geometry.height, this->image, 0);
     }
   } else if (this->transparent) {
-    this->DrawAuxiliary(1, 0, 0, &this->image->image, true, false);
+    this->DrawAuxiliary(1, 0, 0, this->image, true, false);
   } else {
-    this->DrawBitmap(0, 0, &this->image->image, false);
+    this->DrawBitmap(0, 0, this->image, false);
   }
 
   if (this->showOverlay && this->overlay) {
-    this->DrawBitmap(0, 12, &this->overlay->image, true);
+    this->DrawBitmap(0, 12, this->overlay, true);
   }
 }
 
@@ -80,7 +80,7 @@ void CUIGameItemWithNum::Paint() {
   CUIGameItem::Paint();
   if (this->itemInfo.quantity > 0 && this->mode == 0) {
     std::string text = std::to_string(this->itemInfo.quantity);
-    DrawOutlinedText(*this, 14, 15, text.c_str(), 0, 0, 0xFFFFFF, 0, 11, 0, 0);
+    this->DrawOutlinedText(14, 15, text.c_str(), 0, 0, 0xFFFFFF, 0, 11, 0, 0);
   }
 }
 
@@ -104,19 +104,21 @@ void CUIGameItem::OnMouseHover(int x, int y) {
   int screenX = x;
   int screenY = y - 20;
   this->ToScreen(screenX, screenY);
-  const std::uint32_t color = g_session.GetItemNameColor(this->itemInfo);
-  CMode* tooltip = g_modeMgr.gameMode;
   if (this->itemInfo.optionCount > 0) {
-    const std::string text = FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), this->name.c_str(), this->itemInfo.optionCount);
-    tooltip->ShowTooltip(text.c_str(), screenX, screenY, color, 0, 1);
+    CMode* tooltip = g_modeMgr.gameMode;
+    tooltip->ShowTooltip(
+      FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), this->name.c_str(), this->itemInfo.optionCount).c_str(),
+      screenX, screenY, g_session.GetItemNameColor(this->itemInfo), 0, 1
+    );
   } else {
-    tooltip->ShowTooltip(this->name.c_str(), screenX, screenY, color, 0, 1);
+    CMode* tooltip = g_modeMgr.gameMode;
+    tooltip->ShowTooltip(this->name.c_str(), screenX, screenY, g_session.GetItemNameColor(this->itemInfo), 0, 1);
   }
 }
 
 // OFFSET: 0x009E7750
 // FUNCTION: fn_14483
-void CUIGameItem::OnLBtnDblClk(int, int) {
+void CUIGameItem::OnRBtnDown(int, int) {
   if (this->allowItemInfo == 0 || std::atoi(this->itemInfo.itemId.c_str()) <= 0) {
     return;
   }
@@ -161,7 +163,7 @@ void CUIGameItem::SetItem(const ITEM_INFO& item) {
     oldImage->Unlock();
   }
 
-  if (item.grade > 0) {
+  if (0 < item.grade) {
     CBitmapRes* overlay = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(std::format("유저인터페이스\\grade_enchant\\grade_icon{}.bmp", item.grade)));
     if (overlay) {
       overlay->Lock();

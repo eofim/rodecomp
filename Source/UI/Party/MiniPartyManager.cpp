@@ -5,12 +5,15 @@
 #include "Contents/Messenger/MessengerMember.h"
 #include "UI/Party/MiniPartyGrid.h"
 #include "UI/Party/MiniPartyPlacement.h"
+#include "UI/Dialogs/UIMenuWnd.h"
 #include "UI/Party/UIMiniPartyWnd.h"
 #include "UI/Party/MiniPartyWndAreaMgr.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/WindowManagerWindows.h"
 #include <new>
+
+template __declspec(noinline) std::_List_node<UIWindow*, void*>* std::list<UIWindow*>::_Emplace<UIWindow* const&>(std::_List_node<UIWindow*, void*>* const, UIWindow* const&);
 
 // OFFSET: 0x007435C0
 // FUNCTION: fn_07745
@@ -28,15 +31,15 @@ void UIWindowMgr::SetScreenSize(int width, int height) {
   this->screenHeight = height;
   this->chatWndX = 0;
   this->chatWndY = height - this->chatWndHeight;
-  reinterpret_cast<MiniPartyGrid*>(CMiniPartyWndAreaMgr::Instance())->BuildAvailableCells();
+  CMiniPartyWndAreaMgr::Instance()->BuildAvailableCells();
 }
 
 // OFFSET: 0x00AA2510
 // FUNCTION: fn_17214
 void UIWindowMgr::ArrangeMiniPartyWindows() {
   for (UIWindow* window : this->snapExcluded) {
-    const MiniPartyGridPoint position = reinterpret_cast<MiniPartyGrid*>(CMiniPartyWndAreaMgr::Instance())
-      ->GetCellPosition(*reinterpret_cast<int*>(reinterpret_cast<char*>(window) + 0x104));
+    const MiniPartyGridPoint position = CMiniPartyWndAreaMgr::Instance()
+      ->GetCellPosition(static_cast<UIMiniPartyWnd*>(window)->m_cell);
     window->Move(position.x, position.y);
   }
 }
@@ -61,7 +64,7 @@ void UIWindowMgr::RearrangeMiniPartyWindows() {
   auto cell = cells.begin();
   auto entry = this->snapExcluded.begin();
   for (; cell != cells.end() && entry != this->snapExcluded.end(); ++cell, ++entry) {
-    const MiniPartyGridPoint position = reinterpret_cast<const MiniPartyGrid*>(&area)->GetWindowPosition(*cell);
+    const MiniPartyGridPoint position = area.GetWindowPosition(*cell);
     (*entry)->Move(position.x, position.y);
     static_cast<UIMiniPartyWnd*>(*entry)->m_cell = *cell;
 
@@ -140,9 +143,8 @@ void UIWindowMgr::RebuildMiniPartyWindows() {
     window->SendMsg(nullptr, UM_REFRESHITEM, reinterpret_cast<std::intptr_t>(&member), 0, 0, 0);
     g_session.AddMiniPartyRecord(record.id, record.cell);
 
-    UIWindow* drag = this->menuWnd;
-    if (drag != nullptr && *reinterpret_cast<int*>(reinterpret_cast<char*>(drag) + 0xB4) == 301 &&
-        *reinterpret_cast<std::uint32_t*>(reinterpret_cast<char*>(drag) + 0xCC) == record.cell) {
+    UIMenuWnd* drag = static_cast<UIMenuWnd*>(this->menuWnd);
+    if (drag != nullptr && drag->m_menuId == 301 && drag->m_targetWindowId == record.cell) {
       const int x = drag->geometry.x;
       const int y = drag->geometry.y;
       window->SendMsg(nullptr, UM_MAKEMENU, 0, 0, 0, 0);

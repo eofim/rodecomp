@@ -35,11 +35,13 @@ void CEnergyOrbEffect::Close() {
 // FUNCTION: fn_19025
 void CEnergyOrbEffect::Open() {
   for (int i = 0; i < this->count; ++i) {
-    const int angle = std::max(0, rand() % 360);
-    const int phase = std::max(0, rand() % 3);
+    const int angleRoll = rand() % 360;
+    const int angle = angleRoll >= 0 ? angleRoll : 0;
+    const int phaseRoll = rand() % 3;
+    const int phase = phaseRoll >= 0 ? phaseRoll : 0;
 
     for (int j = 0; j < this->mode; ++j) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
@@ -48,15 +50,15 @@ void CEnergyOrbEffect::Open() {
       particle->rowIndex = i;
       particle->columnIndex = j;
       particle->groupIndex = 1;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(360 / this->count * i);
+      particle->angle = static_cast<float>(360 / this->count * i);
       particle->SetTexture("effect\\thunder_center.bmp");
       particle->alpha = 0;
       particle->scale = 0.8f;
       particle->speedParameter = 0.15f;
       particle->animationParameter = 8.0f;
       particle->phaseParameter = angle;
-      *reinterpret_cast<float*>(&particle->animationParameters[0]) = static_cast<float>(phase);
-      *reinterpret_cast<float*>(&particle->animationParameters[4]) = -12.0f;
+      particle->animationParameters[0] = static_cast<float>(phase);
+      particle->animationParameters[1] = -12.0f;
       if (j == 0) {
         particle->destinationBlend = 6;
       }
@@ -86,8 +88,8 @@ void CEnergyOrbEffect::Open() {
         particle->scale = 6.0f;
         particle->speedParameter = 0.05f;
         particle->animationParameter = 4.0f;
-        *reinterpret_cast<float*>(&particle->animationParameters[0]) = 0.0f;
-        *reinterpret_cast<float*>(&particle->animationParameters[4]) = -8.0f;
+        particle->animationParameters[0] = 0.0f;
+        particle->animationParameters[1] = -8.0f;
         particle->destinationBlend = 6;
         break;
       }
@@ -107,20 +109,21 @@ bool CEnergyOrbEffect::IsAlive() {
 // FUNCTION: fn_19027
 void CEnergyOrbEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
     CParticle* particle = *it;
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
       if (particle->elapsedFrames <= 200) {
         ++particle->alpha;
       }
 
-      float angle = particle->speedParameter * 5.0f + *reinterpret_cast<float*>(&particle->angleBits);
+      float angle = particle->speedParameter * 5.0f + particle->angle;
       if (angle > 360.0f) {
         angle -= 360.0f;
       }
-      *reinterpret_cast<float*>(&particle->angleBits) = angle;
+      particle->angle = angle;
 
       if (particle->alpha > 0) {
         matrix rotation;
@@ -129,7 +132,7 @@ void CEnergyOrbEffect::OnProcess() {
         rotation.AppendXRotation(3.141592f);
 
         const float scale = particle->scale;
-        particle->phaseParameter = static_cast<int>(static_cast<float>(particle->phaseParameter) + *reinterpret_cast<float*>(&particle->animationParameters[0])) % 360;
+        particle->phaseParameter = static_cast<int>(static_cast<float>(particle->phaseParameter) + particle->animationParameters[0]) % 360;
         float pulse = scale * 0.1f * g_sinTable[particle->phaseParameter];
         if (this->mode > 1 && particle->columnIndex == 0) {
           pulse = static_cast<float>(scale * 0.1 + pulse);
@@ -140,11 +143,11 @@ void CEnergyOrbEffect::OnProcess() {
         scaling.SetScale(size, size, size);
 
         const float wave = g_sinTable[particle->phaseParameter] * 0.6f;
-        const int index = static_cast<int>(*reinterpret_cast<float*>(&particle->angleBits));
+        const int index = static_cast<int>(particle->angle);
         const float radius = wave + particle->animationParameter;
         matrix translation;
         std::memcpy(translation.values, g_identityMatrix, sizeof(translation.values));
-        translation.MakeTranslate(radius * g_cosTable[index], wave * *reinterpret_cast<float*>(&particle->animationParameters[0]) + *reinterpret_cast<float*>(&particle->animationParameters[4]), radius * g_sinTable[index]);
+        translation.MakeTranslate(radius * g_cosTable[index], wave * particle->animationParameters[0] + particle->animationParameters[1], radius * g_sinTable[index]);
 
         matrix scaled;
         scaled.Compose(scaling, rotation);

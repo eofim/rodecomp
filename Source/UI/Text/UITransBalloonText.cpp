@@ -125,12 +125,6 @@ void UITransBalloonText::OnCreate(int, int) {
   this->m_fontMode = 0;
 }
 
-// INLINED
-void UITransBalloonText::SetColors(std::uint32_t text, std::uint32_t outline) {
-  this->m_textColor = text;
-  this->m_outlineColor = outline;
-}
-
 // OFFSET: 0x008697E0
 // FUNCTION: fn_10970
 void UITransBalloonText::SetBackground(std::uint32_t color) {
@@ -158,7 +152,7 @@ void UITransBalloonText::Paint() {
     color = index < this->m_lineColors.size() && this->m_lineColors[index] != 0 ? this->m_lineColors[index] : this->m_textColor;
 
     if (this->m_richText != 0) {
-      DrawColoredText(*this, 6, y, this->m_lines[index].c_str(), 0, color, family, height, true);
+      this->DrawColoredText(6, y, this->m_lines[index].c_str(), 0, color, family, height, true);
     } else {
       this->DrawShadowedText(6, y, this->m_lines[index].c_str(), 0, color, this->m_outlineColor, family, height, 0);
     }
@@ -172,7 +166,7 @@ void UITransBalloonText::Paint() {
 void UIColorTransBalloonText::Paint() {
   this->ClearSurface(0xFFFF00FF);
   std::uint32_t color = 0xFFFFFF;
-  DrawColoredText(*this, 6, 4, this->m_lines[0].c_str(), 0, color, 0, 12, false);
+  this->DrawColoredText(6, 4, this->m_lines[0].c_str(), 0, color, 0, 12, false);
 }
 
 // OFFSET: 0x0085B010

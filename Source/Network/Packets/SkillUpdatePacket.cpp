@@ -7,6 +7,8 @@
 
 #include <cstring>
 
+template __declspec(noinline) void std::list<CSkillInfo>::clear() noexcept;
+
 namespace {
   // INLINED
   template <class T> T Read(const unsigned char* bytes) {
@@ -19,7 +21,7 @@ namespace {
 // OFFSET: 0x00D42AA0
 // FUNCTION: fn_21829
 void CGameMode::ApplySkillUpdatePacket(const void* packet) {
-  *reinterpret_cast<int*>(&this->equipmentRequestState[0x0C]) = 0;
+  this->isReqUpgradeSkillLevel = 0;
 
   const auto* bytes = static_cast<const unsigned char*>(packet);
   CSkillInfo value;
@@ -59,11 +61,11 @@ void CGameMode::ReceiveLearnedSkill(
   value.id = id;
   value.level = level;
   value.upgradable = upgradable;
-  value.name = value.IdName(*g_session.m_hotkeyScript);
+  value.name = value.IdName();
   value.spCost = spCost;
   value.range = range;
   value.learnedLevel = learnedLevel;
-  value.apCost = value.UseApAmount(*g_session.m_hotkeyScript, level);
+  value.apCost = value.UseApAmount(level);
 
   g_session.m_skillBundle.RecordLevelChange(value);
   if (value.id == 336) {
@@ -76,7 +78,7 @@ void CGameMode::ReceiveLearnedSkill(
 // OFFSET: 0x00D2B5C0
 // FUNCTION: fn_45442
 void CGameMode::ApplyAdditionalSkillPacket(const void* packet) {
-  *reinterpret_cast<int*>(&this->equipmentRequestState[0x0C]) = 0;
+  this->isReqUpgradeSkillLevel = 0;
   g_session.m_additionalSkills.clear();
 
   const auto* bytes = static_cast<const unsigned char*>(packet);
@@ -92,7 +94,7 @@ void CGameMode::ApplyAdditionalSkillPacket(const void* packet) {
     value.spCost = static_cast<std::int32_t>(Read<std::int16_t>(record + 8));
     value.type = Read<std::uint32_t>(record + 2);
     value.upgradable = record[36];
-    value.name = value.IdName(*g_session.m_hotkeyScript);
+    value.name = value.IdName();
     value.apCost = value.UseApAmount(*g_session.m_hotkeyScript, Read<std::int16_t>(record + 6));
 
     if (value.id - 10000u <= 19u) {

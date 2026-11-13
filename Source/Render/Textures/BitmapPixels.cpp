@@ -261,9 +261,12 @@ void CDCBitmap::Brighten(int x, int y, int copyWidth, int copyHeight, int amount
     for (int column = x; column < right; ++column) {
       std::uint32_t& pixel = this->m_bitmap.pixels[column + row * this->m_bitmap.width];
       if (pixel != 0xFFFF00FF) {
-        const int red = std::min(std::max(static_cast<int>((pixel >> 16) & 0xFF) + amount, 0), 255);
-        const int green = std::min(std::max(static_cast<int>((pixel >> 8) & 0xFF) + amount, 0), 255);
-        const int blue = std::min(std::max(static_cast<int>(pixel & 0xFF) + amount, 0), 255);
+        const int brightRed = static_cast<int>((pixel >> 16) & 0xFF) + amount;
+        const int red = std::min(brightRed >= 0 ? brightRed : 0, 255);
+        const int brightGreen = static_cast<int>((pixel >> 8) & 0xFF) + amount;
+        const int green = std::min(brightGreen >= 0 ? brightGreen : 0, 255);
+        const int brightBlue = static_cast<int>(pixel & 0xFF) + amount;
+        const int blue = std::min(brightBlue >= 0 ? brightBlue : 0, 255);
         pixel = 0xFF000000 | ((red & 0xFF) << 16) | ((green & 0xFF) << 8) | (blue & 0xFF);
       }
     }
@@ -358,7 +361,7 @@ static float SurfacePixelAlpha(int value) {
 // OFFSET: 0x005460B0
 // FUNCTION: fn_01839
 void CDCBitmap::DrawSurface(
-  int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter, int
+  int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter
 ) {
   if (!source || !this->m_bitmap.pixels) {
     return;
@@ -832,9 +835,10 @@ void CDCBitmap::ScaleCopy(int x, int y, int sourceWidth, int sourceHeight, int d
   this->m_bitmap.dirty = true;
   const float scaleX = static_cast<float>(drawWidth) / static_cast<float>(sourceWidth);
   const float scaleY = static_cast<float>(drawHeight) / static_cast<float>(sourceHeight);
+  std::vector<std::uint32_t> scratch;
   const int columns = scaleX < 1 ? sourceWidth : drawWidth;
   const int rows = scaleY < 1 ? sourceHeight : drawHeight;
-  std::vector<std::uint32_t> scratch(static_cast<std::uint32_t>(columns) * rows);
+  scratch.resize(static_cast<std::uint32_t>(columns) * rows);
 
   if (scaleX == 1) {
     for (int row = 0; row < sourceHeight; ++row) {

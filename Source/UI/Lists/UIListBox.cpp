@@ -25,7 +25,7 @@
 #include <cstring>
 #include <mbstring.h>
 
-namespace {}
+template __declspec(noinline) std::pair<std::map<int, IdListLine>::iterator, bool> std::_Tree<std::_Tmap_traits<int, IdListLine, std::less<int>, std::allocator<std::pair<const int, IdListLine>>, false>>::insert(std::pair<const int, IdListLine>&&);
 
 // OFFSET: 0x0086D940
 // FUNCTION: fn_11055
@@ -270,10 +270,11 @@ void UIListBox::Refresh() {
   UIScrollBar* bar = this->verticalBar;
   if (overflow != 0) {
     bar->maximum = this->bottomMargin + overflow;
+    bar->total = static_cast<int>(this->lines.size());
   } else {
     bar->maximum = 0;
+    bar->total = static_cast<int>(this->lines.size());
   }
-  bar->total = static_cast<int>(this->lines.size());
   bar->visible = visible;
   bar->Invalidate();
 
@@ -342,7 +343,7 @@ void UIListBox::Paint() {
 
   const int first = this->topLine;
   const int limit = ((this->geometry.height / this->lineHeight - this->bottomMargin) + first);
-  const int end = static_cast<int>(std::min(static_cast<unsigned>(this->lines.size()), static_cast<unsigned>(limit)));
+  const int end = static_cast<int>(std::min(static_cast<unsigned>(limit), static_cast<unsigned>(this->lines.size())));
   std::uint32_t color = this->textColor;
 
   for (int index = first; index < end; ++index) {
@@ -356,11 +357,10 @@ void UIListBox::Paint() {
     int y = (row * this->lineHeight);
 
     if (this->centerVertically == 1) {
-      const int height = this->TextHeight(this->lines[index].c_str(), 0, 0, 12, 0, 0);
-      y = static_cast<int>(static_cast<float>((this->lineHeight - height)) * 0.5f + static_cast<float>((row * this->lineHeight)));
+      y = static_cast<int>(static_cast<float>((this->lineHeight - this->TextHeight(this->lines[index].c_str(), 0, 0, 12, 0, 0))) * 0.5f + static_cast<float>((row * this->lineHeight)));
     }
 
-    DrawColoredText(*this, x, y, this->lines[index].c_str(), static_cast<unsigned>(this->lines[index].size()), color, 0, 12, false);
+    this->DrawColoredText(x, y, this->lines[index].c_str(), static_cast<unsigned>(this->lines[index].size()), color, 0, 12, false);
   }
 }
 
@@ -388,18 +388,6 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
 
     break;
 
-  case UM_DOWNPUSH:
-    this->selected = (this->selected + 1);
-    if (this->selected > this->lines.size() - 1) {
-      this->selected = this->lines.size() - 1;
-    }
-
-    if (this->selected > this->topLine - 1 + this->geometry.height / this->lineHeight) {
-      this->SendMsg(nullptr, UM_SCROLLVERT, 1, 0, 0, 0);
-    }
-
-    break;
-
   case UM_UPPUSH:
     this->selected = (this->selected - 1);
 
@@ -409,6 +397,18 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
 
     if (this->selected < this->topLine) {
       this->SendMsg(nullptr, UM_SCROLLVERT, -1, 0, 0, 0);
+    }
+
+    break;
+
+  case UM_DOWNPUSH:
+    this->selected = (this->selected + 1);
+    if (this->selected > this->lines.size() - 1) {
+      this->selected = this->lines.size() - 1;
+    }
+
+    if (this->selected > this->topLine - 1 + this->geometry.height / this->lineHeight) {
+      this->SendMsg(nullptr, UM_SCROLLVERT, 1, 0, 0, 0);
     }
 
     break;
@@ -538,7 +538,7 @@ void UIChatHisBox::CopyHistory(const UIChatHisBox& other) {
 // FUNCTION: fn_11200
 void UIComboBoxID::AddLine(const char* text, int id, int data) {
   const int index = static_cast<int>(this->lines.size());
-  this->lines.emplace(index, IdListLine{id, text});
+  this->lines.insert({index, {id, text}});
   const int width = this->TextWidth(text, 0, 0, 12, 0, 0);
   this->contentWidth = std::max(this->contentWidth, width);
   this->Refresh();
@@ -551,7 +551,7 @@ void UIComboBoxID::AddLine(const char* text, int id, int data) {
 // OFFSET: 0x00875DD0
 // FUNCTION: fn_11203
 void UIListBoxID::AddLine(const char* text, int id) {
-  this->lines.emplace(static_cast<int>(this->lines.size()), IdListLine{id, text});
+  this->lines.insert({static_cast<int>(this->lines.size()), {id, text}});
   const int width = this->TextWidth(text, 0, 0, 12, 0, 0);
   this->contentWidth = std::max(this->contentWidth, width);
   this->Refresh();

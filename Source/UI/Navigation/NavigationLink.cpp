@@ -306,7 +306,7 @@ std::string NavigationLinkParser::ExpandMessages(std::string text) {
 
 // OFFSET: 0x00833160
 // FUNCTION: fn_10409
-int DecodeNavigationNumber(std::string value) {
+int __stdcall DecodeNavigationNumber(std::string value) {
   const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const int size = static_cast<int>(value.size()) + 1;
   int result = 0;
@@ -339,11 +339,12 @@ int DecodeNavigationNumber(std::string value) {
 std::string NavigationLinkParser::EncodeNavigationNumber(int value) {
   const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   std::vector<char> characters;
+  int radix = 62;
 
   do {
-    characters.push_back(digits[value % 62]);
-    value /= 62;
-  } while (value >= 62);
+    characters.push_back(digits[value % radix]);
+    value /= radix;
+  } while (value >= radix);
   characters.push_back(digits[value]);
 
   std::string result("");
@@ -661,8 +662,8 @@ void LineCutter::UIText::Paint() {
   }
 
   if (this->m_outlined == 1) {
-    DrawOutlinedText(
-      *this, 1, 1, this->m_text.c_str(), this->m_text.size(), this->m_style.color, this->m_outlineColor, 0, this->m_style.fontHeight, this->m_style.bold, this->m_style.italic
+    this->DrawOutlinedText(
+      1, 1, this->m_text.c_str(), this->m_text.size(), this->m_style.color, this->m_outlineColor, 0, this->m_style.fontHeight, this->m_style.bold, this->m_style.italic
     );
   } else {
     this->DrawTextAt(0, 0, this->m_text.c_str(), this->m_text.size(), 0, this->m_style.fontHeight, this->m_style.color, this->m_style.bold, this->m_style.italic
@@ -1049,7 +1050,7 @@ std::vector<std::string> CCreateLineInfo::SplitLines(UIWindow* window, std::stri
 
 // OFFSET: 0x00839860
 // FUNCTION: fn_10459
-std::string CCreateLineInfo::FitText(UIWindow* window, std::string text, const LineTextStyle& style, int width) {
+std::string CCreateLineInfo::FitText(UIWindow* window, const std::string text, const LineTextStyle& style, int width) {
   const int length = static_cast<int>(text.size());
   int position = 0;
   int total = 0;
@@ -1204,7 +1205,7 @@ void CCreateLineInfo::NewLine() {
 // OFFSET: 0x0083AB90
 // FUNCTION: fn_10466
 void CCreateLineInfo::AddSegment(int type) {
-  LineTextSegment segment(std::string(), LineTextStyle{this->m_color, this->m_fontHeight, this->m_bold > 0, this->m_italic > 0});
+  LineTextSegment segment(std::string(""), LineTextStyle{this->m_color, this->m_fontHeight, this->m_bold > 0, this->m_italic > 0});
   segment.type = type;
   this->m_segments.push_back(segment);
   this->m_newSegment = false;
@@ -1764,7 +1765,8 @@ bool NavigationLinkParser::HasUnownedItemLink(std::string text) {
     }
 
     const int itemId = ItemLinkMessageId(link);
-    if (link.substr(0, 6) == "00000T" && itemId <= g_itemTagOwner->maxTipId) {
+    const bool isTip = link.substr(0, 6) == "00000T";
+    if (isTip && itemId <= g_itemTagOwner->maxTipId) {
       offset += static_cast<int>(link.size() + g_itemLinkTag.size() + g_itemLinkCloseTag.size());
       continue;
     }

@@ -129,8 +129,8 @@ void CLanguageBase::CopySelection() {
   if (memory) {
     auto* data = static_cast<char*>(GlobalLock(memory));
     if (data) {
-      const int begin = std::min(this->cursor, this->anchor);
-      const int end = std::max(this->anchor, this->cursor);
+      const int begin = this->anchor < this->cursor ? this->anchor : this->cursor;
+      const int end = this->anchor < this->cursor ? this->cursor : this->anchor;
 
       if (!this->password) {
         std::memcpy(data, this->text.c_str() + begin, end - begin);
@@ -284,22 +284,22 @@ void CLanguageBase::Character(unsigned value, LPARAM) {
 // OFFSET: 0x00ACE880
 // FUNCTION: fn_17792
 void CLanguageBase::KeyDown(unsigned key, LPARAM) {
-  if (static_cast<unsigned char>(static_cast<unsigned short>(GetKeyState(VK_SHIFT)) >> 8)) {
+  if (HIBYTE(GetKeyState(VK_SHIFT))) {
     switch (key) {
-    case VK_END:
-      this->cursor = static_cast<int>(this->text.size());
-      break;
-    case VK_HOME:
-      this->cursor = 0;
-      break;
     case VK_LEFT:
       this->MoveBack();
       break;
     case VK_RIGHT:
       this->MoveForward();
       break;
+    case VK_END:
+      this->cursor = static_cast<int>(this->text.size());
+      break;
     case VK_INSERT:
       this->Paste();
+      break;
+    case VK_HOME:
+      this->cursor = 0;
       break;
     case VK_DELETE:
       this->CopySelection();
@@ -310,18 +310,8 @@ void CLanguageBase::KeyDown(unsigned key, LPARAM) {
     return;
   }
 
-  if (static_cast<unsigned char>(static_cast<unsigned short>(GetKeyState(VK_CONTROL)) >> 8)) {
+  if (HIBYTE(GetKeyState(VK_CONTROL))) {
     switch (key) {
-    case 'A':
-      this->anchor = 0;
-      this->cursor = static_cast<int>(this->text.size());
-      if (this->cursor < 0) {
-        this->cursor = 0;
-      }
-      break;
-    case 'C':
-      this->CopySelection();
-      break;
     case 'V':
       this->Paste();
       break;
@@ -329,19 +319,28 @@ void CLanguageBase::KeyDown(unsigned key, LPARAM) {
       this->CopySelection();
       this->DeleteSelection();
       break;
+    case 'C':
+      this->CopySelection();
+      break;
+    case 'A':
+      this->anchor = 0;
+      this->cursor = static_cast<int>(this->text.size());
+      if (this->cursor < 0) {
+        this->cursor = 0;
+      }
+      break;
     }
 
     return;
   }
 
   switch (key) {
-  case VK_END:
-    this->cursor = static_cast<int>(this->text.size());
-    this->anchor = this->cursor;
-    break;
-  case VK_HOME:
-    this->cursor = 0;
-    this->anchor = 0;
+  case VK_DELETE:
+    if (!std::abs(this->cursor - this->anchor)) {
+      this->MoveForward();
+    }
+
+    this->DeleteSelection();
     break;
   case VK_LEFT:
     if (ChatWindow() && ChatWindow()->SuggestionsVisible() && ChatWindow()->m_suggestions) {
@@ -361,12 +360,13 @@ void CLanguageBase::KeyDown(unsigned key, LPARAM) {
     this->MoveForward();
     this->anchor = this->cursor;
     break;
-  case VK_DELETE:
-    if (this->cursor == this->anchor) {
-      this->MoveForward();
-    }
-
-    this->DeleteSelection();
+  case VK_HOME:
+    this->cursor = 0;
+    this->anchor = 0;
+    break;
+  case VK_END:
+    this->cursor = static_cast<int>(this->text.size());
+    this->anchor = this->cursor;
     break;
   }
 }
@@ -384,11 +384,6 @@ void SuggestChatCommand(const char* text) {
 // FUNCTION: fn_17806
 int SubACFCE0() {
   return 0;
-}
-
-// OFFSET: 0x007D9960
-// FUNCTION: fn_09607
-UIHairBitmap::UIHairBitmap() : UIBitmapButton() {
 }
 
 // OFFSET: 0x007ECEC0

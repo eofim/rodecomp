@@ -70,7 +70,7 @@ void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
 // FUNCTION: fn_04162
 void UIIngredientInfoWnd::OnLBtnDown(int x, int y) {
   if (this->insufficient != 1 && this->item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->drag.BeginItem(g_windowMgr, 27, this->item, this->quantity, -1);
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(27, this->item, this->quantity, -1);
   }
 }
 
@@ -122,7 +122,7 @@ void UILapineBoxWnd::OnLBtnDown(int x, int y) {
   const ITEM_INFO item = this->ReadMaterial(x, y);
 
   if (item.identity[1] != 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->drag.BeginItem(g_windowMgr, 0x1A, item, item.quantity, -1);
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(0x1A, item, item.quantity, -1);
   }
 }
 
@@ -190,15 +190,16 @@ void UIIngredientInfoWnd::OnRBtnDown(int, int) {
 __declspec(noinline) void UILapineBoxWnd::MaterialPosition(int* out, int index) {
   if (index >= 0) {
     const unsigned int count = this->items.size();
-    if (static_cast<unsigned int>(index) <= count) {
-      int left = count > 5 ? 0x19 : 0x21;
-      int top = count > 5 ? 0x98 : 0xA2;
-      if (index >= 5) {
+    if (count >= static_cast<unsigned int>(index)) {
+      int columns = 5;
+      int left = count > columns ? 0x19 : 0x21;
+      int top = count > columns ? 0x98 : 0xA2;
+      if (index >= columns) {
         left = 0x2A;
         top = 0xB7;
       }
       out[1] = top;
-      out[0] = left + static_cast<unsigned int>(index) % 5 * 0x22;
+      out[0] = left + static_cast<unsigned int>(index) % columns * 0x22;
       return;
     }
   }
@@ -240,9 +241,8 @@ bool UILapineBox_IngredientListWnd::CanUseIngredient(std::uint32_t identity) {
     return false;
   }
 
-  const int required = material->quantity;
-  if (required > item.quantity) {
-    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_INPUT_FREE_MESSAGE), required).c_str()), 0, 0, 0);
+  if (material->quantity > item.quantity) {
+    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_INPUT_FREE_MESSAGE), material->quantity).c_str()), 0, 0, 0);
     return false;
   }
   if (this->minRefine > item.refiningLevel) {
@@ -258,9 +258,9 @@ bool UILapineBox_IngredientListWnd::CanUseIngredient(std::uint32_t identity) {
   }
 
   if (Equipment(item) == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
-    const int* cards = reinterpret_cast<const int*>(item.cards);
+    const std::uint32_t* cards = item.cards;
     for (int index = 0; index < ItemSlotsCount(item); ++index) {
-      if (index < 4 && cards[index] > 0) {
+      if (index < 4 && static_cast<int>(cards[index]) > 0) {
         this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PURCHASEWND_TOTAL)), 0, 0, 0);
         return true;
       }
@@ -402,7 +402,7 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
     }
 
     for (std::vector<UIIngredientInfoWnd*>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
-      ITEM_INFO owned = LookupClientItemByIdentity(g_session.m_inventoryItems, (*it)->item.identity[1]);
+      ITEM_INFO owned = g_session.LookupClientItemByIdentity((*it)->item.identity[1]);
       if (owned.identity[1] == 0) {
         (*it)->Show(0);
       }
@@ -553,7 +553,7 @@ void UILapineBoxWnd::AddMaterial(int id, int quantity) {
 // OFFSET: 0x006028C0
 // FUNCTION: fn_04183
 void UIIngredientInfoWnd::SetIngredientItem(std::uint32_t id) {
-  this->item = LookupClientItemByIdentity(g_session.m_inventoryItems, id);
+  this->item = g_session.LookupClientItemByIdentity(id);
 
   std::vector<char*> breaks;
   char name[260];

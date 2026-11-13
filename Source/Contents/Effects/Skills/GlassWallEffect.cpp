@@ -19,20 +19,19 @@ CGlassWall::~CGlassWall() {
 // FUNCTION: fn_18890
 void CGlassWall::AddPanel(float angle, float scale, vector3d offset) {
   const int startFrame = this->effectLifetime - 6;
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 1);
-  float* params = &particle->animationParameter;
+  CParticle* particle = CreateParticle(&this->positionVector, 1);
   particle->scale = scale;
   particle->speedParameter = 0.25f;
   particle->alpha = 0;
-  *reinterpret_cast<float*>(&particle->angleBits) = angle;
+  particle->angle = angle;
   particle->offsetX = offset.x;
   particle->offsetY = offset.y;
   particle->offsetZ = offset.z;
-  params[0] = 40.0f;
-  params[1] = 30.0f;
-  params[2] = static_cast<float>(startFrame);
-  params[3] = 180.0f;
-  params[4] = 50.0f;
+  particle->animationParameter = 40.0f;
+  particle->animationParameters[0] = 30.0f;
+  particle->animationParameters[1] = static_cast<float>(startFrame);
+  particle->animationParameters[2] = 180.0f;
+  particle->animationParameters[3] = 50.0f;
   particle->SetTexture("effect\\ring_blue.tga");
   this->particles.push_back(particle);
 }
@@ -50,8 +49,8 @@ void CGlassWall::Close() {
 // OFFSET: 0x00B449B0
 // FUNCTION: fn_18892
 void CGlassWall::Open() {
-  int angle = 180;
   CRenderObject* actor = FindRenderObject(this->actor);
+  int angle = 180;
   if (actor) {
     angle = static_cast<int>(180.0f - actor->render.angle);
   }
@@ -70,9 +69,12 @@ void CGlassWall::Open() {
   this->effect = new CEZ2STRScreenEffect();
   this->effect->SetActor(this->actor);
   this->effect->SetSourceActor(this->sourceActor);
-  this->effect->position[0] = this->position[0];
-  this->effect->position[1] = this->position[1];
-  this->effect->position[2] = this->position[2];
+  {
+    CEffect* effect = this->effect;
+    effect->position[0] = this->position[0];
+    effect->position[1] = this->position[1];
+    effect->position[2] = this->position[2];
+  }
   this->effect->SetId(this->id);
   this->effect->Open();
 }
@@ -111,7 +113,7 @@ void CGlassWall::OnProcess() {
     translation.MakeTranslate(particle->position.x + particle->offsetX, particle->position.y + particle->offsetY,
                               particle->position.z + particle->offsetZ);
     matrix rotation;
-    rotation.MakeYRotation(GetRadian(static_cast<int>(*reinterpret_cast<float*>(&particle->angleBits))));
+    rotation.MakeYRotation(GetRadian(static_cast<int>(particle->angle)));
     matrix result;
     result.Compose(rotation, translation);
 
@@ -135,18 +137,20 @@ void CGlassWall::Render() {
     CParticle* particle = *it;
     const float width = particle->scale;
     const float height = particle->animationParameter;
+    const float top = -height;
+    const float back = -width;
     particle->vertices[0].x = 0.0f;
-    particle->vertices[0].y = -height;
+    particle->vertices[0].y = top;
     particle->vertices[0].z = width;
     particle->vertices[1].x = 0.0f;
-    particle->vertices[1].y = -height;
-    particle->vertices[1].z = -width;
+    particle->vertices[1].y = top;
+    particle->vertices[1].z = back;
     particle->vertices[2].x = 0.0f;
     particle->vertices[2].y = 0.0f;
     particle->vertices[2].z = width;
     particle->vertices[3].x = 0.0f;
     particle->vertices[3].y = 0.0f;
-    particle->vertices[3].z = -width;
+    particle->vertices[3].z = back;
     particle->Render(true, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
   }
 

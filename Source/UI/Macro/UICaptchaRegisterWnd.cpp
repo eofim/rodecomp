@@ -104,9 +104,9 @@ void UICaptchaRegisterWnd::OnCreate(int width, int height) {
 // OFFSET: 0x007EA8D0
 // FUNCTION: fn_09789
 void UICaptchaRegisterWnd::Paint() {
-  DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xFFFFFFFF);
+  this->DrawFilledRoundedOutline(0, 0, this->geometry.width, this->geometry.height, 0xFFFFFFFF);
   this->DrawTitleBar(true, "", 0);
-  DrawRectangleBorder(*this, 34, 80, 222, 92, 0);
+  this->DrawRectOutline(34, 80, 222, 92, 0);
 }
 
 // OFFSET: 0x007EA910
@@ -135,7 +135,7 @@ int UICaptchaRegisterWnd::SendMsg(
               this->m_decompressedData = std::malloc(this->m_decompressedSize);
               compress(
                 static_cast<Bytef*>(this->m_decompressedData),
-                reinterpret_cast<uLongf*>(&this->m_decompressedSize),
+                &this->m_decompressedSize,
                 static_cast<const Bytef*>(file.GetData()),
                 file.GetSize()
               );
@@ -172,7 +172,7 @@ int UICaptchaRegisterWnd::SendMsg(
           memcpy_s(packet.text, sizeof(packet.text), this->m_editCtrl->Text(), sizeof(packet.text));
           packet.size = static_cast<std::int16_t>(this->m_decompressedSize);
 
-          GetRagConnection().Send(reinterpret_cast<PacketLengths&>(GetRagConnection()).FixedLength(packet.id), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
 
           g_serverLanguage->ResetInput();
         }

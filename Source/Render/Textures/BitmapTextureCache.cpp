@@ -18,49 +18,50 @@ BitmapTextureCache::~BitmapTextureCache() {
 
 // OFFSET: 0x00548380
 // FUNCTION: fn_01854
-void BitmapTextureCache::Update(BitmapPixels& bitmap) {
-  if (!bitmap.dirty) {
+void CDCBitmap::UpdateCache() {
+  if (!this->m_bitmap.dirty) {
     return;
   }
 
-  if (this->m_alpha) {
-    if (this->m_textures.empty()) {
-      CTexture* texture = g_texMgr.CreateTexture(bitmap.width, bitmap.height, TextureFormat::A8R8G8B8, false, false);
+  if (this->m_cache.m_alpha == true) {
+    if (this->m_cache.m_textures.empty()) {
+      CTexture* texture = g_texMgr.CreateTexture(this->m_bitmap.width, this->m_bitmap.height, TextureFormat::A8R8G8B8, false, false);
       if (texture) {
-        this->m_textures.push_back(texture);
+        this->m_cache.m_textures.push_back(texture);
       }
     }
 
-    for (CTexture* texture : this->m_textures) {
-      texture->Upload(0, 0, bitmap.width, bitmap.height, bitmap.pixels, 0, bitmap.width);
+    for (auto it = this->m_cache.m_textures.begin(); it != this->m_cache.m_textures.end(); ++it) {
+      (*it)->Upload(0, 0, this->m_bitmap.width, this->m_bitmap.height, this->m_bitmap.pixels, 0, this->m_bitmap.width);
     }
   } else {
-    if (this->m_textures.empty()) {
-      for (unsigned y = 0; y < bitmap.height; y += 256) {
-        for (unsigned x = 0; x < bitmap.width; x += 256) {
-          this->m_textures.push_back(
-            g_texMgr.CreateTexture(std::min(256u, bitmap.width - x), std::min(256u, bitmap.height - y), TextureFormat::A1R5G5B5, false, false)
+    if (this->m_cache.m_textures.empty()) {
+      for (unsigned y = 0; y < this->m_bitmap.height; y += 256) {
+        for (unsigned x = 0; x < this->m_bitmap.width; x += 256) {
+          this->m_cache.m_textures.push_back(
+            g_texMgr.CreateTexture(std::min(this->m_bitmap.width - x, 256u), std::min(this->m_bitmap.height - y, 256u), TextureFormat::A1R5G5B5, false, false)
           );
         }
       }
     }
 
-    const std::int32_t bytes = static_cast<std::int32_t>(4u * bitmap.width * bitmap.height);
+    const std::int32_t bytes = static_cast<std::int32_t>(4u * this->m_bitmap.width * this->m_bitmap.height);
 
     for (std::int32_t offset = 0; offset < bytes; offset += 4) {
-      reinterpret_cast<unsigned char*>(bitmap.pixels)[offset + 3] = 255;
+      reinterpret_cast<unsigned char*>(this->m_bitmap.pixels)[offset + 3] = 255;
     }
 
-    auto texture = this->m_textures.begin();
+    auto texture = this->m_cache.m_textures.begin();
 
-    for (unsigned y = 0; y < bitmap.height; y += 256) {
-      for (unsigned x = 0; x < bitmap.width; x += 256) {
-        (*texture++)->Upload(0, 0, std::min(256u, bitmap.width - x), std::min(256u, bitmap.height - y), bitmap.pixels + x + y * bitmap.width, 0, bitmap.width);
+    for (unsigned y = 0; y < this->m_bitmap.height; y += 256) {
+      for (unsigned x = 0; x < this->m_bitmap.width; x += 256) {
+        (*texture)->Upload(0, 0, std::min(this->m_bitmap.width - x, 256u), std::min(this->m_bitmap.height - y, 256u), this->m_bitmap.pixels + x + y * this->m_bitmap.width, 0, this->m_bitmap.width);
+        ++texture;
       }
     }
   }
 
-  bitmap.dirty = false;
+  this->m_bitmap.dirty = false;
 }
 
 // OFFSET: 0x00547B80
@@ -70,14 +71,14 @@ void CDCBitmap::Draw(int x, int y, int width, int height, std::uint32_t color) {
     return;
   }
 
-  this->m_cache.Update(this->m_bitmap);
+  this->UpdateCache();
   if (this->m_cache.m_textures.empty()) {
     return;
   }
 
-  if (this->m_cache.m_alpha) {
-    for (CTexture* texture : this->m_cache.m_textures) {
-      texture->Draw(x, y, width, height, color);
+  if (this->m_cache.m_alpha == true) {
+    for (auto texture = this->m_cache.m_textures.begin(); texture != this->m_cache.m_textures.end(); ++texture) {
+      (*texture)->Draw(x, y, width, height, color);
     }
   } else {
     auto texture = this->m_cache.m_textures.begin();
@@ -87,7 +88,8 @@ void CDCBitmap::Draw(int x, int y, int width, int height, std::uint32_t color) {
       int remainingWidth = width;
 
       for (int column = 0; column < width; column += 256, remainingWidth -= 256) {
-        (*texture++)->Draw(x + column, y + row, std::min(256, remainingWidth), std::min(256, remainingHeight), color);
+        (*texture)->Draw(x + column, y + row, remainingWidth > 256 ? 256 : remainingWidth, remainingHeight > 256 ? 256 : remainingHeight, color);
+        ++texture;
       }
     }
   }

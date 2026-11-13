@@ -1,4 +1,5 @@
 #include "UI/Window/UIWindowMgr.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "Render/DeviceContext/DeviceContext.h"
@@ -13,6 +14,8 @@
 
 #include <algorithm>
 
+template __declspec(noinline) std::_Tree_find_result<std::map<int, ExtendedListLine>::_Mybase::_Nodeptr> std::map<int, ExtendedListLine>::_Mybase::_Find_lower_bound<int>(const int&) const;
+
 namespace {
   // INLINED
   unsigned Palette(int column, int row) {
@@ -20,7 +23,7 @@ namespace {
     unsigned red;
     unsigned green;
     unsigned blue;
-    SkinPaletteChannels(resources, column, row, red, green, blue);
+    g_skinInfo.PaletteChannels(column, row, red, green, blue);
 
     return RGB(red, green, blue);
   }

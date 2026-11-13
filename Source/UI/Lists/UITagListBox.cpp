@@ -70,7 +70,7 @@ void UITagListBox::Paint() {
   }
   const int limit = (this->geometry.height / divisor + first);
   const int end =
-    static_cast<int>(std::min(static_cast<unsigned>(this->lines.size()), static_cast<unsigned>(limit)));
+    static_cast<int>(std::min(static_cast<unsigned>(limit), static_cast<unsigned>(this->lines.size())));
   std::uint32_t color = 0;
 
   for (int index = 0; index < first; ++index) {
@@ -88,16 +88,16 @@ void UITagListBox::Paint() {
       for (int index = first; index < end; ++index) {
         const std::string& line = this->lines[index];
         const int y = (index - first) * this->lineHeight + 4;
-        DrawColoredText(
-          *this, 3, y, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false
+        this->DrawColoredText(
+          3, y, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false
         );
       }
     } else {
       for (int index = first; index < end; ++index) {
         const std::string& line = this->lines[index];
         const int y = (index - first) * this->lineHeight + 4;
-        DrawOutlinedText(
-          *this, 3, y, line.c_str(), static_cast<unsigned>(line.size()), 0, 0xFFFFFF, 0, 12, 0, 0
+        this->DrawOutlinedText(
+          3, y, line.c_str(), static_cast<unsigned>(line.size()), 0, 0xFFFFFF, 0, 12, 0, 0
         );
       }
     }
@@ -384,6 +384,7 @@ void UITagListBox::AppendText(std::intptr_t argument1, std::intptr_t argument2, 
   char* text = reinterpret_cast<char*>(argument1);
   const int width = static_cast<int>(argument2);
   std::vector<std::string> lines;
+  const int lineWidth = width == 0 ? 35 : width;
 
   if (width == 138) {
     WrapPlainText(text, lines, 38);
@@ -407,7 +408,7 @@ void UITagListBox::AppendText(std::intptr_t argument1, std::intptr_t argument2, 
     } else {
       std::vector<STagInfoV2> tags;
       const std::string parsed = this->ParseTaggedText(std::string(text), tags);
-      this->AppendTaggedLines(parsed, tags, width == 0 ? 35 : width);
+      this->AppendTaggedLines(parsed, tags, lineWidth);
     }
 
     this->plainTextMode &= ~255;

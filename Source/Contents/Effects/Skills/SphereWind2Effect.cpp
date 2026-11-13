@@ -7,6 +7,7 @@
 #include "Contents/Effects/Core/EffectPoint.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Sound/SoundMgr.h"
+#include "Contents/Actors/Pc.h"
 #include "Contents/World/World.h"
 #include "Utility/Math/AffineMatrix.h"
 
@@ -36,7 +37,7 @@ void CSphereWind2Effect::Open() {
       const int speed = std::max(rand() % 4, 0) + 3;
 
       for (int part = 0; part < 21; ++part) {
-        CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+        CParticle* particle = CreateParticle(&this->positionVector, 5);
         if (!particle) {
           continue;
         }
@@ -48,15 +49,15 @@ void CSphereWind2Effect::Open() {
         particle->elapsedFrames = delay;
         particle->speedParameter = radius;
         particle->scale = 5.0f;
-        *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(rotation);
+        particle->angle = static_cast<float>(rotation);
         particle->phaseParameter = angle;
         particle->alpha = 0;
         particle->angleParameter = step;
         particle->animationParameter = -10.0f;
-        *reinterpret_cast<float*>(particle->animationParameters) = static_cast<float>(speed);
+        particle->animationParameters[0] = static_cast<float>(speed);
         particle->SetTexture("effect\\fire_ivy.bmp");
         particle->SetColor(255, 89, 182);
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         this->particles.push_back(particle);
       }
 
@@ -65,7 +66,7 @@ void CSphereWind2Effect::Open() {
   }
 
   CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
-  const vector3d& player = reinterpret_cast<const CRenderObject*>(world->player)->render.position;
+  const vector3d& player = world->player->render.position;
   g_soundMgr->PlayWave("effect\\EF_Blessing.wav", this->position[0] - player.x, 0.0f, this->position[2] - player.z, 250, 40, 1.0f, 0);
   this->effectLifetime = 200;
 }
@@ -81,9 +82,10 @@ bool CSphereWind2Effect::IsAlive() {
 void CSphereWind2Effect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
       if (particle->elapsedFrames > 0) {
         int alpha = particle->alpha;
@@ -102,8 +104,8 @@ void CSphereWind2Effect::OnProcess() {
         const int angle = particle->phaseParameter;
 
         const int texPart = particle->columnIndex;
-        float& spin = *reinterpret_cast<float*>(&particle->angleBits);
-        float rotation = *reinterpret_cast<float*>(particle->animationParameters) + spin;
+        float& spin = particle->angle;
+        float rotation = particle->animationParameters[0] + spin;
         if (rotation >= 360.0f) {
           rotation -= 360.0f;
         }

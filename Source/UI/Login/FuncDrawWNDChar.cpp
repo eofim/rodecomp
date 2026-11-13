@@ -179,7 +179,7 @@ void FuncDrawWNDChar::Draw(bool option) {
       if (clip <= top) {
         this->m_window->geometry.surface->DrawSurface(
           x, top, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f - static_cast<float>(clip)), image->width,
-          image->height + clip, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0, 0
+          image->height + clip, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
         );
       }
     }
@@ -377,7 +377,7 @@ void FuncDrawWNDChar::LoadResources(const std::list<int>& layers) {
       case 1: {
         int job = this->m_flags == 1 ? g_session.GetRidingJob(this->m_job) : this->m_job;
         sprName = static_cast<const std::string&>(g_session.GetBodySprName(job, this->m_sex, this->m_body, this->m_shield));
-        actName = static_cast<const std::string&>(GetBodyActionResourceName(job, this->m_sex, this->m_body, this->m_shield));
+        actName = static_cast<const std::string&>(g_session.GetBodyActionResourceName(job, this->m_sex, this->m_body, this->m_shield));
         this->bodyPaletteName = static_cast<const std::string&>(g_session.GetBodyPalName(job, this->m_sex, this->m_bodyStyle, this->m_body, this->m_shield, 0));
         break;
       }

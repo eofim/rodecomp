@@ -10,6 +10,17 @@
 #include <new>
 #include <process.h>
 
+extern "C" __declspec(dllimport) unsigned int __stdcall AIL_stream_status(void* stream);
+extern "C" __declspec(dllimport) int __stdcall AIL_3D_room_type(void* provider);
+extern "C" __declspec(dllimport) void __stdcall AIL_end_sample(void* sample);
+extern "C" __declspec(dllimport) void __stdcall AIL_end_3D_sample(void* sample);
+extern "C" __declspec(dllimport) void __stdcall AIL_close_stream(void* stream);
+extern "C" __declspec(dllimport) void* __stdcall AIL_open_stream(void* driver, const char* name, int flags);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_stream_volume(void* stream, int volume);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_stream_loop_count(void* stream, int count);
+extern "C" __declspec(dllimport) void __stdcall AIL_start_stream(void* stream);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_room_type(void* provider, int roomType);
+
 // STATIC: 0x0138BE7C
 // GLOBAL: gl_24457
 CSoundMgr* g_soundMgr = nullptr;
@@ -323,18 +334,16 @@ void CSoundMgr::Destroy() {
 // OFFSET: 0x006398A0
 // FUNCTION: fn_04754
 void CSoundMgr::EndSamples() {
-  MilesRuntime& miles = MilesRuntime::Get();
-
   for (int i = 0; i < 48; ++i) {
     if (this->samples[i]) {
-      miles.endSample(this->samples[i]);
+      AIL_end_sample(this->samples[i]);
     }
   }
 
   if (this->provider) {
     for (int i = 0; i < 48; ++i) {
       if (this->samples3D[i]) {
-        miles.end3DSample(this->samples3D[i]);
+        AIL_end_3D_sample(this->samples3D[i]);
       }
     }
   }
@@ -396,19 +405,21 @@ bool CSoundMgr::IsComplete() const {
     return false;
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-
-  if (miles.streamStatus(this->secondaryStream) == 2) {
+  if (AIL_stream_status(this->secondaryStream) == 2) {
     return true;
   }
 
-  return miles.streamStatus(this->stream) == 2;
+  if (AIL_stream_status(this->stream) == 2) {
+    return true;
+  }
+
+  return false;
 }
 
 // OFFSET: 0x00639AC0
 // FUNCTION: fn_04758
 bool CSoundMgr::IsStopped() const {
-  return this->stream && MilesRuntime::Get().streamStatus(this->stream) == 8;
+  return this->stream && AIL_stream_status(this->stream) == 8;
 }
 
 // OFFSET: 0x00639AE0
@@ -611,19 +622,17 @@ void CSoundMgr::RestartSecondary() {
     return;
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-
   if (this->reopenPending && this->secondaryStream) {
-    miles.closeStream(this->secondaryStream);
+    AIL_close_stream(this->secondaryStream);
     this->secondaryStream = nullptr;
-    this->secondaryStream = miles.openStream(this->driver, this->currentName.c_str(), 0);
+    this->secondaryStream = AIL_open_stream(this->driver, this->currentName.c_str(), 0);
     this->reopenPending = 0;
   }
 
   if (this->secondaryStream) {
-    miles.setStreamVolume(this->secondaryStream, this->streamVolume);
-    miles.setStreamLoopCount(this->secondaryStream, 1);
-    miles.startStream(this->secondaryStream);
+    AIL_set_stream_volume(this->secondaryStream, this->streamVolume);
+    AIL_set_stream_loop_count(this->secondaryStream, 1);
+    AIL_start_stream(this->secondaryStream);
   }
 }
 
@@ -666,11 +675,10 @@ void CSoundMgr::SetRoom(int room) {
     return;
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-  this->roomSupport = miles.roomType(this->provider) != -1;
+  this->roomSupport = AIL_3D_room_type(reinterpret_cast<void*>(this->provider)) != -1;
 
   if (this->roomSupport) {
-    miles.setRoomType(this->provider, room);
+    AIL_set_3D_room_type(reinterpret_cast<void*>(this->provider), room);
   }
 }
 

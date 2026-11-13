@@ -31,14 +31,14 @@ void CWindEffect::Init() {
     const int maxAlpha = this->maxAlpha;
     const int alpha = maxAlpha == 0 ? 0 : std::ranges::max(rand() % maxAlpha, 0);
     for (int segment = 0; segment < 21; ++segment) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
       particle->alpha = alpha;
       particle->SetColor(this->red, this->green, this->blue);
       particle->scale = this->particleScale;
-      particle->animationParameter = this->ringCount > 1 ? this->height / static_cast<float>(this->ringCount - 1) * static_cast<float>(ring) : 0.0f;
+      particle->animationParameter = 1 < this->ringCount ? this->height / static_cast<float>(this->ringCount - 1) * static_cast<float>(ring) : 0.0f;
       particle->speedParameter = this->angleSpeed;
       particle->angleParameter = this->arcLength;
       if (this->sourceBlend != -1) {
@@ -48,9 +48,9 @@ void CWindEffect::Init() {
         particle->destinationBlend = this->destinationBlend;
       }
       particle->SetTexture(this->textureName);
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(segment) * step + static_cast<float>(startAngle);
+      particle->angle = static_cast<float>(segment) * step + static_cast<float>(startAngle);
       particle->animationState = 0;
-      InitParticleQuad(particle->vertices);
+      particle->InitParticleQuad(particle->vertices);
       particle->effectId = this->id;
       particle->columnIndex = segment;
       particle->rowIndex = ring;
@@ -101,7 +101,7 @@ void CWindEffect::OnProcess() {
     switch (particle->animationState) {
     case 0: {
       int alpha = particle->alpha + 1;
-      if (alpha >= this->maxAlpha) {
+      if (this->maxAlpha <= alpha) {
         alpha = this->maxAlpha;
         particle->animationState = 1;
       }
@@ -119,15 +119,15 @@ void CWindEffect::OnProcess() {
     }
     }
 
-    float& angle = *reinterpret_cast<float*>(&particle->angleBits);
+    float& angle = particle->angle;
     float nextAngle = particle->speedParameter + angle;
     if (nextAngle > 360.0f) {
       nextAngle -= 360.0f;
     }
     angle = nextAngle;
 
-    const float cosine = static_cast<float>(std::cos(static_cast<double>(angle / 180.0f * 3.141592f)));
-    const float sine = static_cast<float>(std::sin(static_cast<double>(angle / 180.0f * 3.141592f)));
+    const float cosine = ClientCos(angle / 180.0f * 3.141592f);
+    const float sine = ClientSin(angle / 180.0f * 3.141592f);
 
     EffectPoint points[4];
     const float scale = particle->scale;
@@ -180,7 +180,14 @@ void CWindEffect::Render() {
       continue;
     }
 
-    const ParticleQuad quad = {true, 0.0f, 1.0f, static_cast<float>(texPart - 1) / 21.0f, static_cast<float>(texPart) / 21.0f, false, true};
+    ParticleQuad quad;
+    quad.unused = false;
+    quad.depth = true;
+    quad.top = 0.0f;
+    quad.bottom = 1.0f;
+    quad.billboard = true;
+    quad.left = static_cast<float>(texPart - 1) / 21.0f;
+    quad.right = static_cast<float>(texPart) / 21.0f;
     particle->Render(quad);
   }
 }

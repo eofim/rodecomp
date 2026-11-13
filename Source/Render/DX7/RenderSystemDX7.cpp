@@ -1,4 +1,5 @@
 #include "Render/DX7/RenderSystemDX7.h"
+#include "Contents/Configuration/ServiceOptions.h"
 #include "Render/DX7/DeviceOwnerDX7.h"
 #include "Render/DX7/DirectDrawEnumeration.h"
 #include "Render/DX7/SurfaceDX7.h"
@@ -8,6 +9,9 @@
 #include "Render/Device/RenderAdapter.h"
 
 #include <new>
+
+template __declspec(noinline) std::shared_ptr<CSurface>& std::shared_ptr<CSurface>::operator=(std::shared_ptr<CSurface>&&) noexcept;
+template __declspec(noinline) std::shared_ptr<CSurface>& std::shared_ptr<CSurface>::operator=<CSurfaceDX7>(std::shared_ptr<CSurfaceDX7>&&) noexcept;
 
 // GLOBAL: gl_24503
 DeviceOwnerDX7* g_deviceOwnerDX7;
@@ -116,7 +120,8 @@ std::uint32_t CRenderSystemDX7::Height() {
 // FUNCTION: fn_02330
 std::shared_ptr<CSurface> CRenderSystemDX7::BackBufferSurface() {
   if (!this->m_backBuffer) {
-    this->m_backBuffer = std::shared_ptr<CSurface>(std::make_shared<CSurfaceDX7>(*this->m_device, this->m_device->renderTarget));
+    IDirectDrawSurface7* renderTarget = this->m_device->renderTarget;
+    this->m_backBuffer = std::make_shared<CSurfaceDX7>(*this->m_device, renderTarget);
   }
 
   return this->m_backBuffer;
@@ -149,11 +154,17 @@ HRESULT CRenderSystemDX7::Initialize(HWND window) {
   const RenderAdapter selected = SelectedRenderAdapter();
 
   for (std::size_t i = 0; i < adapters.size(); ++i) {
-    if (adapters[i].Matches(selected)) {
-      drawIdentity = adapters[i].drawGuid;
-      renderIdentity = adapters[i].renderGuid;
+    const RenderAdapter& adapter = adapters[i];
+    if (adapter.Matches(selected)) {
+      drawIdentity = adapter.drawGuid;
+      renderIdentity = adapter.renderGuid;
       break;
     }
+  }
+
+  DWORD flags = 6;
+  if (g_configuredFullscreen != 0) {
+    flags = 7;
   }
 
   DDSURFACEDESC2 mode;
@@ -161,7 +172,6 @@ HRESULT CRenderSystemDX7::Initialize(HWND window) {
   mode.dwWidth = static_cast<DWORD>(g_configuredScreenWidth);
   mode.dwHeight = static_cast<DWORD>(g_configuredScreenHeight);
   mode.ddpfPixelFormat.dwRGBBitCount = static_cast<DWORD>(g_configuredBitsPerPixel);
-  const DWORD flags = g_configuredFullscreen != 0 ? 7 : 6;
   return this->m_device->Initialize(window, &drawIdentity, &renderIdentity, &mode, flags);
 }
 

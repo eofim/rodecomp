@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 // GLOBAL: gl_24485
 template <>
 CEZ2STREffectMgr* Singleton<CEZ2STREffectMgr>::s_instance = nullptr;
@@ -118,7 +120,9 @@ void EffectResourceSwitcher::SetNames(const std::string& source, const std::stri
   EffectLists* effects = g_effectMgr;
   this->effect = static_cast<CEZ2STREffectEx*>(
       effects->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(this->sourceName), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
-  this->spawnPosition = actor->render.position;
+  this->spawnPosition.x = actor->render.position.x;
+  this->spawnPosition.y = actor->render.position.y;
+  this->spawnPosition.z = actor->render.position.z;
 }
 
 // OFFSET: 0x005A22E0
@@ -264,7 +268,7 @@ CEZ2STREffectMgr* Singleton<CEZ2STREffectMgr>::GetInstance() {
 
 // OFFSET: 0x006FFA00
 // FUNCTION: fn_06967
-__declspec(noinline) bool CEZ2STREffectEx::IsFinished() {
+__declspec(noinline) unsigned char CEZ2STREffectEx::IsFinished() {
   if (!this->emitter) {
     return false;
   }
@@ -285,7 +289,7 @@ void CEZ2STREffectEx::Open() {
     return;
   }
 
-  InitParticleQuad(particle->vertices);
+  particle->InitParticleQuad(particle->vertices);
   particle->m_actorId = this->actor;
   particle->Load(info->name);
 
@@ -334,10 +338,10 @@ bool CEZ2STREffectEx::IsAlive() {
   }
 
   if (emitter->looping == 1) {
-    return CEffect::IsAlive();
+    return this->ActorExists();
   }
 
-  if (emitter->lifetime == 0.0f) {
+  if (0.0f == emitter->lifetime) {
     return true;
   }
 
@@ -491,38 +495,27 @@ void CEZ2STREffectEx::SetDelay(int argument) {
 // OFFSET: 0x00700070
 // FUNCTION: fn_06983
 void CEZ2STREffectMgr::InfoInserter::operator()(const std::pair<const std::string, EZ2STREffectRecord>& entry) const {
-  const EZ2STREffectRecord& record = entry.second;
-  if (record.name.empty()) {
+  if (entry.second.name.empty()) {
     return;
   }
 
   EZ2STREffectInfo info;
   info.id = static_cast<int>(this->manager->effects.size());
-  info.name = static_cast<const std::string&>(FromUtf8(record.name, g_textCodePage));
-  info.offsetX = static_cast<float>(record.offsetX);
-  if (record.infinite) {
-    info.flags |= 1;
-  }
-  if (record.floor) {
-    info.flags |= 2;
-  }
-  info.offsetY = static_cast<float>(record.offsetY);
-  if (record.aboveUi) {
-    info.flags |= 4;
-  }
-  info.soundPath = static_cast<const std::string&>(FromUtf8(record.soundPath, g_textCodePage));
-  if (record.soundLoop) {
-    info.flags |= 8;
-  }
-  info.delays[0] = record.delays[0];
-  info.delays[1] = record.delays[1];
-  if (record.toGround) {
-    info.flags |= 16;
-  }
+  info.name = static_cast<const std::string&>(FromUtf8(entry.second.name, g_textCodePage));
+  info.offsetX = static_cast<float>(entry.second.offsetX);
+  info.flags = entry.second.infinite ? info.flags | 1 : info.flags;
+  info.flags = entry.second.floor ? info.flags | 2 : info.flags;
+  info.offsetY = static_cast<float>(entry.second.offsetY);
+  info.flags = entry.second.aboveUi ? info.flags | 4 : info.flags;
+  info.soundPath = static_cast<const std::string&>(FromUtf8(entry.second.soundPath, g_textCodePage));
+  info.flags = entry.second.soundLoop ? info.flags | 8 : info.flags;
+  info.delays[0] = entry.second.delays[0];
+  info.delays[1] = entry.second.delays[1];
+  info.flags = entry.second.toGround ? info.flags | 16 : info.flags;
 
   std::string key = FromUtf8(entry.first, g_textCodePage);
   std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-  this->manager->effects.insert(std::make_pair(key, info));
+  this->manager->effects.insert(std::pair<const std::string, EZ2STREffectInfo>(key, info));
 }
 
 // OFFSET: 0x00700A10

@@ -23,6 +23,9 @@
 #include <algorithm>
 #include <cstring>
 
+template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const unsigned int, RenewQuestOngoingInfo>>>, std::_Iterator_base0>&
+std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const unsigned int, RenewQuestOngoingInfo>>>, std::_Iterator_base0>::operator++() noexcept;
+
 #pragma pack(push, 1)
 struct PACKET_CZ_ACTIVE_QUEST {
   short packetType;
@@ -94,11 +97,7 @@ void UIQuestDisplay::Paint() {
     } else {
       for (int index = 0; index < info.m_huntCount; ++index) {
         std::string hunt;
-        if (info.m_huntMobId[index] == 31999) {
-          hunt = static_cast<const std::string&>(
-            g_renewQuestMgr->GetMonsterConditionText(info.m_huntConditionFlags[index], info.m_huntMinLevel[index], info.m_huntMaxLevel[index])
-          );
-        } else {
+        if (info.m_huntMobId[index] != 31999) {
           const short minLevel = info.m_huntMinLevel[index];
           const short maxLevel = info.m_huntMaxLevel[index];
           const char* name = info.m_huntName[index];
@@ -113,6 +112,10 @@ void UIQuestDisplay::Paint() {
           } else {
             hunt = static_cast<const std::string&>(FormatOwnedString("%s", name));
           }
+        } else {
+          hunt = static_cast<const std::string&>(
+            g_renewQuestMgr->GetMonsterConditionText(info.m_huntConditionFlags[index], info.m_huntMinLevel[index], info.m_huntMaxLevel[index])
+          );
         }
 
         hunt = StripColorCodes(hunt.c_str(), hunt.size());
@@ -132,10 +135,10 @@ void UIQuestDisplay::Paint() {
         const short goal = info.m_huntMaxCount[index];
         if (goal > 0) {
           const short count = info.m_huntKillCount[index];
-          if (count == goal) {
-            hunt = static_cast<const std::string&>(FormatOwnedString("%s ( %s )", hunt.c_str(), LookupMessage(MSI_COMPLETE_HUNTING_QUEST)));
-          } else {
+          if (count != goal) {
             hunt = static_cast<const std::string&>(FormatOwnedString("%s ( %d / %d )", hunt.c_str(), count, goal));
+          } else {
+            hunt = static_cast<const std::string&>(FormatOwnedString("%s ( %s )", hunt.c_str(), LookupMessage(MSI_COMPLETE_HUNTING_QUEST)));
           }
 
           const int y = index * 13 + top;
@@ -205,8 +208,8 @@ void UIQuestDisplay::OnRBtnUp(int x, int y) {
 // OFFSET: 0x009515D0
 // FUNCTION: fn_12953
 void UIQuestDisplay::StoreInfo() {
-  if (this->m_visibleSetting) {
-    *this->m_visibleSetting = this->geometry.visible;
+  if (this->m_info) {
+    this->m_info->visible = this->geometry.visible;
   }
 }
 
@@ -215,12 +218,12 @@ void UIQuestDisplay::StoreInfo() {
 int UIQuestDisplay::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
   switch (message) {
   case UM_SETINFO: {
-    this->m_visibleSetting = reinterpret_cast<int*>(argument1);
+    this->m_info = reinterpret_cast<QuestDisplayInfo*>(argument1);
     QuestDisplayInfo* info = reinterpret_cast<QuestDisplayInfo*>(argument1);
     if (!info->IsValid()) {
       info->Reset();
     }
-    this->Show(*this->m_visibleSetting);
+    this->Show(this->m_info->visible);
     break;
   }
   case UM_MENU_SELECTED: {
@@ -234,7 +237,7 @@ int UIQuestDisplay::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
           packet.packetType = ID_CZ_ACTIVE_QUEST;
           packet.questId = it->first;
           packet.active = !it->second.m_active;
-          GetRagConnection().Send(reinterpret_cast<const PacketLengths&>(GetRagConnection()).FixedLength(packet.packetType), &packet);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
           this->Invalidate();
           break;
         }

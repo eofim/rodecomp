@@ -6,6 +6,7 @@
 #include "Contents/Effects/Core/EffectMemoryMgr.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Sound/SoundMgr.h"
+#include "Contents/Actors/Pc.h"
 #include "Contents/World/World.h"
 #include "Utility/Math/AffineMatrix.h"
 
@@ -17,11 +18,12 @@
 // FUNCTION: fn_19002
 void CElectricEffect::AddBolt(int tilt) {
   for (int row = 0; row < 4; ++row) {
-    const float spin = static_cast<float>((std::max)(rand() % 11, 0)) * 0.01f;
+    const int roll = rand() % 11;
+    const float spin = static_cast<float>(roll >= 0 ? roll : 0) * 0.01f;
 
     for (int segment = 0; segment < 20; ++segment) {
       for (int strand = 0; strand < 4; ++strand) {
-        CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+        CParticle* particle = CreateParticle(&this->positionVector, 5);
         if (!particle) {
           continue;
         }
@@ -35,19 +37,19 @@ void CElectricEffect::AddBolt(int tilt) {
         particle->alpha = 0;
         particle->phaseParameter = tilt;
         particle->scale = 0.0f;
-        *reinterpret_cast<float*>(&particle->angleBits) = spin;
+        particle->angle = spin;
         particle->angleParameter = 0;
-        InitParticleQuad(particle->vertices);
+        particle->InitParticleQuad(particle->vertices);
         this->bolts.push_back(particle);
 
         float* arc = &particle->animationParameter;
         arc[20] = 9.0f;
         for (int index = 20; index > 0; --index) {
-          float value = arc[index] + 9.0f;
-          if (value > 180.0f) {
-            value = 180.0f;
+          if (arc[index] + 9.0f > 180.0f) {
+            arc[index - 1] = 180.0f;
+          } else {
+            arc[index - 1] = arc[index] + 9.0f;
           }
-          arc[index - 1] = value;
         }
       }
     }
@@ -88,7 +90,7 @@ void CElectricEffect::OnProcess() {
 
   if (this->tick == 25) {
     CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
-    const vector3d& player = reinterpret_cast<const CRenderObject*>(world->player)->render.position;
+    const vector3d& player = world->player->render.position;
     g_soundMgr->PlayWave("effect\\T_전기.wav", this->position[0] - player.x, 0.0f, this->position[2] - player.z, 250, 40, 1.0f, 0);
   }
 
@@ -104,10 +106,11 @@ void CElectricEffect::OnProcess() {
     ++particle->elapsedFrames;
     int alpha = scale > 15.0f ? particle->alpha - 2 : particle->alpha;
     if (particle->elapsedFrames <= 25) {
-      alpha += 5 + (std::max)(rand() % 4, 0);
+      const int flicker = rand() % 4;
+      alpha += 5 + (flicker >= 0 ? flicker : 0);
     }
     particle->scale = scale;
-    particle->alpha = (std::max)(alpha, 0);
+    particle->alpha = alpha >= 0 ? alpha : 0;
 
     matrix rotation;
     std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
@@ -124,15 +127,15 @@ void CElectricEffect::OnProcess() {
         const float bend = arc[segment + index];
         const float radius = bend / 90.0f * particle->scale;
         this->path[index].x = radius * g_cosTable[particle->phaseParameter];
-        this->path[index].y = -particle->scale * g_sinTable[static_cast<int>(bend)] * *reinterpret_cast<const float*>(&particle->angleBits);
+        this->path[index].y = -particle->scale * g_sinTable[static_cast<int>(bend)] * particle->angle;
         this->path[index].z = radius * g_sinTable[particle->phaseParameter];
 
         const int jitterZ = rand() % 7;
         const int jitterY = rand() % 7;
         const int jitterX = rand() % 7;
-        this->path[index].x += static_cast<float>((std::max)(jitterX, 0)) * 0.1f - 2.3f;
-        this->path[index].y += static_cast<float>((std::max)(jitterY, 0)) * 0.1f - 0.3f;
-        this->path[index].z += static_cast<float>((std::max)(jitterZ, 0)) * 0.1f - 0.3f;
+        this->path[index].x += static_cast<float>(jitterX >= 0 ? jitterX : 0) * 0.1f - 2.3f;
+        this->path[index].y += static_cast<float>(jitterY >= 0 ? jitterY : 0) * 0.1f - 0.3f;
+        this->path[index].z += static_cast<float>(jitterZ >= 0 ? jitterZ : 0) * 0.1f - 0.3f;
       }
 
       const float dx = this->path[0].x - this->path[1].x;

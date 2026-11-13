@@ -11,6 +11,12 @@
 
 namespace {
 // INLINED
+int ClampedRandom(int range) {
+  const int value = rand() % range;
+  return value >= 0 ? value : 0;
+}
+
+// INLINED
 __forceinline bool IsParticleActive(const CSpriteParticle* particle) {
   if (0.0f == particle->life) {
     return true;
@@ -30,7 +36,7 @@ CCloudKillEffect::CCloudKillEffect() : CEffect(1080) {
 
 // OFFSET: 0x006FC600
 // FUNCTION: fn_06924
-CCloudKillEffect::~CCloudKillEffect() {
+__declspec(noinline) CCloudKillEffect::~CCloudKillEffect() {
 }
 
 // OFFSET: 0x006FC8F0
@@ -42,23 +48,23 @@ void CCloudKillEffect::AddSprites() {
       CSpriteParticle* particle = static_cast<CSpriteParticle*>(created);
       matrix& rotation = *reinterpret_cast<matrix*>(particle->rotationStorage);
       rotation.IsIdentity();
-      rotation.MakeYRotation(GetRadian(std::max(rand() % 360, 0)));
-      const float distance = static_cast<float>(std::max(rand() % 6, 0) + 2);
+      rotation.MakeYRotation(GetRadian(ClampedRandom(360)));
+      const float distance = static_cast<float>(ClampedRandom(6) + 2);
       const float* values = rotation.values;
       particle->originX = values[3] * 0.0f + values[0] * 0.0f + distance * values[6] + values[9] + static_cast<float>(x);
       particle->originY = values[4] * 0.0f + values[1] * 0.0f + distance * values[7] + values[10] + 0.0f;
       particle->originZ = values[5] * 0.0f + values[2] * 0.0f + distance * values[8] + values[11] + static_cast<float>(z);
       rotation.MakeXRotation(GetRadian(90));
-      const float speed = static_cast<float>(std::max(rand() % 30, 0) + 30) / 100.0f;
+      const float speed = static_cast<float>(ClampedRandom(30) + 30) / 100.0f;
       const float acceleration = -(speed / 40.0f) * g_depthAverageHalf;
-      const int size = std::max(rand() % 50, 0);
+      const int size = ClampedRandom(50);
       particle->frameDelay = speed;
       reinterpret_cast<float&>(particle->accelerationStorage) = acceleration;
       particle->scale = static_cast<float>(size + 40) / 170.0f;
-      reinterpret_cast<float&>(particle->spinBits) = 3.0f;
+      particle->spin = 3.0f;
       particle->alpha = 0;
       particle->animationParameter = 25.4f;
-      reinterpret_cast<float&>(particle->animationParameters) = 32.0f;
+      particle->animationParameters[0] = 32.0f;
       particle->SetSprite("이팩트\\particle3.spr");
       particle->SetAction("이팩트\\particle3.act");
       particle->life = static_cast<float>(this->spriteLifetimeFrames) / 60.0f;
@@ -100,16 +106,16 @@ void CCloudKillEffect::OnProcess() {
     CSpriteParticle* particle = static_cast<CSpriteParticle*>(created);
     matrix& rotation = *reinterpret_cast<matrix*>(particle->rotationStorage);
     rotation.IsIdentity();
-    rotation.MakeYRotation(GetRadian(std::max(rand() % 360, 0)));
+    rotation.MakeYRotation(GetRadian(ClampedRandom(360)));
     rotation.MakeXRotation(GetRadian(90));
-    const float speed = static_cast<float>(std::max(rand() % 20, 0) + 20) / 80.0f;
+    const float speed = static_cast<float>(ClampedRandom(20) + 20) / 80.0f;
     particle->frameDelay = speed;
     reinterpret_cast<float&>(particle->accelerationStorage) = -(speed / 10.0f) * g_depthAverageHalf;
     particle->scale = 0.8f;
-    reinterpret_cast<float&>(particle->spinBits) = 3.0f;
+    particle->spin = 3.0f;
     particle->alpha = 70;
     particle->animationParameter = 25.4f;
-    reinterpret_cast<float&>(particle->animationParameters) = 8.0f;
+    particle->animationParameters[0] = 8.0f;
     particle->SetSprite("이팩트\\particle3.spr");
     particle->SetAction("이팩트\\particle3.act");
     particle->life = static_cast<float>(this->particleLifetimeFrames) / 60.0f;
@@ -123,19 +129,22 @@ void CCloudKillEffect::OnProcess() {
       it = this->particles.erase(it);
     } else {
       const float* values = reinterpret_cast<matrix*>(particle->rotationStorage)->values;
-      float& angle = reinterpret_cast<float&>(particle->angleBits);
+      float& angle = particle->angle;
       const float speed = reinterpret_cast<float&>(particle->accelerationStorage) + particle->frameDelay;
       particle->frameDelay = speed;
-      particle->velocity.x = values[3] * 0.0f + values[0] * 0.0f + speed * values[6] + values[9] + particle->velocity.x;
-      particle->velocity.y = values[4] * 0.0f + values[1] * 0.0f + speed * values[7] + values[10] + particle->velocity.y;
-      particle->velocity.z = values[5] * 0.0f + values[2] * 0.0f + speed * values[8] + values[11] + particle->velocity.z;
-      angle = reinterpret_cast<float&>(particle->spinBits) + angle;
+      const float x = values[3] * 0.0f + values[0] * 0.0f + speed * values[6] + values[9] + particle->velocity.x;
+      const float y = values[4] * 0.0f + values[1] * 0.0f + speed * values[7] + values[10] + particle->velocity.y;
+      const float z = values[5] * 0.0f + values[2] * 0.0f + speed * values[8] + values[11] + particle->velocity.z;
+      particle->velocity.x = x;
+      particle->velocity.y = y;
+      particle->velocity.z = z;
+      angle = particle->spin + angle;
       particle->position.z = particle->velocity.z + this->position[2];
       particle->position.x = particle->velocity.x + this->position[0];
       particle->position.y = particle->velocity.y + this->position[1];
       const int age = particle->elapsedFrames;
       float fade = particle->animationParameter;
-      if (age == static_cast<int>(reinterpret_cast<float&>(particle->animationParameters))) {
+      if (age == static_cast<int>(particle->animationParameters[0])) {
         fade = -(static_cast<float>(particle->alpha) / static_cast<float>(this->particleLifetimeFrames - age));
       }
       particle->animationParameter = fade;
@@ -158,19 +167,22 @@ void CCloudKillEffect::OnProcess() {
       it = this->sprites.erase(it);
     } else {
       const float* values = reinterpret_cast<matrix*>(particle->rotationStorage)->values;
-      float& angle = reinterpret_cast<float&>(particle->angleBits);
+      float& angle = particle->angle;
       const float speed = reinterpret_cast<float&>(particle->accelerationStorage) + particle->frameDelay;
       particle->frameDelay = speed;
-      particle->velocity.x = values[3] * 0.0f + values[0] * 0.0f + speed * values[6] + values[9] + particle->velocity.x;
-      particle->velocity.y = values[4] * 0.0f + values[1] * 0.0f + speed * values[7] + values[10] + particle->velocity.y;
-      particle->velocity.z = values[5] * 0.0f + values[2] * 0.0f + speed * values[8] + values[11] + particle->velocity.z;
+      const float x = values[3] * 0.0f + values[0] * 0.0f + speed * values[6] + values[9] + particle->velocity.x;
+      const float y = values[4] * 0.0f + values[1] * 0.0f + speed * values[7] + values[10] + particle->velocity.y;
+      const float z = values[5] * 0.0f + values[2] * 0.0f + speed * values[8] + values[11] + particle->velocity.z;
+      particle->velocity.x = x;
+      particle->velocity.y = y;
+      particle->velocity.z = z;
       particle->position.y = particle->originY + this->position[1] + particle->velocity.y;
       particle->position.x = particle->originX + this->position[0] + particle->velocity.x;
       particle->position.z = this->position[2] + particle->originZ + particle->velocity.z;
-      angle = reinterpret_cast<float&>(particle->spinBits) + angle;
+      angle = particle->spin + angle;
       const int age = particle->elapsedFrames;
       float fade = particle->animationParameter;
-      if (age == static_cast<int>(reinterpret_cast<float&>(particle->animationParameters))) {
+      if (age == static_cast<int>(particle->animationParameters[0])) {
         fade = -(static_cast<float>(particle->alpha) / static_cast<float>(this->spriteLifetimeFrames - age));
       }
       particle->animationParameter = fade;

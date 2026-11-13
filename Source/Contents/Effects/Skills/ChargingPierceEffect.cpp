@@ -29,11 +29,6 @@ static __forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
 // OFFSET: 0x00703060
 // FUNCTION: fn_07017
 CChargingPierceEffect::CChargingPierceEffect() : CEffect(-1) {
-  for (vector3d& offset : this->offsets) {
-    offset.x = 0.0f;
-    offset.y = 0.0f;
-    offset.z = 0.0f;
-  }
 }
 
 // OFFSET: 0x007030F0
@@ -43,7 +38,7 @@ CChargingPierceNewEffect::CChargingPierceNewEffect() : CEffect(-1) {
 
 // OFFSET: 0x007032D0
 // FUNCTION: fn_07019
-CChargingPierceNewEffect::~CChargingPierceNewEffect() {
+__declspec(noinline) CChargingPierceNewEffect::~CChargingPierceNewEffect() {
 }
 
 // OFFSET: 0x00703490
@@ -167,8 +162,8 @@ void CChargingPierceEffect::OnProcess() {
       rotation.MakeXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
       rotation.AppendYRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw / 180.0f * 3.141592f);
 
-      const float y = height + offset.y;
       const float x = offset.x + 0.0f;
+      const float y = height + offset.y;
       const float z = offset.z + 0.0f;
       const float rotatedX = y * rotation.values[3] + x * rotation.values[0] + z * rotation.values[6] + rotation.values[9];
       const float rotatedY = y * rotation.values[4] + x * rotation.values[1] + z * rotation.values[7] + rotation.values[10];
@@ -196,7 +191,7 @@ void CChargingPierceEffect::OnProcess() {
             height = -13.0f - static_cast<float>(actor->MountType() ? 3 : 0);
           }
 
-          const vector3d origin = *reinterpret_cast<const vector3d*>(this->position);
+          const vector3d origin = this->positionVector;
           const float x = origin.x;
           const float y = origin.y;
           const float z = origin.z;
@@ -205,9 +200,12 @@ void CChargingPierceEffect::OnProcess() {
           const float viewZ = y * view[5] + x * view[2] + z * view[8] + view[11];
           const float viewX = y * view[3] + x * view[0] + z * view[6] + view[9] + offset.x;
           const float viewY = y * view[4] + x * view[1] + z * view[7] + view[10] + (height + offset.y);
-          emitter->position.x = viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9];
-          emitter->position.y = viewX * inverse[1] + viewY * inverse[4] + viewZ * inverse[7] + inverse[10];
-          emitter->position.z = viewX * inverse[2] + viewY * inverse[5] + viewZ * inverse[8] + inverse[11];
+          const float worldX = viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9];
+          const float worldY = viewX * inverse[1] + viewY * inverse[4] + viewZ * inverse[7] + inverse[10];
+          const float worldZ = viewX * inverse[2] + viewY * inverse[5] + viewZ * inverse[8] + inverse[11];
+          emitter->position.x = worldX;
+          emitter->position.y = worldY;
+          emitter->position.z = worldZ;
           emitter->Process(0.0f, 0.0f, 0.0f);
           ++emitter->elapsedFrames;
         }
@@ -215,7 +213,7 @@ void CChargingPierceEffect::OnProcess() {
         FreeParticle(emitter);
         this->emitters[index] = nullptr;
         if (!this->sparks[index]) {
-          CParticle* spark = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 0x101);
+          CParticle* spark = CreateParticle(&this->positionVector, 0x101);
           spark->effectId = this->id;
           spark->columnIndex = 1;
           spark->rowIndex = 0;
@@ -223,7 +221,7 @@ void CChargingPierceEffect::OnProcess() {
           spark->SetTexture("effect\\new_chargingpierce\\cha_orb.bmp");
           spark->scale = 1.5f;
           spark->depthOffset = 0.035f;
-          InitParticleQuad(spark->vertices);
+          spark->InitParticleQuad(spark->vertices);
           this->sparks[index] = spark;
         }
       }
@@ -235,7 +233,7 @@ void CChargingPierceEffect::OnProcess() {
 // FUNCTION: fn_07031
 void CChargingPierceNewEffect::OnProcess() {
   for (CEZ2STRParticle* particle : this->emitters) {
-    const vector3d origin = *reinterpret_cast<const vector3d*>(this->position);
+    const vector3d origin = this->positionVector;
 
     const matrix& view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
     vector3d viewPos;

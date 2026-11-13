@@ -1,4 +1,5 @@
 #include "Contents/Jobs/JobId.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -47,6 +48,7 @@
 #include "Client/Mode/CMode.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include "Resource/MSGSTRINGID.h"
 #include <cstdio>
@@ -162,7 +164,7 @@ void UINewSkillListWnd::DrawCharacter() {
   const int bodyPalette = g_session.m_bodyStyle;
   const int headPalette = g_session.m_headPalette;
 
-  actions[0].assign(static_cast<const std::string&>(GetBodyActionResourceName(job, sex, g_session.m_bodyCostume, 0)));
+  actions[0].assign(static_cast<const std::string&>(g_session.GetBodyActionResourceName(job, sex, g_session.m_bodyCostume, 0)));
   sprites[0].assign(static_cast<const std::string&>(g_session.GetBodySprName(job, sex, g_session.m_bodyCostume, 0)));
   actions[1].assign(static_cast<const std::string&>(g_session.GetHeadActName(job, sex, &head)));
   sprites[1].assign(static_cast<const std::string&>(g_session.GetHeadSprName(job, sex, &head)));
@@ -172,7 +174,7 @@ void UINewSkillListWnd::DrawCharacter() {
   if (headPalette != 0) {
     headPal.assign(static_cast<const std::string&>(g_session.GetHeadPalName(head, job, sex, headPalette)));
   }
-  bodyImf = GetBodyImfName(job, sex, head, g_session.m_bodyCostume);
+  bodyImf = g_session.GetBodyImfName(job, sex, head, g_session.m_bodyCostume);
 
   for (int layer = 0; layer < 2; ++layer) {
     ResourceMgr::Instance().Load(bodyImf.c_str());
@@ -197,11 +199,11 @@ void UINewSkillListWnd::DrawCharacter() {
       int y = 0;
       int view = 0;
       if (layer == 4) {
-        view = *reinterpret_cast<const int*>(&g_session.accessoryAppearance[0]);
+        view = g_session.m_accessory;
       } else if (layer == 3) {
-        view = *reinterpret_cast<const int*>(&g_session.accessoryAppearance[4]);
+        view = g_session.m_accessory2;
       } else if (layer == 2) {
-        view = *reinterpret_cast<const int*>(&g_session.accessoryAppearance[8]);
+        view = g_session.m_accessory3;
       }
       g_session.m_hotkeyScript->Call("OffsetItemPos_GetOffsetForDoram", "ddd>dd", view, 23, g_session.GetCurrentSex(), &x, &y);
       offsetX = x;
@@ -252,7 +254,7 @@ void UINewSkillListWnd::DrawCharacter() {
     const int clipY = y >= 0 ? 0 : y;
     this->geometry.surface->DrawSurface(
       cell.x + offsetX + 48, y >= 0 ? y : 0, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f - clipY), image->width,
-      image->height + clipY, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0, 0
+      image->height + clipY, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
 }
@@ -260,7 +262,6 @@ void UINewSkillListWnd::DrawCharacter() {
 // OFFSET: 0x009AF300
 // FUNCTION: fn_13802
 void UINewSkillListWnd::DrawSkillList() {
-  LuaScript& script = *g_session.m_hotkeyScript;
   int drawn = 0;
   int index = 0;
 
@@ -272,11 +273,11 @@ void UINewSkillListWnd::DrawSkillList() {
 
       if (this->m_selectedSkill == index) {
         unsigned red, green, blue;
-        SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, red, green, blue);
+        g_skinInfo.PaletteChannels(6, 2, red, green, blue);
         if (skill.level == 0) {
-          SkinPaletteChannels(ResourceMgr::Instance(), 10, 2, red, green, blue);
+          g_skinInfo.PaletteChannels(10, 2, red, green, blue);
         } else if (skill.spCost == 0) {
-          SkinPaletteChannels(ResourceMgr::Instance(), 14, 2, red, green, blue);
+          g_skinInfo.PaletteChannels(14, 2, red, green, blue);
         }
         this->FillRegion(x + 104, y + 32, 164, 28, RGB(red, green, blue));
       }
@@ -292,9 +293,9 @@ void UINewSkillListWnd::DrawSkillList() {
       if (bitmap) {
         if (level == 0) {
           shade = 120;
-          this->DrawAuxiliary(1, x + 44, y + 34, &bitmap->image, true, false);
+          this->DrawAuxiliary(1, x + 44, y + 34, bitmap, true, false);
         } else {
-          this->DrawBitmap(x + 44, y + 34, &bitmap->image, true);
+          this->DrawBitmap(x + 44, y + 34, bitmap, true);
         }
       }
 
@@ -303,7 +304,7 @@ void UINewSkillListWnd::DrawSkillList() {
       const int green = level > maxLevel ? 0 : shade;
       const int textX = x + 112;
       const int textY = y + 47;
-      const bool usesLevel = CSkillInfo::UsesLevel(script, static_cast<int>(skill.id));
+      const bool usesLevel = CSkillInfo::UsesLevel(static_cast<int>(skill.id));
       if (level != 0) {
         std::sprintf(text, g_serviceType == 12 ? "Nv :" : "Lv :");
         const int labelX = this->m_locked != 0 || !usesLevel ? textX + 1 : textX + 12;
@@ -339,7 +340,7 @@ void UINewSkillListWnd::DrawSkillList() {
             const std::uint32_t id = skill.id;
             for (const CSkillInfo& live : this->SkillList(this->m_tab, true)) {
               if (live.id == id && live.level != 0) {
-                const int amount = skill.UseSpAmount(script, useLevel);
+                const int amount = skill.UseSpAmount(*g_session.m_hotkeyScript, useLevel);
                 if (amount != 0 && useLevel <= skill.level) {
                   sp = amount;
                 }
@@ -349,10 +350,10 @@ void UINewSkillListWnd::DrawSkillList() {
             }
           }
           if (!found) {
-            sp = skill.UseSpAmount(script, skill.level);
+            sp = skill.UseSpAmount(*g_session.m_hotkeyScript, skill.level);
           }
 
-          const int ap = skill.UseApAmount(script, useLevel > 0 ? useLevel : skill.level);
+          const int ap = skill.UseApAmount(*g_session.m_hotkeyScript, useLevel > 0 ? useLevel : skill.level);
           if (SkillUsesPercentSp(static_cast<int>(skill.id))) {
             if (ap != 0) {
               std::sprintf(text, "Sp : %d%%, Ap : %d", sp, ap);
@@ -368,7 +369,7 @@ void UINewSkillListWnd::DrawSkillList() {
         this->DrawTextAt(textX + 100, textY, text, 0, 0, 12, gray, 0, 0);
       }
 
-      this->DrawTextAt(textX, y + 35, skill.DisplayName(script), 0, 0, 12, RGB(shade, shade, shade), 0, 0);
+      this->DrawTextAt(textX, y + 35, skill.DisplayName(), 0, 0, 12, RGB(shade, shade, shade), 0, 0);
       if (++drawn == this->m_visibleRows * this->m_columns) {
         break;
       }
@@ -473,9 +474,7 @@ std::list<CSkillInfo>& UINewSkillListWnd::SkillList(int tab, bool live) {
 // FUNCTION: fn_13810
 void UINewSkillListWnd::InitTabs() {
   const int initialTabCount = this->m_tabs->labels.size();
-  const std::uint8_t source[] = CRYPT_BYTES(23, "JobSkillTab_GetTabName", 0x03772763F96D9DA5ULL);
-  thread_local EncryptedName<sizeof(source), 0x03772763F96D9DA5ULL> funcName(source);
-  const char* func = funcName.Text();
+  const char* func = OBFUSCATE_BYTES_TEXT("JobSkillTab_GetTabName", 0x03772763F96D9DA5ULL);
 
   const char* defaultTabs[4] = {};
   const char* jobTabs[4] = {};
@@ -734,8 +733,8 @@ bool UINewSkillListWnd::IsExtraTab(int tab) {
 // OFFSET: 0x009B0FA0
 // FUNCTION: fn_13813
 bool UINewSkillListWnd::IsSkillArea(int x, int y) {
-  int minX = 76;
   int rowHeight = 56;
+  int minX = 76;
   int yOffset = 40;
   bool inside = true;
   if (g_session.m_simplifiedSkillList != 0) {
@@ -771,8 +770,8 @@ void UINewSkillListWnd::OnCreate(int width, int height) {
 
     int titleButtonX[3] = {22, this->geometry.width - 30, this->geometry.width - 16};
     UIBitmapButton** titleButtons = &this->m_btnHelp;
-    for (int i = 0; i < 3; ++i) {
-      titleButtons[i]->Move(titleButtonX[i], 5);
+    for (int i = 0; i < 3; ++i, ++titleButtons) {
+      (*titleButtons)->Move(titleButtonX[i], 5);
     }
   }
 
@@ -880,8 +879,7 @@ void UINewSkillListWnd::Paint() {
   bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\skill_upbar_right.bmp")));
   this->DrawBitmap(this->geometry.width - bitmap->image.width, 0, bitmap, false);
 
-  int span = this->geometry.width - left - 24;
-  int count = span / 5 + (span % 5 != 0);
+  int count = (this->geometry.width - left - 24) / 5 + ((this->geometry.width - left - 24) % 5 != 0);
   for (int i = 0, x = left + 12; i < count; ++i, x += 5) {
     bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\skill_upbar_mid.bmp")));
     this->DrawBitmap(x, 0, bitmap, false);
@@ -893,7 +891,7 @@ void UINewSkillListWnd::Paint() {
   this->DrawBitmap(this->geometry.width - bitmap->image.width, this->geometry.height - bitmap->image.height, bitmap, false);
 
   bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\skill_botbar_mid.bmp")));
-  span = this->geometry.width - left - 24;
+  int span = this->geometry.width - left - 24;
   count = span / bitmap->image.width + (span % bitmap->image.width != 0);
   for (int i = 0, x = left + 12; i < count; ++i, x += 5) {
     this->DrawBitmap(x, this->geometry.height - bitmap->image.height, bitmap, false);
@@ -982,7 +980,7 @@ void UINewSkillListWnd::OnLBtnDown(int x, int y) {
         if (level == 0) {
           level = skill.level;
         }
-        gameMode->drag.BeginSkill(g_windowMgr, ResourceMgr::Instance(), 8, skill.id, skill.name, level, -1);
+        gameMode->BeginDragSkill(8, skill.id, skill.name, level, -1);
       }
     }
   }
@@ -1028,7 +1026,7 @@ void UINewSkillListWnd::OnMouseHover(int x, int y) {
       int tooltipY = -20;
       this->ToScreen(tooltipX, tooltipY);
       CMode* mode = g_modeMgr.gameMode;
-      mode->ShowTooltip((*skill)->DisplayName(*g_session.m_hotkeyScript), tooltipX + x, tooltipY + y, -1, 0, 1);
+      mode->ShowTooltip((*skill)->DisplayName(), tooltipX + x, tooltipY + y, -1, 0, 1);
     }
   }
 
@@ -1220,10 +1218,12 @@ void UINewSkillListWnd::LayoutButtons() {
   this->m_btnClose->Move(this->geometry.width - 16, 5);
   this->m_btnApply->Move(this->geometry.width - inset - 100, this->geometry.height - 27);
   this->m_btnCancel->Move(this->geometry.width - inset - 50, this->geometry.height - 27);
-  this->m_btnApply->SetDisabled(!this->m_locked);
-  this->m_btnApply->Invalidate();
-  this->m_btnCancel->SetDisabled(!this->m_locked);
-  this->m_btnCancel->Invalidate();
+  UIBitmapButton* apply = this->m_btnApply;
+  apply->SetDisabled(!this->m_locked);
+  apply->Invalidate();
+  UIBitmapButton* cancel = this->m_btnCancel;
+  cancel->SetDisabled(!this->m_locked);
+  cancel->Invalidate();
   if (!this->m_locked) {
     this->m_btnApply->SetState(0);
     this->m_btnCancel->SetState(0);
@@ -1248,18 +1248,18 @@ void UINewSkillListWnd::LayoutButtons() {
         this->m_btnLevelUp[row]->Move(78, y - 14);
       }
       if (!this->m_locked && row < this->m_visibleRows && static_cast<unsigned int>(this->m_firstRow + row) < list.size() &&
-          skill.available != 0 && skill.level != 0 && CSkillInfo::UsesLevel(*g_session.m_hotkeyScript, skill.id)) {
+          skill.available != 0 && skill.level != 0 && CSkillInfo::UsesLevel(skill.id)) {
         this->m_btnSkills[row]->Move(112, y);
         this->m_btnSkillUps[row]->Move(192, y);
       }
     }
   } else if (!this->m_locked) {
     for (std::list<CSkillInfo>::iterator it = list.begin(); it != list.end(); ++it) {
-      const unsigned int slot = it->treePosition - this->m_columns * this->m_firstRow;
-      if (slot < 42 && it->available != 0 && it->treePosition != 0xFFFFFFFF && it->level != 0 &&
-          CSkillInfo::UsesLevel(*g_session.m_hotkeyScript, it->id)) {
-        const int y = static_cast<int>(slot) / this->m_columns * 56 + 70;
-        const int x = static_cast<int>(slot) % this->m_columns * 68 + 56;
+      const int slot = it->treePosition - this->m_columns * this->m_firstRow;
+      if (slot >= 0 && slot < 42 && it->available != 0 && it->treePosition != 0xFFFFFFFF && it->level != 0 &&
+          CSkillInfo::UsesLevel(it->id)) {
+        const int y = slot / this->m_columns * 56 + 70;
+        const int x = slot % this->m_columns * 68 + 56;
         this->m_btnSkillUps[slot]->Move(x + 55, y);
         this->m_btnSkills[slot]->Move(x, y);
       }
@@ -1531,7 +1531,7 @@ bool UINewSkillListWnd::IncreaseSkillLevel(int skillId) {
       }
 
       if (static_cast<int>(info->canPlanLevel) <= 0) {
-        const char* name = info->DisplayName(*g_session.m_hotkeyScript);
+        const char* name = info->DisplayName();
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatString(LookupMessage(MSI_REFUSE_LOGIN_AUTH), name)), 0xFF, 0, 0, 0);
         return false;
       }
@@ -1620,16 +1620,16 @@ void UINewSkillListWnd::DrawSkillTree() {
     }
     if (bitmap) {
       if (!this->IsExtraTab(this->m_tab) && HasSkillValue(this->m_values, static_cast<int>(skill.id))) {
-        this->DrawAuxiliary(2, x + 4, y + 44, &bitmap->image, true, true);
+        this->DrawAuxiliary(2, x + 4, y + 44, bitmap, true, true);
         const std::string value = this->ValueText(static_cast<int>(skill.id));
         if (value.size() != 0) {
-          DrawOutlinedText(*this, x + 30, y + 58, value.c_str(), 0, 0xFFFFFF, 0, 0, 11, 1, 0);
+          this->DrawOutlinedText(x + 30, y + 58, value.c_str(), 0, 0xFFFFFF, 0, 0, 11, 1, 0);
         }
       } else if (this->m_skillPoints != 0 && skill.available != 0 && skill.upgradable != 0) {
-        this->DrawAuxiliary(4, x + 4, y + 44, &bitmap->image, true, true);
+        this->DrawAuxiliary(4, x + 4, y + 44, bitmap, true, true);
       } else if (level == 0) {
         shade = 120;
-        this->DrawAuxiliary(1, x + 4, y + 44, &bitmap->image, true, true);
+        this->DrawAuxiliary(1, x + 4, y + 44, bitmap, true, true);
       } else {
         this->DrawBitmap(x + 4, y + 44, bitmap, true);
       }
@@ -1665,9 +1665,9 @@ void UINewSkillListWnd::DrawSkillTree() {
         std::sprintf(text, "%d / %d", useLevel, skill.level);
         int textX = (24 - this->TextWidth(text, 0, 0, 11, 1, 0)) / 2 + x + 4;
         std::sprintf(text, "%d", useLevel);
-        DrawOutlinedText(*this, textX, textY, text, 0, useLevel == skill.level ? (shade << 8 | shade) << 8 | shade : 0x7F3CFF, 0xFFFFFF, 0, 11, 1, 0);
+        this->DrawOutlinedText(textX, textY, text, 0, useLevel == skill.level ? (shade << 8 | shade) << 8 | shade : 0x7F3CFF, 0xFFFFFF, 0, 11, 1, 0);
         textX += this->TextWidth(text, 0, 0, 11, 1, 0);
-        DrawOutlinedText(*this, textX, textY, " / ", 0, (shade << 8 | shade) << 8 | shade, 0xFFFFFF, 0, 11, 1, 0);
+        this->DrawOutlinedText(textX, textY, " / ", 0, (shade << 8 | shade) << 8 | shade, 0xFFFFFF, 0, 11, 1, 0);
         textX += this->TextWidth(" / ", 0, 0, 11, 1, 0);
 
         const std::uint32_t id = skill.id;
@@ -1681,20 +1681,20 @@ void UINewSkillListWnd::DrawSkillTree() {
           target = extra->level;
         }
         StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d", target);
-        DrawOutlinedText(*this, textX, textY, text, 0, (blue << 8 | green) << 8 | red, 0xFFFFFF, 0, 11, 1, 0);
+        this->DrawOutlinedText(textX, textY, text, 0, (blue << 8 | green) << 8 | red, 0xFFFFFF, 0, 11, 1, 0);
       } else {
         std::sprintf(text, "%d", skill.level);
         const int width = this->TextWidth(text, 0, 0, 11, 1, 0);
-        DrawOutlinedText(*this, (24 - width) / 2 + x + 4, textY, text, 0, (blue << 8 | green) << 8 | red, 0xFFFFFF, 0, 11, 1, 0);
+        this->DrawOutlinedText((24 - width) / 2 + x + 4, textY, text, 0, (blue << 8 | green) << 8 | red, 0xFFFFFF, 0, 11, 1, 0);
       }
     }
 
-    const int nameWidth = this->TextWidth(skill.DisplayName(script), 0, 0, 11, 0, 0);
+    const int nameWidth = this->TextWidth(skill.DisplayName(), 0, 0, 11, 0, 0);
     int nameOffset = 0;
     if (nameWidth < 48) {
       nameOffset = (48 - nameWidth) / 2;
     }
-    this->DrawTextAt(x - 8 + nameOffset, y + 30, this->ClipTextToWidth(skill.DisplayName(script), 48, 0, 11, 0), 0, 0, 11, (shade << 8 | shade) << 8 | shade, 0, 0
+    this->DrawTextAt(x - 8 + nameOffset, y + 30, this->ClipTextToWidth(skill.DisplayName(), 48, 0, 11, 0), 0, 0, 11, (shade << 8 | shade) << 8 | shade, 0, 0
     );
 
     if (g_session.m_skillBundle.HasHigherLevel(skill.id) == true) {

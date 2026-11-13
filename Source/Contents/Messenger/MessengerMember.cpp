@@ -1,4 +1,5 @@
 #include "Contents/Messenger/MessengerMember.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -48,6 +49,8 @@
 #include <timeapi.h>
 #include <string>
 #include <vector>
+
+template __declspec(noinline) std::vector<unsigned char>::vector(const std::size_t, const unsigned char&, const std::allocator<unsigned char>&);
 
 namespace {
 #pragma pack(push, 1)
@@ -162,11 +165,11 @@ public:
   // INLINED
   UIWindow* CompanionWindow() const {
     if (this->mode == 0) {
-      return reinterpret_cast<UIWindow*>(g_windowMgr.friendOptionWnd);
+      return static_cast<UIWindow*>(g_windowMgr.friendOptionWnd);
     }
-    UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.partyInvitationToWnd);
+    UIWindow* window = static_cast<UIWindow*>(g_windowMgr.partyInvitationToWnd);
     if (g_windowMgr.partySettingWnd) {
-      window = reinterpret_cast<UIWindow*>(g_windowMgr.partySettingWnd);
+      window = static_cast<UIWindow*>(g_windowMgr.partySettingWnd);
     }
     return window;
   }
@@ -255,7 +258,7 @@ std::uint32_t MessengerMember::Deserialize(const std::vector<unsigned char>& dat
   MessengerRecordHeader header;
   header.Clear();
   std::memcpy(&header, data.data(), sizeof(header));
-  if (header.id != 251) {
+  if (251 != header.id) {
     return 0xFFFFFFFF;
   }
 
@@ -340,15 +343,20 @@ void UIDragMiniPartyWnd::Paint() {
   this->ClearSurface(0xFFFFFFFF);
   std::string prefix = "유저인터페이스\\renewalparty\\";
   if (this->member.valid) {
-    bool dead = false;
+    int dead = 0;
     if (this->member.dead == 1) {
-      dead = true;
-    } else if (this->member.accountId == g_session.m_aid) {
-      dead = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->isPlayerDead == 1;
+      dead = 1;
+    } else if (g_session.m_aid == this->member.accountId) {
+      if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->isPlayerDead == 1) {
+        dead = 1;
+      }
     }
 
     int yOffset = this->member.leader ? 0 : 2;
-    const char* jobFmt = dead ? "%sicon_jobs_%d_die.bmp" : "%sicon_jobs_%d.bmp";
+    const char* jobFmt = "%sicon_jobs_%d.bmp";
+    if (dead) {
+      jobFmt = "%sicon_jobs_%d_die.bmp";
+    }
     char path[256];
     sprintf(path, jobFmt, prefix.c_str(), this->member.job);
     this->DrawBitmap(
@@ -594,7 +602,7 @@ UIJobIconButton::~UIJobIconButton() = default;
 // OFFSET: 0x00739450
 // FUNCTION: fn_07687
 void UIJobIconButton::Paint() {
-  std::string name;
+  std::string name("");
   if (this->m_disabled == 1) {
     name = this->m_names[3];
   } else {
@@ -615,7 +623,7 @@ void UIJobIconButton::Paint() {
     auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
     if (bitmap) {
       if (this->offline == 1) {
-        this->DrawAuxiliary(1, 0, 0, &bitmap->image, true, false);
+        this->DrawAuxiliary(1, 0, 0, bitmap, true, false);
       } else {
         this->DrawBitmap(0, 0, bitmap, true);
       }
@@ -669,14 +677,12 @@ UIMessengerGroupWnd::UIMessengerGroupWnd() : UIFrameWnd(0) {
   this->iconModeButtons[1] = nullptr;
   this->iconModeButtons[0] = nullptr;
   this->iconIndex = 0;
-  for (int i = 0; i < 11; ++i) {
-    this->hiddenButtons[i] = 0;
-  }
+  SecureZeroMemory(this->hiddenButtons, sizeof(this->hiddenButtons));
 }
 
 // OFFSET: 0x0073A080
 // FUNCTION: fn_07700
-UIMessengerGroupWnd::~UIMessengerGroupWnd() = default;
+__declspec(noinline) UIMessengerGroupWnd::~UIMessengerGroupWnd() = default;
 
 // OFFSET: 0x0073A1C0
 // FUNCTION: fn_07702
@@ -891,8 +897,11 @@ void UIMessengerGroupWnd::OnCreate(int, int) {
       this->buttons[index]->Move(x, this->geometry.height - 40);
       this->buttons[index]->SetId(ids[index]);
       static_cast<UIBitmapButton*>(this->buttons[index])->SetTooltip(this->mode == 0 ? friendTooltips[index] : partyTooltips[index]);
-      static_cast<UIBitmapButton*>(this->buttons[index])->SetDisabled(disabled[index]);
-      this->buttons[index]->Invalidate();
+      {
+        UIBitmapButton* button = static_cast<UIBitmapButton*>(this->buttons[index]);
+        button->SetDisabled(disabled[index]);
+        button->Invalidate();
+      }
       this->AddChild(this->buttons[index]);
     }
   }
@@ -914,7 +923,7 @@ void UIMessengerGroupWnd::Paint() {
   this->DrawTitleBar(true, "", 0);
   {
     unsigned red, green, blue;
-    SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
   }
   DrawRectangleBorder(*this, 0, 17, this->geometry.width, this->geometry.height - 38, 0xC0C0C0);
@@ -971,7 +980,7 @@ void UIMessengerGroupWnd::Paint() {
       }
       if (this->selected == index) {
         unsigned selectRed, selectGreen, selectBlue;
-        SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, selectRed, selectGreen, selectBlue);
+        g_skinInfo.PaletteChannels(6, 2, selectRed, selectGreen, selectBlue);
         this->FillRegion(0, top + 2, this->geometry.width, this->rowHeight, RGB(selectRed, selectGreen, selectBlue));
       }
 
@@ -1075,7 +1084,7 @@ void UIMessengerGroupWnd::Paint() {
 
       if (this->selected == index) {
         unsigned selectRed, selectGreen, selectBlue;
-        SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, selectRed, selectGreen, selectBlue);
+        g_skinInfo.PaletteChannels(6, 2, selectRed, selectGreen, selectBlue);
         this->FillRegion(
           x + 17, top + 4, this->TextWidth(nameText, 0, 0, 12, 0, 0) + 3, 16,
           RGB(selectRed, selectGreen, selectBlue)
@@ -1129,7 +1138,7 @@ void UIMessengerGroupWnd::OnRBtnUp(int x, int y) {
 // FUNCTION: fn_07709
 void UIMessengerGroupWnd::OnLBtnDown(int x, int y) {
   if (y < 17) {
-    UIFrameWnd::OnRBtnUp(x, y);
+    UIFrameWnd::OnLBtnDown(x, y);
     if (UIWindow* window = this->CompanionWindow()) {
       window->geometry.targetAlpha = 128;
       window->geometry.alphaStart = timeGetTime();
@@ -1504,16 +1513,22 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
 
     int tooltip;
     if (this->mode == 0) {
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetDisabled(1);
-      static_cast<UIBitmapButton*>(this->buttons[0])->Invalidate();
+      {
+        UIBitmapButton* button = static_cast<UIBitmapButton*>(this->buttons[0]);
+        button->SetDisabled(1);
+        button->Invalidate();
+      }
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 0, 0);
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 1, 0);
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 2, 0);
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 3, 0);
       tooltip = 0x62;
     } else {
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetDisabled(0);
-      static_cast<UIBitmapButton*>(this->buttons[0])->Invalidate();
+      {
+        UIBitmapButton* button = static_cast<UIBitmapButton*>(this->buttons[0]);
+        button->SetDisabled(0);
+        button->Invalidate();
+      }
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01.bmp", 0, 0);
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_a.bmp", 1, 0);
       static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_b.bmp", 2, 0);

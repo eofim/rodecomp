@@ -6,6 +6,7 @@
 
 #include <unordered_map>
 #include <utility>
+#include <windows.h>
 
 enum ServiceOption : int { ConfineCursor = 271 };
 
@@ -16,15 +17,15 @@ std::pair<int, unsigned char> FindServiceOption(const char* name);
 int SetOption(const char* name, unsigned char value);
 
 struct ServiceOptions {
-  /* 0000 */ std::unordered_map<std::uint32_t, unsigned char, SkillIdHash> values;
+  /* 0000 */ std::unordered_map<int, unsigned char> values;
 
-  unsigned char Get(int id) const;
+  static unsigned char Get(int id);
   static bool Set(int id, unsigned char value);
 };
 
 extern ServiceOptions g_serviceOptions;
 extern float g_serviceOptionJitterScale;
-extern bool g_showBattleFieldIcon;
+extern const GUID g_defaultDrawGuidDX7;
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(ServiceOptions) == 0x20);

@@ -17,7 +17,7 @@ CSoulUnityEffect::CSoulUnityEffect() : CEffect(1222) {
 
 // OFFSET: 0x0072B0E0
 // FUNCTION: fn_07466
-CSoulUnityEffect::~CSoulUnityEffect() {
+__declspec(noinline) CSoulUnityEffect::~CSoulUnityEffect() {
 }
 
 // OFFSET: 0x0072B230
@@ -32,7 +32,7 @@ void CSoulUnityEffect::Close() {
 // OFFSET: 0x0072B2A0
 // FUNCTION: fn_07469
 void CSoulUnityEffect::Open() {
-  CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 0);
+  CParticle* particle = CreateParticle(&this->positionVector, 0);
   if (particle) {
     particle->SetTexture("effect\\soul_unity\\soul_unity.bmp");
     particle->effectId = this->id;
@@ -41,7 +41,7 @@ void CSoulUnityEffect::Open() {
     particle->groupIndex = 1;
     particle->scale = 2.5f;
     particle->depthOffset = 0.035f;
-    InitParticleQuad(particle->vertices);
+    particle->InitParticleQuad(particle->vertices);
     this->particles.push_back(particle);
   }
 }

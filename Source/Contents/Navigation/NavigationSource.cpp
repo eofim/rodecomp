@@ -11,6 +11,12 @@
 #include <cstdlib>
 #include <cstring>
 
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
+template __declspec(noinline) std::vector<char>::vector(const std::size_t, const char&, const std::allocator<char>&);
+template __declspec(noinline) void std::vector<PathCell>::push_back(const PathCell&);
+template __declspec(noinline) void std::_Destroy_range<std::allocator<NaviRouteLine>>(NaviRouteLine*, NaviRouteLine* const, std::allocator<NaviRouteLine>&) noexcept;
+
 // GLOBAL: gl_24627
 CNavigationManager g_navigationManager;
 
@@ -650,7 +656,7 @@ int CNavigationManager::RouteFromPlayer() {
   if (this->data.GetInfo() == info) {
     const int type = this->savedTarget.type;
     if (type != 2 && type != 0) {
-      int code = type == 1 ? 6 : -96;
+      int code = type != 1 ? -96 : 6;
       if (type == 3) {
         code = 8;
       }
@@ -675,7 +681,7 @@ int CNavigationManager::RouteFromPlayer() {
       this->currentTarget = this->savedTarget;
       this->LoadTargetPreview();
       const int targetType = this->savedTarget.type;
-      result = targetType == 2 ? 7 : -96;
+      result = targetType != 2 ? -96 : 7;
       this->drawRoute = true;
       this->routeFlag = true;
       this->drawDestination = true;
@@ -729,8 +735,7 @@ int CNavigationManager::RouteFromPlayer() {
       NaviCell cellX;
       NaviCell cellY;
       if (start.x == this->nodes[0]->GetCell(&cellX)->x && start.y == this->nodes[0]->GetCell(&cellY)->y) {
-        PathCell point = {start.x, start.y, 0, 0};
-        this->movementRoute.points.push_back(point);
+        this->movementRoute.points.push_back({start.x, start.y, 0, 0});
       } else if (!this->BuildRoute(start.x, start.y, this->nodes[0]->GetCell(&cellX)->x, this->nodes[0]->GetCell(&cellY)->y, true)) {
         goto search;
       }

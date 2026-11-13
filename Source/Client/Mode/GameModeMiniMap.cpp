@@ -26,6 +26,7 @@
 #include "Utility/Text/FormatString.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
+#include "Utility/Cipher/Obfuscate.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -33,11 +34,13 @@
 #include <timeapi.h>
 #include <windows.h>
 
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 namespace {
 
 // INLINED
 __forceinline const char* TimeFontActionName() {
-  constexpr auto sourceText = CRYPT_NAME("이팩트\\TimeFont.act", 0x7D5D0F110B6B8371ULL);
+  constexpr auto sourceText = OBFUSCATE_SOURCE("이팩트\\TimeFont.act", 0x7D5D0F110B6B8371ULL);
   const auto& source = sourceText.data;
   // GLOBAL: gl_25508
   thread_local EncryptedName<sizeof(source), 0x7D5D0F110B6B8371ULL> name(source);
@@ -46,7 +49,7 @@ __forceinline const char* TimeFontActionName() {
 
 // INLINED
 __forceinline const char* TimeFontSpriteName() {
-  const char source[] = CRYPT_CHARS(20, "이팩트\\TimeFont.spr", 0x114901C7E37F6D49ULL);
+  const char source[] = OBFUSCATE_SOURCE_CHARS(20, "이팩트\\TimeFont.spr", 0x114901C7E37F6D49ULL);
   // GLOBAL: gl_25509
   thread_local EncryptedName<sizeof(source), 0x114901C7E37F6D49ULL> name(source);
   return name.Text();
@@ -457,7 +460,7 @@ void CGameMode::DrawMiniMapMarker(
       if (g_windowMgr.miniMapWnd) {
         g_windowMgr.miniMapWnd->SendMsg(nullptr, UM_MINIMAP_SET_PLAYER_POS, x, y, 0, 0);
       }
-      if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.minimapZoomWnd)) {
+      if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.minimapZoomWnd)) {
         window->Invalidate();
       }
     }
@@ -474,9 +477,8 @@ void CGameMode::DrawMiniMapMarker(
 // OFFSET: 0x00CD1C50
 // FUNCTION: fn_21258
 void CGameMode::DrawMiniMapCoordinates() {
-  const char* player = reinterpret_cast<const char*>(this->scene->player);
-  const int coordinateX = *reinterpret_cast<const int*>(player + 0x494);
-  const int coordinateY = *reinterpret_cast<const int*>(player + 0x498);
+  const int coordinateX = this->scene->player->pkRank;
+  const int coordinateY = this->scene->player->pkTotal;
   if (coordinateY <= 0 || coordinateX <= 0) {
     return;
   }
@@ -608,9 +610,8 @@ int g_timeAttackFrame;
 // OFFSET: 0x00CD1EE0
 // FUNCTION: fn_21259
 void CGameMode::DrawTimeAttackTimer() {
-  const char* player = reinterpret_cast<const char*>(this->scene->player);
-  const int coordinateX = *reinterpret_cast<const int*>(player + 0x494);
-  const int coordinateY = *reinterpret_cast<const int*>(player + 0x498);
+  const int coordinateX = this->scene->player->pkRank;
+  const int coordinateY = this->scene->player->pkTotal;
   if (coordinateY <= 0 || coordinateX <= 0) {
     return;
   }

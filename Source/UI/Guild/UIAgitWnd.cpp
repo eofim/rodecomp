@@ -1,4 +1,5 @@
 #include "Client/Mode/ModeMessage.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Guild/UIAgitWnd.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/CMode.h"
@@ -89,9 +90,9 @@ void UIListBoxAgit::OnRBtnDown(int x, int y) {
 // FUNCTION: fn_13081
 void UIListBoxAgitMenu::Paint() {
   unsigned red, green, blue;
-  SkinPaletteChannels(ResourceMgr::Instance(), 6, 6, red, green, blue);
+  g_skinInfo.PaletteChannels(6, 6, red, green, blue);
   this->ClearSurface(RGB(red, green, blue));
-  SkinPaletteChannels(ResourceMgr::Instance(), 2, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->FillRegion(1, 1, this->geometry.width - 2, this->geometry.height - 2, RGB(red, green, blue));
 
   auto* leftUp = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\sysboxs_lu.bmp")));
@@ -103,7 +104,7 @@ void UIListBoxAgitMenu::Paint() {
   auto* rightDown = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\sysboxs_rd.bmp")));
   this->DrawBitmap(this->geometry.width - rightDown->image.width, this->geometry.height - rightDown->image.height, rightDown, false);
 
-  SkinPaletteChannels(ResourceMgr::Instance(), 6, 2, red, green, blue);
+  g_skinInfo.PaletteChannels(6, 2, red, green, blue);
   for (int index = 0; index < 2; ++index) {
     if (index == this->selected) {
       this->FillRegion(3, this->lineHeight * index + 1, this->geometry.width - 6, this->lineHeight - 2, RGB(red, green, blue));
@@ -159,10 +160,10 @@ int UIListBoxAgitMenu::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       return 0;
     }
 
+    char* agitName = nullptr;
     GuildInfo* guildInfo = &g_guildInfo;
     uint16_t agitId = static_cast<uint16_t>(guildInfo->GetAgitId(this->m_agitIndex));
 
-    char* agitName = nullptr;
     g_session.m_hotkeyScript->Call("get_agit_name", "d>s", agitId, &agitName);
     if (strnlen(agitName, 256) != 0) {
       int costZeny = 0;
@@ -171,12 +172,10 @@ int UIListBoxAgitMenu::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       g_session.m_hotkeyScript->Call("get_agit_costzeny", "db>d", agitId, 1, &costGuildPoint);
 
       UIAgitMessageBox* box = new UIAgitMessageBox();
-      const char* text = FormatString(LookupMessage(MSI_NOT_LEARN_BASIC_SKILL), agitName, costZeny, costGuildPoint);
-      box->InitializeMessageBox(text, 310, 130);
+      box->InitializeMessageBox((FormatString(LookupMessage(MSI_NOT_LEARN_BASIC_SKILL), agitName, costZeny, costGuildPoint)), 310, 130);
 
       int x = g_renderer->viewport.centerX - box->geometry.width / 2;
-      int y = g_renderer->viewport.centerY - box->geometry.height / 2;
-      box->Move(x, y);
+      box->Move(x, (g_renderer->viewport.centerY - box->geometry.height / 2));
       box->m_agitId = agitId;
       g_windowMgr.AddRendered(box);
     }
@@ -184,8 +183,7 @@ int UIListBoxAgitMenu::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   }
   case 1: {
     CMode* mode = g_modeMgr.GetGameMode();
-    GuildInfo* guildInfo = &g_guildInfo;
-    uint16_t agitId = static_cast<uint16_t>(guildInfo->GetAgitId(this->m_agitIndex));
+    uint16_t agitId = static_cast<uint16_t>((&g_guildInfo)->GetAgitId(this->m_agitIndex));
     mode->SendMsg(MM_REQ_AGIT_INVESTMENT, agitId, 0, 0, 0);
     break;
   }

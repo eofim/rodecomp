@@ -51,6 +51,10 @@
 #include <shellapi.h>
 #include <timeapi.h>
 
+template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
+
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 #pragma pack(push, 1)
 struct CashItemPurchase {
   /* 0000 */ int itemId;
@@ -100,7 +104,7 @@ UICashShopWnd_CartItem::UICashShopWnd_CartItem() : UIWindow(0) {
 
 // OFFSET: 0x007CDE30
 // FUNCTION: fn_09521
-UICashShopWnd::~UICashShopWnd() {
+__declspec(noinline) UICashShopWnd::~UICashShopWnd() {
 }
 
 // OFFSET: 0x007CE110
@@ -205,7 +209,7 @@ void UICashShopWnd::OnCreate(int, int) {
   this->m_banner->SetSize(0x213, 0x33);
   this->m_banner->Move(3, 0x12);
   this->AddChild(this->m_banner);
-  if (g_session.characterRenameEnabled) {
+  if (g_session.m_launchPassCommandLine) {
     this->m_secondBanner = new UICashShopWnd_Banner();
     this->m_secondBanner->SetSize(0xB0, 0x38);
     this->m_secondBanner->Move(0x21A, 0x1A9);
@@ -341,7 +345,7 @@ void UICashShopWnd::OnCreate(int, int) {
   this->SendMsg(this->m_tabButtons[this->m_selectedTab], UM_COMMAND, ID_RADIOBTN, 0, 0, 0);
   this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   g_modeMgr.GetGameMode()->SendMsg(MM_GET_ACCOUNT_LIMITED_SALE_LIST, 0, 0, 0, 0);
-  if (g_session.characterRenameEnabled) {
+  if (g_session.m_launchPassCommandLine) {
     charge->Enable(0);
     this->m_pointsEdit->Show(0);
   }
@@ -429,7 +433,7 @@ void UICashShopWnd::Paint() {
   const char* background = this->m_selectedTab == 9 ? "유저인터페이스\\cashshop\\img_shop_bg2.bmp" : "유저인터페이스\\cashshop\\img_shop_bg.bmp";
   CBitmapRes* backgroundBitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background)));
   this->DrawBitmap(0, 0, backgroundBitmap, false);
-  if (g_session.characterRenameEnabled) {
+  if (g_session.m_launchPassCommandLine) {
     this->DrawBitmap(
       0x218, 0x11, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\cashshop\\img_shop_bg3_cover.bmp"))), false
     );
@@ -442,17 +446,17 @@ void UICashShopWnd::Paint() {
     this->DrawWrappedFormattedText(0xF7, 0x1EE, FormatOwnedString("^b%d^/b / %d", this->m_page + 1, this->m_pageCount), 0x2B, 0, 6, 0, 0xC, 0x6B2921, 0);
   }
 
-  if (g_session.characterRenameEnabled) {
-    {
-      const auto source = CRYPT_NAME("스토브 구입 리스트", 0x474DC581D5E98357ULL);
+  if (g_session.m_launchPassCommandLine) {
+    this->DrawCenteredText(0x21A, 0x1B, []() {
+      const auto source = OBFUSCATE_SOURCE("스토브 구입 리스트", 0x474DC581D5E98357ULL);
       thread_local EncryptedName<sizeof(source), 0x474DC581D5E98357ULL> title(source.data);
-      this->DrawCenteredText(0x21A, 0x1B, title.Text(), 0xB9, 0, 0xE, 0, 1);
-    }
-    {
-      const char source[] = CRYPT_CHARS(19, "스토브 구입 리스트", 0x3F557BE333F95F6DULL);
+      return title.Text();
+    }(), 0xB9, 0, 0xE, 0, 1);
+    this->DrawCenteredText(0x219, 0x1A, []() {
+      const char source[] = OBFUSCATE_SOURCE_CHARS(19, "스토브 구입 리스트", 0x3F557BE333F95F6DULL);
       thread_local EncryptedName<sizeof(source), 0x3F557BE333F95F6DULL> title(source);
-      this->DrawCenteredText(0x219, 0x1A, title.Text(), 0xB9, 0, 0xE, 0xFFFFFF, 1);
-    }
+      return title.Text();
+    }(), 0xB9, 0, 0xE, 0xFFFFFF, 1);
   } else {
     this->DrawCenteredText(0x21A, 0x1B, LookupMessage(MSI_CASHSHOP_TAB_LIMITED), 0xB9, 0, 0xE, 0, 1);
     this->DrawCenteredText(0x219, 0x1A, LookupMessage(MSI_CASHSHOP_TAB_LIMITED), 0xB9, 0, 0xE, 0xFFFFFF, 1);
@@ -511,7 +515,7 @@ void UICashShopWnd_CartItem::Paint() {
     ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\collection\\%s.bmp", ItemResourcePath(this->m_item)).c_str()))
   );
   if (icon != nullptr) {
-    this->DrawBitmapScaled(4, 0, static_cast<int>(icon->image.width * 0.5), static_cast<int>(icon->image.height * 0.5), &icon->image, 1);
+    this->DrawBitmapScaled(4, 0, static_cast<int>(icon->image.width * 0.5), static_cast<int>(icon->image.height * 0.5), icon, 1);
   }
 
   this->DrawRightAlignedText(0xA0, 0x22, FormatOwnedString("%d C", this->m_item.prices[0]).c_str(), 0, 0, 0xC, 0, 0);
@@ -612,7 +616,7 @@ void UICashShopWnd_CartItem::OnLBtnDblClk(int, int) {
 void UICashShopWnd_CartItem::OnLBtnDown(int, int) {
   if (this->m_item.identity[1] > 0) {
     static_cast<CGameMode*>(g_modeMgr.GetGameMode())
-      ->drag.BeginItem(g_windowMgr, 4, this->m_item, this->m_item.quantity, -1);
+      ->BeginDragItem(4, this->m_item, this->m_item.quantity, -1);
   }
 }
 
@@ -620,7 +624,7 @@ void UICashShopWnd_CartItem::OnLBtnDown(int, int) {
 // FUNCTION: fn_09546
 void UICashShopWnd_Item::OnLBtnDown(int, int) {
   if (this->m_item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->drag.BeginItem(g_windowMgr, 6, this->m_item, 1, -1);
+    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(6, this->m_item, 1, -1);
   }
 }
 
@@ -682,7 +686,7 @@ void UICashShopWnd::OnProcess() {
   }
 
   this->m_banner->OnProcess();
-  if (g_session.characterRenameEnabled) {
+  if (g_session.m_launchPassCommandLine) {
     this->m_secondBanner->OnProcess();
   }
 }
@@ -762,7 +766,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
   const CSession& lists = g_session;
   switch (message) {
   case UM_SETINFO:
-    if (g_session.characterRenameEnabled) {
+    if (g_session.m_launchPassCommandLine) {
       if (g_session.m_hotkeyScript->Call("set_stoveshop_banner", "") == true) {
         this->m_banner->CreateButtons();
         this->m_secondBanner->CreateButtons();
@@ -903,7 +907,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
   case UM_COMMAND:
     switch (argument1) {
     case ID_CLOSE:
-      if (g_session.characterRenameEnabled) {
+      if (g_session.m_launchPassCommandLine) {
         g_modeMgr.GetGameMode()->SendMsg(MM_STOVE_AUTHENTICATION, 5, 0, 0, 0);
       }
       g_windowMgr.CloseWindow(WID_CASHSHOP_WND);
@@ -942,7 +946,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         return 0;
       }
 
-      if (g_session.characterRenameEnabled) {
+      if (g_session.m_launchPassCommandLine) {
         const int owned = lists.GetList0Size() + g_session.CountDistinctEquippedItems() + g_session.CountDistinctCostumeItems();
         if (g_session.m_weight > g_session.m_maxWeight * 0.7f || cartItems.front().quantity + owned > g_session.extraInventorySlots + 100) {
           g_windowMgr.Confirm(LookupMessage(MSI_ANOTHER_WORKING), 0, true, false, 0, "Message", 0x118, 0x78, 0);
@@ -1131,7 +1135,7 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     }
 
     if (it == this->m_cartItems.end()) {
-      if (g_session.characterRenameEnabled && !this->m_cartItems.empty()) {
+      if (g_session.m_launchPassCommandLine && !this->m_cartItems.empty()) {
         const int result =
           g_windowMgr.Confirm(FormatOwnedString(CashShopReplaceCartItemText()().Text(), item.displayName.c_str()).c_str(), 2, true, false, 0, "Message", 0x118, 0x78, 0);
         if (result != 0xBB) {
@@ -1310,15 +1314,21 @@ int UICashShopWnd_Item::SendMsg(UIWindow* sender, int message, std::intptr_t arg
   case UM_REFRESHITEM:
     this->m_item = *reinterpret_cast<const ITEM_INFO*>(argument1);
     this->Show(1);
-    this->m_addButton->SetDisabled(0);
-    this->m_addButton->Invalidate();
+    {
+      auto* addButton = this->m_addButton;
+      addButton->SetDisabled(0);
+      addButton->Invalidate();
+    }
     this->m_soldOut->Show(0);
     this->m_largeLayout = argument2 == 9;
     if (argument2 == 9) {
       if (static_cast<int>(this->m_item.saleData[3]) <= 0) {
         this->m_addButton->Move(0x53, 0x78);
-        this->m_addButton->SetDisabled(1);
-        this->m_addButton->Invalidate();
+        {
+          auto* addButton = this->m_addButton;
+          addButton->SetDisabled(1);
+          addButton->Invalidate();
+        }
         this->m_addButton->SetText(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_DONT_MOVE_CART));
         this->m_addButton->AddTextStyle(0, 0xC, 0x313131, 1, 1, -1000, -1000);
         this->m_addButton->AddTextStyle(1, 0xC, 0x313131, 1, 1, -1000, -1000);

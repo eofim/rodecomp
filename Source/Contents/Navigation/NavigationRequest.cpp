@@ -10,6 +10,8 @@
 #include <windows.h>
 #include <shlwapi.h>
 
+template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+
 // OFFSET: 0x00B8C0B0
 // FUNCTION: fn_19420
 __declspec(noinline) CNavi_Object* FindNaviObjectByName(const char* name, const std::vector<CNavi_Object*>& objects) {
@@ -510,7 +512,10 @@ void CNaviInfo::SearchMap(const std::vector<std::string>& keywords, std::vector<
     wideKeywords.push_back(std::wstring(buffer));
   }
 
-  const std::string text = this->name + ' ' + this->title + ' ';
+  std::string text = this->name;
+  text.push_back(' ');
+  text += this->title;
+  text.push_back(' ');
   MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, buffer, 100);
   const std::wstring wideText(buffer);
 
@@ -555,7 +560,10 @@ void CNaviInfo::SearchMobs(const std::vector<std::string>& keywords, std::vector
   }
 
   std::wstring entryText;
-  const std::string text = this->name + ' ' + this->title + ' ';
+  std::string text = this->name;
+  text.push_back(' ');
+  text += this->title;
+  text.push_back(' ');
   MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, buffer, 100);
   const std::wstring wideText(buffer);
 

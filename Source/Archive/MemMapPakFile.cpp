@@ -1,9 +1,6 @@
 #include "Archive/MemMapPakFile.h"
 
-// INLINED
-CMemMapPakFile::CMemMapPakFile() {
-  this->Initialize();
-}
+template __declspec(noinline) std::vector<std::uint8_t>::~vector() noexcept;
 
 // OFFSET: 0x00AECAA0
 // FUNCTION: fn_18140
@@ -132,10 +129,10 @@ std::uint8_t* CMemMapPakFile::Read(std::uint64_t offset, std::uint32_t length) {
   SetFilePointerEx(this->m_handle, position, nullptr, FILE_BEGIN);
   DWORD read = 0;
 
-  if (ReadFile(this->m_handle, this->m_buffer.data(), length, &read, nullptr)) {
-    this->m_view = this->m_buffer.empty() ? nullptr : this->m_buffer.data();
-    return this->m_view;
+  if (!ReadFile(this->m_handle, this->m_buffer.data(), length, &read, nullptr)) {
+    return nullptr;
   }
 
-  return nullptr;
+  this->m_view = this->m_buffer.empty() ? nullptr : this->m_buffer.data();
+  return this->m_view;
 }

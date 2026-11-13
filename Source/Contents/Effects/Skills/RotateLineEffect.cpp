@@ -28,25 +28,27 @@ void CRotateLineEffect::Close() {
 void CRotateLineEffect::Open() {
   int ring = 0;
   for (int startAngle = 0; startAngle < 360; startAngle += 90) {
-    const int tilt = std::max(0, rand() % 21) + 80;
+    const int tiltRoll = rand() % 21;
+    const int tilt = (tiltRoll >= 0 ? tiltRoll : 0) + 80;
     for (int i = 0; i < 21; ++i) {
-      CParticle* particle = CreateParticle(reinterpret_cast<const vector3d*>(this->position), 5);
+      CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (!particle) {
         continue;
       }
 
       particle->effectId = this->id;
-      particle->columnIndex = i;
-      particle->rowIndex = ring;
-      particle->groupIndex = 1;
+      int* indices = &particle->groupIndex;
+      indices[1] = i;
+      indices[2] = ring;
+      indices[0] = 1;
       particle->SetTexture("effect\\cloud11.tga");
       particle->angleParameter = 30;
-      *reinterpret_cast<float*>(&particle->angleBits) = static_cast<float>(startAngle);
+      particle->angle = static_cast<float>(startAngle);
       particle->alpha = 50;
       particle->phaseParameter = tilt;
       particle->scale = 7.0f - static_cast<float>(ring);
       particle->animationParameter = 28.0f - static_cast<float>(ring) * 5.0f;
-      *reinterpret_cast<float*>(particle->animationParameters) = 3.0f;
+      particle->animationParameters[0] = 3.0f;
       switch (this->id) {
       case EF_ROTATE_LINE_GRAY:
         particle->SetColor(50, 50, 50);
@@ -74,12 +76,13 @@ bool CRotateLineEffect::IsAlive() {
 // FUNCTION: fn_19158
 void CRotateLineEffect::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    (*it)->position.x = this->position[0];
-    (*it)->position.y = this->position[1];
-    (*it)->position.z = this->position[2];
     CParticle* particle = *it;
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
     if (particle) {
-      float& particleAngle = *reinterpret_cast<float*>(&particle->angleBits);
+      float& particleAngle = particle->angle;
       int& particleSpread = particle->angleParameter;
       if (particle->columnIndex == 0) {
         this->angle = static_cast<int>(particleAngle);
@@ -124,7 +127,7 @@ void CRotateLineEffect::OnProcess() {
       const int tilt = particle->phaseParameter;
       const float tiltCosine = g_cosTable[tilt];
       EffectPoint points[2];
-      const float height = *reinterpret_cast<float*>(particle->animationParameters);
+      const float height = particle->animationParameters[0];
       points[0].x = cosine * particle->scale;
       points[0].y = -particle->animationParameter;
       points[0].z = sine * particle->scale;

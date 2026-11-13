@@ -48,7 +48,8 @@ void CJupitelThunderStormEffect::Open() {
   const float dy = this->sourcePosition[1] - this->position[1];
   const float dx = this->sourcePosition[0] - this->position[0];
   const float dz = this->sourcePosition[2] - this->position[2];
-  const float speed = SquareRoot(dy * dy + dx * dx + dz * dz) / static_cast<float>(this->duration);
+  const float distance = SquareRoot(dy * dy + dx * dx + dz * dz);
+  const float speed = distance / static_cast<float>(this->duration);
 
   this->step.x = this->sourcePosition[0] - this->position[0];
   this->step.y = this->sourcePosition[1] - this->position[1];
@@ -59,7 +60,7 @@ void CJupitelThunderStormEffect::Open() {
   this->step.z = scale * this->step.z * speed;
 
   const float angle = ScreenAngle(this->position, this->sourcePosition, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values);
-  CEZ2STRParticle* ball = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  CEZ2STRParticle* ball = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   this->particle = ball;
   if (ball) {
     ball->Load(std::string("HYPER_NOVICE\\HN_JUPITEL_THUNDER_STORM\\jupitel_thunder_storm_ball\\jupitel_thunder_storm_ball.str"));
@@ -71,7 +72,7 @@ void CJupitelThunderStormEffect::Open() {
   const int rings = (this->effectLevel - 1) / 4;
   const int lastDelay = ((this->effectLevel - 1) / 2 + 6) * 150;
   for (int delay = 80; delay <= lastDelay; delay += 80, ++index) {
-    CEZ2STRParticle* bolt = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+    CEZ2STRParticle* bolt = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
     if (!bolt) {
       continue;
     }
@@ -84,11 +85,13 @@ void CJupitelThunderStormEffect::Open() {
       offsetZ = static_cast<float>(corners[corner][1]) * g_depthAverageHalf;
     } else {
       const int randomZ = rand() % range;
-      offsetX = std::max(rand() % range, 0);
-      offsetZ = (static_cast<float>(std::max(randomZ, 0)) + g_depthAverageHalf) * static_cast<float>(corners[corner][1]);
+      const int randomX = rand() % range;
+      offsetX = randomX >= 0 ? randomX : 0;
+      offsetZ = (static_cast<float>(randomZ >= 0 ? randomZ : 0) + g_depthAverageHalf) * static_cast<float>(corners[corner][1]);
     }
 
-    bolt->Load(FormatOwnedString("HYPER_NOVICE\\HN_JUPITEL_THUNDER_STORM\\jupitel_thunder_storm\\jupitel_thunder_storm_%02d.str", std::max(rand() % 3, 0)));
+    const int variant = rand() % 3;
+    bolt->Load(FormatOwnedString("HYPER_NOVICE\\HN_JUPITEL_THUNDER_STORM\\jupitel_thunder_storm\\jupitel_thunder_storm_%02d.str", variant >= 0 ? variant : 0));
     bolt->position.z = offsetZ + this->sourcePosition[2];
     bolt->position.y = this->sourcePosition[1] - 15.0f;
     bolt->position.x = static_cast<float>(corners[corner][0]) * (static_cast<float>(offsetX) + g_depthAverageHalf) + this->sourcePosition[0];
@@ -126,7 +129,7 @@ void CJupitelThunderStormEffect::OnProcess() {
         position.y = particle->position.y + this->step.y;
         position.z = particle->position.z + this->step.z;
       } else {
-        position = *reinterpret_cast<const vector3d*>(this->sourcePosition);
+        position = this->sourcePositionVector;
       }
       particle->position.x = position.x;
       particle->position.y = position.y;
