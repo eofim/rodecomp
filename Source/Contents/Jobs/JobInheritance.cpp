@@ -119,7 +119,7 @@ bool CSession::IsNpcJob(int job) const {
 bool __stdcall ValidateCharacterName(const char* name) {
   const int length = static_cast<int>(std::strlen(name));
   for (int index = 0; index < length; ++index) {
-    if (name[index] == 0) {
+    if (name[index] < 0) {
       return false;
     }
   }
