@@ -170,12 +170,12 @@ struct TradeItemRecord {
   /* 0009 */ int quantity;
   /* 000D */ std::uint16_t weight;
   /* 000F */ unsigned char refine;
-  /* 0010 */ std::uint32_t cards[4];
+  /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
   /* 0020 */ std::uint16_t index;
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(TradeItemRecord) == 0x22);
 #endif
 
@@ -238,7 +238,7 @@ namespace {
     /* 000A */ std::uint16_t wearState;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001E */ std::uint32_t expireTime;
   };
 
@@ -251,7 +251,7 @@ namespace {
     /* 000A */ std::uint16_t wearState;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001E */ std::uint32_t expireTime;
     /* 0022 */ std::uint16_t bindOnEquip;
     /* 0024 */ std::uint16_t sprite;
@@ -272,7 +272,7 @@ namespace {
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 0020 */ std::uint32_t expireTime;
     /* 0024 */ std::uint16_t bindOnEquip;
     /* 0026 */ std::uint16_t sprite;
@@ -286,12 +286,12 @@ namespace {
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 0020 */ std::uint32_t expireTime;
     /* 0024 */ std::uint16_t bindOnEquip;
     /* 0026 */ std::uint16_t sprite;
     /* 0028 */ unsigned char optionCount;
-    /* 0029 */ StoreItemOption options[5];
+    /* 0029 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
     /* 0042 */ unsigned char flags;
   };
 
@@ -301,7 +301,7 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::int16_t amount;
     /* 0009 */ std::uint32_t location;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ std::uint32_t expireTime;
     /* 0021 */ unsigned char flags;
   };
@@ -396,8 +396,8 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
-    /* 0020 */ StoreItemOption options[5];
+    /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+    /* 0020 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
   };
 
   struct Item1718Record {
@@ -418,8 +418,8 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
-    /* 0020 */ StoreItemOption options[5];
+    /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+    /* 0020 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
     /* 0039 */ std::int32_t location;
     /* 003D */ std::uint16_t sprite;
   };
@@ -432,17 +432,18 @@ namespace {
     std::uint32_t location;
     std::uint32_t wearState;
     unsigned char refine;
-    std::uint32_t cards[4];
+    std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     std::uint32_t expireTime;
     std::uint16_t bindOnEquip;
     std::uint16_t sprite;
     bool identified;
     bool damaged;
     bool placeEtcTab;
-    StoreItemOption options[5];
+    StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
     unsigned char grade;
   };
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(ItemStoreListHeader) == 0x1C);
   static_assert(sizeof(StoreEquipRecord) == 0x29);
   static_assert(sizeof(StoreEquipOptionRecord) == 0x43);
@@ -454,11 +455,12 @@ namespace {
   static_assert(sizeof(ChatTextEntry) == 0x10);
   static_assert(sizeof(ChatEntryListPacket) == 0x16);
   static_assert(sizeof(ActorValuePacket) == 0x08);
+#endif
 
   // INLINED
   int CountStoreItemOptions(const StoreItemOption* options) {
     int count = 0;
-    for (int index = 0; index < 5; ++index) {
+    for (int index = 0; index < MAX_ITEM_RANDOM_OPTIONS; ++index) {
       if (0 != options[index].id) {
         ++count;
       }
@@ -501,6 +503,7 @@ namespace {
     std::memcpy(entry.options, record.options, sizeof(entry.options));
   }
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(DispelPacket) == 6);
   static_assert(sizeof(DevotionListPacket) == 0x1C);
   static_assert(sizeof(FormatStringMessagePacket) == 6);
@@ -512,6 +515,7 @@ namespace {
   static_assert(sizeof(SimulationPacketHeader) == 0x24);
   static_assert(sizeof(EnchantSimulationRecord) == 0x1C);
   static_assert(sizeof(PackageSimulationRecord) == 0x32);
+#endif
 }
 
 // OFFSET: 0x00D1F540
@@ -856,7 +860,7 @@ void CGameMode::ReceiveItem1738EquipList(const unsigned char* data) {
 
   const int count = (packet->length - sizeof(ItemStoreListHeader)) / sizeof(StoreEquipRecord);
   const StoreEquipRecord* records = reinterpret_cast<const StoreEquipRecord*>(data + sizeof(ItemStoreListHeader));
-  StoreItemOption options[5] = {0};
+  StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS] = {0};
   for (int i = 0; i < count; ++i) {
     const StoreEquipRecord* record = &records[i];
     StoreEquipEntry entry;
@@ -1687,7 +1691,7 @@ __declspec(noinline) void CGameMode::ReceiveActorInt64Pair(const unsigned char* 
 __declspec(noinline) void CGameMode::ReceiveItem1740EquipList(const unsigned char* packet) {
   const int count = (*reinterpret_cast<const std::int16_t*>(packet + 2) - 4) / sizeof(StoreEquipRecord);
   const StoreEquipRecord* records = reinterpret_cast<const StoreEquipRecord*>(packet + 4);
-  StoreItemOption options[5] = {0};
+  StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS] = {0};
   for (int i = 0; i < count; ++i) {
     const StoreEquipRecord* record = &records[i];
     StoreEquipEntry entry;
@@ -2094,7 +2098,7 @@ void __stdcall Nullsub479(int value) {
 // FUNCTION: fn_21996
 int CountItemRandomOptions(const unsigned char* entries) {
   int count = 0;
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < MAX_ITEM_RANDOM_OPTIONS; ++index) {
     if (0 != *reinterpret_cast<const std::uint16_t*>(entries + index * 5)) {
       ++count;
     }
@@ -4092,7 +4096,9 @@ namespace {
     /* 0008 */ char name[24];
   };
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(FriendRecord) == 0x20);
+#endif
 }
 
 // OFFSET: 0x00D2AB70
@@ -4137,7 +4143,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(SwapEquipmentRecord) == 6);
+#endif
 
 #pragma pack(push, 1)
   struct StatusBonusPacket {
@@ -4148,7 +4156,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(StatusBonusPacket) == 0xE);
+#endif
 }
 
 namespace EquipmentProperties {
@@ -4339,7 +4349,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(GuildMemberRecord) == 0x22);
+#endif
 }
 
 // OFFSET: 0x00D89F20
@@ -4397,7 +4409,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(GuildMemberMemoRecord) == 0x68);
+#endif
 }
 
 // OFFSET: 0x00D4EE00
@@ -4507,7 +4521,9 @@ struct ParChangePacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ParChangePacket) == 8);
+#endif
 
 // OFFSET: 0x00D3A7A0
 // FUNCTION: fn_21780
@@ -6545,7 +6561,7 @@ struct ParaResultEntry {
   /* 0004 */ std::int16_t quantity;
   /* 0006 */ int location;
   /* 000A */ unsigned char refine;
-  /* 000B */ int cards[4];
+  /* 000B */ int cards[MAX_ITEM_CARD_SLOTS];
   /* 001B */ std::uint16_t index;
 };
 #pragma pack(pop)
@@ -6934,7 +6950,9 @@ struct RandomOptionSimulationRecord {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(RandomOptionSimulationRecord) == 0x25);
+#endif
 
 // OFFSET: 0x00D606B0
 // FUNCTION: fn_21974
@@ -7517,9 +7535,11 @@ struct AddQuestHunt {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(AddQuestPacket) == 0x11);
 static_assert(sizeof(AddQuestHunt64) == 0x2E);
 static_assert(sizeof(AddQuestHunt) == 0x2A);
+#endif
 
 // OFFSET: 0x00D20C00
 // FUNCTION: fn_21651
@@ -7646,7 +7666,9 @@ struct BarterMarketItemRecord {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(BarterMarketItemRecord) == 0x1F);
+#endif
 
 // OFFSET: 0x00D215B0
 // FUNCTION: fn_21655
@@ -7755,7 +7777,9 @@ struct SkillFailurePacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(SkillFailurePacket) == 0xE);
+#endif
 
 // OFFSET: 0x00D21220
 // FUNCTION: fn_21654
@@ -7816,19 +7840,21 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
-    /* 000F */ std::uint32_t cards[4];
+    /* 000F */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001F */ std::uint32_t expireTime;
     /* 0023 */ std::uint16_t bindOnEquip;
     /* 0025 */ std::uint16_t sprite;
     /* 0027 */ unsigned char optionCount;
-    /* 0028 */ StoreItemOption options[5];
+    /* 0028 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
     /* 0041 */ unsigned char refine;
     /* 0042 */ unsigned char grade;
     /* 0043 */ unsigned char flags;
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(EquipWindowGradeRecord) == 0x44);
+#endif
 
   // INLINED
   __forceinline void ReadStoreEquipEntry(StoreEquipEntry& entry, const EquipWindowGradeRecord& record) {
@@ -8084,7 +8110,7 @@ void CGameMode::ReceiveInventoryEquipList(const unsigned char* packet) {
   const int length = *reinterpret_cast<const std::int16_t*>(packet + 2);
   const int count = static_cast<unsigned>(length - 4) / 41u;
   const StoreEquipRecord* record = reinterpret_cast<const StoreEquipRecord*>(packet + 4);
-  StoreItemOption options[5] = {0};
+  StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS] = {0};
   for (int index = 0; index < count; ++index, ++record) {
     StoreEquipEntry entry;
     ReadStoreEquipEntry(entry, *record);
@@ -8141,7 +8167,7 @@ void CGameMode::ReceiveInventoryEquipList3(const unsigned char* packet) {
 }
 
 struct ItemCardSlots {
-  /* 0000 */ std::uint32_t cards[4];
+  /* 0000 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
 };
 
 namespace {
@@ -8154,7 +8180,7 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char type;
     /* 0020 */ unsigned char result;
@@ -8168,7 +8194,7 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char type;
     /* 0020 */ unsigned char result;
@@ -8183,7 +8209,7 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char type;
     /* 0020 */ unsigned char result;
@@ -8199,20 +8225,22 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ std::uint32_t location;
     /* 0021 */ unsigned char type;
     /* 0022 */ unsigned char result;
     /* 0023 */ std::uint32_t expireTime;
     /* 0027 */ std::uint16_t bindOnEquip;
-    /* 0029 */ StoreItemOption options[5];
+    /* 0029 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(ItemPickupAckPacket) == 0x21);
   static_assert(sizeof(ItemPickupAck2Packet) == 0x25);
   static_assert(sizeof(ItemPickupAck3Packet) == 0x27);
   static_assert(sizeof(ItemPickupAck7Packet) == 0x42);
+#endif
 }
 
 // OFFSET: 0x00D2DF80
@@ -8230,7 +8258,7 @@ void CGameMode::ReceiveItemPickupAck2(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -8263,7 +8291,7 @@ void CGameMode::ReceiveItemPickupAck2(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -8328,7 +8356,7 @@ void CGameMode::ReceiveItemPickupAck3(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -8366,7 +8394,7 @@ void CGameMode::ReceiveItemPickupAck3(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -8435,7 +8463,7 @@ void CGameMode::ReceiveItemPickupAck(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -8467,7 +8495,7 @@ void CGameMode::ReceiveItemPickupAck(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -8535,7 +8563,7 @@ void CGameMode::ReceiveItemPickupAck5(
   switch (result) {
   case PICKUP_SUCCEED: {
     {
-      StoreItemOption options[5] = {0};
+      StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS] = {0};
       ITEM_INFO item;
       item.identity[0] = type;
       item.identity[2] = location;
@@ -8578,7 +8606,7 @@ void CGameMode::ReceiveItemPickupAck5(
     break;
   }
   case RECEIVE_ITEM: {
-    StoreItemOption options[5] = {0};
+    StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS] = {0};
     ITEM_INFO item;
     item.identity[0] = type;
     item.identity[2] = location;
@@ -8649,7 +8677,7 @@ void CGameMode::ReceiveItemPickupAck5(
 namespace {
 #pragma pack(push, 1)
   struct PickupItemOptions {
-    /* 0000 */ StoreItemOption options[5];
+    /* 0000 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
   };
 #pragma pack(pop)
 
@@ -8665,7 +8693,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -8711,7 +8739,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -8871,10 +8899,12 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(ExpandedBarterChunkRecord) == 0xC);
   static_assert(sizeof(ExpandedBarterRecord) == 0x1A);
   static_assert(sizeof(ExpandedBarterRecord2) == 0x24);
   static_assert(sizeof(ExpandedBarterListPacket) == 0x8);
+#endif
 }
 
 // OFFSET: 0x00D29A30
@@ -8970,7 +9000,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(FeedResultPacket) == 7);
+#endif
 }
 
 // OFFSET: 0x00D2A450
@@ -9039,7 +9071,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(PetChangeStatePacket) == 0xB);
+#endif
 }
 
 // OFFSET: 0x00D26080
@@ -9170,7 +9204,9 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(GuildInfoPacket) == 0x76);
+#endif
 }
 
 // OFFSET: 0x00D2B360
@@ -9226,8 +9262,10 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(ChatRoomMemberRecord) == 0x1C);
   static_assert(sizeof(ChatRoomMemberListPacket) == 0x8);
+#endif
 }
 
 // OFFSET: 0x00D1E840
@@ -9708,13 +9746,13 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ std::uint32_t location;
     /* 0021 */ unsigned char type;
     /* 0022 */ unsigned char result;
     /* 0023 */ std::uint32_t expireTime;
     /* 0027 */ std::uint16_t bindOnEquip;
-    /* 0029 */ StoreItemOption options[5];
+    /* 0029 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
     /* 0042 */ unsigned char favorite;
     /* 0043 */ std::uint16_t look;
   };
@@ -9726,13 +9764,13 @@ namespace {
     /* 0006 */ int itemId;
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
-    /* 000C */ std::uint32_t cards[4];
+    /* 000C */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001C */ std::uint32_t location;
     /* 0020 */ unsigned char type;
     /* 0021 */ unsigned char result;
     /* 0022 */ std::uint32_t expireTime;
     /* 0026 */ std::uint16_t bindOnEquip;
-    /* 0028 */ StoreItemOption options[5];
+    /* 0028 */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
     /* 0041 */ unsigned char favorite;
     /* 0042 */ std::uint16_t look;
     /* 0044 */ unsigned char refine;
@@ -9740,8 +9778,10 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(ItemPickupAckV8Packet) == 0x45);
   static_assert(sizeof(ItemPickupAckV9Packet) == 0x46);
+#endif
 }
 
 namespace {
@@ -9758,7 +9798,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -9808,7 +9848,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -10006,7 +10046,9 @@ struct EffectNumberPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(EffectNumberPacket) == 0xE);
+#endif
 
 // OFFSET: 0x00D37700
 // FUNCTION: fn_21764
@@ -10083,9 +10125,11 @@ struct GuildBanNamedRecord {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GuildBanRecord) == 0x40);
 static_assert(sizeof(GuildBanCharacterRecord) == 0x2C);
 static_assert(sizeof(GuildBanNamedRecord) == 0x44);
+#endif
 
 // OFFSET: 0x00D4B860
 // FUNCTION: fn_21866
@@ -10275,7 +10319,9 @@ struct ActorDisappearPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorDisappearPacket) == 7);
+#endif
 
 // OFFSET: 0x00D39530
 // FUNCTION: fn_21771
@@ -10460,9 +10506,11 @@ struct GuildInfoV4Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GuildInfoV2Packet) == 0x76);
 static_assert(sizeof(GuildInfoV3Packet) == 0x5E);
 static_assert(sizeof(GuildInfoV4Packet) == 0x76);
+#endif
 
 // OFFSET: 0x00D4D3B0
 // FUNCTION: fn_21871
@@ -10600,7 +10648,9 @@ struct GuildNoticePacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GuildNoticePacket) == 0xB6);
+#endif
 
 // OFFSET: 0x00D4DD70
 // FUNCTION: fn_21874
@@ -10680,8 +10730,10 @@ struct GuildMemberAddV3Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GuildMemberAddV2Packet) == 0x3C);
 static_assert(sizeof(GuildMemberAddV3Packet) == 0x52);
+#endif
 
 // OFFSET: 0x00D4E800
 // FUNCTION: fn_21878
@@ -10792,9 +10844,11 @@ namespace {
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(GuildMemberNamedRecord) == 0x3A);
   static_assert(sizeof(GuildMemberMemoOnlyRecord) == 0x50);
   static_assert(sizeof(GuildRelationRecord) == 0x20);
+#endif
 }
 
 // OFFSET: 0x00D4F180
@@ -10929,7 +10983,9 @@ struct EquipItemNoticePacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(EquipItemNoticePacket) == 7);
+#endif
 
 #pragma pack(push, 1)
 struct MapMovePacket {
@@ -10951,15 +11007,19 @@ struct GuildPositionNamePacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(MapMovePacket) == 0x16);
 static_assert(sizeof(GuildPositionNameEntry) == 0x1C);
+#endif
 
 struct GuildStorageLogItem {
   /* 0000 */ ITEM_INFO item;
   /* 00F8 */ unsigned char logFlags;
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GuildStorageLogItem) == 0x100);
+#endif
 
 // OFFSET: 0x00D3A1E0
 // FUNCTION: fn_21776
@@ -11467,7 +11527,9 @@ struct ParaResultRecord {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ParaResultRecord) == 0x0A);
+#endif
 
 // OFFSET: 0x00D39F20
 // FUNCTION: fn_21774
@@ -11730,7 +11792,9 @@ struct GuildMemberAddV4Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GuildMemberAddV4Packet) == 0x24);
+#endif
 
 // OFFSET: 0x00D89CC0
 // FUNCTION: fn_22214
@@ -11804,7 +11868,9 @@ struct ActorStandEntry {
   /* 0078 */ int bodyCostume;
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntry) == 0x7C);
+#endif
 
 // OFFSET: 0x00D7AFA0
 // FUNCTION: fn_22199
@@ -11899,7 +11965,9 @@ struct MirrorSkillSpawnData {
   /* 0018 */ int level;
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(MirrorSkillSpawnData) == 0x1C);
+#endif
 
 // OFFSET: 0x00D60D70
 // FUNCTION: fn_21975
@@ -11969,8 +12037,8 @@ struct Item1748Record2 {
   /* 0009 */ int itemId;
   /* 000D */ unsigned char identified;
   /* 000E */ unsigned char damaged;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ StoreItemOption options[5];
+  /* 000F */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+  /* 001F */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
   /* 0038 */ std::int32_t location;
   /* 003C */ std::uint16_t sprite;
   /* 003E */ unsigned char refine;
@@ -11985,15 +12053,17 @@ struct Item1758StoreRecord2 {
   /* 0009 */ int itemId;
   /* 000D */ unsigned char identified;
   /* 000E */ unsigned char damaged;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ StoreItemOption options[5];
+  /* 000F */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+  /* 001F */ StoreItemOption options[MAX_ITEM_RANDOM_OPTIONS];
   /* 0038 */ unsigned char refine;
   /* 0039 */ unsigned char grade;
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(Item1748Record2) == 0x40);
 static_assert(sizeof(Item1758StoreRecord2) == 0x3A);
+#endif
 
 // OFFSET: 0x00D782F0
 // FUNCTION: fn_22161
@@ -12054,7 +12124,9 @@ struct PartyMemberLeftPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(PartyMemberLeftPacket) == 0x1F);
+#endif
 
 // OFFSET: 0x00D26BB0
 // FUNCTION: fn_21684
@@ -12262,9 +12334,11 @@ struct NpcStandEntryPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryPacket) == 0x40);
 static_assert(sizeof(ActorTypedEntryPacket) == 0x37);
 static_assert(sizeof(NpcStandEntryPacket) == 0x2C);
+#endif
 
 // OFFSET: 0x00D38330
 // FUNCTION: fn_21767
@@ -12659,7 +12733,9 @@ struct ActorMoveEntry {
   ActorMoveEntry() {}
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorMoveEntry) == 0x80);
+#endif
 
 #pragma pack(push, 1)
 struct ActorMoveEntryPacket {
@@ -12741,9 +12817,11 @@ struct ActorMoveEntryLegacyPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorMoveEntryPacket) == 0x58);
 static_assert(sizeof(ActorMoveEntryBodyPacket) == 0x5A);
 static_assert(sizeof(ActorMoveEntryLegacyPacket) == 0x54);
+#endif
 
 // OFFSET: 0x00D61390
 // FUNCTION: fn_21982
@@ -13063,7 +13141,9 @@ struct ActorMoveEntryOldPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorMoveEntryOldPacket) == 0x40);
+#endif
 
 // OFFSET: 0x00D346A0
 // FUNCTION: fn_21754
@@ -13196,7 +13276,9 @@ struct ActorMoveEntryOld2Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorMoveEntryOld2Packet) == 0x45);
+#endif
 
 // OFFSET: 0x00D34B90
 // FUNCTION: fn_21755
@@ -13336,7 +13418,9 @@ struct ActorMoveEntryNamedPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorMoveEntryNamedPacket) == 0x4B);
+#endif
 
 // OFFSET: 0x00D350A0
 // FUNCTION: fn_21756
@@ -13479,7 +13563,9 @@ struct ActorMoveEntryOld0Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorMoveEntryOld0Packet) == 0x3C);
+#endif
 
 // OFFSET: 0x00D35630
 // FUNCTION: fn_21757
@@ -13730,12 +13816,14 @@ struct ActorStateEntryNamedBodyPacket : ActorStateEntryNamedPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryLegacyPacket) == 0x4D);
 static_assert(sizeof(ActorStateEntryLegacyPacket) == 0x4E);
 static_assert(sizeof(ActorStandEntryNamedPacket) == 0x51);
 static_assert(sizeof(ActorStandEntryNamedBodyPacket) == 0x53);
 static_assert(sizeof(ActorStateEntryNamedPacket) == 0x52);
 static_assert(sizeof(ActorStateEntryNamedBodyPacket) == 0x54);
+#endif
 
 // OFFSET: 0x00D62540
 // FUNCTION: fn_21986
@@ -13931,7 +14019,9 @@ struct ActorStandEntryNamedOldPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryNamedOldPacket) == 0x44);
+#endif
 
 // OFFSET: 0x00D35AF0
 // FUNCTION: fn_21758
@@ -14079,7 +14169,9 @@ struct ActorStandEntryOldPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryOldPacket) == 0x39);
+#endif
 
 // OFFSET: 0x00D35FD0
 // FUNCTION: fn_21759
@@ -14203,7 +14295,9 @@ struct ActorStandEntryOld2Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryOld2Packet) == 0x3D);
+#endif
 
 // OFFSET: 0x00D364C0
 // FUNCTION: fn_21760
@@ -14330,7 +14424,9 @@ struct ActorStandEntryOld3Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryOld3Packet) == 0x3F);
+#endif
 
 // OFFSET: 0x00D369C0
 // FUNCTION: fn_21761
@@ -14459,7 +14555,9 @@ struct ActorStandEntryOld0Packet {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStandEntryOld0Packet) == 0x35);
+#endif
 
 // OFFSET: 0x00D36ED0
 // FUNCTION: fn_21762
@@ -14597,7 +14695,9 @@ struct ActorStateEntryNamedOldPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStateEntryNamedOldPacket) == 0x45);
+#endif
 
 // OFFSET: 0x00D37A10
 // FUNCTION: fn_21765
@@ -14745,7 +14845,9 @@ struct ActorStateEntryOldPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(ActorStateEntryOldPacket) == 0x3A);
+#endif
 
 // OFFSET: 0x00D37EA0
 // FUNCTION: fn_21766
@@ -15032,9 +15134,11 @@ struct ItemBroadcastPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(RefineBroadcastPacket) == 0x29);
 static_assert(sizeof(TradeBroadcastPacket) == 0x38);
 static_assert(sizeof(ItemBroadcastPacket) == 0x20);
+#endif
 
 // OFFSET: 0x00D23B70
 // FUNCTION: fn_21663
@@ -15105,7 +15209,9 @@ struct RateInfoRecord {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(RateInfoRecord) == 0xD);
+#endif
 
 // OFFSET: 0x00D642F0
 // FUNCTION: fn_21993
@@ -15686,9 +15792,11 @@ struct PartyMemberListEntry {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(PartyMemberInfoPacket) == 0x4F);
 static_assert(sizeof(PartyMemberListHeader) == 0x1C);
 static_assert(sizeof(PartyMemberListEntry) == 0x2E);
+#endif
 }
 
 // OFFSET: 0x00D20900
@@ -19951,10 +20059,12 @@ struct CameraInfoPacket {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(CameraInfoPacket) == 0x0F);
 static_assert(offsetof(CameraInfoPacket, distance) == 3);
 static_assert(offsetof(CameraInfoPacket, yaw) == 7);
 static_assert(offsetof(CameraInfoPacket, pitch) == 0x0B);
+#endif
 
 // OFFSET: 0x00D08820
 // FUNCTION: fn_45485
@@ -20037,7 +20147,7 @@ struct CardItemRecord {
   /* 0007 */ unsigned char identified;
   /* 0008 */ std::int16_t amount;
   /* 000A */ std::uint16_t location;
-  /* 000C */ int cards[4];
+  /* 000C */ int cards[MAX_ITEM_CARD_SLOTS];
 };
 
 struct CardItemExpiryRecord {
@@ -20051,7 +20161,7 @@ struct FlaggedItemRecord {
   /* 0006 */ unsigned char type;
   /* 0007 */ std::int16_t amount;
   /* 0009 */ std::uint16_t location;
-  /* 000B */ int cards[4];
+  /* 000B */ int cards[MAX_ITEM_CARD_SLOTS];
   /* 001B */ std::uint32_t expireTime;
   /* 001F */ unsigned char flags;
 };
@@ -20063,7 +20173,7 @@ struct FlaggedEquipRecord {
   /* 0007 */ std::uint16_t location;
   /* 0009 */ std::uint16_t wearState;
   /* 000B */ unsigned char refine;
-  /* 000C */ int cards[4];
+  /* 000C */ int cards[MAX_ITEM_CARD_SLOTS];
   /* 001C */ std::uint32_t expireTime;
   /* 0020 */ std::uint16_t bindOnEquip;
   /* 0022 */ std::uint16_t look;
@@ -20119,7 +20229,7 @@ struct ActorMoveRoute {
 using ItemSlotOption = ItemOptionRecord;
 
 struct ItemSlotOptions {
-  /* 0000 */ ItemSlotOption options[5];
+  /* 0000 */ ItemSlotOption options[MAX_ITEM_RANDOM_OPTIONS];
 };
 #pragma pack(pop)
 
@@ -20132,7 +20242,7 @@ struct ChatRoomMemberUpdateInfo {
   /* 003C */ int id;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ChatRoomMemberUpdateInfo) == 0x40);
 static_assert(offsetof(ChatRoomMemberUpdateInfo, padding_0018) == 0x18);
 static_assert(offsetof(ChatRoomMemberUpdateInfo, type) == 0x30);
@@ -23125,7 +23235,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -23147,7 +23257,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -23170,7 +23280,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -23453,7 +23563,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -23477,7 +23587,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -23502,7 +23612,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -24908,7 +25018,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -24932,7 +25042,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -24957,7 +25067,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -24981,7 +25091,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->wearState;
         item.quantity = 1;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -25008,7 +25118,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->wearState;
         item.quantity = 1;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);

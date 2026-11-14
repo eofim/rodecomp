@@ -89,7 +89,8 @@ bool ITEM_INFO::HasCards() const {
     return first;
   }
 
-  return first || IsItemCard(CardId(*this, 1)) || IsItemCard(CardId(*this, 2)) || IsItemCard(CardId(*this, 3));
+  return first || IsItemCard(CardId(*this, 1)) || IsItemCard(CardId(*this, 2)) || IsItemCard(CardId(*this, 3)) || IsItemCard(CardId(*this, 4)) ||
+         IsItemCard(CardId(*this, 5));
 }
 
 // OFFSET: 0x006D5780
@@ -132,11 +133,11 @@ int ITEM_INFO::Creator(char* output, int& capacity, unsigned char consume) const
 // OFFSET: 0x006D6F50
 // FUNCTION: fn_06588
 __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsigned char consume) const {
-  int ids[4] = {CardId(*this, 0), CardId(*this, 1), CardId(*this, 2), CardId(*this, 3)};
+  int ids[MAX_ITEM_CARD_SLOTS] = {CardId(*this, 0), CardId(*this, 1), CardId(*this, 2), CardId(*this, 3), CardId(*this, 4), CardId(*this, 5)};
   int remaining = capacity;
   char* cursor = output;
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < MAX_ITEM_CARD_SLOTS; ++index) {
     if (ids[index] <= 0) {
       continue;
     }
@@ -148,7 +149,7 @@ __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsign
 
     int count = 1;
 
-    for (int next = index + 1; next < 4; ++next) {
+    for (int next = index + 1; next < MAX_ITEM_CARD_SLOTS; ++next) {
       if (ids[next] == ids[index]) {
         ids[next] = 0;
         ++count;
@@ -198,11 +199,11 @@ __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsign
 // OFFSET: 0x006D6DB0
 // FUNCTION: fn_06587
 int ITEM_INFO::Suffixes(char* output, int& capacity, unsigned char consume) const {
-  int ids[4] = {CardId(*this, 0), CardId(*this, 1), CardId(*this, 2), CardId(*this, 3)};
+  int ids[MAX_ITEM_CARD_SLOTS] = {CardId(*this, 0), CardId(*this, 1), CardId(*this, 2), CardId(*this, 3), CardId(*this, 4), CardId(*this, 5)};
   int remaining = capacity;
   char* cursor = output;
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < MAX_ITEM_CARD_SLOTS; ++index) {
     if (ids[index] <= 0) {
       continue;
     }
@@ -214,7 +215,7 @@ int ITEM_INFO::Suffixes(char* output, int& capacity, unsigned char consume) cons
 
     int count = 1;
 
-    for (int next = index + 1; next < 4; ++next) {
+    for (int next = index + 1; next < MAX_ITEM_CARD_SLOTS; ++next) {
       if (ids[next] == ids[index]) {
         ids[next] = 0;
         ++count;
@@ -811,10 +812,13 @@ std::uint32_t __fastcall ItemCardColor(const ITEM_INFO* item) {
     int count = 0;
     const int id = std::atoi(item->itemId.c_str());
     const int slots = FindItemDescription(id, g_itemDescriptions).slots;
-    for (int index = 0; index < 4; ++index) {
+    for (int index = 0; index < MAX_ITEM_CARD_SLOTS; ++index) {
       if (index >= slots && IsItemCard(CardId(*item, index))) {
         ++count;
       }
+    }
+    if (count > 4) {
+      count = 4;
     }
     return colors[count];
   }

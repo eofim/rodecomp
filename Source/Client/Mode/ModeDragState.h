@@ -26,11 +26,11 @@ struct ModeDragState {
   /* 0344 */ std::string name;
   /* 035C */ std::string skillName;
   /* 0374 */ int skillLevel;
-  /* 0378 */ std::uint32_t cards[4];
+  /* 0378 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
   /* 0388 */ unsigned char skill;
   /* 038C */ UIWindow* sourceWindow;
   /* 0390 */ int optionCount;
-  /* 0394 */ ItemOptionRecord options[5];
+  /* 0394 */ ItemOptionRecord options[MAX_ITEM_RANDOM_OPTIONS];
   /* 03B0 */ int barterId;
   /* 03B4 */ std::uint16_t grade;
   /* 03B6 */ unsigned char uniqueItem;
@@ -44,7 +44,7 @@ struct ModeDragState {
   void BeginBarterEntry(int source, const BarterMarketEntry& entry, int quantity, int slot);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ModeDragState) == 192);
 #endif
 

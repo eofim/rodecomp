@@ -147,7 +147,7 @@ std::uint32_t ITEM_INFO::Assign(const ModeDragState& item) {
   this->prices[0] = item.itemValue;
   this->prices[1] = item.price;
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < MAX_ITEM_CARD_SLOTS; ++index) {
     std::memcpy(&this->cards[index], &item.cards[index], sizeof(item.cards[index]));
   }
 
@@ -156,7 +156,7 @@ std::uint32_t ITEM_INFO::Assign(const ModeDragState& item) {
   this->identified = item.identified;
   this->refiningLevel = item.refine;
 
-  this->optionCount = item.optionCount > 5 ? 0 : item.optionCount;
+  this->optionCount = item.optionCount > MAX_ITEM_RANDOM_OPTIONS ? 0 : item.optionCount;
 
   for (int index = 0; index < this->optionCount; ++index) {
     this->options[index] = item.options[index];
@@ -587,7 +587,7 @@ int ITEM_INFO::GetItemId() const {
 // OFFSET: 0x006D9070
 // FUNCTION: fn_06611
 void ITEM_INFO::SetOption(ItemOption option, const int& index) {
-  if (index < 5) {
+  if (index < MAX_ITEM_RANDOM_OPTIONS) {
     this->options[index].id = option.id;
     this->options[index].parameter = option.parameter;
     this->options[index].value = option.value;
@@ -597,7 +597,7 @@ void ITEM_INFO::SetOption(ItemOption option, const int& index) {
 // OFFSET: 0x006D9590
 // FUNCTION: fn_06613
 void ITEM_INFO::SetCard(const int& card, const int& index) {
-  if (index < 4) {
+  if (index < MAX_ITEM_CARD_SLOTS) {
     std::memcpy(&this->cards[index], &card, sizeof(card));
   }
 }

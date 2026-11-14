@@ -50,7 +50,7 @@ namespace {
   using ItemRandomOption = ItemOptionRecord;
 
   struct ItemRandomOptions {
-    /* 0000 */ ItemRandomOption values[5];
+    /* 0000 */ ItemRandomOption values[MAX_ITEM_RANDOM_OPTIONS];
   };
 
   struct ItemAddPacket {
@@ -62,7 +62,7 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
   };
 
   struct ItemAddOptionsPacket {
@@ -74,7 +74,7 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 0020 */ ItemRandomOptions options;
   };
 
@@ -86,7 +86,7 @@ namespace {
     /* 000C */ unsigned char type;
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
-    /* 000F */ std::uint32_t cards[4];
+    /* 000F */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001F */ ItemRandomOptions options;
     /* 0038 */ unsigned char refine;
     /* 0039 */ unsigned char grade;
@@ -100,7 +100,7 @@ namespace {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
   };
 
   struct ItemSlotOptionsPacket {
@@ -111,8 +111,8 @@ namespace {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
-    /* 001E */ ItemRandomOption options[5];
+    /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+    /* 001E */ ItemRandomOption options[MAX_ITEM_RANDOM_OPTIONS];
   };
 
   struct FriendNoticePacket {
@@ -129,7 +129,7 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::int16_t amount;
     /* 0009 */ int location;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001D */ int expireTime;
     /* 0021 */ unsigned char flags;
   };
@@ -147,7 +147,7 @@ namespace {
 
     const int count = item.optionCount;
 
-    if (value.optionCount != count || value.optionCount >= 5) {
+    if (value.optionCount != count || value.optionCount >= MAX_ITEM_RANDOM_OPTIONS) {
       return false;
     }
 
@@ -177,7 +177,7 @@ namespace {
   }
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ItemRandomOption) == 5);
 static_assert(sizeof(ItemAddPacket) == 0x20);
 static_assert(sizeof(ItemAddOptionsPacket) == 0x39);
@@ -223,7 +223,7 @@ public:
 };
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EquipmentProperties::CEquipmentPropertiesMgr) == 0x1FC);
 #endif
 
@@ -247,7 +247,7 @@ void __fastcall RefreshItemWindows(UIWindowMgr* mgr) {
 // INLINED
 static int CountItemOptions(const ItemRandomOption* options) {
   int count = 0;
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < MAX_ITEM_RANDOM_OPTIONS; ++index) {
     if (0 != options[index].id) {
       ++count;
     }
@@ -326,7 +326,7 @@ void CGameMode::ReceiveItem1738Add(const unsigned char* data) {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
   };
 
   struct ItemAddSlotOptionsPacket {
@@ -337,7 +337,7 @@ void CGameMode::ReceiveItem1738Add(const unsigned char* data) {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001E */ ItemRandomOptions options;
   };
 #pragma pack(pop)
@@ -510,20 +510,22 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
-    /* 000F */ std::uint32_t cards[4];
+    /* 000F */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
     /* 001F */ std::uint32_t expireTime;
     /* 0023 */ std::uint16_t bindOnEquip;
     /* 0025 */ std::uint16_t sprite;
     /* 0027 */ unsigned char optionCount;
-    /* 0028 */ ItemRandomOption options[5];
+    /* 0028 */ ItemRandomOption options[MAX_ITEM_RANDOM_OPTIONS];
     /* 0041 */ unsigned char refine;
     /* 0042 */ unsigned char grade;
     /* 0043 */ unsigned char flags;
   };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
   static_assert(sizeof(EquipItemListHeader) == 5);
   static_assert(sizeof(EquipItemListRecord) == 0x44);
+#endif
 
   // INLINED
   __forceinline void FillEquipItemListItem(ITEM_INFO& item, const EquipItemListRecord& record, const ItemRandomOption* options) {
@@ -564,7 +566,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
         continue;
       }
 
-      ItemRandomOption options[5];
+      ItemRandomOption options[MAX_ITEM_RANDOM_OPTIONS];
       std::memcpy(options, record.options, sizeof(options));
       ITEM_INFO item;
       FillEquipItemListItem(item, record, options);
@@ -574,7 +576,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
   case INVTYPE_INVENTORY:
     for (std::int64_t i = 0; i < count; ++i) {
       const EquipItemListRecord record = records[i];
-      ItemRandomOption options[5];
+      ItemRandomOption options[MAX_ITEM_RANDOM_OPTIONS];
       std::memcpy(options, record.options, sizeof(options));
       ITEM_INFO item;
       FillEquipItemListItem(item, record, options);
@@ -614,7 +616,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
   case INVTYPE_CART:
     for (std::int64_t i = 0; i < count; ++i) {
       const EquipItemListRecord record = records[i];
-      ItemRandomOption options[5];
+      ItemRandomOption options[MAX_ITEM_RANDOM_OPTIONS];
       std::memcpy(options, record.options, sizeof(options));
       ITEM_INFO item;
       FillEquipItemListItem(item, record, options);

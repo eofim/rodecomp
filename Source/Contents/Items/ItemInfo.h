@@ -9,6 +9,12 @@
 
 struct ModeDragState;
 
+// Kafraverse extended item protocol: 6 card slots and 9 random options.
+// Matches the server build with KAFRAVERSE_CARD_SLOTS6 / KAFRAVERSE_RANDOM_OPTIONS9
+// (card = uint32 on the wire, option record = 5 bytes on the wire).
+constexpr int MAX_ITEM_CARD_SLOTS = 6;
+constexpr int MAX_ITEM_RANDOM_OPTIONS = 9;
+
 struct RawItemBasic {
   /* 0000 */ std::int32_t id;
   /* 0004 */ std::uint32_t price;
@@ -20,7 +26,7 @@ struct RawItemBasic {
   /* 0038 */ std::int32_t sprite;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(RawItemBasic, itemId) == 0x11);
 static_assert(offsetof(RawItemBasic, location) == 0x34);
 static_assert(offsetof(RawItemBasic, sprite) == 0x38);
@@ -78,7 +84,7 @@ struct ITEM_INFO {
   /* 0000 */ std::uint32_t identity[4];
   /* 0010 */ std::int32_t quantity;
   /* 0014 */ std::uint32_t prices[2];
-  /* 001C */ std::uint32_t cards[4];
+  /* 001C */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
   /* 002C */ std::string itemId;
   /* 0044 */ std::string displayName;
   /* 005C */ unsigned char identified;
@@ -94,7 +100,7 @@ struct ITEM_INFO {
   /* 0088 */ std::int16_t grade;
   /* 0090 */ std::uint64_t productId;
   /* 0098 */ std::int32_t optionCount;
-  /* 009C */ ItemOptionRecord options[5];
+  /* 009C */ ItemOptionRecord options[MAX_ITEM_RANDOM_OPTIONS];
   /* 00B8 */ std::uint32_t recordIds[2];
   /* 00C0 */ unsigned char recordType;
   /* 00C1 */ unsigned char recordName[24];
@@ -110,8 +116,9 @@ int ReadItemList(std::list<ITEM_INFO>& items, int offset, int size, const std::v
 int ReadItemArray(ITEM_INFO* items, int offset, int size, const std::vector<unsigned char>& data);
 
 
-#if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(ITEM_INFO) == 248);
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
+// sizeof(ITEM_INFO) intentionally diverges from the original (248) with the
+// extended 6-card / 9-option layout; the per-record wire sizes are unchanged.
 static_assert(sizeof(ItemOption) == 6);
 static_assert(sizeof(ItemOptionRecord) == 5);
 #endif

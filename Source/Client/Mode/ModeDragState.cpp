@@ -25,7 +25,7 @@ void CGameMode::ClearDrag() {
   this->drag.slot = -1;
   this->drag.skillLevel = 0;
   this->drag.refine = 0;
-  for (int card = 0; card < 4; ++card) {
+  for (int card = 0; card < MAX_ITEM_CARD_SLOTS; ++card) {
     this->drag.cards[card] = 0;
   }
   this->drag.barterId = -1;

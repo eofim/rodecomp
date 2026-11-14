@@ -224,8 +224,8 @@ struct ItemRewardPacket {
   /* 000C */ unsigned char identified;
   /* 000D */ unsigned char damaged;
   /* 000E */ unsigned char refine;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ ItemRewardOption options[5];
+  /* 000F */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+  /* 001F */ ItemRewardOption options[MAX_ITEM_RANDOM_OPTIONS];
   /* 0038 */ std::uint16_t value;
   /* 003A */ unsigned char bound;
   /* 003B */ int expireTime;
@@ -240,8 +240,8 @@ struct ItemRewardPacket2 {
   /* 000B */ unsigned char type;
   /* 000C */ unsigned char identified;
   /* 000D */ unsigned char damaged;
-  /* 000E */ std::uint32_t cards[4];
-  /* 001E */ ItemRewardOption options[5];
+  /* 000E */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+  /* 001E */ ItemRewardOption options[MAX_ITEM_RANDOM_OPTIONS];
   /* 0037 */ std::uint16_t value;
   /* 0039 */ unsigned char bound;
   /* 003A */ int expireTime;
@@ -330,7 +330,7 @@ struct GroundSkillPacketExtended {
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(Item1718BasicRecord) == 0x13);
 static_assert(sizeof(Item1718IndexRecord) == 0x0A);
 static_assert(sizeof(HomunculusInfoPacket) == 0x49);
@@ -359,7 +359,9 @@ struct GroundSkillSpawnData {
   /* 0018 */ int level;
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GroundSkillSpawnData) == 0x1C);
+#endif
 
 struct GroundSkillExtendedData {
   /* 0000 */ GroundSkillSpawnData skill;
@@ -371,8 +373,10 @@ struct GroundSkillArgumentData {
   /* 0020 */ int value;
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(GroundSkillExtendedData) == 0x20);
 static_assert(sizeof(GroundSkillArgumentData) == 0x24);
+#endif
 
 // OFFSET: 0x00D66230
 // FUNCTION: fn_22010
@@ -2260,7 +2264,7 @@ void CGameMode::ReceiveItemReward2(const unsigned char* data) {
     std::memcpy(item.cards, packet->cards, sizeof(packet->cards));
 
     int count = 0;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < MAX_ITEM_RANDOM_OPTIONS; ++i) {
       if (0 != packet->options[i].id) {
         ++count;
       }
@@ -2871,7 +2875,9 @@ struct Item1718PendingRecord {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(Item1718PendingRecord) == 0x19);
+#endif
 
 struct Unknown015D4818Values {
   /* 0000 */ std::uint32_t padding_0000[2];
@@ -2986,8 +2992,8 @@ struct SearchStoreItemPacket {
   /* 005C */ unsigned char kind;
   /* 005D */ int price;
   /* 0061 */ std::uint16_t quantity;
-  /* 0063 */ std::uint32_t cards[4];
-  /* 0073 */ SearchStoreOption options[5];
+  /* 0063 */ std::uint32_t cards[MAX_ITEM_CARD_SLOTS];
+  /* 0073 */ SearchStoreOption options[MAX_ITEM_RANDOM_OPTIONS];
   /* 008C */ unsigned char refine;
   /* 008D */ unsigned char grade;
 };
@@ -3012,8 +3018,10 @@ struct SearchStoreItemPacketOld {
 };
 #pragma pack(pop)
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(SearchStoreItemPacket) == 0x8E);
 static_assert(sizeof(SearchStoreItemPacketOld) == 0x8D);
+#endif
 
 // OFFSET: 0x00D3FA20
 // FUNCTION: fn_21814
@@ -3043,7 +3051,7 @@ void CGameMode::ReceiveSearchStoreItems(const unsigned char* packet) {
     entry.item.identity[0] = record.kind;
     entry.item.identified = 1;
     int optionCount = 0;
-    for (int j = 0; j < 5; ++j) {
+    for (int j = 0; j < MAX_ITEM_RANDOM_OPTIONS; ++j) {
       if (record.options[j].id != 0) {
         ++optionCount;
       }
@@ -3093,7 +3101,7 @@ void CGameMode::ReceiveSearchStoreItemsOld(const unsigned char* packet) {
     entry.item.identified = 1;
     const SearchStoreOption* options = reinterpret_cast<const SearchStoreOption*>(record.options);
     int optionCount = 0;
-    for (int j = 0; j < 5; ++j) {
+    for (int j = 0; j < MAX_ITEM_RANDOM_OPTIONS; ++j) {
       if (0 != options[j].id) {
         ++optionCount;
       }
