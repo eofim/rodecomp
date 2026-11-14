@@ -62,7 +62,7 @@ struct RagEffectState {
   /* 11B69 */ unsigned char padding_11B69[7];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RagEffectSegment) == 0x50);
 static_assert(sizeof(RagEffectState) == 0x11B70);
 static_assert(offsetof(RagEffectState, transforms) == 0x6BC);

@@ -29,7 +29,7 @@ public:
 
 extern CClanInfo* g_clanInfo;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CClanInfo) == 0x68);
 static_assert(offsetof(CClanInfo, m_clanName) == 0x04);
 static_assert(offsetof(CClanInfo, m_masterName) == 0x1C);

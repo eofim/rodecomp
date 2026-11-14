@@ -28,7 +28,7 @@ public:
   /* 00EC */ int alpha;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMagnumBreak, waves) == 0xD8);
 static_assert(offsetof(CMagnumBreak, alpha) == 0xEC);
 static_assert(sizeof(CMagnumBreak) == 0xF0);

@@ -22,7 +22,7 @@ private:
   __declspec(noinline) void DrawReverse(CooldownState& value);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CooldownDrawing) == 0x18);
 static_assert(offsetof(CooldownDrawing, normal) == 0x00);
 static_assert(offsetof(CooldownDrawing, reverse) == 0x0C);

@@ -49,7 +49,7 @@ public:
   /* 0004 */ std::map<unsigned int, EntryQueueInfo*> m_entryQueue;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EntryQueueInfo) == 0x738);
 static_assert(sizeof(CTableMng) == 0xC);
 #endif

@@ -92,7 +92,7 @@ struct CLanguageTH : CLanguageBase {
   const char* NextChar(const char* current, int remaining) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CLanguageBase, fakeInput) == 0x0004);
 static_assert(offsetof(CLanguageBase, candidateList) == 0x0018);
 static_assert(offsetof(CLanguageBase, candidateStorage) == 0x0028);

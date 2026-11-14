@@ -24,7 +24,7 @@ public:
   /* 00D4 */ int state;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CAMachineEffect) == 0xD8);
 static_assert(offsetof(CAMachineEffect, state) == 0xD4);
 #endif

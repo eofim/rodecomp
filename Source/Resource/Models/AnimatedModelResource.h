@@ -86,7 +86,7 @@ public:
 
 static_assert(sizeof(AnimatedModelFace) == 24);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(AnimatedModelFrame) == 8);
 static_assert(offsetof(AnimatedModelFrame, textureVertices) == 0x04);
 static_assert(offsetof(AnimatedModelNode, vertexCount) == 0x40);

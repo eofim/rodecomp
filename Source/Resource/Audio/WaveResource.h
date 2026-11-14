@@ -22,7 +22,7 @@ public:
 
 void RegisterWaveResource(ResourceMgr& resourceMgr, CWave& prototype);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CWave) == 0x118);
 static_assert(offsetof(CWave, data) == 0x110);
 static_assert(offsetof(CWave, milesAllocated) == 0x114);

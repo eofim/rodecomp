@@ -9,7 +9,7 @@ public:
   void Process(const std::uint64_t& now) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCheckGDISchedule) == 0x30);
 #endif
 

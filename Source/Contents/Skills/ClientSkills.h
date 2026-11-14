@@ -16,7 +16,7 @@ struct ActiveSkillEffect {
 extern std::vector<ActiveSkillEffect> g_activeSkillEffects;
 
 static_assert(sizeof(ActiveSkillEffect) == 28);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(ActiveSkillEffect, remainingDuration) == 0x18);
 #endif
 

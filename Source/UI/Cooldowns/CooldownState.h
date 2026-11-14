@@ -40,7 +40,7 @@ struct CooldownState {
 };
 
 static_assert(sizeof(CooldownEdge) == 16);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CooldownEdge, current) == 0x04);
 static_assert(offsetof(CooldownEdge, radius) == 0x08);
 static_assert(offsetof(CooldownEdge, increasing) == 0x0C);

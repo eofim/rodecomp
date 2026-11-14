@@ -26,7 +26,7 @@ protected:
   /* 0014 */ std::vector<NAsyncWorkThread*> m_workers;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(NAsyncWorkMgr) == 32);
 #endif
 

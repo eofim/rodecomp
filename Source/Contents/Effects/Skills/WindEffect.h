@@ -41,7 +41,7 @@ public:
   /* 012C */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CWindEffect) == 0x138);
 static_assert(offsetof(CWindEffect, maxAlpha) == 0xCE);
 static_assert(offsetof(CWindEffect, particleScale) == 0xD4);

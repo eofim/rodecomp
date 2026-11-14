@@ -89,7 +89,7 @@ private:
 
 extern CSoundMgr* g_soundMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(std::string) == 0x18);
 static_assert(offsetof(CSoundMgr, fadeThread) == 0x004);
 static_assert(offsetof(CSoundMgr, threadId) == 0x008);

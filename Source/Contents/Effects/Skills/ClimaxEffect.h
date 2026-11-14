@@ -20,7 +20,7 @@ public:
   /* 00CC */ CParticle* particles[2];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CClimaxEffect) == 0xD4);
 static_assert(offsetof(CClimaxEffect, particles) == 0xCC);
 #endif

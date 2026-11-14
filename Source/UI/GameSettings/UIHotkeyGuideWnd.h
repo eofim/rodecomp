@@ -73,7 +73,7 @@ protected:
   /* 00D8 */ std::vector<int> m_keys;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(HotkeyGuideKey) == 0x10);
 static_assert(sizeof(HotkeyGuideLabel) == 0x38);
 #endif

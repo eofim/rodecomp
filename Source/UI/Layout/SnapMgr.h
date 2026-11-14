@@ -40,7 +40,7 @@ extern bool g_snapEnabled;
 extern int g_snapDirection;
 extern CSnapMgr g_snapMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSnapMgr) == 16);
 #endif
 

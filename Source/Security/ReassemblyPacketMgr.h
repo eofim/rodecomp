@@ -48,7 +48,7 @@ public:
 extern CReassemblyPacketImpl* g_packetReassembler;
 extern CReassemblyPacketMgr* g_reassemblyPacketMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CReassemblyPacketImpl) == 0x10);
 static_assert(offsetof(CReassemblyPacketImpl, padding_000C) == 0xC);
 static_assert(sizeof(CReassemblyPacketMgr) == 1);

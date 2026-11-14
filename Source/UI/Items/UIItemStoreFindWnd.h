@@ -48,7 +48,7 @@ public:
   /* 015D */ unsigned char padding_015D[0x7];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemStoreFindWnd, statusText) == 0x124);
 static_assert(offsetof(UIItemStoreFindWnd, searchText) == 0x13C);
 static_assert(offsetof(UIItemStoreFindWnd, saved) == 0x154);

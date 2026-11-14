@@ -58,7 +58,7 @@ private:
   bool SaveBitmapResource(const char* filename, int format, CBitmapRes* overlay);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRendererDX9) == 0x274);
 #endif
 

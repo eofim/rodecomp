@@ -27,7 +27,7 @@ public:
   /* 0104 */ std::vector<CParticle*> bolts;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CElectricEffect, bolts) == 0x104);
 #endif
 

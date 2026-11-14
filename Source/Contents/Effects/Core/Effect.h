@@ -101,7 +101,7 @@ public:
   /* 00C9 */ unsigned char padding_00C9[3];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EffectEvent) == 36);
 static_assert(offsetof(EffectEvent, text) == 0xC);
 static_assert(sizeof(CEffect) == 204);

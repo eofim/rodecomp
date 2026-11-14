@@ -13,7 +13,7 @@ struct RendererFogDX9 {
 
 static_assert(sizeof(RendererFogDX9) == 12);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(RendererFogDX9, enabled) == 0x0150 - 0x0150);
 static_assert(offsetof(RendererFogDX9, dirty) == 0x0154 - 0x0150);
 static_assert(offsetof(RendererFogDX9, supported) == 0x0158 - 0x0150);

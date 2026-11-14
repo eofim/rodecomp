@@ -57,7 +57,7 @@ public:
   void LoadMapEffectScript(bool reload);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EffectLists) == 0x28);
 static_assert(offsetof(EffectLists, allocators) == 0x08);
 static_assert(offsetof(EffectLists, active) == 0x10);

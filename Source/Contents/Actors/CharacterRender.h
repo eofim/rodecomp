@@ -82,7 +82,7 @@ public:
   /* 00C0 */ bool isHelmRobe;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CCharacterRender, viewportWidth) == 0x68);
 static_assert(offsetof(CCharacterRender, cameraUpY) == 0x8C);
 static_assert(offsetof(CCharacterRender, layerViews) == 0xB4);

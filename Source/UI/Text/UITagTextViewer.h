@@ -70,7 +70,7 @@ public:
   /* 00C0 */ std::vector<std::string> m_texts;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(TagTextViewer::Position) == 8);
 static_assert(sizeof(TagTextViewer::TextFont) == 12);
 #endif

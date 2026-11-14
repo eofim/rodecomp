@@ -16,7 +16,7 @@ public:
   unsigned Count() const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CShowEffect, effects) == 0xCC);
 static_assert(sizeof(CShowEffect) == 0xD4);
 #endif

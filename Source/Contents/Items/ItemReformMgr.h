@@ -50,7 +50,7 @@ public:
 
 extern CItemReformMgr* g_itemReformMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ItemReformInfo) == 0x70);
 static_assert(sizeof(CItemReformMgr) == 0x20);
 #endif

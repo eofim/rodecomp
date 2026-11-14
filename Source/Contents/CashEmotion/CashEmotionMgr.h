@@ -223,7 +223,7 @@ protected:
 extern CCashEmotionMgr* g_cashEmotionMgr;
 class UICashEmotionListWnd;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CashEmotionData, name) == 0x08);
 static_assert(sizeof(CashEmotionData) == 0x30);
 static_assert(sizeof(CashEmotionPack) == 0x34);

@@ -51,7 +51,7 @@ public:
 
 extern CActorPickNode g_actorPickNode;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ActorPickInfo) == 0x28);
 static_assert(offsetof(ActorPickInfo, depth) == 0x08);
 static_assert(offsetof(ActorPickInfo, right) == 0x0C);

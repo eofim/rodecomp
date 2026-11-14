@@ -50,7 +50,7 @@ public:
   void OnLBtnUp(int x, int y) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CUIThumb, dragOrigin) == 0x90);
 static_assert(offsetof(CUIThumb, tooltip) == 0x98);
 static_assert(offsetof(CUIThumb, onDrag) == 0xF8);

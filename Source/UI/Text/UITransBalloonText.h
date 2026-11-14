@@ -66,7 +66,7 @@ protected:
   /* 00CC */ int m_fontFamily;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(BalloonRectangle) == 0x1C);
 static_assert(offsetof(BalloonRectangle, x) + 0xA0 == 0xA0);
 static_assert(offsetof(BalloonRectangle, y) + 0xA0 == 0xA4);

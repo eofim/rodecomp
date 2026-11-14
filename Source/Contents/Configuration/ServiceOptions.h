@@ -27,7 +27,7 @@ extern ServiceOptions g_serviceOptions;
 extern float g_serviceOptionJitterScale;
 extern const GUID g_defaultDrawGuidDX7;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ServiceOptions) == 0x20);
 #endif
 

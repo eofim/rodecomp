@@ -80,7 +80,7 @@ struct PACKET_CZ_QUEST_STATUS_REQ_BUFFER {
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenewQuestOngoingRecord) == 0x18);
 static_assert(sizeof(RenewQuestHuntRecord) == 0x47);
 static_assert(sizeof(RenewQuestShortHuntRecord) == 0x2C);

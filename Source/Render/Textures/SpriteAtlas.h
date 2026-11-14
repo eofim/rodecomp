@@ -63,7 +63,7 @@ private:
   /* 0084 */ std::vector<CTexture*> m_spare;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(SpriteAtlasRecord) == 40);
 static_assert(offsetof(SpriteAtlasRecord, palette) == 0x04);
 static_assert(offsetof(SpriteAtlasRecord, lastUsed) == 0x08);

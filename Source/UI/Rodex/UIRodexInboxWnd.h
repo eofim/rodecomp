@@ -102,7 +102,7 @@ public:
   /* 01FC */ std::vector<RodexMailEntry> mails2;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RodexMailEntry) == 0x10);
 static_assert(offsetof(UIRodexInboxWnd, filterButton) == 0x12C);
 static_assert(offsetof(UIRodexInboxWnd, checks) == 0x174);

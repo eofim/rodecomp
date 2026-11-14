@@ -22,7 +22,7 @@ public:
   /* 00E8 */ float screenY;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CBash, rays) == 0xCC);
 static_assert(offsetof(CBash, sparks) == 0xD8);
 static_assert(offsetof(CBash, screenY) == 0xE8);

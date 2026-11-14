@@ -47,7 +47,7 @@ struct ModelMesh {
   void CalculateNormals();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ModelFace) == 32);
 static_assert(offsetof(ModelFace, vertices) == 0x00);
 static_assert(offsetof(ModelFace, textureVertices) == 0x06);

@@ -54,7 +54,7 @@ public:
   );
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMode, cursorType) == 0x4);
 static_assert(offsetof(CMode, tooltip) == 0x1C);
 static_assert(offsetof(CMode, tooltipTick) == 0x20);

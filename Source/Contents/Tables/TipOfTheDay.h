@@ -20,7 +20,7 @@ public:
 extern CTipOfTheDay g_tipOfTheDay;
 extern bool g_tipOfTheDayEnglish;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CTipOfTheDay) == 0x10);
 static_assert(offsetof(CTipOfTheDay, m_tipList) == 0x4);
 #endif

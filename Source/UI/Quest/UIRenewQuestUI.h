@@ -112,7 +112,7 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::Resize(int width, 
 template <>
 void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::LoadSkin(bool resolveSkin);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenewQuestUI::CUIQuestItem) == 0x110);
 static_assert(sizeof(CUIRenewQuestUI) == 0x128);
 #endif

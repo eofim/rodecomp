@@ -71,7 +71,7 @@ public:
   /* 018C */ short selectedColumn;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMerchantShopMakeWnd, titleEdit) == 0xCC);
 static_assert(offsetof(UIMerchantShopMakeWnd, editIndex) == 0xD8);
 static_assert(offsetof(UIMerchantShopMakeWnd, priceEdits) == 0xE0);

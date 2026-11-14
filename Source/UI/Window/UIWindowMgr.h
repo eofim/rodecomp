@@ -654,7 +654,7 @@ extern int g_savedWindowCloseValue;
 
 void __fastcall RefreshItemWindows(UIWindowMgr* mgr);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(WindowTextEntry) == 0x1C);
 static_assert(sizeof(WindowTextRecord) == 0x20);
 static_assert(sizeof(SavedWindowRectangle) == 0x10);

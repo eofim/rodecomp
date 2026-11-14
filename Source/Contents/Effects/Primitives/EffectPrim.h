@@ -261,7 +261,7 @@ CEffectPrim* CreateEffectParticle(
   std::list<CRenderObject*>& worldObjects
 );
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CEffectPrim) == 0xFA18);
 static_assert(offsetof(CEffectPrim, state) == 0x138);
 #endif

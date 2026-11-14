@@ -38,7 +38,7 @@ std::vector<RenderAdapter> EnumerateRenderAdapters(int backend);
 std::vector<RenderAdapter> EnumerateAdaptersDX7();
 std::vector<RenderAdapter> EnumerateAdaptersDX9();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenderAdapter) == 104);
 static_assert(offsetof(RenderAdapter, ordinal) == 0x0004);
 static_assert(offsetof(RenderAdapter, description) == 0x0008);

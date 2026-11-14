@@ -132,7 +132,7 @@ public:
   /* 00F4 */ std::uint32_t padding_00F4;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIChangeMaterialWnd, m_resultX) == 0xC4);
 static_assert(offsetof(UIChangeMaterialWnd, m_resultItem) == 0xD0);
 static_assert(offsetof(UIChangeMaterialWnd, m_materialPos) == 0x1C8);

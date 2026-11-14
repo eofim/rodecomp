@@ -65,7 +65,7 @@ public:
   void BindLightmap(CTextureDX7* lightmap);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRendererDX7) == 0x284);
 static_assert(offsetof(CRendererDX7, clearColor) == 0x0270);
 static_assert(offsetof(CRendererDX7, boundTexture) == 0x0268);

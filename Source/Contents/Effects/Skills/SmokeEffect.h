@@ -22,7 +22,7 @@ public:
   /* 00D0 */ std::vector<CSpriteParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSmokeEffect) == 0xDC);
 static_assert(offsetof(CSmokeEffect, visibleCount) == 0xCC);
 static_assert(offsetof(CSmokeEffect, particles) == 0xD0);

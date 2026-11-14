@@ -24,7 +24,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> lines;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CRedLineEffect, previousInner) == 0xCC);
 static_assert(offsetof(CRedLineEffect, previousOuter) == 0xD8);
 static_assert(offsetof(CRedLineEffect, lines) == 0xE4);

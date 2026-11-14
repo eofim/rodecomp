@@ -28,7 +28,7 @@ public:
   /* 00F0 */ std::vector<CParticle*> sprites;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CLevel99Effect, previousRingPoints) == 0xCC);
 static_assert(offsetof(CLevel99Effect, sparkles) == 0xE4);
 static_assert(offsetof(CLevel99Effect, sprites) == 0xF0);

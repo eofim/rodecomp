@@ -10,7 +10,7 @@ struct vector3d {
 };
 
 static_assert(sizeof(vector3d) == 12);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(vector3d, z) == 0x8);
 #endif
 

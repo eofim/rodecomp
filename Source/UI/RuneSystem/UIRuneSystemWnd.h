@@ -350,7 +350,7 @@ public:
   /* 00E0 */ UIRune_Decom* m_runeDecom;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RuneSetInfoLine) == 0x24);
 static_assert(sizeof(RuneSystemOpenPacket) == 3);
 static_assert(sizeof(RuneSetEquipPacket) == 8);

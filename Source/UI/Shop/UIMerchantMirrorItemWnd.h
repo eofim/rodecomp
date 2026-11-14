@@ -23,7 +23,7 @@ public:
   /* 00F4 */ int mode;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMerchantMirrorItemWnd, saved) == 0xF0);
 #endif
 

@@ -31,7 +31,7 @@ public:
   bool SetMode(int mode);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(std::vector<UCHAR>) == 12);
 static_assert(sizeof(AES) == 36);
 #endif

@@ -96,7 +96,7 @@ public:
 
 extern RouletteMgr* g_rouletteMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RouletteSlot) == 12);
 static_assert(sizeof(RouletteQuads) == 0x240);
 static_assert(offsetof(RouletteMgr, m_quads) == 0x1C);

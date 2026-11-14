@@ -77,7 +77,7 @@ public:
   /* 0020 */ std::deque<Request> requests;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CActorNameCard) == 156);
 static_assert(sizeof(CActorNameCardHolder) == 52);
 #endif

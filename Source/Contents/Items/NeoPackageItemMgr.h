@@ -59,7 +59,7 @@ public:
   /* 0004 */ std::set<int> m_items;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PackageEntry) == 0x20);
 static_assert(sizeof(PackageGroup) == 0xC);
 static_assert(sizeof(CNeoPackageItemMgr) == 0xC);

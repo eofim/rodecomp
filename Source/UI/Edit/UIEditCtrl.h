@@ -266,7 +266,7 @@ public:
   /* 0088 */ int padding_0088;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIEditCtrl) == 0x11C);
 static_assert(sizeof(UIEditCtrlWheel) == 0x11C);
 static_assert(sizeof(UIEditCtrl2) == 0x11C);

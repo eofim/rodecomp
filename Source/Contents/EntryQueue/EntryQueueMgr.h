@@ -91,7 +91,7 @@ extern std::map<unsigned int, EntryQueueInfo*> g_entryQueueList;
 bool CreateEntryQueueMgr();
 void DestroyEntryQueueMgr();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EntryQueueInfo) == 0x738);
 static_assert(offsetof(EntryQueueStatus, ranking) == 0x1A);
 static_assert(sizeof(EntryQueueReady) == 0x32);

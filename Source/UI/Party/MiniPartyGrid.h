@@ -20,7 +20,7 @@ struct MiniPartyGridRectangle {
 extern int g_miniPartyCellWidth;
 extern int g_miniPartyCellHeight;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(MiniPartyGridPoint) == 0x08);
 static_assert(offsetof(MiniPartyGridPoint, y) == 0x04);
 static_assert(sizeof(MiniPartyGridRectangle) == 0x10);

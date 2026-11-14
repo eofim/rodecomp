@@ -29,7 +29,7 @@ struct NormalItemSlotWindow {
   int IsValid() const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(NormalItemSlotWindow, x) == 0x0000);
 static_assert(offsetof(NormalItemSlotWindow, y) == 0x0004);
 static_assert(offsetof(NormalItemSlotWindow, width) == 0x0008);
@@ -401,7 +401,7 @@ struct SayDialogWndInfo : WindowPlacement {
   int IsValid() const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(WindowPlacement, height) == 0x000C);
 static_assert(sizeof(WindowPlacement) == 0x10);
 static_assert(sizeof(BasicInfoWndInfo) == 0x14);

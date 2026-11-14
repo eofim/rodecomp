@@ -38,7 +38,7 @@ public:
 
 extern CMapPropertyMgr* g_mapPropertyMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMapProperty) == 0xC);
 static_assert(sizeof(CMapPropertyMgr) == 0x10);
 static_assert(offsetof(CMapPropertyMgr, m_properties) == 0x8);

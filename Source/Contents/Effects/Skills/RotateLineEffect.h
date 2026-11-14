@@ -28,7 +28,7 @@ public:
   /* 00F8 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRotateLineEffect) == 0x104);
 static_assert(offsetof(CRotateLineEffect, started) == 0xDC);
 static_assert(offsetof(CRotateLineEffect, previous) == 0xE0);

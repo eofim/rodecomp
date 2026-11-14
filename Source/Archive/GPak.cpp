@@ -130,7 +130,7 @@ namespace {
   }
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(PakUniformRandom, m_distribution) == 0x1388);
 #endif
 

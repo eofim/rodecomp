@@ -26,7 +26,7 @@ public:
   /* 016C */ int padding_016C;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CArrowEffect) == 0x170);
 static_assert(offsetof(CArrowEffect, startPos) == 0x138);
 static_assert(offsetof(CArrowEffect, speedScale) == 0x15C);

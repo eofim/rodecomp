@@ -72,7 +72,7 @@ protected:
   /* 0018 */ CLuaInstance m_lua;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ReputeInfo) == 0x40);
 static_assert(offsetof(ReputeInfo, visibility) == 0x28);
 static_assert(offsetof(ReputeInfo, point) == 0x30);

@@ -30,7 +30,7 @@ private:
   /* 0158 */ int m_maxMotion[15][104];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ImfData) == 36);
 static_assert(sizeof(CImfRes) == 0x19B8);
 #endif

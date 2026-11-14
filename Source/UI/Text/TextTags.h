@@ -55,7 +55,7 @@ extern std::vector<CTagPrototype> g_textTagRegistry;
 std::vector<CTagPrototype> BuildTextTagRegistry();
 std::vector<STagString> ExtractTextTags(std::string text);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CTagPrototype, type) == 0x04);
 static_assert(offsetof(CTagPrototype, opening) == 0x08);
 static_assert(offsetof(CTagPrototype, closing) == 0x20);

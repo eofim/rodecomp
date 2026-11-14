@@ -203,7 +203,7 @@ public:
 // GLOBAL: gl_25250
 std::string g_messengerNamelessTag = "<NAMELESS>";
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(MiniPartyIconPosition) == 12);
 static_assert(sizeof(MessengerRecordHeader) == 6);
 #endif

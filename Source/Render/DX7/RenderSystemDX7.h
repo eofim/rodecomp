@@ -61,7 +61,7 @@ extern int g_viewportHeight;
 
 void ClearDirectDrawModes();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRenderSystemDX7) == 20);
 #endif
 

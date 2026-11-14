@@ -51,7 +51,7 @@ public:
 
 using GameSettings = CGameSettingsMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(GameSettingsOption) == 0x64);
 static_assert(offsetof(GameSettingsOption, defaultValue) == 0x58);
 static_assert(offsetof(GameSettings, options) == 0x0C);

@@ -162,8 +162,10 @@ struct SearchStoreResult {
   };
 };
 
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(SearchStoreResult) == 0x158);
 static_assert(offsetof(SearchStoreResult, item) == 0x60);
+#endif
 
 struct SubChatWndInfo {
   /* 0000 */ std::string name;
@@ -187,7 +189,9 @@ struct SessionTraits {
   /* 0008 */ int bonus[6];
   /* 0020 */ std::int64_t points[6];
 };
+#ifndef KAFRAVERSE_FORK
 static_assert(sizeof(SessionTraits) == 0x50);
+#endif
 
 class CSession {
 public:
@@ -1367,7 +1371,7 @@ void ClearMemberFlags(std::uint32_t* flags);
 void __fastcall RefreshPartyWindows(CSession* session);
 std::vector<unsigned char> SerializeMessengerMembers(const std::list<MessengerMember>& members);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(BlockedCharacter) == 0x18);
 static_assert(sizeof(SessionRecord6144) == 0x38);
 static_assert(sizeof(SessionRecord6178) == 0x2C);

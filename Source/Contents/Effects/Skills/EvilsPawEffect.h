@@ -30,7 +30,7 @@ public:
   /* 00FC */ int textureIndex;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CEvilsPawEffect) == 0x100);
 static_assert(offsetof(CEvilsPawEffect, particles) == 0xCC);
 static_assert(offsetof(CEvilsPawEffect, offset) == 0xE4);

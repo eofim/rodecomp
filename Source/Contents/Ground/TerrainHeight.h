@@ -10,7 +10,7 @@ struct TerrainHeightCell {
 };
 
 static_assert(sizeof(TerrainHeightCell) == 20);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(TerrainHeightCell, type) == 0x10);
 #endif
 

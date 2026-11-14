@@ -36,7 +36,7 @@ private:
     /* 0000 */ std::uint32_t id;
     /* 0004 */ std::uint32_t tick;
   };
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
   static_assert(sizeof(Entry) == 0x1C);
   static_assert(offsetof(Entry, tick) == 0x18);
   static_assert(sizeof(Request) == 0x08);
@@ -48,7 +48,7 @@ private:
   /* 0024 */ std::deque<Request> m_requests;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPlayerNameDictionary) == 0x38);
 #endif
 

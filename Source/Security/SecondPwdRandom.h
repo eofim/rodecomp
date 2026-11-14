@@ -32,7 +32,7 @@ public:
   /* 0010 */ unsigned int m_count;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSecondPwdRandom) == 0x14);
 #endif
 

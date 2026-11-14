@@ -143,7 +143,7 @@ public:
   void SetOngoingQuest(unsigned int id, const RenewQuestOngoingInfo& info);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenewQuestInfo) == 0xB4);
 static_assert(sizeof(RenewQuestOngoingInfo) == 0x200);
 static_assert(sizeof(RenewQuestRecommendedInfo) == 0xF0);

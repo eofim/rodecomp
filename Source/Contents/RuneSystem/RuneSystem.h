@@ -198,7 +198,7 @@ int SetRuneDisplayName(lua_State* state);
 int SetRuneUpGradeTable(lua_State* state);
 int SetRuneSystemInfo(lua_State* state);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(Decom_ItemInfo) == 0x14);
 static_assert(sizeof(RuneData) == 0x50);
 static_assert(sizeof(RuneSetReward) == 0x39);

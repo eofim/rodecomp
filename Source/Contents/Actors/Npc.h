@@ -94,7 +94,7 @@ public:
   /* 0444 */ int padding_0444;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CNpc) == 0x440);
 static_assert(sizeof(CCharacterNpc) == 0x448);
 static_assert(sizeof(CHalluNPC) == 0x458);

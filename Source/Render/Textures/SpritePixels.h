@@ -27,7 +27,7 @@ struct SpriteRleImage {
   /* 000C */ const std::uint8_t* runs;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(SpriteFrameCell, imageType) == 0x20);
 static_assert(sizeof(SpriteRleImage) == 0x10);
 static_assert(offsetof(SpriteRleImage, doubleWidth) == 0x04);

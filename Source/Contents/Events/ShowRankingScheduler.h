@@ -39,7 +39,7 @@ public:
   /* 0090 */ std::vector<std::uint32_t> rankingList;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RankingBoardStyle) == 12);
 static_assert(sizeof(RankingData) == 88);
 static_assert(offsetof(CShowRankingScheduler, rankingData) == 0x30);

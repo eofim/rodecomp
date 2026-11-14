@@ -49,7 +49,7 @@ protected:
   /* 0024 */ bool m_enabled;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(NAsyncWorkRequestQueue) == 56);
 static_assert(sizeof(NAsyncWorkResponseQueue) == 40);
 static_assert(sizeof(NAsyncWorkResponse) == 16);

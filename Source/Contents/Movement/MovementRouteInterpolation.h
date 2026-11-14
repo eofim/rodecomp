@@ -41,7 +41,7 @@ struct MovementRouteInterpolation {
 };
 
 static_assert(sizeof(PathCell) == 16);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PathNode) == 28);
 static_assert(offsetof(PathNode, metadata) == 0x18);
 static_assert(sizeof(MovementRouteInterpolation) == 24);

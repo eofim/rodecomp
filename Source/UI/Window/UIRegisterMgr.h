@@ -26,7 +26,7 @@ public:
   /* 001C */ CRITICAL_SECTION lock;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CUIRegisterMgr) == 0x34);
 static_assert(offsetof(CUIRegisterMgr, entries) == 0x4);
 static_assert(offsetof(CUIRegisterMgr, lock) == 0x1C);

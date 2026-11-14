@@ -22,7 +22,7 @@ public:
   /* 0008 */ std::size_t active;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ParticlePool) == 0xC);
 static_assert(offsetof(ParticlePool, active) == 0x8);
 #endif

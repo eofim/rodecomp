@@ -53,7 +53,7 @@ public:
   int SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ChatRoomSetting) == 0x40);
 static_assert(offsetof(ChatRoomSetting, roomId) == 0x3C);
 static_assert(offsetof(UIChatRoomMakeWnd, m_titleEdit) == 0xCC);

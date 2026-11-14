@@ -21,7 +21,7 @@ public:
   /* 00D8 */ unsigned char finishSpawned;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CShadowExceed) == 0xDC);
 static_assert(offsetof(CShadowExceed, finishSpawned) == 0xD8);
 #endif

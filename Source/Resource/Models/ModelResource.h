@@ -180,7 +180,7 @@ static_assert(sizeof(ModelScaleKey) == 32);
 static_assert(sizeof(ModelRotationKey) == 20);
 static_assert(sizeof(ModelVolume) == 232);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ModelNode) == 0x58);
 static_assert(sizeof(ModelNodeV1) == 0x98);
 static_assert(sizeof(ModelNodeV2) == 0xB4);

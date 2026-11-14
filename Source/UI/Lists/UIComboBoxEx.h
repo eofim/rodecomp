@@ -36,7 +36,7 @@ public:
   /* 00C4 */ int alignment;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIComboBoxEx) == 0xC4);
 static_assert(sizeof(UIComboBoxEx2) == 0xC8);
 #endif

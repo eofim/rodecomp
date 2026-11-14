@@ -34,7 +34,7 @@ inline const std::map<int, std::int64_t>& CInstantVar::Values() const {
   return this->m_values;
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CInstantVar) == 12);
 #endif
 

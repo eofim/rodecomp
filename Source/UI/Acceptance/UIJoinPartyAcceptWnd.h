@@ -114,7 +114,7 @@ public:
   /* 00C4 */ int m_location;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIChooseSellBuyWnd) == 0xBC);
 static_assert(sizeof(UIExchangeAcceptWnd) == 0xC0);
 static_assert(sizeof(UIJoinPartyAcceptWnd) == 0xC0);

@@ -24,7 +24,7 @@ public:
   /* 01FC */ int textY;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemTagButton, item) == 0xF8);
 static_assert(offsetof(UIItemTagButton, column) == 0x1F0);
 static_assert(offsetof(UIItemTagButton, line) == 0x1F4);

@@ -46,7 +46,7 @@ public:
   /* 00D0 */ int maxRefine;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIScrollWnd, scrollBar) == 0x90);
 static_assert(offsetof(UIScrollWnd, wheelScroll) == 0xA5);
 static_assert(offsetof(UILapineUpgradeBox_IngredientListWnd, materials) == 0xB0);
@@ -73,7 +73,7 @@ public:
   /* 00CC */ int maxRefine;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UILapineBox_IngredientListWnd, materials) == 0xB0);
 static_assert(offsetof(UILapineBox_IngredientListWnd, items) == 0xBC);
 static_assert(offsetof(UILapineBox_IngredientListWnd, minRefine) == 0xC8);

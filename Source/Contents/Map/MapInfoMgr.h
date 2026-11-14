@@ -75,7 +75,7 @@ public:
   void DrawMapName();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(MapInfo) == 0x64);
 static_assert(sizeof(MapNameDisplay) == 0x10);
 static_assert(sizeof(CMapInfoMgr) == 0x2C);

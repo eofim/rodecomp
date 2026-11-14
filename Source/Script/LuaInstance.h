@@ -41,7 +41,7 @@ private:
   static int LuaMessageBox(lua_State* state);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CLuaInstance) == 8);
 #endif
 

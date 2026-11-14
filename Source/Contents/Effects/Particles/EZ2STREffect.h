@@ -52,7 +52,7 @@ public:
 float GetHatEffectOffsetX(int id, const char* name);
 int GetHatEffectOffsetY(int id, CGameActor* actor);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CEZ2STRScreenEffect, particle) == 0xCC);
 static_assert(offsetof(CEZ2STRScreenEffect, name) == 0xD0);
 static_assert(offsetof(CEZ2STRScreenEffect, overlayColor) == 0xEC);

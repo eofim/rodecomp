@@ -102,7 +102,7 @@ public:
   /* 0188 */ unsigned startTick;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(C3dActor) == 368);
 static_assert(sizeof(C3dActorV1) == 384);
 static_assert(sizeof(C3dActorV2) == 400);

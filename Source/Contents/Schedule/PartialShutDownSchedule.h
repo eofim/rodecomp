@@ -24,7 +24,7 @@ public:
   /* 003C */ int noticeIndex;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPartialShutDownSchedule) == 0x40);
 static_assert(offsetof(CPartialShutDownSchedule, startTime) == 0x30);
 static_assert(offsetof(CPartialShutDownSchedule, seconds) == 0x38);

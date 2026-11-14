@@ -20,7 +20,7 @@ public:
   /* 0100 */ ApplyForPartyWndInfo* saved;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIApplyForPartyWnd) == 0x104);
 #endif
 

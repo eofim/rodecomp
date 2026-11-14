@@ -39,7 +39,7 @@ public:
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSchedulerIDAlocator) == 0x8);
 static_assert(sizeof(CSchedule) == 0x30);
 static_assert(offsetof(CSchedule, serial) == 0x8);

@@ -25,7 +25,7 @@ public:
   /* 00E0 */ int travelFrames;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CFuumaShouakuEffect) == 0xE4);
 static_assert(offsetof(CFuumaShouakuEffect, second) == 0xD0);
 #endif

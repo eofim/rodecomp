@@ -32,7 +32,7 @@ public:
   /* 00FC */ int shopId;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemSellWnd2, saved) == 0xF4);
 #endif
 

@@ -47,7 +47,7 @@ protected:
   /* 01B0 */ std::string padding_01B0[7];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(SecondCostumeEntry) == 0x1C);
 #endif
 

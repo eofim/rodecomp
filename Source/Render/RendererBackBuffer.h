@@ -10,7 +10,7 @@ struct RendererBackBuffer {
   /* 0258 */ int bitsPerPixel;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RendererBackBuffer) == 12);
 static_assert(offsetof(RendererBackBuffer, pixels) + 0x0250 == 0x0250);
 static_assert(offsetof(RendererBackBuffer, pitch) + 0x0250 == 0x0254);

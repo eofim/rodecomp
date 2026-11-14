@@ -177,7 +177,7 @@ namespace EquipmentProperties {
   };
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EquipmentProperties::CEquipmentProperties) == 0x10);
 static_assert(sizeof(EquipmentProperties::CEquipmentProperties1Dim) == 0x14);
 static_assert(sizeof(EquipmentProperties::CEquipmentProperties2Dim) == 0x18);
@@ -486,7 +486,7 @@ namespace EquipmentProperties {
   };
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EquipmentProperties::CEquipmentInfo) == 0x44);
 static_assert(offsetof(EquipmentProperties::CEquipment, m_properties) == 0xC);
 static_assert(offsetof(EquipmentProperties::CEquipment, m_pretend) == 0x34);
@@ -4974,7 +4974,7 @@ int C_Logger(lua_State* state) {
   return 0;
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EquipmentPropertyDefinition) == 0x80);
 static_assert(sizeof(EquipmentPropertyGroup) == 0x20);
 static_assert(sizeof(EquipmentPropertyStore) == 0x28);

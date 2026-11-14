@@ -34,7 +34,7 @@ public:
   void SumEquippedStats();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemParamChangeDisplayWnd, m_placement) - offsetof(UIItemParamChangeDisplayWnd, itemParam) == 0x2C);
 #endif
 

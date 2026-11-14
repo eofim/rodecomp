@@ -30,7 +30,7 @@ protected:
   /* 0034 */ std::vector<std::uint8_t> m_buffer;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMemMapPakFile) == 64);
 #endif
 

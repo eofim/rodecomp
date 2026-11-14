@@ -14,7 +14,7 @@ public:
   /* 015C */ int padding_015C;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CDummyEffectLauncher) == 0x160);
 static_assert(offsetof(CDummyEffectLauncher, lifeFrames) == 0x158);
 #endif

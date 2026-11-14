@@ -26,7 +26,7 @@ struct PACKET_CZ_APPROXIMATE_ACTOR {
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PACKET_CZ_APPROXIMATE_ACTOR) == 9);
 static_assert(offsetof(PACKET_CZ_APPROXIMATE_ACTOR, accountId) == 2);
 static_assert(offsetof(PACKET_CZ_APPROXIMATE_ACTOR, range) == 6);

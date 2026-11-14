@@ -41,7 +41,7 @@ public:
   /* 00D8 */ int gridSize;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMultiTexParticle) == 0x328);
 static_assert(offsetof(CMultiTexParticle, command) == 0x2BC);
 static_assert(offsetof(CMultiTexParticle, texture1) == 0x2D8);

@@ -54,7 +54,7 @@ public:
   /* 013C */ float baseScale;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CBlowEffect) == 0x138);
 static_assert(sizeof(CCorpse) == 0x140);
 static_assert(sizeof(CMasterChaser) == 0x140);

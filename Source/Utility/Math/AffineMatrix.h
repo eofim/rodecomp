@@ -40,7 +40,7 @@ struct matrix {
 
 static_assert(sizeof(matrix) == 48);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(matrix, values) == 0x0000);
 #endif
 

@@ -28,7 +28,7 @@ public:
   /* 00E8 */ vector3d launchPosition;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CAxeBoomerang) == 0xF4);
 static_assert(offsetof(CAxeBoomerang, alive) == 0xD0);
 static_assert(offsetof(CAxeBoomerang, launchPosition) == 0xE8);

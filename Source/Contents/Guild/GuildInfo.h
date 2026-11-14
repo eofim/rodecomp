@@ -141,7 +141,7 @@ public:
 
 extern GuildInfo g_guildInfo;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(GuildInfo::Member) == 0x78);
 static_assert(offsetof(GuildInfo::Member, accountId) == 0x00);
 static_assert(offsetof(GuildInfo::Member, characterId) == 0x04);

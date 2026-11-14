@@ -21,7 +21,7 @@ public:
   /* 0108 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CFortuneKiss) == 0x114);
 static_assert(offsetof(CFortuneKiss, particles) == 0x108);
 #endif

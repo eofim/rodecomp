@@ -22,7 +22,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMappillarEffect, particles) == 0xE4);
 static_assert(sizeof(CMappillarEffect) == 0xF0);
 #endif

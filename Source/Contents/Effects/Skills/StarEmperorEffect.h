@@ -26,7 +26,7 @@ public:
   /* 00D8 */ std::vector<CParticle*> rings;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CStarEmperorEffect, sphere) == 0xCC);
 static_assert(offsetof(CStarEmperorEffect, rings) == 0xD8);
 static_assert(sizeof(CStarEmperorEffect) == 0xE4);

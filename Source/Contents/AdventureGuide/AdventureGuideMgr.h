@@ -134,7 +134,7 @@ public:
 
 extern CAdventureGuideMgr* g_adventureGuideMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(AdventureGuideDetail) == 0x24);
 static_assert(sizeof(AdventureGuideIntro) == 0x3C);
 static_assert(offsetof(AdventureGuideIntro, details) == 0x34);

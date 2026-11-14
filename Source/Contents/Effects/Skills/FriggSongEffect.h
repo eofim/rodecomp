@@ -25,7 +25,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CFriggSongEffect) == 0xF0);
 static_assert(offsetof(CFriggSongEffect, particles) == 0xE4);
 #endif

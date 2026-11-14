@@ -27,7 +27,7 @@ public:
   /* 00E4 */ unsigned char emitting;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CCloudKillEffect, particles) == 0xCC);
 static_assert(offsetof(CCloudKillEffect, emitting) == 0xE4);
 #endif

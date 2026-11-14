@@ -23,7 +23,7 @@ std::vector<DisplayMode> EnumerateDisplayModesDX9(UINT adapter);
 
 LSTATUS SaveDisplayDeviceSettings();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(DisplayMode) == 36);
 static_assert(offsetof(DisplayMode, height) == 0x0004);
 static_assert(offsetof(DisplayMode, bitsPerPixel) == 0x0008);

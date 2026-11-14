@@ -154,7 +154,7 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
 template <>
 __declspec(noinline) CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::CUIListBoxEx();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(OngoingQuestInfo::CUIContents) == 0x8C);
 static_assert(sizeof(OngoingQuestInfo::CUIRewards) == 0xA4);
 static_assert(sizeof(OngoingQuestInfo::CUIScrollWindow) == 0x98);

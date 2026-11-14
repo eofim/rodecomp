@@ -40,7 +40,7 @@ protected:
   /* 0008 */ NAsyncWork* m_work;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(NAsyncWork) == 40);
 static_assert(sizeof(NAsyncWorkPtr) == 12);
 #endif

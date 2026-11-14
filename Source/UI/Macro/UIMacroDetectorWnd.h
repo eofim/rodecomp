@@ -46,7 +46,7 @@ public:
 
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMacroDetectorWnd, m_captchaKey) == 0xC0);
 static_assert(offsetof(UIMacroDetectorWnd, m_imageData) == 0xC4);
 static_assert(offsetof(UIMacroDetectorWnd, m_lastAnswer) == 0xE0);

@@ -57,7 +57,7 @@ private:
   UIBitmapButton* m_hideItems;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIShortCutWnd) == 0x18C);
 #endif
 

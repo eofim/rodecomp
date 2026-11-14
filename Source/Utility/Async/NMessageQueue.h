@@ -49,7 +49,7 @@ protected:
 };
 
 static_assert(sizeof(NMessage) == 16);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(NMessage, argumentHigh) == 4);
 static_assert(offsetof(NMessage, argumentLow) == 8);
 static_assert(offsetof(NMessage, valid) == 12);

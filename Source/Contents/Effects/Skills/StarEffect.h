@@ -22,7 +22,7 @@ public:
   /* 0100 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CStarEffect, particles) == 0x100);
 static_assert(sizeof(CStarEffect) == 0x10C);
 #endif

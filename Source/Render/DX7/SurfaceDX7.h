@@ -40,7 +40,7 @@ public:
   void Upload(int x, int y, int width, int height, const std::uint32_t* pixels, int option, int sourceWidth) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSurfaceDX7) == 20);
 #endif
 

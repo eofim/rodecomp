@@ -27,7 +27,7 @@ inline void RenderPrimitivePool::Rewind() {
   this->m_current = this->m_commands.begin();
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenderPrimitivePool) == 32);
 #endif
 

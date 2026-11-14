@@ -236,7 +236,7 @@ bool IsSupportSkill(int skillId);
 bool ShowsCastEffect(int skillId);
 vector3d CellWorldPosition(int column, int row);
 static_assert(sizeof(SkillInfoEntry) == 8);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(SkillInfoEntry, requiredLevel) == 0x4);
 static_assert(sizeof(CSkillInfo) == 68);
 static_assert(offsetof(CSkillActionMgr, m_efstActions) == 0x0C);

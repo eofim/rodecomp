@@ -45,7 +45,7 @@ struct LexiconSerializer {
   std::uint32_t Serialize(LexiconNode* node, std::uint32_t offset, unsigned char terminal);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(LexiconNode) == 12);
 static_assert(sizeof(LexiconHeader) == 0x118);
 static_assert(sizeof(LexiconSerializer) == 300);

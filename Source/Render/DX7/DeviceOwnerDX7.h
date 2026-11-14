@@ -104,7 +104,7 @@ struct DeviceOwnerDX7Handle {
   unsigned int PackColor(int red, int green, int blue) const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(DeviceOwnerDX7) == 588);
 static_assert(offsetof(DeviceOwnerDX7, caps) == 72);
 static_assert(offsetof(DeviceOwnerDX7, depthFormat) == 312);

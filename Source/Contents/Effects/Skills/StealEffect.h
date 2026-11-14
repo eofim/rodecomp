@@ -24,7 +24,7 @@ public:
   /* 00D4 */ vector3d offsets[10];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CSteal, offsets) == 0xD4);
 static_assert(sizeof(CSteal) == 0x14C);
 #endif

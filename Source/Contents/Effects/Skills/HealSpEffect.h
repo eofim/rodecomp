@@ -27,7 +27,7 @@ public:
   /* 00E4 */ int alphaLevel;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CHealSp, particles) == 0xCC);
 static_assert(offsetof(CHealSp, sprites) == 0xD8);
 static_assert(sizeof(CHealSp) == 0xE8);

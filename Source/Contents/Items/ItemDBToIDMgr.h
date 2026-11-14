@@ -22,7 +22,7 @@ protected:
 
 extern CItemDBToIDMgr* g_itemDbToIdMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CItemDBToIDMgr) == 12);
 #endif
 

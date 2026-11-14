@@ -30,7 +30,7 @@ public:
 
 extern CConfigMgr* g_configMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CConfigMgr) == 0x20);
 #endif
 

@@ -270,7 +270,7 @@ public:
 
 extern GrannyAnimationLibrary g_grannyAnimationLibrary;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(granny_texture, imageCount) == 0x3C);
 static_assert(offsetof(granny_file_info, skeletons) == 0x24);
 static_assert(offsetof(granny_texture, width) == 0x08);

@@ -86,7 +86,7 @@ public:
   /* 0164 */ UIStaticText* instructionText;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIPasswordWnd) == 0xC0);
 static_assert(offsetof(UISecondPasswordInputWnd, keypadButtons) == 0x124);
 static_assert(offsetof(UISecondPasswordInputWnd, instructionText) == 0x164);

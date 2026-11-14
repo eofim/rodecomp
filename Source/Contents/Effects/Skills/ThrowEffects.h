@@ -37,7 +37,7 @@ public:
   /* 00F8 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CThrowItemEffect, particles) == 0xF8);
 #endif
 
@@ -55,7 +55,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CVolcanoEffect, particles) == 0xE4);
 #endif
 

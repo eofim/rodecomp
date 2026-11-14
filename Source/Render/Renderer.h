@@ -80,7 +80,7 @@ extern CRenderer* g_renderer;
 
 int ScaleByScreenHeight(int value);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRenderer) == 0x25C);
 static_assert(offsetof(CRenderer, padding_0049) == 0x0049);
 static_assert(offsetof(CRenderer, commands) == 0x0050);

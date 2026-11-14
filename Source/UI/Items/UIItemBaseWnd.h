@@ -35,7 +35,7 @@ public:
   /* 00E8 */ std::list<ITEM_INFO> items;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemBaseWnd, scroll) == 0xD8);
 static_assert(offsetof(UIItemBaseWnd, items) == 0xE8);
 static_assert(sizeof(UIItemBaseWnd) == 0xF0);

@@ -28,7 +28,7 @@ struct LightmappedBuffer {
   void Clear();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(LightmappedBuffer, indices) == 0x8);
 #endif
 

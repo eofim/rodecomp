@@ -31,7 +31,7 @@ public:
   void Update();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(ServerTimeManager, now) == 0x8);
 static_assert(offsetof(ServerTimeManager, offset) == 0x10);
 static_assert(offsetof(ServerTimeManager, second) == 0x2C);

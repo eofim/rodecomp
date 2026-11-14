@@ -48,7 +48,7 @@ public:
   void Send(const char* text);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CNProtectGameGuardMgr, m_errorMessage) == 0x14);
 static_assert(offsetof(CNProtectGameGuardMgr, m_lock) == 0x2C);
 static_assert(offsetof(CNProtectGameGuardMgr, m_tokens) == 0x44);

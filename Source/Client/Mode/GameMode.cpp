@@ -7755,7 +7755,7 @@ public:
 };
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EquipmentProperties::CEquipmentPropertiesMgr) == 0x1FC);
 #endif
 

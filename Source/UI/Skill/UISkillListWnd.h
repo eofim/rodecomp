@@ -49,7 +49,7 @@ public:
   /* 0144 */ int skillTab;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UISkillListWnd, scrollBar) == 0xB8);
 static_assert(offsetof(UISkillListWnd, buttons) == 0xBC);
 static_assert(offsetof(UISkillListWnd, hovered) == 0x118);

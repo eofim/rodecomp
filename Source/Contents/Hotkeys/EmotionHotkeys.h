@@ -22,7 +22,7 @@ struct EmotionHotkeys {
   void Export(Json::Value& data) const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EmotionHotkeys) == 24);
 static_assert(offsetof(EmotionHotkeys, saved) == 12);
 #endif

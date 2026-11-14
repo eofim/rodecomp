@@ -51,14 +51,14 @@ std::string __stdcall PrivateFontFamilyName(const std::string& path);
 int FallbackFontIndex(const std::string& name);
 
 struct FontCacheLayout {
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
   static_assert(offsetof(FontCache, m_fonts) == 0x0000);
   static_assert(offsetof(FontCache, m_startup) == 0x000C);
   static_assert(offsetof(FontCache, m_gdiplus) == 0x001C);
 #endif
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(FontEntry) == 24);
 static_assert(offsetof(FontEntry, family) == 0x0000);
 static_assert(offsetof(FontEntry, height) == 0x0004);

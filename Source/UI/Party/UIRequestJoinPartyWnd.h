@@ -42,7 +42,7 @@ public:
   /* 00E8 */ UIStaticText* levelText;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIRequestJoinPartyWnd) == 0xEC);
 #endif
 

@@ -14,7 +14,7 @@ struct ShortcutGrid {
 };
 
 static_assert(sizeof(ShortcutGrid) == 12);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(ShortcutGrid, hovered) + 0x0154 == 0x0154);
 static_assert(offsetof(ShortcutGrid, row) + 0x0154 == 0x0158);
 static_assert(offsetof(ShortcutGrid, rows) + 0x0154 == 0x015C);

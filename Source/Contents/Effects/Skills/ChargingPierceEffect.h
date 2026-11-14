@@ -59,7 +59,7 @@ public:
   /* 00CC */ std::list<CEZ2STRParticle*> emitters;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CChargingPierceEffect) == 0x194);
 static_assert(offsetof(CChargingPierceEffect, sparks) == 0x144);
 static_assert(offsetof(CChargingPierceEffect, emitters) == 0x16C);

@@ -27,7 +27,7 @@ public:
 
 void ConvertSpritePalette(std::uint32_t* output, const std::uint8_t* input, int count);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSprRes) == 1324);
 static_assert(sizeof(SpriteRleImage) == 16);
 #endif

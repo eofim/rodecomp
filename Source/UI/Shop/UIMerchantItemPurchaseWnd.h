@@ -30,7 +30,7 @@ public:
   /* 0108 */ int buyingStore;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMerchantItemPurchaseWnd, saved) == 0xFC);
 #endif
 

@@ -25,7 +25,7 @@ protected:
 
 extern const char* g_characterLinkedUserDataLoadPoolName;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCharacterLinkedUserDataLoadAsyncWork) == 200);
 #endif
 

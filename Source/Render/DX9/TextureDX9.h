@@ -50,7 +50,7 @@ private:
   bool UploadSurface(IDirect3DSurface9* surface, int x, int y, int width, int height, const std::uint32_t* pixels, std::uint8_t blackTransparent, int sourceWidth);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CTextureDX9) == 340);
 #endif
 

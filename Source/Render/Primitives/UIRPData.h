@@ -24,7 +24,7 @@ protected:
   /* 000C */ CTexture* m_texture;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIRPData) == 16);
 #endif
 

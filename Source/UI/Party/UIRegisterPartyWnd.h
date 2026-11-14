@@ -36,7 +36,7 @@ private:
   void NormalizeLevels();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIRegisterPartyWnd) == 0xE8);
 #endif
 

@@ -28,7 +28,7 @@ public:
   /* 00E4 */ int particleGridSize;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPowderingEffect) == 0xE8);
 static_assert(offsetof(CPowderingEffect, spriteParticles) == 0xD8);
 static_assert(offsetof(CPowderingEffect, particleGridSize) == 0xE4);

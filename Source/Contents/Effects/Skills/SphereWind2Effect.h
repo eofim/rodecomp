@@ -22,7 +22,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CSphereWind2Effect, lastOuter) == 0xCC);
 static_assert(offsetof(CSphereWind2Effect, lastInner) == 0xD8);
 static_assert(offsetof(CSphereWind2Effect, particles) == 0xE4);

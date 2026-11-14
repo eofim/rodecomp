@@ -14,7 +14,7 @@ struct BinkHandle {
   /* 00EC */ std::int32_t paused;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(BinkHandle, frames) == 0x08);
 static_assert(offsetof(BinkHandle, frame) == 0x0C);
 static_assert(offsetof(BinkHandle, paused) == 0xEC);

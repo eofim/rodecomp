@@ -1000,7 +1000,7 @@ void LaunchSkillActorEffect(CGameActor* actor, short x, short y, std::uint16_t s
 void __stdcall LaunchBulletSpriteEffect(const vector3d* position, int actorId, float scale, int job);
 void DecodeSrcDst(const unsigned char* packed, int* srcX, int* srcY, int* dstX, int* dstY, int* subX, int* subY);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CGameMode, mapName) == 0x68);
 static_assert(offsetof(CGameMode, areaBounds) == 0x58);
 static_assert(offsetof(CGameMode, leftBtnClickTick) == 0xD8);

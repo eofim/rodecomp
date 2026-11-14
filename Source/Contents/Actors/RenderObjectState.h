@@ -121,7 +121,7 @@ struct RenderObjectState {
   /* 0130 */ unsigned char translucentOther[8];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenderObjectState) == 296);
 static_assert(offsetof(RenderObjectState, sequenceAnimation) == 0xA5);
 static_assert(offsetof(RenderObjectState, sequenceAnimations) == 0xA7);

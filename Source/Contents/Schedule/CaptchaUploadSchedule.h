@@ -15,7 +15,7 @@ public:
   /* 003C */ int sent;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCaptchaUploadSchedule) == 0x40);
 static_assert(offsetof(CCaptchaUploadSchedule, buffer) == 0x34);
 static_assert(offsetof(CCaptchaUploadSchedule, sent) == 0x3C);

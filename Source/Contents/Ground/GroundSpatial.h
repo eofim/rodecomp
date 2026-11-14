@@ -43,7 +43,7 @@ struct GroundCell {
   /* 0053 */ unsigned char padding_0053;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(GroundVertex) == 0x20);
 static_assert(sizeof(GroundQuad) == 156);
 static_assert(offsetof(GroundQuad, texture) == 0x84);

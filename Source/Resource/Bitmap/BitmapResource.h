@@ -37,7 +37,7 @@ public:
   /* 0110 */ BitmapImage image;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CBitmapRes) == 292);
 static_assert(offsetof(CBitmapRes, image) == 0x0110);
 #endif

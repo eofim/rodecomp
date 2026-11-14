@@ -23,7 +23,7 @@ public:
   __declspec(noinline) void UpdateParticle(CEZ2STRParticle* particle);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CTalismanMarkEffect, particles) == 0xCC);
 static_assert(sizeof(CTalismanMarkEffect) == 0xD8);
 #endif

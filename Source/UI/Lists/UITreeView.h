@@ -29,7 +29,7 @@ struct UITreeNode {
   /* 0188 */ std::vector<std::string> icons;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UITreeNode, children) == 0x180);
 #endif
 

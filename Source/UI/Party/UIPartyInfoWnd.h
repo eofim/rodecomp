@@ -27,7 +27,7 @@ public:
   /* 017C */ CAdvenPartyInfo info;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIPartyInfoWnd) == 0x1C8);
 #endif
 

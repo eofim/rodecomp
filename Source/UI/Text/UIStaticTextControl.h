@@ -61,7 +61,7 @@ public:
   /* 00F8 */ int textY;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CUIStaticText) == 0xFC);
 static_assert(offsetof(CUIStaticText, displayText) == 0x98);
 static_assert(offsetof(CUIStaticText, scrollBar) == 0xC0);

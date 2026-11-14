@@ -28,7 +28,7 @@ private:
   /* 0000 */ std::map<const char*, CTexture*, TextureNameLess> m_textures;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(TextureCache) == 8);
 #endif
 

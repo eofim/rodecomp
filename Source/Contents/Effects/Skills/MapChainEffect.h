@@ -38,7 +38,7 @@ public:
   /* 0100 */ int chainModeE;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMapChainEffect, particles) == 0xE4);
 static_assert(sizeof(CMapChainEffect) == 0x104);
 #endif

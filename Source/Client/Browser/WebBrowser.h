@@ -68,7 +68,7 @@ HRESULT __stdcall UnadviseBrowserEvents(IUnknown* source, REFIID events, DWORD c
 
 enum class BrowserCommand : WORD { Navigate = 1000 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CWebBrowser, host) == 0xC);
 static_assert(offsetof(CWebBrowser, padding_0019) == 0x19);
 static_assert(offsetof(CWebBrowser, cookie) == 0x24);

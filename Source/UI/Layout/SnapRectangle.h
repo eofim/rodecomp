@@ -23,7 +23,7 @@ struct SnapRectangle {
   void Snap(const SnapRectangle& other, int& dx, int& dy) const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(SnapRectangle) == 48);
 static_assert(sizeof(SnapRectangle::Edge) == 12);
 static_assert(offsetof(SnapRectangle::Edge, position) == 0x0);

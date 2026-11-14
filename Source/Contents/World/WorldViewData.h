@@ -165,7 +165,7 @@ public:
   /* 02B8 */ std::uint32_t selectBoxColor;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(WorldViewRecord) == 0x54);
 static_assert(offsetof(WorldViewRecord, name) == 0x20);
 static_assert(offsetof(WorldViewRecord, left) == 0x38);

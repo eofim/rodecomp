@@ -48,7 +48,7 @@ public:
   /* 00F4 */ float offsetY;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CharacterParticleBundle, startTime) == 0xD0);
 static_assert(offsetof(CharacterParticleBundle, particles) == 0xDC);
 static_assert(offsetof(CChopChopClawMarks, lastSpawnTime) == 0xE8);

@@ -29,7 +29,7 @@ private:
   static std::size_t __cdecl WriteResponse(char* data, std::size_t size, std::size_t count, std::string* response);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCURLPostHander) == 72);
 #endif
 

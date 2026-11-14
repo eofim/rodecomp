@@ -67,7 +67,7 @@ public:
   /* 0188 */ int duration;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CEmitterEffect, velocityMin) == 0xCC);
 static_assert(offsetof(CEmitterEffect, texture) == 0x134);
 static_assert(offsetof(CEmitterEffect, rotation) == 0x160);

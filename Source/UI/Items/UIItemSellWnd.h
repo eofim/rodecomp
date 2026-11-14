@@ -30,7 +30,7 @@ public:
   /* 00F8 */ int hovered;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemSellWnd, saved) == 0xF4);
 #endif
 

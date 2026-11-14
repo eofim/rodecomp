@@ -26,7 +26,7 @@ public:
   /* 00CC */ CEZ2STRParticle* balls[5];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CTetraBallEffect, balls) == 0xCC);
 static_assert(sizeof(CTetraBallEffect) == 0xE0);
 #endif

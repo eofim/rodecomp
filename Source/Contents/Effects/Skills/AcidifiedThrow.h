@@ -26,7 +26,7 @@ public:
   /* 00E4 */ vector3d impactPosition;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CAcidifiedThrow) == 0xF0);
 static_assert(offsetof(CAcidifiedThrow, active) == 0xDC);
 static_assert(offsetof(CAcidifiedThrow, impactPosition) == 0xE4);

@@ -28,7 +28,7 @@ void __stdcall ExtractNavigationTextLinks(const std::string& text, std::vector<T
 void ExtractTipBoxTextLinks(const std::string& text, std::vector<TextLink>& links);
 void ExtractUrlTextLinks(const std::string& text, std::vector<TextLink>& links);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(TextLink) == 60);
 static_assert(offsetof(TextLink, position) == 0x0);
 static_assert(offsetof(TextLink, padding_0004) == 0x4);

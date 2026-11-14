@@ -87,7 +87,7 @@ inline void RenderQueues::Clear() {
   this->queue_0240.clear();
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(DepthPrimitive) == 8);
 static_assert(sizeof(RenderQueues) == 240);
 static_assert(offsetof(DepthPrimitive, primitive) == 0x0004);

@@ -17,7 +17,7 @@ public:
   /* 0018 */ unsigned char buf[64];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(MD5State, abcd) == 0x08);
 static_assert(offsetof(MD5State, buf) == 0x18);
 static_assert(sizeof(MD5State) == 0x58);

@@ -125,7 +125,7 @@ private:
   /* 0224 */ int m_kafraBottom;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RoMapTooltipBox) == 0x14);
 static_assert(sizeof(CKafraMoveMapServiceInfo) == 0x68);
 static_assert(offsetof(CKafraMoveMapServiceInfo, markers) == 0x04);

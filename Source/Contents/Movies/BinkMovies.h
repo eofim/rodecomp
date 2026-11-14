@@ -39,7 +39,7 @@ private:
   /* 0000 */ std::list<NamedBinkMovie*> m_movies;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(MoviePosition) == 0x000C);
 static_assert(offsetof(MoviePosition, x) == 0x0000);
 static_assert(offsetof(MoviePosition, y) == 0x0004);

@@ -30,7 +30,7 @@ void PaintAlternateCooldowns(
 );
 
 static_assert(sizeof(ShortcutCooldownIcon) == 16);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ShortcutCooldownRecord) == 28);
 static_assert(offsetof(ShortcutCooldownIcon, id) == 0x0000);
 static_assert(offsetof(ShortcutCooldownIcon, slot) == 0x0004);

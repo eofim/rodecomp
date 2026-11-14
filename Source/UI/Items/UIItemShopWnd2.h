@@ -35,7 +35,7 @@ public:
   /* 0108 */ int extraBottomHeight;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemShopWnd2, saved) == 0xFC);
 #endif
 

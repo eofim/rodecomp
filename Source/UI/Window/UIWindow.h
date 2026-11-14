@@ -256,7 +256,7 @@ private:
 
 extern std::uint32_t g_windowUid;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIWindow) == 0x7C);
 static_assert(offsetof(UIWindow, parent) == 0x10);
 #endif

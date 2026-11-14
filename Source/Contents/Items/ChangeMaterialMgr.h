@@ -93,7 +93,7 @@ std::string ChangeMaterialFormat(const char* format, ...);
 
 extern CChangeMaterialMgr* g_changeMaterialMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ChangeMaterialRecipe) == 0x1C);
 static_assert(sizeof(ChangeMaterialResult) == 0x1C);
 static_assert(sizeof(CChangeMaterialMgr) == 0xC);

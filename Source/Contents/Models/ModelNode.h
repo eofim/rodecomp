@@ -73,7 +73,7 @@ public:
   /* 0118 */ std::map<int, ModelTextureTransform> textureTransforms;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(C3dNode) == 140);
 static_assert(sizeof(C3dNodeV1) == 176);
 static_assert(sizeof(C3dNodeV2) == 288);

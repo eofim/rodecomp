@@ -60,7 +60,7 @@ public:
 
 extern CPathFinder g_pathFinder;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CPathFinder, attrCache) == 0x1078);
 static_assert(offsetof(CPathFinder, nodePool) == 0x1084);
 static_assert(offsetof(CPathFinder, nodeMap) == 0x1090);

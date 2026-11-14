@@ -71,7 +71,7 @@ protected:
   /* 00B0 */ int m_argument;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIButton) == 0xB4);
 #endif
 

@@ -20,7 +20,7 @@ public:
   /* 0164 */ int padding_0164;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGndRiser) == 0x168);
 static_assert(offsetof(CGndRiser, lifetime) == 0x158);
 static_assert(offsetof(CGndRiser, screenX) == 0x15C);

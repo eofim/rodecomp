@@ -28,7 +28,7 @@ public:
   /* 00E8 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRectUpEffect) == 0xF4);
 static_assert(offsetof(CRectUpEffect, particleLifetime) == 0xE4);
 static_assert(offsetof(CRectUpEffect, particles) == 0xE8);

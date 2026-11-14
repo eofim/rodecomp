@@ -188,7 +188,7 @@ void __stdcall Get_Angle(float x, float y, std::int16_t* angle);
 
 static_assert(sizeof(EffectPrimitiveRecord) == 140);
 static_assert(sizeof(EffectPrimitiveSlot) == 0xB4);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(EffectPrimitiveRecord, corners) == 0xC);
 static_assert(offsetof(EffectPrimitiveRecord, matrix) == 0x48);
 static_assert(offsetof(EffectPrimitiveRecord, color) == 0x88);

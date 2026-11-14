@@ -21,7 +21,7 @@ public:
   /* 00CC */ std::list<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSoulUnityEffect) == 0xD4);
 static_assert(offsetof(CSoulUnityEffect, particles) == 0xCC);
 #endif

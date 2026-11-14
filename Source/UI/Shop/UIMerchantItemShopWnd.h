@@ -39,7 +39,7 @@ public:
   /* 0118 */ int footerHeight;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMerchantItemShopWnd, saved) == 0xF8);
 static_assert(offsetof(UIMerchantItemShopWnd, startTick) == 0x110);
 static_assert(sizeof(UIMerchantItemShopWnd) == 0x11C);

@@ -22,7 +22,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> bands;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CRainbowEffect, previousOuter) == 0xCC);
 static_assert(offsetof(CRainbowEffect, previousInner) == 0xD8);
 static_assert(offsetof(CRainbowEffect, bands) == 0xE4);

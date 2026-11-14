@@ -50,7 +50,7 @@ public:
   /* 0018 */ std::vector<int> m_autoFeeding;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PetEvolutionRecipe) == 0x10);
 static_assert(sizeof(CPetEvolutionMgr) == 0x24);
 #endif

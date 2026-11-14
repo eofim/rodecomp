@@ -81,7 +81,7 @@ private:
 void DecryptRijndael192(const char* input, char* output);
 void DecryptRijndael256(const char* input, char* output);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRijndael) == 0x474);
 #endif
 

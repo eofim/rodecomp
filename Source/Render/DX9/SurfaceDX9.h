@@ -33,7 +33,7 @@ protected:
   /* 0010 */ IDirect3DSurface9* m_surface;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSurfaceDX9) == 20);
 #endif
 

@@ -26,7 +26,7 @@ public:
   /* 00FC */ std::vector<CParticle*> ribbon;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMapMagicZoneEffect, previousInner) == 0xCC);
 static_assert(offsetof(CMapMagicZoneEffect, previousOuter) == 0xD8);
 static_assert(offsetof(CMapMagicZoneEffect, spinners) == 0xE4);

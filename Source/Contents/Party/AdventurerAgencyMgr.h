@@ -44,7 +44,7 @@ private:
 
 extern CAdventurerAgencyMgr* g_adventurerAgencyMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CAdventurerAgencyMgr) == 28);
 #endif
 

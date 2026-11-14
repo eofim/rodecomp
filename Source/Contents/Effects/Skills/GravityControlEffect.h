@@ -21,7 +21,7 @@ public:
   /* 00D4 */ float minimumHeightOffset;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGravityControlEffect) == 0xD8);
 static_assert(offsetof(CGravityControlEffect, target) == 0xCC);
 #endif

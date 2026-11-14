@@ -31,7 +31,7 @@ protected:
     /* 000C */ int key2;
     /* 0010 */ std::string description;
   };
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
   static_assert(sizeof(Hotkey) == 40);
 #endif
   /* 0004 */ bool m_enabled;
@@ -43,7 +43,7 @@ protected:
 
 extern CUserHotkeyMgr* g_userHotkeyMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CUserHotkeyMgr) == 24);
 #endif
 

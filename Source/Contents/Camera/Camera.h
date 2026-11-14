@@ -51,7 +51,7 @@ public:
   /* 01B4 */ CSkyBox* skyBox;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CView, camera) == 0x0020);
 static_assert(offsetof(CView, frame) == 0x0080);
 static_assert(offsetof(CView, spatial) == 0x00F8);

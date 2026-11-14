@@ -27,7 +27,7 @@ public:
   /* 0108 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMagicFloorEffect, lastPoints) == 0xCC);
 static_assert(offsetof(CMagicFloorEffect, padding_00E4) == 0xE4);
 static_assert(offsetof(CMagicFloorEffect, floors) == 0xFC);

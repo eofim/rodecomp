@@ -17,7 +17,7 @@ struct ReputeInfoRecord {
   /* 0020 */ std::string invisible;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 #include <cstddef>
 static_assert(sizeof(ReputeGroupRecord) == 0x3C);
 static_assert(sizeof(ReputeInfoRecord) == 0x38);

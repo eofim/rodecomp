@@ -40,7 +40,7 @@ extern CooldownOwner* g_cooldownOwner;
 bool CreateCooldownOwner();
 void DestroyCooldownOwner();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CooldownOwner) == 36);
 #endif
 

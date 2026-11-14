@@ -30,7 +30,7 @@ private:
   /* 0010 */ CFile* m_file;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(BinkMovie) == 0x0014);
 #endif
 

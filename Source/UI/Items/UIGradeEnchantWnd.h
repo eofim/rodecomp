@@ -29,7 +29,7 @@ struct GradeEnchantInfo {
   /* 000C */ std::int32_t bonusPerStep;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(GradeEnchantMaterial) == 17);
 static_assert(sizeof(GradeEnchantInfo) == 16);
 #endif

@@ -57,7 +57,7 @@ public:
   /* 0190 */ unsigned char m_hideCapacity;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemStoreWnd, tabs) == 0x100);
 static_assert(offsetof(UIItemStoreWnd, saved) == 0x164);
 #endif

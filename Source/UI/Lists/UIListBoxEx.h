@@ -69,7 +69,7 @@ inline int UIListBoxEx::LineAt(int x, int y) const {
   return index >= 0 && static_cast<unsigned>(index) < this->lines.size() ? index : -1;
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ExtendedListLine) == 28);
 static_assert(sizeof(UIListBoxEx) == 0xC0);
 #endif

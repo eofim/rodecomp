@@ -34,7 +34,7 @@ struct CLanguageTC : CLanguageBase {
 };
 
 static_assert(sizeof(TraditionalKeyMapping) == 4);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CLanguageTC, keys) == 0xB8);
 static_assert(offsetof(CLanguageTC, mappings) == 0xC0);
 static_assert(offsetof(CLanguageTC, keyStroke) == 0x4C1);

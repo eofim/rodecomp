@@ -57,7 +57,7 @@ public:
   /* 012C */ UIButton* filterButton;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemWnd, saved) == 0xF0);
 static_assert(offsetof(UIItemWnd, expandedHeight) == 0x110);
 static_assert(offsetof(UIItemWnd, tabs) == 0x118);

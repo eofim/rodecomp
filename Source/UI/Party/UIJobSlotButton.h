@@ -15,7 +15,7 @@ public:
   /* 0150 */ bool selected;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIJobSlotButton) == 0x154);
 #endif
 

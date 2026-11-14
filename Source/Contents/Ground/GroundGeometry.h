@@ -122,7 +122,7 @@ public:
 
 extern float g_groundGridUV[8];
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(GroundLightmap) == 56);
 static_assert(offsetof(GroundLightmap, texture) == 0x04);
 static_assert(offsetof(GroundLightmap, uv) == 0x08);

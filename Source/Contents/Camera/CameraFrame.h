@@ -20,7 +20,7 @@ struct CameraFrame {
 
 static_assert(sizeof(CameraFrame) == 120);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CameraFrame, up) + 0x80 == 0x8C);
 static_assert(offsetof(CameraFrame, view) + 0x80 == 0x98);
 static_assert(offsetof(CameraFrame, inverse) + 0x80 == 0xC8);

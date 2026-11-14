@@ -90,7 +90,7 @@ bool CreateSignBoardMgr();
 void DestroySignBoardMgr();
 void __fastcall InitializeSignBoardManager(CSignBoardMgr* manager);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CIcon) == 0x138);
 static_assert(sizeof(SignBoardInfo) == 0x20);
 static_assert(sizeof(CSignBoardMgr) == 0x10);

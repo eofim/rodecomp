@@ -146,7 +146,7 @@ public:
   /* 0144 */ std::vector<unsigned int> m_questIds[4];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIRecommededQuestScrollWnd, m_questId) == 0xB0);
 static_assert(sizeof(UIRecommededQuestScrollWnd) == 0xB8);
 static_assert(sizeof(UIRenewQuestScrollBar) == sizeof(UIScrollBar));

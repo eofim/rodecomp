@@ -70,7 +70,7 @@ public:
   void SetThumbImages(const std::string& top, const std::string& middle, const std::string& bottom);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CUIVScrollBar, total) == 0x90);
 static_assert(offsetof(CUIVScrollBar, dragging) == 0xA8);
 static_assert(offsetof(CUIVScrollBar, backgroundName) == 0xAC);

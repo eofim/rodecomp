@@ -34,7 +34,7 @@ struct XmlDocument : XmlNode {
   /* 002C */ void* buffer;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(XmlNode) == 44);
 static_assert(sizeof(XmlDocument) == 48);
 #endif

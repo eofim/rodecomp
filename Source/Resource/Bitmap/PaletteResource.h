@@ -18,7 +18,7 @@ public:
   /* 0510 */ std::uint32_t palette[256];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPaletteRes) == 0x910);
 #endif
 

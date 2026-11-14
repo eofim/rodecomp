@@ -40,7 +40,7 @@ namespace myGPack {
 
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPakFile) == 4);
 static_assert(sizeof(std::vector<std::uint8_t>) == 12);
 static_assert(sizeof(myGPack::CReadPakFile) == 32);

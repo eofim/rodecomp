@@ -90,7 +90,7 @@ public:
 
 extern CTipBoxMgr* g_itemTagOwner;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(TipBoxImage) == 28);
 static_assert(sizeof(TipBoxEntry) == 88);
 static_assert(offsetof(TipBoxEntry, searchable) == 0x34);

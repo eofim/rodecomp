@@ -31,7 +31,7 @@ public:
   /* 00DC */ std::vector<CEZ2STRParticle*> lights;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCaneOfEvilEyeEffect) == 0xE8);
 static_assert(offsetof(CCaneOfEvilEyeEffect, eyes) == 0xD0);
 static_assert(offsetof(CCaneOfEvilEyeEffect, lights) == 0xDC);

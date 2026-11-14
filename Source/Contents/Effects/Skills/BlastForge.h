@@ -29,7 +29,7 @@ public:
   /* 00E0 */ std::int64_t startTime;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CBlastForge) == 0xE8);
 static_assert(offsetof(CBlastForge, openToggle) == 0xDC);
 static_assert(offsetof(CBlastForge, startTime) == 0xE0);

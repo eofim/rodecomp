@@ -30,7 +30,7 @@ public:
   virtual void Stretch(int x, int y, int width, int height) = 0;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSurface) == 4);
 static_assert(sizeof(SurfaceLock) == 24);
 static_assert(offsetof(SurfaceLock, pixels) == 0x04);

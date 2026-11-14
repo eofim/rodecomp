@@ -26,7 +26,7 @@ public:
   /* 96CC */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CPokJukEffect, trails) == 0xCC);
 static_assert(offsetof(CPokJukEffect, states) == 0x78CC);
 static_assert(offsetof(CPokJukEffect, beats) == 0x82CC);

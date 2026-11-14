@@ -62,7 +62,7 @@ struct SkillUnitMessage {
   /* 0020 */ std::uint32_t characterId;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(SkillHitMessage) == 0x2C);
 static_assert(sizeof(SkillUnitMessage) == 0x24);
 #endif

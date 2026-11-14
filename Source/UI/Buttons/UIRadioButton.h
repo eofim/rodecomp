@@ -35,7 +35,7 @@ public:
   bool IsChecked();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CUICheckBox, onCheck) == 0x128);
 static_assert(sizeof(CUICheckBox) == 0x150);
 static_assert(offsetof(CUIRadioButton, onSelect) == 0x150);

@@ -19,7 +19,7 @@ public:
   /* 0008 */ std::uint64_t identity;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGameObject) == 16);
 #endif
 

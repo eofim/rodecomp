@@ -15,7 +15,7 @@ struct ItemTagRecord {
   /* 01C4 */ int index;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ItemTagRecord) == 456);
 static_assert(offsetof(ItemTagRecord, child) == 0x0000);
 static_assert(offsetof(ItemTagRecord, number) == 0x0004);

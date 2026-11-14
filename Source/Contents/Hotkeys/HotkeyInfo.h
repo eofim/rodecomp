@@ -31,7 +31,7 @@ std::string SkillTooltipFlat(const char* hotkey, const char* name, int level, in
 std::string SkillTooltip(const char* hotkey, const char* name, int level, int sp, int ap, bool percent);
 bool SkillUsesPercentSp(int id);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(HotkeyInfo) == 56);
 static_assert(offsetof(HotkeyInfo, text) == 8);
 static_assert(offsetof(HotkeyInfo, description) == 0x0020);

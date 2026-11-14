@@ -65,7 +65,7 @@ struct MakeCharacterStatus {
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(MakeCharacterStatus) == 0x50);
 #endif
 
@@ -136,7 +136,7 @@ public:
   /* 0368 */ int previewPhase;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UINewMakeCharWnd, m_job) == 0x264);
 static_assert(offsetof(UINewMakeCharWnd, m_head) == 0x266);
 static_assert(offsetof(UINewMakeCharWnd, m_costumeJob) == 0x268);

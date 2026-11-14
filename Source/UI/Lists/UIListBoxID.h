@@ -75,7 +75,7 @@ public:
   /* 00C4 */ std::map<int, int> lineData;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(IdListLine) == 28);
 static_assert(sizeof(UIListBoxID) == 0xC0);
 static_assert(offsetof(UIListBoxID, selectionColor) == 0xBC);

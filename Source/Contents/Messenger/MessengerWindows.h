@@ -110,7 +110,7 @@ public:
   /* 028C */ int mode;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIDragMiniPartyWnd, member) == 0xB4);
 static_assert(sizeof(UIFriendOptionWnd) == 0xC8);
 static_assert(sizeof(UIMessengerGroupWnd) == 0x290);

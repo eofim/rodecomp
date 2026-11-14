@@ -25,7 +25,7 @@ protected:
 
 extern const char* g_stopRecruitingPoolName;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CStopRecruitingAsyncWork) == 0xC8);
 #endif
 

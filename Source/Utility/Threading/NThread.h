@@ -27,7 +27,7 @@ private:
   static unsigned __stdcall Entry(void* parameter);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(NThread) == 44);
 #endif
 

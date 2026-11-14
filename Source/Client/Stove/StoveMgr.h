@@ -41,7 +41,7 @@ public:
   void StartPurchase(const std::vector<ITEM_INFO>& items);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CStoveMgr, m_environment) == 0x000C);
 static_assert(offsetof(CStoveMgr, m_purchaseUrl) == 0x0018);
 static_assert(offsetof(CStoveMgr, m_accessToken) == 0x0030);

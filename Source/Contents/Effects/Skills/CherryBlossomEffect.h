@@ -24,7 +24,7 @@ public:
   /* 018C */ std::vector<CParticle*> petals;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CCherryBlossomEffect, offsets) == 0xCC);
 static_assert(offsetof(CCherryBlossomEffect, petals) == 0x18C);
 #endif

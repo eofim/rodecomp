@@ -275,7 +275,7 @@ inline JsonValue& JsonCppLoader::GetValue(JsonValue& out, const std::string& key
   return out;
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(JsonValue) == 0x10);
 static_assert(offsetof(JsonValue, smallValue) == 0x02);
 static_assert(offsetof(JsonValue, pointer) == 0x04);

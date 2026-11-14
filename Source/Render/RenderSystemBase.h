@@ -33,7 +33,7 @@ public:
   virtual HRESULT Present(bool option) = 0;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRenderSystemBase) == 4);
 #endif
 

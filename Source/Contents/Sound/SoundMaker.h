@@ -25,7 +25,7 @@ public:
   /* 0168 */ std::uint32_t cycle;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CSoundMaker, file) == 0x138);
 static_assert(offsetof(CSoundMaker, volume) == 0x150);
 static_assert(offsetof(CSoundMaker, width) == 0x154);

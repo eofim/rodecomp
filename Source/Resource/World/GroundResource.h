@@ -69,7 +69,7 @@ static_assert(sizeof(GroundWaterParameters) == 24);
 static_assert(sizeof(GroundWater) == 36);
 static_assert(sizeof(GroundLegacyLightmap) == 40);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGndRes) == 0x01B4);
 #endif
 

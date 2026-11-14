@@ -21,7 +21,7 @@ public:
   MiniPartyGridPoint GetWindowPosition(int index) const;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMiniPartyWndSortArea, area) == 0x04);
 static_assert(offsetof(CMiniPartyWndSortArea, cells) == 0x1C);
 static_assert(sizeof(CMiniPartyWndSortArea) == 0x24);

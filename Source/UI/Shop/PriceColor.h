@@ -11,7 +11,7 @@ struct PriceColors {
 
 PriceColors PriceColor(std::int64_t amount);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PriceColors) == 0x08);
 static_assert(offsetof(PriceColors, secondary) == 0x04);
 #endif

@@ -90,7 +90,7 @@ public:
 static_assert(sizeof(WorldModelRecord) == 268);
 static_assert(sizeof(WorldSoundRecord) == 192);
 static_assert(sizeof(WorldEffectRecord) == 116);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(WorldModelRecord, position) == 0x00C8);
 static_assert(offsetof(WorldModelRecord, animationSpeed) == 0x00F4);
 static_assert(offsetof(WorldModelRecord, flag) == 0x0104);

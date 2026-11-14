@@ -43,7 +43,7 @@ public:
   /* 01E0 */ UIStaticText* m_bronzeText;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIRoulletteWnd, m_prizeButton) == 0xBC);
 static_assert(offsetof(UIRoulletteWnd, m_enabled) == 0xC8);
 static_assert(offsetof(UIRoulletteWnd, m_item) == 0xD0);

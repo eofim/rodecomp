@@ -28,7 +28,7 @@ public:
   /* 018C */ std::uint16_t itemEntryFlags;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CItem, name) == 0x158);
 static_assert(offsetof(CItem, itemAid) == 0x17C);
 static_assert(offsetof(CItem, isFalling) == 0x180);

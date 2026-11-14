@@ -22,7 +22,7 @@ struct CEffectMaker : EffectActor {
   /* 0170 */ float parameter4;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CEffectMaker, elapsedFrames) == 0x158);
 static_assert(offsetof(CEffectMaker, parameter4) == 0x170);
 #endif

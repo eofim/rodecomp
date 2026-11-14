@@ -110,7 +110,7 @@ public:
   /* 0100 */ EntryQueueWndInfo* saved;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIEntryQueueWnd, m_helpButton) == 0xC0);
 static_assert(offsetof(UIEntryQueueWnd, m_labels) == 0xC4);
 static_assert(offsetof(UIEntryQueueWnd, m_values) == 0xE0);

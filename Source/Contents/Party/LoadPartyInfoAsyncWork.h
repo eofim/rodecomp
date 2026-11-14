@@ -26,7 +26,7 @@ protected:
 
 extern const char* g_loadPartyInfoPoolName;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CLoadPartyInfoAsyncWork) == 208);
 #endif
 

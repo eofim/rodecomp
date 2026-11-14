@@ -32,7 +32,7 @@ public:
   /* 0110 */ std::vector<CParticle*> segmentParticles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CRotateBgEffect, segmentReady) == 0xE8);
 static_assert(offsetof(CRotateBgEffect, lastInner) == 0xEC);
 static_assert(offsetof(CRotateBgEffect, particles) == 0x104);

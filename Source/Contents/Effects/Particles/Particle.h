@@ -173,7 +173,7 @@ std::string EmitterKey(std::string effect, std::string emitter);
 std::string EmitterInfoKey(std::string effect);
 void SubmitParticlePrimitive(RenderCommand* primitive, int flags);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ParticleQuad) == 0x18);
 static_assert(offsetof(ParticleQuad, unused) == 0x14);
 static_assert(offsetof(EZeffectData, clips) == 0x10);

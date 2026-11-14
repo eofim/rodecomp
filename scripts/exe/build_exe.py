@@ -579,7 +579,7 @@ def compile_units(tc, config, out_dir, jobs):
         extra = [f"/I{tc.path(ROOT / directory)}" for directory in includes]
         prelude = unit_prelude(unit)
         forced = [f"/FI{tc.path(prelude)}"] if prelude else []
-        args = [*(tc.expand(a) for a in config["shapes"][shape]), *extra, *forced, "/Z7", f"/Fo{tc.path(obj)}", tc.path(ROOT / unit)]
+        args = [*(tc.expand(a) for a in config["shapes"][shape]), "-DKAFRAVERSE_FORK", *extra, *forced, "/Z7", f"/Fo{tc.path(obj)}", tc.path(ROOT / unit)]
         key = "\x00".join(args)
         try:
             record = json.loads(deps_file.read_text(encoding="utf-8"))

@@ -47,7 +47,7 @@ public:
   /* 0010 */ std::map<int, lcReward> m_rewards;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCheckAttendanceMgr) == 0x18);
 #endif
 

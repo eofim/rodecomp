@@ -241,7 +241,7 @@ public:
   /* 0544 */ CRagEffect* skillEffect;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPlayer) == 0x548);
 static_assert(offsetof(CPlayer, proceedTargetGid) == 0x51C);
 static_assert(offsetof(CPlayer, skillEffect) == 0x544);
@@ -357,7 +357,7 @@ public:
   };
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CPc, honor) == 0x430);
 static_assert(offsetof(CPc, headPalette) == 0x444);
 static_assert(offsetof(CPc, accessory3) == 0x458);

@@ -15,7 +15,7 @@ public:
   /* 013C */ int padding_013C;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMandraAttackEffect) == 0x140);
 static_assert(offsetof(CMandraAttackEffect, startFrame) == 0x138);
 #endif

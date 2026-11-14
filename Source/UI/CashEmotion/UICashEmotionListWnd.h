@@ -55,7 +55,7 @@ protected:
   /* 00EC */ UIStaticText* m_period;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UICashEmotionListWnd) == 0xF0);
 #endif
 

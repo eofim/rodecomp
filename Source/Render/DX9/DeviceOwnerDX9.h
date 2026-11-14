@@ -46,7 +46,7 @@ public:
   /* 068C */ HRESULT lastPresent;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(DeviceOwnerDX9) == 0x690);
 static_assert(offsetof(DeviceOwnerDX9, state) == 0x000C);
 static_assert(offsetof(DeviceOwnerDX9, dynamicTextures) == 0x0688);

@@ -24,7 +24,7 @@ public:
   /* 00D0 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CCellRangeEffect, cellSize) == 0xCC);
 static_assert(offsetof(CCellRangeEffect, particles) == 0xD0);
 static_assert(sizeof(CCellRangeEffect) == 0xDC);

@@ -27,7 +27,7 @@ struct RendererViewport {
 extern float g_cotangent;
 
 static_assert(sizeof(RendererViewport) == 52);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(RendererViewport, width) == 0x24);
 static_assert(offsetof(RendererViewport, centerY) == 0x30);
 #endif

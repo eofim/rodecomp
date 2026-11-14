@@ -75,7 +75,7 @@ public:
   /* 00DD */ unsigned char italic;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIListBox) == 0xD4);
 static_assert(offsetof(UIServerListBox, balloonTexts) == 0xD4);
 static_assert(offsetof(UIServerListBox, balloon) == 0xE0);

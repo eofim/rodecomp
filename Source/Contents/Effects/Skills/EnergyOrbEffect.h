@@ -25,7 +25,7 @@ public:
   /* 00D4 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CEnergyOrbEffect, particles) == 0xD4);
 static_assert(sizeof(CEnergyOrbEffect) == 0xE0);
 #endif

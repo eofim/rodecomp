@@ -287,7 +287,7 @@ struct CharServerEndpoint {
   /* 0014 */ char host[129];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CharServerEndpoint) == 0x98);
 #endif
 

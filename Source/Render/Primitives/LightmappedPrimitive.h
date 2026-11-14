@@ -116,7 +116,7 @@ inline LightmappedPrimitive* LightmappedPrimitivePool::Acquire() {
   return new (primitive) LightmappedPrimitive;
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(LightmappedPrimitive) == 188);
 static_assert(sizeof(LightmappedCommand) == 28);
 static_assert(sizeof(ModelRenderCommand) == 40);

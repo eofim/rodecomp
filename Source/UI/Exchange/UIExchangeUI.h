@@ -88,7 +88,7 @@ public:
 };
 
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ExchangeUI::CItemData) == 0x100);
 static_assert(offsetof(ExchangeUI::CItemData, frozen) == 0xFC);
 static_assert(offsetof(ExchangeUI::CItemListBox, imageNames) == 0x90);

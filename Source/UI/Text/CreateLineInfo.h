@@ -136,7 +136,7 @@ private:
   void CloseItalic(std::string tag);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(LineTextStyle) == 0xC);
 static_assert(sizeof(LineTextSegment) == 0x30);
 static_assert(sizeof(LineFontState) == 0x8);

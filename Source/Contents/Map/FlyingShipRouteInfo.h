@@ -55,7 +55,7 @@ public:
   /* 0038 */ std::string lineTextureName;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RoMapMarker) == 0x3C);
 static_assert(offsetof(RoMapMarker, area) == 0x18);
 static_assert(offsetof(RoMapMarker, center) == 0x2C);

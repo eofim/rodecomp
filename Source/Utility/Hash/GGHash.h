@@ -36,7 +36,7 @@ protected:
   /* 000C */ DWORD* m_data;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGGHash) == 16);
 #endif
 

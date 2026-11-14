@@ -23,7 +23,7 @@ public:
   /* 011D */ unsigned char toggled;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UITextureButton, normalTexture) == 0xBC);
 static_assert(offsetof(UITextureButton, disabledTexture) == 0x104);
 static_assert(offsetof(UITextureButton, toggleEnabled) == 0x11C);

@@ -37,7 +37,7 @@ private:
   /* 0454 */ DWORD m_sampler[2][14];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(DeviceStateDX9) == 1232);
 static_assert(offsetof(DeviceStateDX9, device) == 0x0000);
 static_assert(offsetof(DeviceStateDX9, fvf) == 0x0004);

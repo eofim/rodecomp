@@ -30,7 +30,7 @@ public:
   /* 00F8 */ double distance;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CStormCannonEffect) == 0x100);
 static_assert(offsetof(CStormCannonEffect, direction) == 0xD8);
 static_assert(offsetof(CStormCannonEffect, speed) == 0xF0);

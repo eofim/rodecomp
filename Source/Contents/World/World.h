@@ -100,7 +100,7 @@ public:
 
 CRenderObject* FindRenderObject(std::uint32_t aid);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CWorld, gameMode) == 0x04);
 static_assert(offsetof(CWorld, objects) == 0x08);
 static_assert(offsetof(CWorld, actors) == 0x10);

@@ -73,7 +73,7 @@ void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::s
 template <>
 void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::string>::LoadSkin(bool resolveSkin);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine) == 0xF8);
 static_assert(offsetof(EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, evenRowColor) == 0xF0);
 static_assert(offsetof(EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, oddRowColor) == 0xF4);

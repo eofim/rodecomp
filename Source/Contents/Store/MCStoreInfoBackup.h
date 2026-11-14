@@ -44,7 +44,7 @@ public:
   /* 0058 */ std::vector<ITEM_INFO> items;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMCStoreInfoBackup) == 100);
 #endif
 

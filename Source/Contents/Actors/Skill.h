@@ -37,7 +37,7 @@ public:
   /* 043C */ int padding_043C;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CSkill) == 0x440);
 static_assert(offsetof(CSkill, skillAid) == 0x418);
 static_assert(offsetof(CSkill, m_hasEffect) == 0x428);

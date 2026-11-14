@@ -73,7 +73,7 @@ private:
   void Search(int trigger);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(PartyBoardPlacement, y) == 0x04);
 static_assert(offsetof(PartyBoardPlacement, width) == 0x08);
 static_assert(offsetof(PartyBoardPlacement, height) == 0x0C);

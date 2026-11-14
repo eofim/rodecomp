@@ -557,7 +557,7 @@ public:
   /* 0130 */ double startAngle;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CCrimsonArrowEffect, emitter) == 0xCC);
 static_assert(sizeof(CRootTwistEffect) == 0xD8);
 static_assert(sizeof(CSvgSpiritEffect) == 0xD0);

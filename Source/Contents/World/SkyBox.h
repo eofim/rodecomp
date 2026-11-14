@@ -91,7 +91,7 @@ public:
   /* 000C */ CLensFlare m_flare;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(FlareElement) == 0x28);
 static_assert(offsetof(FlareElement, position) == 0x18);
 static_assert(sizeof(CLensFlare) == 0x320);

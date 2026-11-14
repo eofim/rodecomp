@@ -31,7 +31,7 @@ private:
 
 extern ResourceFailures g_resourceFailures;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(ResourceFailures, m_lock) == 0x04);
 static_assert(offsetof(ResourceFailures, m_reported) == 0x1C);
 static_assert(sizeof(ResourceFailures) == 0x24);

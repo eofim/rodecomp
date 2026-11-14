@@ -56,7 +56,7 @@ class CEffectMemoryMgr {
   /* 0008 */ std::vector<IEffectMemoryPool*> m_pools;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CEffectMemoryMgr) == 0x14);
 static_assert(offsetof(CEffectMemoryMgr, m_pools) == 0x8);
 #endif

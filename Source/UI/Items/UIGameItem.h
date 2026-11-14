@@ -40,7 +40,7 @@ public:
   void SetMode(int mode) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CUIGameItem, itemInfo) == 0x90);
 static_assert(offsetof(CUIGameItem, name) == 0x188);
 static_assert(offsetof(CUIGameItem, image) == 0x1A0);

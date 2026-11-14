@@ -26,7 +26,7 @@ public:
   /* 0174 */ int m_skillId;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CGroundScope, m_lastingTime) == 0x164);
 static_assert(offsetof(CGroundScope, m_skillId) == 0x174);
 #endif

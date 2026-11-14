@@ -68,7 +68,7 @@ public:
   /* 0100 */ UIEditCtrl* m_tagCtrl;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIRodexComposeWnd) == 0x108);
 #endif
 

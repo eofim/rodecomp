@@ -72,7 +72,7 @@ public:
   /* 00FD */ bool alive;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMeteorEffect) == 0xE0);
 static_assert(offsetof(CMeteorEffect, quakeFrame) == 0xD8);
 static_assert(sizeof(CShadowExceedNew) == 0xE0);

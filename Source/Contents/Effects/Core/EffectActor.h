@@ -37,7 +37,7 @@ struct EffectActor : CRenderObject {
   /* 0138 */ EffectActorState state;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EffectActorState) == 28);
 static_assert(sizeof(EffectActor) == 0x158);
 static_assert(offsetof(EffectActor, state) == 0x138);

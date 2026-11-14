@@ -17,7 +17,7 @@ public:
   /* 013C */ int padding_013C;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMousePointer) == 0x140);
 static_assert(offsetof(CMousePointer, m_remainingFrames) == 0x138);
 #endif

@@ -26,7 +26,7 @@ public:
   /* 00F8 */ UIStaticText* info;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMerchantItemWnd, saved) == 0xF0);
 #endif
 

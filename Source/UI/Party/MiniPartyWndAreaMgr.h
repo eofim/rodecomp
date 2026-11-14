@@ -29,7 +29,7 @@ public:
 
 extern CMiniPartyWndAreaMgr* g_miniPartyWndAreaMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CMiniPartyWndAreaMgr, excluded) == 0x1C);
 static_assert(offsetof(CMiniPartyWndAreaMgr, available) == 0x28);
 static_assert(sizeof(CMiniPartyWndAreaMgr) == 0x34);

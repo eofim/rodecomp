@@ -39,7 +39,7 @@ public:
 
 float ScreenAngle(const float* from, const float* to, const float* matrix);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CEZ2STREffectEx, emitter) == 0xCC);
 static_assert(offsetof(CEZ2STREffectEx, alternateRender) == 0xD8);
 #endif

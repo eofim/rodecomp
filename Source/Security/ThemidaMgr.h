@@ -19,7 +19,7 @@ public:
 
 extern CThemidaMgr* g_themidaMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CThemidaMgr) == 8);
 static_assert(offsetof(CThemidaMgr, m_valid) == 4);
 #endif

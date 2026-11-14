@@ -24,7 +24,7 @@ public:
   void Process(const std::uint64_t& now) override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CEmotionPurchaseExpireSchedule) == 0x30);
 static_assert(sizeof(CEmotionPurchaseUseableTimeUISchedule) == 0x30);
 static_assert(sizeof(CEmotionSaleExpireSchedule) == 0x30);

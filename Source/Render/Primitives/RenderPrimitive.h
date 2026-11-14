@@ -60,7 +60,7 @@ struct RenderPrimitive : RenderCommand {
 void DrawPrimitive(RenderCommand* primitive);
 
 static_assert(sizeof(RenderVertex) == 32);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenderCommand) == 40);
 static_assert(sizeof(RenderTriangle) == 108);
 static_assert(sizeof(RenderPrimitive) == 168);

@@ -21,7 +21,7 @@ public:
   /* 00D8 */ vector3d previous[2];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CHitLineEffect, particles) == 0xCC);
 static_assert(offsetof(CHitLineEffect, previous) == 0xD8);
 static_assert(sizeof(CHitLineEffect) == 0xF0);

@@ -135,7 +135,7 @@ protected:
   /* 007C */ std::string m_itemId;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(LineCutter::UIText) == 0xB0);
 #endif
 

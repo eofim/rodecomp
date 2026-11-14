@@ -38,7 +38,7 @@ public:
   /* 0120 */ std::vector<CParticle*> sparkParticles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CHealEffect) == 0x12C);
 static_assert(offsetof(CHealEffect, columnEdge) == 0xCC);
 static_assert(offsetof(CHealEffect, coneEdge) == 0xE4);

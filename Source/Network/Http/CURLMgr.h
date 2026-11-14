@@ -40,7 +40,7 @@ inline CCURLMgr* CCURLMgr::GetInstance() {
   return g_curlMgr;
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCURLMgr) == 56);
 static_assert(offsetof(CCURLMgr, globalInit) == 0x0004);
 static_assert(offsetof(CCURLMgr, globalCleanup) == 0x0008);

@@ -29,7 +29,7 @@ public:
   /* 055C */ float m_angle;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGraffiSkill) == 0x560);
 static_assert(offsetof(CGraffiSkill, m_cellX) == 0x444);
 static_assert(offsetof(CGraffiSkill, m_canvas) == 0x44C);

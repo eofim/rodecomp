@@ -20,7 +20,7 @@ public:
   /* 00CC */ CEZ2STRParticle* particle;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCresciveBolt) == 0xD0);
 static_assert(offsetof(CCresciveBolt, particle) == 0xCC);
 #endif

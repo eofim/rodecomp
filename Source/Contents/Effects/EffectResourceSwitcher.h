@@ -77,7 +77,7 @@ public:
   void RetireEffects();
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EZ2STREffectInfo) == 0x48);
 static_assert(sizeof(CEZ2STREffectMgr) == 0xC);
 static_assert(sizeof(EZ2STREffectRecord) == 0x58);

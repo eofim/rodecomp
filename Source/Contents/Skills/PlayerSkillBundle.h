@@ -74,7 +74,7 @@ private:
 
 bool IsIndexedSkill(int id);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CPlayerSkillBundle::lcEXCInfo) == 12);
 static_assert(offsetof(CPlayerSkillBundle::lcEXCInfo, previous) == 0x4);
 static_assert(offsetof(CPlayerSkillBundle::lcEXCInfo, target) == 0x8);

@@ -45,7 +45,7 @@ public:
   bool OnProcess() override;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMsgEffect) == 0x1B8);
 static_assert(sizeof(CSummonActorEffect) == 0x1B8);
 static_assert(offsetof(CMsgEffect, m_owner) == 0x15C);

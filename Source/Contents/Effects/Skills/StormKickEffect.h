@@ -28,7 +28,7 @@ public:
   /* 00F0 */ std::vector<CParticle*> clouds;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CStormKickEffect, lastPoints) == 0xCC);
 static_assert(offsetof(CStormKickEffect, storms) == 0xE4);
 static_assert(offsetof(CStormKickEffect, clouds) == 0xF0);

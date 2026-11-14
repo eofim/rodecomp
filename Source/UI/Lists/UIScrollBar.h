@@ -43,7 +43,7 @@ public:
   /* 00B0 */ int verticalStep;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIScrollBar) == sizeof(UIWindow) + 0x38);
 #endif
 

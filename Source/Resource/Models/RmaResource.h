@@ -34,7 +34,7 @@ public:
   /* 0148 */ int interiorFrameEnd = 0;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RmaAction) == 0x18);
 static_assert(offsetof(CRmaRes, actions) == 0x110);
 static_assert(offsetof(CRmaRes, interiorZoom) == 0x134);

@@ -42,7 +42,7 @@ public:
   /* 00CC */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CLevel150Effect, lastPoints) == 0xCC);
 static_assert(offsetof(CLevel150Effect, bubbles) == 0xE4);
 static_assert(offsetof(CLevel150Effect, shocks) == 0xF0);

@@ -437,7 +437,7 @@ public:
 
 extern CNavigationManager g_navigationManager;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CNavi_Link) == 0x98);
 static_assert(offsetof(CNavi_Link, linkedInfo) == 0x7C);
 static_assert(offsetof(CNavi_Link, depth) == 0x88);

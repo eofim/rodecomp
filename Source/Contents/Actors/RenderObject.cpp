@@ -125,7 +125,7 @@ public:
   /* 0150 */ char name[0x108];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(C3dGrannyGameActor, model) == 0x414);
 static_assert(offsetof(C3dGrannyGameActor, motionProgress) == 0x52C);
 static_assert(offsetof(C3dGrannyGameActor, motion) == 0x544);

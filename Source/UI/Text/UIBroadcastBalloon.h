@@ -45,7 +45,7 @@ protected:
   /* 007C */ std::map<int, std::list<BroadcastBalloonMessage>> m_messages;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(BroadcastBalloonLine) == 0x20);
 static_assert(offsetof(BroadcastBalloonMessage, start) == 0x08);
 static_assert(offsetof(BroadcastBalloonMessage, height) == 0x24);

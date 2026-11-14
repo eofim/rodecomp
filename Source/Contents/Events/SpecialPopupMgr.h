@@ -56,7 +56,7 @@ extern CSpecialPopupMgr* g_specialPopupMgr;
 
 std::string FormatPopupString(const char* format, ...);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PopupData) == 0x18);
 static_assert(sizeof(CSpecialPopupMgr) == 0x10);
 #endif

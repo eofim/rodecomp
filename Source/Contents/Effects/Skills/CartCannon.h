@@ -28,7 +28,7 @@ public:
   /* 00F4 */ vector3d startPosition;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCartCannon) == 0x100);
 static_assert(offsetof(CCartCannon, particle) == 0xCC);
 static_assert(offsetof(CCartCannon, currentStep) == 0xD0);

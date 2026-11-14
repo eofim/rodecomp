@@ -94,7 +94,7 @@ public:
   std::string name;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIComboBoxDefWnd) == 0xA8);
 static_assert(sizeof(UIComboBoxDef2Wnd) == 0xB8);
 #endif

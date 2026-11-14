@@ -55,7 +55,7 @@ protected:
 extern const char* g_mcStoreInfoBackupLoadPoolName;
 extern const char* g_mcStoreInfoBackupSavePoolName;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CMCStoreInfoBackupLoadAsyncWork) == 208);
 static_assert(sizeof(CMCStoreInfoBackupSaveAsyncWork) == 232);
 #endif

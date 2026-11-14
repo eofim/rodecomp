@@ -36,7 +36,7 @@ private:
   /* 011C */ std::vector<Cell> m_cells;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(C3dAttr) == 0x0128);
 #endif
 

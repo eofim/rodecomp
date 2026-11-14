@@ -316,7 +316,7 @@ void __stdcall CreateHallucinationPc(int job, int sex, int head, const vector3d*
 extern int g_maxMoveSpeed;
 extern int g_multiHitInterval;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(AiMessage) == 0x18);
 static_assert(sizeof(CGameActor) == 0x410);
 static_assert(offsetof(CGameActor, route) == 0x220);

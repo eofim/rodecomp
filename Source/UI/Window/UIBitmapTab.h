@@ -21,7 +21,7 @@ public:
   /* 007C */ std::vector<BitmapTabEntry> tabs;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(BitmapTabEntry) == 0x1C);
 #endif
 

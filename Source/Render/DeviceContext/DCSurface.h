@@ -89,7 +89,7 @@ private:
   /* 0004 */ std::shared_ptr<CSurface> m_surface;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CDCSurface) == 12);
 #endif
 

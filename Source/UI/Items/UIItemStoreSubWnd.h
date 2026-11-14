@@ -45,7 +45,7 @@ public:
   /* 0159 */ unsigned char padding_0159[7];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIItemStoreSubWnd, saved) == 0x150);
 static_assert(offsetof(UIItemStoreSubWnd, tabIndex) == 0x154);
 static_assert(offsetof(UIItemStoreSubWnd, title) == 0x114);

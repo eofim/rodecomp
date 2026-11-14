@@ -52,7 +52,7 @@ public:
 };
 
 static_assert(sizeof(ActionAnchor) == 12);
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ActionFrame) == 68);
 static_assert(sizeof(CActRes) == 312);
 static_assert(offsetof(ActionAnchor, y) == 0x0004);

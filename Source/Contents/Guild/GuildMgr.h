@@ -54,7 +54,7 @@ public:
 
 extern CGuildMgr* g_guildMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGuild) == 8);
 static_assert(offsetof(CGuild, m_emblemVersion) == 0x04);
 static_assert(sizeof(CGuildMgr) == 52);

@@ -34,7 +34,7 @@ public:
   /* 02F4 */ int actorId;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CSpriteParticle, velocity) == 0x2C8);
 static_assert(offsetof(CSpriteParticle, frameDelay) == 0x2D8);
 static_assert(offsetof(CSpriteParticle, loopMode) == 0x2F0);

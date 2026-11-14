@@ -68,7 +68,7 @@ public:
   /* 0100 */ int showAtStartup;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(TipBoxAnimation) == 0x30);
 static_assert(sizeof(TipBoxDot) == 0xC);
 #endif

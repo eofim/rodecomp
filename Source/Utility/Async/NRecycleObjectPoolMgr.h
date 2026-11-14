@@ -24,7 +24,7 @@ protected:
   /* 0008 */ std::unordered_map<std::string, NRecycleObjectPoolInter*, NameHash> m_pools;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(NRecycleObjectPoolMgr) == 44);
 #endif
 

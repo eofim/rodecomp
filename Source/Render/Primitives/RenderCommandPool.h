@@ -26,7 +26,7 @@ inline void RenderCommandPool::Rewind() {
   this->m_current = this->m_commands.begin();
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenderCommandPool) == 32);
 #endif
 

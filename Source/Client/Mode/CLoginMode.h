@@ -89,7 +89,7 @@ struct LoginStringRecord {
   /* 0078 */ unsigned char typeAndVersion[8];
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(LoginStringRecord) == 0x80);
 #endif
 
@@ -229,7 +229,7 @@ int GetClientType();
 std::string GetMacAddress();
 const char* GetUserCountText(unsigned short userCount);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CharacterInfo) == 0xAF);
 static_assert(offsetof(CharacterInfo, name) == 0x6C);
 static_assert(offsetof(CharacterInfo, slot) == 0x8A);

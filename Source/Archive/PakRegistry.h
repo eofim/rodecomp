@@ -22,7 +22,7 @@ private:
   /* 0000 */ std::list<std::pair<CMemMapPakFile*, CGPak*>> m_archives;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PakRegistry) == 8);
 #endif
 

@@ -30,7 +30,7 @@ public:
   void RemoveSchedulesByKey(int value);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CTimeScheduler) == 0x10);
 static_assert(offsetof(CTimeScheduler, m_schedules) == 0x04);
 static_assert(offsetof(CTimeScheduler, m_initialized) == 0x0C);

@@ -70,7 +70,7 @@ private:
 
 CRagConnection& GetRagConnection();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(ConnectionEndpoint, port) == 0x10);
 static_assert(offsetof(ConnectionEndpoint, overrideAddress) == 0x14);
 static_assert(sizeof(CConnection) == 0x6C);

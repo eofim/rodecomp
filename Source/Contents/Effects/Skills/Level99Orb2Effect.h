@@ -23,7 +23,7 @@ public:
   /* 018C */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CLevel99Orb2Effect, offsets) == 0xCC);
 static_assert(offsetof(CLevel99Orb2Effect, particles) == 0x18C);
 static_assert(sizeof(CLevel99Orb2Effect) == 0x198);

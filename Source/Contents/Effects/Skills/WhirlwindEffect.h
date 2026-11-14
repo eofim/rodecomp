@@ -21,7 +21,7 @@ struct CWhirlwindEffect : CRagEffect {
   void SetDuration(int duration);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CWhirlwindEffect) == 0x11CB8);
 static_assert(offsetof(CWhirlwindEffect, duration) == 0x11CA8);
 static_assert(offsetof(CWhirlwindEffect, endTime) == 0x11CB0);

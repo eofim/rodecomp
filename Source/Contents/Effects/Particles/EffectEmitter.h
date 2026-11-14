@@ -46,7 +46,7 @@ struct EZ2STREmitter {
   /* 3FEB */ unsigned char followGround;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(EZ2STREmitter, position) == 0x24);
 static_assert(offsetof(EZ2STREmitter, alpha) == 0x44);
 static_assert(offsetof(EZ2STREmitter, angle) == 0xC4);

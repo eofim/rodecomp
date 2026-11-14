@@ -38,7 +38,7 @@ std::vector<const char*>& EnsureItemDescriptionLines(int id, std::map<int, std::
 const std::vector<const char*>& FindMetalProcessItems(int id);
 bool IsBookItem(int id);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ITEM_DESC) == 68);
 #endif
 

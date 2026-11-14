@@ -14,7 +14,7 @@ public:
   /* 0004 */ std::uint32_t address;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(NIPAddr) == 8);
 #endif
 

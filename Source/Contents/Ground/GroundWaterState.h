@@ -17,7 +17,7 @@ struct GroundWaterSurface {
   /* 0020 */ CTexture* texture;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(GroundWaterSurface) == 36);
 static_assert(offsetof(GroundWaterSurface, texture) == 0x20);
 #endif

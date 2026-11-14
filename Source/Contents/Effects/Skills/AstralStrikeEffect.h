@@ -25,7 +25,7 @@ public:
   /* 00D8 */ std::vector<CEZ2STRParticle*> strikes;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CAstralStrikeEffect) == 0xE4);
 static_assert(offsetof(CAstralStrikeEffect, strikes) == 0xD8);
 #endif

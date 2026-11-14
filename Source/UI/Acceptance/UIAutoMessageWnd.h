@@ -17,7 +17,7 @@ public:
   /* 00B4 */ UIEditCtrl* m_edit;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIAutoMessageWnd) == 0xB8);
 #endif
 

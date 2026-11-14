@@ -46,7 +46,7 @@ public:
   /* 0128 */ unsigned char renderFlag;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CCloud, particle) == 0xCC);
 static_assert(offsetof(CCloud, red) == 0xF4);
 static_assert(offsetof(CCloud, renderFlag) == 0x128);

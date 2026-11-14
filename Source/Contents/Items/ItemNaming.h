@@ -42,7 +42,7 @@ std::string ItemDisplayName(int id);
 const char* ItemResourcePath(const ITEM_INFO& item);
 int ItemSlotsCount(const ITEM_INFO& item);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ItemCardName) == 12);
 static_assert(offsetof(ItemCardName, name) == 0x0000);
 static_assert(offsetof(ItemCardName, prefix) == 0x0004);

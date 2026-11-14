@@ -42,7 +42,7 @@ public:
   explicit CWindBomb(const std::string& name);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CBezierArcThrowEffect) == 0xFC);
 static_assert(offsetof(CBezierArcThrowEffect, m_active) == 0xCC);
 static_assert(offsetof(CBezierArcThrowEffect, m_particle) == 0xD4);

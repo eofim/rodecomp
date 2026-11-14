@@ -12,7 +12,7 @@ struct DeferredWorldModel {
   /* 0004 */ const WorldModelRecord* placement;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(DeferredWorldModel) == 8);
 static_assert(offsetof(DeferredWorldModel, placement) == 4);
 #endif

@@ -100,7 +100,7 @@ int L_SetReset(lua_State* L);
 int L_SetSlotOrder(lua_State* L);
 int L_SetSuccessRate(lua_State* L);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EnchantRandomUpgradeInfo) == 0x18);
 static_assert(sizeof(EnchantPerfectInfo) == 0x10);
 static_assert(offsetof(EnchantPerfectInfo, materials) == 0x08);

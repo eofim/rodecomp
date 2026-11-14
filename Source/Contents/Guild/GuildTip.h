@@ -18,7 +18,7 @@ public:
 
 extern CGuildTip g_guildTip;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGuildTip) == 0x10);
 static_assert(offsetof(CGuildTip, m_tipList) == 0x4);
 #endif

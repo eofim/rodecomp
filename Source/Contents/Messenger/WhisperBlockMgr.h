@@ -42,7 +42,7 @@ protected:
 
 extern CWhisperBlockMgr* g_whisperBlockMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CWhisperBlockMgr) == 32);
 #endif
 

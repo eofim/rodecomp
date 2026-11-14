@@ -25,7 +25,7 @@ struct SpriteQuad {
 
 RenderPrimitive* BuildSpriteQuad(CRenderSystemBase& system, const SpriteQuad& quad, const std::uint32_t* palette, int blend, float offsetX, float offsetY);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(SpriteQuad, angle) == 0x001C);
 static_assert(offsetof(SpriteQuad, image) == 0x002C);
 #endif

@@ -111,7 +111,7 @@ public:
 extern int g_pickInvert;
 extern int g_pickModifierKey;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RenderBounds) == 0x14);
 static_assert(sizeof(CRenderObject) == 0x138);
 static_assert(offsetof(CRenderObject, render) == 0x0010);

@@ -47,7 +47,7 @@ protected:
 
 extern CCharacterLinkedUserDataMgr* g_characterLinkedUserDataMgr;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CCharacterLinkedUserDataMgr) == 96);
 #endif
 

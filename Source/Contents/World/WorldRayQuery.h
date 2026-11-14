@@ -18,7 +18,7 @@ struct WorldRayQuery {
   __declspec(noinline) void CollectNode(WorldSpatialTree* node, int depth);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(WorldRayQuery) == 36);
 static_assert(offsetof(WorldRayQuery, origin) == 0x0008);
 static_assert(offsetof(WorldRayQuery, direction) == 0x0014);

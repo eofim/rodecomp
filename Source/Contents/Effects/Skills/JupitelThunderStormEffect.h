@@ -25,7 +25,7 @@ public:
   /* 00E8 */ int duration;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CJupitelThunderStormEffect) == 0xEC);
 static_assert(offsetof(CJupitelThunderStormEffect, particles) == 0xD0);
 static_assert(offsetof(CJupitelThunderStormEffect, duration) == 0xE8);

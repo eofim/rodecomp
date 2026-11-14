@@ -164,7 +164,7 @@ void CUIListBoxEx<AdventureGuide::CUIQuestInfo, AdventureGuide::CQuestInfo>::Add
 template <>
 void CUIListBoxEx<AdventureGuide::CUITabInfo, Guide_Intro::Contents>::AddNewItem();
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(AdventureGuide::CUIIntro) == 0x8C);
 static_assert(sizeof(AdventureGuide::CUIMonster) == 0xA0);
 static_assert(sizeof(AdventureGuide::CUIQuest) == 0xA4);

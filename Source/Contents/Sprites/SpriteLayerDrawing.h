@@ -86,7 +86,7 @@ public:
   /* 00A4 */ float depthBias;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(SpriteLayerQuad) == 0x38);
 static_assert(offsetof(SpriteLayerRenderer, pc) == 0x38);
 static_assert(offsetof(SpriteLayerRenderer, layers) == 0x70);

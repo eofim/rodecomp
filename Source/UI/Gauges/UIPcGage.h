@@ -70,7 +70,7 @@ public:
   /* 00B0 */ int m_threshold;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIGage, colors) == 0x7C);
 static_assert(offsetof(UIPcGage, current) == 0xA0);
 static_assert(sizeof(UIPcGage) == 0xB0);

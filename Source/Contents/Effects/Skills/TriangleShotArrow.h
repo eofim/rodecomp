@@ -28,7 +28,7 @@ public:
   /* 00F4 */ vector3d origin;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CTriangleShotArrow) == 0x100);
 static_assert(offsetof(CTriangleShotArrow, origin) == 0xF4);
 #endif

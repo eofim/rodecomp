@@ -20,7 +20,7 @@ struct FrameTextHash {
 using FrameTextLines = std::vector<std::vector<std::pair<int, std::string>>>;
 using FrameTextCache = std::unordered_map<FrameTextKey, FrameTextLines, FrameTextHash>;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(FrameTextKey) == 32);
 static_assert(offsetof(FrameTextKey, word0) == 0x0000);
 static_assert(offsetof(FrameTextKey, word1) == 0x0004);

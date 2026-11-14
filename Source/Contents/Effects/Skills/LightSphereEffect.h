@@ -23,7 +23,7 @@ public:
   /* 00D8 */ std::vector<CParticle*> rays;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(CLightSphereEffect, spheres) == 0xCC);
 static_assert(offsetof(CLightSphereEffect, rays) == 0xD8);
 static_assert(sizeof(CLightSphereEffect) == 0xE4);

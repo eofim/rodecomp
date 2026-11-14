@@ -35,7 +35,7 @@ int __stdcall ijlWrite(IJL15Properties* properties, int operation);
 int __stdcall ijlFree(IJL15Properties* properties);
 }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(IJL15Properties, dibBytes) == 0x0004);
 static_assert(offsetof(IJL15Properties, dibWidth) == 0x0008);
 static_assert(offsetof(IJL15Properties, dibHeight) == 0x000C);

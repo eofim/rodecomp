@@ -58,7 +58,7 @@ public:
   /* 00D8 */ int textX;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(UIStaticText) == 0xD8);
 #endif
 

@@ -25,14 +25,14 @@ protected:
 
     Recent(std::uint32_t guildId, std::uint32_t version, std::uint32_t tick) : guildId(guildId), version(version), tick(tick) {}
   };
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
   static_assert(sizeof(Recent) == 0xC);
 #endif
   /* 0004 */ std::deque<std::pair<std::uint32_t, std::uint32_t>> m_pending;
   /* 0018 */ std::deque<Recent> m_recent;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CGuildEmblemReqBundle) == 44);
 #endif
 

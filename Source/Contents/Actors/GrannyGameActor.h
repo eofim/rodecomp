@@ -67,7 +67,7 @@ public:
   /* 0DBC */ std::vector<vector3d> litPositions;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(C3dGrannyGameActor) == 0xDC8);
 #endif
 

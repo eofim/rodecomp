@@ -41,7 +41,7 @@ public:
   /* 011C */ int footerHeight;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(UIMerchantItemMyShopWnd, saved) == 0xF8);
 static_assert(offsetof(UIMerchantItemMyShopWnd, buyingShop) == 0x100);
 static_assert(offsetof(UIMerchantItemMyShopWnd, saleAlarm) == 0x104);

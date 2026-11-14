@@ -27,7 +27,7 @@ struct WorldViewSpatial {
   void CollectNode(WorldSpatialTree& node, int depth, bool fullyInside);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(ModelViewPlanes) == 0x00A8);
 static_assert(offsetof(ModelViewPlanes, normals) == 0x0060);
 static_assert(offsetof(WorldViewSpatial, clipped) == 0x0008);

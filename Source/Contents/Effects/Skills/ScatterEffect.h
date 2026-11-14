@@ -21,7 +21,7 @@ public:
   /* 00CC */ std::vector<CSpriteParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CScatterEffect) == 0xD8);
 static_assert(offsetof(CScatterEffect, particles) == 0xCC);
 #endif

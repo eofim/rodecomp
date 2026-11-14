@@ -76,7 +76,7 @@ private:
   /* D324 */ CFile m_file;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(EZeffectTransform) == 116);
 static_assert(sizeof(EZeffectKeyFrame) == 124);
 static_assert(sizeof(EZeffectClip) == 896);

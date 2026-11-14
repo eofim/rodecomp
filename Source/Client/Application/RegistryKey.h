@@ -21,7 +21,7 @@ public:
   bool Set(const char* name, DWORD type, const BYTE* data, DWORD size);
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(RegistryKey) == 4);
 #endif
 

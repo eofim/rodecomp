@@ -34,7 +34,7 @@ private:
 
 extern PacketLengths g_packetLengths;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PacketLengthValue) == 0x0C);
 static_assert(offsetof(PacketLengthValue, variable) == 0x04);
 static_assert(offsetof(PacketLengthValue, record) == 0x08);

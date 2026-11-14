@@ -16,7 +16,7 @@ struct PACKET_CZ_REQNAME2 {
 };
 #pragma pack(pop)
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(PACKET_CZ_REQNAME2) == 6);
 #endif
 

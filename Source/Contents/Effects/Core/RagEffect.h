@@ -358,7 +358,7 @@ struct CRagEffect : CRenderObject {
 };
 
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRagEffect) == 0x11CA8);
 static_assert(offsetof(CRagEffect, state) == 0x138);
 #endif

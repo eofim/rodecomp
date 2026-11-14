@@ -28,7 +28,7 @@ protected:
 
 extern const char* g_loadMyPartyPoolName;
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CLoadMyPartyAsyncWork) == 200);
 #endif
 

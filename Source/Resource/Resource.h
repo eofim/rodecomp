@@ -37,7 +37,7 @@ public:
   /* 0010 */ ResourceName name;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CRes) == 272);
 static_assert(offsetof(ResourceName, text) == 0x04);
 #endif

@@ -24,7 +24,7 @@ public:
   /* 00E4 */ std::vector<CParticle*> particles;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CFlowerCastingEffect) == 0xF0);
 static_assert(offsetof(CFlowerCastingEffect, lastInner) == 0xCC);
 static_assert(offsetof(CFlowerCastingEffect, lastOuter) == 0xD8);

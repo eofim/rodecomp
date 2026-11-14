@@ -391,7 +391,7 @@ public:
   /* 00D0 */ std::function<void(int, int)> onResize;
 };
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(sizeof(CUIControl) == 0x80);
 static_assert(offsetof(CUIResizer, minWidth) == 0x84);
 static_assert(offsetof(CUIResizer, imageName) == 0xB4);

@@ -33,7 +33,7 @@ struct PlayerNameUpdatePacket {
 
 void SetPlayerName(std::uint32_t id, std::string name);
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) && !defined(_WIN64) && !defined(KAFRAVERSE_FORK)
 static_assert(offsetof(ActorNameAllPacket, positionName) == 0x4E);
 static_assert(sizeof(ActorNameAllPacket) == 0x66);
 static_assert(offsetof(ActorNameTitlePacket, title) == 0x22);
