@@ -1,4 +1,5 @@
 #include "Resource/ResourceFailures.h"
+#include "Debug/DebugLog.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Utility/Text/GroupedInteger.h"
@@ -30,6 +31,8 @@ void ResourceFailures::Report(std::string requested, std::string resolved) {
     }
     this->m_reported.insert(resolved);
   }
+
+  DebugLog("resource", "load failed: requested=\"%s\" resolved=\"%s\"", requested.c_str(), resolved.c_str());
 
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("Resource File Loading fail"), 255, 0, 0, 0);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(requested.c_str()), 255, 0, 0, 0);

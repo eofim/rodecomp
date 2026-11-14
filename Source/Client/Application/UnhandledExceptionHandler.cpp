@@ -4,6 +4,7 @@
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Application/UnhandledExceptionHandler.h"
 #include "Client/Session/Session.h"
+#include "Debug/DebugLog.h"
 #include "Utility/Text/FormatString.h"
 
 #include <windows.h>
@@ -302,7 +303,11 @@ LONG WINAPI TopLevelExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
     sprintf(&g_crashString[strlen(g_crashString)], "Can't find DbgHelp.DLL !!!");
   }
 
-  DialogBoxParamA(GetModuleHandleA(nullptr), MAKEINTRESOURCEA(117), nullptr, DialogFunc, 0);
+  DebugLogRaw("crash", g_crashString);
+
+  if (DialogBoxParamA(GetModuleHandleA(nullptr), MAKEINTRESOURCEA(117), nullptr, DialogFunc, 0) == -1) {
+    MessageBoxA(nullptr, g_crashString, "Ragexe crash report (saved to rode_debug.log)", MB_OK | MB_ICONERROR);
+  }
 
   if (g_unhandledExceptionCallback != nullptr) {
     g_unhandledExceptionCallback();

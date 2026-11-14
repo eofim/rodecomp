@@ -1,4 +1,6 @@
 #include "Archive/PakRegistry.h"
+#include "Archive/GPak.h"
+#include "Debug/DebugLog.h"
 #include "File/ResourcePath.h"
 #include "Utility/Hash/GGHashMgr.h"
 
@@ -23,7 +25,9 @@ bool PakRegistry::Add(const char* filename) {
   CMemMapPakFile* file = new CMemMapPakFile(filename);
 
   this->m_archives.push_front(std::make_pair(file, archive));
-  return this->m_archives.front().second->Open(this->m_archives.front().first);
+  const bool opened = this->m_archives.front().second->Open(this->m_archives.front().first);
+  DebugLog("grf", "mount \"%s\": %s (size=%llu bytes)", filename, opened ? "OK" : "FAILED", static_cast<unsigned long long>(file->GetSize()));
+  return opened;
 }
 
 // OFFSET: 0x00AE9BF0

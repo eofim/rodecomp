@@ -1,4 +1,5 @@
 #include "Client/Application/ErrorDialog.h"
+#include "Debug/DebugLog.h"
 #include "File/File.h"
 #include "Render/DeviceContext/DCSurface.h"
 #include "Resource/World/WorldResource.h"
@@ -119,6 +120,7 @@ bool C3dWorldRes::Load(const char* name) {
   CFile input;
 
   if (!input.Open(name, 0, true, false)) {
+    DebugLog("rsw", "open failed (not found in any mounted GRF / loose path): \"%s\"", name);
     return false;
   }
 
@@ -128,6 +130,7 @@ bool C3dWorldRes::Load(const char* name) {
   magic[4] = 0;
 
   if (std::strcmp(magic, signature) != 0) {
+    DebugLog("rsw", "invalid format (magic=\"%s\"): \"%s\"", magic, name);
     ShowErrorDialog("Invalid Format", 0);
     return false;
   }
@@ -140,6 +143,7 @@ bool C3dWorldRes::Load(const char* name) {
   char message[256];
 
   if (major > 2 || (major == 2 && minor > 7)) {
+    DebugLog("rsw", "unsupported version %d.%d (client max 2.7): \"%s\"", major, minor, name);
     sprintf_s(message, sizeof(message), "Unsupported Version\n current version: %d.%d < %d.%d", 2, 7, major, minor);
     ShowErrorDialog(message, 0);
 

@@ -1,5 +1,6 @@
 #include "Utility/Text/StringUtil.h"
 #include "Archive/GPak.h"
+#include "Debug/DebugLog.h"
 #include "Archive/PakCipher.h"
 #include "Utility/Threading/NSyncObject.h"
 #include "Utility/Zlib.h"
@@ -80,7 +81,15 @@ bool CGPak::Extract(const myGPack::PakEntry* entry, void* buffer) {
   }
   if (entry->flags & 1) {
     unsigned long outputSize = entry->originalSize;
-    uncompress(static_cast<std::uint8_t*>(buffer), &outputSize, source, decodedLength);
+    const int zret = uncompress(static_cast<std::uint8_t*>(buffer), &outputSize, source, decodedLength);
+    if (zret != 0) {
+      const std::uint8_t* b = source ? source : mapped;
+      DebugLog(
+        "extract", "uncompress failed zret=%d name=\"%s\" off=%llu aligned=%u comp=%u orig=%u flags=%u src[0..7]=%02x %02x %02x %02x %02x %02x %02x %02x",
+        zret, entry->name.m_name, static_cast<unsigned long long>(entry->dataOffset + 46), entry->alignedSize, entry->compressedSize, entry->originalSize,
+        entry->flags, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]
+      );
+    }
   } else {
     std::memcpy(buffer, source, entry->originalSize);
   }
