@@ -91,7 +91,7 @@ bool CPrivateAirplaneMgr::Init() {
   lua_register(lua.GetState(), "InsertEndableMap", CPrivateAirplaneMgr::L_InsertEndableMap);
   lua_register(lua.GetState(), "InsertNeedItem", CPrivateAirplaneMgr::L_InsertNeedItem);
 
-  std::string filename = "System\\PrivateAirplane_True.lub";
+  std::string filename = "System\\PrivateAirplane.lub";
   if (luaL_loadfile(lua.GetState(), filename.c_str()) != 0) {
     MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CPrivateAirplaneMgr", 0);
     return false;

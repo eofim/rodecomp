@@ -196,7 +196,7 @@ bool CMapInfoMgr::LoadScript() {
     lua_register(lua.GetState(), "AddMapSignName", CMapInfoMgr::L_AddMapSignName);
     lua_register(lua.GetState(), "AddMapBackgroundBmp", CMapInfoMgr::L_AddMapBackgroundBmp);
 
-    if (luaL_loadfile(lua.GetState(), "system\\mapInfo_true.lub") == 0 && lua_pcall(lua.GetState(), 0, 0, 0) == 0) {
+    if (luaL_loadfile(lua.GetState(), "system\\mapInfo.lub") == 0 && lua_pcall(lua.GetState(), 0, 0, 0) == 0) {
       lua_getglobal(lua.GetState(), "main");
       if (lua_pcall(lua.GetState(), 0, 2, 0) == 0) {
         return true;

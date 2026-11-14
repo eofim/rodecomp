@@ -76,7 +76,7 @@ bool CCheckAttendanceMgr::Load() {
   luaL_openlibs(lua.GetState());
   lua_register(lua.GetState(), "InsertCheckAttendanceConfig", CCheckAttendanceMgr::L_InsertCheckAttendanceConfig);
   lua_register(lua.GetState(), "InsertCheckAttendanceReward", CCheckAttendanceMgr::L_InsertCheckAttendanceReward);
-  if (luaL_loadfile(lua.GetState(), "System\\CheckAttendance.lub") != 0) {
+  if (luaL_loadfile(lua.GetState(), "System\\Attendance.lub") != 0) {
     MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CCheckAttendanceMgr", 0);
     return false;
   }

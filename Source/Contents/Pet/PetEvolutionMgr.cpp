@@ -103,7 +103,7 @@ bool CPetEvolutionMgr::Load() {
   luaL_openlibs(lua.GetState());
   lua_register(lua.GetState(), "InsertEvolutionRecipeLGU", CPetEvolutionMgr::L_InsertEvolutionRecipeLGU);
   lua_register(lua.GetState(), "InsertPetAutoFeeding", CPetEvolutionMgr::L_InsertPetAutoFeeding);
-  if (luaL_loadfile(lua.GetState(), "system\\PetEvolutionCln_true.lub") != 0) {
+  if (luaL_loadfile(lua.GetState(), "system\\PetEvolution.lub") != 0) {
     MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CPetEvolutionMgr", 0);
     return false;
   }
