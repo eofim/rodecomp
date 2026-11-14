@@ -1,6 +1,7 @@
 #ifndef RAGNAROK_SOURCE_UI_MACRO_UIMACROUSERINFOWND_H
 #define RAGNAROK_SOURCE_UI_MACRO_UIMACROUSERINFOWND_H
 
+#include "Contents/UserData/NormalItemSlots.h"
 #include "UI/Window/UIFrameWnd.h"
 
 #include <string>
@@ -26,6 +27,8 @@ public:
   /* 00CC */ std::string m_message;
 };
 
+struct ActorPickInfo;
+
 struct MacroReporterEntry {
   MacroReporterEntry() = default;
   MacroReporterEntry(std::string name, int id, short padding_001C);
@@ -35,11 +38,7 @@ struct MacroReporterEntry {
   /* 001C */ short reportValue;
 };
 
-struct MacroReporterState {
-  /* 0000 */ int width;
-  /* 0004 */ int height;
-  /* 0008 */ int x;
-  /* 000C */ int y;
+struct MacroReporterState : MacroReporterWndInfo {
   /* 0010 */ unsigned char padding_0010;
   /* 0011 */ bool activeOnly;
   /* 0014 */ std::vector<MacroReporterEntry> entries;
@@ -62,7 +61,7 @@ public:
   void UpdateScrollBar();
   bool ValidateTarget(unsigned char notify);
   bool ValidateNames(unsigned char notify);
-  void AddPickedActor(MacroReporterEntry* entry);
+  void AddPickedActor(ActorPickInfo* pick);
   void AddActorByAID(int aid);
   void AddActorRow(int aid, std::string name);
   std::string EllipsizeText(int maxWidth, const char* text, int font, int height, unsigned char bold);

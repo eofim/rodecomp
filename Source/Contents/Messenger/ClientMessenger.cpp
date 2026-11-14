@@ -32,6 +32,7 @@
 #include "Contents/Configuration/GameSettingsMgr.h"
 #include "Contents/CashEmotion/CashEmotionMgr.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Items/ItemInfoMgr.h"
 #include "Contents/Map/MapInfoMgr.h"
@@ -331,7 +332,7 @@ namespace EquipmentProperties {
     /* 0010 */ int padding_0010;
     /* 0014 */ int shopId;
     /* 0018 */ EquipmentPropertyStore* store;
-    /* 001C */ int currentEquipment;
+    /* 001C */ CEquipment* currentEquipment;
     /* 0020 */ UIWindow* notifyWindow;
     /* 0024 */ std::unordered_map<int, CEquipmentWearable*> properties1;
     /* 0044 */ std::unordered_map<unsigned int, CEquipmentExpansion*> properties2;
@@ -358,7 +359,7 @@ namespace EquipmentProperties {
     void Clear();
     void SetWindow(UIWindow* window);
     const int& GetConstantValue(const int& key);
-    int GetCurrentEquipment();
+    CEquipment* GetCurrentEquipment();
     CEquipmentWearable* FindProperty1(const int& key);
     CEquipmentInfo* FindEquipmentInfo(const int& key);
     CLuaInstance& GetScript();
@@ -1334,7 +1335,7 @@ __declspec(noinline) const int& EquipmentProperties::CEquipmentPropertiesMgr::Ge
 
 // OFFSET: 0x006AC3B0
 // FUNCTION: fn_06174
-int EquipmentProperties::CEquipmentPropertiesMgr::GetCurrentEquipment() {
+EquipmentProperties::CEquipment* EquipmentProperties::CEquipmentPropertiesMgr::GetCurrentEquipment() {
   return this->currentEquipment;
 }
 
@@ -1364,64 +1365,64 @@ int GetEquipLocationMask(const int& location) {
   int mask = 0;
   switch (location) {
   case 1:
-    mask = 0x1;
+    mask = EQP_HEAD_LOW;
     break;
   case 2:
-    mask = 0x10;
+    mask = EQP_ARMOR;
     break;
   case 3:
-    mask = 0x20;
+    mask = EQP_HAND_L;
     break;
   case 4:
-    mask = 0x2;
+    mask = EQP_HAND_R;
     break;
   case 5:
-    mask = 0x4;
+    mask = EQP_GARMENT;
     break;
   case 6:
-    mask = 0x40;
+    mask = EQP_SHOES;
     break;
   case 7:
-    mask = 0x8;
+    mask = EQP_ACC_R;
     break;
   case 8:
-    mask = 0x80;
+    mask = EQP_ACC_L;
     break;
   case 10:
-    mask = 0x100;
+    mask = EQP_HEAD_TOP;
     break;
   case 11:
-    mask = 0x200;
+    mask = EQP_HEAD_MID;
     break;
   case 20:
-    mask = 0x400;
+    mask = EQP_COSTUME_HEAD_TOP;
     break;
   case 21:
-    mask = 0x800;
+    mask = EQP_COSTUME_HEAD_MID;
     break;
   case 22:
-    mask = 0x1000;
+    mask = EQP_COSTUME_HEAD_LOW;
     break;
   case 23:
-    mask = 0x2000;
+    mask = EQP_COSTUME_GARMENT;
     break;
   case 30:
-    mask = 0x10000;
+    mask = EQP_SHADOW_ARMOR;
     break;
   case 31:
-    mask = 0x20000;
+    mask = EQP_SHADOW_WEAPON;
     break;
   case 32:
-    mask = 0x40000;
+    mask = EQP_SHADOW_SHIELD;
     break;
   case 33:
-    mask = 0x80000;
+    mask = EQP_SHADOW_SHOES;
     break;
   case 34:
-    mask = 0x100000;
+    mask = EQP_SHADOW_ACC_R;
     break;
   case 35:
-    mask = 0x200000;
+    mask = EQP_SHADOW_ACC_L;
     break;
   }
   return mask;
@@ -4006,7 +4007,7 @@ void EquipmentProperties::CEquipmentPropertiesMgr::ApplyProperty(const char* nam
   }
 
   if (this->currentEquipment != 0) {
-    reinterpret_cast<CEquipment*>(this->currentEquipment)->AddProperty(text, name, index, value, key);
+    this->currentEquipment->AddProperty(text, name, index, value, key);
   }
 }
 
@@ -4273,7 +4274,7 @@ void EquipmentProperties::CEquipmentPropertiesMgr::Rebuild() {
 // FUNCTION: fn_06208
 void EquipmentProperties::CEquipmentPropertiesMgr::SetCurrentEquipment(CEquipment* equipment) {
   this->displayValues.clear();
-  this->currentEquipment = reinterpret_cast<int>(equipment);
+  this->currentEquipment = equipment;
 }
 
 // OFFSET: 0x006B7770
@@ -4732,13 +4733,6 @@ int GetCategoryJob(lua_State* state) {
   return 1;
 }
 
-struct EquipLocationSource {
-  virtual void Destroy();
-  virtual void Load();
-  virtual void Clear();
-  virtual int GetLocation();
-};
-
 // OFFSET: 0x006BD3C0
 // FUNCTION: fn_06277
 int GetEquipArmorLv(lua_State* state) {
@@ -4789,7 +4783,7 @@ int GetLocation(lua_State* state) {
   int index = 0;
   EquipmentProperties::CEquipmentPropertiesMgr* mgr = EquipmentProperties::CEquipmentPropertiesMgr::GetInstance();
   if (mgr->currentEquipment != 0) {
-    const int location = reinterpret_cast<EquipLocationSource*>(mgr->currentEquipment)->GetLocation();
+    const int location = mgr->currentEquipment->GetType();
     index = GetEquipLocationIndex(location);
   }
   lua_pushnumber(state, index);
@@ -4866,17 +4860,20 @@ int GetPlayerValue(lua_State* state) {
   std::map<int, int>& traitStats = g_session.m_traits.stats;
   int value = 0;
   switch (args[0]) {
+  case SP_BASELEVEL:
+    value = g_session.m_level;
+    break;
+  case SP_JOBLEVEL:
+    value = g_session.m_jobLevel;
+    break;
+  case SP_CLASS:
+    value = g_session.m_job;
+    break;
   case SP_SP:
     value = g_session.m_sp;
     break;
   case SP_MAXSP:
     value = g_session.m_maxSp;
-    break;
-  case SP_BASELEVEL:
-    value = g_session.m_level;
-    break;
-  case SP_CLASS:
-    value = g_session.m_job;
     break;
   case SP_USTR:
     value = g_session.m_standardStats[0];
@@ -4896,26 +4893,23 @@ int GetPlayerValue(lua_State* state) {
   case SP_ULUK:
     value = g_session.m_standardStats[5];
     break;
-  case SP_JOBLEVEL:
-    value = g_session.m_jobLevel;
-    break;
   case 255:
-    value = traitStats[219];
+    value = traitStats[SP_POW];
     break;
   case 256:
-    value = traitStats[220];
-    break;
-  case 257:
-    value = traitStats[221];
-    break;
-  case 258:
-    value = traitStats[222];
+    value = traitStats[SP_STA];
     break;
   case 259:
-    value = traitStats[223];
+    value = traitStats[SP_CON];
     break;
   case 260:
-    value = traitStats[224];
+    value = traitStats[SP_CRT];
+    break;
+  case 258:
+    value = traitStats[SP_SPL];
+    break;
+  case 257:
+    value = traitStats[SP_WIS];
     break;
   case 263:
     value = g_runeSystemMgr->GetCurSlotCount();
@@ -5474,64 +5468,64 @@ int CLuaInstance::GetInt(int& value, int index) {
 bool CGameMode::IsAllowedPair(int kind, int value) {
   bool result = false;
   switch (kind) {
-  case 8:
+  case WID_ITEMWND:
     if (value == 6 || value == 9) {
       result = true;
     }
     break;
-  case 0x16:
+  case WID_ITEMSHOPWND:
     if (g_windowMgr.dragAllItems != 0) {
       break;
     }
-  case 0xA0:
+  case WID_ITEMSHOPWND2:
     if (value == 4 || value == 5) {
       result = true;
     }
     break;
-  case 0x18:
+  case WID_ITEMSELLWND:
     if (g_windowMgr.dragAllItems != 0) {
       break;
     }
-  case 0x17:
-  case 0xA1:
+  case WID_ITEMPURCHASEWND:
+  case WID_ITEMSELLWND2:
     result = value == 3;
     break;
-  case 0x21:
+  case WID_ITEMSTOREWND:
     if (value == 9 || value == 1) {
       result = true;
     }
     break;
-  case 0x28:
+  case WID_MERCHANTITEMWND:
     if (value == 1 || value == 6) {
       result = true;
     }
     break;
-  case 0x29:
+  case WID_MERCHANTSHOPMAKEWND:
     result = value == 0xB;
     break;
-  case 0x2A:
+  case WID_MERCHANTMIRRORITEMWND:
     result = value == 0xA;
     break;
-  case 0x2B:
+  case WID_MERCHANTITEMSHOPWND:
     result = value == 0xD;
     break;
-  case 0x2C:
-  case 0xB2:
+  case WID_MERCHANTITEMPURCHASEWND:
+  case WID_MERCHANTITEMPURCHASEWND_MODE_1:
     if (value == 0xC || value == 0x16) {
       result = true;
     }
     break;
-  case 0xAF:
+  case WID_MERCHANTMIRRORITEMWND_MODE_1:
     result = value == 0x15;
     break;
-  case 0xB8:
-  case 0x13E:
+  case WID_NCASHWND:
+  case WID_CASHSHOP_WND:
     if (value == 6 || value == 4) {
       result = true;
     }
     break;
   case 0x1F:
-  case 0x271B:
+  case WID_EXCHANGEUI:
     if (value == 1) {
       result = true;
     }
@@ -6372,7 +6366,7 @@ void CSession::InitClientData() {
   this->LoadOptionInfo();
   this->LoadDamageSkinSettings();
 
-  if (g_serviceType == 0) {
+  if (g_serviceType == ServiceKorea) {
     InitEmbedFont();
     SetEmbedFontRootUrl("http://www.ragnarok.co.kr");
     LoadEmbedFont(&g_embedFontFiles, "RixSquirrel_10.eot", 0);
@@ -6782,7 +6776,7 @@ EquipmentProperties::CEquipmentWearable::CEquipmentWearable(const ITEM_INFO* ite
 
   for (int index = 0; index < 5; ++index) {
     EquipmentItemOption option;
-    std::memcpy(&option, item->options + index * sizeof(option), sizeof(option));
+    std::memcpy(&option, &item->options[index], sizeof(option));
     const int optionId = option.id;
     EquipmentPropertyDefinition* definition = CEquipmentPropertiesMgr::GetInstance()->FindRandomOptionDefinition(optionId);
     if (definition == nullptr || definition->functions.front() == "SetWeaponAttr") {

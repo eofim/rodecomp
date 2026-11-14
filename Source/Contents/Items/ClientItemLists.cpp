@@ -47,11 +47,7 @@ namespace {
   };
 
 #pragma pack(push, 1)
-  struct ItemRandomOption {
-    /* 0000 */ std::int16_t id;
-    /* 0002 */ std::int16_t value;
-    /* 0004 */ unsigned char param;
-  };
+  using ItemRandomOption = ItemOptionRecord;
 
   struct ItemRandomOptions {
     /* 0000 */ ItemRandomOption values[5];
@@ -156,11 +152,11 @@ namespace {
     }
 
     if (value.optionCount != 0) {
-      const auto* left = reinterpret_cast<const ItemRandomOption*>(value.options);
-      const auto* right = reinterpret_cast<const ItemRandomOption*>(item.options);
+      const auto* left = value.options;
+      const auto* right = item.options;
 
       for (int index = 0; index < count; ++index) {
-        if (left[index].id != right[index].id || left[index].value != right[index].value || left[index].param != right[index].param) {
+        if (left[index].id != right[index].id || left[index].value != right[index].value || left[index].parameter != right[index].parameter) {
           return false;
         }
       }
@@ -279,7 +275,7 @@ static __forceinline void AddCartPacketItem(std::int16_t index, int amount, int 
   cards[3] = card4;
   item.optionCount = CountItemOptions(options.values);
   for (int index = 0; index < item.optionCount; ++index) {
-    reinterpret_cast<ItemRandomOption*>(item.options)[index] = options.values[index];
+    item.options[index] = options.values[index];
   }
   item.grade = static_cast<std::int16_t>(grade);
   g_session.AddCartItem(item, 1);
@@ -306,7 +302,7 @@ static __forceinline void AddMerchantShopPacketItem(std::int16_t index, int amou
   cards[3] = card4;
   item.optionCount = CountItemOptions(options.values);
   for (int index = 0; index < item.optionCount; ++index) {
-    reinterpret_cast<ItemRandomOption*>(item.options)[index] = options.values[index];
+    item.options[index] = options.values[index];
   }
   item.grade = static_cast<std::int16_t>(grade);
   g_session.AddMerchantShopItem(item);
@@ -375,7 +371,7 @@ static __forceinline void AddExchangePacketItem(int itemId, unsigned char type, 
   item.quantity = slot;
   item.optionCount = CountItemOptions(options.values);
   for (int index = 0; index < item.optionCount; ++index) {
-    reinterpret_cast<ItemRandomOption*>(item.options)[index] = options.values[index];
+    item.options[index] = options.values[index];
   }
   g_session.AddItemSlot(item);
 }
@@ -548,7 +544,7 @@ namespace {
     item.optionCount = CountItemOptions(options);
     item.grade = record.grade;
     for (int index = 0; index < item.optionCount; ++index) {
-      reinterpret_cast<ItemRandomOption*>(item.options)[index] = options[index];
+      item.options[index] = options[index];
     }
   }
 }
@@ -564,7 +560,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
   case INVTYPE_GUILD_STORAGE:
     for (std::int64_t i = 0; i < count; ++i) {
       const EquipItemListRecord record = records[i];
-      if (record.location == 0x8000) {
+      if (record.location == EQP_AMMO) {
         continue;
       }
 
@@ -785,14 +781,14 @@ bool CSession::AddMerchantMyShopItem(const ITEM_INFO& item, int type, unsigned c
     if (value.identity[1] == item.identity[1]) {
       value.quantity += item.quantity;
       if (refresh == 1) {
-        std::uint32_t window;
+        UIWindow* window;
         if (type == 1) {
           window = g_windowMgr.buyingShopMirrorItemWnd;
         } else {
           window = type == 2 ? g_windowMgr.purchaseMirrorItemWnd : g_windowMgr.merchantMirrorItemWnd;
         }
         if (window) {
-          reinterpret_cast<UIWindow*>(window)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+          window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
         }
       }
       return false;
@@ -801,14 +797,14 @@ bool CSession::AddMerchantMyShopItem(const ITEM_INFO& item, int type, unsigned c
 
   this->merchantMyShopItems.push_back(item);
   if (refresh == 1) {
-    std::uint32_t window;
+    UIWindow* window;
     if (type == 1) {
       window = g_windowMgr.buyingShopMirrorItemWnd;
     } else {
       window = type == 2 ? g_windowMgr.purchaseMirrorItemWnd : g_windowMgr.merchantMirrorItemWnd;
     }
     if (window) {
-      reinterpret_cast<UIWindow*>(window)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+      window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
     }
   }
   return true;
@@ -1075,7 +1071,7 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
     g_windowMgr.InvalidateFrames();
   }
 
-  if (item.identity[3] != 0x8000) {
+  if (item.identity[3] != EQP_AMMO) {
     this->RemoveInventoryItem(item.identity[1], 1);
   }
   if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.itemParamChangeDisplayWnd)) {
@@ -1087,7 +1083,7 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
 // OFFSET: 0x00DFC620
 // FUNCTION: fn_23598
 bool CSession::UnequipItem(int location, std::uint32_t identity) {
-  if (location == 0x8000) {
+  if (location == EQP_AMMO) {
     const ITEM_INFO item = g_session.LookupClientItemByIdentity(identity);
     if (item.identity[1] != 0) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s%s", item.DisplayName(0).c_str(), LookupMessage(MSI_ITEM_IS_REMOVED)).c_str()), 0xFF, 7, 0, 0);
@@ -1166,47 +1162,47 @@ EquipSlots CSession::GetEquipSlots(int location) {
   int mask = location;
   switch (location) {
   case EQP_COSTUME_HEAD_TOP:
-    mask = 0x100;
+    mask = EQP_HEAD_TOP;
     break;
   case EQP_COSTUME_HEAD_MID:
-    mask = 0x200;
+    mask = EQP_HEAD_MID;
     break;
   case EQP_COSTUME_HEAD_TOP | EQP_COSTUME_HEAD_MID:
-    mask = 0x300;
+    mask = EQP_HEAD_TOP | EQP_HEAD_MID;
     break;
   case EQP_COSTUME_HEAD_LOW:
-    mask = 1;
+    mask = EQP_HEAD_LOW;
     break;
   case EQP_COSTUME_HEAD_TOP | EQP_COSTUME_HEAD_LOW:
-    mask = 0x101;
+    mask = EQP_HEAD_TOP | EQP_HEAD_LOW;
     break;
   case EQP_COSTUME_HEAD_MID | EQP_COSTUME_HEAD_LOW:
-    mask = 0x201;
+    mask = EQP_HEAD_MID | EQP_HEAD_LOW;
     break;
   case EQP_COSTUME_HEAD_TOP | EQP_COSTUME_HEAD_MID | EQP_COSTUME_HEAD_LOW:
-    mask = 0x301;
+    mask = EQP_HEAD_TOP | EQP_HEAD_MID | EQP_HEAD_LOW;
     break;
   case EQP_COSTUME_GARMENT:
-    mask = 4;
+    mask = EQP_GARMENT;
     break;
   case 0x4000:
   case EQP_SHADOW_WEAPON:
-    mask = 2;
+    mask = EQP_HAND_R;
     break;
   case EQP_SHADOW_ARMOR:
-    mask = 0x10;
+    mask = EQP_ARMOR;
     break;
   case EQP_SHADOW_SHIELD:
-    mask = 0x20;
+    mask = EQP_HAND_L;
     break;
   case EQP_SHADOW_SHOES:
-    mask = 0x40;
+    mask = EQP_SHOES;
     break;
   case EQP_SHADOW_ACC_R:
-    mask = 8;
+    mask = EQP_ACC_R;
     break;
   case EQP_SHADOW_ACC_L:
-    mask = 0x80;
+    mask = EQP_ACC_L;
     break;
   }
 

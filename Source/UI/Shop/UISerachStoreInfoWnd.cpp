@@ -45,15 +45,6 @@ struct SearchStoreQueryPacket {
 
 static_assert(offsetof(SearchStoreQueryPacket, ids) == 0xF);
 
-struct SearchStoreResult {
-  /* 0000 */ int storeId;
-  /* 0004 */ int accountId;
-  /* 0008 */ unsigned char padding_0008[0x58];
-  /* 0060 */ ITEM_INFO item;
-};
-
-static_assert(sizeof(SearchStoreResult) == sizeof(SessionEntry5BD4));
-
 // OFFSET: 0x009121F0
 // FUNCTION: fn_12527
 UISerachStoreInfoWnd::UISerachStoreInfoWnd()
@@ -78,9 +69,9 @@ ITEM_INFO UISerachStoreInfoWnd::ItemAt(int x, int y) {
       return item;
     }
 
-    std::vector<SessionEntry5BD4>::iterator it = g_session.storeSearchResults.begin() + index;
+    std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + index;
     if (it != g_session.storeSearchResults.end()) {
-      item = reinterpret_cast<const SearchStoreResult&>(*it).item;
+      item = it->item;
     }
   }
   return item;
@@ -166,7 +157,7 @@ void UISerachStoreInfoWnd::OnCreate(int width, int height) {
     this->m_findButton->SetBitmap((path + "btn_find_b" + ".bmp").c_str(), 2, 0);
     this->m_findButton->SetSize(this->m_findButton->BitmapWidth(), this->m_findButton->BitmapHeight());
     this->m_findButton->Move(this->geometry.width - 0x2D, 0x38);
-    this->m_findButton->SetId(0x16D);
+    this->m_findButton->SetId(ID_PARTY_SEARCH);
     this->AddChild(this->m_findButton);
   }
 
@@ -177,7 +168,7 @@ void UISerachStoreInfoWnd::OnCreate(int width, int height) {
       this->geometry.width / 2 - this->TextWidth(LookupMessage(MSI_PREV_PAGE), 0, 0, 0xC, 0, 0) - 0x14,
       this->geometry.height - 0x15);
   this->m_prevButton->SetTooltip(LookupMessage(MSI_PREV_PAGE));
-  this->m_prevButton->SetId(0x13C);
+  this->m_prevButton->SetId(ID_PREV_PAGE);
   this->AddChild(this->m_prevButton);
 
   this->m_nextButton = new UITextButton();
@@ -185,7 +176,7 @@ void UISerachStoreInfoWnd::OnCreate(int width, int height) {
   this->m_nextButton->m_hoverColor = 0xEFB700;
   this->m_nextButton->Move(this->geometry.width / 2 + 0x14, this->geometry.height - 0x15);
   this->m_nextButton->SetTooltip(LookupMessage(MSI_NEXT_PAGE));
-  this->m_nextButton->SetId(0x13D);
+  this->m_nextButton->SetId(ID_NEXT_PAGE);
   this->AddChild(this->m_nextButton);
 
   this->AddBaseButton();
@@ -236,7 +227,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         }
       }
       break;
-    case 365: {
+    case ID_PARTY_SEARCH: {
       this->m_searchPending = 1;
       UIBitmapButton* findButton = this->m_findButton;
       findButton->SetDisabled(1);
@@ -382,7 +373,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
 
   case UM_TEXT_LBTN_UP:
     switch (argument1) {
-    case 316:
+    case ID_PREV_PAGE:
       if (this->m_page > 1) {
         this->m_hoverRow = -1;
         --this->m_page;
@@ -390,7 +381,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         return 0;
       }
       break;
-    case 317: {
+    case ID_NEXT_PAGE: {
       const int page = this->m_page;
       this->m_hoverRow = -1;
       if (static_cast<unsigned int>(page * 10) < g_session.storeSearchResults.size()) {
@@ -431,7 +422,7 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
   }
 
   const unsigned int index = this->m_hoverRow + (this->m_page - 1) * 10;
-  std::vector<SessionEntry5BD4>::iterator it = g_session.storeSearchResults.begin() + index;
+  std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + index;
   if (it == g_session.storeSearchResults.end()) {
     return;
   }
@@ -441,7 +432,7 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
     return;
   }
 
-  const SearchStoreResult* entry = reinterpret_cast<const SearchStoreResult*>(&*it);
+  const SearchStoreResult* entry = &*it;
 
   g_session.storeSearchX = -1;
   g_session.storeSearchY = -1;

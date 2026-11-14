@@ -1,4 +1,5 @@
 #include "Client/Mode/CLoginMode.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
@@ -244,11 +245,6 @@ struct LoginMessagePacket {
   /* 0004 */ char text[1];
 };
 
-struct BlockedCharacter {
-  /* 0000 */ std::uint32_t gid;
-  /* 0004 */ char expireDate[20];
-};
-
 struct BlockedCharacterPacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ std::uint16_t length;
@@ -437,10 +433,10 @@ void CLoginMode::SubD8D500(const char* packet) {
 // OFFSET: 0x00D8E1D0
 // FUNCTION: fn_22270
 int GetClientType() {
-  if (g_serviceMode != 1) {
-    if (g_serviceMode != 5) {
+  if (g_serviceMode != ServerSakray) {
+    if (g_serviceMode != ServerPk) {
       switch (g_serviceType) {
-      case 1:
+      case ServiceAmerica:
         return 1;
       case ServiceJapan:
         return 3;
@@ -450,21 +446,21 @@ int GetClientType() {
         return 5;
       case ServiceThai:
         return 7;
-      case 6:
+      case ServiceIndonesia:
         return 12;
-      case 7:
+      case ServicePhilippine:
         return 15;
-      case 8:
+      case ServiceMalaysia:
         return 16;
-      case 9:
+      case ServiceSingapore:
         return 17;
-      case 10:
+      case ServiceGermany:
         return 20;
-      case 11:
+      case ServiceIndia:
         return 21;
-      case 12:
+      case ServiceBrazil:
         return 22;
-      case 13:
+      case ServiceAustralia:
         return 23;
       case ServiceRussia:
         return 25;
@@ -472,18 +468,18 @@ int GetClientType() {
         return 26;
       case ServiceChile:
         return 30;
-      case 18:
+      case ServiceFrance:
         return 31;
-      case 19:
+      case ServiceUae:
         return 35;
-      case 20:
+      case ServiceEu:
         return 36;
       default:
         return 0;
       }
     }
     switch (g_serviceType) {
-    case 7:
+    case ServicePhilippine:
       return 27;
     case ServiceJapan:
       return 28;
@@ -491,14 +487,14 @@ int GetClientType() {
       return 29;
     case ServiceVietnam:
       return 32;
-    case 6:
+    case ServiceIndonesia:
       return 34;
     default:
       return 0;
     }
   }
   switch (g_serviceType) {
-  case 1:
+  case ServiceAmerica:
     return 14;
   case ServiceJapan:
     return 9;
@@ -508,29 +504,29 @@ int GetClientType() {
     return 5;
   case ServiceThai:
     return 7;
-  case 6:
+  case ServiceIndonesia:
     return 13;
-  case 7:
+  case ServicePhilippine:
     return 18;
-  case 8:
+  case ServiceMalaysia:
     return 16;
-  case 9:
+  case ServiceSingapore:
     return 17;
-  case 10:
+  case ServiceGermany:
     return 20;
-  case 11:
+  case ServiceIndia:
     return 21;
-  case 12:
+  case ServiceBrazil:
     return 22;
-  case 13:
+  case ServiceAustralia:
     return 23;
   case ServiceVietnam:
     return 33;
-  case 19:
+  case ServiceUae:
     return 35;
   case ServiceRussia:
     return 25;
-  case 20:
+  case ServiceEu:
     return 36;
   default:
     return 2;
@@ -662,12 +658,12 @@ void CLoginMode::ReceiveCharacterResult(const CharacterResultPacket* packet) {
     }
     break;
   case 1:
-    if (g_windowMgr.Confirm(LookupMessage(1218), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_ALREADY_CHANGED_NAME), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
       window->SendMsg(nullptr, UM_COMMAND, ID_CANCEL, 0, 0, 0);
     }
     break;
   case 2:
-    if (g_windowMgr.Confirm(LookupMessage(1219), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_NOTREGISTED_USER), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
       window->SendMsg(nullptr, UM_COMMAND, ID_CANCEL, 0, 0, 0);
     }
     break;
@@ -682,17 +678,17 @@ void CLoginMode::ReceiveCharacterResult(const CharacterResultPacket* packet) {
     }
     break;
   case 5:
-    if (g_windowMgr.Confirm(LookupMessage(2022), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_FAILED_RENAME_BELONGS_TO_GUILD), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
       window->SendMsg(nullptr, UM_COMMAND, ID_CANCEL, 0, 0, 0);
     }
     break;
   case 6:
-    if (g_windowMgr.Confirm(LookupMessage(2023), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_FAILED_RENAME_BELONGS_TO_PARTY), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
       window->SendMsg(nullptr, UM_COMMAND, ID_CANCEL, 0, 0, 0);
     }
     break;
   case 10:
-    if (g_windowMgr.Confirm(LookupMessage(2024), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_FAILED_RENAME_UNKOWN), 0, true, true, 0, "Message", 280, 120, 0) == 184 && window) {
       window->SendMsg(nullptr, UM_COMMAND, ID_CANCEL, 0, 0, 0);
     }
     break;
@@ -968,9 +964,9 @@ void CLoginMode::OnUpdateEx(int value) {
   if (ShouldRenderFrame()) {
     g_renderer->ClearDepth(1);
     g_windowMgr.UpdateFrameWindows();
-    if (g_serviceType == 0 || g_serviceType == 4 || g_serviceType == 8 || g_serviceType == 9 || g_serviceType == 3 || g_serviceType == 10 ||
-        g_serviceType == 1 || g_serviceType == 11 || g_serviceType == 12 || g_serviceType == 5 || g_serviceType == 7 || g_serviceType == 14 ||
-        g_serviceType == 20) {
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceTaiwan || g_serviceType == ServiceMalaysia || g_serviceType == ServiceSingapore || g_serviceType == ServiceChina || g_serviceType == ServiceGermany ||
+        g_serviceType == ServiceAmerica || g_serviceType == ServiceIndia || g_serviceType == ServiceBrazil || g_serviceType == ServiceThai || g_serviceType == ServicePhilippine || g_serviceType == ServiceRussia ||
+        g_serviceType == ServiceEu) {
       g_windowMgr.DrawLoginOverlay();
       if (this->cursorType == 0) {
         g_windowMgr.DrawCenteredBackground();
@@ -993,7 +989,7 @@ void CLoginMode::OnUpdateEx(int value) {
 // FUNCTION: fn_22302
 void CLoginMode::SubD97780(int value) {
   int timeout = 0x3A98;
-  if (g_serviceType == 5 || g_serviceType == 7) {
+  if (g_serviceType == ServiceThai || g_serviceType == ServicePhilippine) {
     timeout = 0x1D4C0;
   }
 
@@ -1002,7 +998,7 @@ void CLoginMode::SubD97780(int value) {
     if (static_cast<int>(timeGetTime()) > this->otpStarted + timeout) {
       this->SendMsg(LMM_DISCONNECT_ACSVR, 0, 0, 0, 0);
     }
-    if (g_serviceType == 5 || g_serviceType == 7) {
+    if (g_serviceType == ServiceThai || g_serviceType == ServicePhilippine) {
       if (static_cast<int>(timeGetTime()) > this->otpStarted + 0x3A98) {
         if (this->waitWnd == nullptr) {
           this->waitWnd = g_windowMgr.EnsureWindow(WID_WAITWND);
@@ -1118,9 +1114,9 @@ void CLoginMode::Update() {
   if (ShouldRenderFrame()) {
     g_renderer->ClearDepth(1);
     g_windowMgr.UpdateFrameWindows();
-    if (g_serviceType == 0 || g_serviceType == 4 || g_serviceType == 8 || g_serviceType == 9 || g_serviceType == 3 || g_serviceType == 10 ||
-        g_serviceType == 1 || g_serviceType == 11 || g_serviceType == 12 || g_serviceType == 5 || g_serviceType == 7 || g_serviceType == 14 ||
-        g_serviceType == 20 || g_serviceType == 15) {
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceTaiwan || g_serviceType == ServiceMalaysia || g_serviceType == ServiceSingapore || g_serviceType == ServiceChina || g_serviceType == ServiceGermany ||
+        g_serviceType == ServiceAmerica || g_serviceType == ServiceIndia || g_serviceType == ServiceBrazil || g_serviceType == ServiceThai || g_serviceType == ServicePhilippine || g_serviceType == ServiceRussia ||
+        g_serviceType == ServiceEu || g_serviceType == ServiceVietnam) {
       g_windowMgr.DrawLoginOverlay();
       if (this->cursorType == 0) {
         g_windowMgr.DrawCenteredBackground();
@@ -1163,7 +1159,7 @@ void CLoginMode::OpenAccountRegistration() {
       ShellExecuteA(hWnd, OBFUSCATE_DECRYPT(0xE52DF30DCBAF7125ULL, source), url, nullptr, nullptr, SW_SHOWNORMAL);
     }
     break;
-  case 1: {
+  case ServiceAmerica: {
     constexpr std::array<char, 61> urlSource = OBFUSCATE_SOURCE("https://iro.ragnarokonline.com/member/memberjoin1.asp?mNum=1", 0x13E33FA1A591AB67ULL);
     const char* file = OBFUSCATE_DECRYPT(0x13E33FA1A591AB67ULL, urlSource);
     constexpr std::array<char, 5> source = OBFUSCATE_SOURCE("open", 0x17A9E5BF39AD4737ULL);
@@ -1752,7 +1748,7 @@ void CLoginMode::Initialize(const char* name) {
   g_session.ClearItemContainers();
   g_guildInfo.Init();
   PreloadCommonSprites();
-  if (g_serviceOptions.Get(7)) {
+  if (g_serviceOptions.Get(TT_MUSIC_ON_OFF)) {
     g_soundMgr->PlayStream("bgm\\01.mp3", 0, false);
   }
   this->slotExtension = CharacterSlotExtension();
@@ -1956,7 +1952,7 @@ void CLoginMode::ShowLoginError(int code, int argument) {
     message = LookupMessage(MSI_INCORRECT_USERID);
     break;
   case REFUSE_INVALID_PASSWD:
-    if (g_serviceType == 0 && ++g_loginFailCount >= 3) {
+    if (g_serviceType == ServiceKorea && ++g_loginFailCount >= 3) {
       message = std::string(PasswordRetryExceededMessage{}().Text());
       if (g_windowMgr.Confirm(message.c_str(), 0, true, true, 0, "Message", 280, 120, 0) == 0xB8) {
         if (g_session.m_channelCopId == 1) {
@@ -2039,7 +2035,7 @@ void CLoginMode::ShowLoginError(int code, int argument) {
     break;
   }
   case 16:
-    if (g_serviceType == 0) {
+    if (g_serviceType == ServiceKorea) {
       constexpr std::array<char, 48> textSource = OBFUSCATE_SOURCE("비밀 번호 변경 후, 다시 접속 해주시기 바랍니다.", 0xF14F79170939C7F1ULL);
       message = std::string(OBFUSCATE_DECRYPT(0xF14F79170939C7F1ULL, textSource));
       if (g_windowMgr.Confirm(message.c_str(), 0, true, true, 0, "Message", 280, 120, 0) == 0xB8) {
@@ -2237,7 +2233,7 @@ static void ComputeLoginDigest(unsigned char* digest, const void* data, int size
 // FUNCTION: fn_22264
 void CLoginMode::ReceiveAcceptLogin(const AcceptLoginPacket* packet, int version) {
   g_session.m_loginAcceptTime = timeGetTime();
-  *reinterpret_cast<std::string*>(&g_session.autoReplyText) = LookupMessage(MSI_AUTO_MSG);
+  g_session.autoReplyText = LookupMessage(MSI_AUTO_MSG);
 
   g_session.m_authCode = packet->authCode;
   g_session.m_userLevel = packet->userLevel;
@@ -2260,13 +2256,13 @@ void CLoginMode::ReceiveAcceptLogin(const AcceptLoginPacket* packet, int version
   }
 
   switch (g_serviceType) {
-  case 6:
-  case 10:
-  case 12:
+  case ServiceIndonesia:
+  case ServiceGermany:
+  case ServiceBrazil:
     g_serviceOptions.Set(0x6C, 0);
     break;
   }
-  const unsigned char flags = g_serviceOptions.Get(0x6C);
+  const unsigned char flags = g_serviceOptions.Get(TT_BOLD_NAME_TYPE_ON_OFF);
   g_session.SetServiceFlags(flags, flags);
 
   g_session.m_lastLoginIp = packet->lastLoginIp;
@@ -2400,25 +2396,25 @@ void CLoginMode::PollNetworkStatus() {
       int message;
       switch (reinterpret_cast<const ResultPacket*>(g_gameModePacketBuffer)->result) {
       case 0:
-        message = 10;
+        message = MSI_CHARACTER_NAME_ALREADY_EXISTS;
         break;
       case 1:
-        message = 0x12A;
+        message = MSI_LIMIT_AGE;
         break;
       case 2:
-        message = 0x4F8;
+        message = MSI_LIMIT_CHAR_DELETE;
         break;
       case 3:
-        message = 0x54B;
+        message = MSI_FR_ERR_MKCHAR_INVALID_SLOT;
         break;
       case 11:
-        message = 0x553;
+        message = MSI_NEED_PREMIUM_SERVICE;
         break;
       case 12:
-        message = 0x7E2;
+        message = MSI_CHARACTERNAME_ERROR;
         break;
       default:
-        message = 11;
+        message = MSI_CHARACTER_CREATION_DENIED;
         break;
       }
       g_windowMgr.Confirm(LookupMessage(message), 0, true, false, 0, "Message", 280, 120, 0);
@@ -2445,16 +2441,16 @@ void CLoginMode::PollNetworkStatus() {
       int message;
       switch (reinterpret_cast<const ResultPacket*>(g_gameModePacketBuffer)->result) {
       case 0:
-        message = g_serviceType == 0 ? 0x12F : 0x12D;
+        message = g_serviceType == ServiceKorea ? MSI_CANNOT_DELETE_CHARACTER_PEOPLE_REG_NUMBER : MSI_CANNOT_DELETE_CHARACTER_EMAIL;
         break;
       case 1:
-        message = 0x54C;
+        message = MSI_FR_ERR_DELCHAR_INVALID_SLOT;
         break;
       case 2:
-        message = 0x788;
+        message = MSI_RESULT_FAIL_CHAR_DELETE;
         break;
       default:
-        message = 12;
+        message = MSI_CANNOT_DELETE_CHARACTER;
         break;
       }
       g_windowMgr.Confirm(LookupMessage(message), 0, true, false, 0, "Message", 280, 120, 0);
@@ -2505,7 +2501,7 @@ void CLoginMode::PollNetworkStatus() {
     }
     case ID_HC_BLOCK_CHARACTER: {
       const BlockedCharacterPacket* packet = reinterpret_cast<const BlockedCharacterPacket*>(g_gameModePacketBuffer);
-      BlockedCharacter* blocked = reinterpret_cast<BlockedCharacter*>(&g_session.characterSelectionData[0x40]);
+      BlockedCharacter* blocked = g_session.m_blockedCharacters;
       g_session.blockedCharacterCount = (packet->length - offsetof(BlockedCharacterPacket, characters)) / sizeof(BlockedCharacter);
       memset(blocked, 0, g_session.blockedCharacterCount * sizeof(BlockedCharacter));
       memcpy(blocked, packet->characters, g_session.blockedCharacterCount * sizeof(BlockedCharacter));
@@ -2772,28 +2768,28 @@ void CLoginMode::PollNetworkStatus() {
       int message = 0xC82;
       switch (packet->result) {
       case 1:
-        message = 0xC7C;
+        message = MSI_TAREN_LOGINREFUSE_FAIL_PERSONALNUMBER;
         break;
       case 2:
-        message = 0xC7D;
+        message = MSI_TAREN_LOGINREFUSE_FAIL_ACCOUNT_BLOCK;
         break;
       case 3:
-        message = 0xC7E;
+        message = MSI_TAREN_LOGINREFUSE_FAIL_SYSTEM;
         break;
       case 4:
-        message = 0xC7F;
+        message = MSI_TAREN_LOGINREFUSE_FAIL_UNKNOWN;
         break;
       case 5:
-        message = 0xC80;
+        message = MSI_NAVIGATION_ICONTITEL;
         break;
       case 6:
-        message = 0xC81;
+        message = MSI_NAVIGATION_RUITELISTTITEL;
         break;
       case 7:
-        message = 0xC8E;
+        message = MSI_NAVIGATION_V4_HELP02;
         break;
       case 9:
-        message = 0xF47;
+        message = MSI_ZEROQUEST_SIMPLEUI_ON;
         break;
       }
       GetRagConnection().Close();
@@ -3027,7 +3023,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     return 0;
   case LMM_ID:
     strcpy(this->m_accountId, reinterpret_cast<const char*>(argument1));
-    strcpy(reinterpret_cast<char*>(g_session.characterSelectionData), reinterpret_cast<const char*>(argument1));
+    strcpy(g_session.m_selectedAccountText, reinterpret_cast<const char*>(argument1));
     return 0;
   case LMM_SET_AUTH_CODE:
     strcpy(this->m_authCode, reinterpret_cast<const char*>(argument1));
@@ -3082,16 +3078,16 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
           g_session.m_maxSp = maxSp;
           g_session.RefreshHpSpWindows();
         }
-        g_session.m_zeny = *reinterpret_cast<const int*>(&this->characters[i].progressionData[0x00]);
+        g_session.m_zeny = this->characters[i].zeny;
         g_session.RefreshHpSpWindows();
         g_session.InvalidateWindowFrames();
-        g_session.m_jobExp = *reinterpret_cast<const std::int64_t*>(&this->characters[i].progressionData[0x04]);
+        g_session.m_jobExp = this->characters[i].jobExp;
         g_session.InvalidateWindowFrames();
-        g_session.m_karma = *reinterpret_cast<const int*>(&this->characters[i].progressionData[0x1C]);
+        g_session.m_karma = this->characters[i].karma;
         g_session.InvalidateWindowFrames();
-        g_session.m_manner = *reinterpret_cast<const int*>(&this->characters[i].progressionData[0x20]);
+        g_session.m_manner = this->characters[i].manner;
         g_session.InvalidateWindowFrames();
-        g_session.m_jobLevel = *reinterpret_cast<const int*>(&this->characters[i].progressionData[0x0C]);
+        g_session.m_jobLevel = this->characters[i].jobLevel;
         g_session.InvalidateWindowFrames();
         g_session.m_characterFlags = this->characters[i].characterFlags[0];
         g_session.m_head = this->characters[i].head;
@@ -3105,9 +3101,9 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
         g_session.m_accessory3 = this->characters[i].accessory3;
         g_session.m_robe = this->characters[i].robe;
         g_session.m_bodyCostume = this->characters[i].bodyCostume;
-        g_session.m_bodyState = *reinterpret_cast<const int*>(&this->characters[i].progressionData[0x10]);
-        g_session.m_effectState = *reinterpret_cast<const int*>(&this->characters[i].progressionData[0x14]);
-        g_session.m_jobFlags = *reinterpret_cast<const std::uint32_t*>(&this->characters[i].progressionData[0x18]);
+        g_session.m_bodyState = this->characters[i].bodyState;
+        g_session.m_effectState = this->characters[i].effectState;
+        g_session.m_jobFlags = this->characters[i].jobFlags;
         return 0;
       }
     }
@@ -3124,7 +3120,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     this->selectedAccount = argument1;
     g_session.m_selectedAccount = argument1;
     TraceSelection(argument1);
-    if (g_serviceType == 19) {
+    if (g_serviceType == ServiceUae) {
       std::string suffix;
       if (argument1 == 1) {
         g_tipOfTheDayEnglish = true;
@@ -3140,7 +3136,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
       g_session.ReloadLanguageTables();
       g_session.IgnoreText(suffix);
     }
-    this->pendingCursorType = (g_serviceType == 5 || g_serviceType == 7) ? 13 : 3;
+    this->pendingCursorType = (g_serviceType == ServiceThai || g_serviceType == ServicePhilippine) ? 13 : 3;
     return 0;
   case LMM_SELECTACCOUNT2:
     this->selectedSecondaryAccount = argument1;
@@ -3825,11 +3821,11 @@ void CLoginMode::OnChangeState(int value) {
     packet.id = ID_CA_LOGIN;
     packet.version = g_patchedClientVersion;
     std::memcpy(packet.name, this->m_accountId, sizeof(packet.name));
-    if (g_serviceType == 7) {
+    if (g_serviceType == ServicePhilippine) {
       char password[24];
       DecryptAES(this->m_password, password, sizeof(password));
       std::memcpy(packet.password, password, sizeof(packet.password));
-    } else if (g_serviceType == 4) {
+    } else if (g_serviceType == ServiceTaiwan) {
       DecryptRijndael192(this->m_password, packet.password);
     } else {
       std::memcpy(packet.password, this->m_password, sizeof(packet.password));
@@ -3896,12 +3892,12 @@ void CLoginMode::OnChangeState(int value) {
     std::strncpy(packet.code, reinterpret_cast<const char*>(this->billingInfo), sizeof(packet.code));
     const CharacterInfo* character = reinterpret_cast<const CharacterInfo*>(this->SendMsg(MM_QUERYCHARICTORINFO, static_cast<unsigned char>(g_selectedSlotIndex), 0, 0, 0));
     packet.gid = character->gid;
-    if (g_serviceType == 0) {
+    if (g_serviceType == ServiceKorea) {
       if (this->billingInfo[5] == '\0') {
         packet.code[0] = '\0';
       }
       GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
-    } else if (g_serviceType == 10 || g_serviceType == 12 || g_serviceType == 1) {
+    } else if (g_serviceType == ServiceGermany || g_serviceType == ServiceBrazil || g_serviceType == ServiceAmerica) {
       DeleteCharacterEmailPacket email;
       email.gid = character->gid;
       email.id = ID_CH_DELETE_CHAR2;
@@ -3978,12 +3974,12 @@ void CLoginMode::OnChangeState(int value) {
     g_windowMgr.EnsureWindow(WID_SELCHARFORUSERVERWND);
     break;
   case 29: {
-    if (g_serviceType == 6 || g_serviceType == 10 || g_serviceType == 12) {
+    if (g_serviceType == ServiceIndonesia || g_serviceType == ServiceGermany || g_serviceType == ServiceBrazil) {
       g_serviceOptions.Set(0x6C, 0);
     }
-    const unsigned char flags = g_serviceOptions.Get(0x6C);
+    const unsigned char flags = g_serviceOptions.Get(TT_BOLD_NAME_TYPE_ON_OFF);
     g_session.SetServiceFlags(flags, flags);
-    reinterpret_cast<Replay&>(ReplayFileList::Instance()).SetBaseFrame(reinterpret_cast<std::uint32_t>(&Replay::Instance()));
+    ReplayFileList::Instance().SetReplay(&Replay::Instance());
     this->wallpaperName = std::string(OBFUSCATE_BYTES_TEXT("유저인터페이스\\login_interface\\warning2.bmp", 0x4F99DF03C3EF31B7ULL));
     g_windowMgr.SetBackgroundSurface(static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->wallpaperName.c_str()))));
     g_windowMgr.EnsureWindow(WID_NOTICECONFIRMWND)->SendMsg(nullptr, UM_SET_TARGET, 10026, 0, 0, 0);

@@ -1,5 +1,7 @@
 #include "Contents/Sprites/SpriteLayerDrawing.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Jobs/JobId.h"
 
 #include "Client/Session/Session.h"
 #include "Contents/Actors/ActorStateFlags.h"
@@ -328,9 +330,9 @@ void SpriteLayerRenderer::DrawRobe(bool drawOnTop) {
 
   if (this->pc->sex == 0) {
     switch (this->pc->GetEffectiveJob(-1)) {
-      case 0xFF6:
-      case 0xFF7:
-      case 0x1010:
+      case JT_MADOGEAR:
+      case JT_MADOGEAR_H:
+      case JT_MADOGEAR_B:
         return;
     }
   }
@@ -415,7 +417,7 @@ int SpriteLayerRenderer::DrawBodyOutline(int layer) {
     return layer;
   }
 
-  if (g_serviceOptions.Get(229)) {
+  if (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF)) {
     color = ((((0x46u << 8) | static_cast<std::uint8_t>(color >> 16)) << 8 | static_cast<std::uint8_t>(color >> 8)) << 8) | static_cast<std::uint8_t>(color);
   }
 

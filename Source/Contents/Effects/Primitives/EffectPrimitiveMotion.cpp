@@ -1,4 +1,5 @@
 #include "Contents/Effects/Primitives/EffectPrimitiveMotion.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Contents/Actors/ActorEnums.h"
@@ -306,7 +307,7 @@ bool CEffectPrim::MoveEffectPrimitive() {
     this->state.blue = this->state.blue > 255 ? 255 : this->state.blue < 0 ? 0 : this->state.blue;
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
 
   if (this->state.stateCnt % this->state.animSpeed == 0) {
     const auto next = this->render.curMotion + 1u;
@@ -475,7 +476,7 @@ bool CEffectPrim::Prim3DCylinder() {
     this->state.outerSpeed = -(this->state.outerSize / static_cast<float>(this->state.duration - this->state.stateCnt + 1));
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
 
   if (this->state.stateCnt % this->state.animSpeed == 0) {
     const auto next = this->render.curMotion + 1u;
@@ -528,7 +529,7 @@ bool CEffectPrim::Prim3DCylinderHalf() {
     this->state.outerSpeed = -(this->state.outerSize / static_cast<float>(this->state.duration - this->state.stateCnt + 1));
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
 
   if (this->state.stateCnt % this->state.animSpeed == 0) {
     const auto next = this->render.curMotion + 1u;
@@ -577,7 +578,7 @@ __declspec(noinline) void CEffectPrim::AdvanceEffectPrimitive() {
       this->state.accel = this->state.changeAccel3d.y;
     }
   } else {
-    this->state.ProcessAlpha();
+    this->ProcessAlpha();
   }
 }
 
@@ -864,7 +865,7 @@ void CEffectPrim::Prim3DCircle() {
   }
 
   this->state.size = scale;
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
 }
 
@@ -1736,7 +1737,7 @@ bool CEffectPrim::PrimKouenka() {
     this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -1798,7 +1799,7 @@ bool CEffectPrim::PrimSakura() {
     this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -2182,7 +2183,7 @@ bool CEffectPrim::PrimGhost() {
   this->render.position.x = this->state.deltaPos.x;
   this->render.position.y = this->state.deltaPos.y;
   this->render.position.z = this->state.deltaPos.z;
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -2468,7 +2469,7 @@ bool CEffectPrim::Prim3DParticle() {
     this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -2509,7 +2510,7 @@ bool CEffectPrim::Prim3DParticleGravity() {
     }
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -2708,7 +2709,7 @@ bool CEffectPrim::Prim3DTextureNoMaster() {
     particle.blue = particle.blue > 255 ? 255 : particle.blue < 0 ? 0 : particle.blue;
   }
 
-  particle.ProcessAlpha();
+  this->ProcessAlpha();
 
   if (particle.stateCnt % particle.animSpeed == 0) {
     const auto next = this->render.curMotion + 1u;
@@ -2817,7 +2818,7 @@ bool CEffectPrim::Prim3DParticleNoMaster() {
     this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -2881,7 +2882,7 @@ bool CEffectPrim::Prim3DParticleOrbit() {
   this->state.latitude = rotation;
   this->state.transform.AppendZRotation(rotation);
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -2920,7 +2921,7 @@ bool CEffectPrim::Prim3DParticleSpline() {
   this->render.position.y = this->state.deltaPos.y + this->state.orgPos.y + this->state.deltaPos3.y;
   this->render.position.z = this->state.deltaPos.z + this->state.orgPos.z + this->state.deltaPos3.z;
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -3365,7 +3366,7 @@ bool CEffectPrim::PrimAsuraCasting() {
         }
       }
 
-      if (this->state.slots[index].process > (this->state.slots[index].flag1[4] == 4 ? 25 : 140)) {
+      if (this->state.slots[index].process > (this->state.slots[index].flag1[4] != 4 ? 140 : 25)) {
         ShrinkLast(this->state.slots[index], 10, 1.01f);
       }
     }
@@ -5066,7 +5067,7 @@ __declspec(noinline) bool CEffectPrim::PrimFadeAlpha() {
     }
   }
 
-  reinterpret_cast<EffectPrimitiveState*>(this)->ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -5270,7 +5271,7 @@ void CEffectPrim::PrimExpandPulse() {
       if (slot.flag1[1] == 16) {
         slot.alphaB = static_cast<std::int16_t>(slot.alphaB + 15);
       } else if (slot.flag1[1] == 24) {
-        slot.alphaB = static_cast<std::int16_t>(slot.alphaB + (g_serviceOptions.Get(229) != 0 ? 8 : 15));
+        slot.alphaB = static_cast<std::int16_t>(slot.alphaB + (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF) != 0 ? 8 : 15));
       } else {
         slot.alphaB = static_cast<std::int16_t>(slot.alphaB + 15);
       }
@@ -5517,7 +5518,7 @@ __declspec(noinline) void CEffectPrim::PrimWaveHeightsSlow() {
 
     if (slot.process < 30) {
       slot.alphaB = static_cast<std::int16_t>(slot.alphaB + 5);
-      const int limit = g_serviceOptions.Get(229) != 0 ? 80 : 150;
+      const int limit = g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF) != 0 ? 80 : 150;
       if (slot.alphaB > limit) {
         slot.alphaB = static_cast<std::int16_t>(limit);
       }
@@ -5708,7 +5709,7 @@ bool CEffectPrim::PrimDriftingRings() {
 
     if (process < 10) {
       slot.alphaB = static_cast<std::int16_t>(slot.alphaB + 25);
-      const int limit = g_serviceOptions.Get(229) != 0 ? 125 : 250;
+      const int limit = g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF) != 0 ? 125 : 250;
       if (slot.alphaB > limit) {
         slot.alphaB = static_cast<std::int16_t>(limit);
       }
@@ -5903,7 +5904,7 @@ bool CEffectPrim::Prim3DSlotParticle() {
     this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   if (!this->AnimMotion()) {
     return false;
@@ -6207,7 +6208,7 @@ bool CEffectPrim::PrimWanderingSlots() {
     g_modeMgr.GetGameMode();
   }
 
-  this->state.ProcessAlpha();
+  this->ProcessAlpha();
   this->ShiftSegment();
   return this->AnimMotion();
 }
@@ -7736,7 +7737,7 @@ bool CEffectPrim::Move2DPrimitive() {
     particle.chCnt = ClampedRandom(10) + 10;
   }
 
-  particle.ProcessAlpha();
+  this->ProcessAlpha();
 
   if (particle.stateCnt % particle.animSpeed == 0) {
     ++this->render.curMotion;
@@ -7907,7 +7908,7 @@ bool CEffectPrim::OnProcess() {
         return true;
       }
       break;
-    case 23:
+    case PP_3DCASTING:
     case 28:
     case 29:
     case 30:
@@ -7915,12 +7916,12 @@ bool CEffectPrim::OnProcess() {
     case 35:
     case 60:
     case PP_ASURACASTING:
-    case 99:
-    case 104:
+    case PP_DOUBLEGUMGANG:
+    case PP_HALFSPHERE:
     case 105:
-    case 106:
+    case PP_ATTACKENERGY2:
     case PP_FLOWERCAST:
-    case 109:
+    case PP_SOULLINK:
     case PP_SOULPARTICLE:
     case 130:
     case 131:
@@ -7974,7 +7975,7 @@ bool CEffectPrim::OnProcess() {
       this->state.heightSize = this->state.heightSpeed + this->state.heightSize;
       this->render.position.x = ClientSine(static_cast<int>(this->state.longitude)) * this->state.radius + this->state.orgPos.x;
       this->render.position.y = this->state.orgPos.y - ClientCosine(static_cast<int>(this->state.longitude)) * this->state.radius;
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
 
       if (this->state.stateCnt % this->state.animSpeed == 0) {
         const auto next = this->render.curMotion + 1u;
@@ -8012,7 +8013,7 @@ bool CEffectPrim::OnProcess() {
       this->state.longitude = this->state.longSpeed + this->state.longitude;
       this->state.heightSize = this->state.heightSpeed + this->state.heightSize;
       this->state.arcAngle = this->state.widthSpeed + this->state.arcAngle;
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
     } break;
     case PP_2DCIRCLE: {
       this->render.position.x = this->state.deltaPos2.x + this->state.master->state.tlvertX;
@@ -8026,7 +8027,7 @@ bool CEffectPrim::OnProcess() {
         this->state.size = this->state.innerSize;
       }
 
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
     } break;
     case PP_3DPARTICLE:
       if (!this->Prim3DParticle()) {
@@ -8051,10 +8052,10 @@ bool CEffectPrim::OnProcess() {
     case PP_3DPARTICLESPLINE:
       this->Prim3DParticleSpline();
       break;
-    case 9:
+    case PP_3DQUADHORN:
       this->AdvanceEffectPrimitive();
       break;
-    case 117: {
+    case PP_3DQUADHORN2: {
       this->state.orgPos.x = this->state.master->render.position.x + this->state.deltaPos2.x;
       this->state.orgPos.y = this->state.master->render.position.y + this->state.deltaPos2.y;
       this->state.orgPos.z = this->state.master->render.position.z + this->state.deltaPos2.z;
@@ -8082,7 +8083,7 @@ bool CEffectPrim::OnProcess() {
       this->render.position.x = this->state.orgPos.x + this->state.deltaPos.x;
       this->render.position.y = this->state.deltaPos.y + this->state.orgPos.y;
       this->render.position.z = this->state.deltaPos.z + this->state.orgPos.z;
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
     } break;
     case PP_3DCIRCLE:
       this->Prim3DCircle();
@@ -8100,7 +8101,7 @@ bool CEffectPrim::OnProcess() {
       this->state.radiusSpeed = this->state.radiusAccel + this->state.radiusSpeed;
       this->state.radius = this->state.radiusSpeed + this->state.radius;
       this->state.longitude = this->state.longSpeed + this->state.longitude;
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
     } break;
     case PP_3DCYLINDERHALF:
       this->Prim3DCylinderHalf();
@@ -8130,7 +8131,7 @@ bool CEffectPrim::OnProcess() {
       this->state.arcAngle = this->state.widthSpeed + this->state.arcAngle;
       this->state.longitude = this->state.longSpeed + this->state.longitude;
       this->state.heightSize = this->state.heightSpeed + this->state.heightSize;
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
     } break;
     case PP_3DSPLINE:
     case PP_3DSPIRAL: {
@@ -8151,12 +8152,12 @@ bool CEffectPrim::OnProcess() {
       this->state.segPos[1] = {x1, y1 + this->state.heightSpeed, z1};
       this->state.segPos[2] = {x0, y0 - this->state.size, z0};
       this->state.segPos[3] = {x1, (y1 + this->state.heightSpeed) - this->state.size, z1};
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
       this->ShiftSegment();
       this->state.longitude = this->state.longitude + this->state.longSpeed;
       this->state.deltaPos2.y = this->state.deltaPos2.y + this->state.heightSpeed;
     } break;
-    case 20:
+    case PP_3DLINE:
       this->render.position.y = this->render.position.y + 5.0f;
       break;
     case PP_3DPARTICLE_NOMASTER:
@@ -8169,7 +8170,7 @@ bool CEffectPrim::OnProcess() {
         return false;
       }
       break;
-    case 23:
+    case PP_3DCASTING:
       this->UpdateStoneCurse();
       break;
     case 144:
@@ -8184,7 +8185,7 @@ bool CEffectPrim::OnProcess() {
     case 173:
       this->PrimWaveHeightsSlow();
       break;
-    case 24: {
+    case PP_3DCASTING_2: {
       this->render.position.x = this->state.master->render.position.x;
       this->render.position.y = this->state.master->render.position.y;
       this->render.position.z = this->state.master->render.position.z;
@@ -8231,7 +8232,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
     } break;
-    case 25:
+    case PP_3DCASTING_3:
       this->UpdateFireWall();
       break;
     case PP_3DCASTING_4:
@@ -8246,7 +8247,7 @@ bool CEffectPrim::OnProcess() {
     case PP_ACIDDEMON:
       this->PrimAcidDemon();
       break;
-    case 73: {
+    case PP_MAGNUM2: {
       const vector3d& parent = this->state.master->render.position;
       this->render.position.x = parent.x;
       this->render.position.y = parent.y;
@@ -8302,7 +8303,7 @@ bool CEffectPrim::OnProcess() {
     case 131:
       this->PrimRisingFan2();
       break;
-    case 70: {
+    case PP_HITLINE: {
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -8337,7 +8338,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
     } break;
-    case 100: {
+    case PP_HITLINE3: {
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -8378,7 +8379,7 @@ bool CEffectPrim::OnProcess() {
     case 103:
       this->PrimSpinFade();
       break;
-    case 101: {
+    case PP_ELECTRIC: {
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -8433,13 +8434,13 @@ bool CEffectPrim::OnProcess() {
       this->PrimDriftingRings();
       break;
     case 60:
-    case 110:
+    case PP_HEAL_LOW:
       this->PrimPulsingColumns();
       break;
     case PP_GUARD:
       this->PrimGuard();
       break;
-    case 104: {
+    case PP_HALFSPHERE: {
       FollowMaster(*this);
 
       for (int index = 0; index < 4; ++index) {
@@ -8498,7 +8499,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
     } break;
-    case 106: {
+    case PP_ATTACKENERGY2: {
       FollowMaster(*this);
 
       for (int index = 0; index < 4; ++index) {
@@ -8546,7 +8547,7 @@ bool CEffectPrim::OnProcess() {
     case PP_SAINTWING:
       this->PrimSaintWing();
       break;
-    case 77: {
+    case PP_SPHEREWIND: {
       const vector3d& parent = this->state.master->render.position;
       this->render.position.x = parent.x;
       this->render.position.y = parent.y;
@@ -8570,7 +8571,7 @@ bool CEffectPrim::OnProcess() {
     case PP_SPHEREWIND2:
       this->PrimSphereWind2();
       break;
-    case 78: {
+    case PP_COLORPAPER: {
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -8703,7 +8704,7 @@ bool CEffectPrim::OnProcess() {
     case 157:
       this->PrimOrbitFade();
       break;
-    case 109: {
+    case PP_SOULLINK: {
       FaceCamera(this->state.slots);
       FollowMaster(*this);
 
@@ -9009,7 +9010,7 @@ bool CEffectPrim::OnProcess() {
     case 142:
       this->PrimWaterFall();
       break;
-    case 93: {
+    case PP_RAINBOW: {
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -9087,7 +9088,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
     } break;
-    case 37: {
+    case PP_GRANDCROSS2: {
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -9116,7 +9117,7 @@ bool CEffectPrim::OnProcess() {
         slot.height[2] = g_sinTable[slot.process] * slot.maxHeight;
       }
     } break;
-    case 75: {
+    case PP_SLASH1: {
       const vector3d& parent = this->state.master->render.position;
       this->render.position.x = parent.x;
       this->render.position.y = parent.y;
@@ -9164,7 +9165,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
     } break;
-    case 64:
+    case PP_RECT_UP:
       this->PrimPulseRing();
       break;
     case 132:
@@ -9211,7 +9212,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
       break;
-    case 90:
+    case PP_RECT_UP2:
       this->PrimFadingColumns();
       break;
     case PP_INTIMIDATE:
@@ -9416,7 +9417,7 @@ bool CEffectPrim::OnProcess() {
     case PP_SMA:
       this->PrimSMA();
       break;
-    case 121:
+    case PP_SMA2:
       for (int index = 0; index < 4; ++index) {
         EffectPrimitiveSlot& slot = this->state.slots[index];
 
@@ -9553,7 +9554,7 @@ bool CEffectPrim::OnProcess() {
       this->PrimPokJuk();
       break;
     case 35:
-    case 99:
+    case PP_DOUBLEGUMGANG:
       this->PrimFloatingBubbles();
       break;
     case 39: {
@@ -9605,7 +9606,7 @@ bool CEffectPrim::OnProcess() {
     case 148:
       this->FollowMasterAndTickSlots2();
       break;
-    case 114: {
+    case PP_HERMODE: {
       EffectPrimitiveSlot& slot = this->state.slots[0];
       this->render.position = this->state.master->render.position;
 
@@ -9666,7 +9667,7 @@ bool CEffectPrim::OnProcess() {
         this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
       }
 
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
       this->ShiftSegment();
       this->AnimMotion();
     } break;
@@ -9923,7 +9924,7 @@ bool CEffectPrim::OnProcess() {
         }
       }
     } break;
-    case 71:
+    case PP_BLIND:
       this->PrimFadeInFollow();
       break;
     case 72:
@@ -10020,7 +10021,7 @@ bool CEffectPrim::OnProcess() {
         this->state.roll = this->render.angle - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
       }
 
-      this->state.ProcessAlpha();
+      this->ProcessAlpha();
       this->ShiftSegment();
       this->AnimMotion();
     } break;

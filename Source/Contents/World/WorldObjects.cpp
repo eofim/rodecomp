@@ -1,4 +1,5 @@
 #include "Client/Mode/CGameMode.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Actors/ActorEnums.h"
 #include "UI/Window/UIEnums.h"
@@ -38,6 +39,7 @@
 #include "Client/Input/Mouse.h"
 #include "Client/Replay/Replay.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Guild/GuildMgr.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Contents/Tables/MessageTable.h"
@@ -282,7 +284,7 @@ void CWorld::SendObjectMessage(CGameObject* sender, std::uint64_t identity, int 
 
 // OFFSET: 0x00CD8000
 // FUNCTION: fn_21298
-void CGameMode::SpawnArrowEffect(std::uint32_t aid, int target, char flag, int argument) {
+void CGameMode::SpawnArrowEffect(const vector3d* source, std::uint32_t target, float speed, int job) {
   if (target == 0) {
     return;
   }
@@ -291,7 +293,7 @@ void CGameMode::SpawnArrowEffect(std::uint32_t aid, int target, char flag, int a
 
   if (effect) {
     this->scene->objects.push_back(effect);
-    effect->SendMsg(nullptr, AM_SETPOS, static_cast<int>(aid), static_cast<std::uint32_t>(target), reinterpret_cast<int>(&flag), argument, 0, 0);
+    effect->SendMsg(nullptr, AM_SETPOS, reinterpret_cast<std::intptr_t>(source), target, reinterpret_cast<std::intptr_t>(&speed), job, 0, 0);
   }
 }
 
@@ -477,13 +479,13 @@ void CGameMode::UpdateNameBalloon(CGameActor* actor) {
     this->nameBalloon->SetName(card, stripHash, 0);
   }
 
-  const unsigned char showEmblem = g_serviceOptions.Get(0x40);
+  const unsigned char showEmblem = g_serviceOptions.Get(TT_SHOW_EMBLEM_ON_OFF);
   if ((g_session.IsNpcJob(actor->GetEffectiveJob(-1)) || g_session.IsMonsterActor(actor)) && card.groupIconId) {
     this->nameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
   } else if (g_session.IsAllyActor(actor->render.accountId, actor->GetEffectiveJob(-1)) && card.groupIconId) {
     this->nameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
   } else if (actor->GetGdid() && showEmblem) {
-    const unsigned char framedEmblem = g_serviceOptions.Get(0xF3);
+    const unsigned char framedEmblem = g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF);
     std::string emblem = g_guildMgr->GetEmblemFilename(actor->GetGdid());
     this->nameBalloon->SetIcon(emblem.c_str(), static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->isSiegeMode == 1 && framedEmblem ? 1 : 0);
   } else if (static_cast<CGameActor*>(this->scene->player) == actor) {
@@ -507,7 +509,7 @@ void CGameMode::UpdateNameBalloon(CGameActor* actor) {
   this->nameBalloonHeight = balloon->geometry.height;
   if (balloon) {
     const int aid = actor->render.accountId;
-    if (g_serviceType == 12) {
+    if (g_serviceType == ServiceBrazil) {
       switch (aid) {
       case 0x189111:
       case 0x189112:
@@ -624,12 +626,12 @@ void CGameMode::ApplyMapFog(int enabled) {
 
 // OFFSET: 0x00CD8F30
 // FUNCTION: fn_21306
-void CGameMode::SpawnMandraAttack(std::uint32_t aid, int target, char flag) {
+void CGameMode::SpawnMandraAttack(std::uint32_t target, int job, float startFrame) {
   CMandraAttackEffect* effect = new CMandraAttackEffect;
 
   if (effect) {
     this->scene->objects.push_back(effect);
-    effect->SendMsg(nullptr, AM_SETPOS, aid, reinterpret_cast<int>(&flag), target, 0, 0, 0);
+    effect->SendMsg(nullptr, AM_SETPOS, target, reinterpret_cast<std::intptr_t>(&startFrame), job, 0, 0, 0);
   }
 }
 

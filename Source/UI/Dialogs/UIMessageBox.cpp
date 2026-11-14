@@ -332,7 +332,7 @@ void UIMakeCharWnd::Paint() {
     if (cell.imageType == 0) {
       texture = g_renderer->atlas.Find(image, palette, record);
       if (!texture) {
-        texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, palette, record, g_serviceType, g_resourceReuseDelay);
+        texture = g_renderer->atlas.Insert(image, palette, record);
       }
     } else {
       texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
@@ -655,9 +655,9 @@ void UIMessageBox::Configure(
     button->SetBitmap((prefix + names[2][2] + ".bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->Move(width - 46, height - 24);
-    button->SetId(185);
+    button->SetId(ID_CANCEL);
     this->AddChild(button);
-    this->m_message0 = 185;
+    this->m_message0 = ID_CANCEL;
     break;
   }
   case 0: {
@@ -667,9 +667,9 @@ void UIMessageBox::Configure(
     button->SetBitmap((prefix + names[0][2] + ".bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->Move(width - 46, height - 24);
-    button->SetId(184);
+    button->SetId(ID_OK);
     this->AddChild(button);
-    this->m_message0 = 184;
+    this->m_message0 = ID_OK;
     break;
   }
   case 2: {
@@ -699,9 +699,9 @@ void UIMessageBox::Configure(
     button->SetBitmap((prefix + names[0][2] + ".bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->Move(width - 46, height - 24);
-    button->SetId(184);
+    button->SetId(ID_OK);
     this->AddChild(button);
-    this->m_message0 = 184;
+    this->m_message0 = ID_OK;
 
     auto* link = new UITextButton();
     link->Configure(LookupMessage(MSI_FRIEND_ALREADY_FRIEND), 0x00F4934A, 0, 12, 0, 0);
@@ -803,7 +803,7 @@ int UIMessageBoxAutoreturn::SendMsg(UIWindow* sender, int message, std::intptr_t
 int UIMonsterInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
   case UM_COMMAND:
-    if (a == 184) {
+    if (a == ID_OK) {
       g_windowMgr.Schedule(this);
     }
 
@@ -894,7 +894,7 @@ void UIMerInfoWnd::OnCreate(int, int) {
     this->button->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
     this->button->Move(187, 44);
-    this->button->SetId(350);
+    this->button->SetId(ID_FIRE_MER);
     this->AddChild(this->button);
   }
   {
@@ -905,7 +905,7 @@ void UIMerInfoWnd::OnCreate(int, int) {
     this->button->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
     this->button->Move(232, 44);
-    this->button->SetId(349);
+    this->button->SetId(ID_OPEN_MERSKILLLIST);
     this->AddChild(this->button);
   }
 
@@ -921,7 +921,7 @@ void UIMerInfoWnd::OnCreate(int, int) {
   this->spBar->Move(117, 88);
   this->AddChild(this->spBar);
 
-  this->m_message0 = 201;
+  this->m_message0 = ID_CLOSE;
 }
 
 // OFFSET: 0x008C3630
@@ -961,7 +961,7 @@ int UIMerInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     case ID_FIRE_MER: {
       CMode* mode = g_modeMgr.GetGameMode();
 
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_MER), 2, false, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_MER), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
         mode->SendMsg(MM_COMMAND_MER, 2, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_MERINFOWND);
         g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_1);
@@ -1411,18 +1411,18 @@ void UINoticeWnd::OnWheel(int delta) {
 // OFFSET: 0x008A8AD0
 // FUNCTION: fn_11715
 void UIPayConfirmWnd::Configure(const std::string& text, int itemId) {
-  reinterpret_cast<UIMessageBox*>(this)->Configure(text.c_str(), 2, 187, 0, LookupMessage(MSI_TITLE_QUEST_BOARD_INFO), 0xDC, 0x85, 1, nullptr);
+  UIMessageBox::Configure(text.c_str(), 2, 187, 0, LookupMessage(MSI_TITLE_QUEST_BOARD_INFO), 0xDC, 0x85, 1, nullptr);
 
   this->viewer->Resize(0xA5, 0x50);
   this->viewer->Move(7, 0x17);
   this->viewer->SetBackgroundColor(0xFFFF00FF);
 
-  auto accept = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == 187; });
+  auto accept = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == ID_YES; });
   if (this->m_children.end() != accept) {
     (*accept)->Move(0x59, 0x6D);
   }
 
-  auto cancel = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == 188; });
+  auto cancel = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == ID_NO; });
   if (this->m_children.end() != cancel) {
     auto* button = static_cast<UIBitmapButton*>(*cancel);
     button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_off.bmp", 0, 0);
@@ -1550,7 +1550,7 @@ void UIMakeCharWnd::InitHairControls() {
   this->m_rotateLeftButton->SetBitmap("유저인터페이스\\scroll1left.bmp", 2, 0);
   this->m_rotateLeftButton->SetSize(this->m_rotateLeftButton->BitmapWidth(), this->m_rotateLeftButton->BitmapHeight());
   this->m_rotateLeftButton->Move(20, 80);
-  this->m_rotateLeftButton->SetId(227);
+  this->m_rotateLeftButton->SetId(ID_LEFT);
   this->m_rotateLeftButton->SetTooltip(LookupMessage(MSI_VIEW_BEFORE_WORLDINFO_TITLE));
   this->AddChild(this->m_rotateLeftButton);
 
@@ -1560,7 +1560,7 @@ void UIMakeCharWnd::InitHairControls() {
   this->m_rotateRightButton->SetBitmap("유저인터페이스\\scroll1right.bmp", 2, 0);
   this->m_rotateRightButton->SetSize(this->m_rotateLeftButton->BitmapWidth(), this->m_rotateLeftButton->BitmapHeight());
   this->m_rotateRightButton->Move(110, 80);
-  this->m_rotateRightButton->SetId(226);
+  this->m_rotateRightButton->SetId(ID_RIGHT);
   this->m_rotateRightButton->SetTooltip(LookupMessage(MSI_VIEW_BEFORE_SERVERINFO));
   this->AddChild(this->m_rotateRightButton);
 
@@ -1603,7 +1603,7 @@ void UIMakeCharWnd::OnCreate(int, int) {
   this->AddChild(this->m_nameEdit);
   this->InitHairControls();
   g_windowMgr.SetFocus(this->m_nameEdit);
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x008AD130
@@ -1616,7 +1616,7 @@ void UIChatRoomWnd::Move(int x, int y) {
 // OFFSET: 0x008AD3C0
 // FUNCTION: fn_11738
 void UIChatRoomWnd::OnCreate(int, int) {
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 
   this->resizer = new UIResizer();
   this->resizer->SetSize(16, 16);
@@ -1677,7 +1677,7 @@ void UINoticeWnd::OnCreate(int, int) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 
   if (!std::fopen(this->m_patchFile, "r")) {
     FILE* file = std::fopen(this->m_patchFile, "w");
@@ -1968,7 +1968,7 @@ void UISelectReplayDataWnd::OnCreate(int width, int height) {
     }
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 
   UIStaticText** text = this->m_texts;
   for (int y = 35; y < 110; y += 15) {
@@ -2009,7 +2009,7 @@ void UITalkboxTrapInputWnd::OnCreate(int, int) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x008B7A60
@@ -2301,13 +2301,13 @@ int UIReplayRECControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     case ID_CONFIRM_REPLAY_RECORDING_PATH: {
       auto* edit = static_cast<UIEditCtrl*>(this->filenameEdit);
       if (edit->Length() <= 0) {
-        g_windowMgr.Confirm(LookupMessage(1972), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_ENTERTHEFILENAME), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
 
       if (_mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
           _mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(2812), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
 
@@ -2716,10 +2716,10 @@ void UICntWnd::OnCreate(int, int) {
     button->SetBitmap((prefix + "btn_ok_b" + ".bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->Move(x, y);
-    button->SetId(184);
+    button->SetId(ID_OK);
     this->AddChild(button);
   }
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x008C0B20
@@ -2870,7 +2870,7 @@ int UISelectReplayDataWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       }
       break;
     case ID_EXIT:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
         return 0;
@@ -3012,7 +3012,7 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   case UM_COMMAND:
     switch (a) {
     case ID_SELECT_REPLAY:
-      reinterpret_cast<Replay&>(ReplayFileList::Instance()).SetBaseFrame(reinterpret_cast<std::uint32_t>(&Replay::Instance()));
+      ReplayFileList::Instance().SetReplay(&Replay::Instance());
       ReplayFileList::Instance().selectionState = g_session.m_aid;
       ReplayFileList::Instance().dialogState = g_session.GetCurrentSex();
       g_modeMgr.gameMode->SendMsg(LMM_SELECT_REPLAY_DATA, 0, 0, 0, 0);
@@ -3039,7 +3039,7 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       g_modeMgr.gameMode->SendMsg(LMM_CANCEL, 0, 0, 0, 0);
       return 0;
     case ID_EXIT:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
         return 0;
@@ -3116,7 +3116,7 @@ void UIPetInfoWnd::Paint() {
     const int width = this->TextWidth(command, 0, 0, 12, 0, 0);
     this->DrawTextAt(206 - width / 2, 48, command, 0, 0, 12, 0, 0, 0);
     this->DrawTextAt(100, 119, LookupMessage(MSI_PET_ACCESSARY), 0, 0, 12, 0, 0, 0);
-    this->DrawTextAt(100, 139, LookupMessage(g_session.petAccessory == 0 ? 600 : 598), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(100, 139, LookupMessage(g_session.petAccessory == 0 ? MSI_ITEM_UNEQUIPED : MSI_ITEM_EQUIPED), 0, 0, 12, 0, 0, 0);
 
     if (this->autoFeedAvailable == 1) {
       this->DrawTextAt(100, 159, LookupMessage(MSI_PET_AUTO_FEEDING_OFF), 0, 0, 12, 0, 0, 0);
@@ -3190,9 +3190,9 @@ void UIMonsterInfoWnd::OnCreate(int, int) {
   button->SetBitmap((prefix + "btn_ok_b" + ".bmp").c_str(), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(this->geometry.width - 46, this->geometry.height - 24);
-  button->SetId(184);
+  button->SetId(ID_OK);
   this->AddChild(button);
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 
   this->actorId = g_session.m_monsterInfoActorId;
   {
@@ -3322,7 +3322,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
           ShellExecuteA(hWnd, OBFUSCATE_TEXT_NAMED("open", 0x839B27DF8F5967B3ULL, verbName), url, nullptr, nullptr, SW_SHOWNORMAL);
           break;
         }
-        if (g_windowMgr.Confirm(LookupMessage(MSI_SELECTCHARWND_RESERVE_TO_DEL_CHAR), 2, true, false, 0, "Message", 280, 120, 0) != 187) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_SELECTCHARWND_RESERVE_TO_DEL_CHAR), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
           break;
         }
       }
@@ -3352,7 +3352,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       break;
     case ID_EXIT:
       this->SaveLogin();
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         goto quit;
       }
       break;
@@ -3411,8 +3411,8 @@ int UILoginOTPWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   switch (message) {
   case UM_COMMAND: {
     switch (a) {
-    case 185:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+    case ID_CANCEL:
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
       }
@@ -3469,7 +3469,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
     this->button->SetBitmap((bitmap + "_b.bmp").c_str(), 2, 0);
     this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
     this->button->Move(187, 44);
-    this->button->SetId(291);
+    this->button->SetId(ID_DELETE_HOMUN);
     this->AddChild(this->button);
   }
   {
@@ -3480,7 +3480,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
     this->button->SetBitmap((bitmap + "_b.bmp").c_str(), 2, 0);
     this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
     this->button->Move(232, 44);
-    this->button->SetId(289);
+    this->button->SetId(ID_OPEN_HOMUNSKILLLIST);
     this->AddChild(this->button);
   }
   {
@@ -3491,7 +3491,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
     this->button->SetBitmap((bitmap + "_b.bmp").c_str(), 2, 0);
     this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
     this->button->Move(210, 155);
-    this->button->SetId(290);
+    this->button->SetId(ID_FEED_TO_HOMUN);
     this->AddChild(this->button);
     this->button->Move(210, 105);
   }
@@ -3503,7 +3503,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
     this->button->SetBitmap((bitmap + "_b.bmp").c_str(), 2, 0);
     this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
     this->button->Move(232, 21);
-    this->button->SetId(184);
+    this->button->SetId(ID_OK);
     this->AddChild(this->button);
   }
 
@@ -3533,7 +3533,7 @@ void UIHomunInfoWnd::OnCreate(int, int) {
   this->intimacyBar->Move(101, 145);
   this->intimacyBar->SetValues(&g_session.homunHunger, &g_session.homunMaxHunger);
   this->AddChild(this->intimacyBar);
-  this->m_message0 = 201;
+  this->m_message0 = ID_CLOSE;
 
   this->autoFeedCheckBox = new UICheckBox();
   this->autoFeedCheckBox->SetSize(12, 12);
@@ -3635,7 +3635,7 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       } else {
         char text[512];
         std::sprintf(text, LookupMessage(MSI_BLOCK_CALL_NOTIFY), this->nameEdit->Text());
-        if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != 188) {
+        if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
           if (g_forbiddenWords.Contains(this->nameEdit->Text()) != true) {
             g_modeMgr.GetGameMode()->SendMsg(MM_MER_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
             std::sprintf(name, this->nameEdit->Text());
@@ -3675,7 +3675,7 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       return 0;
     case ID_DELETE_HOMUN: {
       CMode* mode = g_modeMgr.GetGameMode();
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_HOMUN), 2, false, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_HOMUN), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
         mode->SendMsg(MM_COMMAND_HOMUN, 2, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_HOMUNINFOWND);
         g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_0);
@@ -3686,7 +3686,7 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     }
     case 488: {
       CMode* mode = g_modeMgr.GetGameMode();
-      if (sender == this->feedConfirmation && b == 187) {
+      if (sender == this->feedConfirmation && b == ID_YES) {
         if (g_windowMgr.LookupWindow(WID_EXCHANGEUI)) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_EXCHANGED_FAILED)), 255, 0, 0, 0);
         } else {
@@ -3735,7 +3735,7 @@ void UIPetInfoWnd::OnCreate(int, int) {
     this->renameButton->SetBitmap((prefix + "btn_rewrite_b" + ".bmp").c_str(), 2, 0);
     this->renameButton->SetSize(this->renameButton->BitmapWidth(), this->renameButton->BitmapHeight());
     this->renameButton->Move(230, 21);
-    this->renameButton->SetId(184);
+    this->renameButton->SetId(ID_OK);
     this->AddChild(this->renameButton);
   }
 
@@ -3764,7 +3764,7 @@ void UIPetInfoWnd::OnCreate(int, int) {
   this->friendlyGauge->Move(145, 105);
   this->AddChild(this->friendlyGauge);
   this->UpdateFriendlyGauge();
-  this->m_message0 = 201;
+  this->m_message0 = ID_CLOSE;
 
   const int petEgg = std::atoi(g_session.LookupClientItemByIdentity(g_session.petEggIndex).itemId.c_str());
   this->autoFeedAvailable = g_petEvolutionMgr->IsAutoFeeding(petEgg);
@@ -3830,7 +3830,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     return 0;
   }
   case UM_COMMAND:
-    if (a == 184 || a == 201) {
+    if (a == ID_OK || a == ID_CLOSE) {
       this->RecordResponse(static_cast<int>(a), b, c, d);
     }
 
@@ -3844,7 +3844,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       } else {
         char text[512];
         std::sprintf(text, LookupMessage(MSI_STORE_ASSISTANT_TRADE_CNT), this->nameEdit->Text());
-        if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != 188) {
+        if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
           if (g_forbiddenWords.Contains(this->nameEdit->Text()) != true) {
             g_modeMgr.GetGameMode()->SendMsg(MM_PET_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
             std::sprintf(g_session.petName, this->nameEdit->Text());
@@ -3911,7 +3911,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     }
     case 488: {
       CMode* mode = g_modeMgr.GetGameMode();
-      if (sender == this->feedConfirmationWnd && b == 187) {
+      if (sender == this->feedConfirmationWnd && b == ID_YES) {
         if (g_windowMgr.LookupWindow(WID_EXCHANGEUI)) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BARTERITEM_NAME_COUNT)), 255, 0, 0, 0);
           this->feedConfirmationWnd = nullptr;
@@ -3981,7 +3981,7 @@ void UISelectServerWnd::OnCreate(int width, int height) {
     }
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x008B31F0
@@ -4023,12 +4023,12 @@ void UIReplayControlWnd::OnCreate(int, int) {
   this->AddChild(this->m_pauseButton);
 
   HotkeyInfo hotkey;
-  hotkey = GetHotkeyInfo(*g_session.m_hotkeyScript, 1, 39);
+  hotkey = g_session.GetHotkeyInfo(1, 39);
   this->m_playButton->SetTooltip(hotkey.text.c_str());
   this->m_pauseButton->SetTooltip(hotkey.text.c_str());
-  hotkey = GetHotkeyInfo(*g_session.m_hotkeyScript, 1, 40);
+  hotkey = g_session.GetHotkeyInfo(1, 40);
   static_cast<UIButton*>(this->m_buttons[2])->SetTooltip(hotkey.text.c_str());
-  hotkey = GetHotkeyInfo(*g_session.m_hotkeyScript, 1, 41);
+  hotkey = g_session.GetHotkeyInfo(1, 41);
   static_cast<UIButton*>(this->m_buttons[3])->SetTooltip(hotkey.text.c_str());
 
   this->m_progress = new UIBarGraph4();
@@ -4180,9 +4180,9 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   button->SetBitmap((root + "btn_cancel_b" + ".bmp").c_str(), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(234, 96);
-  button->SetId(185);
+  button->SetId(ID_CANCEL);
   this->AddChild(button);
-  this->m_message0 = 185;
+  this->m_message0 = ID_CANCEL;
 }
 
 // OFFSET: 0x008BEE20
@@ -4398,7 +4398,7 @@ void UILoginWnd::OnCreate(int, int) {
   button->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_join_press.bmp", 0xF161095D0DE18F95ULL, joinPressName), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(87, 104);
-  button->SetId(267);
+  button->SetId(ID_MAKEACCOUNT);
   {
     const std::string text(LookupMessage(MSI_ADVENTURER_AGENCY_REGIST_FAILED));
     button->text = text;
@@ -4416,7 +4416,7 @@ void UILoginWnd::OnCreate(int, int) {
   bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_start_press.bmp", 0x2BAD156DE3E1F9D9ULL, startPressName), 2, 0);
   bitmapButton->SetSize(bitmapButton->BitmapWidth(), bitmapButton->BitmapHeight());
   bitmapButton->Move(192, 32);
-  bitmapButton->SetId(186);
+  bitmapButton->SetId(ID_LOGIN);
   this->AddChild(bitmapButton);
 
   bitmapButton = new UIBitmapButton();
@@ -4425,9 +4425,9 @@ void UILoginWnd::OnCreate(int, int) {
   bitmapButton->SetBitmap(OBFUSCATE_TEXT_NAMED("유저인터페이스\\login_interface\\bt_close2_press.bmp", 0x2F8B0F37118D157FULL, exitPressName), 2, 0);
   bitmapButton->SetSize(bitmapButton->BitmapWidth(), bitmapButton->BitmapHeight());
   bitmapButton->Move(273, 15);
-  bitmapButton->SetId(221);
+  bitmapButton->SetId(ID_EXIT);
   this->AddChild(bitmapButton);
-  this->m_message0 = 186;
+  this->m_message0 = ID_LOGIN;
 
   this->passwordEdit = new UIEditCtrl_Custom();
   this->passwordEdit->SetSize(153, 16);

@@ -1,3 +1,4 @@
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Items/ItemType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
@@ -188,7 +189,7 @@ __forceinline void UIShortCutWnd::ClickControl(int id) {
     g_windowMgr.ShowWindowById(WID_SHORTCUTWND, 0);
     return;
 
-  case 549: {
+  case SHORTCUT_BUTTON_BANK: {
     const int bank = g_session.GetOption(10);
     g_session.SetOption(10, bank == 0 ? 1 : 0, 0);
     this->m_bank->geometry.state = bank == 0;
@@ -202,7 +203,7 @@ __forceinline void UIShortCutWnd::ClickControl(int id) {
     return;
   }
 
-  case 589:
+  case SHORTCUT_BUTTON_HIDE_ITEMS:
     g_session.ItemSlotActive() = false;
     this->m_showItems->Enable(1);
     this->m_showItems->SetDisabled(0);
@@ -213,7 +214,7 @@ __forceinline void UIShortCutWnd::ClickControl(int id) {
     this->SendMsg(nullptr, UM_RESIZE, 0, 0, 0, 0);
     return;
 
-  case 588:
+  case SHORTCUT_BUTTON_SHOW_ITEMS:
     g_session.ItemSlotActive() = true;
     this->m_showItems->Enable(0);
     this->m_showItems->SetDisabled(1);
@@ -379,7 +380,7 @@ __forceinline void UseShortcutSlot(const NormalItemSlot& slot) {
   case TYPE_ARROW:
   case TYPE_AMMO:
   case TYPE_THROWWEAPON:
-  case 19:
+  case TYPE_CANNONBALL:
     if (item.identity[3] == 0x8000) {
       mode->SendMsg(MM_WEAR_EQUIP_ARROW, item.identity[1], item.identity[2], 0, 0);
     }
@@ -497,7 +498,7 @@ void UINewChatWnd::Move(int x, int y) {
   this->m_inputX = screenX + 3;
   this->m_inputY = this->m_inputOffsetY + screenY;
 
-  if (UIWindow* window = reinterpret_cast<UIWindow*>(g_windowMgr.subChatMiniWnd)) {
+  if (UIWindow* window = g_windowMgr.subChatMiniWnd) {
     window->SendMsg(this, UM_COMMAND, ID_DIALOG, this->geometry.width + x, this->geometry.height + y, 0);
   }
 }
@@ -630,7 +631,7 @@ void UINewChatWnd::Paint() {
   this->ClearSurface(0xFFFF00FF);
   this->FillRegion(4, this->geometry.height - this->m_inputAreaHeight, this->geometry.width - 8, 1, 0x8E8E8E);
 
-  if (static_cast<unsigned char>(g_windowMgr.chatWndStickOn) != 0 && this->geometry.height > this->m_inputAreaHeight + this->m_inputOffsetY) {
+  if (g_windowMgr.chatWndStickOn != 0 && this->geometry.height > this->m_inputAreaHeight + this->m_inputOffsetY) {
     const int tabsWidth = static_cast<int>(this->m_tabControl->labels.size()) * this->m_tabWidth;
     this->FillRegion(3, this->m_inputOffsetY, 1, this->geometry.height - this->m_inputOffsetY, 0xFFFFFF);
     this->FillRegion(tabsWidth + 3, this->m_inputOffsetY, this->geometry.width - tabsWidth - 10, 1, 0xFFFFFF);
@@ -753,14 +754,14 @@ void UIMemorialDunWnd::OnCreate(int, int) {
     this->m_actionButton->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     this->m_actionButton->SetSize(this->m_actionButton->BitmapWidth(), this->m_actionButton->BitmapHeight());
     this->m_actionButton->Move(-100, -100);
-    this->m_actionButton->SetId(184);
+    this->m_actionButton->SetId(ID_OK);
     this->AddChild(this->m_actionButton);
   }
 
   this->m_partyButton = new (std::nothrow) UIBasicButton();
   this->m_partyButton->Configure(125, LookupMessage(MSI_PARTY_NOT_LEAVE_PARTY_UNTIL_YIELD_PARTYMASTER));
   this->m_partyButton->Move(-100, -100);
-  this->m_partyButton->SetId(211);
+  this->m_partyButton->SetId(ID_DELETE);
   this->AddChild(this->m_partyButton);
   this->ArrangeButtons();
 }
@@ -811,7 +812,7 @@ void UIMemorialDunWnd::Paint() {
     this->DrawColoredText((this->geometry.width - width) / 2, (this->geometry.height - 17) / 2, text, 0, color, 0, 12, false);
   } else if (g_session.memorialDungeonState == 1) {
     if (g_session.memorialExpirationTime) {
-      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(reinterpret_cast<const __time32_t*>(&g_session.memorialExpirationTime)));
+      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(&g_session.memorialExpirationTime));
       sprintf(text, LookupMessage(MSI_MEMORIAL_DUN_NOTIFY), timeText);
       std::vector<std::string> lines;
       this->WrapPixelText(text, lines, this->geometry.width - 20);
@@ -829,7 +830,7 @@ void UIMemorialDunWnd::Paint() {
   } else if (g_session.memorialDungeonState == 2) {
     if (g_session.memorialCreationTime) {
       this->DrawTextAt(10, 55, LookupMessage(MSI_MEMORIAL_DUN_NOTIFY2), 0, 0, 12, 0, 0, 0);
-      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(reinterpret_cast<const __time32_t*>(&g_session.memorialCreationTime)));
+      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(&g_session.memorialCreationTime));
       sprintf(text, "^ff0000%s^ffffff", timeText);
       const int width = this->ColoredTextWidth(text, 0, 0, 12, 0);
       this->DrawColoredText((this->geometry.width - width) / 2, 75, text, 0, color, 0, 12, false);
@@ -1138,7 +1139,7 @@ UINewChatWnd::UINewChatWnd() : UIFrameWnd(0) {
   this->m_inputEdit = nullptr;
   this->m_inputResizer = nullptr;
   this->m_maxTabs = 10;
-  *reinterpret_cast<unsigned char*>(&g_windowMgr.chatWndStickOn) = 1;
+  g_windowMgr.chatWndStickOn = 1;
   this->geometry.state = 0;
   this->m_menuMode = 0;
   this->m_currentTab = 0;
@@ -1147,15 +1148,15 @@ UINewChatWnd::UINewChatWnd() : UIFrameWnd(0) {
   this->m_tabWidth = 71;
   this->m_inputAreaHeight = 24;
   switch (g_serviceType) {
-  case 10:
+  case ServiceGermany:
     this->m_tabWidth = 71;
     break;
-  case 18:
+  case ServiceFrance:
     this->m_tabWidth = 90;
     break;
-  case 1:
-  case 7:
-  case 11:
+  case ServiceAmerica:
+  case ServicePhilippine:
+  case ServiceIndia:
     this->m_tabWidth = 110;
     break;
   }
@@ -1393,7 +1394,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
     static_cast<UIBitmapButton*>(this->m_headerButton)->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     static_cast<UIBitmapButton*>(this->m_headerButton)->SetSize(static_cast<UIBitmapButton*>(this->m_headerButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_headerButton)->BitmapHeight());
     static_cast<UIBitmapButton*>(this->m_headerButton)->Move(this->m_tabWidth * 2 + 4, 4);
-    static_cast<UIBitmapButton*>(this->m_headerButton)->SetId(0x166);
+    static_cast<UIBitmapButton*>(this->m_headerButton)->SetId(ID_STICK_OFF);
     this->AddChild(static_cast<UIBitmapButton*>(this->m_headerButton));
   }
 
@@ -1406,7 +1407,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
     static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetSize(static_cast<UIBitmapButton*>(this->m_chatModeButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_chatModeButton)->BitmapHeight());
     static_cast<UIBitmapButton*>(this->m_chatModeButton)->Move(this->m_tabWidth * 2 + 19, 5);
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetId(0xC1);
+    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetId(ID_OPTION);
     this->AddChild(static_cast<UIBitmapButton*>(this->m_chatModeButton));
   }
 
@@ -1419,7 +1420,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
     button->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->Move(this->m_tabWidth * 2 + 34, 5);
-    button->SetId(0x176);
+    button->SetId(ID_ADD_CHAT_TAB);
     this->AddChild(button);
   }
 
@@ -1431,7 +1432,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
     button->SetBitmap((name + "_b.bmp").c_str(), 1, 0);
     button->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-    button->SetId(0xCA);
+    button->SetId(ID_MINI);
     this->AddChild(button);
   }
 

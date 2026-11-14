@@ -1,4 +1,6 @@
+#include "File/CommonObject.h"
 #include "Client/Replay/Replay.h"
+#include "UI/GameSettings/TalkType.h"
 #include "UI/Window/WindowId.h"
 #include "Network/Packets/PacketId.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
@@ -1274,7 +1276,7 @@ std::vector<unsigned char> CSession::BuildCharacterReplayRecords() {
   AppendRecord(records, MakeReplayRecord(1095, &this->partyItemCollect, sizeof(this->partyItemCollect)));
   AppendRecord(records, MakeReplayRecord(1096, &this->partyItemDistribute, sizeof(this->partyItemDistribute)));
   AppendRecord(records, BuildReplayTaggedRecord(1097, this->storeTitle.c_str(), this->storeTitle.size()));
-  const unsigned char option = g_serviceOptions.Get(0x40);
+  const unsigned char option = g_serviceOptions.Get(TT_SHOW_EMBLEM_ON_OFF);
   AppendRecord(records, MakeReplayRecord(1098, &option, sizeof(option)));
   AppendRecord(records, MakeReplayRecord(1099, &this->adoptionSkillAvailable, sizeof(this->adoptionSkillAvailable)));
   AppendRecord(records, MakeReplayRecord(1100, &this->m_bodyCostume, sizeof(this->m_bodyCostume)));
@@ -1360,7 +1362,7 @@ std::vector<unsigned char> CSession::BuildStatsReplayRecords() {
   AppendRecord(records, BuildReplayTaggedRecord(2025, this->replayStatValuesA, sizeof(this->replayStatValuesA)));
   AppendRecord(records, BuildReplayTaggedRecord(2026, this->replayStatValuesB, sizeof(this->replayStatValuesB)));
   AppendRecord(records, BuildReplayTaggedRecord(2027, this->replayStatValuesC, sizeof(this->replayStatValuesC)));
-  AppendRecord(records, BuildReplayTaggedRecord(2028, this->minimapTokenStorage, 0x30));
+  AppendRecord(records, BuildReplayTaggedRecord(2028, this->replayStatValuesD, 0x30));
   AppendRecord(records, BuildReplayTaggedRecord(2029, &this->hp, sizeof(this->hp)));
   AppendRecord(records, BuildReplayTaggedRecord(2030, &this->maxHp, sizeof(this->maxHp)));
   AppendRecord(records, BuildReplayTaggedRecord(2031, &this->m_sp, sizeof(this->m_sp)));

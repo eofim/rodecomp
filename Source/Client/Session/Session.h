@@ -11,6 +11,7 @@
 #include "Contents/Skills/PlayerSkillBundle.h"
 #include "Contents/Store/MCStoreInfoBackup.h"
 #include "Contents/UserData/NormalItemSlots.h"
+#include "File/CommonObject.h"
 #include "Resource/Xml/XmlNode.h"
 #include "UI/Cooldowns/CooldownState.h"
 #include "UI/Shortcuts/ShortcutCooldowns.h"
@@ -35,11 +36,17 @@ class CFile;
 class CGameActor;
 class CRenderObject;
 class LuaScript;
+struct HotkeyInfo;
 struct ActionFrame;
 struct vector3d;
 
 struct EquipSlots {
   /* 0000 */ int values[3];
+};
+
+struct BlockedCharacter {
+  /* 0000 */ std::uint32_t gid;
+  /* 0004 */ char expireDate[20];
 };
 
 struct SessionRecord6144 {
@@ -130,21 +137,23 @@ struct SessionParameterNameLess {
   }
 };
 
-struct SessionEntry5BD4 {
-  SessionEntry5BD4() : item() {}
-  SessionEntry5BD4(const SessionEntry5BD4& other) {
-    std::memcpy(this->storeIdentity, other.storeIdentity, sizeof(this->storeIdentity));
+struct SearchStoreResult {
+  SearchStoreResult() : item() {}
+  SearchStoreResult(const SearchStoreResult& other) {
+    this->storeId = other.storeId;
+    this->accountId = other.accountId;
     std::memcpy(this->storeName, other.storeName, sizeof(this->storeName));
     this->price = other.price;
     this->quantity = other.quantity;
     new (&this->item) ITEM_INFO(other.item);
   }
-  ~SessionEntry5BD4() {
+  ~SearchStoreResult() {
     this->item.displayName.~basic_string();
     this->item.itemId.~basic_string();
   }
 
-  /* 0000 */ unsigned char storeIdentity[8];
+  /* 0000 */ int storeId;
+  /* 0004 */ int accountId;
   /* 0008 */ char storeName[80];
   /* 0058 */ int price;
   /* 005C */ std::uint16_t quantity;
@@ -153,7 +162,8 @@ struct SessionEntry5BD4 {
   };
 };
 
-static_assert(sizeof(SessionEntry5BD4) == 0x158);
+static_assert(sizeof(SearchStoreResult) == 0x158);
+static_assert(offsetof(SearchStoreResult, item) == 0x60);
 
 struct SubChatWndInfo {
   /* 0000 */ std::string name;
@@ -183,6 +193,8 @@ class CSession {
 public:
   void IconPath(char* output, const char* id, int identified);
   ITEM_INFO LookupClientItemByIdentity(std::uint32_t id) const;
+  HotkeyInfo GetHotkeyInfo(int tab, int index) const;
+  int HotkeyCount(int tab) const;
   std::string ShortcutFilename(std::uint32_t identifier) const;
   const char* ItemDragResource(const char* id, int identified);
   const char* SkillDragResource(const char* name);
@@ -239,7 +251,8 @@ public:
     };
   };
   /* 07B4 */ unsigned char m_playerNameKey[0x40];
-  /* 07F4 */ unsigned char characterSelectionData[0x6A0];
+  /* 07F4 */ char m_selectedAccountText[0x40];
+  /* 0834 */ BlockedCharacter m_blockedCharacters[68];
   /* 0E94 */ int characterCount;
   /* 0E98 */ int cachedSex;
   /* 0E9C */ int m_sex;
@@ -437,7 +450,8 @@ public:
   /* 5370 */ unsigned char replayStatValuesA[0x30];
   /* 53A0 */ unsigned char replayStatValuesB[0x30];
   /* 53D0 */ unsigned char replayStatValuesC[0x30];
-  /* 5400 */ unsigned char minimapTokenStorage[0x40];
+  /* 5400 */ unsigned char replayStatValuesD[0x30];
+  /* 5430 */ CCommonObject m_tableLoader;
   /* 5440 */ std::list<ShortcutCooldownRecord> m_requestTimers;
   /* 5448 */ int showTimer;
   /* 544C */ int m_mapTransitionFlag;
@@ -536,7 +550,7 @@ public:
   /* 56B4 */ int m_mercenaryActionState;
   /* 56B8 */ bool m_autoReplyEnabled;
   /* 56B9 */ unsigned char padding_56B9[3];
-  /* 56BC */ unsigned char autoReplyText[0x18];
+  /* 56BC */ std::string autoReplyText;
   /* 56D4 */ int m_storePasswordMode;
   /* 56D8 */ bool m_passwordInputAlternate;
   /* 56D9 */ unsigned char padding_56D9[0x7];
@@ -563,8 +577,8 @@ public:
   /* 594C */ int memorialReplayValue;
   /* 5950 */ std::string memorialDungeonName;
   /* 5968 */ int memorialQueuePosition;
-  /* 596C */ int memorialCreationTime;
-  /* 5970 */ int memorialExpirationTime;
+  /* 596C */ __time32_t memorialCreationTime;
+  /* 5970 */ __time32_t memorialExpirationTime;
   /* 5974 */ int m_allowEquipView;
   /* 5978 */ int m_equipViewLook[10];
   /* 59A0 */ char m_equipViewName[24];
@@ -595,7 +609,7 @@ public:
   /* 5BC8 */ int elementalSp;
   /* 5BCC */ int elementalMaxHp;
   /* 5BD0 */ int elementalMaxSp;
-  /* 5BD4 */ std::vector<SessionEntry5BD4> storeSearchResults;
+  /* 5BD4 */ std::vector<SearchStoreResult> storeSearchResults;
   /* 5BE0 */ int storeSearchCount;
   union {
     /* 5BE4 */ int storeSearchPageFlags;
@@ -866,7 +880,7 @@ public:
   void SetPlayerNameKey(const unsigned char* key);
   // INLINED
   NormalItemSlot& SkillHotkey(int index) {
-    return reinterpret_cast<NormalItemSlot*>(reinterpret_cast<unsigned char*>(this) + offsetof(CSession, quickSlot))[index];
+    return (&this->quickSlot)[index];
   }
   void ResetCostumeItems();
   void ResetMercenaryStats();
@@ -1354,6 +1368,7 @@ void __fastcall RefreshPartyWindows(CSession* session);
 std::vector<unsigned char> SerializeMessengerMembers(const std::list<MessengerMember>& members);
 
 #if defined(_WIN32) && !defined(_WIN64)
+static_assert(sizeof(BlockedCharacter) == 0x18);
 static_assert(sizeof(SessionRecord6144) == 0x38);
 static_assert(sizeof(SessionRecord6178) == 0x2C);
 static_assert(sizeof(ProhibitionLogEntry) == 0x54);

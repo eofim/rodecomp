@@ -1,4 +1,5 @@
 #include "Contents/Ground/GroundGeometry.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Ground/GroundRendering.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Effects/Core/EffectPoint.h"
@@ -14,7 +15,6 @@
 #include "Resource/World/WorldResource.h"
 
 #include "Utility/Math/ScalarConversion.h"
-#include <bit>
 #include <cstring>
 
 // OFFSET: 0x00AC1D30
@@ -27,7 +27,7 @@ void GroundGeometry::DrawLightmapped(const float* matrix, const GroundQuad& quad
 
   for (unsigned corner = 0; corner < 4; ++corner) {
     vertices[corner].specular = 0xFF000000u;
-    g_renderer->viewport.Project(quad.vertices[corner], matrix, vertices[corner]);
+    g_renderer->viewport.Project(quad.vertices[corner].position, matrix, vertices[corner]);
   }
 
   if (clip && !GroundQuadVisible(vertices)) {
@@ -36,32 +36,32 @@ void GroundGeometry::DrawLightmapped(const float* matrix, const GroundQuad& quad
 
   if (!g_overrideColor && quad.selected != 0) {
     for (unsigned corner = 0; corner < 4; ++corner) {
-      vertices[corner].u = quad.vertices[corner][4];
-      vertices[corner].v = quad.vertices[corner][5];
-      lightUV[corner][0] = quad.vertices[corner][6];
-      lightUV[corner][1] = quad.vertices[corner][7];
+      vertices[corner].u = quad.vertices[corner].u;
+      vertices[corner].v = quad.vertices[corner].v;
+      lightUV[corner][0] = quad.vertices[corner].lightU;
+      lightUV[corner][1] = quad.vertices[corner].lightV;
 
-      std::uint32_t color = std::bit_cast<std::uint32_t>(quad.vertices[corner][3]);
+      std::uint32_t color = quad.vertices[corner].color;
       reinterpret_cast<SpriteColor&>(color).alpha = 0x80;
       vertices[corner].diffuse = color;
     }
   } else {
     for (unsigned corner = 0; corner < 4; ++corner) {
-      vertices[corner].u = quad.vertices[corner][4];
-      vertices[corner].v = quad.vertices[corner][5];
-      lightUV[corner][0] = quad.vertices[corner][6];
-      lightUV[corner][1] = quad.vertices[corner][7];
+      vertices[corner].u = quad.vertices[corner].u;
+      vertices[corner].v = quad.vertices[corner].v;
+      lightUV[corner][0] = quad.vertices[corner].lightU;
+      lightUV[corner][1] = quad.vertices[corner].lightV;
 
-      std::uint32_t color = std::bit_cast<std::uint32_t>(quad.vertices[corner][3]);
+      std::uint32_t color = quad.vertices[corner].color;
       SpriteColor& channels = reinterpret_cast<SpriteColor&>(color);
       channels.red = static_cast<std::uint8_t>(channels.red * scales[0]);
       channels.green = static_cast<std::uint8_t>(channels.green * scales[1]);
       channels.blue = static_cast<std::uint8_t>(channels.blue * scales[2]);
-      vertices[corner].diffuse = color;
+      vertices[corner].diffuse = std::bit_cast<std::uint32_t>(channels);
     }
   }
 
-  const bool enabled = g_serviceOptions.Get(119) != 0;
+  const bool enabled = g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF) != 0;
 
   if (g_multitexture && enabled) {
     LightmappedPrimitive* primitive = g_renderer->lightmapped.Acquire();
@@ -79,7 +79,7 @@ void GroundGeometry::DrawLightmapped(const float* matrix, const GroundQuad& quad
     return;
   }
 
-  if (g_serviceOptions.Get(119) != 0) {
+  if (g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF) != 0) {
     RenderPrimitive* lightmap = g_renderer->primitives.Acquire();
     std::memcpy(lightmap->vertices, vertices, sizeof(vertices));
 

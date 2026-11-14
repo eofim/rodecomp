@@ -45,6 +45,9 @@ enum ACTORSTATEID : int {
   ST_MADOSKILL = 43,
   ST_MADOSKILL2 = 44,
   ST_AB_SPECIAL = 45,
+  ST_LEFT = 14,
+  ST_RIGHT = 15,
+  ST_FEED = 29,
 };
 
 enum AIPROPERTY : int {
@@ -60,6 +63,9 @@ enum AIPROPERTY : int {
   V_MAXHP = 10,
   V_MAXSP = 11,
   V_MERTYPE = 12,
+  V_TYPE = 2,
+  V_POSITION_APPLY_SKILLATTACKRANGE = 13,
+  V_SKILLATTACKRANGE_LEVEL = 14,
 };
 
 enum AICOMMAND : int {

@@ -1,4 +1,5 @@
 #include "UI/Macro/UIMacroUserInfoWnd.h"
+#include "Contents/Actors/ActorPickNode.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 
@@ -68,9 +69,9 @@ UIMacroUserInfoWnd::UIMacroUserInfoWnd()
 
 // OFFSET: 0x007EF2C0
 // FUNCTION: fn_09839
-void UIMacroReporterWnd::AddPickedActor(MacroReporterEntry* entry) {
-  if (entry) {
-    this->AddActorByAID(entry->id);
+void UIMacroReporterWnd::AddPickedActor(ActorPickInfo* pick) {
+  if (pick) {
+    this->AddActorByAID(pick->accountId);
   }
 }
 
@@ -103,14 +104,6 @@ found:
   this->UpdateScrollBar();
 }
 
-struct AccessibleButton : public UIButton {
-  using UIButton::m_argument;
-};
-
-struct AccessibleTextButton : public UITextButton {
-  using UITextButton::m_hoverColor;
-};
-
 // OFFSET: 0x007EF430
 // FUNCTION: fn_09841
 void UIMacroReporterWnd::AddActorRow(int aid, std::string name) {
@@ -125,15 +118,15 @@ void UIMacroReporterWnd::AddActorRow(int aid, std::string name) {
   btn1->SetBitmap("유저인터페이스\\basic_interface\\que_close_off.bmp", 1, 0);
   btn1->SetBitmap("유저인터페이스\\basic_interface\\que_close_off.bmp", 2, 0);
   btn1->SetSize(btn1->BitmapWidth(), btn1->BitmapHeight());
-  btn1->SetId(211);
-  reinterpret_cast<AccessibleButton*>(btn1)->m_argument = aid;
+  btn1->SetId(ID_DELETE);
+  btn1->m_argument = aid;
   btn1->Enable(0);
   this->AddChild(btn1);
 
   std::string truncated = this->EllipsizeText(0x8E, name.c_str(), 0, 13, 0);
   auto* btn2 = new UITextButton();
   btn2->Configure("", 0, 0, 13, 0, 1);
-  static_cast<AccessibleTextButton*>(btn2)->m_hoverColor = 0x2D2D2D;
+  btn2->m_hoverColor = 0x2D2D2D;
   btn2->SetLabel(truncated);
   btn2->ResizeToText();
   btn2->SetTooltip(name.c_str());
@@ -493,7 +486,7 @@ void UIMacroReporterWnd::OnCreate(int, int) {
   static_cast<UIBitmapButton*>(this->m_reportButton)->SetBitmap("유저인터페이스\\btn_ok_c.bmp", 3, 0);
   static_cast<UIBitmapButton*>(this->m_reportButton)->SetSize(static_cast<UIBitmapButton*>(this->m_reportButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_reportButton)->BitmapHeight());
   static_cast<UIBitmapButton*>(this->m_reportButton)->Move(202, 285);
-  static_cast<UIBitmapButton*>(this->m_reportButton)->SetId(345);
+  static_cast<UIBitmapButton*>(this->m_reportButton)->SetId(ID_SEND);
   this->AddChild(this->m_reportButton);
 
   std::string labels[4] = {LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_CELL), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_RANGE), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_QUIZ), LookupMessage(MSI_MACRO_REPORTER_UNKNWON_MAP)};
@@ -505,7 +498,7 @@ void UIMacroReporterWnd::OnCreate(int, int) {
     static_cast<UIRadioBtn*>(this->m_tabs[index])->SetSize(50, 12);
     static_cast<UIRadioBtn*>(this->m_tabs[index])->Move(14 + index * 55, 31);
     static_cast<UIRadioBtn*>(this->m_tabs[index])->SetText(labels[index].c_str());
-    static_cast<UIRadioBtn*>(this->m_tabs[index])->SetId(215);
+    static_cast<UIRadioBtn*>(this->m_tabs[index])->SetId(ID_RADIOBTN);
     static_cast<UIRadioBtn*>(this->m_tabs[index])->value = index;
     static_cast<UIRadioBtn*>(this->m_tabs[index])->SendMsg(this, UM_SETSTATE, index == this->m_mode, 0, 0, 0);
     if (const char* tooltip = tooltips[index].c_str()) {
@@ -518,7 +511,7 @@ void UIMacroReporterWnd::OnCreate(int, int) {
     static_cast<UIRadioBtn*>(this->m_tabs[index])->SetSize(50, 12);
     static_cast<UIRadioBtn*>(this->m_tabs[index])->Move(70 + index * 30, 31);
     static_cast<UIRadioBtn*>(this->m_tabs[index])->SetText(labels[index].c_str());
-    static_cast<UIRadioBtn*>(this->m_tabs[index])->SetId(215);
+    static_cast<UIRadioBtn*>(this->m_tabs[index])->SetId(ID_RADIOBTN);
     static_cast<UIRadioBtn*>(this->m_tabs[index])->value = index;
     static_cast<UIRadioBtn*>(this->m_tabs[index])->SendMsg(this, UM_SETSTATE, index == this->m_mode, 0, 0, 0);
     if (const char* tooltip = tooltips[index].c_str()) {
@@ -593,8 +586,8 @@ int UIMacroReporterWnd::SendMsg(
   switch (message) {
   case UM_SETINFO: {
     this->m_state = reinterpret_cast<MacroReporterState*>(argument1);
-    if (!reinterpret_cast<MacroReporterWndInfo*>(this->m_state)->IsValid()) {
-      reinterpret_cast<MacroReporterWndInfo*>(this->m_state)->Reset();
+    if (!this->m_state->IsValid()) {
+      this->m_state->Reset();
     }
     this->Resize(this->m_state->width, this->m_state->height);
     this->Move(this->m_state->x, this->m_state->y);

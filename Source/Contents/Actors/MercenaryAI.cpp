@@ -2,6 +2,7 @@
 #include "UI/Window/UIEnums.h"
 #include "Contents/Actors/MercenaryAI.h"
 #include "Contents/Actors/ActorEnums.h"
+#include "Network/Packets/NoticeEnums.h"
 
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
@@ -102,7 +103,7 @@ int ClampTargetAttackRange(std::uint32_t aid, int distance) {
   CGameActor* actor = static_cast<CGameActor*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(aid));
   if (actor) {
     CGameActor* target = static_cast<CGameActor*>(
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(*reinterpret_cast<const std::uint32_t*>(&actor->homunMsg[5]))
+      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(static_cast<std::uint32_t>(actor->homunMsg.target))
     );
     if (target) {
       return distance < target->GetNpcLocationRadius() ? target->GetNpcLocationRadius() : distance;
@@ -388,7 +389,7 @@ int AiHomunGetV(lua_State* state) {
     return 1;
 
   case V_POSITION:
-  case 13:
+  case V_POSITION_APPLY_SKILLATTACKRANGE:
     if (actor) {
       if (aid == g_session.m_aid || !(StateFlag06(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag02(actor->GetStateFlags()))) {
         int cellX, cellY;
@@ -442,7 +443,7 @@ int AiHomunGetV(lua_State* state) {
     lua_pushnumber(state, -1.0);
     return 2;
 
-  case 2:
+  case V_TYPE:
     return 1;
 
   case V_MOTION:
@@ -475,7 +476,7 @@ int AiHomunGetV(lua_State* state) {
     }
 
   case V_SKILLATTACKRANGE:
-  case 14: {
+  case V_SKILLATTACKRANGE_LEVEL: {
     std::uint32_t skillId = static_cast<std::uint32_t>(luaL_checknumber(state, 3));
     CSkillInfo skill = g_session.LookupHomunSkill(skillId);
     double result;
@@ -576,7 +577,7 @@ int AiMercenaryGetV(lua_State* state) {
     return 1;
 
   case V_POSITION:
-  case 13:
+  case V_POSITION_APPLY_SKILLATTACKRANGE:
     if (actor) {
       if (aid == g_session.m_aid || !(StateFlag06(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag02(actor->GetStateFlags()))) {
         int cellX, cellY;
@@ -631,7 +632,7 @@ int AiMercenaryGetV(lua_State* state) {
     lua_pushnumber(state, -1.0);
     return 2;
 
-  case 2:
+  case V_TYPE:
     return 1;
 
   case V_MOTION:
@@ -664,7 +665,7 @@ int AiMercenaryGetV(lua_State* state) {
     }
 
   case V_SKILLATTACKRANGE:
-  case 14: {
+  case V_SKILLATTACKRANGE_LEVEL: {
     std::uint32_t skillId = static_cast<std::uint32_t>(luaL_checknumber(state, 3));
     CSkillInfo skill = g_session.LookupMercSkill(skillId);
     double result;
@@ -839,19 +840,6 @@ void AiSetTableNumber(lua_State* state, int key, int value) {
 
 namespace {
 
-struct AiMessage {
-  /* 0000 */ int type;
-  /* 0004 */ int x;
-  /* 0008 */ int y;
-  /* 000C */ int level;
-  /* 0010 */ int skill;
-  /* 0014 */ int target;
-
-  AiMessage() : type(0), x(0), y(0), level(0), skill(0), target(0) {}
-};
-
-static_assert(sizeof(AiMessage) == 24);
-
 #pragma pack(push, 1)
 struct MoveToOwnerPacket {
   /* 0000 */ std::int16_t opcode;
@@ -891,7 +879,7 @@ int AiGetMsg(lua_State* state) {
     return 0;
   }
 
-  AiMessage message = *reinterpret_cast<const AiMessage*>(actor->GetMsg2AI(index));
+  AiMessage message = *actor->GetMsg2AI(index);
   lua_newtable(state);
   lua_pushnumber(state, 1);
   lua_pushnumber(state, message.type);
@@ -920,7 +908,7 @@ int AiGetMsg(lua_State* state) {
   }
 
   message.type = 0;
-  actor->SetMsg2AI(reinterpret_cast<const float*>(&message), index);
+  actor->SetMsg2AI(&message, index);
   return 1;
 }
 
@@ -942,7 +930,7 @@ int AiGetResMsg(lua_State* state) {
     return 0;
   }
 
-  AiMessage message = *reinterpret_cast<const AiMessage*>(actor->GetResMsg2AI(index));
+  AiMessage message = *actor->GetResMsg2AI(index);
   lua_newtable(state);
   lua_pushnumber(state, 1);
   lua_pushnumber(state, message.type);
@@ -971,7 +959,7 @@ int AiGetResMsg(lua_State* state) {
   }
 
   message.type = 0;
-  actor->SetResMsg2AI(reinterpret_cast<const float*>(&message), index);
+  actor->SetResMsg2AI(&message, index);
   return 1;
 }
 
@@ -986,10 +974,10 @@ int AiIsMonster(lua_State* state) {
     int job = actor->GetEffectiveJob(-1);
     if (((job > 1000 && job < 3999) || static_cast<unsigned>(job - 20021) <= 11978) && actor->objectType != 7) {
       switch (actor->objectType) {
-      case 9:
-      case 10:
-      case 13:
-      case 14:
+      case NPC_MERSOL_TYPE:
+      case NPC_ELEMENTAL_TYPE:
+      case NPC_ABR_TYPE:
+      case NPC_BIONIC_TYPE:
         result = 0.0;
         break;
       default:

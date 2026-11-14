@@ -76,18 +76,6 @@ int CSession::IsMercenarySkill(unsigned id) const {
   return id - 8200u <= 41 || id - 8400u <= 57;
 }
 
-namespace {
-  struct SearchStoreEntry {
-    /* 0000 */ unsigned char padding_0000[8];
-    /* 0008 */ char storeName[80];
-    /* 0058 */ int price;
-    /* 005C */ std::uint16_t quantity;
-    /* 0060 */ ITEM_INFO item;
-  };
-
-  static_assert(sizeof(SearchStoreEntry) == sizeof(SessionEntry5BD4));
-}
-
 // OFFSET: 0x00E1DCE0
 // FUNCTION: fn_23876
 int CSession::IsHirelingJob(unsigned id) const {
@@ -809,7 +797,7 @@ void UISelCharForUServerWnd::Paint() {
       if (cell.imageType == 0) {
         texture = g_renderer->atlas.Find(image, palette, record);
         if (!texture) {
-          texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, palette, record, g_serviceType, g_resourceReuseDelay);
+          texture = g_renderer->atlas.Insert(image, palette, record);
         }
       } else {
         texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
@@ -873,8 +861,8 @@ void UISerachStoreInfoWnd::Paint() {
     return;
   }
 
-  const SearchStoreEntry* end = reinterpret_cast<const SearchStoreEntry*>(g_session.storeSearchResults.data() + g_session.storeSearchResults.size());
-  const SearchStoreEntry* entry = reinterpret_cast<const SearchStoreEntry*>(g_session.storeSearchResults.data()) + (this->m_page - 1) * 10;
+  const SearchStoreResult* end = g_session.storeSearchResults.data() + g_session.storeSearchResults.size();
+  const SearchStoreResult* entry = g_session.storeSearchResults.data() + (this->m_page - 1) * 10;
   for (int row = 0; entry != end; ++entry) {
     if (row == 10) {
       break;

@@ -688,7 +688,7 @@ void CCashEmotionMgr::ProcessChatCommand(const char* command) {
     this->HideSuggestions();
   } else {
     chatWnd->ShowSuggestions(1);
-    reinterpret_cast<UICashEmotionMiniWnd*>(suggestions)->Select(reinterpret_cast<CashEmotionCommand*>(actionId));
+    static_cast<UICashEmotionMiniWnd*>(suggestions)->Select(reinterpret_cast<CashEmotionCommand*>(actionId));
   }
 }
 
@@ -3645,7 +3645,7 @@ UICashEmotionScrollBar::UICashEmotionScrollBar() : UIScrollBar() {
 void UICashEmotionScrollBar::Paint() {
   this->ClearSurface(0xFFFF00FF);
   const int height = this->geometry.height;
-  DrawRectangleBorder(*this, 0, 0, this->geometry.width, height, 0xDECEBD);
+  this->DrawRectOutline(0, 0, this->geometry.width, height, 0xDECEBD);
 
   bool disabled;
   const char* name;
@@ -3825,7 +3825,7 @@ void UICashEmotionSprBtn::Paint() {
     if (cell->imageType == 0) {
       texture = g_renderer->atlas.Find(image, palette, record);
       if (!texture) {
-        texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, palette, record, g_serviceType, g_resourceReuseDelay);
+        texture = g_renderer->atlas.Insert(image, palette, record);
       }
     } else {
       texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
@@ -3969,7 +3969,7 @@ void UIHeadsprButton::Paint() {
   if (cell.imageType == 0) {
     texture = g_renderer->atlas.Find(image, palette, record);
     if (!texture) {
-      texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, palette, record, g_serviceType, g_resourceReuseDelay);
+      texture = g_renderer->atlas.Insert(image, palette, record);
     }
   } else {
     texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
@@ -4019,7 +4019,7 @@ void UISpriteButton::Paint() {
     if (cell.imageType == 0) {
       texture = g_renderer->atlas.Find(image, palette, record);
       if (!texture) {
-        texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, palette, record, g_serviceType, g_resourceReuseDelay);
+        texture = g_renderer->atlas.Insert(image, palette, record);
       }
     } else {
       texture = static_cast<CTexture*>(const_cast<void*>(image->surface));

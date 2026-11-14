@@ -481,7 +481,7 @@ void UICashShopWnd_Banner::Paint() {
 
   ResourceMgr& resources = ResourceMgr::Instance();
   this->DrawBitmap(
-    0, 0, static_cast<CBitmapRes*>(resources.Load(Resolve(("유저인터페이스\\cashshop\\" + this->m_entries[this->m_index].image).c_str()))),
+    0, 0, static_cast<CBitmapRes*>(resources.Load(Resolve(("유저인터페이스\\cashshop\\" + this->m_entries[this->m_index].first).c_str()))),
     false
   );
 }
@@ -635,7 +635,7 @@ void UICashShopWnd_Banner::OnLBtnUp(int, int) {
     return;
   }
 
-  std::string url = this->m_entries[this->m_index].url;
+  std::string url = this->m_entries[this->m_index].second;
   ShellExecuteA(nullptr, "OPEN", url.c_str(), url.c_str(), nullptr, SW_SHOW);
 }
 
@@ -744,7 +744,7 @@ void UICashShopWnd_CartItem::OnWheel(int delta) {
 // FUNCTION: fn_09557
 void UICashShopWnd_Banner::CreateButtons() {
   int index = 0;
-  for (std::vector<Entry>::iterator entry = this->m_entries.begin(); entry != this->m_entries.end(); ++entry) {
+  for (std::vector<std::pair<std::string, std::string>>::iterator entry = this->m_entries.begin(); entry != this->m_entries.end(); ++entry) {
     UIBmpRadioBtn* button = new UIBmpRadioBtn();
     button->SetBitmap("유저인터페이스\\cashshop\\btn_ad_off.bmp", 0);
     button->SetBitmap("유저인터페이스\\cashshop\\btn_ad_off.bmp", 1);
@@ -977,7 +977,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         return 0;
       }
 
-      if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 0x118, 0x78, 0) != 0xBB) {
+      if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 0x118, 0x78, 0) != ID_YES) {
         return 0;
       }
 
@@ -1093,7 +1093,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
 // OFFSET: 0x007D2C00
 // FUNCTION: fn_09559
 int UICashShopWnd_Banner::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
-  if (message == UM_COMMAND && argument1 == 0xD7) {
+  if (message == UM_COMMAND && argument1 == ID_RADIOBTN) {
     for (unsigned int index = 0; index < this->m_buttons.size(); ++index) {
       if (sender == this->m_buttons[index]) {
         this->m_buttons[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
@@ -1138,7 +1138,7 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       if (g_session.m_launchPassCommandLine && !this->m_cartItems.empty()) {
         const int result =
           g_windowMgr.Confirm(FormatOwnedString(CashShopReplaceCartItemText()().Text(), item.displayName.c_str()).c_str(), 2, true, false, 0, "Message", 0x118, 0x78, 0);
-        if (result != 0xBB) {
+        if (result != ID_YES) {
           break;
         }
         this->m_cartItems.clear();

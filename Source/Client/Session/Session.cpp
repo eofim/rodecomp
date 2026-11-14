@@ -1,4 +1,6 @@
 #include "Client/Session/Session.h"
+#include "UI/GameSettings/TalkType.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Contents/Actors/ActorEnums.h"
@@ -79,7 +81,7 @@
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
 
-template __declspec(noinline) void std::vector<SessionEntry5BD4>::_Destroy(SessionEntry5BD4*, SessionEntry5BD4*);
+template __declspec(noinline) void std::vector<SearchStoreResult>::_Destroy(SearchStoreResult*, SearchStoreResult*);
 
 // STATIC: 0x01732638
 // GLOBAL: gl_24474
@@ -1946,7 +1948,7 @@ void CSession::RefreshItem1740Window() {
 // OFFSET: 0x00DFF0A0
 // FUNCTION: fn_23608
 void CSession::RefreshItem1750Window(int type) {
-  std::uint32_t window;
+  UIWindow* window;
   if (type == 1) {
     window = g_windowMgr.buyingShopMirrorItemWnd;
   } else {
@@ -1954,7 +1956,7 @@ void CSession::RefreshItem1750Window(int type) {
   }
 
   if (window) {
-    reinterpret_cast<UIWindow*>(window)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+    window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
 }
 
@@ -2129,7 +2131,7 @@ int CSession::SetFriendOffline(std::uint32_t accountId, std::uint32_t characterI
   for (MessengerMember& member : this->m_friends) {
     if (member.accountId == accountId && member.characterId == characterId) {
       member.offline = offline;
-      if (g_serviceOptions.Get(165)) {
+      if (g_serviceOptions.Get(TT_LOGINOUT_ON_OFF)) {
         if (member.name.empty() && g_modeMgr.GetGameMode()) {
           member.name = LookupPlayerName(member.characterId);
         }
@@ -2713,19 +2715,19 @@ void CSession::LoadMiniPartyInfo() {
 // FUNCTION: fn_23603
 void CSession::LoadExternalSettings() {
   switch (g_serviceType) {
-  case 0:
+  case ServiceKorea:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       {
         const char* fileName = std::strstr(g_launchServerName, "QmSakray") != nullptr ? "Lua Files\\service_korea\\ExternalSettings_kr_sak_qm" : "Lua Files\\service_korea\\ExternalSettings_kr_sak";
         this->m_hotkeyScript->Load(fileName, true, false);
       }
       break;
-    case 2:
+    case ServerLocal:
       this->m_hotkeyScript->Load("Lua Files\\service_korea\\ExternalSettings_kr_indoor", true, false);
       break;
     default:
-      if (g_serviceMode == 0 && std::strstr(g_launchServerName, "Dev") != nullptr) {
+      if (g_serviceMode == ServerPrimary && std::strstr(g_launchServerName, "Dev") != nullptr) {
         this->m_hotkeyScript->Load("Lua Files\\service_korea\\ExternalSettings_kr_qm", true, false);
       } else {
         this->m_hotkeyScript->Load("Lua Files\\service_korea\\ExternalSettings_kr", true, false);
@@ -2733,9 +2735,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 1:
+  case ServiceAmerica:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_usa\\ExternalSettings_usa_sak", true, false);
       break;
     default:
@@ -2743,9 +2745,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 2:
+  case ServiceJapan:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_japan\\ExternalSettings_jp_sak", true, false);
       break;
     default:
@@ -2753,9 +2755,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 3:
+  case ServiceChina:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_china\\ExternalSettings_ch_sak", true, false);
       break;
     default:
@@ -2763,9 +2765,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 4:
+  case ServiceTaiwan:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_taiwan\\ExternalSettings_tw_sak", true, false);
       break;
     default:
@@ -2773,9 +2775,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 5:
+  case ServiceThai:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_thailand\\ExternalSettings_th_sak", true, false);
       break;
     case 13:
@@ -2786,9 +2788,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 6:
+  case ServiceIndonesia:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_indonesia\\ExternalSettings_id_sak", true, false);
       break;
     default:
@@ -2796,9 +2798,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 7:
+  case ServicePhilippine:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_philippine\\ExternalSettings_ph_sak", true, false);
       break;
     default:
@@ -2806,9 +2808,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 12:
+  case ServiceBrazil:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_brazil\\ExternalSettings_br_sak", true, false);
       break;
     default:
@@ -2816,9 +2818,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 18:
+  case ServiceFrance:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_france\\ExternalSettings_fr_sak", true, false);
       break;
     default:
@@ -2826,9 +2828,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 15:
+  case ServiceVietnam:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_vietnam\\ExternalSettings_vn_sak", true, false);
       break;
     default:
@@ -2836,9 +2838,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 14:
+  case ServiceRussia:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_ru\\ExternalSettings_ru_sak", true, false);
       break;
     default:
@@ -2846,9 +2848,9 @@ void CSession::LoadExternalSettings() {
       break;
     }
     break;
-  case 20:
+  case ServiceEu:
     switch (g_serviceMode) {
-    case 1:
+    case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_eu\\ExternalSettings_eu_sak", true, false);
       break;
     default:
@@ -2940,7 +2942,7 @@ void CSession::Init() {
   HKEY key;
   if (RegCreateKeyExA(HKEY_CURRENT_USER, OBFUSCATE_ARRAY_TEXT("Software\\Gravity\\RagnarokOnline", 0x2FE993D1DDE1F197ULL, char), 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, nullptr) == ERROR_SUCCESS) {
     std::string valueName = OBFUSCATE_ARRAY_TEXT("RagPath", 0xE7978FB5A94DD7FDULL, char);
-    if (g_serviceMode == 1) {
+    if (g_serviceMode == ServerSakray) {
       std::string sakrayValueName = OBFUSCATE_ARRAY_TEXT("SakrayPath", 0xB7FD8F670FC7B96BULL, char);
     }
 
@@ -3219,7 +3221,7 @@ void CSession::ResetCharacterState() {
   GlobalMemoryStatus(&memoryStatus);
   this->lowMemory = memoryStatus.dwTotalPhys < 0x9B72EC0 ? 1 : 0;
 
-  std::memset(&this->characterSelectionData[0x40], 0, 0x660);
+  std::memset(this->m_blockedCharacters, 0, sizeof(this->m_blockedCharacters));
   this->replayPacketMode = 0;
 
   std::map<int, int>& traitStats = this->m_traits.stats;
@@ -3328,7 +3330,7 @@ struct ParameterNameLess {
 const std::vector<std::string>* CSession::GetFogParameters(const char* rswName, int* found) {
   *found = 0;
   // GLOBAL: gl_24841
-  static std::vector<std::string> s_defaultParameters(4);
+  static std::vector<std::string> s_defaultFogParameters(4);
 
   std::string name = rswName;
   const std::size_t position = name.rfind("@");
@@ -3343,13 +3345,12 @@ const std::vector<std::string>* CSession::GetFogParameters(const char* rswName, 
     return &it->second;
   }
 
-  return &s_defaultParameters;
+  return &s_defaultFogParameters;
 }
 
 // OFFSET: 0x00DE3410
 // FUNCTION: fn_23479
 const std::vector<std::string>* CSession::GetMapViewParameters(const char* rswName, int* found) {
-  std::vector<std::pair<std::string, std::vector<std::string>>>& parameters = this->m_mapViewParameters;
   *found = 0;
   // GLOBAL: gl_24993
   static std::vector<std::string> s_defaultParameters(9);
@@ -3361,8 +3362,8 @@ const std::vector<std::string>* CSession::GetMapViewParameters(const char* rswNa
   }
 
   const char* key = name.c_str();
-  auto it = std::lower_bound(parameters.begin(), parameters.end(), key, ParameterNameLess());
-  if (it != parameters.end() && std::strcmp(it->first.c_str(), name.c_str()) == 0) {
+  auto it = std::lower_bound(this->m_mapViewParameters.begin(), this->m_mapViewParameters.end(), key, ParameterNameLess());
+  if (it != this->m_mapViewParameters.end() && std::strcmp(it->first.c_str(), name.c_str()) == 0) {
     *found = 1;
     return &it->second;
   }
@@ -3939,7 +3940,7 @@ void CSession::InitCommandTables() {
   chatCommands.push_back({"/inall", 17});
   chatCommands.push_back({"/exall", 16});
   std::vector<std::pair<const char*, int>>& windowCommands = this->m_windowCommands;
-  if (g_serviceType == 12) {
+  if (g_serviceType == ServiceBrazil) {
     windowCommands.push_back({"Sala de Chat", 67});
     windowCommands.push_back({"Atributos", 65});
     windowCommands.push_back({"Detalhes", 68});
@@ -5428,7 +5429,7 @@ void CSession::InitResourceNameTables() {
   palJobNames[286] = "건너";
   palJobNames[279] = "리벨리온";
   palJobNames[287] = "리벨리온";
-  if (g_serviceType == 0) {
+  if (g_serviceType == ServiceKorea) {
     palJobNames[14] = "크루";
     palJobNames[15] = "몽크";
     palJobNames[16] = "세이지";
@@ -5898,7 +5899,7 @@ void CSession::LoadSessionTables() {
   ++g_sessionTableLoadCount;
   session->InitJobHitWaveNames();
 
-  CCommonObject& storage = reinterpret_cast<CCommonObject&>(session->minimapTokenStorage[0x30]);
+  CCommonObject& storage = session->m_tableLoader;
   {
     std::vector<char*> tokens;
     session->m_bgmFileNames.clear();

@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "UI/GameSettings/TalkType.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/GameSettings/GameSettingsUI.h"
@@ -1371,7 +1372,7 @@ void CUIGroupGraphics::LoadModes() {
 
   auto found = std::find_if(data.begin(), data.end(), [this](const DisplayMode& mode) { return this->m_pendingMode.Matches(mode); });
   if (found == data.end()) {
-    DisplayMode fallback{};
+    DisplayMode fallback;
     ScreenDimensions screen;
     const ScreenDimensions* resolution = DefaultResolution(&screen);
     fallback.width = resolution->width;
@@ -1500,7 +1501,7 @@ void CUIPage::OnInit() {
 // OFFSET: 0x00A3F360
 // FUNCTION: fn_15942
 void CUIGroupSound::SetBgmEnabled(bool enabled) {
-  const unsigned char previous = g_serviceOptions.Get(7);
+  const unsigned char previous = g_serviceOptions.Get(TT_MUSIC_ON_OFF);
   this->m_bgmSlider->SetTransparent(!enabled);
   CUIVScrollBar* const slider = this->m_bgmSlider;
   slider->dragging = !enabled;
@@ -1532,7 +1533,7 @@ void CUIGroupSound::SetEffectVolume(int volume) {
 void CUIGroupEmblem::SetEnabled(bool enabled) {
   g_serviceOptions.Set(0xF3, enabled);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? 0xDC7 : 0xDC8)), 0x64FFFF, 0, 0, 0);
+  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? MSI_USESKILL_FAIL_EMPTY_SOUL_ENERGY : MSI_ADDSKILL_FAIL_INCLUDE_SKILL_YOU_CANNOT_LEARN)), 0x64FFFF, 0, 0, 0);
 }
 
 // OFFSET: 0x00A3F5C0
@@ -1540,7 +1541,7 @@ void CUIGroupEmblem::SetEnabled(bool enabled) {
 void CUIGroupLogInOut::SetEnabled(bool enabled) {
   g_serviceOptions.Set(0xA5, enabled);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? 0x414 : 0x415)), 0x64FFFF, 0, 0, 0);
+  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? MSI_LOGINOUT_ON : MSI_LOGINOUT_OFF)), 0x64FFFF, 0, 0, 0);
 }
 
 // OFFSET: 0x00A3F6B0
@@ -1633,7 +1634,7 @@ void CUIGroupSound::OnEffectScroll(int position) {
 // OFFSET: 0x00A43650
 // FUNCTION: fn_16032
 void CUIGroupEmblem::Refresh() {
-  const bool enabled = g_serviceOptions.Get(0xF3);
+  const bool enabled = g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF);
   this->m_onButton->checked = enabled;
   this->m_onButton->Invalidate();
   this->m_offButton->checked = !enabled;
@@ -1655,10 +1656,10 @@ void CUIGroupFullscreen::Refresh() {
 // FUNCTION: fn_16036
 void CUIGroupLogInOut::Refresh() {
   auto* const onButton = this->m_onButton;
-  onButton->checked = g_serviceOptions.Get(0xA5);
+  onButton->checked = g_serviceOptions.Get(TT_LOGINOUT_ON_OFF);
   onButton->Invalidate();
   auto* const offButton = this->m_offButton;
-  offButton->checked = !g_serviceOptions.Get(0xA5);
+  offButton->checked = !g_serviceOptions.Get(TT_LOGINOUT_ON_OFF);
   offButton->Invalidate();
 }
 
@@ -1708,7 +1709,7 @@ void CUIGroupSound::Refresh() {
   this->m_bgmSlider->SetVisible(this->m_bgmSlider->PositionFromOffset(8));
   this->m_bgmSlider->SetPosition(CSoundMgr::Volume(g_soundMgr));
   this->m_bgmSlider->SetThumbTooltip(std::to_string(CSoundMgr::Volume(g_soundMgr)));
-  const bool bgmMuted = !g_serviceOptions.Get(7);
+  const bool bgmMuted = !g_serviceOptions.Get(TT_MUSIC_ON_OFF);
   this->m_bgmSlider->SetTransparent(bgmMuted);
   CUIVScrollBar* const bgmSlider = this->m_bgmSlider;
   bgmSlider->dragging = bgmMuted;
@@ -1721,7 +1722,7 @@ void CUIGroupSound::Refresh() {
   this->m_effectSlider->SetVisible(this->m_effectSlider->PositionFromOffset(8));
   this->m_effectSlider->SetPosition(g_soundMgr->sampleVolume);
   this->m_effectSlider->SetThumbTooltip(std::to_string(g_soundMgr->sampleVolume));
-  const bool effectMuted = !g_serviceOptions.Get(0xB);
+  const bool effectMuted = !g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF);
   this->m_effectSlider->SetTransparent(effectMuted);
   CUIVScrollBar* const effectSlider = this->m_effectSlider;
   effectSlider->dragging = effectMuted;
@@ -1805,7 +1806,7 @@ void CUIGameSettingsUI::OnTitleIconClick() {
 // FUNCTION: fn_45480
 void CUIGameSettingsUI::OnApply() {
   const bool modified = this->m_graphicsPage->IsModified();
-  if (g_windowMgr.Confirm(LookupMessage(modified ? 3168 : 3167), 2, true, false, 0, "Message", 280, 120, 0) != 188) {
+  if (g_windowMgr.Confirm(LookupMessage(modified ? MSI_GRAPHIC_SETTING_AURA_OFF_CHECK : MSI_GRAPHIC_SETTING_SIMPLE_AURA_CHECK), 2, true, false, 0, "Message", 280, 120, 0) != ID_NO) {
     this->m_graphicsPage->ApplySettings();
     this->UpdateApplyButton();
   }
@@ -3426,7 +3427,7 @@ void CUIGameSettingsUI::RefreshHotkeyLabels() {
 // OFFSET: 0x00A3F180
 // FUNCTION: fn_15940
 void CUIGameSettingsUI::ResetToDefaults() {
-  if (g_windowMgr.Confirm(LookupMessage(MSI_GRAPHIC_SETTING_FOG_CHECK), 2, true, false, 0, "Message", 280, 120, 0) == 0xBC) {
+  if (g_windowMgr.Confirm(LookupMessage(MSI_GRAPHIC_SETTING_FOG_CHECK), 2, true, false, 0, "Message", 280, 120, 0) == ID_NO) {
     return;
   }
 

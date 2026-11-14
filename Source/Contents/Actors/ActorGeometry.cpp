@@ -1,6 +1,8 @@
 #include "Client/Mode/ModeMgr.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Session/Session.h"
+#include "Contents/Actors/Pc.h"
 #include "Contents/Actors/RenderObject.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Ground/GroundGeometry.h"
@@ -167,7 +169,7 @@ bool CRenderObject::PrepareSprite(
   float lightRed = 1.0f;
   float lightGreen = 1.0f;
   float lightBlue = 1.0f;
-  if (this->render.useGroundLighting == 1 && g_serviceOptions.Get(0x77)) {
+  if (this->render.useGroundLighting == 1 && g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF)) {
     CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
     GroundGeometry* ground = mode->scene->ground;
     if (ground->IsNewVer()) {
@@ -217,7 +219,7 @@ bool CRenderObject::GetTargetPos(std::uint32_t targetAid, vector3d& targetPos) c
   bool found = true;
 
   if (targetAid == g_session.m_aid) {
-    const vector3d& playerPos = reinterpret_cast<const CRenderObject*>(mode->scene->player)->render.position;
+    const vector3d& playerPos = mode->scene->player->render.position;
     targetPos.x = playerPos.x;
     targetPos.y = playerPos.y;
     targetPos.z = playerPos.z;
@@ -227,7 +229,7 @@ bool CRenderObject::GetTargetPos(std::uint32_t targetAid, vector3d& targetPos) c
     targetPos.z = actor->render.position.z;
   } else {
     found = false;
-    const vector3d& playerPos = reinterpret_cast<const CRenderObject*>(mode->scene->player)->render.position;
+    const vector3d& playerPos = mode->scene->player->render.position;
     const vector3d& position = this->render.position;
     const vector3d delta = {playerPos.x - position.x, playerPos.y - position.y, playerPos.z - position.z};
     targetPos.x = position.x - delta.x;

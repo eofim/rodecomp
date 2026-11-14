@@ -7,6 +7,7 @@
 #include "Contents/Actors/Pc.h"
 #include "Contents/Camera/Camera.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Map/MapSkyMgr.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skin/SkinMgr.h"
@@ -17,6 +18,7 @@
 #include "Render/Textures/TextureCache.h"
 #include "Resource/ResourcePreload.h"
 #include "UI/GameSettings/GameSettingsUI.h"
+#include "UI/GameSettings/TalkType.h"
 #include "UI/Items/UIItemWnd.h"
 #include "UI/Events/UIRoulletteWnd.h"
 #include "Contents/Skills/ClientSkills.h"
@@ -542,11 +544,11 @@ unsigned char ServiceOptions::Get(int id) {
 // FUNCTION: fn_06319
 bool IsServiceOption(int id) {
   switch (id) {
-  case 106:
-  case 107:
-  case 108:
-  case 231:
-  case 269:
+  case TT_FULL_AURA_ON_OFF:
+  case TT_HIDE_AURA_ON_OFF:
+  case TT_BOLD_NAME_TYPE_ON_OFF:
+  case TT_BLOCK_CALL_ON_OFF:
+  case TT_HIDE_FOOTPRINT_ON_OFF:
     return true;
   default:
     return false;
@@ -719,7 +721,7 @@ std::pair<int, unsigned char> FindServiceOption(const char* name) {
     return {3, 0};
   }
 
-  int optionId = 3;
+  int optionId = TT_UNKNOWN;
   std::string strings[3];
   g_session.GetTalkType(name, &optionId, strings);
   const auto entry = g_serviceOptions.values.find(optionId);
@@ -951,7 +953,7 @@ void ApplyServiceOptionXmasWeather(int id, unsigned char value, bool notify, int
 
   const std::string mapName = mode->MapName();
   if (mapName == "xmas_fild01.rsw" || mapName == "xmas.rsw") {
-    if (g_serviceOptions.Get(8)) {
+    if (g_serviceOptions.Get(TT_EFFECT_ON_OFF)) {
       g_weatherEffect.Snow();
     } else {
       g_weatherEffect.ExtendEffect();
@@ -981,7 +983,7 @@ void ApplyServiceOptionMapFog(int id, unsigned char value, bool notify, int enab
 void ApplyServiceOptionWithNotice(int id, unsigned char value, bool notify, int enabledMessage, int disabledMessage) {
   if (value != g_serviceOptions.Get(id)) {
     g_serviceOptions.Set(id, value);
-    if (g_serviceOptions.Get(107)) {
+    if (g_serviceOptions.Get(TT_HIDE_AURA_ON_OFF)) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SWAP_EQUIPITEM_FAIL_DEAD)), 0x64FFFF, 0, 0, 0);
       return;
     }
@@ -1061,7 +1063,7 @@ void ApplyServiceOptionCursorClip(int id, unsigned char value, bool notify, int 
 // OFFSET: 0x006C5DF0
 // FUNCTION: fn_06369
 void ApplyServiceOptionAskOnDisable(int id, unsigned char value, bool notify, int enabledMessage, int disabledMessage) {
-  if (value == g_serviceOptions.Get(0x128)) {
+  if (value == g_serviceOptions.Get(TT_PETINFO_ALERT_ONOFF)) {
     return;
   }
 
@@ -1379,7 +1381,7 @@ void ShowPlayerLocation() {
   const std::string text = std::format("{}({}) : {}, {}", g_session.GetMapDisplayName(mode->MapName().c_str()), name.c_str(), column, row);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text.c_str()), 0x64FFFF, 0, 0, 0);
-  if (g_serviceType != 10) {
+  if (g_serviceType != ServiceGermany) {
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY2, reinterpret_cast<std::intptr_t>(text.c_str()), 0x64FFFF, 0, 0, 0);
   }
 }
@@ -1506,7 +1508,7 @@ void CSession::LoadOptionInfo() {
 
   Singleton<CGameSettingsMgr>::GetInstance();
   ::SetOption(LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), this->GetOptionInteger(LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), 0) != 0);
-  g_serviceOptionJitterScale = g_serviceOptions.Get(0xF1) ? 730.0f : g_jitterDistanceScale;
+  g_serviceOptionJitterScale = g_serviceOptions.Get(TT_EXPAND_SIGHT_ON_OFF) ? 730.0f : g_jitterDistanceScale;
 
   if (g_outdoorCameraPitch < -65.0f) {
     g_outdoorCameraPitch = -65.0f;
@@ -1523,7 +1525,7 @@ void CSession::LoadOptionInfo() {
   }
 
   g_skinInfo.m_name = this->GetOptionString("SkinName", "<Basic Skin>");
-  this->monsterInfoEnabled = g_serviceOptions.Get(0x2E);
+  this->monsterInfoEnabled = g_serviceOptions.Get(TT_ATTACK_SNAP_ON_OFF);
   g_session.m_showBattleFieldIcon = this->GetOptionInteger("ShowBattleFieldIcon", 1) != 0;
   Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(ConfineCursor, "MouseExclusive");
 
@@ -1688,16 +1690,16 @@ void CSession::SaveOptionInfo() {
   this->WriteOptionInteger(output, "bItemDefaultSort", this->m_itemDefaultSort != 0);
   this->WriteOptionInteger(output, "bItemAscendingOrder", this->m_itemAscendingOrder != 0);
   this->WriteOptionInteger(output, "bItemDescendingOrder", this->m_itemDescendingOrder != 0);
-  this->WriteOptionInteger(output, LookupMessage(MSI_USESKILL_FAIL_NEED_EQUIPPED_WEAPONE), g_serviceOptions.Get(0xF3));
-  this->WriteOptionInteger(output, "bExtendDamage", g_serviceOptions.Get(0x10B));
-  this->WriteOptionInteger(output, "bShowMapName", g_serviceOptions.Get(0x10C));
-  this->WriteOptionInteger(output, "bShowOnlyMineFootprint", g_serviceOptions.Get(0x10D));
-  this->WriteOptionInteger(output, LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), g_serviceOptions.Get(0xF1));
+  this->WriteOptionInteger(output, LookupMessage(MSI_USESKILL_FAIL_NEED_EQUIPPED_WEAPONE), g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF));
+  this->WriteOptionInteger(output, "bExtendDamage", g_serviceOptions.Get(TT_EXTEND_DAMAGE_ON_OFF));
+  this->WriteOptionInteger(output, "bShowMapName", g_serviceOptions.Get(TT_SHOW_MAP_NAME_ON_OFF));
+  this->WriteOptionInteger(output, "bShowOnlyMineFootprint", g_serviceOptions.Get(TT_HIDE_FOOTPRINT_ON_OFF));
+  this->WriteOptionInteger(output, LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), g_serviceOptions.Get(TT_EXPAND_SIGHT_ON_OFF));
   this->WriteOptionInteger(output, "DamageSkin", this->m_damageSkinIndex);
   this->WriteOptionInteger(output, "DamageDir", this->m_damageSkinMode);
   this->WriteOptionInteger(output, "PriorityClass", this->m_priorityClass);
-  this->WriteOptionInteger(output, "bSummonTranslucent", g_serviceOptions.Get(0x10A));
-  this->WriteOptionInteger(output, "bHidePlayer", g_serviceOptions.Get(0x109));
-  this->WriteOptionInteger(output, "bQuickSlot", g_serviceOptions.Get(0x10E));
+  this->WriteOptionInteger(output, "bSummonTranslucent", g_serviceOptions.Get(TT_HIDE_SUMMON_ON_OFF));
+  this->WriteOptionInteger(output, "bHidePlayer", g_serviceOptions.Get(TT_HIDE_PLAYER_ON_OFF));
+  this->WriteOptionInteger(output, "bQuickSlot", g_serviceOptions.Get(TT_QUICK_SLOT_ON_OFF));
   output.Close();
 }

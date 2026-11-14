@@ -1,11 +1,11 @@
 #include "Render/Renderer.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/CMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Jobs/JobInheritance.h"
-#include "Render/Drawing/ActionSpriteDrawing.h"
 #include "Render/Primitives/TextureQuad.h"
 #include "Render/Textures/Texture.h"
 #include "Render/Textures/TextureCache.h"
@@ -76,15 +76,13 @@ void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
   if (width < 2) {
     int x = this->viewport.width - 207;
     for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode();
-      DrawActionSprite(system, x, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+      g_modeMgr.GetGameMode()->DrawActionSprite(x, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
       x -= 32;
     }
   } else {
     int x = this->viewport.width - 175;
     for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode();
-      DrawActionSprite(system, x, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+      g_modeMgr.GetGameMode()->DrawActionSprite(x, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
       x -= 32;
     }
   }
@@ -96,15 +94,13 @@ void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
   if (width > 1) {
     int x = this->viewport.width - 175;
     for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode();
-      DrawActionSprite(system, x, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+      g_modeMgr.GetGameMode()->DrawActionSprite(x, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
       x -= 32;
     }
   } else {
     int x = this->viewport.width - 207;
     for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode();
-      DrawActionSprite(system, x, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+      g_modeMgr.GetGameMode()->DrawActionSprite(x, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
       x -= 32;
     }
   }
@@ -162,17 +158,15 @@ timer:
     const int scale = this->viewport.height / 700;
     CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load("이팩트\\TimeFont.act"));
     CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("이팩트\\TimeFont.spr"));
-    g_modeMgr.GetGameMode();
-    DrawActionSprite(system, 100, 100, action, sprite, 0, 0, static_cast<float>(scale) * 0.5f, 0.0f, 0xFFFFFFFF, 0x201);
-    g_modeMgr.GetGameMode();
-    DrawActionSprite(system, 100, 200, action, sprite, 1, 0, static_cast<float>(scale), 0.0f, 0xFFFFFFFF, 0x201);
+    g_modeMgr.GetGameMode()->DrawActionSprite(100, 100, action, sprite, 0, 0, static_cast<float>(scale) * 0.5f, 0.0f, 0xFFFFFFFF, 0x201);
+    g_modeMgr.GetGameMode()->DrawActionSprite(100, 200, action, sprite, 1, 0, static_cast<float>(scale), 0.0f, 0xFFFFFFFF, 0x201);
   }
 
   if (g_session.GetBattleFieldMode() == 1) {
     this->DrawBattleFieldIcon(system);
   }
 
-  if (!g_serviceOptions.Get(8) || g_screenShakeDuration <= 0 || g_screenShakeMode == 2 || !this->LockBackBuffer()) {
+  if (!g_serviceOptions.Get(TT_EFFECT_ON_OFF) || g_screenShakeDuration <= 0 || g_screenShakeMode == 2 || !this->LockBackBuffer()) {
     return;
   }
 

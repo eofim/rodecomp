@@ -138,7 +138,7 @@ void CSpriteParticle::Draw(char mode) {
     if (!texture) {
       texture = g_renderer->atlas.Find(image, sprite->palette, record);
       if (!texture) {
-        texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, sprite->palette, record, g_serviceType, g_resourceReuseDelay);
+        texture = g_renderer->atlas.Insert(image, sprite->palette, record);
       }
     } else {
       record.u0 = 0.0f;
@@ -241,7 +241,7 @@ void CSpriteParticle::Draw(char mode) {
           offsetY += p[1];
         }
         if (this->applyActorLift != 0) {
-          offsetY -= static_cast<float>(static_cast<double>(*reinterpret_cast<const long long*>(&renderObject->render.hoverOffsetLow)));
+          offsetY -= static_cast<float>(static_cast<double>(renderObject->render.hoverOffset));
         }
       }
       offsetX *= scaleDistance;

@@ -3,6 +3,7 @@
 
 #include "Client/Mode/CMode.h"
 #include "Client/Mode/ModeDragState.h"
+#include "UI/Chat/UIChatRoomTitle.h"
 #include "Contents/Actors/ActorNameCard.h"
 
 #include <cstddef>
@@ -185,12 +186,7 @@ public:
   /* 02EC */ std::string menuTargetName;
   /* 0304 */ unsigned char padding_0304[0x04];
   /* 0308 */ ModeDragState drag;
-  /* 03C8 */ std::string chatRoomTitle;
-  /* 03E0 */ std::string chatRoomPassword;
-  /* 03F8 */ int chatRoomPublic;
-  /* 03FC */ int chatRoomMemberCount;
-  /* 0400 */ int chatRoomMemberLimit;
-  /* 0404 */ int chatRoomId;
+  /* 03C8 */ ChatRoomTitleInfo chatRoom;
   /* 0408 */ void* skillUseType;
   /* 040C */ int skillId;
   /* 0410 */ int skillAttackRange;
@@ -207,9 +203,9 @@ public:
   /* 0464 */ int countdownStartTick;
   /* 0468 */ int recordChatCount;
   /* 046C */ std::string recordChat[11];
-  /* 0574 */ unsigned char recordChatTime[0x2C];
+  /* 0574 */ std::uint32_t recordChatTime[11];
   /* 05A0 */ int strikeCount;
-  /* 05A4 */ unsigned char strikeTime[0x0C];
+  /* 05A4 */ std::uint32_t strikeTime[3];
   /* 05B0 */ int forcedAttack;
   /* 05B4 */ int yggdrasilUsePending;
   /* 05B8 */ int lastPickItemTime;
@@ -398,7 +394,7 @@ public:
   CMsgEffect* SpawnMsgEffect(int effectId, const vector3d* position, std::uint32_t accountId, bool visible);
   void ApplyMapFog(int enabled);
   void SpawnGrannyCorpse(float x, float y, float z, float angle, const char* name);
-  void SpawnMandraAttack(std::uint32_t aid, int target, char flag);
+  void SpawnMandraAttack(std::uint32_t target, int job, float startFrame);
   void OpenActorMenu(const ActorPickInfo* pick, int handled);
   int HandleActorPick(ActorPickInfo* pick, int result);
   void ExecuteTalkType(int talkType, std::string* arguments);
@@ -504,7 +500,6 @@ public:
   void ShowNoticeBalloon(const std::vector<std::string>* lines);
   void UpdateBalloons();
   void ChangeZoneServer(std::string mapName, int x, int y, int ip, int port, std::string host);
-  const char* RecordChat4Text();
   CPlayer* Player();
   MinimapMarker* FindMinimapMarker(std::uint32_t key);
   float CameraDesiredYaw();
@@ -635,7 +630,7 @@ public:
   void ReceiveSummonHpUpdate(const unsigned char* buffer);
   void ReceiveGameOptionResult(int command, int result, int enabled);
   void ReceiveCharViewResult(const unsigned char* packet);
-  void SpawnArrowEffect(std::uint32_t aid, int target, char flag, int argument);
+  void SpawnArrowEffect(const vector3d* source, std::uint32_t target, float speed, int job);
   void SpawnArrowEffect64(const vector3d* source, const vector3d* target, float speed);
   void UnusedArrowStub(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j);
   bool UpdateReplayPause(bool resume);

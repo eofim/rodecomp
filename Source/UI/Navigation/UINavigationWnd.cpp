@@ -47,7 +47,7 @@ void UINavigationWnd::OnCreate(int width, int height) {
   this->m_routePanel->backgroundRed = 210;
   this->m_routePanel->backgroundGreen = 210;
   this->m_routePanel->backgroundBlue = 210;
-  this->m_routePanel->SetId(336);
+  this->m_routePanel->SetId(ID_SELECT_ITEM);
   this->m_routePanel->Move(-1000, -1000);
   this->AddChild(this->m_routePanel);
 
@@ -56,7 +56,7 @@ void UINavigationWnd::OnCreate(int width, int height) {
   this->m_searchPanel->backgroundRed = 210;
   this->m_searchPanel->backgroundGreen = 210;
   this->m_searchPanel->backgroundBlue = 210;
-  this->m_searchPanel->SetId(441);
+  this->m_searchPanel->SetId(NAVI_SEARCH_LIST);
   this->m_searchPanel->Move(-1000, -1000);
   this->m_searchPanel->SetDefaultLineColor(0x1414F0);
   this->AddChild(this->m_searchPanel);
@@ -78,7 +78,7 @@ void UINavigationWnd::OnCreate(int width, int height) {
     LookupMessage(MSI_NAVIGATION_SEARCHINFO), LookupMessage(MSI_NAVIGATION_VIEWCHANGE), LookupMessage(MSI_NAVIGATION_LIGHTCHANGE), LookupMessage(MSI_NAVIGATION_END), LookupMessage(MSI_NAVIGATION_BASE), LookupMessage(MSI_NAVIGATION_MINI),
   };
   const char* names[6] = {"NaviSearch", "NaviStart", "NaviRoute", "NaviList", "Navisyschange2", "navifolder"};
-  const int ids[6] = {321, 184, 189, 190, 284, 191};
+  const int ids[6] = {ID_SEARCH, ID_OK, ID_BUTTON1, ID_BUTTON2, ID_CHARGE, NAVI_BUTTON_DATA};
 
   for (int index = 0; index < 6; ++index) {
     this->m_buttons[index] = new UIBitmapButton();
@@ -101,7 +101,7 @@ void UINavigationWnd::OnCreate(int width, int height) {
   this->m_helpButton->SetBitmap((path + "NaviHelp_on.bmp").c_str(), 2, 0);
   this->m_helpButton->SetSize(this->m_helpButton->BitmapWidth(), this->m_helpButton->BitmapHeight());
   this->m_helpButton->Move(this->geometry.width - 42, 3);
-  this->m_helpButton->SetId(343);
+  this->m_helpButton->SetId(ID_HELP);
   this->m_helpButton->SetTooltip(LookupMessage(MSI_NAVIGATION_NPC));
   this->AddChild(this->m_helpButton);
 
@@ -168,7 +168,7 @@ void UINavigationWnd::OnCreate(int width, int height) {
 // FUNCTION: fn_12702
 void UINavigationWnd::OnLBtnUp(int x, int y) {
   if (static_cast<unsigned int>(x - 8) <= 126 && static_cast<unsigned int>(y - 39) <= 126) {
-    this->SendMsg(this, UM_COMMAND, 429, 0, 0, 0);
+    this->SendMsg(this, UM_COMMAND, NAVI_BUTTON_VIEW_CHANGE, 0, 0, 0);
   }
   this->UIFrameWnd::OnLBtnUp(x, y);
 }
@@ -229,7 +229,7 @@ void UINavigationWnd::RefreshHeaderTexts(int mode) {
 
 // OFFSET: 0x0093DD20
 // FUNCTION: fn_12772
-void UINavigationWnd::RefreshWorldMapMarks() {
+void UIRoMapWnd::RefreshWorldMapMarks() {
   g_worldViewMgr.ClearMarks();
   if (g_navigationManager.viewMode == 2) {
     std::string name;
@@ -251,7 +251,7 @@ void UINavigationWnd::RefreshWorldMapMarks() {
 
 // OFFSET: 0x0093DED0
 // FUNCTION: fn_12773
-void UINavigationWnd::RefreshWorldMapSelection() {
+void UIRoMapWnd::RefreshWorldMapSelection() {
   this->Invalidate();
   std::string name = g_navigationManager.GetCurrentTargetName();
   if (!name.empty()) {
@@ -264,7 +264,7 @@ void UINavigationWnd::RefreshWorldMapSelection() {
 
 // OFFSET: 0x0093DF80
 // FUNCTION: fn_12774
-void UINavigationWnd::RefreshWorldMapLevels() {
+void UIRoMapWnd::RefreshWorldMapLevels() {
   g_worldViewMgr.ClearLevels();
   const int count = g_navigationManager.StateCount();
   if (count > 0) {
@@ -624,7 +624,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
     this->Invalidate();
     return 0;
   case UM_COMMAND:
-    if (argument1 != ID_SELECT_ITEM && argument1 != 0x1B9) {
+    if (argument1 != ID_SELECT_ITEM && argument1 != NAVI_SEARCH_LIST) {
       this->RecordResponse(static_cast<int>(argument1), argument2, argument3, argument4);
     }
 
@@ -641,7 +641,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
           this->SendMsg(this, UM_COMMAND, ID_BUTTON1, 0, 0, 0);
           this->RefreshRouteList();
           if (g_windowMgr.modal) {
-            static_cast<UINavigationWnd*>(g_windowMgr.modal)->RefreshWorldMapMarks();
+            g_windowMgr.modal->RefreshWorldMapMarks();
           }
         }
       }
@@ -654,7 +654,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         g_navigationManager.RefreshSearch();
         this->SendMsg(this, UM_COMMAND, ID_BUTTON2, 0, 0, 0);
         if (g_windowMgr.modal) {
-          static_cast<UINavigationWnd*>(g_windowMgr.modal)->RefreshWorldMapLevels();
+          g_windowMgr.modal->RefreshWorldMapLevels();
           return 0;
         }
       }
@@ -668,14 +668,14 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         const int index = static_cast<int>(argument2) - this->m_routePanel->LineOffset();
         if (index >= 0 && g_navigationManager.SelectState(index)) {
           if (g_windowMgr.modal) {
-            static_cast<UINavigationWnd*>(g_windowMgr.modal)->RefreshWorldMapSelection();
+            g_windowMgr.modal->RefreshWorldMapSelection();
           }
           this->Invalidate();
           return 0;
         }
       }
       break;
-    case 0x1AD:
+    case NAVI_BUTTON_VIEW_CHANGE:
       if (!g_navigationManager.expandedMap && this->m_saved->expanded) {
         const int targetType = g_navigationManager.GetCurrentTarget().type;
         if (targetType != 1 && targetType != 6 && targetType != 0) {
@@ -692,7 +692,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         }
       }
       break;
-    case 0x11C:
+    case ID_CHARGE:
       this->m_saved->expanded = !this->m_saved->expanded;
       this->ApplyMinimized();
       this->Invalidate();
@@ -702,7 +702,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       this->ApplyMinimized();
       this->RefreshHeaderTexts(g_navigationManager.viewMode);
       if (g_navigationManager.expandedMap && g_windowMgr.modal) {
-        static_cast<UIRoMapWnd*>(g_windowMgr.modal)->UpdateNavigationButtons();
+        g_windowMgr.modal->UpdateNavigationButtons();
         return 0;
       }
       break;
@@ -722,7 +722,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       g_navigationManager.hideWindow = false;
       if (g_windowMgr.modal) {
         g_navigationManager.expandedMap = true;
-        static_cast<UIRoMapWnd*>(g_windowMgr.modal)->UpdateNavigationButtons();
+        g_windowMgr.modal->UpdateNavigationButtons();
         return 0;
       }
       g_windowMgr.Schedule(this);
@@ -736,7 +736,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       g_navigationManager.displayMode = 0;
       this->LayoutTabs();
       return 0;
-    case 0xBF: {
+    case NAVI_BUTTON_DATA: {
       if (g_windowMgr.comboBoxWnd) {
         g_windowMgr.CloseWindow(WID_COMBOBOXWND);
       }
@@ -784,15 +784,15 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         return 0;
       }
       break;
-    case 0x1B9:
+    case NAVI_SEARCH_LIST:
       if (g_replayAnimationScaling == 0) {
         argument2 = this->m_searchPanel->selected;
       }
       if (argument2 != -1) {
-        this->RecordResponse(0x1B9, argument2, argument3, argument4);
+        this->RecordResponse(NAVI_SEARCH_LIST, argument2, argument3, argument4);
         if (g_navigationManager.SelectTarget(static_cast<int>(argument2) - this->m_searchPanel->LineOffset())) {
           if (g_windowMgr.modal) {
-            static_cast<UINavigationWnd*>(g_windowMgr.modal)->RefreshWorldMapSelection();
+            g_windowMgr.modal->RefreshWorldMapSelection();
           }
           this->Invalidate();
           return 0;
@@ -823,7 +823,7 @@ int UINavigationWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
     case ID_SELECT_ITEM:
       this->m_routePanel->AddLine(reinterpret_cast<const char*>(argument2));
       break;
-    case 0x1B9:
+    case NAVI_SEARCH_LIST:
       this->m_searchPanel->AddLine(reinterpret_cast<const char*>(argument2));
       break;
     }

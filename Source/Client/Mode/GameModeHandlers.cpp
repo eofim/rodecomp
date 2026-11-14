@@ -1,4 +1,6 @@
 #include "Client/Mode/CGameMode.h"
+#include "UI/GameSettings/TalkType.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
@@ -590,7 +592,7 @@ void CGameMode::ReceivePartyBookingUpdate(const unsigned char* packet) {
 // FUNCTION: fn_21787
 void CGameMode::ReceiveToggleNotice(const unsigned char* packet) {
   g_session.replaySessionFlag = packet[2];
-  const char* message = LookupMessage(g_session.replaySessionFlag == 0 ? 1326 : 1325);
+  const char* message = LookupMessage(g_session.replaySessionFlag == 0 ? MSI_INVITE_PARTY_ACCEPT : MSI_INVITE_PARTY_REFUSE);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message), 0x64FFFF, 0, 0, 0);
 }
 
@@ -787,7 +789,7 @@ void CGameMode::ReceivePetAct(unsigned char* packet) {
     if (std::strcmp(speech, "") != 0) {
       const std::int64_t text = reinterpret_cast<std::intptr_t>(speech);
       actor->SendMsg(nullptr, AM_CHAT, text, 0, 0, 0, 0, 0);
-      if (!g_serviceOptions.Get(114) && !g_serviceOptions.Get(148)) {
+      if (!g_serviceOptions.Get(TT_NOTALKMSG_ON_OFF) && !g_serviceOptions.Get(TT_NOTALKMSG2_ON_OFF)) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(speech), 0xFAFAFA, 0, 0, 0);
       }
     }
@@ -825,7 +827,7 @@ void CGameMode::NotifyPetEvolutionResult(int result) {
 // OFFSET: 0x00D3CEC0
 // FUNCTION: fn_21798
 void CGameMode::PlayBgm(unsigned char type, std::string name) {
-  if (!g_serviceOptions.Get(7)) {
+  if (!g_serviceOptions.Get(TT_MUSIC_ON_OFF)) {
     return;
   }
 
@@ -855,7 +857,7 @@ void CGameMode::PlayBgm(unsigned char type, std::string name) {
 // OFFSET: 0x00D3D0F0
 // FUNCTION: fn_21799
 void CGameMode::ReceiveNpcBgm(const unsigned char* packet) {
-  if (g_serviceOptions.Get(7)) {
+  if (g_serviceOptions.Get(TT_MUSIC_ON_OFF)) {
     const std::string path = std::string("bgm\\") + reinterpret_cast<const char*>(packet + 2) + std::string(".mp3");
     g_soundMgr->PlayStream(path.c_str(), 1, true);
     g_soundMgr->secondaryEnabled = 1;
@@ -885,7 +887,7 @@ void CGameMode::ReceiveHomunculusInfo(const unsigned char* data) {
   const HomunculusInfoPacket* packet = reinterpret_cast<const HomunculusInfoPacket*>(data);
   char* name = g_session.m_homunName;
   int* stats = g_session.m_homunStats;
-  if (g_serviceType == 10 || g_serviceType == 12 || g_serviceType == 15) {
+  if (g_serviceType == ServiceGermany || g_serviceType == ServiceBrazil || g_serviceType == ServiceVietnam) {
     std::sprintf(name, "%s", packet->name);
   } else {
     std::sprintf(name, packet->name);
@@ -990,7 +992,7 @@ void CGameMode::ReceiveHomunculusInfo2(const unsigned char* data) {
   const HomunculusInfoPacket2* packet = reinterpret_cast<const HomunculusInfoPacket2*>(data);
   char* name = g_session.m_homunName;
   int* stats = g_session.m_homunStats;
-  if (g_serviceType == 10 || g_serviceType == 12 || g_serviceType == 15) {
+  if (g_serviceType == ServiceGermany || g_serviceType == ServiceBrazil || g_serviceType == ServiceVietnam) {
     std::sprintf(name, "%s", packet->name);
   } else {
     std::sprintf(name, packet->name);
@@ -1062,7 +1064,7 @@ void CGameMode::ReceiveBookOpen(const unsigned char* packet) {
   _itoa(*reinterpret_cast<const int*>(packet + 2), number, 10);
 
   char path[260];
-  if (g_serviceType == 10) {
+  if (g_serviceType == ServiceGermany) {
     std::sprintf(path, "%sbook\\%s.txt", g_serverLanguage->servicePrefix.c_str(), number);
   } else {
     std::sprintf(path, "book\\%s.txt", number);
@@ -1125,7 +1127,7 @@ void CGameMode::IgnoreRemovedPacket2(const unsigned char*) {
 void CGameMode::ReceiveBillingInfo(const unsigned char* packet) {
   char text[512];
   std::memset(text, 0, sizeof(text));
-  if (g_serviceType == 3) {
+  if (g_serviceType == ServiceChina) {
     switch (*reinterpret_cast<const int*>(packet + 2)) {
     case 1:
       std::sprintf(text, LookupMessage(MSI_BILLING_1), *reinterpret_cast<const int*>(packet + 6) / 86400 + 1);
@@ -1672,7 +1674,7 @@ void CGameMode::SpawnSkillWarningPlanes(std::uint32_t aid, std::uint16_t skillId
     return;
   }
 
-  CWarningPlaneEffect* effect = static_cast<CWarningPlaneEffect*>(g_effectMgr->Spawn(actor->render.accountId, 0x45A, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0));
+  CWarningPlaneEffect* effect = static_cast<CWarningPlaneEffect*>(g_effectMgr->Spawn(actor->render.accountId, EF_WARNING_PLANE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0));
   if (!effect) {
     return;
   }
@@ -2486,7 +2488,7 @@ void CGameMode::ReceiveBroadcastBalloonNotice(const unsigned char* packet) {
     LookupMessage(MSI_PCBANG_EVENT), *reinterpret_cast<const int*>(packet + 2), *reinterpret_cast<const int*>(packet + 6),
     *reinterpret_cast<const int*>(packet + 10)
   );
-  if (g_serviceType == 12) {
+  if (g_serviceType == ServiceBrazil) {
     text = LookupMessage(MSI_BILLING_2);
   }
 
@@ -2496,7 +2498,7 @@ void CGameMode::ReceiveBroadcastBalloonNotice(const unsigned char* packet) {
       message.lines.emplace_back(text, color);
       balloon->AddMessage(0, message);
     }
-    if (g_serviceType == 0) {
+    if (g_serviceType == ServiceKorea) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text.c_str()), 0x62B0FF, 0, 0, 0);
     }
   }
@@ -2956,7 +2958,7 @@ void CGameMode::ReceiveClanChat(const unsigned char* packet) {
     g_forbiddenWords.Mask(message, &masked);
   }
 
-  if (!g_serviceOptions.Get(148)) {
+  if (!g_serviceOptions.Get(TT_NOTALKMSG2_ON_OFF)) {
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message), 0xB4B4FF, 21, 0, 0);
   }
 }
@@ -2977,7 +2979,8 @@ struct SearchStoreOption {
 };
 
 struct SearchStoreItemPacket {
-  /* 0000 */ unsigned char storeIdentity[8];
+  /* 0000 */ int storeId;
+  /* 0004 */ int accountId;
   /* 0008 */ char storeName[80];
   /* 0058 */ int itemId;
   /* 005C */ unsigned char kind;
@@ -2996,7 +2999,8 @@ struct SearchStoreItemPacketOld {
     SecureZeroMemory(this->options, sizeof(this->options));
   }
 
-  /* 0000 */ unsigned char storeIdentity[8];
+  /* 0000 */ int storeId;
+  /* 0004 */ int accountId;
   /* 0008 */ char storeName[80];
   /* 0058 */ int itemId;
   /* 005C */ unsigned char kind;
@@ -3028,8 +3032,9 @@ void CGameMode::ReceiveSearchStoreItems(const unsigned char* packet) {
   const unsigned int count = (header->length - 7) / sizeof(SearchStoreItemPacket);
   for (long long i = 0; i < count; ++i) {
     const SearchStoreItemPacket record = items[i];
-    SessionEntry5BD4 entry;
-    std::memcpy(entry.storeIdentity, record.storeIdentity, sizeof(entry.storeIdentity));
+    SearchStoreResult entry;
+    entry.storeId = record.storeId;
+    entry.accountId = record.accountId;
     std::memcpy(entry.storeName, record.storeName, sizeof(entry.storeName));
     entry.price = record.price;
     entry.quantity = record.quantity;
@@ -3076,8 +3081,9 @@ void CGameMode::ReceiveSearchStoreItemsOld(const unsigned char* packet) {
   for (int i = 0; i < count; ++i, ++next) {
     SearchStoreItemPacketOld record;
     std::memcpy(&record, next, sizeof(record));
-    SessionEntry5BD4 entry;
-    std::memcpy(entry.storeIdentity, record.storeIdentity, sizeof(entry.storeIdentity));
+    SearchStoreResult entry;
+    entry.storeId = record.storeId;
+    entry.accountId = record.accountId;
     std::memcpy(entry.storeName, record.storeName, sizeof(entry.storeName));
     entry.price = record.price;
     entry.quantity = record.quantity;

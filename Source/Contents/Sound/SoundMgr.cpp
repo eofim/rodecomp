@@ -1,4 +1,5 @@
 #include "Contents/Configuration/ServiceOptions.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Sound/SoundConfiguration.h"
 #include "Contents/Sound/SoundMgr.h"
 #include "Resource/ResourceMgr.h"
@@ -20,6 +21,22 @@ extern "C" __declspec(dllimport) void __stdcall AIL_set_stream_volume(void* stre
 extern "C" __declspec(dllimport) void __stdcall AIL_set_stream_loop_count(void* stream, int count);
 extern "C" __declspec(dllimport) void __stdcall AIL_start_stream(void* stream);
 extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_room_type(void* provider, int roomType);
+extern "C" __declspec(dllimport) unsigned int __stdcall AIL_3D_sample_status(void* sample);
+extern "C" __declspec(dllimport) int __stdcall AIL_set_3D_sample_file(void* sample, const void* data);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_sample_effects_level(void* sample, float level);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_position(void* sample, float x, float y, float z);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_orientation(void* sample, float x, float y, float z, float upX, float upY, float upZ);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_sample_volume(void* sample, int volume);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_sample_distances(void* sample, float maximum, float minimum);
+extern "C" __declspec(dllimport) void __stdcall AIL_start_3D_sample(void* sample);
+extern "C" __declspec(dllimport) void __stdcall AIL_release_3D_sample_handle(void* sample);
+extern "C" __declspec(dllimport) void __stdcall AIL_close_3D_listener(void* listener);
+extern "C" __declspec(dllimport) void __stdcall AIL_close_3D_provider(MilesProvider provider);
+extern "C" __declspec(dllimport) void __stdcall AIL_release_sample_handle(void* sample);
+extern "C" __declspec(dllimport) void __stdcall AIL_close_digital_driver(void* driver);
+extern "C" __declspec(dllimport) void __stdcall AIL_shutdown();
+extern "C" __declspec(dllimport) void __stdcall AIL_pause_stream(void* stream, int paused);
+extern "C" __declspec(dllimport) int __stdcall AIL_stream_volume(void* stream);
 
 // STATIC: 0x0138BE7C
 // GLOBAL: gl_24457
@@ -273,9 +290,8 @@ void CSoundMgr::Update() {
   }
 
   if (this->stream) {
-    MilesRuntime& miles = MilesRuntime::Get();
-    miles.pauseStream(this->stream, 1);
-    miles.streamVolume(this->stream);
+    AIL_pause_stream(this->stream, 1);
+    AIL_stream_volume(this->stream);
   }
 
   this->FadeIn();
@@ -486,7 +502,7 @@ bool CSoundMgr::PlayData3D(const void* data, const float& x, const float& y, con
 void CSoundMgr::SetDefaultName(std::string name) {
   this->defaultName = name;
 
-  if (g_serviceOptions.Get(7)) {
+  if (g_serviceOptions.Get(TT_MUSIC_ON_OFF)) {
     this->PlayStream(nullptr, 0, false);
   }
 
@@ -568,29 +584,28 @@ void CSoundMgr::PlayStream(const char* name, int loopCount, bool fade) {
       return;
     }
 
-    this->secondaryStream = MilesRuntime::Get().openStream(this->driver, this->currentName.c_str(), 0);
+    this->secondaryStream = AIL_open_stream(this->driver, this->currentName.c_str(), 0);
     const std::string copiedName(name);
     return;
   }
 
   this->StopStreams();
   this->currentName.assign(name);
-  MilesRuntime& miles = MilesRuntime::Get();
-  this->stream = miles.openStream(this->driver, this->currentName.c_str(), 0);
+  this->stream = AIL_open_stream(this->driver, this->currentName.c_str(), 0);
 
   {
     const std::string copiedName(name);
   }
 
-  miles.setStreamVolume(this->stream, this->streamVolume);
-  miles.setStreamLoopCount(this->stream, loopCount);
-  miles.startStream(this->stream);
+  AIL_set_stream_volume(this->stream, this->streamVolume);
+  AIL_set_stream_loop_count(this->stream, loopCount);
+  AIL_start_stream(this->stream);
 }
 
 // OFFSET: 0x0063A130
 // FUNCTION: fn_04764
 void CSoundMgr::PlayWave(const char* name, float x, float y, float z, int maximumDistance, int minimumDistance, float scale, int unused) {
-  const unsigned char enabled = g_serviceOptions.Get(11);
+  const unsigned char enabled = g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF);
 
   if (g_soundConfiguration.mode == 0 || !enabled) {
     return;

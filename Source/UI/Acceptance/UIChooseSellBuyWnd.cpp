@@ -1,4 +1,5 @@
 #include "Client/Mode/CMode.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
@@ -532,7 +533,7 @@ void UIDisconnectedServerMsgWnd::Paint() {
 // FUNCTION: fn_12220
 void UIEmailAddressWnd::Paint() {
   this->DrawBorder(0, 0, 0, 0);
-  const char* text = LookupMessage(g_serviceType == 0 ? 1815 : 299);
+  const char* text = LookupMessage(g_serviceType == 0 ? MSI_ENTER_PEOPLE_BIRTH : MSI_ENTER_EMAIL);
   this->DrawTextAt(15, 6, text, 0, 0, 12, 0, 0, 0);
 }
 
@@ -559,8 +560,7 @@ void UIEquipWnd::Paint() {
     return;
   }
 
-  const char* background = this->m_viewOther != 0 ? "유저인터페이스\\basic_interface\\equipwin_bg.bmp" : "유저인터페이스\\basic_interface\\equipwin_bg2.bmp";
-  if (CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background)))) {
+  if (CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_viewOther != 0 ? "유저인터페이스\\basic_interface\\equipwin_bg.bmp" : "유저인터페이스\\basic_interface\\equipwin_bg2.bmp")))) {
     this->DrawBitmap(0, this->m_contentTop + 17, bitmap, false);
   }
 
@@ -589,7 +589,7 @@ void UIEquipWnd::Paint() {
 
     this->DrawEquipSlots();
     this->RefreshLook();
-    FuncDrawWNDChar drawer(
+    FuncDrawWNDChar(
       this,
       this->geometry.width / 2 + 1,
       149,
@@ -609,8 +609,7 @@ void UIEquipWnd::Paint() {
       0,
       0,
       this->m_updateTick
-    );
-    drawer.Draw(false);
+    ).Draw(false);
 
     if (this->m_viewOther == 0) {
       if (this->m_page == 0) {
@@ -843,7 +842,7 @@ int UIMinimapZoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
     return 0;
   }
   case 502: {
-    const unsigned char enabled = g_serviceOptions.Get(223);
+    const unsigned char enabled = g_serviceOptions.Get(TT_SHOW_MINIMAP_BUTTON_ONOFF);
     for (UIWindow* button : this->m_buttons) {
       static_cast<UIButton*>(button)->Enable(enabled);
     }
@@ -938,7 +937,7 @@ void UIMonsterDisplayWnd::Paint() {
     if (cell.imageType == 0) {
       texture = g_renderer->atlas.Find(image, sprite->palette, record);
       if (!texture) {
-        texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, sprite->palette, record, g_serviceType, g_resourceReuseDelay);
+        texture = g_renderer->atlas.Insert(image, sprite->palette, record);
       }
     } else {
       texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
@@ -1104,7 +1103,7 @@ void UIPartyInvitationToWnd::Paint() {
 // OFFSET: 0x008EFA00
 // FUNCTION: fn_12240
 void UIPartySettingWnd::Paint() {
-  const char* title = LookupMessage(this->m_mode != 50 ? 291 : 2054);
+  const char* title = LookupMessage(this->m_mode != 50 ? MSI_PARTYSETTING : MSI_CREATE_PARTY);
   const int titleHeight = this->DrawTitleBar(true, title, 0);
   this->DrawPanelBackground(titleHeight, 0, "");
   this->DrawButtonBar(2, 0, 1);
@@ -1790,7 +1789,7 @@ void UIPetTamingDeceiveWnd::Paint() {
     const SpriteRleImage* image = sprite->images[0][cell.image];
     CTexture* texture = g_renderer->atlas.Find(image, sprite->palette, record);
     if (!texture) {
-      texture = g_renderer->atlas.Insert(*GetRenderSystemHolder()->system, image, sprite->palette, record, g_serviceType, g_resourceReuseDelay);
+      texture = g_renderer->atlas.Insert(image, sprite->palette, record);
     }
     this->geometry.surface->DrawSurface(
       this->geometry.width / 2 + cell.x, this->geometry.height / 2 + cell.y, texture, static_cast<int>(record.u0 * 256.0f),
@@ -3080,7 +3079,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
   case UM_COMMAND:
     switch (a) {
     case ID_CLOSE:
-      g_windowMgr.CloseWindow(this->m_viewOther == 1 ? 139 : 10);
+      g_windowMgr.CloseWindow(this->m_viewOther == 1 ? WID_EQUIPWND_VIEWOTHER_1 : WID_EQUIPWND);
       return 0;
     case ID_MINI: {
       const int height = this->geometry.height;
@@ -3130,7 +3129,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       const bool enabled = g_session.replayPacketMode > 0;
       if (StateFlag05(g_session.m_jobFlags)) {
         const int job = g_session.GetDisplayJob();
-        notice = LookupMessage(job == 4082 || job == 4083 || job == 4110 ? 2096 : 442);
+        notice = LookupMessage(job == JT_ROYAL_CHICKEN || job == JT_ROYAL_CHICKEN_H || job == JT_ROYAL_CHICKEN_B ? MSI_BATTLEFIELD_MSG_REQUEST_JOINWAIT : MSI_CHIKENOFF);
       } else if (StateFlag22(g_session.m_jobFlags)) {
         notice = LookupMessage(MSI_MADOOFF);
       } else if (StateFlag19(g_session.m_jobFlags) || StateFlag23(g_session.m_jobFlags) || StateFlag24(g_session.m_jobFlags) || StateFlag25(g_session.m_jobFlags) ||
@@ -3370,7 +3369,7 @@ void UIEquipWnd::OnCreate(int width, int height) {
         tooltip = LookupMessage(MSI_DRAGONOFF);
       }
       if (g_session.replayPacketMode > 0) {
-        tooltip = LookupMessage(tooltip ? 0xE34 : 0xDF);
+        tooltip = LookupMessage(tooltip ? MSI_BAN_LOGIN_IS_RESTRICTED : MSI_CARTOFF);
       }
       this->m_viewButton->SetTooltip(tooltip);
       this->AddChild(this->m_viewButton);
@@ -3764,9 +3763,9 @@ int UIBookWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
         ++this->m_pageCount;
       }
       if (b == 287) {
-        this->SendMsg(this, 92, page, 0, 0, 0);
+        this->SendMsg(this, UM_READBOOK, page, 0, 0, 0);
       } else {
-        this->SendMsg(this, 93, page, 0, 0, 0);
+        this->SendMsg(this, UM_AUTOREAD, page, 0, 0, 0);
       }
     }
     break;
@@ -5557,7 +5556,7 @@ int UILoadingWnd::SendMsg(UIWindow*, int message, std::intptr_t argument1, std::
 
 // OFFSET: 0x008CED00
 // FUNCTION: fn_12071
-int UIItemTagCtrl::MeasureText(const std::string& text, const unsigned& bytes) {
+int UINpcTextEditDialogWnd::MeasureText(const std::string& text, const unsigned& bytes) {
   return this->TextWidth(text.c_str(), bytes, 0, 12, 0, 0);
 }
 
@@ -5838,15 +5837,15 @@ int UIChatRoomMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       }
 
       if (this->m_titleEdit->Length() == 0) {
-        g_windowMgr.Confirm(LookupMessage(13), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_ROOM_TITLE), 0, true, false, 0, "Message", 280, 120, 0);
         break;
       }
       if (g_forbiddenWords.Contains(this->m_titleEdit->Text())) {
-        g_windowMgr.Confirm(LookupMessage(14), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_BAD_SENTANGE), 0, true, false, 0, "Message", 280, 120, 0);
         break;
       }
       if (g_serviceType == 1 && !ValidateCharacterName(this->m_titleEdit->Text())) {
-        g_windowMgr.Confirm(LookupMessage(190), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
         break;
       }
       if (this->m_passwordEdit->Length() < 4 && this->m_public == 1) {
@@ -5942,15 +5941,15 @@ int UIChatRoomChangeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     switch (a) {
     case ID_OK: {
       if (this->m_titleEdit->Length() == 0) {
-        g_windowMgr.Confirm(LookupMessage(13), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_ROOM_TITLE), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
       if (g_forbiddenWords.Contains(this->m_titleEdit->Text())) {
-        g_windowMgr.Confirm(LookupMessage(14), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_BAD_SENTANGE), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
       if (g_serviceType == 1 && !ValidateCharacterName(this->m_titleEdit->Text())) {
-        g_windowMgr.Confirm(LookupMessage(190), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
       if (this->m_passwordEdit->Length() < 4 && this->m_public == 1) {
@@ -6443,7 +6442,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
     this->SendMsg(this, UM_COMMAND, 386, 0, 0, 0);
     return 0;
 
-  case 120: {
+  case UM_SET_CASHSHOP_BALANCE: {
     std::strcpy(key, g_subKey);
     std::strcat(key, "\\NeoCash");
     HKEY handle;
@@ -6550,7 +6549,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       }
       int notice;
       if (this->m_cashBalance < std::atoi(this->m_pointEdit->Text()) || std::atoi(this->m_pointEdit->Text()) + this->m_pointBalance < this->m_totalPrice) {
-        notice = 1254;
+        notice = MSI_BUY_CASH_FAIL_MONEY;
       } else if (std::atoi(this->m_pointEdit->Text()) <= this->m_totalPrice) {
         NCashBuyHeader header = {};
         header.packetType = ID_CZ_SE_PC_BUY_CASHITEM_LIST;
@@ -6563,7 +6562,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
         } else {
           FormatMessageBuffer(text, LookupMessage(MSI_CHANGE_MATERIAL_INVSORT), total - points, points);
         }
-        if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 280, 120, 0) != 187) {
+        if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 280, 120, 0) != ID_YES) {
           break;
         }
 
@@ -6590,7 +6589,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
         GetRagConnection().Send(static_cast<short>(length), buffer);
         return 0;
       } else {
-        notice = 1860;
+        notice = MSI_BUY_CASH_FAIL2;
       }
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(notice)), 0xFF, 0, 0, 0);
       return 0;
@@ -9373,7 +9372,7 @@ int UIAutoMessageWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
   }
 
   if (a == ID_OK) {
-    reinterpret_cast<std::string&>(g_session.autoReplyText) = this->m_edit->Text();
+    g_session.autoReplyText = this->m_edit->Text();
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_AUTO_MSG_ON)), 0x64FFFF, 0, 0, 0);
     g_windowMgr.RestoreInput();
     g_windowMgr.CloseWindow(WID_AUTOMESSAGEWND);
@@ -9644,7 +9643,7 @@ void UIAutoMessageWnd::OnCreate(int, int) {
   this->m_edit->Move(15, 22);
   this->m_edit->maximum = 100;
   this->m_edit->Background(232, 232, 232);
-  this->m_edit->SetText(reinterpret_cast<const std::string&>(g_session.autoReplyText).c_str());
+  this->m_edit->SetText(g_session.autoReplyText.c_str());
   this->m_edit->SelectAll();
   this->AddChild(this->m_edit);
 
@@ -10232,7 +10231,7 @@ int UIMakingArrowListWnd::SendMsg(UIWindow*, int message, std::intptr_t a, std::
 void UITipboxWnd::OnProcess() {
   if (this->refreshPending == true) {
     this->refreshPending = false;
-    const int index = g_itemTagOwner->paragraphIndex >= 0 ? g_itemTagOwner->paragraphIndex : 0;
+    const int index = g_itemTagOwner->paragraphIndex < 0 ? 0 : g_itemTagOwner->paragraphIndex;
     const std::string text = g_itemTagOwner->m_currentEntry.paragraphs[index];
     std::vector<std::string> lines;
     WrapPlainText(text.c_str(), lines, 1000);
@@ -10749,7 +10748,7 @@ int UISecondPasswordInputWnd::SendMsg(UIWindow* sender, int message, std::intptr
       std::memset(this->confirmPassword, 0, sizeof(this->confirmPassword));
       break;
     case ID_CANCEL:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
       }
@@ -11157,7 +11156,7 @@ int UISecondPasswordEditWnd::SendMsg(UIWindow* sender, int message, std::intptr_
       std::memset(this->confirmPassword, 0, sizeof(this->confirmPassword));
       break;
     case ID_CANCEL:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
       }
@@ -12330,7 +12329,7 @@ int UIProhibitListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       counter->Move((g_renderer->viewport.width - 640) / 2 + 200, ScaleByScreenHeight(200));
       g_windowMgr.AddRendered(counter);
       counter->SendMsg(nullptr, UM_SET_TARGET, 0x98, 0, 0, 0);
-      counter->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(0x186)), 0, 0, 0);
+      counter->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GIVE_MINUS_MANNER_POINT)), 0, 0, 0);
       counter->SendMsg(nullptr, UM_SET_COUNT, 1, 0, 0, 0);
       break;
     }
@@ -12348,7 +12347,7 @@ int UIProhibitListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       counter->Move((g_renderer->viewport.width - 640) / 2 + 200, ScaleByScreenHeight(200));
       g_windowMgr.AddRendered(counter);
       counter->SendMsg(nullptr, UM_SET_TARGET, 0x97, 0, 0, 0);
-      counter->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(0x185)), 0, 0, 0);
+      counter->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GIVE_PLUS_MANNER_POINT)), 0, 0, 0);
       counter->SendMsg(nullptr, UM_SET_COUNT, 1, 0, 0, 0);
       break;
     }
@@ -12655,7 +12654,7 @@ int UIItemCollectionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t ar
     }
     if (this->m_kind == 12) {
       ITEM_INFO* equipped = g_session.GetEquippedItem(&this->m_item);
-      if (g_serviceOptions.Get(264) && equipped && argument4 == 0) {
+      if (g_serviceOptions.Get(TT_ITEM_COMPARE_ON_OFF) && equipped && argument4 == 0) {
         UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTION_COMPARISONWND);
         if (window) {
           window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(equipped), 1, 0, 0);

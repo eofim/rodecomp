@@ -1,4 +1,5 @@
 #include "Client/Mode/ModeMessage.h"
+#include "UI/GameSettings/TalkType.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/Actors/Pc.h"
@@ -145,35 +146,35 @@ void CGrannyPc::SetAction(unsigned animation, int, int repeat) {
     return;
   }
 
-  this->render.state = 0;
+  this->render.state = ST_STAND;
   switch (animation) {
     case 0:
-      this->render.state = 0;
+      this->render.state = ST_STAND;
       break;
     case 48:
-      this->render.state = 4;
+      this->render.state = ST_DAMAGE;
       break;
     case 80:
     case 88:
-      this->render.state = 2;
+      this->render.state = ST_ATTACK;
       break;
     case 64:
-      this->render.state = 3;
+      this->render.state = ST_DEAD;
       break;
     case 8:
-      this->render.state = 1;
+      this->render.state = ST_MOVE;
       break;
     case 24:
-      this->render.state = 5;
+      this->render.state = ST_PICKUP;
       break;
     case 32:
-      this->render.state = 11;
+      this->render.state = ST_ATTACKWAIT;
       break;
     case 40:
-      this->render.state = 12;
+      this->render.state = ST_THROW;
       break;
     case 16:
-      this->render.state = 6;
+      this->render.state = ST_SIT;
       break;
   }
   this->PlayMotion(repeat);
@@ -189,7 +190,7 @@ void CGrannyPc::PlayMotion(int repeat) {
   }
   this->animationTime = 0;
 
-  if (repeat == 1 && this->render.state != 6) {
+  if (repeat == 1 && this->render.state != ST_SIT) {
     this->controls[this->motion] = this->model->PlayAnimation(this->motion, this->instance, this->controls[this->motion], 1);
   } else {
     this->controls[this->motion] = this->model->PlayAnimation(this->motion, this->instance, this->controls[this->motion], 0);
@@ -384,17 +385,15 @@ void CGrannyPc::SetSprWeapon(int weaponLow32, int weaponHigh32) {
 // FUNCTION: fn_22650
 void CGrannyPc::SetState(int state, int resetPosition) {
   const int current = this->render.state;
-  if (current == 3 || this->isTrickDead != 0) {
+  if (current == ST_DEAD || this->isTrickDead != 0) {
     return;
   }
 
-  if (current == 4 && static_cast<char>(resetPosition) == 1) {
+  if (current == ST_DAMAGE && static_cast<char>(resetPosition) == 1) {
     this->render.position.x = this->damageDestX;
     this->render.position.z = this->damageDestZ;
   }
 
-  using SpawnArrow = void (CGameMode::*)(const vector3d*, std::uint32_t, float, int);
-  const SpawnArrow spawnArrow = reinterpret_cast<SpawnArrow>(&CGameMode::SpawnArrowEffect);
 
   switch (state) {
   case ST_BEGIN_SKILL:
@@ -414,18 +413,18 @@ void CGrannyPc::SetState(int state, int resetPosition) {
       this->render.isMotionFreezed = false;
     }
     this->headDir = 0;
-    CGameActor::SetState(1, resetPosition);
+    CGameActor::SetState(ST_MOVE, resetPosition);
     break;
   case ST_STAND:
-    CGameActor::SetState(0, resetPosition);
+    CGameActor::SetState(ST_STAND, resetPosition);
     this->render.curMotion = this->headDir;
-    if (current == 4 || current == 2 || this->healthState != 0 || current == 8) {
+    if (current == ST_DAMAGE || current == ST_ATTACK || this->healthState != 0 || current == ST_BEGIN_SKILL) {
       this->SetAction(0x20, 4, 0);
     }
     static_cast<CGameMode*>(g_modeMgr.GetGameMode())->waitingUseItemAck = 0;
     break;
   case ST_SKILL:
-    if (current == 6) {
+    if (current == ST_SIT) {
       return;
     }
     if (this->GetEffectiveJob(-1) == 0x13 || this->GetEffectiveJob(-1) == 0x14 || this->GetEffectiveJob(-1) == 0xE ||
@@ -462,7 +461,7 @@ void CGrannyPc::SetState(int state, int resetPosition) {
     g_session.m_hotkeyScript->Call("IsItemUsingArrow", "d>b", this->weapon, &usesArrow);
     if (usesArrow == true) {
       CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-      (mode->*spawnArrow)(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
+      mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
     break;
@@ -480,14 +479,14 @@ void CGrannyPc::SetState(int state, int resetPosition) {
     this->attackMotion = AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
     if ((this->weapon == 14 && this->secondaryWeapon == 0) || (this->weapon == 13 && this->secondaryWeapon == 0)) {
       CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-      (mode->*spawnArrow)(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
+      mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
     break;
   }
   default:
     CGameActor::SetState(state, resetPosition);
-    if (this->render.state == 3) {
+    if (this->render.state == ST_DEAD) {
       this->PlayMotion(1);
     }
     return;
@@ -842,7 +841,7 @@ void CPc::RenderBodyOutline(int layer, const float* position, float x, float y, 
   }
 
   int motion;
-  if (this->render.state == 3 || this->isTrickDead != 0) {
+  if (this->render.state == ST_DEAD || this->isTrickDead != 0) {
     this->render.previousAnimation = this->ActionBase(this->render.state);
     motion = action->FrameCount(this->render.previousAnimation) - 1;
     this->render.curMotion = motion;
@@ -882,7 +881,7 @@ void CPc::RenderBodyOutline(int layer, const float* position, float x, float y, 
       }
     } else {
       this->PrepareSprite(index, index, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, reinterpret_cast<int*>(&box), &quadColor, 0, 0, 0);
-      if (this->render.state == 0 && index == 1) {
+      if (this->render.state == ST_STAND && index == 1) {
         quad.bottomRhw = bottomRhw + 0.000008f;
         quad.topRhw = topRhw + 0.00008f;
       }
@@ -1076,8 +1075,7 @@ void CPc::ApplyLayerEffects(
   }
 
   const long long hoverOffset = hover;
-  this->render.hoverOffsetLow = static_cast<std::uint32_t>(hoverOffset);
-  this->render.hoverOffsetHigh = static_cast<std::uint32_t>(hoverOffset >> 32);
+  this->render.hoverOffset = hoverOffset;
 
   SpriteQuad jitter;
   if ((this->render.flags & 8) != 0 && layer <= 4 && (this->render.flags & 0x30000) == 0) {
@@ -1874,7 +1872,7 @@ granny_world_pose* CGrannyPc::UpdateAnimation(C3dGrannyModelRes* model) {
 // OFFSET: 0x00DAC030
 // FUNCTION: fn_22591
 void CGrannyPc::ProcessMotion() {
-  if (this->render.state == 2) {
+  if (this->render.state == ST_ATTACK) {
     this->render.isMotionFinished = GrannyGetControlDurationLeft(this->controls[2]) < 0.1f;
   } else {
     this->render.isMotionFinished = true;
@@ -2008,7 +2006,7 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
   CActRes* action = static_cast<CActRes*>(this->GetEquipAction(0));
 
   int motion;
-  if (this->render.state == 3 || this->isTrickDead != 0) {
+  if (this->render.state == ST_DEAD || this->isTrickDead != 0) {
     this->render.previousAnimation = this->ActionBase(this->render.state);
     motion = action->FrameCount(this->render.previousAnimation) - 1;
     this->render.curMotion = motion;
@@ -2041,7 +2039,7 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
       }
     } else {
       this->PrepareSprite(index, index, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, reinterpret_cast<int*>(&box), &color, 0, 0, 0);
-      if (this->render.state == 0 && index == 1) {
+      if (this->render.state == ST_STAND && index == 1) {
         quad.bottomRhw = bottomRhw + 0.000008f;
         quad.topRhw = topRhw + 0.00008f;
       }
@@ -2304,7 +2302,7 @@ void CPc::Render(int argument) {
   }
 
   this->render.translucentOther[0] = 0;
-  if (g_serviceOptions.Get(0x109) && this->render.accountId != g_session.m_aid) {
+  if (g_serviceOptions.Get(TT_HIDE_PLAYER_ON_OFF) && this->render.accountId != g_session.m_aid) {
     this->render.translucentOther[0] = 1;
   }
 
@@ -2316,10 +2314,10 @@ void CPc::Render(int argument) {
   }
 
   if (this->render.visible) {
-    if (this->render.state != 6 && this->render.state != 3) {
+    if (this->render.state != ST_SIT && this->render.state != ST_DEAD) {
       this->DrawShadow(argument, this->render.scale);
     }
-    if (this->render.state == 6) {
+    if (this->render.state == ST_SIT) {
       switch (this->GetEffectiveJob(-1)) {
       case JT_STAR2:
       case JT_STAR2_B:
@@ -2900,7 +2898,7 @@ void CPlayer::UpdatePendingAction() {
     if (target == nullptr) {
       break;
     }
-    if (target->render.state == 3) {
+    if (target->render.state == ST_DEAD) {
       return;
     }
 
@@ -2909,18 +2907,18 @@ void CPlayer::UpdatePendingAction() {
     mode->WorldCell(this->render.position.x, this->render.position.z, column, row);
     if (this->GetEffectiveJob(-1) == 16 || this->GetEffectiveJob(-1) == 4017 || this->GetEffectiveJob(-1) == 4039) {
       const int state = static_cast<int>(this->render.state);
-      if (state != 1 && state != 0 && state != 4 && state != 7 && state != 8) {
+      if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE && state != ST_SKILL && state != ST_BEGIN_SKILL) {
         return;
       }
     } else if ((this->GetEffectiveJob(-1) >= 4046 && this->GetEffectiveJob(-1) < 4361) || this->GetEffectiveJob(-1) == 24 ||
                this->GetEffectiveJob(-1) == 25) {
       const int state = static_cast<int>(this->render.state);
-      if (state != 1 && state != 0 && state != 4 && state != 7 && state != 8 && state < 16) {
+      if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE && state != ST_SKILL && state != ST_BEGIN_SKILL && state < 16) {
         return;
       }
     } else {
       const int state = static_cast<int>(this->render.state);
-      if (state != 1 && state != 0 && state != 4) {
+      if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE) {
         return;
       }
     }
@@ -2945,7 +2943,7 @@ void CPlayer::UpdatePendingAction() {
       }
       this->ApplyFollowOffset(target, x, z, &cellY, &cellX);
       mode->FindWalkableCellToward(this->render.position.x, this->render.position.z, x, z, cellX, cellY, g_session.storeItemLimit);
-      if ((this->destCellX != cellX || this->destCellZ != cellY) && state != 2 &&
+      if ((this->destCellX != cellX || this->destCellZ != cellY) && state != ST_ATTACK &&
           this->isAttackRequest == 0 && elapsed) {
         this->destCellX = cellX;
         this->destCellZ = cellY;
@@ -2992,7 +2990,7 @@ void CPlayer::UpdatePendingAction() {
     const int range = mode->GetSkillAttackRange(this->skillId, this->skillUseLevel);
     mode->FindWalkableCellToward(this->render.position.x, this->render.position.z, x, z, cellX, cellY, range);
     const int state = static_cast<int>(this->render.state);
-    if (state != 1 && state != 0 && state != 4 && state < 16) {
+    if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE && state < 16) {
       return;
     }
 
@@ -3008,7 +3006,7 @@ void CPlayer::UpdatePendingAction() {
     if (this->destCellX == cellX && this->destCellZ == cellY) {
       return;
     }
-    if (this->render.state == 2) {
+    if (this->render.state == ST_ATTACK) {
       return;
     }
     this->destCellZ = cellY;
@@ -3029,7 +3027,7 @@ void CPlayer::UpdatePendingAction() {
     mode->CellCenter(groundX, groundY, x, z);
     mode->FindWalkableCellToward(this->render.position.x, this->render.position.z, x, z, groundX, groundY, range);
     const int state = static_cast<int>(this->render.state);
-    if (state != 1 && state != 0 && state != 4 && state < 16) {
+    if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE && state < 16) {
       return;
     }
 
@@ -3043,7 +3041,7 @@ void CPlayer::UpdatePendingAction() {
     if (this->destCellX == groundX && this->destCellZ == groundY) {
       return;
     }
-    if (this->render.state == 2) {
+    if (this->render.state == ST_ATTACK) {
       return;
     }
     this->destCellZ = groundY;
@@ -3067,7 +3065,7 @@ void CPlayer::UpdatePendingAction() {
     const int targetY = itemY;
     mode->StepTowardWalkableCell(column, row, itemX, itemY);
     const int state = static_cast<int>(this->render.state);
-    if (state != 0 && state < 16) {
+    if (state != ST_STAND && state < 16) {
       return;
     }
 
@@ -3109,7 +3107,7 @@ void CPlayer::UpdatePendingAction() {
     mode->CellCenter(cellX, cellY, x, z);
     mode->FindWalkableCellToward(this->render.position.x, this->render.position.z, x, z, cellX, cellY, range);
     const int state = static_cast<int>(this->render.state);
-    if (state != 1 && state != 0 && state != 4 && state < 16) {
+    if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE && state < 16) {
       return;
     }
 
@@ -3119,7 +3117,7 @@ void CPlayer::UpdatePendingAction() {
       if (this->destCellX == cellX && this->destCellZ == cellY) {
         return;
       }
-      if (this->render.state == 2 && skill->GetEffectiveJob(-1) != UNT_ICEWALL && skill->GetEffectiveJob(-1) != UNT_BLASTMINE &&
+      if (this->render.state == ST_ATTACK && skill->GetEffectiveJob(-1) != UNT_ICEWALL && skill->GetEffectiveJob(-1) != UNT_BLASTMINE &&
           skill->GetEffectiveJob(-1) != UNT_CLAYMORETRAP) {
         return;
       }
@@ -3424,7 +3422,7 @@ void CPlayer::ReapplySkillEffects() {
       break;
     case EFST_ROLLINGCUTTER:
       if (value < 10) {
-        if (g_serviceOptions.Get(0xE5)) {
+        if (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF)) {
           g_effectMgr->Spawn(this->render.accountId, value + 0x5BA, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
         } else {
           g_effectMgr->Spawn(this->render.accountId, value + 0x513, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
@@ -3570,7 +3568,7 @@ void CPlayer::ReapplySkillEffects() {
     case EFST_SV_ROOTTWIST:
       g_effectMgr->Retire(this->render.accountId, 0x456);
       if (g_effectMgr->HasAllocator(0x456) == true) {
-        g_effectMgr->Spawn(this->render.accountId, 0x456, this->render.position.x, this->render.position.y, this->render.position.z, 0, -1, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_SU_SV_ROOTTWIST, this->render.position.x, this->render.position.y, this->render.position.z, 0, -1, 0, 0);
       }
       break;
     case EFST_BITESCAR:
@@ -3605,25 +3603,25 @@ void CPlayer::ReapplySkillEffects() {
       if (g_effectMgr->Has(this->render.accountId, 0x4BE) == true) {
         g_effectMgr->Retire(this->render.accountId, 0x4BE);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x4BE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_SUN_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       break;
     case EFST_LUNARSTANCE:
       if (g_effectMgr->Has(this->render.accountId, 0x4BF) == true) {
         g_effectMgr->Retire(this->render.accountId, 0x4BF);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x4BF, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_LUNAR_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       break;
     case EFST_STARSTANCE:
       if (g_effectMgr->Has(this->render.accountId, 0x4C0) == true) {
         g_effectMgr->Retire(this->render.accountId, 0x4C0);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x4C0, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_STAR_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       break;
     case EFST_UNIVERSESTANCE:
       if (g_effectMgr->Has(this->render.accountId, 0x4C1) == true) {
         g_effectMgr->Retire(this->render.accountId, 0x4C1);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x4C1, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_UNIVERSE_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       break;
     case EFST_FLASHKICK:
       if (g_effectMgr->Has(this->render.accountId, 0x4C5) == true) {
@@ -3635,7 +3633,7 @@ void CPlayer::ReapplySkillEffects() {
       if (g_effectMgr->Has(this->render.accountId, 0x4C6) == true) {
         g_effectMgr->Retire(this->render.accountId, 0x4C6);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x4C6, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_SOUL_UNITY, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       g_soundMgr->PlayWave("effect\\t_바람방출.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       break;
     case EFST_SOULSHADOW:
@@ -3672,7 +3670,7 @@ void CPlayer::ReapplySkillEffects() {
       break;
     case EFST_HANDICAPSTATE_FROSTBITE:
       g_effectMgr->Spawn(this->render.accountId, EF_STATE_FROSTBITE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      g_effectMgr->Spawn(this->render.accountId, 0x8E0, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_FROSTBITE_SCREEN, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       break;
     case EFST_HANDICAPSTATE_LIGHTNINGSTRIKE:
       g_effectMgr->Retire(this->render.accountId, 0x8DC);
@@ -3706,11 +3704,11 @@ void CPlayer::ReapplySkillEffects() {
       break;
     case EFST_CLIMAX:
       if (!g_effectMgr->Has(this->render.accountId, 0x708)) {
-        g_effectMgr->Spawn(this->render.accountId, 0x708, this->render.position.x, this->render.position.y, this->render.position.z, 0, value, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_CLIMAX, this->render.position.x, this->render.position.y, this->render.position.z, 0, value, 0, 0);
       }
       break;
     case EFST_MEDIALE:
-      if (!g_serviceOptions.Get(0xE5) && !g_effectMgr->Has(this->render.accountId, 0x712)) {
+      if (!g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF) && !g_effectMgr->Has(this->render.accountId, 0x712)) {
         g_effectMgr->Spawn(this->render.accountId, EF_MEDIALE_VOTUM_LOOP, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       }
       break;
@@ -3736,10 +3734,10 @@ void CPlayer::ReapplySkillEffects() {
       }
       break;
     case EFST_A_MACHINE:
-      g_effectMgr->Spawn(this->render.accountId, 0x72F, this->render.position.x, this->render.position.y, this->render.position.z, 0, value, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_A_MACHINE, this->render.position.x, this->render.position.y, this->render.position.z, 0, value, 0, 0);
       break;
     case EFST_COMPETENTIA:
-      if (!g_serviceOptions.Get(0xE5) && !g_effectMgr->Has(this->render.accountId, 0x73C)) {
+      if (!g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF) && !g_effectMgr->Has(this->render.accountId, 0x73C)) {
         g_effectMgr->Spawn(this->render.accountId, EF_COMPETENTIA_LOOP, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       }
       if (!g_effectMgr->Has(this->render.accountId, 0x73D)) {
@@ -3753,7 +3751,7 @@ void CPlayer::ReapplySkillEffects() {
       break;
     case EFST_E_SLASH_COUNT:
       if (!g_effectMgr->Has(this->render.accountId, 0x779)) {
-        g_effectMgr->Spawn(this->render.accountId, 0x779, this->render.position.x, this->render.position.y, this->render.position.z, 0, value, 0, 0);
+        g_effectMgr->Spawn(this->render.accountId, EF_ETERNAL_SLASH_COUNT, this->render.position.x, this->render.position.y, this->render.position.z, 0, value, 0, 0);
       }
       break;
     case EFST_HELLS_PLANT_ARMOR:
@@ -3887,9 +3885,9 @@ void CPlayer::SendMsg(
     break;
   case AM_REQ_SIT:
     if (!StateFlag01(this->stateFlags)) {
-      if (this->render.state == 0) {
+      if (this->render.state == ST_STAND) {
         mode->SendMsg(MM_REQUEST_ACT, 2, this->proceedTargetGid, 0, 0);
-      } else if (this->render.state == 6) {
+      } else if (this->render.state == ST_SIT) {
         mode->SendMsg(MM_REQUEST_ACT, 3, this->proceedTargetGid, 0, 0);
       }
     }
@@ -3918,7 +3916,7 @@ void CPlayer::SendMsg(
     break;
   case AM_REQ_CHANGE_DIR: {
     const std::uint32_t state = this->render.state;
-    if (state != 0 && state != 4 && state != 6) {
+    if (state != ST_STAND && state != ST_DAMAGE && state != ST_SIT) {
       break;
     }
     float targetX;
@@ -3990,7 +3988,7 @@ void CPlayer::SendMsg(
     if (this->FindRoute(route[1], route[2], route[3], route[4], route[5], route[6], g_session.m_moveSpeed)) {
       this->movementState[5] = route[5];
       this->destCellY = route[6];
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     } else {
       int column;
@@ -4001,14 +3999,14 @@ void CPlayer::SendMsg(
       if (this->FindRoute(column, row, subColumn, subRow, route[5], route[6], g_session.m_moveSpeed)) {
         this->movementState[5] = route[5];
         this->destCellY = route[6];
-        this->SetState(1, 1);
+        this->SetState(ST_MOVE, 1);
       }
     }
     g_navigationManager.CheckArrival(this->movementState[5], this->destCellY);
     break;
   }
   case AM_FREEZE:
-    this->SetState(0, 1);
+    this->SetState(ST_STAND, 1);
     break;
   case AM_CANCELATTACK:
     this->isAttackRequest = 0;
@@ -4039,7 +4037,7 @@ void CPlayer::SendMsg(
     this->skillUseLevel = static_cast<int>(b);
     break;
   case AM_PROCEEDGROUNDSKILL:
-    if (this->render.state != 6 &&
+    if (this->render.state != ST_SIT &&
         (!StateFlag01(this->stateFlags) || b == 0x89 || b == 0xD4 || b == 0x211 || b == 0x212)) {
       this->proceedType = 4;
       this->skillId = static_cast<int>(b);
@@ -4049,7 +4047,7 @@ void CPlayer::SendMsg(
     }
     break;
   case AM_PROCEEDSKILL:
-    if (this->render.state != 6 &&
+    if (this->render.state != ST_SIT &&
         (!StateFlag01(this->stateFlags) || c == 0x89 || c == 0xD4 || c == 0x211 || c == 0x212 || c == 0x250)) {
       this->proceedType = 3;
       this->proceedTargetGid = static_cast<int>(b);
@@ -4057,7 +4055,7 @@ void CPlayer::SendMsg(
     }
     break;
   case AM_RESUMEPROCEEDATTACK:
-    if (this->render.state != 6 && !StateFlag01(this->stateFlags)) {
+    if (this->render.state != ST_SIT && !StateFlag01(this->stateFlags)) {
       const int attackMode = this->proceedType == 1 ? 5 : 1;
       this->tickOfMoveForAttack = timeGetTime() - 1200;
       this->proceedType = attackMode;
@@ -4069,7 +4067,7 @@ void CPlayer::SendMsg(
     }
     break;
   case AM_PROCEEDATTACK:
-    if (this->render.state != 6 && !StateFlag01(this->stateFlags)) {
+    if (this->render.state != ST_SIT && !StateFlag01(this->stateFlags)) {
       CRenderObject* target = mode->scene->GetGameActorByAID(static_cast<std::uint32_t>(b));
       if (target != nullptr) {
         this->proceedType =
@@ -4085,13 +4083,13 @@ void CPlayer::SendMsg(
     }
     break;
   case AM_PROCEEDPICKUPITEM:
-    if (this->render.state != 6 && !StateFlag01(this->stateFlags)) {
+    if (this->render.state != ST_SIT && !StateFlag01(this->stateFlags)) {
       this->proceedType = 2;
       this->proceedTargetGid = static_cast<int>(b);
     }
     break;
   case AM_PROCEEDTOUCHSKILL:
-    if (this->render.state != 6 && !StateFlag01(this->stateFlags)) {
+    if (this->render.state != ST_SIT && !StateFlag01(this->stateFlags)) {
       const int* skill = reinterpret_cast<const int*>(static_cast<std::intptr_t>(c));
       this->proceedType = 6;
       this->skillId = skill[1];
@@ -4298,7 +4296,7 @@ void CPlayer::Initialize() {
   this->preengageXOfMove = -1;
   this->preengageYOfMove = -1;
   this->standTick = timeGetTime() - 1200;
-  this->SetState(0, 1);
+  this->SetState(ST_STAND, 1);
 
   this->moveSpeed = g_session.m_moveSpeed;
   this->render.isCharacter = 1;
@@ -4345,22 +4343,22 @@ void CPlayer::Initialize() {
 // FUNCTION: fn_22651
 void CPc::SetState(int state, int resetPosition) {
   int current = this->render.state;
-  if (current == 3 || this->isTrickDead != 0) {
+  if (current == ST_DEAD || this->isTrickDead != 0) {
     return;
   }
 
-  if (state != 3 && (current == 0x51 || state == -1)) {
+  if (state != ST_DEAD && (current == 0x51 || state == -1)) {
     return;
   }
 
-  if (state == 3) {
+  if (state == ST_DEAD) {
     const int job = this->GetEffectiveJob(JobNames::BaseJob(this->job));
     this->LoadEquipAction(0, g_session.GetBodyActionResourceName(job, this->sex, this->bodyStyle, this->GetMadogearType()).c_str());
     this->LoadEquipSprite(0, g_session.GetBodySprName(job, this->sex, this->bodyStyle, this->GetMadogearType()).c_str());
     current = this->render.state;
   }
 
-  if (current == 4 && static_cast<char>(resetPosition) == 1) {
+  if (current == ST_DAMAGE && static_cast<char>(resetPosition) == 1) {
     this->render.position.x = this->damageDestX;
     this->render.position.z = this->damageDestZ;
   }
@@ -4372,8 +4370,6 @@ void CPc::SetState(int state, int resetPosition) {
     action = this->JobActionBase(state);
   }
 
-  using SpawnArrow = void (CGameMode::*)(const vector3d*, std::uint32_t, float, int);
-  const SpawnArrow spawnArrow = reinterpret_cast<SpawnArrow>(&CGameMode::SpawnArrowEffect);
 
   switch (state) {
   case ST_BEGIN_SKILL:
@@ -4393,10 +4389,10 @@ void CPc::SetState(int state, int resetPosition) {
       this->render.isMotionFreezed = false;
     }
     this->headDir = 0;
-    CGameActor::SetState(1, resetPosition);
+    CGameActor::SetState(ST_MOVE, resetPosition);
     break;
   case ST_STAND:
-    CGameActor::SetState(0, resetPosition);
+    CGameActor::SetState(ST_STAND, resetPosition);
     if (g_session.m_aid == this->render.accountId) {
       switch (g_session.m_job) {
       case JT_STAR:
@@ -4449,7 +4445,7 @@ void CPc::SetState(int state, int resetPosition) {
     static_cast<CGameMode*>(g_modeMgr.GetGameMode())->waitingUseItemAck = 0;
     break;
   case ST_SKILL:
-    if (this->render.specialMotionLocked == 1 || this->render.state == 6) {
+    if (this->render.specialMotionLocked == 1 || this->render.state == ST_SIT) {
       return;
     }
     this->SetAction(action, 6, 1);
@@ -4532,14 +4528,14 @@ void CPc::SetState(int state, int resetPosition) {
         this->SetArrowEffectSuppressed(false);
       } else {
         CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-        (mode->*spawnArrow)(&this->render.position, this->hitTargetAid, this->render.speed * this->attackMotion, 0);
+        mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->render.speed * this->attackMotion, 0);
       }
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
 
     if (g_session.IsDoramJob(this->GetEffectiveJob(-1)) == true && this->alternateDoramAppearance[0] == 1) {
       CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-      (mode->*spawnArrow)(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, this->GetEffectiveJob(-1));
+      mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, this->GetEffectiveJob(-1));
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
     break;
@@ -4556,7 +4552,7 @@ void CPc::SetState(int state, int resetPosition) {
     this->attackMotion = AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
     if ((this->weapon == 14 && this->secondaryWeapon == 0) || (this->weapon == 13 && this->secondaryWeapon == 0)) {
       CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-      (mode->*spawnArrow)(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
+      mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
     break;
@@ -4762,7 +4758,7 @@ void CPc::SendMsg(
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
   switch (message) {
   case AM_SET_HEAD_DIR:
-    if (this->render.state == 0 || this->render.state == 6) {
+    if (this->render.state == ST_STAND || this->render.state == ST_SIT) {
       this->render.curMotion = static_cast<int>(b);
     }
     break;
@@ -4805,16 +4801,16 @@ void CPc::SendMsg(
     this->SetPropensityInfo(entry->honor, entry->virtue);
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     break;
@@ -4845,16 +4841,16 @@ void CPc::SendMsg(
     this->pkState = entry->pkState;
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     break;
@@ -4901,16 +4897,16 @@ void CPc::SendMsg(
     this->SetPropensityInfo(entry->honor, entry->virtue);
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     if (c == 2 && !StateFlag06(this->stateFlags)) {
@@ -4947,16 +4943,16 @@ void CPc::SendMsg(
     this->SetPropensityInfo(entry->honor, entry->virtue);
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     if (c == 2 && !StateFlag06(this->stateFlags)) {
@@ -4989,10 +4985,10 @@ void CPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     } else {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     this->ShowPartyMemberEffect(entry->aid);
     break;
@@ -5022,10 +5018,10 @@ void CPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     } else {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     this->ShowPartyMemberEffect(entry->aid);
     this->pkState = entry->pkState;
@@ -5050,7 +5046,7 @@ void CPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     }
     this->ShowPartyMemberEffect(entry->aid);
@@ -5077,7 +5073,7 @@ void CPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     }
     this->ShowPartyMemberEffect(entry->aid);
@@ -5184,7 +5180,7 @@ void CGrannyPc::SendMsg(
   CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
   switch (message) {
   case AM_SET_HEAD_DIR:
-    if (this->render.state == 0 || this->render.state == 6) {
+    if (this->render.state == ST_STAND || this->render.state == ST_SIT) {
       this->render.curMotion = static_cast<int>(b);
     }
     break;
@@ -5227,16 +5223,16 @@ void CGrannyPc::SendMsg(
     this->SetPropensityInfo(entry->honor, entry->virtue);
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     break;
@@ -5264,16 +5260,16 @@ void CGrannyPc::SendMsg(
     this->SetPropensityInfo(entry->honor, entry->virtue);
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     break;
@@ -5316,16 +5312,16 @@ void CGrannyPc::SendMsg(
     this->SetPropensityInfo(entry->honor, entry->virtue);
     switch (entry->state) {
     case PCSTATE_STAND:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     case PCSTATE_DEAD:
-      this->SetState(3, 1);
+      this->SetState(ST_DEAD, 1);
       break;
     case PCSTATE_SIT:
-      this->SetState(6, 1);
+      this->SetState(ST_SIT, 1);
       break;
     default:
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
       break;
     }
     if (c == 2 && !StateFlag06(this->stateFlags)) {
@@ -5357,10 +5353,10 @@ void CGrannyPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     } else {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     this->ShowPartyMemberEffect(entry->aid);
     break;
@@ -5391,10 +5387,10 @@ void CGrannyPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     } else {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     this->ShowPartyMemberEffect(entry->aid);
     break;
@@ -5418,7 +5414,7 @@ void CGrannyPc::SendMsg(
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
       this->movementState[5] = entry->destX;
       this->destCellY = entry->destY;
-      this->SetState(1, 1);
+      this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     }
     this->ShowPartyMemberEffect(entry->aid);
@@ -5465,13 +5461,13 @@ bool CGrannyPc::ProcessState() {
     this->ProcessMotion();
     this->GetElapsedFrames();
     if (this->render.isMotionFinished) {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     return true;
   case ST_SKILL:
     this->ProcessMotion();
     if (this->render.isMotionFinished) {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     return true;
   case ST_DEAD:
@@ -5516,7 +5512,7 @@ bool CPc::ProcessState() {
     this->ProcessMotion();
     this->GetElapsedFrames();
     if (this->render.isMotionFinished) {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     return true;
   case ST_SKILL:
@@ -5541,7 +5537,7 @@ bool CPc::ProcessState() {
   case 80:
     this->ProcessMotion();
     if (this->render.isMotionFinished) {
-      this->SetState(0, 1);
+      this->SetState(ST_STAND, 1);
     }
     return true;
   case ST_DEAD:
@@ -5559,7 +5555,7 @@ bool CPc::ProcessState() {
   case 51:
     this->ProcessMotion();
     if (this->render.isMotionFinished == true) {
-      this->render.state = 2;
+      this->render.state = ST_ATTACK;
     }
     return true;
   default:
@@ -5570,11 +5566,11 @@ bool CPc::ProcessState() {
 // OFFSET: 0x00DBA5D0
 // FUNCTION: fn_22673
 void CPlayer::SetState(int state, int resetPosition) {
-  if (this->render.state == 3) {
+  if (this->render.state == ST_DEAD) {
     return;
   }
 
-  if (state != 1) {
+  if (state != ST_MOVE) {
     this->destCellX = -1;
     this->destCellZ = -1;
   }
@@ -5588,7 +5584,7 @@ void CPlayer::SetState(int state, int resetPosition) {
     this->SendMsg(nullptr, AM_REQ_MOVE_PRIMITIVE, cellX, cellY, 0, 0, 0, 0);
   }
 
-  if (state == 3) {
+  if (state == ST_DEAD) {
     CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
     mode->SendMsg(MM_HIDEMOUSEPOINTER, 0, 0, 0, 0);
     mode->LaunchDummyEffect(&this->render.position, 0x174, 300, 0);

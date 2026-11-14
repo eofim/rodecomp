@@ -1,4 +1,5 @@
 #include "Contents/Actors/GroundScope.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Actors/ActorEnums.h"
 #include "Contents/Skills/SkillId.h"
 
@@ -162,14 +163,14 @@ void CGroundScope::Render(int argument) {
       const char* name;
       std::uint32_t tint = color;
       switch (this->m_skillId) {
-        case 0x7F0:
-          name = g_serviceOptions.Get(0xE5) ? "effect\\mineffect\\new_poisonsmoke\\new_poisonsmoke_cast\\poi_magic_circle_1.tga"
+        case GC_POISONSMOKE:
+          name = g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF) ? "effect\\mineffect\\new_poisonsmoke\\new_poisonsmoke_cast\\poi_magic_circle_1.tga"
                                              : "effect\\new_poisonsmoke\\new_poisonsmoke_cast\\poi_magic_circle_1.tga";
           break;
-        case 0x8A5:
+        case WL_COMET:
           name = "effect\\new_comet\\new_comet_cast_magicrune\\new_comet_cast_magicrune.tga";
           break;
-        case 0x149E:
+        case CD_COMPETENTIA:
           name = "effect\\competentia\\competentia_cast_bottom\\com_rune_01.tga";
           tint = static_cast<unsigned char>(static_cast<int>(static_cast<float>(color >> 24) * 0.6f)) << 24 | 0xFFFFFF;
           break;

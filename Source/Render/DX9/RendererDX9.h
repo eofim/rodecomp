@@ -23,7 +23,7 @@ public:
   float FPS() const override;
   bool CaptureBackBuffer() override;
   bool RestoreBackBuffer() override;
-  void DrawAuxiliaryPrimitive(LightmappedPrimitive* primitive) override;
+  void DrawAuxiliaryPrimitive(LightmappedCommand* primitive) override;
   void DrawLightmappedPrimitive(LightmappedPrimitive* primitive) override;
   void DrawPrimitive(RenderCommand* primitive) override;
   bool RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture) override;
@@ -41,7 +41,7 @@ public:
   void DrawAlphaQueues(RenderQueues& queues, unsigned char twoPass);
   void DrawAuxiliaryQueue();
   void DrawBaseQueue();
-  void DrawQueues(RenderQueues& queues, unsigned char twoPass);
+  void DrawQueues();
   void ApplyFog();
   bool SaveScreenshot(const char* filename, int format, CTexture* overlay, const tagRECT* rectangle);
   void Submit(RenderCommand* command, std::uint16_t flags);

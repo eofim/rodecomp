@@ -16,6 +16,7 @@
 #include "File/File.h"
 #include "File/ResourcePath.h"
 #include "Script/LuaFileOperations.h"
+#include "UI/CashShop/UICashShopWnd.h"
 #include "UI/Chat/UINewChatWnd.h"
 #include "UI/Edit/UIEditCtrl.h"
 #include "UI/Window/UIWindow.h"
@@ -58,34 +59,20 @@ std::map<std::string, MiniMapPosition> g_exceptionMiniMapPosList;
 // GLOBAL: gl_24914
 std::map<std::string, std::vector<std::string>> g_kafraServiceMapList;
 
-class LuaScriptBag {
-public:
-  void Add(std::string left, std::string right);
-
-  /* 0000 */ unsigned char padding_0000[0x7C];
-  /* 007C */ std::vector<std::pair<std::string, std::string>> pairs;
-};
-
 // OFFSET: 0x00AFC8B0
 // FUNCTION: fn_18325
-void LuaScriptBag::Add(std::string left, std::string right) {
-  this->pairs.push_back(std::make_pair(left, right));
-}
-
-struct CashShopBannerWindow {
-  /* 0000 */ unsigned char padding_0000[0xBC];
-  /* 00BC */ LuaScriptBag* banners;
-  /* 00C0 */ LuaScriptBag* banners2;
-};
-
-// INLINED
-static void AddCashShopBanner(CashShopBannerWindow* window, std::string image, std::string url) {
-  window->banners->Add(image, url);
+void UICashShopWnd_Banner::AddEntry(std::string image, std::string url) {
+  this->m_entries.push_back(std::make_pair(image, url));
 }
 
 // INLINED
-static void AddCashShopBanner2(CashShopBannerWindow* window, std::string image, std::string url) {
-  window->banners2->Add(image, url);
+static void AddCashShopBanner(UICashShopWnd* window, std::string image, std::string url) {
+  window->m_banner->AddEntry(image, url);
+}
+
+// INLINED
+static void AddCashShopBanner2(UICashShopWnd* window, std::string image, std::string url) {
+  window->m_secondBanner->AddEntry(image, url);
 }
 
 // INLINED
@@ -356,7 +343,7 @@ int SetMagicFloorInfo(lua_State* state) {
     effect->ResetParticles();
     break;
   case MSG_SET_AREA:
-    *reinterpret_cast<float*>(&effect->areaParameters[8]) = static_cast<float>(luaL_checknumber(state, 3));
+    effect->areaSize = static_cast<float>(luaL_checknumber(state, 3));
     break;
   case MSG_SET_SIZE2:
     effect->scaleParameter = static_cast<float>(luaL_checknumber(state, 3));
@@ -453,7 +440,7 @@ int SetOtherEffectInfo(lua_State* state) {
     effect->ResetParticles();
     break;
   case MSG_SET_AREA:
-    *reinterpret_cast<float*>(&effect->areaParameters[8]) = static_cast<float>(luaL_checknumber(state, 4));
+    effect->areaSize = static_cast<float>(luaL_checknumber(state, 4));
     break;
   case MSG_SET_SIZE2:
     effect->scaleParameter = static_cast<float>(luaL_checknumber(state, 4));
@@ -811,7 +798,7 @@ int AddCashshopBanner(lua_State* state) {
   std::string image = luaL_checkstring(state, 1);
   std::string url = luaL_checkstring(state, 2);
   if (UIWindow* window = g_windowMgr.LookupWindow(WID_CASHSHOP_WND)) {
-    AddCashShopBanner(reinterpret_cast<CashShopBannerWindow*>(window), image, url);
+    AddCashShopBanner(static_cast<UICashShopWnd*>(window), image, url);
   }
 
   return 0;
@@ -823,7 +810,7 @@ int AddCashshopBanner2(lua_State* state) {
   std::string image = luaL_checkstring(state, 1);
   std::string url = luaL_checkstring(state, 2);
   if (UIWindow* window = g_windowMgr.LookupWindow(WID_CASHSHOP_WND)) {
-    AddCashShopBanner2(reinterpret_cast<CashShopBannerWindow*>(window), image, url);
+    AddCashShopBanner2(static_cast<UICashShopWnd*>(window), image, url);
   }
 
   return 0;
@@ -1333,9 +1320,9 @@ int UIWindowMgr::GetHotkeyBehavior() {
   if (this->modifierKey == VK_SHIFT && !g_windowMgr.inputSuggestionsEnabled) {
     UIWindow* parent = this->hoverWindow ? this->hoverWindow->parent : nullptr;
     if (!parent || parent == this->chatWnd || parent->geometry.visible == 0) {
-      const int count = HotkeyCount(*g_session.m_hotkeyScript, 0);
+      const int count = g_session.HotkeyCount(0);
       for (int index = 0; index < count; ++index) {
-        const HotkeyInfo hotkey = GetHotkeyInfo(*g_session.m_hotkeyScript, 0, index);
+        const HotkeyInfo hotkey = g_session.GetHotkeyInfo(0, index);
         if (hotkey.key1 == this->keyCode && g_session.m_shortcutSlots[index].enabled != 0) {
           return index;
         }

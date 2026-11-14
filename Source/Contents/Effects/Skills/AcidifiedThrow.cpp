@@ -1,4 +1,6 @@
 #include "Contents/Effects/Skills/AcidifiedThrow.h"
+#include "Contents/Actors/Pc.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
@@ -40,38 +42,38 @@ void CAcidifiedThrow::Close() {
 // OFFSET: 0x006F37D0
 // FUNCTION: fn_06824
 void CAcidifiedThrow::Open() {
-  this->projectileEmitter = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
-  this->impactEmitters[0] = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
-  this->impactEmitters[1] = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 13));
-  this->impactEmitters[2] = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->position), 5));
+  this->projectileEmitter = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+  this->impactEmitters[0] = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+  this->impactEmitters[1] = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
+  this->impactEmitters[2] = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
 
   if (!this->projectileEmitter || !this->impactEmitters[0] || !this->impactEmitters[1] || !this->impactEmitters[2]) {
     return;
   }
 
   switch (this->id) {
-  case 0x89E:
+  case EF_ACIDIFIED_ZONE_FIRE:
     reinterpret_cast<CEZ2STRParticle*>(this->projectileEmitter)->Load("acidified_zone_fire\\acidified_zone_fire_c\\acidified_zone_fire_c.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[0])->Load("acidified_zone_fire\\acidified_zone_fire_b\\acidified_zone_fire_b.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[1])->Load("acidified_zone_fire\\acidified_zone_fire_b_bottom\\acidified_zone_fire_b_bottom.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[2])->Load("acidified_zone_fire\\acidified_zone_fire_water\\acidified_zone_fire_water.str");
     break;
 
-  case 0x8A6:
+  case EF_ACIDIFIED_ZONE_WATER:
     reinterpret_cast<CEZ2STRParticle*>(this->projectileEmitter)->Load("acidified_zone_water\\acidified_zone_water_c\\acidified_zone_water_c.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[0])->Load("acidified_zone_water\\acidified_zone_water_b\\acidified_zone_water_b.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[1])->Load("acidified_zone_water\\acidified_zone_water_b_bottom\\acidified_zone_water_b_bottom.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[2])->Load("acidified_zone_water\\acidified_zone_water_water\\acidified_zone_water_water.str");
     break;
 
-  case 0x8AE:
+  case EF_ACIDIFIED_ZONE_WIND:
     reinterpret_cast<CEZ2STRParticle*>(this->projectileEmitter)->Load("acidified_zone_wind\\acidified_zone_wind_c\\acidified_zone_wind_c.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[0])->Load("acidified_zone_wind\\acidified_zone_wind_b\\acidified_zone_wind_b.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[1])->Load("acidified_zone_wind\\acidified_zone_wind_b_bottom\\acidified_zone_wind_b_bottom.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[2])->Load("acidified_zone_wind\\acidified_zone_wind_water\\acidified_zone_wind_water.str");
     break;
 
-  case 0x8B6:
+  case EF_ACIDIFIED_ZONE_GROUND:
     reinterpret_cast<CEZ2STRParticle*>(this->projectileEmitter)->Load("acidified_zone_ground\\acidified_zone_ground_c\\acidified_zone_ground_c.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[0])->Load("acidified_zone_ground\\acidified_zone_ground_b\\acidified_zone_ground_b.str");
     reinterpret_cast<CEZ2STRParticle*>(this->impactEmitters[1])->Load("acidified_zone_ground\\acidified_zone_ground_b_bottom\\acidified_zone_ground_b_bottom.str");
@@ -179,23 +181,23 @@ void CAcidifiedThrow::OnProcess() {
     FreeParticle(reinterpret_cast<CParticle*>(this->projectileEmitter));
     this->projectileEmitter = nullptr;
 
-    CRenderObject* player = reinterpret_cast<CRenderObject*>(reinterpret_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
+    CRenderObject* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
     float soundX = player->render.position.x - this->impactPosition.x;
     float soundZ = player->render.position.z - this->impactPosition.z;
 
     g_soundMgr->PlayWave("effect\\BO_ACIDIFIED_ZONE.wav", soundX, 0.0f, soundZ, 250, 40, 1.0f, 0);
 
     switch (this->id) {
-    case 0x89E:
+    case EF_ACIDIFIED_ZONE_FIRE:
       g_soundMgr->PlayWave("effect\\BO_ACIDIFIED_ZONE_FIRE.wav", soundX, 0.0f, soundZ, 250, 40, 1.0f, 0);
       return;
-    case 0x8A6:
+    case EF_ACIDIFIED_ZONE_WATER:
       g_soundMgr->PlayWave("effect\\BO_ACIDIFIED_ZONE_WATER.wav", soundX, 0.0f, soundZ, 250, 40, 1.0f, 0);
       return;
-    case 0x8AE:
+    case EF_ACIDIFIED_ZONE_WIND:
       g_soundMgr->PlayWave("effect\\BO_ACIDIFIED_ZONE_WIND.wav", soundX, 0.0f, soundZ, 250, 40, 1.0f, 0);
       return;
-    case 0x8B6:
+    case EF_ACIDIFIED_ZONE_GROUND:
       g_soundMgr->PlayWave("effect\\BO_ACIDIFIED_ZONE_GROUND.wav", soundX, 0.0f, soundZ, 250, 40, 1.0f, 0);
       return;
     default:

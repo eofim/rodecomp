@@ -33,7 +33,7 @@ public:
   virtual void SetDestinationBlend(int argument);
   virtual void SetParticleTexture(std::string name);
   virtual void InitEvents();
-  virtual void AdvanceFrame(int argument);
+  virtual void AdvanceFrame(float speed);
   virtual void SetLifeTime(int argument);
   virtual void SetRepeat(int argument);
   virtual void SetDelay(int) {}
@@ -82,7 +82,8 @@ public:
   /* 0034 */ unsigned char outsideRange;
   /* 0035 */ unsigned char padding_0035[3];
   /* 0038 */ int range;
-  /* 003C */ unsigned char areaParameters[12];
+  /* 003C */ unsigned char areaParameters[8];
+  /* 0044 */ float areaSize;
   /* 0048 */ float scaleParameter;
   /* 004C */ int baseAngle;
   /* 0050 */ float rotationParameter;

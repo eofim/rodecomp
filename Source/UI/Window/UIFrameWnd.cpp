@@ -1,4 +1,5 @@
 #include "Client/Mode/CMode.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
@@ -129,10 +130,12 @@ void UIFrameWnd::OnLBtnDown(int x, int y) {
 
   RaiseWindow(this);
   g_windowMgr.SetCapture(this);
-  int screen[2] = {x, y};
-  this->ToScreen(screen[0], screen[1]);
-  this->m_dragX = screen[0];
-  this->m_dragY = screen[1];
+  int screen[2];
+  screen[1] = x;
+  screen[0] = y;
+  this->ToScreen(screen[1], screen[0]);
+  this->m_dragX = screen[1];
+  this->m_dragY = screen[0];
   this->m_originX = this->geometry.x;
   this->m_originY = this->geometry.y;
   this->geometry.targetAlpha = 128;
@@ -272,7 +275,7 @@ UIBitmapButton* UIFrameWnd::AddBigCloseButton(const char* tooltip, int width) {
   button->SetBitmap("유저인터페이스\\basic_interface\\big_sys_close_on.bmp", 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(width - button->BitmapWidth(), 0);
-  button->SetId(201);
+  button->SetId(ID_CLOSE);
   button->SetTooltip(tooltip);
   this->AddChild(button);
 
@@ -292,7 +295,7 @@ UIBitmapButton* UIFrameWnd::AddCloseButton(const char* tooltip, int width) {
   button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_on.bmp", 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(width - 14, 3);
-  button->SetId(201);
+  button->SetId(ID_CLOSE);
   button->SetTooltip(tooltip);
   this->AddChild(button);
 
@@ -312,7 +315,7 @@ UIBitmapButton* UIFrameWnd::AddMinimizeButton(const char* tooltip, int width) {
   button->SetBitmap("유저인터페이스\\basic_interface\\sys_mini_on.bmp", 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(width - 28, 3);
-  button->SetId(202);
+  button->SetId(ID_MINI);
   button->SetTooltip(tooltip);
   this->AddChild(button);
 
@@ -517,14 +520,14 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   case ID_DOWN:
     step = -1;
     break;
-  case 0x185:
+  case BANK_BUTTON_MAX:
     if (!this->m_amountEdit) {
       return 0;
     }
     this->m_amountEdit->SetText(LookupMessage(MSI_BANK_1_MINI));
     g_windowMgr.SetFocus(this->m_amountEdit);
     return 0;
-  case 0x1CE: {
+  case BANK_BUTTON_DEPOSIT: {
     PACKET_CZ_BANK_TRANSACTION packet;
     if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsMenuWindowOpen() == true) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_WRONG_GUN)), 255, 0, 0, 0);
@@ -549,7 +552,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     }
     return 0;
   }
-  case 0x1CF: {
+  case BANK_BUTTON_WITHDRAW: {
     PACKET_CZ_BANK_TRANSACTION packet;
     if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsMenuWindowOpen() == true) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_WRONG_GUN)), 255, 0, 0, 0);
@@ -574,13 +577,13 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     }
     return 0;
   }
-  case 0x186:
+  case BANK_BUTTON_10MIL:
     step = 10000000;
     break;
-  case 0x187:
+  case BANK_BUTTON_1MIL:
     step = 1000000;
     break;
-  case 0x188:
+  case BANK_BUTTON_100K:
     step = 100000;
     break;
   default:
@@ -749,7 +752,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   case UM_MENU_SELECTED: {
     CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
     switch (this->menuCommands[a].second) {
-    case 0: {
+    case MENUID_EXPEL: {
       if (this->memberList->selected == -1) {
         return 0;
       }
@@ -757,7 +760,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       mode->SendMsg(MM_REQ_EXPEL_MEMBER, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
       return 0;
     }
-    case 1: {
+    case MENUID_GIVE_ROOM_POWER: {
       if (this->memberList->selected == -1) {
         return 0;
       }
@@ -765,16 +768,16 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       mode->SendMsg(MM_REQ_ROLE_CHANGE, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
       return 0;
     }
-    case 2:
-      g_windowMgr.EnsureWindow(WID_CHATROOMCHANGEWND)->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&mode->chatRoomTitle), 0, 0, 0);
+    case MENUID_CHANGE_ROOM_SETTING:
+      g_windowMgr.EnsureWindow(WID_CHATROOMCHANGEWND)->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&mode->chatRoom), 0, 0, 0);
       return 0;
-    case 3:
+    case MENUID_QUERYINFO:
       g_windowMgr.Confirm(LookupMessage(MSI_NOTSUPPORTEDYET), 0, true, false, 0, "Message", 280, 120, 0);
       return 0;
-    case 11:
+    case MENUID_WRITE_CHAT_TO_FILE:
       this->SaveChatLog();
       return 0;
-    case 21: {
+    case MENUID_ADD_TO_FRIEND_CHAR_LIST_FROM_WINDOW: {
       if (this->memberList->selected == -1) {
         return 0;
       }
@@ -839,7 +842,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       for (unsigned index = 0; index < this->menuCommands.size(); ++index) {
         menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(this->menuCommands[index].first.c_str()), 0, 0, 0);
       }
-      menu->SendMsg(nullptr, UM_SET_CALLER_WID, 28, 0, 0, 0);
+      menu->SendMsg(nullptr, UM_SET_CALLER_WID, WID_CHATROOMWND, 0, 0, 0);
       menu->SendMsg(nullptr, UM_ADJUSTSIZE, 0, 0, 0, 0);
 
       int x = g_mouse.x + 1;
@@ -918,7 +921,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     this->memberRoles[std::string(reinterpret_cast<const char*>(a))] = static_cast<int>(b);
     int color = 0;
     if (b != 0) {
-      if (g_serviceOptions.Get(11) && g_soundMgr->tingOnly != 0) {
+      if (g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF) && g_soundMgr->tingOnly != 0) {
         g_soundMgr->PlayWave("버튼소리.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       }
     } else {
@@ -1034,7 +1037,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     if (header.tag == 0x5014) {
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ROOM_IS_MADE)), 0xFFFF00, 0, 0, 0);
-      ChatRoomTitleInfo* settings = reinterpret_cast<ChatRoomTitleInfo*>(&static_cast<CGameMode*>(g_modeMgr.GetGameMode())->chatRoomTitle);
+      ChatRoomTitleInfo* settings = &static_cast<CGameMode*>(g_modeMgr.GetGameMode())->chatRoom;
       unsigned offset = 6;
       while (offset < size) {
         std::memcpy(&header, data + offset, sizeof(header));

@@ -102,7 +102,7 @@ void UIHotKeyWnd::OnCreate(int, int) {
   {
     std::string path = "유저인터페이스\\";
     const char* names[4] = {"btn_ok", "btn_cancel", "btn_reset", "btn_close"};
-    const int ids[4] = {184, 185, 363, 201};
+    const int ids[4] = {ID_OK, ID_CANCEL, ID_RESET, ID_CLOSE};
     int x = 0;
     for (int index = 0; index < 4; ++index) {
       UIBitmapButton* button = new UIBitmapButton();
@@ -114,13 +114,13 @@ void UIHotKeyWnd::OnCreate(int, int) {
       const int id = ids[index];
       button->SetId(id);
       this->AddChild(button);
-      if (id == 184) {
+      if (id == ID_OK) {
         x = this->geometry.width - 139;
-      } else if (id == 185) {
+      } else if (id == ID_CANCEL) {
         x = this->geometry.width - 92;
-      } else if (id == 363) {
+      } else if (id == ID_RESET) {
         x = 5;
-      } else if (id == 201) {
+      } else if (id == ID_CLOSE) {
         x = this->geometry.width - 46;
       }
 
@@ -238,7 +238,7 @@ int UIHotKeyWnd::RowFromPoint(int x, int y) {
     row += this->m_rowsPerPage;
   }
 
-  const int count = HotkeyCount(*g_session.m_hotkeyScript, this->m_tab);
+  const int count = g_session.HotkeyCount(this->m_tab);
 
   if (row < count) {
     return row;
@@ -348,7 +348,7 @@ void UISerachStoreInfoWnd::OnMouseHover(int x, int y) {
     if (static_cast<unsigned int>(x - 51) <= 108) {
       const auto entry = g_session.storeSearchResults.begin() + ((this->m_page - 1) * 10 + this->m_hoverRow);
       if (entry != g_session.storeSearchResults.end()) {
-        text.assign(reinterpret_cast<const char*>(&entry->storeIdentity[8]));
+        text.assign(entry->storeName);
         const std::size_t end = text.find('\r');
         if (end != std::string::npos) {
           text = text.substr(0, end);
@@ -639,7 +639,7 @@ int UIHotKeyWnd::CheckHotkeyConflict() {
       continue;
     }
 
-    const int count = HotkeyCount(*g_session.m_hotkeyScript, tab);
+    const int count = g_session.HotkeyCount(tab);
     for (int index = 0; index < count; ++index) {
       const HotkeyEntry entry = this->GetHotkey(tab, index, true);
       HotkeyInfo info = entry.info;
@@ -652,7 +652,7 @@ int UIHotKeyWnd::CheckHotkeyConflict() {
       }
 
       StringFormat(message, sizeof(message), static_cast<std::size_t>(-1), LookupMessage(MSI_HOTKEYWND_NOTICE4), info.description.c_str());
-      if (g_windowMgr.Confirm(message, 2, true, false, 0, "Message", 280, 120, 0) != 187) {
+      if (g_windowMgr.Confirm(message, 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
         return 1;
       }
 
@@ -662,7 +662,7 @@ int UIHotKeyWnd::CheckHotkeyConflict() {
       this->SetHotkey(tab, entry.index, info);
 
       if (tab == 0 && this->m_tab != 0) {
-        const int shortcutCount = HotkeyCount(*g_session.m_hotkeyScript, 3);
+        const int shortcutCount = g_session.HotkeyCount(3);
         for (int shortcut = 0; shortcut < shortcutCount; ++shortcut) {
           const HotkeyEntry other = this->GetHotkey(3, shortcut, true);
           HotkeyInfo otherInfo = other.info;
@@ -706,7 +706,7 @@ int UIHotKeyWnd::SendMsg(
       this->m_paged = 0;
       this->m_page = 1;
 
-      const int count = HotkeyCount(*g_session.m_hotkeyScript, tab);
+      const int count = g_session.HotkeyCount(tab);
       if (count > 36) {
         this->m_paged = 1;
         this->m_pageCount = count / 36;

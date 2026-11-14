@@ -130,7 +130,8 @@ void UIRoMapWnd::DrawHoverTooltip() {
   const int lineHeight = this->TextHeight(" ", 0, 0, 12, 1, 0) + 3;
   const WorldViewRecord* record = this->hoveredRecord;
   const WorldViewArea* anchor = this->previewArea;
-  const RECT rect = reinterpret_cast<const RECT&>(record->left);
+  RECT rect;
+  std::memcpy(&rect, &record->area, sizeof(rect));
   int x;
   if (anchor->right < rect.right) {
     leftSide = true;
@@ -487,7 +488,7 @@ bool UIRoMapWnd::LocateRecord(WorldViewRecord& record) {
   for (unsigned int index = 0; index < g_worldViewMgr.worlds.size(); ++index) {
     if (CWorldViewField* field = g_worldViewMgr.worlds[index]->FindField(name.c_str())) {
       record.worldIndex = index;
-      reinterpret_cast<WorldViewArea&>(record.left) = reinterpret_cast<const WorldViewArea&>(*field);
+      record.area = field->area;
       return true;
     }
   }
@@ -540,10 +541,10 @@ void UIRoMapWnd::OnMouseMove(int x, int y) {
   this->selectedRecord->worldIndex = g_worldViewMgr.currentWorld;
   this->selectedRecord->mapIndex = mapId;
   this->selectedRecord->name = field->name;
-  reinterpret_cast<WorldViewArea&>(this->selectedRecord->left) = reinterpret_cast<const WorldViewArea&>(*field);
+  this->selectedRecord->area = field->area;
 
   CWorldViewMap* map = world->maps[mapIndex];
-  reinterpret_cast<WorldViewArea&>(this->selectedRecord->screenLeft) = reinterpret_cast<const WorldViewArea&>(map->left);
+  this->selectedRecord->screenArea = map->area;
   this->Invalidate();
 }
 
@@ -556,7 +557,7 @@ void CKafraMoveMapServiceInfo::Build(std::string mapName) {
     CWorldViewField* field = g_worldViewMgr.worlds[0]->FindField(it->c_str());
     if (field) {
       std::string name = field->name;
-      WorldViewArea area = reinterpret_cast<const WorldViewArea&>(*field);
+      WorldViewArea area = field->area;
       RoMapMarker marker;
       SetRoMapMarker(name, area, marker);
       this->markers.push_back(marker);
@@ -572,7 +573,7 @@ void CKafraMoveMapServiceInfo::Update(UIRoMapWnd* wnd, float elapsed) {
     if (this->mapName != record->name) {
       this->mapName = record->name;
       this->Build(record->name);
-      SetRoMapMarker(record->name, reinterpret_cast<const WorldViewArea&>(record->left), this->current);
+      SetRoMapMarker(record->name, record->area, this->current);
       this->blend = 0.0f;
     }
 
@@ -744,7 +745,7 @@ int UIRoMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       if (this->m_searchEdit->Length()) {
         std::string name(this->m_searchEdit->Text());
         if (g_navigationManager.SearchNavigation(name, 0, true) == true) {
-          reinterpret_cast<UINavigationWnd*>(this)->RefreshWorldMapLevels();
+          this->RefreshWorldMapLevels();
         }
       }
       return 0;
@@ -1008,8 +1009,8 @@ void UIRoMapWnd::OnCreate(int, int) {
     }
   }
 
-  reinterpret_cast<UINavigationWnd*>(this)->RefreshWorldMapLevels();
-  reinterpret_cast<UINavigationWnd*>(this)->RefreshWorldMapMarks();
+  this->RefreshWorldMapLevels();
+  this->RefreshWorldMapMarks();
   const int closeX = this->geometry.width - 18;
   UIBitmapButton* closeButton = new UIBitmapButton();
   closeButton->SetBitmap("유저인터페이스\\basic_interface\\world_close_off.bmp", 0, 0);
@@ -1017,7 +1018,7 @@ void UIRoMapWnd::OnCreate(int, int) {
   closeButton->SetBitmap("유저인터페이스\\basic_interface\\world_close_on.bmp", 2, 0);
   closeButton->SetSize(closeButton->BitmapWidth(), closeButton->BitmapHeight());
   closeButton->Move(closeX, 0);
-  closeButton->SetId(201);
+  closeButton->SetId(ID_CLOSE);
   closeButton->SetTooltip("ctrl+`");
   this->AddChild(closeButton);
 
@@ -1027,7 +1028,7 @@ void UIRoMapWnd::OnCreate(int, int) {
     this->m_labelCheck = new (std::nothrow) UICheckBox();
     this->m_labelCheck->SetSize(80, 12);
     this->m_labelCheck->SetImages(checked.c_str(), unchecked.c_str(), LookupMessage(MSI_WORLDMAP_MSG4));
-    this->m_labelCheck->SetId(192);
+    this->m_labelCheck->SetId(ID_STATUS);
     this->m_labelCheck->Move(closeX - 82, 3);
     this->m_labelCheck->SetChecked(this->m_showLabels);
     this->m_labelCheck->SetTooltip("Tab");
@@ -1039,7 +1040,7 @@ void UIRoMapWnd::OnCreate(int, int) {
     this->m_searchButton->SetBitmap("유저인터페이스\\navigation_interface\\NaviSearch_C.bmp", 2, 0);
     this->m_searchButton->SetSize(this->m_searchButton->BitmapWidth(), this->m_searchButton->BitmapHeight());
     this->m_searchButton->Move(-100, -100);
-    this->m_searchButton->SetId(321);
+    this->m_searchButton->SetId(ID_SEARCH);
     this->m_searchButton->SetTooltip(LookupMessage(MSI_NAVIGATION_SEARCHINFO));
     this->AddChild(this->m_searchButton);
 
@@ -1049,7 +1050,7 @@ void UIRoMapWnd::OnCreate(int, int) {
     this->m_searchListButton->SetBitmap("유저인터페이스\\scroll0down.bmp", 2, 0);
     this->m_searchListButton->SetSize(this->m_searchListButton->BitmapWidth(), this->m_searchListButton->BitmapHeight());
     this->m_searchListButton->Move(-100, -100);
-    this->m_searchListButton->SetId(200);
+    this->m_searchListButton->SetId(ID_BASE);
     this->m_searchListButton->SetTooltip(LookupMessage(MSI_NAVIGATION_V4_HELP01));
     this->AddChild(this->m_searchListButton);
 

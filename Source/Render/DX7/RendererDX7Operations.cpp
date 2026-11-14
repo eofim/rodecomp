@@ -1,4 +1,5 @@
 #include "Render/DX7/RenderSystemDX7.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Configuration/ServiceOptions.h"
@@ -100,7 +101,7 @@ void CRendererDX7::DrawLightmappedPrimitive(LightmappedPrimitive* primitive) {
 
 // OFFSET: 0x0055AD50
 // FUNCTION: fn_02084
-void CRendererDX7::DrawAuxiliaryPrimitive(LightmappedPrimitive* primitive) {
+void CRendererDX7::DrawAuxiliaryPrimitive(LightmappedCommand* primitive) {
   if (primitive->vertexCount <= 0) {
     return;
   }
@@ -201,7 +202,7 @@ void CRendererDX7::FlushRenderList() {
   this->device->SetRenderState(D3DRENDERSTATE_AMBIENT, 0xFFFFFFFF);
   this->device->SetRenderState(D3DRENDERSTATE_CULLMODE, D3DCULL_CW);
 
-  if (g_serviceOptions.Get(119)) {
+  if (g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF)) {
     if (g_multitexture) {
       this->device->SetRenderState(D3DRENDERSTATE_COLORKEYENABLE, FALSE);
       this->device->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_MODULATEALPHA_ADDCOLOR);

@@ -1,8 +1,10 @@
 #include "Client/Mode/ModeMessage.h"
+#include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Sound/SoundMaker.h"
 #include "Contents/Actors/ActorEnums.h"
 #include "Contents/Jobs/JobId.h"
+#include "Network/Packets/NoticeEnums.h"
 
 #include "Contents/Actors/ActorStateFlags.h"
 #include "Contents/Actors/EffectActors.h"
@@ -717,11 +719,11 @@ void CNpc::SendMsg(
     CGameActor::SendMsg(sender, message, b, c, d, e, 0, 0);
     const NpcAppearInfo* info = reinterpret_cast<const NpcAppearInfo*>(static_cast<std::intptr_t>(b));
     switch (this->objectType) {
-      case 8:
-      case 9:
-      case 10:
-      case 13:
-      case 14:
+      case NPC_HO_TYPE:
+      case NPC_MERSOL_TYPE:
+      case NPC_ELEMENTAL_TYPE:
+      case NPC_ABR_TYPE:
+      case NPC_BIONIC_TYPE:
         this->emblemVersion = info->ownerId;
         break;
     }
@@ -735,7 +737,7 @@ void CNpc::SendMsg(
       if (this->playerGaugeWindow == nullptr) {
         this->playerGaugeWindow = new UIPlayerGage();
         switch (this->objectType) {
-          case 8: {
+          case NPC_HO_TYPE: {
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
               [] { return static_cast<std::int64_t>(g_session.m_homunHp); },
               [] { return static_cast<std::int64_t>(g_session.m_homunMaxHp); }
@@ -761,7 +763,7 @@ void CNpc::SendMsg(
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->actorKind = 7;
             break;
           }
-          case 9: {
+          case NPC_MERSOL_TYPE: {
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
               [] { return static_cast<std::int64_t>(g_session.m_mercenaryHp); },
               [] { return static_cast<std::int64_t>(g_session.m_mercenaryMaxHp); }
@@ -773,7 +775,7 @@ void CNpc::SendMsg(
             this->playerGaugeWindow->SetSize(60, 9);
             break;
           }
-          case 10: {
+          case NPC_ELEMENTAL_TYPE: {
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
               [] { return static_cast<std::int64_t>(g_session.elementalHp); },
               [] { return static_cast<std::int64_t>(g_session.elementalMaxHp); }
@@ -785,7 +787,7 @@ void CNpc::SendMsg(
             this->playerGaugeWindow->SetSize(60, 9);
             break;
           }
-          case 13: {
+          case NPC_ABR_TYPE: {
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
               [this] { return g_session.FindSummonHp(this->render.accountId); },
               [this] { return g_session.FindSummonMaxHp(this->render.accountId); }
@@ -794,7 +796,7 @@ void CNpc::SendMsg(
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->actorKind = 13;
             break;
           }
-          case 14: {
+          case NPC_BIONIC_TYPE: {
             static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
               [this] { return g_session.FindSummonHp(this->render.accountId); },
               [this] { return g_session.FindSummonMaxHp(this->render.accountId); }
@@ -815,7 +817,7 @@ void CNpc::SendMsg(
       return;
     }
 
-    if (this->objectType == 13 || this->objectType == 14) {
+    if (this->objectType == NPC_ABR_TYPE || this->objectType == NPC_BIONIC_TYPE) {
       return;
     }
 
@@ -1075,7 +1077,7 @@ void CNpc::Render(int argument) {
       bounds[4] = reciprocalDepth;
       this->SetRenderInfo(bounds, x, y);
 
-      if (!g_serviceOptions.Get(8)) {
+      if (!g_serviceOptions.Get(TT_EFFECT_ON_OFF)) {
         this->DrawShadow(argument, this->render.scale * 3.0f);
       }
       return;
@@ -1087,7 +1089,7 @@ void CNpc::Render(int argument) {
       if (this->GetEffectiveJob(-1) < 6017 || this->GetEffectiveJob(-1) > 6046) {
         for (const ActiveSkillEffect& effect : g_activeSkillEffects) {
           if (effect.id == 184) {
-            if (this->objectType == 5 && (!this->render.visible || !this->render.enabled)) {
+            if (this->objectType == NPC_MOB_TYPE && (!this->render.visible || !this->render.enabled)) {
               this->SetColor(-1, 0, 0, 0);
               this->DrawSprite(argument, g_session.IsMonsterClass(this->GetEffectiveJob(-1)), 0.0f);
               return;
@@ -1384,7 +1386,7 @@ bool CNpc::OnProcess() {
       if (this->homunAI->state) {
         this->homunAI->Process(this->render.accountId);
       } else {
-        if (g_serviceOptions.Get(0xA4)) {
+        if (g_serviceOptions.Get(TT_HOMUN_USERAI_ON_OFF)) {
           HANDLE find = FindFirstFileA(".\\AI\\USER_AI", &findData);
           if (find == INVALID_HANDLE_VALUE) {
             CreateDirectoryA(".\\AI\\USER_AI", nullptr);
@@ -1408,7 +1410,7 @@ bool CNpc::OnProcess() {
         this->merAI->Process(this->render.accountId);
       } else {
         const char* path;
-        if (g_serviceOptions.Get(0xAE)) {
+        if (g_serviceOptions.Get(TT_MER_USERAI_ON_OFF)) {
           HANDLE find = FindFirstFileA(".\\AI\\USER_AI", &findData);
           if (find == INVALID_HANDLE_VALUE) {
             CreateDirectoryA(".\\AI\\USER_AI", nullptr);
@@ -1445,13 +1447,13 @@ bool CNpc::OnProcess() {
 
   switch (this->objectType) {
     case 7:
-    case 8:
-    case 9:
-    case 10:
-    case 13:
-    case 14:
+    case NPC_HO_TYPE:
+    case NPC_MERSOL_TYPE:
+    case NPC_ELEMENTAL_TYPE:
+    case NPC_ABR_TYPE:
+    case NPC_BIONIC_TYPE:
       this->SetColor(
-        g_serviceOptions.Get(0x10A) ? 0x3A : static_cast<int>(this->render.color >> 24), static_cast<int>((this->render.color >> 16) & 0xFF),
+        g_serviceOptions.Get(TT_HIDE_SUMMON_ON_OFF) ? 0x3A : static_cast<int>(this->render.color >> 24), static_cast<int>((this->render.color >> 16) & 0xFF),
         static_cast<int>((this->render.color >> 8) & 0xFF), static_cast<int>(this->render.color & 0xFF)
       );
       break;
@@ -1695,13 +1697,13 @@ void CNpc::SetState(int state, int) {
           break;
         case ST_SKILL:
           switch (this->objectType) {
-            case 8:
-            case 10:
-            case 13:
-            case 14:
+            case NPC_HO_TYPE:
+            case NPC_ELEMENTAL_TYPE:
+            case NPC_ABR_TYPE:
+            case NPC_BIONIC_TYPE:
               this->SetAction(40, 4, 1);
               break;
-            case 9:
+            case NPC_MERSOL_TYPE:
               this->SetAction(16, 4, 1);
               break;
           }
@@ -1713,7 +1715,7 @@ void CNpc::SetState(int state, int) {
           if (this->bodyState != 1 && this->bodyState != 2) {
             this->render.isMotionFreezed = false;
           }
-          if (this->objectType == 8) {
+          if (this->objectType == NPC_HO_TYPE) {
             if (this->GetEffectiveJob(-1) == JT_MER_ELEANOR) {
               this->SetAction(16, 4, 1);
             } else if (std::rand() % 2) {

@@ -30,6 +30,20 @@
 #include <timeapi.h>
 #include <vector>
 
+enum RuneSystemButtonId : int {
+  RUNE_BUTTON_UNEQUIP = 344,
+  RUNE_BUTTON_DECOMPOSE = 407,
+  RUNE_BUTTON_GRADE = 509,
+  RUNE_BUTTON_ACTIVATE = 572,
+  RUNE_BUTTON_REWARD_1 = 590,
+  RUNE_BUTTON_REWARD_2 = 591,
+  RUNE_BUTTON_REWARD_3 = 592,
+  RUNE_BUTTON_REWARD_4 = 593,
+  RUNE_BUTTON_REWARD_5 = 594,
+  RUNE_BUTTON_REWARD_6 = 595,
+  RUNE_BUTTON_REWARD_7 = 596,
+};
+
 class Decom_ItemInfo;
 class RuneData;
 class RuneSetData;
@@ -214,7 +228,6 @@ public:
   void OnLBtnDblClk(int x, int y) override;
   void OnMouseHover(int x, int y) override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
-  __declspec(noinline) void UpdateActivation();
   __declspec(noinline) void UpdateRewards();
   __declspec(noinline) void Refresh();
   __declspec(noinline) void RefreshDescription();
@@ -240,6 +253,7 @@ public:
   void OnCreate(int width, int height) override;
   void Paint() override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
+  __declspec(noinline) void UpdateActivation();
 
   /* 007C */ RuneData* m_rune;
   /* 0080 */ UIRuneSystem_ActiveWnd* m_activeWnd;
