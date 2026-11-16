@@ -153,6 +153,7 @@
 #include "Contents/Messenger/MessengerWindows.h"
 #include "UI/Dialogs/UISayDialogWnd.h"
 #include "UI/Guild/UIGuildWnd.h"
+#include "UI/Shortcuts/UIShortCutWnd.h"
 #include "UI/Items/UIEquipWnd.h"
 #include "UI/Items/UIItemWnd.h"
 #include "UI/Navigation/UIMemorialDunWnd.h"
@@ -1006,6 +1007,55 @@ __declspec(noinline) void CGameMode::ReceiveFormatStringMessage(const unsigned c
 // OFFSET: 0x00D2AF90
 // FUNCTION: fn_21707
 void CGameMode::IgnorePacket(const unsigned char*) {
+}
+
+template __declspec(noinline) void std::list<CSkillInfo>::clear() noexcept;
+
+namespace {
+  // INLINED
+  template <class T> T ReadAdditionalSkill(const unsigned char* bytes) {
+    T value;
+    std::memcpy(&value, bytes, sizeof(value));
+    return value;
+  }
+}
+
+// OFFSET: 0x00D2B5C0
+// FUNCTION: fn_45442
+void CGameMode::ApplyAdditionalSkillPacket(const void* packet) {
+  this->isReqUpgradeSkillLevel = 0;
+  g_session.m_additionalSkills.clear();
+
+  const auto* bytes = static_cast<const unsigned char*>(packet);
+
+  const auto length = static_cast<std::uint32_t>(static_cast<int>(ReadAdditionalSkill<std::int16_t>(bytes + 2)) - 6);
+  const int count = static_cast<int>(length / 37);
+  const unsigned char* record = bytes + 6;
+
+  for (int index = 0; index < count; ++index, record += 37) {
+    CSkillInfo value;
+    value.level = ReadAdditionalSkill<std::int16_t>(record + 6);
+    value.id = ReadAdditionalSkill<std::uint16_t>(record);
+    value.spCost = static_cast<std::int32_t>(ReadAdditionalSkill<std::int16_t>(record + 8));
+    value.type = ReadAdditionalSkill<std::uint32_t>(record + 2);
+    value.upgradable = record[36];
+    value.name = value.IdName();
+    value.apCost = value.UseApAmount(ReadAdditionalSkill<std::int16_t>(record + 6));
+
+    if (value.id - 10000u <= 19u) {
+      g_session.UpdateAdditionalSkill(value, 1);
+    }
+  }
+
+  g_session.m_guildSkillPoint = ReadAdditionalSkill<std::int16_t>(bytes + 4);
+  g_session.InvalidateWindowFrames();
+  if (g_windowMgr.guildSkillWnd) {
+    g_windowMgr.guildSkillWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+  }
+
+  if (g_windowMgr.shortCutWnd) {
+    g_windowMgr.shortCutWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+  }
 }
 
 // OFFSET: 0x00D2B710
@@ -2464,7 +2514,7 @@ void __stdcall ProcessVendingSale(int field8, int itemIdWord, int quantityWord, 
   if (g_windowMgr.merchantItemWnd != nullptr) {
     g_windowMgr.merchantItemWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
   }
-  if (g_session.GetList9Size() == 0) {
+  if (g_session.GetNumMerchantPurchaseItems() == 0) {
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_IS_SOLD_OUT)), 0xFF00, 0, 0, 0);
     if (g_windowMgr.merchantItemMyShopWnd != nullptr) {
       g_windowMgr.merchantItemMyShopWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
@@ -2481,7 +2531,7 @@ void __stdcall ProcessVendingSale(int field8, int itemIdWord, int quantityWord, 
 // OFFSET: 0x00D08670
 // FUNCTION: fn_21592
 __declspec(noinline) void CGameMode::ProcessBuyingStorePurchase(int updateTime, int itemId, int amount, int zeny, int zenyLimit, int charId) {
-  ITEM_INFO item = g_session.FindItem1758ByItemId(itemId);
+  ITEM_INFO item = g_session.GetMerchantPurchaseItemInfoByItemId(itemId);
   item.SetItemId(itemId);
   item.quantity = amount;
   item.prices[0] = static_cast<std::uint32_t>(zeny);
@@ -2497,7 +2547,7 @@ __declspec(noinline) void CGameMode::ProcessBuyingStorePurchase(int updateTime, 
     if (g_session.m_muteSellSound) {
       g_soundMgr->PlayWave("effect\\ef_steal.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
-    if (g_session.GetList9Size() == 0) {
+    if (g_session.GetNumMerchantPurchaseItems() == 0) {
       g_windowMgr.buyingShopMyItemsWnd->SendMsg(nullptr, UM_COMMAND, ID_CLOSE, 0, 0, 0);
     }
   }
@@ -7570,7 +7620,7 @@ __declspec(noinline) void CGameMode::ReceiveParaItemResult(unsigned char success
   }
 
   const ParaResultEntry* entry = reinterpret_cast<const ParaResultEntry*>(data);
-  for (int i = count; i > 0; --i, ++entry) {
+  for (int i = 0; i < count; ++i, ++entry) {
     ITEM_INFO item;
     item.SetItemId(entry->itemId);
     item.quantity = entry->quantity;
@@ -14370,7 +14420,7 @@ void CGameMode::ReceiveActorMoveEntryLegacy(const unsigned char* data) {
       g_session.petAccessory = entry.accessory;
     }
     if (entry.accessory && !actor->GetGdid()) {
-      actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+      actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
     }
   } else if (packet->objectType == NPC_HO_TYPE && g_session.IsHomunAid(packet->aid)) {
     g_session.homunAlive = 1;
@@ -14501,7 +14551,7 @@ void CGameMode::SpawnMovingActor(
       g_session.petAccessory = entry.accessory;
     }
     if (entry.accessory && !actor->GetGdid()) {
-      actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+      actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
     }
   } else if (objectType == 8 && g_session.IsHomunAid(aid)) {
     g_session.homunAlive = 1;
@@ -14611,7 +14661,7 @@ void CGameMode::ReceiveActorMoveEntryOld(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory && !actor->GetGdid()) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     if (g_session.GetSiegeMode() && entry.head != 0x2E && actor->sceneNameWindow == nullptr &&
@@ -14650,7 +14700,7 @@ void CGameMode::ReceiveActorMoveEntryOld(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     this->scene->objects.push_back(actor);
@@ -15627,7 +15677,7 @@ void CGameMode::ReceiveActorStandEntryOld(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     actor->SendMsg(nullptr, AM_STANDENTRY2, reinterpret_cast<int>(&entry), 0, 0, 0, 0, 0);
@@ -15657,7 +15707,7 @@ void CGameMode::ReceiveActorStandEntryOld(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     this->scene->objects.push_back(actor);
@@ -15751,7 +15801,7 @@ void CGameMode::ReceiveActorStandEntryOld2(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     actor->SendMsg(nullptr, AM_STANDENTRY2, reinterpret_cast<int>(&entry), 0, 0, 0, 0, 0);
@@ -15782,7 +15832,7 @@ void CGameMode::ReceiveActorStandEntryOld2(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     this->scene->objects.push_back(actor);
@@ -15880,7 +15930,7 @@ void CGameMode::ReceiveActorStandEntryOld3(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     actor->SendMsg(nullptr, AM_STANDENTRY2, reinterpret_cast<int>(&entry), 0, 0, 0, 0, 0);
@@ -15910,7 +15960,7 @@ void CGameMode::ReceiveActorStandEntryOld3(const unsigned char* data) {
         g_session.petAccessory = entry.accessory;
       }
       if (entry.accessory) {
-        actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+        actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
       }
     }
     this->scene->objects.push_back(actor);
@@ -16439,7 +16489,7 @@ void CGameMode::SpawnStandingActor(
       g_session.petAccessory = entry.accessory;
     }
     if (entry.accessory && !actor->GetGdid()) {
-      actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+      actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
     }
   } else if (objectType == 8 && g_session.IsHomunAid(aid)) {
     g_session.homunAlive = 1;
@@ -16712,7 +16762,7 @@ void CGameMode::SpawnStateActor(
       g_session.petAccessory = entry.accessory;
     }
     if (entry.accessory && !actor->GetGdid()) {
-      actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+      actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
     }
   } else if (objectType == 8 && g_session.IsHomunAid(aid)) {
     g_session.homunAlive = 1;
@@ -16891,8 +16941,8 @@ void CGameMode::ReceiveColorBroadcast(const unsigned char* data) {
 void CGameMode::ReceiveTaggedBroadcast(const unsigned char* data) {
   const auto* p = reinterpret_cast<const PacketLengthHeader*>(data);
   char senderName[25] = {};
-  char text[0x400];
   char head[0x400];
+  char text[0x400];
   char body[0x400];
   std::memset(text, 0, sizeof(text));
   std::memset(head, 0, sizeof(head));
@@ -16904,8 +16954,8 @@ void CGameMode::ReceiveTaggedBroadcast(const unsigned char* data) {
   text[size] = '\0';
   const int length = static_cast<int>(std::strlen(text));
 
-  std::string message(text);
   std::uint32_t color = 0xFFFF;
+  std::string message(text);
   std::memcpy(tag, text, std::min<std::size_t>(4, std::strlen(text)));
   tag[4] = '\0';
   _strlwr(tag);
@@ -16919,7 +16969,7 @@ void CGameMode::ReceiveTaggedBroadcast(const unsigned char* data) {
     std::memcpy(head, text + 4, 6);
     head[6] = '\0';
     std::sscanf(head, "%lx", &rgb);
-    color = ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);
+    color = (GetRValue(rgb) << 16) | (GetGValue(rgb) << 8) | GetBValue(rgb);
     std::memcpy(body, text + 10, length - 10);
     body[length - 10] = '\0';
     message = body;
@@ -16939,7 +16989,7 @@ void CGameMode::ReceiveTaggedBroadcast(const unsigned char* data) {
     std::memcpy(head, text + 0x1C, 6);
     head[6] = '\0';
     std::sscanf(head, "%lx", &rgb);
-    color = ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);
+    color = (GetRValue(rgb) << 16) | (GetGValue(rgb) << 8) | GetBValue(rgb);
     const unsigned int bodySize = size - 0x22;
     std::memcpy(body, text + 0x22, bodySize);
     body[size - 0x22] = '\0';
@@ -16962,9 +17012,9 @@ void CGameMode::ReceiveTaggedBroadcast(const unsigned char* data) {
       message = filtered;
     }
   } else if (std::strcmp(tag, "ssss") == 0) {
-    std::memcpy(head, text + 4, length - 4);
-    head[length - 4] = '\0';
-    message = head;
+    std::memcpy(body, text + 4, length - 4);
+    body[length - 4] = '\0';
+    message = body;
     color = 0xFFFF;
     fontType = 14;
     systemMessage = true;
@@ -16979,18 +17029,21 @@ void CGameMode::ReceiveTaggedBroadcast(const unsigned char* data) {
   }
 
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-  g_windowMgr.SendNotice(
-    UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message.c_str()), color, fontType, reinterpret_cast<std::intptr_t>(senderName), 0
-  );
-  if (!systemMessage) {
+  if (systemMessage) {
+    g_windowMgr.SendNotice(
+      UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message.c_str()), color, fontType, reinterpret_cast<std::intptr_t>(senderName), 0
+    );
+  } else {
+    g_windowMgr.SendNotice(
+      UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(message.c_str()), color, fontType, reinterpret_cast<std::intptr_t>(senderName), 0
+    );
     g_windowMgr.SendNotice(
       UIM_PUSHINTOCHATHISTORY2, reinterpret_cast<std::intptr_t>(message.c_str()), color, fontType, reinterpret_cast<std::intptr_t>(senderName), 0
     );
   }
 
   message = g_windowMgr.chatWnd->ConvertChat(message);
-  std::string linked = g_navigationLinkParser->DisplayNavigationLink(message);
-  message = std::move(linked);
+  message = g_navigationLinkParser->DisplayNavigationLink(message);
 
   std::vector<std::string> lines;
   WrapPlainText(message.c_str(), lines, 0x48);
@@ -17188,7 +17241,7 @@ void CGameMode::ReceiveActorStateEntryLegacy(const unsigned char* data) {
       g_session.petAccessory = entry.accessory;
     }
     if (entry.accessory && !actor->GetGdid()) {
-      actor->SetActionName(ResourceMgr::Instance(), g_session.GetPetAccActName(entry.accessory));
+      actor->SetActionName(g_session.GetPetAccActName(entry.accessory));
     }
   } else if (packet->objectType == NPC_HO_TYPE && g_session.IsHomunAid(packet->aid)) {
     g_session.homunAlive = 1;

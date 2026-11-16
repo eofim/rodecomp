@@ -29,17 +29,6 @@ unsigned g_animationJobs[10] = {1288, 722, 1324, 1000, 1000, 1000, 1000, 1286, 1
 // GLOBAL: gl_24706
 const char* g_animationNames[5] = {"stand", "move", "attack", "dead", "damage"};
 
-struct ShadeVector {
-  ShadeVector() : x(0.0f), y(0.0f), z(0.0f) {
-  }
-
-  /* 0000 */ float x;
-  /* 0004 */ float y;
-  /* 0008 */ float z;
-};
-
-static_assert(sizeof(ShadeVector) == 12);
-
 struct ModelFaceRecordV1 {
   // INLINED
   void CopyTo(ModelFace& face) const {
@@ -225,7 +214,7 @@ __forceinline void C3dModelResV1::ReadNode(CFile& file, unsigned minor, const st
   int vertexCount = 0;
   file.Read(&vertexCount, 4);
   mesh.vertexCount = vertexCount;
-  auto* vertices = new std::array<float, 3>[vertexCount];
+  auto* vertices = new std::array<float, 3>[vertexCount]{};
   file.Read(vertices, static_cast<unsigned>(vertexCount) * 12u);
   mesh.vertices = vertices;
 
@@ -544,7 +533,6 @@ void C3dGrannyModelRes::FreeControl(granny_control* control) {
 // OFFSET: 0x007598B0
 // FUNCTION: fn_08019
 granny_file* GrannyAnimationLibrary::ReadAnimationFile(const char* name, const char* suffix) {
-  std::string path;
   CFile file;
   std::sprintf(g_animationPath, "%s%s.gr2", name, suffix);
 

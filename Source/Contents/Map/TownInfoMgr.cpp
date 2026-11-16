@@ -51,7 +51,7 @@ void CTownInfoMgr::AddTownInfo(std::string mapName, std::string name, int x, int
     TownInfo info(type, name, x, y, icons[type]);
     std::vector<TownInfo> list;
     list.push_back(info);
-    this->m_towns.insert(std::make_pair(mapName, list));
+    this->m_towns.insert(std::pair<std::string, std::vector<TownInfo>>(mapName, list));
   } else {
     TownInfo info(type, name, x, y, icons[type]);
     it->second.push_back(info);
@@ -192,7 +192,8 @@ int CTownInfoMgr::L_AddTownInfo(lua_State* state) {
   const int x = static_cast<int>(lua_tonumber(state, -3));
   const int y = static_cast<int>(lua_tonumber(state, -2));
   const int type = static_cast<int>(lua_tonumber(state, -1));
-  g_townInfoMgr->AddTownInfo(mapName, name, x, y, type);
+  CTownInfoMgr* const manager = g_townInfoMgr;
+  manager->AddTownInfo(mapName, name, x, y, type);
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatTownInfoString("good").c_str());
   return 2;

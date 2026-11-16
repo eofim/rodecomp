@@ -1,6 +1,7 @@
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Client/Mode/ModeMgr.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Contents/RuneSystem/RuneSystem.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Resource/Bitmap/BitmapResource.h"
@@ -1734,7 +1735,7 @@ int UIRune_Decom::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       g_windowMgr.CloseWindow(WID_RUNESYSTEM_DECOMRESULTWND);
       if (!CRuneSystemMgr::GetInstance()->IsRequestPending() && (!this->parent || this->parent->SendMsg(this, 0x6A, 50, 0, 0, 0) != 0) && this->m_ownedCount) {
         if (static_cast<float>(g_session.m_weight) > static_cast<float>(g_session.m_maxWeight) * 0.7f ||
-            g_session.GetList0Size() + g_session.CountDistinctEquippedItems() + g_session.CountDistinctCostumeItems() + 8 >=
+            g_session.GetNumInventoryItems() + g_session.CountDistinctEquippedItems() + g_session.CountDistinctCostumeItems() + 8 >=
               g_session.extraInventorySlots + 100) {
           g_windowMgr.Confirm(LookupMessage(MSI_MACRO_USER_REPORT), 0, true, false, 0, "Message", 280, 120, 0);
         } else {
@@ -2120,7 +2121,7 @@ void UIRune_Decom::Paint() {
 
   if (this->m_itemName.size()) {
     const int nameWidth = this->TextWidth(this->m_itemName.c_str(), this->m_itemName.size(), 0, 13, 0, 0);
-    const int nameX = static_cast<int>(static_cast<float>(this->geometry.width - nameWidth) * 0.5f);
+    const int nameX = static_cast<int>(static_cast<float>(this->geometry.width - nameWidth) * g_depthAverageHalf);
     this->DrawTextAt(nameX, 0x19, this->m_itemName.c_str(), 0, 0, 13, 0xFFF0E1, 1, 0);
     this->DrawTextAt(nameX - 1, 0x1A, this->m_itemName.c_str(), 0, 0, 13, 0x864D43, 1, 0);
   }
@@ -2183,7 +2184,7 @@ void UIRune_Decom::Paint() {
 
       text = static_cast<const std::string&>(FormatOwnedString("%d ~ %d", (*this->m_decomList)[index].m_minCount, (*this->m_decomList)[index].m_maxCount));
       width = this->TextWidth(text.c_str(), text.size(), 0, 12, 0, 0);
-      this->DrawTextAt(x - static_cast<int>(static_cast<float>(width) * 0.5f) + 0x13, y + 0x23, text.c_str(), 0, 0, 11,
+      this->DrawTextAt(x - static_cast<int>(static_cast<float>(width) * g_depthAverageHalf) + 0x13, y + 0x23, text.c_str(), 0, 0, 11,
         0x875F51, 0, 0
       );
     }
@@ -2249,7 +2250,8 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
     }
     break;
   case 0xAB:
-    if (argument1 == 0xC2) {
+    switch (argument1) {
+    case 0xC2:
       switch (this->m_tab->geometry.state) {
       case 0: {
         RuneData* rune = argument2 == -1 ? CRuneSystemMgr::GetInstance()->GetCurRuneSet() : CRuneSystemMgr::GetInstance()->GetCurrentRune(0, argument2);
@@ -2273,15 +2275,14 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
             runeSet = info->m_runeSet;
           }
 
-          const int itemId = static_cast<int>(runeSet->m_reward.values[index + 1]);
           if (index < runeSet->m_rewardStep) {
-            info->m_rewards[index]->SendMsg(info, UM_SETID, 3, itemId, 0, 0);
+            info->m_rewards[index]->SendMsg(info, UM_SETID, 3, static_cast<int>(runeSet->m_reward.values[index + 1]), 0, 0);
           } else if (index == 0) {
-            info->m_rewards[0]->SendMsg(info, UM_SETID, runeSet->GetActiveState() ? 2 : 1, itemId, 0, 0);
+            info->m_rewards[0]->SendMsg(info, UM_SETID, runeSet->GetActiveState() ? 2 : 1, static_cast<int>(runeSet->m_reward.values[index + 1]), 0, 0);
           } else if (index == 6) {
-            info->m_rewards[6]->SendMsg(info, UM_SETID, slotCount == activeCount ? 2 : 1, itemId, 0, 0);
+            info->m_rewards[6]->SendMsg(info, UM_SETID, slotCount == activeCount ? 2 : 1, static_cast<int>(runeSet->m_reward.values[index + 1]), 0, 0);
           } else {
-            info->m_rewards[index]->SendMsg(info, UM_SETID, index < activeCount ? 2 : 1, itemId, 0, 0);
+            info->m_rewards[index]->SendMsg(info, UM_SETID, index < activeCount ? 2 : 1, static_cast<int>(runeSet->m_reward.values[index + 1]), 0, 0);
           }
         }
         info->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
@@ -2307,7 +2308,8 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         break;
       }
       this->Invalidate();
-    } else if (argument1 == ID_EQUIP) {
+      break;
+    case ID_EQUIP:
       if (CRuneSystemMgr::GetInstance()->GetCurRuneSet()) {
         g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_DURING_CANNOT_OPEN_BANKING), 0, true, false, 0, "Message", 280, 120, 0);
       } else if (!argument2) {
@@ -2320,7 +2322,8 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         packet.tagId = static_cast<std::uint16_t>(rune->GetTagId());
         GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
-    } else if (argument1 == RUNE_BUTTON_UNEQUIP) {
+      break;
+    case RUNE_BUTTON_UNEQUIP: {
       RuneSetData* runeSet = CRuneSystemMgr::GetInstance()->GetCurRuneSet();
       if (!runeSet) {
         g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_DURING_CANNOT_OPEN_RODEX), 0, true, false, 0, "Message", 280, 120, 0);
@@ -2331,6 +2334,8 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         packet.runeId = 0;
         GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
+      break;
+    }
     }
     break;
   case UM_SCROLLVERT:
@@ -2369,22 +2374,21 @@ int UIRuneSystemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       break;
     case 2: {
       const int count = CRuneSystemMgr::GetInstance()->UpdateOwnedDecomItems();
-      if (this->m_lists[2]->total == count) {
-        this->m_runeDecom->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
-        break;
-      }
-
-      this->m_lists[2]->SetRange(std::max(count - 10, 0), 10, count);
-      UIRuneSetList* decomList = this->m_lists[2];
-      const int previous = decomList->position;
-      const int next = decomList->maximum < 0 ? decomList->maximum : 0;
-      decomList->m_selected = -1;
-      decomList->position = next;
-      if (previous != next) {
+      if (this->m_lists[2]->total != count) {
+        this->m_lists[2]->SetRange(std::max(count - 10, 0), 10, count);
+        UIRuneSetList* decomList = this->m_lists[2];
+        const int previous = decomList->position;
+        const int next = decomList->maximum < 0 ? decomList->maximum : 0;
+        decomList->m_selected = -1;
+        decomList->position = next;
+        if (previous != next) {
+          decomList->Invalidate();
+        }
         decomList->Invalidate();
+        this->m_runeDecom->Reset();
+      } else {
+        this->m_runeDecom->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
       }
-      decomList->Invalidate();
-      this->m_runeDecom->Reset();
       break;
     }
     }

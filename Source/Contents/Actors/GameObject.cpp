@@ -1,3 +1,5 @@
+#include "Render/Primitives/RenderPrimitivePool.h"
+#include <new>
 #include "Client/Mode/ModeMessage.h"
 #include "UI/GameSettings/TalkType.h"
 #include "UI/Window/UIEnums.h"
@@ -92,6 +94,25 @@ std::uint64_t CGameObject::s_nextIdentity = 0;
 
 // GLOBAL: gl_24538
 float g_cotangent = 0.16f;
+
+namespace {
+struct PrimitivePoolAccess : RenderPrimitivePool {
+  // INLINED
+  inline RenderPrimitive* AcquireLocal() {
+    if (this->m_current == this->m_commands.end()) {
+      this->m_commands.emplace_back();
+      this->m_current = this->m_commands.end();
+      return &this->m_commands.back();
+    }
+
+    RenderPrimitive* command = &*this->m_current;
+    ++this->m_current;
+    new (command) RenderPrimitive;
+
+    return command;
+  }
+};
+}
 
 // OFFSET: 0x00CA8600
 // FUNCTION: fn_20989
@@ -743,16 +764,16 @@ void CRenderObject::DrawShadow(int argument, float scale) {
   const float* matrix = reinterpret_cast<const float*>(argument);
   const float z = this->render.position.z;
   CGameMode* mode = g_modeMgr.GetGameMode();
-  float position[3];
-  position[0] = this->render.position.x;
-  position[1] = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
-  position[2] = z;
-  const float depth = position[1] * matrix[5] + position[0] * matrix[2] + z * matrix[8] + matrix[11];
+  vector3d position;
+  position.x = this->render.position.x;
+  position.y = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
+  position.z = z;
+  const float depth = position.y * matrix[5] + position.x * matrix[2] + z * matrix[8] + matrix[11];
 
   float screenX;
   float screenY;
   float reciprocalDepth;
-  g_renderer->ProjectViewport(position, matrix, &screenX, &screenY, &reciprocalDepth);
+  g_renderer->ProjectViewport(&position.x, matrix, &screenX, &screenY, &reciprocalDepth);
   const float distanceScale = g_renderer->ScaleDistance(reciprocalDepth);
 
   CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("shadow.spr"));
@@ -780,8 +801,7 @@ void CRenderObject::DrawShadow(int argument, float scale) {
 
   quad.left = static_cast<float>(static_cast<int>(this->render.spriteOffsetX)) + left;
   quad.right = static_cast<float>(static_cast<int>(this->render.spriteOffsetX)) + quad.right;
-  quad.color = static_cast<std::uint32_t>(((static_cast<std::uint32_t>(cell.color >> 24) << 8 | (cell.color & 0xFF)) << 8 | (cell.color >> 8 & 0xFF)) << 8) |
-               (cell.color >> 16 & 0xFF);
+  quad.color = (((((cell.colorChannels.alpha << 8) + cell.colorChannels.red) << 8) + cell.colorChannels.green) << 8) + cell.colorChannels.blue;
   quad.bottomRhw = 1.0f / (depth - (quad.bottom - screenY) * g_cotangent) + 0.00001f;
   quad.topRhw = 1.0f / (depth - (quad.top - screenY) * g_cotangent) + 0.00001f;
   quad.angle = static_cast<float>(cell.rotation);
@@ -820,7 +840,7 @@ void CRenderObject::DrawQuad(const SpriteQuad& quad, const std::uint32_t* palett
   const float bottomZ = RhwToDepth(static_cast<float>(depthBias + quad.bottomRhw));
   const float topZ = RhwToDepth(static_cast<float>(quad.topRhw + depthBias));
 
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = static_cast<PrimitivePoolAccess&>(g_renderer->primitives).AcquireLocal();
   RenderVertex* vertices = primitive->vertices;
   primitive->texture = texture;
 

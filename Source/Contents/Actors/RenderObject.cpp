@@ -460,11 +460,6 @@ void CRenderObject::SetActionName(const char* name) {
   }
 }
 
-// INLINED
-void CRenderObject::SetActionName(ResourceMgr&, const char* name) {
-  this->SetActionName(name);
-}
-
 // OFFSET: 0x00CC2D40
 // FUNCTION: fn_21144
 void CRenderObject::SetRenderInfo(const float*, float, float) {
@@ -488,11 +483,6 @@ void CRenderObject::SetSpriteName(const char* name) {
   if (this->render.sprite) {
     this->render.sprite->Lock();
   }
-}
-
-// INLINED
-void CRenderObject::SetSpriteName(ResourceMgr&, const char* name) {
-  this->SetSpriteName(name);
 }
 
 // OFFSET: 0x00CC3DC0
@@ -4140,7 +4130,7 @@ void C3dGrannyGameActor::RenderShadowed(int argument) {
 
   vector3d position{0.0f, 0.0f, 0.0f};
   vector3d light{0.0f, 0.0f, 0.0f};
-  mode->camera->frame.Forward(mode->camera->camera, &light.x);
+  mode->camera->Forward(&light.x);
   const vector3d direction = light;
   light.x = direction.y * view.values[3] + direction.x * view.values[0] + direction.z * view.values[6] + view.values[9];
   light.y = direction.y * view.values[4] + direction.x * view.values[1] + direction.z * view.values[7] + view.values[10];
@@ -4203,7 +4193,6 @@ void C3dGrannyGameActor::RenderShadowed(int argument) {
                  static_cast<float>(static_cast<int>(this->render.position.z) % 5);
     this->litPositions.push_back(position);
 
-    CTexture* meshTexture;
     if (mesh == 1) {
       const std::string name = g_guildMgr->GetEmblemFilename(this->GetGdid());
       CEmblemRes* emblem = static_cast<CEmblemRes*>(ResourceMgr::Instance().Load(name));
@@ -4215,14 +4204,13 @@ void C3dGrannyGameActor::RenderShadowed(int argument) {
         }
       }
 
-      meshTexture = this->emblemTexture;
+      command->texture = this->emblemTexture;
     } else {
-      meshTexture = texture;
+      command->texture = texture;
     }
 
-    command->texture = meshTexture;
     command->vertexCount = vertexCount;
-    if (meshTexture != nullptr) {
+    if (command->texture != nullptr) {
       g_renderer->Submit(command, 0);
     }
   }

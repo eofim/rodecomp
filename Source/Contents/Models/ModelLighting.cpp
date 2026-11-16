@@ -65,10 +65,10 @@ namespace {
 
   // INLINED
   __forceinline void GroundColor(const C3dNode* node, const GroundGeometry& ground, const float* matrix, const std::array<float, 3>& vertex, std::uint32_t* output) {
-    const float x = (((vertex[0] * matrix[0] + vertex[1] * matrix[3]) + vertex[2] * matrix[6]) + matrix[9]) + node->model->position.x;
-    const float y = (((vertex[0] * matrix[1] + vertex[1] * matrix[4]) + vertex[2] * matrix[7]) + matrix[10]) + node->model->position.y;
-    const float z = (((vertex[0] * matrix[2] + vertex[1] * matrix[5]) + vertex[2] * matrix[8]) + matrix[11]) + node->model->position.z;
-    ground.WorldColor(x, y, z, output);
+    ground.WorldColor(vector3d{
+      (((vertex[0] * matrix[0] + vertex[1] * matrix[3]) + vertex[2] * matrix[6]) + matrix[9]) + node->model->position.x,
+      (((vertex[0] * matrix[1] + vertex[1] * matrix[4]) + vertex[2] * matrix[7]) + matrix[10]) + node->model->position.y,
+      (((vertex[0] * matrix[2] + vertex[1] * matrix[5]) + vertex[2] * matrix[8]) + matrix[11]) + node->model->position.z}, output);
   }
 
   // INLINED
@@ -144,13 +144,13 @@ void C3dNode::Prepare(const float* matrix, const float* direction, const float* 
   case 2: {
     const ModelFace* faces = this->mesh->faces;
     const ModelTextureVertex* textureVertices = this->mesh->textureVertices;
-    const std::array<float, 3>* normals = this->mesh->vertexNormals;
+    const ShadeVector* normals = this->mesh->vertexNormals;
     ModelColor* color = g_modelFaceColors;
 
     for (int index = 0; index < this->mesh->faceCount; ++index) {
       for (unsigned corner = 0; corner < 3; ++corner) {
         float light[3];
-        Light(normals[index * 3 + corner].data(), rotation.values, direction, diffuse, ambient, light);
+        Light(&normals[index * 3 + corner].x, rotation.values, direction, diffuse, ambient, light);
         const bool shaded = textureVertices[faces[index].textureVertices[corner]].shaded > 0u;
         *color++ = LitColor(this->model->color, this->alpha, shaded, light);
       }
@@ -160,12 +160,12 @@ void C3dNode::Prepare(const float* matrix, const float* direction, const float* 
   case 1: {
     const ModelFace* faces = this->mesh->faces;
     const ModelTextureVertex* textureVertices = this->mesh->textureVertices;
-    const std::array<float, 3>* normals = this->mesh->faceNormals;
+    const ShadeVector* normals = this->mesh->faceNormals;
     ModelColor* color = g_modelFaceColors;
 
     for (int index = 0; index < this->mesh->faceCount; ++index) {
       float light[3];
-      Light(normals[index].data(), rotation.values, direction, diffuse, ambient, light);
+      Light(&normals[index].x, rotation.values, direction, diffuse, ambient, light);
 
       for (unsigned corner = 0; corner < 3; ++corner) {
         const bool shaded = textureVertices[faces[index].textureVertices[corner]].shaded > 0u;

@@ -994,13 +994,13 @@ void UIWindow::DrawCenteredText(int x, int y, const char* text, int width, int f
   context.SetFont(family, height, bold, 0);
   context.SetColor(color);
   const int bytes = static_cast<int>(std::strlen(text));
-  if (width) {
+  if (!width) {
+    context.Draw(x, y, text, bytes);
+  } else {
     SIZE size;
     context.Measure(text, bytes, &size);
     const int extent = size.cx;
     context.Draw(static_cast<int>((width - extent) * 0.5 + x), y, text, static_cast<int>(std::strlen(text)));
-  } else {
-    context.Draw(x, y, text, bytes);
   }
 }
 
@@ -1094,7 +1094,7 @@ void UIWindow::DrawFormattedText(int x, int y, const std::string& text, int widt
     x -= textWidth;
     break;
   case 6:
-    x = static_cast<int>((width - textWidth) * 0.5f + x);
+    x = static_cast<int>((width - textWidth) * g_depthAverageHalf + x);
     break;
   }
 
@@ -1103,7 +1103,7 @@ void UIWindow::DrawFormattedText(int x, int y, const std::string& text, int widt
   const char* current = text.c_str();
   const char* const end = current + std::strlen(current);
 
-  while (current != end) {
+  while (end != current) {
     if (*current == '^') {
       if (current[1] == 'b') {
         currentBold = 1;
@@ -1629,11 +1629,11 @@ void UIWindow::WrapTextWithBreaks(const char* text, std::vector<std::string>* li
     } while (current < end);
 
     if (bytes > 0) {
-      char* buffer = static_cast<char*>(std::malloc(bytes + 1));
+      char* buffer = new char[bytes + 1];
       std::memcpy(buffer, start, bytes);
       buffer[bytes] = '\0';
       lines->push_back(std::string(buffer));
-      std::free(buffer);
+      delete[] buffer;
       breaks->push_back(newline);
       offset += bytes;
     }
@@ -1781,10 +1781,10 @@ std::list<int> UIWindow::WrapFormattedText(std::string text, std::list<std::stri
   while (end != current) {
     if (*current == '\n') {
       lines->push_back(line);
-      if (colorCode.empty()) {
-        line.clear();
-      } else {
+      if (!colorCode.empty()) {
         line = '^' + colorCode;
+      } else {
+        line.clear();
       }
       widths.push_back(width);
       width = 0;
@@ -1840,12 +1840,12 @@ std::list<int> UIWindow::WrapFormattedText(std::string text, std::list<std::stri
     const char* next = CharNextExA(static_cast<WORD>(g_textCodePage), current, 0);
     const int characterWidth = this->TextWidth(std::string(current, next).c_str(), 0, family, height, currentBold, 0);
 
-    if (maxWidth < characterWidth + width) {
+    if (characterWidth + width > maxWidth) {
       lines->push_back(line);
-      if (colorCode.empty()) {
-        line.clear();
-      } else {
+      if (!colorCode.empty()) {
         line = '^' + colorCode;
+      } else {
+        line.clear();
       }
       widths.push_back(width);
       width = 0;
@@ -2582,13 +2582,13 @@ void UINavigationV4Wnd::Paint() {
     );
 
     if (g_navigationManager.cells.begin() != g_navigationManager.cells.end()) {
+      const NaviCell& last = g_navigationManager.cells.back();
       for (const NaviCell& point : g_navigationManager.cells) {
         this->FillRegion(
           static_cast<int>(point.x * 2.078125f + 3.0f), static_cast<int>(point.y * 2.078125f + 46.0f), 2, 2, 0xf0f00a
         );
       }
 
-      const NaviCell& last = g_navigationManager.cells.back();
       this->DrawBitmap(
         static_cast<int>(last.x * 2.078125f + 3.0f - 8.0f), static_cast<int>(last.y * 2.078125f + 46.0f - 21.0f),
         static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\navigation_interface3\\ico_destination.bmp"))), true
@@ -2652,49 +2652,48 @@ void UINavigationV4Wnd::Paint() {
     if (y > 0x2e && y < 0x138) {
       this->FillRegion(3, y, 0x10a, 2, 0xffaa2200);
     }
-    return;
-  }
-
-  this->FillRegion(0x8a, 0x2c, 1, 0x10e, 0xcccccc);
-  this->FillRegion(0x8b, 0xf2, 0x84, 1, 0xcccccc);
-  this->DrawBitmap(
-    5, 0x2e, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\navigation_interface3\\bg_dot.bmp"))), false
-  );
-
-  int mapX = 0x9b;
-  int mapY = 0x3c;
-  int mapSize = 0x64;
-  const NavigationTarget target = g_navigationManager.GetCurrentTarget();
-  if (target.type == 2) {
-    mapX = 0xe3;
-    mapSize = 0x28;
-    this->DrawTargetSprite(
-      0x93, 0x2d, 0x74, 0x74, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\Anibackground.bmp")))
+  } else {
+    this->FillRegion(0x8a, 0x2c, 1, 0x10e, 0xcccccc);
+    this->FillRegion(0x8b, 0xf2, 0x84, 1, 0xcccccc);
+    this->DrawBitmap(
+      5, 0x2e, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\navigation_interface3\\bg_dot.bmp"))), false
     );
-    mapY = 0x78;
-  } else if (target.type == 3) {
-    mapX = 0xe3;
-    mapSize = 0x28;
-    this->DrawActionSprite(
-      g_navigationManager.previewSprite, g_navigationManager.previewAction, 0x93, 0x2d, 0x74, 0x74, 0x5dc, true,
-      static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\Anibackground.bmp")))
-    );
-    mapY = 0x78;
-  }
-  this->DrawMapTexture(mapX, mapY, mapSize);
 
-  const int active = g_navigationManager.previewType;
-  const int count = static_cast<int>(g_navigationManager.routeLines.size());
-  for (int index = 0; index < count; ++index) {
-    if (g_navigationManager.routeLines[index].kind == active) {
-      const int labelX = g_navigationManager.routeLines[index].x;
-      const int labelY = g_navigationManager.routeLines[index].y;
-      this->DrawTextAt(labelX + 1, labelY + 1, g_navigationManager.routeLines[index].text.c_str(), 0, 0, 12,
-        g_navigationManager.routeLines[index].color, 0, 0
+    int mapX = 0x9b;
+    int mapY = 0x3c;
+    int mapSize = 0x64;
+    const NavigationTarget target = g_navigationManager.GetCurrentTarget();
+    if (target.type == 2) {
+      mapX = 0xe3;
+      mapSize = 0x28;
+      this->DrawTargetSprite(
+        0x93, 0x2d, 0x74, 0x74, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\Anibackground.bmp")))
       );
-      this->DrawTextAt(labelX, labelY, g_navigationManager.routeLines[index].text.c_str(), 0, 0, 12,
-        g_navigationManager.routeLines[index].shadowColor, 0, 0
+      mapY = 0x78;
+    } else if (target.type == 3) {
+      mapX = 0xe3;
+      mapSize = 0x28;
+      this->DrawActionSprite(
+        g_navigationManager.previewSprite, g_navigationManager.previewAction, 0x93, 0x2d, 0x74, 0x74, 0x5dc, true,
+        static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\Anibackground.bmp")))
       );
+      mapY = 0x78;
+    }
+    this->DrawMapTexture(mapX, mapY, mapSize);
+
+    const int active = g_navigationManager.previewType;
+    const int count = static_cast<int>(g_navigationManager.routeLines.size());
+    for (int index = 0; index < count; ++index) {
+      if (g_navigationManager.routeLines[index].kind == active) {
+        const int labelX = g_navigationManager.routeLines[index].x;
+        const int labelY = g_navigationManager.routeLines[index].y;
+        this->DrawTextAt(labelX + 1, labelY + 1, g_navigationManager.routeLines[index].text.c_str(), 0, 0, 12,
+          g_navigationManager.routeLines[index].color, 0, 0
+        );
+        this->DrawTextAt(labelX, labelY, g_navigationManager.routeLines[index].text.c_str(), 0, 0, 12,
+          g_navigationManager.routeLines[index].shadowColor, 0, 0
+        );
+      }
     }
   }
 }
@@ -3124,10 +3123,8 @@ void UINavigationRuideWnd::RefreshRoute() {
   for (int index = 0; index < g_navigationManager.NodeCount(); ++index) {
     CNavi_Link* node = g_navigationManager.GetNode(index);
     NaviCell first;
-    const int y = node->GetCell(&first)->y;
     NaviCell second;
-    const int x = node->GetCell(&second)->x;
-    std::sprintf(text, "%s (%d %d)", node->GetInfo()->GetName(), x, y);
+    std::sprintf(text, "%s (%d %d)", node->GetInfo()->GetName(), node->GetCell(&second)->x, node->GetCell(&first)->y);
 
     UIListBox_NaviSearch* list = this->routeList;
     int icon;
@@ -3145,10 +3142,8 @@ void UINavigationRuideWnd::RefreshRoute() {
   NaviCell cell;
   if (g_navigationManager.GetDestinationCell(&cell)->x > 0) {
     NaviCell first;
-    const int y = g_navigationManager.GetDestinationCell(&first)->y;
     NaviCell second;
-    const int x = g_navigationManager.GetDestinationCell(&second)->x;
-    std::sprintf(text, "%s (%d %d)", g_navigationManager.GetDestinationInfo()->GetName(), x, y);
+    std::sprintf(text, "%s (%d %d)", g_navigationManager.GetDestinationInfo()->GetName(), g_navigationManager.GetDestinationCell(&second)->x, g_navigationManager.GetDestinationCell(&first)->y);
   } else {
     std::sprintf(text, "%s", g_navigationManager.GetDestinationInfo()->GetName());
   }
@@ -3752,8 +3747,8 @@ void UINavigationV4Wnd::DrawTargetSprite(int x, int y, int width, int height, co
     return;
   }
 
-  std::vector<CActRes*> actions(9);
-  std::vector<CSprRes*> sprites(9);
+  std::vector<CActRes*> actions(9, nullptr);
+  std::vector<CSprRes*> sprites(9, nullptr);
   int offsetX = 0;
   int offsetY = 0;
   float scale = 1.0f;

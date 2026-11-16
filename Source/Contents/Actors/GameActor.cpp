@@ -323,10 +323,8 @@ bool CGameActor::ProcessState() {
       const unsigned int elapsed = timeGetTime() - this->lastProcessStateTime;
       if (remaining != 0) {
         moved = 1;
-        const float elapsedTime = static_cast<float>(elapsed);
-        const float totalTime = static_cast<float>(remaining);
-        this->render.position.x = elapsedTime * deltaX / totalTime + old.x;
-        this->render.position.z = deltaZ * elapsedTime / totalTime + old.z;
+        this->render.position.x = deltaX * static_cast<float>(elapsed) / static_cast<float>(remaining) + old.x;
+        this->render.position.z = deltaZ * static_cast<float>(elapsed) / static_cast<float>(remaining) + old.z;
       }
       if (this->render.isMotionFinished) {
         this->render.position.x = this->damageDestX;
@@ -427,8 +425,8 @@ EffectActor::EffectActor() {
 // OFFSET: 0x00CA83A0
 // FUNCTION: fn_20988
 CGameActor::CGameActor()
-    : accel(), damageNumberCount(0), lastDamage(0), homunMsg(), homunResMsg(), merMsg(), merResMsg(),
-      positionDelta(), shapeShift(0), savedShapeShift(0) {
+    : accel{0.0f, 0.0f, 0.0f}, damageNumberCount(0), lastDamage(0), homunMsg(), homunResMsg(), merMsg(), merResMsg(),
+      positionDelta{0.0f, 0.0f, 0.0f}, shapeShift(0), savedShapeShift(0) {
   this->ResetState();
 }
 

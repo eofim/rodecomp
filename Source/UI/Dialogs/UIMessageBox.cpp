@@ -114,8 +114,6 @@ static const std::string s_messageBoxItemLinkOpening = "<ITEML>";
 static const std::string s_messageBoxItemLinkClosing = "</ITEML>";
 
 namespace {
-  constexpr char prefix[] = "유저인터페이스\\";
-
   // INLINED
   int TileCount(int length, int tile) {
     const std::div_t tiles = std::div(length, tile);
@@ -2600,20 +2598,12 @@ void UILoginWnd::LoadLogin() {
 
     if (saveId != 0) {
       int shade;
-      bool placeholder = std::strcmp("", id) == 0;
-      if (!placeholder) {
-        EncryptedName<3, 0x83EFBFBB37EDBDBDULL>& compareName = OBFUSCATE_STRING("ID", 0x83EFBFBB37EDBDBDULL);
-        placeholder = std::strcmp(compareName.Text(), id) == 0;
-      }
-
-      if (!placeholder) {
+      if (std::strcmp("", id) != 0 && std::strcmp(OBFUSCATE_STRING("ID", 0x83EFBFBB37EDBDBDULL).Text(), id) != 0) {
         shade = 0;
         this->idPlaceholder = false;
       } else {
         this->idPlaceholder = true;
-        UIEditCtrl_Custom* edit = this->idEdit;
-        EncryptedName<3, 0xBF2B4B31397FF5A7ULL>& textName = OBFUSCATE_STRING("ID", 0xBF2B4B31397FF5A7ULL);
-        edit->SetText(textName.Text());
+        this->idEdit->SetText(OBFUSCATE_STRING("ID", 0xBF2B4B31397FF5A7ULL).Text());
         shade = 156;
       }
 
@@ -4126,7 +4116,9 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   this->SetSize(280, 120);
   this->OnCreate(280, 120);
   this->OnSize(280, 120);
-  this->Move((g_renderer->viewport.width - 640) / 2 + 185, (g_renderer->viewport.height - 480) / 2 + 180);
+  const int y = (g_renderer->viewport.height - 480) / 2 + 180;
+  const int x = (g_renderer->viewport.width - 640) / 2 + 185;
+  this->Move(x, y);
 
   this->viewer = new UITextViewer();
   this->viewer->Configure(10, 22, 260, 48, 0);
@@ -4151,7 +4143,7 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   this->gauge->m_fillBlue = blue;
   this->AddChild(this->gauge);
 
-  const std::string root(prefix);
+  const std::string root("유저인터페이스\\");
   auto* button = new UIBitmapButton();
   button->SetBitmap((root + "btn_cancel" + ".bmp").c_str(), 0, 0);
   button->SetBitmap((root + "btn_cancel_a" + ".bmp").c_str(), 1, 0);
@@ -4177,19 +4169,17 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
         return 0;
       }
 
-      if (this->m_nameEdit->Length() < 4) {
-        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
-      } else {
-        const bool allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
-        bool valid = true;
-        if (g_serviceType == 1) {
-          valid = ValidateCharacterName(this->m_nameEdit->Text());
+      if (this->m_nameEdit->Length() >= 4) {
+        const BOOL allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
+        BOOL valid = TRUE;
+        if (g_serviceType == 1 && !ValidateCharacterName(this->m_nameEdit->Text())) {
+          valid = FALSE;
         }
 
-        const bool control = g_session.HasControlCharacter(this->m_nameEdit->Text());
-        const bool blank = g_session.IsBlankString(this->m_nameEdit->Text());
-        if (control || !allowed || !valid || blank) {
-          if (control || !allowed) {
+        const BOOL badName = g_session.HasControlCharacter(this->m_nameEdit->Text()) || !allowed;
+        const BOOL blank = g_session.IsBlankString(this->m_nameEdit->Text());
+        if (badName || !valid || blank) {
+          if (badName) {
             g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
           }
           if (!valid) {
@@ -4223,19 +4213,24 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           g_modeMgr.currentMode->SendMsg(LMM_SENDCHARINFO, 0, 0, 0, 0);
           g_windowMgr.Schedule(this);
         }
+      } else {
+        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
       }
 
-      g_modeMgr.currentMode->SendMsg(LMM_SET_MAKING_CHAR_NAME, reinterpret_cast<int>(this->m_nameEdit->Text()), 0, 0, 0);
-      int values[8];
-      values[0] = this->m_info.stats[0];
-      values[1] = this->m_info.stats[1];
-      values[2] = this->m_info.stats[2];
-      values[3] = this->m_info.stats[3];
-      values[4] = this->m_info.stats[4];
-      values[5] = this->m_info.stats[5];
-      values[6] = this->m_info.headPalette;
-      values[7] = this->m_info.head;
-      g_modeMgr.currentMode->SendMsg(LMM_SET_CHAR_PARAM, reinterpret_cast<int>(values), 0, 0, 0);
+      CMode* mode = g_modeMgr.currentMode;
+      mode->SendMsg(LMM_SET_MAKING_CHAR_NAME, reinterpret_cast<int>(this->m_nameEdit->Text()), 0, 0, 0);
+      {
+        int values[8];
+        values[0] = this->m_info.stats[0];
+        values[1] = this->m_info.stats[1];
+        values[2] = this->m_info.stats[2];
+        values[3] = this->m_info.stats[3];
+        values[4] = this->m_info.stats[4];
+        values[5] = this->m_info.stats[5];
+        values[6] = this->m_info.headPalette;
+        values[7] = this->m_info.head;
+        mode->SendMsg(LMM_SET_CHAR_PARAM, reinterpret_cast<int>(values), 0, 0, 0);
+      }
       return 0;
     }
     case ID_CANCEL:
@@ -4251,12 +4246,15 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->Invalidate();
       return 0;
     }
-    case ID_RIGHT:
-      if (--this->m_view.action < this->m_view.actionBase) {
+    case ID_RIGHT: {
+      const int action = this->m_view.action - 1;
+      this->m_view.action = action;
+      if (action < this->m_view.actionBase) {
         this->m_view.action = this->m_view.actionBase + 7;
       }
       this->Invalidate();
       return 0;
+    }
     default:
       return 0;
     }
@@ -4360,11 +4358,7 @@ void UILoginWnd::OnCreate(int, int) {
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(13, 104);
   button->SetId(285);
-  {
-    const std::string text(LookupMessage(MSI_ENST_BLESSING2));
-    button->text = text;
-    button->Invalidate();
-  }
+  button->SetText(LookupMessage(MSI_ENST_BLESSING2));
   button->AddTextStyle(0, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(1, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(2, 12, 0x313131, 1, 1, -1000, -1000);
@@ -4377,11 +4371,7 @@ void UILoginWnd::OnCreate(int, int) {
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(87, 104);
   button->SetId(ID_MAKEACCOUNT);
-  {
-    const std::string text(LookupMessage(MSI_ADVENTURER_AGENCY_REGIST_FAILED));
-    button->text = text;
-    button->Invalidate();
-  }
+  button->SetText(LookupMessage(MSI_ADVENTURER_AGENCY_REGIST_FAILED));
   button->AddTextStyle(0, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(1, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(2, 12, 0x313131, 1, 1, -1000, -1000);
@@ -4452,7 +4442,7 @@ void UILoginWnd::OnCreate(int, int) {
   this->idEdit->maximum = 24;
   this->passwordEdit->maximum = 24;
 
-  if (std::strcmp(this->idEdit->Text(), "") != 0 && std::strcmp(this->idEdit->Text(), "ID") != 0) {
+  if (std::strcmp("", this->idEdit->Text()) != 0 && std::strcmp("ID", this->idEdit->Text()) != 0) {
     g_windowMgr.SetFocus(this->passwordEdit);
   } else {
     g_windowMgr.SetFocus(this->idEdit);

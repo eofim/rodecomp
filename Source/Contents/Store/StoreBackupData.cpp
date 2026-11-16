@@ -52,10 +52,10 @@ void CMCStoreInfoBackup::ImportData(Json::Value& data) {
     this->items.push_back(item);
   }
 
-  UIWindow* window = g_windowMgr.merchantShopMakeWnd ? g_windowMgr.merchantShopMakeWnd : g_windowMgr.buyingShopMakeWnd;
-
-  if (window) {
-    static_cast<UIMerchantShopMakeWnd*>(window)->Refresh();
+  if (g_windowMgr.merchantShopMakeWnd) {
+    g_windowMgr.merchantShopMakeWnd->Refresh();
+  } else if (g_windowMgr.buyingShopMakeWnd) {
+    g_windowMgr.buyingShopMakeWnd->Refresh();
   }
 }
 
@@ -65,9 +65,9 @@ void CMCStoreInfoBackup::ExportData(Json::Value& data) const {
   data["Title"] = ToUtf8(this->title, g_textCodePage);
   Json::Value values;
 
-  const int itemCount = g_session.GetList9Size();
+  const int itemCount = g_session.GetNumMerchantPurchaseItems();
   for (int itemIndex = 0; itemIndex < itemCount; ++itemIndex) {
-    const ITEM_INFO item = g_session.GetItem1758At(itemIndex);
+    const ITEM_INFO item = g_session.GetMerchantPurchaseItemInfoBySequence(itemIndex);
     Json::Value value;
     value["ID"] = std::atoi(item.itemId.c_str());
     value["Count"] = item.quantity;
@@ -79,18 +79,15 @@ void CMCStoreInfoBackup::ExportData(Json::Value& data) const {
     value["Slot_3"] = static_cast<std::int32_t>(item.cards[2]);
     value["Slot_4"] = static_cast<std::int32_t>(item.cards[3]);
 
-    const int count = item.optionCount;
-    value["RandomOptionCount"] = count;
+    value["RandomOptionCount"] = item.optionCount;
     Json::Value options;
+    const int count = item.optionCount;
 
     for (int index = 0; index < count; ++index) {
-      const ItemOptionRecord& record = item.options[index];
-      const std::int16_t id = record.id;
-      const std::int16_t amount = record.value;
       Json::Value option;
-      option["OptIndex"] = id;
-      option["Value"] = amount;
-      option["Parm1"] = record.parameter;
+      option["OptIndex"] = item.options[index].id;
+      option["Value"] = item.options[index].value;
+      option["Parm1"] = item.options[index].parameter;
       options.append(option);
     }
 

@@ -1491,7 +1491,7 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
     }
 
     if (message != UM_TEXT_RBTN_UP) {
-      if (this->selectedNode->children.size() != 0) {
+      if (this->selectedNode->children.size() > 0) {
         this->HideNodes(this->root->children);
         const int x = sender->geometry.x;
         const int y = message == UM_TEXT_LBTN_UP ? sender->geometry.y - 6 : sender->geometry.y;
@@ -1577,10 +1577,7 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
   case UM_CHANGE_TVITEM_TEXT:
     if (b == 0) {
       this->editNode = reinterpret_cast<UITreeNode*>(a);
-      if (c > 361) {
-        c = 361;
-      }
-      this->edit->maximum = static_cast<int>(c);
+      this->edit->maximum = std::min(static_cast<int>(c), 361);
       this->edit->SetText(this->editNode->name);
       g_windowMgr.SetFocus(this->edit);
       this->Invalidate();
@@ -1807,10 +1804,7 @@ bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) 
       atCursor = false;
     } else {
       remaining = remaining.substr(found + bytes);
-      if (absolute != found) {
-        absolute += found;
-      }
-      absolute += bytes;
+      absolute = (absolute == found ? absolute : absolute + found) + bytes;
       found = static_cast<int>(remaining.find(fitted));
       continue;
     }
@@ -1877,13 +1871,16 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
 
   std::string remaining = source;
   std::string result = "";
-  unsigned position = 0;
   unsigned previous = 0;
+  unsigned position = 0;
   std::vector<UIItemTagButton*> buttons;
 
-  for (;; previous = position) {
+  for (;;) {
     std::string encoded = "";
-    if (!this->Next(remaining, encoded, position, source.c_str()) || result.size() >= std::strlen(lineText)) {
+    if (!this->Next(remaining, encoded, position, source.c_str())) {
+      break;
+    }
+    if (result.size() >= std::strlen(lineText)) {
       break;
     }
 
@@ -1913,6 +1910,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
           }
         }
         position += static_cast<unsigned>(encoded.size() + g_itemLinkTagEnd.size() + g_itemLinkTagBegin.size());
+        previous = position;
         continue;
       }
     }
@@ -1952,6 +1950,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
       result += label;
       position += static_cast<unsigned>(encoded.size() + g_itemLinkTagEnd.size() + g_itemLinkTagBegin.size());
     }
+    previous = position;
   }
 
   if (result.size() < std::strlen(lineText)) {
@@ -2000,7 +1999,8 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
     }
     link = link.substr(0, end + g_naviLinkTagEnd.size());
 
-    const std::string name = g_navigationLinkParser->FormatNavigationLink(link, false);
+    NavigationLinkParser* const parser = g_navigationLinkParser;
+    const std::string name = parser->FormatNavigationLink(link, false);
     std::string label = "<";
     const int width = this->geometry.width / 2;
     label += this->FitTextToWidth(name, width);
@@ -2010,13 +2010,13 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
     const std::string line(text);
     const std::size_t position = line.find(label);
     if (position != std::string::npos) {
-      tail = line.substr(position + label.size());
+      tail = std::string(line, position + label.size());
     }
 
     UINaviLinkButton* button = new (std::nothrow) UINaviLinkButton();
     button->link = link;
     button->Configure(label.c_str(), 0x82F2E1, 0, 12, 0, 0);
-    if (label.size() - 2 < name.size()) {
+    if (name.size() > label.size() - 2) {
       button->SetTooltip(name.c_str());
     }
     button->m_hoverColor = 0x82F2E1;
@@ -2035,7 +2035,7 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
     remaining = source;
   }
 
-  if (!buttons.empty()) {
+  if (buttons.size() != 0) {
     this->naviLinks.push_back(buttons);
   }
   return result;

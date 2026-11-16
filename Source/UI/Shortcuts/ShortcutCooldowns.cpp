@@ -64,6 +64,7 @@
 #include <timeapi.h>
 
 template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
+template __declspec(noinline) std::_Tree_find_result<std::map<int, std::int64_t>::_Mybase::_Nodeptr> std::map<int, std::int64_t>::_Mybase::_Find_lower_bound<int>(const int&) const;
 
 // OFFSET: 0x00E1DCA0
 // FUNCTION: fn_23875
@@ -411,11 +412,11 @@ void UISeekPartyWnd::Paint() {
   this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
 
   if (!this->m_minimized) {
-    std::string name;
+    std::string name = "";
     const char* names[] = {"bibibic", "bibibic", "달기린", "달기린", "boya", "boya"};
-    name = FormatOwnedString(
+    name = static_cast<const std::string&>(FormatOwnedString(
       "유저인터페이스\\basic_interface\\seekparty\\type_0%d\\seekparty_%s_0%d_%d.bmp", this->m_type, names[this->m_type], this->m_type, this->m_level
-    );
+    ));
     if (ResourceMgr::Instance().Exists(name.c_str())) {
       auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
       this->DrawBitmap(1, 18, bitmap, false);
@@ -494,9 +495,7 @@ void UIQuickSlotWnd::OnCreate(int, int) {}
 // OFFSET: 0x00930610
 // FUNCTION: fn_12686
 void UIQuickSlotWnd::OnLBtnDblClk(int x, int y) {
-  const auto& options = g_session.m_options.Values();
-  const auto option = options.find(5);
-  if (static_cast<int>(option == options.end() ? 0 : option->second) > 0 || static_cast<unsigned>(y) > 23) {
+  if (static_cast<int>(g_session.m_options.Get(5)) > 0 || static_cast<unsigned>(y) > 23) {
     return;
   }
 
@@ -839,13 +838,13 @@ void UISerachStoreInfoWnd::Paint() {
     this->DrawTextAt(5, this->geometry.height - 20, this->m_statusText.c_str(), 0, 0, 12, 0xFF, 0, 0);
   }
 
+  const std::vector<SearchStoreResult>::const_iterator end = g_session.storeSearchResults.end();
   if (static_cast<unsigned int>(this->m_page * 10 - 10) >= g_session.storeSearchResults.size()) {
     return;
   }
 
-  const SearchStoreResult* end = g_session.storeSearchResults.data() + g_session.storeSearchResults.size();
-  const SearchStoreResult* entry = g_session.storeSearchResults.data() + (this->m_page - 1) * 10;
-  for (int row = 0; entry != end; ++entry) {
+  int row = 0;
+  for (std::vector<SearchStoreResult>::const_iterator entry = g_session.storeSearchResults.begin() + (this->m_page - 1) * 10; entry != end; ++entry, ++row) {
     if (row == 10) {
       break;
     }
@@ -856,9 +855,8 @@ void UISerachStoreInfoWnd::Paint() {
     this->DrawRectOutline(50, this->m_rowHeight * row + 100, 110, this->m_rowHeight + 1, 0xC0C0C0);
     this->DrawRectOutline(330, this->m_rowHeight * row + 100, 30, this->m_rowHeight + 1, 0xC0C0C0);
 
-    const int next = row + 1;
-    if (next < 10) {
-      this->FillRegion(5, this->m_rowHeight * next + 100, this->geometry.width - 10, 1, 0xC0C0C0);
+    if (row + 1 < 10) {
+      this->FillRegion(5, this->m_rowHeight * (row + 1) + 100, this->geometry.width - 10, 1, 0xC0C0C0);
     }
 
     const int top = this->m_rowHeight * row + 100;
@@ -884,13 +882,12 @@ void UISerachStoreInfoWnd::Paint() {
 
     char text[100];
     std::sprintf(text, "%d", entry->quantity);
-    this->DrawTextAt((30 - this->TextWidth(text, 0, 0, 12, 0, 0)) / 2 + 330, y, text, 0, 0, 12, 0, 0, 0
-    );
+    x = (30 - this->TextWidth(text, 0, 0, 12, 0, 0)) / 2 + 330;
+    this->DrawTextAt(x, y, text, 0, 0, 12, 0, 0, 0);
 
     const std::string price = FormatGroupedInteger(entry->price, text, 100) + std::string(" Z");
     this->DrawAmount(entry->price, price, 435 - this->TextWidth(price.c_str(), 0, 0, 12, 0, 0), y);
 
-    row = next;
   }
 
   char page[12];

@@ -1064,8 +1064,7 @@ void CUISelectPackageItemBox::BindItem(SelectPackageItemBox::CUIItemInfo* item, 
 
   item->image->SetImage(image);
   item->gameItem->SetItem(data);
-  const std::string name = data.DisplayName(0);
-  item->nameText->SetText(name.c_str(), name.size());
+  item->nameText->SetText(data.DisplayName(0));
 }
 
 // OFFSET: 0x00A703D0
@@ -1087,16 +1086,16 @@ void CUISelectPackageItemBox::OnInit() {
 void CUISelectPackageItemBox::Open(int sourceIndex) {
   this->tabList->ClearData();
   this->itemList->ClearData();
-  this->title->SetTitle("", 0);
+  this->title->SetTitle("");
   this->sourceIndex = sourceIndex;
   const ITEM_INFO item = g_session.LookupClientItemByIdentity(sourceIndex);
-  if (item.identity[1] == 0) {
+  if (item.identity[1] <= 0) {
     return;
   }
 
   this->packageId = std::atoi(item.itemId.c_str());
   const char* name = FindItemDescription(this->packageId).identifiedName;
-  this->title->SetTitle(name, std::strlen(name));
+  this->title->SetTitle(name);
   if (!Singleton<CSelectPackageItemMgr>::s_instance) {
     Singleton<CSelectPackageItemMgr>::s_instance = new (std::nothrow) CSelectPackageItemMgr;
   }
@@ -1109,8 +1108,11 @@ void CUISelectPackageItemBox::Open(int sourceIndex) {
     this->tabList->UpdateScrollBar();
   }
 
-  this->okButton->disabled = 0;
-  this->okButton->Invalidate();
+  {
+    auto* okButton = this->okButton;
+    okButton->disabled = 0;
+    okButton->Invalidate();
+  }
 }
 
 // OFFSET: 0x00A70B90

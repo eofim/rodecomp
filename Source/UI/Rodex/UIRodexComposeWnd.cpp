@@ -50,7 +50,7 @@
 namespace {
 #pragma pack(push, 1)
 struct RodexCheckRecipientPacket {
-  /* 0000 */ std::uint16_t packetType;
+  /* 0000 */ std::int16_t packetType;
   /* 0002 */ char name[24];
   /* 001A */ std::uint8_t known;
 };
@@ -82,12 +82,13 @@ ITEM_INFO UIRodexComposeWnd::GetItemAtPoint(int x, int y) {
   if (x >= 30 && x <= 190 && y >= 309 && y <= 333) {
     this->m_itemIndex = 0;
     int left = 30;
+    int index = 0;
     for (auto item = this->m_items.begin(); item != this->m_items.end(); ++item) {
       if (x > left && x < left + 24) {
         return *item;
       }
       left += 34;
-      ++this->m_itemIndex;
+      this->m_itemIndex = ++index;
     }
   }
 
@@ -320,7 +321,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       break;
     case ID_CHECK:
       if (this->m_recipientEdit->Length() != 0 && this->m_recipientEdit->Length() < 24) {
-        if (g_navigationLinkParser->HasLink(this->m_recipientEdit->Text())) {
+        if (GetNavigationLinkParser()->HasLink(this->m_recipientEdit->Text())) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON)), 0x64FFFF, 0, 0, 0);
           return 0;
         }
@@ -341,7 +342,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       if (this->m_recipientEdit->Length() >= 24) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_WND_OVERFULL)), 0x64FFFF, 0, 0, 0);
       }
-      if (g_navigationLinkParser->HasLink(this->m_recipientEdit->Text())) {
+      if (GetNavigationLinkParser()->HasLink(this->m_recipientEdit->Text())) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON)), 0x64FFFF, 0, 0, 0);
       } else {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_SEND_MAIL_ITEM)), 0x64FFFF, 0, 0, 0);
@@ -379,7 +380,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
 
       if (this->m_recipientIdText->GetText().length() > 0) {
         std::string body(this->m_contents->Text());
-        if (g_navigationLinkParser->HasLink(this->m_contents->Text())) {
+        if (GetNavigationLinkParser()->HasLink(this->m_contents->Text())) {
           this->m_contents->SetText("");
           body.clear();
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLOSE)), 0xFF, 0, 0, 0);
@@ -411,6 +412,18 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     }
     }
     return 0;
+  case UM_DROP: {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    g_modeMgr.GetGameMode()->SendMsg(MM_ADD_MAIL_ITEM, mode->drag.id, mode->drag.quantity, 0, 0);
+    g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    return 0;
+  }
+  case UM_DECITEM: {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    g_modeMgr.GetGameMode()->SendMsg(MM_REMOVE_RODEX_ITEM, mode->drag.id, mode->drag.quantity, 0, 0);
+    g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    return 0;
+  }
   case UM_REFRESHITEM:
     this->m_items.clear();
     for (int i = 0; i < 5; ++i) {
@@ -421,12 +434,6 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     }
     this->Invalidate();
     return 0;
-  case UM_DROP: {
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    g_modeMgr.GetGameMode()->SendMsg(MM_ADD_MAIL_ITEM, mode->drag.id, mode->drag.quantity, 0, 0);
-    g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-    return 0;
-  }
   case UM_TEXT_LBTN_UP:
     if (argument3 > 0) {
       UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
@@ -435,12 +442,6 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       }
     }
     return 0;
-  case UM_DECITEM: {
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    g_modeMgr.GetGameMode()->SendMsg(MM_REMOVE_RODEX_ITEM, mode->drag.id, mode->drag.quantity, 0, 0);
-    g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-    return 0;
-  }
   default:
     return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
@@ -639,7 +640,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
   const bool selected = g_skinInfo.Selected();
   const SkinPaletteCell cell = {1, 2};
   const std::uint32_t color = g_skinInfo.PaletteColor(cell, selected);
-  this->m_contents->Background(color & 0xFF, (color & 0xFFFF) >> 8, (color >> 16) & 0xFF);
+  this->m_contents->Background(GetRValue(color), GetGValue(color), GetBValue(color));
   this->m_contents->TextColor(0x31, 0x31, 0x31, 0xFFFFFFFF);
   this->AddChild(this->m_contents);
   g_windowMgr.SetFocus(this->m_contents);

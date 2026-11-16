@@ -79,43 +79,41 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
     vec4.y = baseY + vec4.y;
     vec4.z = baseZ + vec4.z;
 
-    if (vec1.y > 0.0f || slot.process >= 300 || static_cast<int>(slot.height[13]) <= 0) {
-      continue;
-    }
-
-    if (slot.flag1[0] == 0) {
-      if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
-        CGameMode* gameMode = g_modeMgr.GetGameMode();
-        CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SOULLIGHT2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-        if (effect) {
-          vector3d position{baseX, baseY, baseZ};
-          effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
-        }
-      } else {
-        CGameMode* gameMode = g_modeMgr.GetGameMode();
-        if (auto* actor = gameMode->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10]))) {
-          CRagEffect* effect = actor->LaunchEffect(EF_SOULLIGHT2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    if (vec1.y <= 0.0f && slot.process < 300 && static_cast<int>(slot.height[13]) > 0) {
+      if (slot.flag1[0] == 0) {
+        if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
+          CGameMode* gameMode = g_modeMgr.GetGameMode();
+          CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SOULLIGHT2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
           if (effect) {
             vector3d position{baseX, baseY, baseZ};
             effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
           }
-        }
-      }
-    } else {
-      if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
-        CGameMode* gameMode = g_modeMgr.GetGameMode();
-        CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SOULLIGHT3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-        if (effect) {
-          vector3d position{baseX, baseY, baseZ};
-          effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
+        } else {
+          CGameMode* gameMode = g_modeMgr.GetGameMode();
+          if (auto* actor = gameMode->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10]))) {
+            CRagEffect* effect = actor->LaunchEffect(EF_SOULLIGHT2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+            if (effect) {
+              vector3d position{baseX, baseY, baseZ};
+              effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
+            }
+          }
         }
       } else {
-        CGameMode* gameMode = g_modeMgr.GetGameMode();
-        if (auto* actor = gameMode->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10]))) {
-          CRagEffect* effect = actor->LaunchEffect(EF_SOULLIGHT3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+        if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
+          CGameMode* gameMode = g_modeMgr.GetGameMode();
+          CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SOULLIGHT3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
           if (effect) {
             vector3d position{baseX, baseY, baseZ};
             effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
+          }
+        } else {
+          CGameMode* gameMode = g_modeMgr.GetGameMode();
+          if (auto* actor = gameMode->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10]))) {
+            CRagEffect* effect = actor->LaunchEffect(EF_SOULLIGHT3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+            if (effect) {
+              vector3d position{baseX, baseY, baseZ};
+              effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
+            }
           }
         }
       }
@@ -144,9 +142,8 @@ __declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
   g_renderer->ProjectViewport(position, wtm.values, &screenX, &screenY, &reciprocalDepth);
   float distanceScale = g_renderer->ScaleDistance(reciprocalDepth);
 
-  CRagEffect* master = this->state.master;
-  if (master->state.type == 1240 && master && master->state.parent) {
-    master->state.parent->ScaleByFadePulse(distanceScale);
+  if (this->state.master->state.type == 1240 && this->state.master && this->state.master->state.parent) {
+    this->state.master->state.parent->ScaleByFadePulse(distanceScale);
   }
 
   CSprRes* sprite = this->GetSprite();
@@ -171,13 +168,12 @@ __declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
       return;
     }
 
+    const std::uint32_t color = (((((cell.colorChannels.alpha << 8) + cell.colorChannels.red) << 8) + cell.colorChannels.green) << 8) + cell.colorChannels.blue;
     SpriteQuad quad;
     quad.top = top;
     quad.left = static_cast<float>(static_cast<int>(this->render.spriteOffsetX)) + left;
     quad.bottom = bottom;
     quad.right = static_cast<float>(static_cast<int>(this->render.spriteOffsetX)) + right;
-    const std::uint32_t color = static_cast<std::uint32_t>(((static_cast<std::uint32_t>(cell.color >> 24) << 8 | (cell.color & 0xFF)) << 8 | (cell.color >> 8 & 0xFF)) << 8) |
-                                (cell.color >> 16 & 0xFF);
     quad.bottomRhw = 1.0f / (depth - (bottom - screenY) * g_cotangent) + 0.00001f;
     quad.topRhw = 1.0f / (depth - (top - screenY) * g_cotangent) + 0.00001f;
     quad.angle = static_cast<float>(cell.rotation);

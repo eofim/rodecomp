@@ -164,10 +164,9 @@ __forceinline static void MsgEffectDrift(CMsgEffect* effect, float elapsed) {
     }
   }
 
-  const float step = elapsed / 3.0f;
   const float dirZ = effect->m_drift.z;
-  effect->render.position.x = dirX * step + effect->m_velocity.x + dirX * 3.0f;
-  effect->render.position.z = dirZ * step + effect->m_velocity.z + dirZ * 3.0f;
+  effect->render.position.x = dirX * (elapsed / 3.0f) + effect->m_velocity.x + dirX * 3.0f;
+  effect->render.position.z = dirZ * (elapsed / 3.0f) + effect->m_velocity.z + dirZ * 3.0f;
   float height = effect->m_baseY + 8.0f - (2.0f - elapsed / 30.0f) * elapsed + effect->m_drift.y;
   effect->render.position.y = height;
   if (height > 0.0f) {
@@ -612,8 +611,8 @@ bool CSkill::OnProcess() {
     if (this->m_effect) {
       int duration = this->m_effect->GetDuration();
       this->m_effect->SetStateDuration(duration + 21);
-      int random = rand() % 100;
-      random = random < 0 ? 0 : random;
+      const int roll = rand() % 100;
+      const int random = roll >= 0 ? roll : 0;
       if (random == 1) {
         g_effectMgr->Spawn(this->skillAid, EF_NEW_POISONSMOKE_1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       } else if (random == 2) {
@@ -1349,7 +1348,7 @@ void CMsgEffect::FollowOwner() {
         const CRenderObject* owner = this->m_owner;
         this->render.position = owner->render.position;
         this->render.position.y -= 15.0f;
-        this->render.angle = owner->render.angle;
+        this->render.angle = this->m_owner->render.angle;
         const int dir = this->Get8Dir(this->render.angle);
         this->render.previousAnimation = this->render.animation + dir;
         switch (dir) {
@@ -1377,10 +1376,10 @@ void CMsgEffect::FollowOwner() {
           this->render.previousAnimation = this->render.animation + dir + 12 + ((dir + 4 < 8) ? 8 : 0);
         } else if (dist > 15.0f) {
           const vector3d oldPosition = this->render.position;
-          this->render.previousAnimation = this->render.animation + 8 + dir;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
+          this->render.previousAnimation = this->render.animation + 8 + dir;
           direction.Normalize();
           float radius = dist - 0.7f;
           if (radius <= 15.0f) {
@@ -1450,8 +1449,8 @@ void CMsgEffect::FollowOwner() {
           direction.y = this->render.position.z - owner->render.position.z;
           direction.Normalize();
           this->render.position.x += (owner->render.position.x - this->render.position.x) / 25.0f;
-          this->render.curMotion = 8;
           this->render.position.z += (owner->render.position.z - this->render.position.z) / 25.0f;
+          this->render.curMotion = 8;
           const float movedX = this->render.position.x - oldPosition.x;
           const float movedZ = this->render.position.z - oldPosition.z;
           this->travelDistance += SquareRoot(movedZ * movedZ + movedX * movedX);

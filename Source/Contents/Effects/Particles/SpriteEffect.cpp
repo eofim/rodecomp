@@ -382,11 +382,11 @@ bool CSpriteEffect::IsAlive() {
       return false;
     }
 
-    if (!scene->GetItemByAID(this->actor)) {
-      return false;
+    if (scene->GetItemByAID(this->actor)) {
+      return true;
     }
 
-    return true;
+    return false;
   }
   case EF_BAKURETSU_HADOU:
   case EF_IMMUNE_PROPERTY_NOTHING:

@@ -72,7 +72,7 @@ void AutomaticSkills::DisableAll() {
   for (int id : this->m_ids) {
     const auto skill = static_cast<std::int16_t>(id);
     const int option = ActiveOption(skill);
-    if (g_session.GetOption(option) != 0) {
+    if (static_cast<int>(g_session.m_options.Get(option)) != 0) {
       Cancel(skill);
       g_session.SetOption(option, 0, 0);
     }
@@ -91,7 +91,7 @@ void AutomaticSkills::Use(std::int16_t id, std::int16_t level, std::uint32_t tar
   GetRagConnection().Send(sizeof(packet), packet);
   const int cancel = this->CancelOption(id);
 
-  if (g_session.GetOption(cancel) != 0) {
+  if (static_cast<int>(g_session.m_options.Get(cancel)) != 0) {
     Cancel(id);
     g_session.SetOption(cancel, 0, 0);
   } else {

@@ -207,8 +207,7 @@ void UIHotkeyGuideWnd::OnCreate(int, int) {
 // OFFSET: 0x0096B730
 // FUNCTION: fn_13165
 void UIHotkeyGuideWnd::Paint() {
-  auto* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\hotkey_guide\\bg_shortcuts.bmp")));
-  this->DrawBitmap(0, 0, background, false);
+  this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\hotkey_guide\\bg_shortcuts.bmp"))), false);
   this->DrawTitleBar(false, LookupMessage(MSI_IMAGE_CAPTURE), 0);
 
   for (auto key = this->m_keys.begin(); key != this->m_keys.end(); ++key) {
@@ -221,17 +220,17 @@ void UIHotkeyGuideWnd::Paint() {
     }
   }
 
-  for (auto label = this->m_labels.begin(); label != this->m_labels.end(); ++label) {
-    if (label->second.key.valid == true) {
-      this->DrawKeyLabel(label->second.text, &label->second.key);
+  for (auto& label : this->m_labels) {
+    if (label.second.key.valid == true) {
+      this->DrawKeyLabel(label.second.text, &label.second.key);
     }
-    if (label->second.altKey.valid == true) {
-      this->DrawKeyLabel(label->second.text, &label->second.altKey);
+    if (label.second.altKey.valid == true) {
+      this->DrawKeyLabel(label.second.text, &label.second.altKey);
     }
   }
 
   int index = 0;
-  for (auto entry = this->m_entries.begin(); entry != this->m_entries.end(); ++entry) {
+  for (auto entry = this->m_entries.begin(); entry != this->m_entries.end(); ++entry, ++index) {
     std::string text;
     if (entry->firstKey != 0) {
       text = this->m_labels[entry->firstKey].text;
@@ -242,10 +241,10 @@ void UIHotkeyGuideWnd::Paint() {
     } else {
       text = "Non";
     }
-    int width = this->TextWidth(text.c_str(), 0, 0, 12, 1, 0);
-    int x = static_cast<int>((100 - width) * 0.5 + (index / 6 * 246 + 156));
-    this->DrawTextAt(x, index % 6 * 30 + 315, text.c_str(), 0, 0, 12, 0xA55139, 1, 0);
-    ++index;
+    const char* textPointer = text.c_str();
+    int column = index / 6;
+    int x = static_cast<int>((100 - this->TextWidth(textPointer, 0, 0, 12, 1, 0)) * 0.5 + (column * 246 + 156));
+    this->DrawTextAt(x, index % 6 * 30 + 315, textPointer, 0, 0, 12, 0xA55139, 1, 0);
   }
 
   this->DrawCenteredText(4, 32, FormatOwnedString("%s / %s", LookupMessage(MSI_ZOOM_IN), LookupMessage(MSI_ZENY_LOTTO_BUY_10)).c_str(), 75, 0, 12, 0x2B2625, 0);
@@ -313,11 +312,10 @@ int UIHotkeyGuideWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
 // FUNCTION: fn_13173
 void UIHotkeyGuideWnd::DrawKey(const HotkeyGuideKey* key) {
   CBitmapRes* bitmap;
-  int x;
   if (key->width == 36) {
     const char* name = key->height == 75 ? "유저인터페이스\\hotkey_guide\\bt_enter2.bmp" : "유저인터페이스\\hotkey_guide\\bt_keyboard.bmp";
     bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name)));
-    x = key->x;
+    this->DrawBitmap(key->x, key->y, bitmap, true);
   } else {
     bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\hotkey_guide\\bt_left.bmp")));
     this->DrawBitmap(key->x, key->y, bitmap, true);
@@ -330,9 +328,8 @@ void UIHotkeyGuideWnd::DrawKey(const HotkeyGuideKey* key) {
       this->DrawBitmap(key->x + (key->width - 12), key->y, bitmap, true);
     }
     bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\hotkey_guide\\bt_right.bmp")));
-    x = key->width - 6 + key->x;
+    this->DrawBitmap(key->width - 6 + key->x, key->y, bitmap, true);
   }
-  this->DrawBitmap(x, key->y, bitmap, true);
 }
 
 // OFFSET: 0x0096C730

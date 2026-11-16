@@ -57,14 +57,16 @@ void CRenderer::DrawBattleFieldIcon() {
   rect.right = this->viewport.width - 232;
   rect.bottom = 74;
   CGameMode* mode = g_modeMgr.GetGameMode();
-  mode->DrawTexture(rect, 0, 0.0999f, 0xCDFFFFFF, g_texMgr.Load("effect\\사자(A).bmp", 0, false, true, false), region);
+  CTexture* texture = g_texMgr.Load("effect\\사자(A).bmp", 0, false, true, false);
+  mode->DrawTexture(rect, 0, 0.0999f, 0xCDFFFFFF, texture, region);
 
   rect.left = this->viewport.width - 280;
   rect.top = 84;
   rect.right = this->viewport.width - 232;
   rect.bottom = 132;
   mode = g_modeMgr.GetGameMode();
-  mode->DrawTexture(rect, 0, 0.0999f, 0xCDFFFFFF, g_texMgr.Load("effect\\독수리(B).bmp", 0, false, true, false), region);
+  texture = g_texMgr.Load("effect\\독수리(B).bmp", 0, false, true, false);
+  mode->DrawTexture(rect, 0, 0.0999f, 0xCDFFFFFF, texture, region);
 
   const unsigned char width = g_session.m_score1 > 9 || g_session.m_score2 > 9 ? 2 : 1;
   CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load("이팩트\\RankFont.act"));
@@ -210,11 +212,19 @@ timer:
 
 // OFFSET: 0x00560A40
 // FUNCTION: fn_02161
-CRenderer::CRenderer() : frame(0), viewDirectionX(0), viewDirectionY(0), viewDirectionZ(0), twoPass(0), unknown_004C(0) {
+CRenderer::CRenderer() : viewDirectionX(0), viewDirectionY(0), viewDirectionZ(0) {
+  this->frame = 0;
+  this->twoPass = 0;
+  this->unknown_004C = 0;
+  this->commands.Init(1024);
+  this->primitives.Init(512);
+  this->lightmapped.Init(8192);
+  this->vertices.Init(10240);
   this->atlas.Initialize(50);
   this->fog.enabled = 0;
   this->fog.dirty = 1;
   this->fog.supported = 0;
+  this->queues.Reserve(1000);
 }
 
 // OFFSET: 0x00562090

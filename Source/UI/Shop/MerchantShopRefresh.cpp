@@ -46,10 +46,10 @@ void UIMerchantShopMakeWnd::Refresh() {
     edit->Background(background, background, background);
   }
 
-  const int count = g_session.GetList11Size();
+  const int count = g_session.GetNumMerchantPurchaseSavedItems();
 
   for (int index = 0; index < count; ++index) {
-    const ITEM_INFO item = g_session.GetItem1768At(index);
+    const ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(index);
     g_session.AddMerchantMyShopItem(item, this->mode, 0);
   }
 

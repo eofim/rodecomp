@@ -70,7 +70,17 @@ namespace {
 
   // INLINED
   ItemMoveInfo MakeEmptyItemMoveInfo() {
-    return ItemMoveInfo{};
+    ItemMoveInfo info;
+    info.itemId = 0;
+    info.drop = false;
+    info.trade = false;
+    info.storage = false;
+    info.cart = false;
+    info.sellToNpc = false;
+    info.mail = false;
+    info.auction = false;
+    info.guildStorage = false;
+    return info;
   }
 
   // INLINED
@@ -292,15 +302,10 @@ int ITEM_INFO::Slots(char* output, int& capacity, unsigned char consume) const {
 
 namespace {
   // INLINED
-  __forceinline void AppendText(std::string& result, const char* text, int bytes) {
-    result += bytes > 0 ? text : "";
-  }
-
-  // INLINED
-  __forceinline void AppendName(const ITEM_INFO& item, std::string& result, char (&text)[128], int& capacity) {
+  __forceinline int IdentifiedName(const ITEM_INFO& item, char* output, int& capacity, unsigned char consume) {
     const int id = std::atoi(item.itemId.c_str());
     const char* name = FindItemDescription(id, g_itemDescriptions).identifiedName;
-    AppendText(result, text, CopyText(text, capacity, 0, name ? name : " "));
+    return CopyText(output, capacity, consume, name ? name : " ");
   }
 }
 
@@ -308,73 +313,73 @@ namespace {
 // FUNCTION: fn_06581
 std::string ITEM_INFO::DisplayName(unsigned char detailed) const {
   char text[128] = {};
-  std::string result;
   int capacity = 128;
+  std::string result;
   result.reserve(150);
 
   if (this->identified == 1) {
     const int id = std::atoi(this->itemId.c_str());
     if ((static_cast<unsigned>(id) - 9001u <= 498 || static_cast<unsigned>(id) - 10000u <= 999) && CardId(*this, 3) == 1) {
-      AppendText(result, text, this->Apprentice(text, capacity, 0));
-      AppendName(*this, result, text, capacity);
+      result.append(this->Apprentice(text, capacity, 0) > 0 ? text : "");
+      result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
     } else if (CardId(*this, 0) == 254 && CardId(*this, 1) == 0) {
       if (this->refiningLevel > 0) {
-        AppendText(result, text, this->Refine(text, capacity, 0));
+        result.append(this->Refine(text, capacity, 0) > 0 ? text : "");
       }
 
       if (this->grade > 0) {
-        AppendText(result, text, this->Grade(text, capacity, 0));
+        result.append(this->Grade(text, capacity, 0) > 0 ? text : "");
       }
 
       if (g_serviceType == ServiceBrazil || g_serviceType == ServiceRussia) {
-        AppendName(*this, result, text, capacity);
-        AppendText(result, text, this->Element(text, capacity, 0));
-        AppendText(result, text, this->Creator(text, capacity, 0));
+        result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+        result.append(this->Element(text, capacity, 0) > 0 ? text : "");
+        result.append(this->Creator(text, capacity, 0) > 0 ? text : "");
       } else {
-        AppendText(result, text, this->Creator(text, capacity, 0));
-        AppendText(result, text, this->Element(text, capacity, 0));
-        AppendName(*this, result, text, capacity);
+        result += this->Creator(text, capacity, 0) > 0 ? text : "";
+        result += this->Element(text, capacity, 0) > 0 ? text : "";
+        result += IdentifiedName(*this, text, capacity, 0) > 0 ? text : "";
       }
     } else {
       if (!this->IsEquipment() && detailed == 0) {
-        AppendName(*this, result, text, capacity);
+        result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
       } else {
         if (this->refiningLevel > 0) {
-          AppendText(result, text, this->Refine(text, capacity, 0));
+          result.append(this->Refine(text, capacity, 0) > 0 ? text : "");
         }
 
         if (this->grade > 0) {
-          AppendText(result, text, this->Grade(text, capacity, 0));
+          result.append(this->Grade(text, capacity, 0) > 0 ? text : "");
         }
 
         if (this->HasCards() == true) {
-          AppendText(result, text, this->Prefixes(text, capacity, 0));
-          AppendName(*this, result, text, capacity);
-          AppendText(result, text, this->Suffixes(text, capacity, 0));
-          AppendText(result, text, this->Slots(text, capacity, 0));
+          result.append(this->Prefixes(text, capacity, 0) > 0 ? text : "");
+          result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+          result.append(this->Suffixes(text, capacity, 0) > 0 ? text : "");
+          result.append(this->Slots(text, capacity, 0) > 0 ? text : "");
         } else if (CardId(*this, 0) != 254 && CardId(*this, 0) != 255) {
-          AppendName(*this, result, text, capacity);
-          AppendText(result, text, this->Slots(text, capacity, 0));
+          result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+          result.append(this->Slots(text, capacity, 0) > 0 ? text : "");
         } else if (g_serviceType == ServiceBrazil) {
-          AppendName(*this, result, text, capacity);
-          AppendText(result, text, this->Element(text, capacity, 0));
-          AppendText(result, text, this->Star(text, capacity, 0));
-          AppendText(result, text, this->Creator(text, capacity, 0));
+          result += IdentifiedName(*this, text, capacity, 0) > 0 ? text : "";
+          result += this->Element(text, capacity, 0) > 0 ? text : "";
+          result += this->Star(text, capacity, 0) > 0 ? text : "";
+          result += this->Creator(text, capacity, 0) > 0 ? text : "";
         } else if (g_serviceType == ServiceRussia) {
-          AppendText(result, text, this->Star(text, capacity, 0));
-          AppendName(*this, result, text, capacity);
-          AppendText(result, text, this->Element(text, capacity, 0));
-          AppendText(result, text, this->Creator(text, capacity, 0));
+          result += this->Star(text, capacity, 0) > 0 ? text : "";
+          result += IdentifiedName(*this, text, capacity, 0) > 0 ? text : "";
+          result += this->Element(text, capacity, 0) > 0 ? text : "";
+          result += this->Creator(text, capacity, 0) > 0 ? text : "";
         } else {
-          AppendText(result, text, this->Star(text, capacity, 0));
-          AppendText(result, text, this->Creator(text, capacity, 0));
-          AppendText(result, text, this->Element(text, capacity, 0));
-          AppendName(*this, result, text, capacity);
+          result += this->Star(text, capacity, 0) > 0 ? text : "";
+          result += this->Creator(text, capacity, 0) > 0 ? text : "";
+          result += this->Element(text, capacity, 0) > 0 ? text : "";
+          result += IdentifiedName(*this, text, capacity, 0) > 0 ? text : "";
         }
       }
     }
   } else {
-    AppendText(result, text, this->UnidentifiedName(text, capacity, 0));
+    result.append(this->UnidentifiedName(text, capacity, 0) > 0 ? text : "");
   }
 
   return result;
@@ -524,13 +529,13 @@ void __fastcall DestroyReplayTaggedRecordHeader(ReplayTaggedRecordHeader* value)
 // OFFSET: 0x006D78C0
 // FUNCTION: fn_06596
 __declspec(noinline) void LoadItemNameTables() {
+  std::vector<char*> tokens;
   g_itemDescriptions.clear();
   g_itemCardNames.clear();
   g_metalProcessItems.clear();
   g_tableStorage.Clear();
   g_bookItemNames.clear();
 
-  std::vector<char*> tokens;
   if (tokens.capacity() < 20000) {
     tokens.reserve(20000);
   }
@@ -742,7 +747,8 @@ __declspec(noinline) void LoadItemNameTables() {
   sorry.name = "sorry";
   sorry.prefix = "";
   sorry.suffix = "";
-  FindItemCardName(-1, g_itemCardNames) = sorry;
+  ItemCardName& fallback = FindItemCardName(-1, g_itemCardNames);
+  fallback = sorry;
 
   std::vector<int> moveInfo;
   if (LoadItemIntegerTable(moveInfo, "ItemMoveInfoV5.txt") && !moveInfo.empty()) {

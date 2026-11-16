@@ -1346,6 +1346,22 @@ void CGameMode::RecordChatRoomSettings() {
 
 #pragma pack(push, 1)
 struct GameModeChunkHeader {
+  // INLINED
+  GameModeChunkHeader() {
+    this->Clear();
+  }
+
+  // INLINED
+  ~GameModeChunkHeader() {
+    this->Clear();
+  }
+
+  // INLINED
+  void Clear() {
+    this->type = 0;
+    this->size = 0;
+  }
+
   /* 0000 */ std::int16_t type;
   /* 0002 */ std::uint32_t size;
 };
@@ -1393,14 +1409,15 @@ unsigned CGameMode::ReadReplayGroundSkills(const std::vector<unsigned char>& dat
     return 0xFFFFFFFFu;
   }
 
-  GameModeChunkHeader header = {};
+  GameModeChunkHeader header;
   unsigned offset = 6;
+  header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   if (17000 != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
-    while (offset < data.size()) {
-      header = {};
+    while (data.size() > offset) {
+      header.Clear();
       header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
       offset += 6;
 
@@ -2628,7 +2645,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_SELL: {
-      const int count = g_session.GetList4Size();
+      const int count = g_session.GetNumStorageItems();
       const std::uint32_t size = 4U + static_cast<std::uint32_t>(count) * 4U;
       if (size > 0x800) {
         return 0;
@@ -2637,7 +2654,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const std::uint16_t header[2] = {ID_CZ_PC_SELL_ITEMLIST, static_cast<std::uint16_t>(size)};
       std::memcpy(packet, header, sizeof(header));
       for (int i = 0; i < count; ++i) {
-        const ITEM_INFO item = g_session.GetItem1730At(i);
+        const ITEM_INFO item = g_session.GetStorageItemInfoBySequence(i);
         const std::uint16_t entry[2] = {
           static_cast<std::uint16_t>(item.identity[1]), static_cast<std::uint16_t>(item.quantity)
         };
@@ -2839,7 +2856,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_REQ_TRADE_BUYING_STORE: {
       g_session.CopyItems1760To1770();
-      const int count = g_session.GetList10Size();
+      const int count = g_session.GetNumMerchantHopeToSellItems();
       const std::uint32_t size = 12U + static_cast<std::uint32_t>(count) * 8U;
       if (size > 0x800) {
         return 0;
@@ -2852,7 +2869,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet + 4, &argument1, 4);
       std::memcpy(packet + 8, &argument2, 4);
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1760At(index);
+        const ITEM_INFO item = g_session.GetMerchantHopeToSellItemInfoBySequence(index);
         if (item.identity[1] != 0) {
           const std::uint16_t itemIndex = static_cast<std::uint16_t>(item.identity[1]);
           const int itemId = std::atoi(item.itemId.c_str());
@@ -3186,7 +3203,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_OPEN_BUYING_STORE_EXTENDED: {
       unsigned char packet[0x800]{};
-      const int count = g_session.GetList11Size();
+      const int count = g_session.GetNumMerchantPurchaseSavedItems();
       const std::uint16_t packetId = ID_CZ_REQ_CREATE_ASSISTANT_BUYING;
       const std::uint16_t length = static_cast<std::uint16_t>(96 + count * 10);
       std::memcpy(packet, &packetId, sizeof(packetId));
@@ -3204,7 +3221,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       unsigned char* output = packet + 96;
       for (int index = 0; index < count; ++index) {
-        ITEM_INFO item = g_session.GetItem1768At(index);
+        ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(index);
         if (item.identity[1] > 0) {
           const int itemId = std::atoi(item.itemId.c_str());
           const std::uint16_t quantity = static_cast<std::uint16_t>(item.quantity);
@@ -3387,7 +3404,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_NPC_MARKET_PURCHASE: {
       unsigned char packet[2048]{};
-      const int count = g_session.GetList2Size();
+      const int count = g_session.GetNumPurchaseItems();
       const std::uint32_t length = 4U + static_cast<std::uint32_t>(count) * 8U;
       if (length > sizeof(packet)) {
         return 0;
@@ -3398,7 +3415,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet + 2, &packetLength, sizeof(packetLength));
       if (count > 0) {
         for (int index = 0; index < count; ++index) {
-          const ITEM_INFO item = g_session.GetItem1720At(index);
+          const ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(index);
           const int id = std::atoi(item.itemId.c_str());
           std::memcpy(packet + 4 + index * 8, &id, sizeof(id));
           std::memcpy(packet + 8 + index * 8, &item.quantity, sizeof(item.quantity));
@@ -3703,7 +3720,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_NPC_MARKET_PURCHASE_V2: {
       unsigned char packet[0x800]{};
-      const int count = g_session.GetList2Size();
+      const int count = g_session.GetNumPurchaseItems();
       const std::uint32_t length = static_cast<std::uint32_t>(count) * 10U + 4U;
       if (length > sizeof(packet)) {
         return 0;
@@ -3712,7 +3729,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet, header, sizeof(header));
       if (count > 0) {
         for (int index = 0; index < count; ++index) {
-          const ITEM_INFO item = g_session.GetItem1720At(index);
+          const ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(index);
           const std::int32_t itemId = std::atoi(item.itemId.c_str());
           const std::uint16_t identity = static_cast<std::uint16_t>(item.identity[1]);
           unsigned char* entry = packet + 4 + index * 10;
@@ -3971,11 +3988,11 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_BUY_CASH_POINT: {
-      if (g_session.GetList2Size() == 0 || this->isPlayerDead != 0) {
+      if (g_session.GetNumPurchaseItems() == 0 || this->isPlayerDead != 0) {
         g_session.ClearTradeItems();
         return 0;
       }
-      const int count = g_session.GetList2Size();
+      const int count = g_session.GetNumPurchaseItems();
       const std::uint32_t length = static_cast<std::uint32_t>(count) * 6U + 10U;
       if (length > 0x800) {
         return 0;
@@ -3989,7 +4006,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet + 4, &argument1, sizeof(argument1));
       std::memcpy(packet + 8, &itemCount, sizeof(itemCount));
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1720At(index);
+        const ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(index);
         const std::uint16_t quantity = static_cast<std::uint16_t>(item.quantity);
         const int itemId = std::atoi(item.itemId.c_str());
         std::memcpy(packet + 10 + index * 6, &quantity, sizeof(quantity));
@@ -4436,7 +4453,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_OPENSTORE: {
-      const int count = g_session.GetList11Size();
+      const int count = g_session.GetNumMerchantPurchaseSavedItems();
       OpenStorePacket packet;
       packet.packetId = ID_CZ_REQ_OPENSTORE2;
       packet.length = static_cast<std::int16_t>(85 + count * 8);
@@ -4454,7 +4471,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       OpenStoreEntry* entry = packet.entries;
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1768At(index);
+        const ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(index);
         if (item.identity[1]) {
           entry->index = static_cast<std::uint16_t>(item.identity[1]);
           entry->amount = static_cast<std::uint16_t>(item.quantity);
@@ -4636,7 +4653,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_PC_PURCHASE_ITEMLIST_FROMMC: {
       g_session.CopyItems1760To1770();
-      const int count = g_session.GetList10Size();
+      const int count = g_session.GetNumMerchantHopeToSellItems();
       const std::uint32_t length = 12U + static_cast<std::uint32_t>(count) * 4U;
       if (length > 0x800U) {
         return 0;
@@ -4647,7 +4664,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet + 4, &argument1, sizeof(argument1));
       std::memcpy(packet + 8, &argument2, sizeof(argument2));
       for (int index = 0; index < count; ++index) {
-        ITEM_INFO item = g_session.GetItem1760At(index);
+        ITEM_INFO item = g_session.GetMerchantHopeToSellItemInfoBySequence(index);
         if (item.identity[1] != 0) {
           *reinterpret_cast<std::uint16_t*>(packet + 12 + index * 4) = static_cast<std::uint16_t>(item.quantity);
           *reinterpret_cast<std::uint16_t*>(packet + 14 + index * 4) = static_cast<std::uint16_t>(item.identity[1]);
@@ -4821,7 +4838,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_PURCHASE: {
-      const int count = g_session.GetList2Size();
+      const int count = g_session.GetNumPurchaseItems();
       const std::uint32_t length = 4U + static_cast<std::uint32_t>(count) * 6U;
       if (length > 0x800) {
         return 0;
@@ -4830,7 +4847,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       const std::uint16_t header[2] = {ID_CZ_PC_PURCHASE_ITEMLIST, static_cast<std::uint16_t>(length)};
       std::memcpy(packet, header, sizeof(header));
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1720At(index);
+        const ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(index);
         const std::uint16_t quantity = static_cast<std::uint16_t>(item.quantity);
         const int itemId = std::atoi(item.itemId.c_str());
         std::memcpy(packet + 4 + index * 6, &quantity, sizeof(quantity));
@@ -4977,7 +4994,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_ITEMLISTWIN_RES: {
-      const int count = g_session.GetList4Size();
+      const int count = g_session.GetNumStorageItems();
       const std::uint32_t length = 12U + static_cast<std::uint32_t>(count) * 4U;
       if (length > 0x800) {
         return 0;
@@ -4989,7 +5006,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::memcpy(packet + 4, &argument1, sizeof(argument1));
       std::memcpy(packet + 8, &flag, sizeof(flag));
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1730At(index);
+        const ITEM_INFO item = g_session.GetStorageItemInfoBySequence(index);
         const std::uint16_t entry[2] = {
           static_cast<std::uint16_t>(item.identity[1]), static_cast<std::uint16_t>(item.quantity)
         };
@@ -5170,7 +5187,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_OPEN_BUYING_STORE: {
-      const int count = g_session.GetList11Size();
+      const int count = g_session.GetNumMerchantPurchaseSavedItems();
       unsigned char packet[0x800];
       const std::uint16_t header[] = {ID_CZ_REQ_OPEN_BUYING_STORE, static_cast<std::uint16_t>(0x59 + count * 10)};
       std::memcpy(packet, header, sizeof(header));
@@ -5187,7 +5204,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       unsigned char* output = packet + 0x59;
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1768At(index);
+        const ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(index);
         if (item.identity[1] > 0) {
           const int id = std::atoi(item.itemId.c_str());
           const std::uint16_t quantity = static_cast<std::uint16_t>(item.quantity);
@@ -5205,7 +5222,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_OFFLINE_STORE_CREATE: {
       unsigned char packet[0x800] = {};
-      const int count = g_session.GetList11Size();
+      const int count = g_session.GetNumMerchantPurchaseSavedItems();
       const std::uint16_t header[] = {ID_CZ_REQ_CREATE_ASSISTANT_VENDING, static_cast<std::uint16_t>(0x58 + count * 8)};
       std::memcpy(packet, header, sizeof(header));
       std::strncpy(reinterpret_cast<char*>(packet + 4), reinterpret_cast<const char*>(argument1), 0x4F);
@@ -5217,7 +5234,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       unsigned char* output = packet + 0x58;
       for (int index = 0; index < count; ++index) {
-        const ITEM_INFO item = g_session.GetItem1768At(index);
+        const ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(index);
         if (item.identity[1] != 0) {
           const std::uint16_t id = static_cast<std::uint16_t>(item.identity[1]);
           const std::uint16_t quantity = static_cast<std::uint16_t>(item.quantity);
@@ -5700,14 +5717,15 @@ unsigned CGameMode::ReadReplayGroundItems(const std::vector<unsigned char>& data
     return 0xFFFFFFFFu;
   }
 
-  GameModeChunkHeader header = {};
+  GameModeChunkHeader header;
   unsigned offset = 6;
+  header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   if (15000 != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
-    while (offset < data.size()) {
-      header = {};
+    while (data.size() > offset) {
+      header.Clear();
       header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
       offset += 6;
 
@@ -5738,20 +5756,21 @@ unsigned CGameMode::ReadReplayActors(const std::vector<unsigned char>& data) {
     return 0xFFFFFFFFu;
   }
 
-  GameModeChunkHeader header = {};
+  GameModeChunkHeader header;
   unsigned offset = 6;
+  header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   if (10000 != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
     std::vector<unsigned char> record;
-    while (offset < data.size()) {
-      header = {};
+    while (data.size() > offset) {
+      header.Clear();
       header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
       offset += 6;
 
       if (static_cast<int>(header.size) > 0) {
-        record.resize(header.size);
+        record.resize(header.size, 0);
       }
 
       if (header.type == 10001) {
@@ -6381,21 +6400,22 @@ unsigned CGameMode::ReadReplayGuildInfo(const std::vector<unsigned char>& data) 
     return 0xFFFFFFFFu;
   }
 
-  GameModeChunkHeader header = {};
+  GameModeChunkHeader header;
   std::vector<unsigned char> record;
   unsigned offset = 6;
   std::uint32_t guildId = 0;
+  header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   if (13000 != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
-    while (offset < data.size()) {
-      header = {};
+    while (data.size() > offset) {
+      header.Clear();
       header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
       offset += 6;
 
       if (static_cast<int>(header.size) > 0) {
-        record.resize(header.size);
+        record.resize(header.size, 0);
       }
 
       switch (header.type) {
@@ -8393,13 +8413,14 @@ void CGameMode::Initialize(const char* name) {
   if (Replay::Instance().state == 6) {
     const std::vector<unsigned char> data = Replay::Instance().ReadSection(0x12);
     if (data.begin() != data.end()) {
-      GameModeChunkHeader header = {};
-      g_activeSkillEffects.clear();
+      GameModeChunkHeader header;
+      g_activeSkillEffects.erase(g_activeSkillEffects.begin(), g_activeSkillEffects.end());
       unsigned offset = 6;
+      header.Clear();
       header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
       if (header.type == 19000) {
         while (offset < data.size()) {
-          header = {};
+          header.Clear();
           header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
           offset += 6;
           if (header.type == 19001) {
@@ -8539,12 +8560,13 @@ void CGameMode::Initialize(const char* name) {
 
     const std::vector<unsigned char> data = Replay::Instance().ReadSection(0x17);
     if (data.begin() != data.end()) {
-      GameModeChunkHeader header = {};
+      GameModeChunkHeader header;
       unsigned offset = 6;
+      header.Clear();
       header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
       if (header.type == 14000) {
         while (offset < data.size()) {
-          header = {};
+          header.Clear();
           header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
           offset += 6;
           if (header.type == 14001) {
@@ -8569,7 +8591,11 @@ void CGameMode::Initialize(const char* name) {
   }
 
   if (g_screenShakeMode == 2) {
-    this->scene->player->SendMsg(nullptr, AM_STATUS_CHANGE, 0x22, g_screenShakeDuration <= 10000 && g_screenShakeDuration != 0, 0, 0, 0, 0);
+    if (g_screenShakeDuration <= 10000 && g_screenShakeDuration != 0) {
+      this->scene->player->SendMsg(nullptr, AM_STATUS_CHANGE, 0x22, 1, 0, 0, 0, 0);
+    } else {
+      this->scene->player->SendMsg(nullptr, AM_STATUS_CHANGE, 0x22, 0, 0, 0, 0, 0);
+    }
   }
 
   if (g_session.GetOption(6) > 0) {
@@ -9382,8 +9408,10 @@ void CGameMode::Update() {
               bool reachable = true;
               if (!this->IsValidCell(x, y)) {
                 reachable = this->GetClosestValidCell(&cellX, &cellY);
-                x = cellX;
-                y = cellY;
+                if (reachable) {
+                  x = cellX;
+                  y = cellY;
+                }
               }
               if (reachable) {
                 if (g_windowMgr.menuWnd != nullptr) {
@@ -9474,16 +9502,17 @@ void CGameMode::Update() {
 
     if (this->drag.source != 0 && (g_windowMgr.itemDropCntWnd == nullptr || g_windowMgr.itemDropCntWnd->geometry.visible == 0)) {
       if (this->drag.source == 0x1D) {
-        if (g_windowMgr.Window4F250Ready()) {
+        if (g_windowMgr.Window4F250Ready() == 1) {
           g_windowMgr.MoveTransient(g_mouse.x, g_mouse.y);
         }
       } else if (this->drag.resource.empty()) {
         this->drag.Clear();
       } else {
         const std::string resource = this->drag.resource;
-        CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load((resource + ".spr").c_str()));
-        CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load((resource + ".act").c_str()));
-        this->DrawActionSprite(g_mouse.x, g_mouse.y, action, sprite, 0, 0, 1.0f, 0.0f, 0xFAFFFFFF, 0x201);
+        this->DrawActionSprite(
+          g_mouse.x, g_mouse.y, static_cast<CActRes*>(ResourceMgr::Instance().Load((resource + ".act").c_str())),
+          static_cast<CSprRes*>(ResourceMgr::Instance().Load((resource + ".spr").c_str())), 0, 0, 1.0f, 0.0f, 0xFAFFFFFF, 0x201
+        );
       }
     }
 
@@ -10706,6 +10735,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     attack = shiftHeld;
     if (support) {
       attack = shiftHeld == 0;
+      skillMode = 1;
     }
   } else {
     skillMode = 0;
@@ -10715,7 +10745,6 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     optionalSelf = false;
   }
 
-  bool resetCursor = false;
   if (pick) {
     if (this->scene->isBattleFieldMode == 0) {
       if (g_session.GetMapProperty07()) {
@@ -10761,9 +10790,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
           attack = 1;
         } else if (known) {
           attack = 0;
-          if (!skillMode) {
-            resetCursor = true;
-          } else {
+          if (skillMode) {
             attack = support;
             if ((selfTargetOption || shiftHeld) && optionalSelf == true) {
               attack = 1;
@@ -10782,9 +10809,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     }
   }
 
-  if (resetCursor) {
-    this->SetCursorAction(0);
-  } else if (attack && actor->render.state != 3) {
+  if (attack && actor->render.state != 3) {
     this->SetCursorAction(skillMode ? 11 : 5);
     handled = 1;
   } else if (skillMode && actor->render.state != 3) {
@@ -10905,12 +10930,10 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
   }
 
   int& balloonAid = this->lastPcGid;
-  if (this->oldMouseX == g_mouse.x && this->oldMouseY == g_mouse.y) {
-    this->ShowActorNameBalloon(balloonAid);
-    return;
+  if (this->oldMouseX != g_mouse.x || this->oldMouseY != g_mouse.y) {
+    balloonAid = 0;
   }
-  balloonAid = 0;
-  this->ShowActorNameBalloon(0);
+  this->ShowActorNameBalloon(balloonAid);
 }
 
 // OFFSET: 0x00CFE510
@@ -10995,11 +11018,22 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
       this->statusIconTooltip->SetText(" ", 35);
     }
 
-    UITransBalloonText* balloon = this->statusIconTooltip;
     std::string extra;
     int line = 1;
     std::uint32_t color = 0;
-    if (id != 0x2B7) {
+    if (id == 0x2B7) {
+      {
+        ITEM_INFO item = g_session.LookupClientItemByIdentity(g_session.equippedArrowIndex);
+        if (item.identity[1] > 0) {
+          extra = static_cast<const std::string&>(FormatOwnedString("%s : %d", item.DisplayName(0).c_str(), item.quantity));
+          color = 0xFABEBE;
+        }
+      }
+
+      if (extra.size() != 0) {
+        this->statusIconTooltip->SetLine(extra.c_str(), color);
+      }
+    } else {
       for (;;) {
         const char* text;
         int red;
@@ -11022,18 +11056,10 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
         }
 
         const std::uint32_t lineColor = RGB(red, green, blue);
-        bool replace;
-        if (line == 1) {
-          replace = true;
+        if (line == 1 || firstLine(this->statusIconTooltip) == " ") {
+          this->statusIconTooltip->SetLine(description.c_str(), lineColor);
         } else {
-          const std::string first = firstLine(balloon);
-          replace = first.size() == 1 && first[0] == ' ';
-        }
-
-        if (replace) {
-          balloon->SetLine(description.c_str(), lineColor);
-        } else {
-          balloon->AddLine(description.c_str(), lineColor);
+          this->statusIconTooltip->AddLine(description.c_str(), lineColor);
         }
         ++line;
       }
@@ -11046,33 +11072,17 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
         }
 
         if (extra.size() != 0) {
-          balloon->AddLine(extra.c_str(), 0);
+          this->statusIconTooltip->AddLine(extra.c_str(), 0);
         }
-      }
-    } else {
-      {
-        ITEM_INFO item = g_session.LookupClientItemByIdentity(g_session.equippedArrowIndex);
-        if (item.identity[1] != 0) {
-          extra = static_cast<const std::string&>(FormatOwnedString("%s : %d", item.DisplayName(0).c_str(), item.quantity));
-          color = 0xFABEBE;
-        }
-      }
-
-      if (extra.size() != 0) {
-        balloon->SetLine(extra.c_str(), color);
       }
     }
 
-    const std::string first = firstLine(this->statusIconTooltip);
-    if (!(first.size() == 1 && first[0] == ' ')) {
+    if (firstLine(this->statusIconTooltip) != " ") {
       this->statusIconTooltip->Show(1);
       const int windowHeight = this->statusIconTooltip->geometry.height;
       const int left = right - 30 + (slot / rows) * -45 - this->statusIconTooltip->geometry.width;
       const int top = (slot % rows) * 35;
-      int windowY = g_renderer->viewport.height - windowHeight;
-      if (windowHeight + 171 + top <= g_renderer->viewport.height) {
-        windowY = top + 171;
-      }
+      const int windowY = windowHeight + 171 + top > g_renderer->viewport.height ? g_renderer->viewport.height - windowHeight : top + 171;
       this->statusIconTooltip->Move(left, windowY);
     }
 

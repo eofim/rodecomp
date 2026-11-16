@@ -303,8 +303,7 @@ void CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_GATLING::OnSkillEffect(int level
     effect->position[2] = target->render.position.z + 0.0f;
     effect->position[1] = static_cast<float>(index % 4 / 2 * 15 - (first >= 0 ? first : 0)) + target->render.position.y;
     effect->SetDelay(index * 32);
-    const int scale = rand() % 51;
-    effect->SetScale(static_cast<float>((scale >= 0 ? scale : 0) + 50) * 0.01f);
+    effect->SetScale(static_cast<float>(std::max(rand() % 51, 0) + 50) * 0.01f);
   }
 }
 
@@ -318,7 +317,8 @@ int CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN::GetSkillAttackMotion() {
 // FUNCTION: fn_08685
 void CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
   if (source) {
-    g_effectMgr->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("the_vigilante_at_night_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    EffectLists* effects = g_effectMgr;
+    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("the_vigilante_at_night_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 
   if (!target) {
@@ -327,7 +327,8 @@ void CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN::OnSkillEffect(int level
 
   for (int index = 0; index < 4; ++index) {
     const vector3d position = target->render.position;
-    CEffect* effect = g_effectMgr->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("the_vigilante_at_night_crack"), position, 0, -1, 0, 0);
+    EffectLists* effects = g_effectMgr;
+    CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("the_vigilante_at_night_crack"), position, 0, -1, 0, 0);
     if (!effect) {
       return;
     }
@@ -338,8 +339,7 @@ void CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN::OnSkillEffect(int level
     effect->position[2] = target->render.position.z + 0.0f;
     effect->position[1] = static_cast<float>(index % 4 / 2 * 10 - (first >= 0 ? first : 0)) + target->render.position.y;
     effect->SetDelay(index * 32);
-    const int scale = rand() % 31;
-    effect->SetScale(static_cast<float>((scale >= 0 ? scale : 0) + 70) * 0.01f);
+    effect->SetScale(static_cast<float>(std::max(rand() % 31, 0) + 70) * 0.01f);
   }
 }
 

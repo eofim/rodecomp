@@ -1105,8 +1105,8 @@ void CPc::ApplyLayerEffects(
     jitter.bottomRhw = jitterBottomRhw;
     jitter.topRhw = jitterTopRhw;
     jitter.color = 0x64FFFFFF;
-    jitter.angle = static_cast<float>(cell->rotation + static_cast<int>(this->render.spriteAngle));
     jitter.image = image;
+    jitter.angle = static_cast<float>(cell->rotation + static_cast<int>(this->render.spriteAngle));
     this->DrawQuad(jitter, palette, 5, 0.0f, 0.0f, 0);
 
     wave = g_sinTable[this->render.wavePhase];
@@ -1128,8 +1128,8 @@ void CPc::ApplyLayerEffects(
     jitter.bottomRhw = jitterBottomRhw;
     jitter.topRhw = jitterTopRhw;
     jitter.color = 0x78FFFFFF;
-    jitter.angle = static_cast<float>(cell->rotation + static_cast<int>(this->render.spriteAngle));
     jitter.image = image;
+    jitter.angle = static_cast<float>(cell->rotation + static_cast<int>(this->render.spriteAngle));
     this->DrawQuad(jitter, palette, 5, 0.0f, 0.0f, 0);
   }
 
@@ -3287,9 +3287,9 @@ void CPlayer::ReapplySkillEffects() {
           this->LaunchEffect(EF_BLACKDEVIL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
           g_soundMgr->PlayWave("effect\\_blind.wav", 0.0f, -100.0f, 0.0f, 250, 40, 1.0f, 0);
         }
-        for (int id = 0x1DB; id < 0x1E5; ++id) {
-          if (this->HasId(id) == true) {
-            this->SendMsg(nullptr, AM_DELETE_EFFECT, id, 0, 0, 0, 0, 0);
+        for (int i = 0; i < 10; ++i) {
+          if (this->HasId(0x1DB + i) == true) {
+            this->SendMsg(nullptr, AM_DELETE_EFFECT, 0x1DB + i, 0, 0, 0, 0, 0);
           }
         }
         this->LaunchEffect(effectId, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
@@ -3402,19 +3402,19 @@ void CPlayer::ReapplySkillEffects() {
         } else {
           switch (value) {
           case 0:
-            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_1, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0));
+            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
           case 1:
-            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_3, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0));
+            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_3, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
           case 2:
-            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_2, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0));
+            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_2, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
           case 3:
-            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_4, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0));
+            ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_4, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
           }
@@ -3939,11 +3939,11 @@ void CPlayer::SendMsg(
       this->headDir = 0;
       this->render.angle = facing;
     } else if (direction == 1) {
-      if (this->headDir == 1) {
+      if (this->headDir != 1) {
+        this->headDir = 1;
+      } else {
         this->headDir = 0;
         this->render.angle = facing;
-      } else {
-        this->headDir = 1;
       }
     } else {
       if (direction == 2 || direction == 3) {
@@ -3955,11 +3955,11 @@ void CPlayer::SendMsg(
         }
       }
       if (direction == 7) {
-        if (this->headDir == 2) {
+        if (this->headDir != 2) {
+          this->headDir = 2;
+        } else {
           this->headDir = 0;
           this->render.angle = facing;
-        } else {
-          this->headDir = 2;
         }
       } else if (direction == 5 || direction == 6) {
         const float angle = facing - 45.0f;
@@ -4057,7 +4057,10 @@ void CPlayer::SendMsg(
     break;
   case AM_RESUMEPROCEEDATTACK:
     if (this->render.state != ST_SIT && !StateFlag01(this->stateFlags)) {
-      const int attackMode = this->proceedType == 1 ? 5 : 1;
+      int attackMode = 5;
+      if (this->proceedType != 1) {
+        attackMode = 1;
+      }
       this->tickOfMoveForAttack = timeGetTime() - 1200;
       this->proceedType = attackMode;
       this->proceedTargetGid = static_cast<int>(b);
@@ -4145,9 +4148,9 @@ void CGrannyPc::RenderModel(
   rotation.AppendYRotation((this->angle + 180.0f) / 180.0f * 3.141592f);
   rotation.AppendScale(0.3f, 0.3f, 0.3f);
   vector3d position;
-  position.x = this->render.position.x - 2.0f;
-  position.y = this->render.position.y;
-  position.z = this->render.position.z - 2.0f;
+  position = this->render.position;
+  position.x -= 2.0f;
+  position.z -= 2.0f;
   rotation.AppendTranslate(&position.x);
 
   float screenX;
@@ -4249,7 +4252,8 @@ void CGrannyPc::RenderModel(
   }
 
   if (model == this->model) {
-    if (this->model->ProjectBounds(bounds, view, rotation, &g_modeMgr.GetGameMode()->camera->frame.eye.x)) {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    if (this->model->ProjectBounds(bounds, view, rotation, &mode->camera->frame.eye.x)) {
       this->SetRenderInfo(bounds, screenX, screenY);
     } else {
       this->SetTlvert(screenX, screenY);
@@ -4348,7 +4352,11 @@ void CPc::SetState(int state, int resetPosition) {
     return;
   }
 
-  if (state != ST_DEAD && (current == 0x51 || state == -1)) {
+  if (state != ST_DEAD && current == 0x51) {
+    return;
+  }
+
+  if (state == -1) {
     return;
   }
 
@@ -4483,9 +4491,7 @@ void CPc::SetState(int state, int resetPosition) {
     } else if (this->GetShapeShift() == 2) {
       weaponAllowed = true;
     } else {
-      weaponAllowed = g_session.IsJobWeaponAllowed(
-        this->GetEffectiveJob(-1), this->sex, (static_cast<std::int64_t>(this->secondaryWeapon) << 32) | static_cast<std::uint32_t>(this->weapon)
-      );
+      weaponAllowed = g_session.IsJobWeaponAllowed(this->GetEffectiveJob(-1), this->sex, this->weaponPair);
     }
 
     int attackState;
@@ -4546,12 +4552,10 @@ void CPc::SetState(int state, int resetPosition) {
     if (this->bodyState != 1 && this->bodyState != 2) {
       this->render.isMotionFreezed = false;
     }
-    const bool weaponAllowed = g_session.IsJobWeaponAllowed(
-      this->GetEffectiveJob(-1), this->sex, (static_cast<std::int64_t>(this->secondaryWeapon) << 32) | static_cast<std::uint32_t>(this->weapon)
-    );
+    const bool weaponAllowed = g_session.IsJobWeaponAllowed(this->GetEffectiveJob(-1), this->sex, this->weaponPair);
     CGameActor::SetState(weaponAllowed ? 9 : 2, resetPosition);
     this->attackMotion = g_session.AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
-    if ((this->weapon == 14 && this->secondaryWeapon == 0) || (this->weapon == 13 && this->secondaryWeapon == 0)) {
+    if (this->weaponPair == 14 || this->weaponPair == 13) {
       CGameMode* mode = g_modeMgr.GetGameMode();
       mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
@@ -4861,7 +4865,7 @@ void CPc::SendMsg(
   case 136: {
     this->SetSprJob(this->GetEffectiveJob(-1));
     this->SetImfFileName();
-    const std::int64_t weapon = this->GetWeapon();
+    const std::uint64_t weapon = this->GetWeapon();
     if (weapon >= 1 && weapon <= 104) {
       this->SetSprWeapon(static_cast<int>(weapon), static_cast<int>(weapon >> 32));
     } else {

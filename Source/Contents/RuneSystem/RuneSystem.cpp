@@ -725,7 +725,7 @@ int CRuneSystemMgr::SendRequest(int packetId, RuneData* rune, int value) {
 // FUNCTION: fn_08153
 int CRuneSystemMgr::UpdateOwnedDecomItems() {
   this->m_ownedDecomItems.clear();
-  for (int i = 0; i < g_session.GetList0Size(); ++i) {
+  for (int i = 0; i < g_session.GetNumInventoryItems(); ++i) {
     ITEM_INFO item = g_session.GetInventoryItemAt(i);
     if (this->m_itemDecoms.find(std::atoi(item.itemId.c_str())) != this->m_itemDecoms.end()) {
       this->m_ownedDecomItems.push_back(std::atoi(item.itemId.c_str()));
@@ -1201,7 +1201,8 @@ int AddTag(lua_State* state) {
     return 2;
   }
 
-  g_runeSystemMgr->m_tags.push_back(new CTagData(tagValue, name));
+  CRuneSystemMgr* mgr = g_runeSystemMgr;
+  mgr->InsertTag(tagValue, name);
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
   return 2;
@@ -1218,7 +1219,7 @@ int AddDecomItemNum(lua_State* state) {
     return 2;
   }
 
-  g_runeSystemMgr->m_decomItems.push_back(itemId);
+  g_runeSystemMgr->InsertDecomItem(itemId);
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
   return 2;

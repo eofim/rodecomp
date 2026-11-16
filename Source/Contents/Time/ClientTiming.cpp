@@ -545,7 +545,7 @@ void CSession::SetHotkeySkillLevel(std::uint32_t skillLevel, int index) {
 // FUNCTION: fn_23916
 void CSession::RefreshTrackedAchievement(int id) {
   std::vector<SessionRecord6178>& tracked = this->trackedAchievements;
-  auto found = std::find_if(tracked.begin(), tracked.end(), [id](SessionRecord6178 record) { return id == record.id; });
+  auto found = std::find_if(tracked.begin(), tracked.end(), [&](SessionRecord6178 record) { return id == record.id; });
   if (found == tracked.end()) {
     return;
   }
@@ -706,13 +706,13 @@ void CSession::LoadNavigationScripts() {
 void CSession::LoadRobeAlpha() {
   for (int index = 1; index < 1000; ++index) {
     int robeId = 0;
-    int from = 0;
-    int to = 0;
-    int period = 0;
+    RobeAlpha alpha;
+    alpha.from = 0;
+    alpha.to = 0;
+    alpha.period = 0;
     LuaScript* script = this->m_hotkeyScript;
 
-
-    if (!script->Call(OBFUSCATE_TEXT("querytransparentiteminfo", 0xD51953E763B94747ULL), OBFUSCATE_TEXT("d>dddd", 0x6373E5456BAD7B71ULL), index, &robeId, &from, &to, &period)) {
+    if (!script->Call(OBFUSCATE_TEXT("querytransparentiteminfo", 0xD51953E763B94747ULL), OBFUSCATE_TEXT("d>dddd", 0x6373E5456BAD7B71ULL), index, &robeId, &alpha.from, &alpha.to, &alpha.period)) {
       char message[260];
       std::memset(message, 0, sizeof(message));
       std::sprintf(message, OBFUSCATE_TEXT("querytransparentiteminfo // %d 읽기 실패", 0x6BE143F5D31307DBULL), index);
@@ -723,7 +723,7 @@ void CSession::LoadRobeAlpha() {
     if (!robeId) {
       return;
     }
-    this->m_robeAlpha.insert({robeId, RobeAlpha{from, to, period}});
+    this->m_robeAlpha.insert({robeId, alpha});
   }
 }
 
@@ -754,7 +754,7 @@ void CSession::UnflagInventoryItem(int id) {
 // OFFSET: 0x00E016A0
 // FUNCTION: fn_23648
 void CSession::UnflagMerchantShopItem(int id) {
-  for (ITEM_INFO& entry : this->merchantShopItems) {
+  for (ITEM_INFO& entry : this->m_merchantShopItems) {
     if (entry.identity[1] == static_cast<std::uint32_t>(id)) {
       entry.flags[2] = 0;
       break;
@@ -765,7 +765,7 @@ void CSession::UnflagMerchantShopItem(int id) {
 // OFFSET: 0x00E016D0
 // FUNCTION: fn_23649
 void CSession::UnflagCartItem(int id) {
-  for (ITEM_INFO& entry : this->cartItems) {
+  for (ITEM_INFO& entry : this->m_cartItems) {
     if (entry.identity[1] == static_cast<std::uint32_t>(id)) {
       entry.flags[2] = 0;
       break;

@@ -4,6 +4,7 @@
 #include "Contents/Actors/RenderObject.h"
 #include "Contents/Camera/Camera.h"
 #include "Contents/Effects/Core/EffectMemoryMgr.h"
+#include "Contents/Effects/Core/EffectPoint.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Sound/SoundMgr.h"
 #include "Contents/Actors/Pc.h"
@@ -98,9 +99,10 @@ void CElectricEffect::OnProcess() {
 
   for (auto it = this->bolts.begin(); it != this->bolts.end(); ++it) {
     CParticle* particle = *it;
-    particle->position.x = this->position[0];
-    particle->position.y = this->position[1];
-    particle->position.z = this->position[2];
+    vector3d& particlePosition = (*it)->position;
+    particlePosition.x = this->position[0];
+    particlePosition.y = this->position[1];
+    particlePosition.z = this->position[2];
 
     const float scale = particle->scale + 0.4f;
     ++particle->elapsedFrames;
@@ -119,7 +121,7 @@ void CElectricEffect::OnProcess() {
 
     const int segment = particle->columnIndex;
     const int strand = particle->groupIndex;
-    vector3d unused[2] = {};
+    EffectPoint points[2];
 
     if (strand == 0) {
       const float* arc = &particle->animationParameter;

@@ -223,7 +223,7 @@ std::pair<bool, BarterMarketItem> UIBarterItemPurchaseWnd::GetBarterItemAt(int x
 // OFFSET: 0x00841910
 // FUNCTION: fn_10551
 int UIBarterItemPurchaseWnd::GetInventoryItemCount(int itemId) {
-  const int count = g_session.GetList0Size();
+  const int count = g_session.GetNumInventoryItems();
   for (int i = 0; i < count; ++i) {
     ITEM_INFO item = g_session.GetInventoryItemAt(i);
     if (std::atoi(item.itemId.c_str()) == itemId) {
@@ -515,7 +515,7 @@ int UIExpandedBarterItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std:
       if (g_session.HasItemCount(chunk->field_0, chunk->field_4) == true) {
         const int itemId = chunk->field_0;
         const int refine = chunk->field_4;
-        const int count = g_session.GetList0Size();
+        const int count = g_session.GetNumInventoryItems();
         int available = 0;
         for (int i = 0; i < count; ++i) {
           ITEM_INFO item = g_session.GetInventoryItemAt(i);
@@ -655,7 +655,7 @@ int UIExpandedBarterItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std:
     this->entries.erase(this->entries.begin(), this->entries.end());
     std::vector<BarterMarketEntry>* entries = g_expandedBarterMarketItemMgr->GetEntries();
     for (std::vector<BarterMarketEntry>::iterator it = entries->begin(); it != entries->end(); ++it) {
-      this->entries.emplace_back(*it);
+      this->entries.push_back(*it);
     }
     this->Invalidate();
     this->UpdateScrollBar();
@@ -1173,7 +1173,7 @@ bool UIBarterItemPurchaseWnd::Purchase() {
   std::map<std::string, int> totals;
   std::list<BarterMarketItem> items = *g_barterMarketItemMgr->GetAllItems();
 
-  int count = g_session.GetList0Size();
+  int count = g_session.GetNumInventoryItems();
   count += g_session.CountDistinctEquippedItems();
   count += g_session.CountDistinctCostumeItems();
 
@@ -1199,8 +1199,8 @@ bool UIBarterItemPurchaseWnd::Purchase() {
     return false;
   }
 
-  std::map<int, int>* required = g_barterMarketItemMgr->GetTotals();
-  for (std::map<int, int>::iterator it = required->begin(); it != required->end(); ++it) {
+  std::map<int, int> required = *g_barterMarketItemMgr->GetTotals();
+  for (std::map<int, int>::iterator it = required.begin(); it != required.end(); ++it) {
     if (this->GetInventoryItemCount(it->first) < it->second) {
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PVP)), 255, 0, 0, 0);
@@ -1584,7 +1584,7 @@ bool UIExpandedBarterItemPurchaseWnd::Purchase() {
   std::map<std::string, int> totals;
   std::vector<BarterMarketEntry> entries = *g_expandedBarterMarketItemMgr->GetEntries();
 
-  int count = g_session.GetList0Size();
+  int count = g_session.GetNumInventoryItems();
   count += g_session.CountDistinctEquippedItems();
   count += g_session.CountDistinctCostumeItems();
 
@@ -1619,7 +1619,7 @@ bool UIExpandedBarterItemPurchaseWnd::Purchase() {
 
   for (std::map<std::string, int>::iterator it = totals.begin(); it != totals.end(); ++it) {
     const int itemId = std::atoi(it->first.c_str());
-    const int inventoryCount = g_session.GetList0Size();
+    const int inventoryCount = g_session.GetNumInventoryItems();
     int owned = 0;
     for (int i = 0; i < inventoryCount; ++i) {
       ITEM_INFO item = g_session.GetInventoryItemAt(i);

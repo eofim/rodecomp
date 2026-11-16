@@ -2287,7 +2287,7 @@ void UInCashWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   switch (drag->source) {
   case 4:
     if (x < 445) {
-      const int quantity = g_session.GetItem1720QuantityByItemId(drag->name.c_str());
+      const int quantity = g_session.GetPurchaseItemNumByItemId(drag->name.c_str());
       if (quantity <= 1) {
         this->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
         return;
@@ -3078,25 +3078,6 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
   }
   case UM_COMMAND:
     switch (a) {
-    case ID_CLOSE:
-      g_windowMgr.CloseWindow(this->m_viewOther == 1 ? WID_EQUIPWND_VIEWOTHER_1 : WID_EQUIPWND);
-      return 0;
-    case ID_MINI: {
-      const int height = this->geometry.height;
-      if (height == 17) {
-        this->Resize(this->geometry.width, this->m_show);
-      } else {
-        this->m_show = height;
-        this->Resize(this->geometry.width, 17);
-      }
-      g_windowMgr.StoreSnapRectangle(this);
-      g_windowMgr.Promote(this);
-      const int delta = this->geometry.height - height;
-      if (delta != 0) {
-        g_snapMgr.MoveEdge(this, 0, delta, 3);
-      }
-      return 0;
-    }
     case ID_CHECK:
       if (this->m_viewOther != 0) {
         return 0;
@@ -3107,17 +3088,6 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       }
       g_modeMgr.currentMode->SendMsg(MM_OPEN_EQUIPEDITEM_CHANGE, b, 0, 0, 0);
       return 0;
-    case ID_RADIOBTN:
-      for (int index = 0; index < 4; ++index) {
-        this->damageSkinButtons[index + 2]->Invalidate();
-        if (sender == this->damageSkinButtons[index + 2]) {
-          this->damageSkinMode = index;
-          this->damageSkinButtons[index + 2]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
-        } else {
-          this->damageSkinButtons[index + 2]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
-        }
-      }
-      return 0;
     case ID_EQUIP_OPTION_OFF: {
       if (g_windowMgr.merchantItemMyShopWnd != nullptr) {
         g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
@@ -3125,11 +3095,15 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         return 0;
       }
 
-      std::string notice;
-      const bool enabled = g_session.replayPacketMode > 0;
+      std::string notice("");
+      bool enabled = false;
+      if (g_session.replayPacketMode > 0) {
+        enabled = true;
+      }
       if (StateFlag05(g_session.m_jobFlags)) {
-        const int job = g_session.GetDisplayJob();
-        notice = LookupMessage(job == JT_ROYAL_CHICKEN || job == JT_ROYAL_CHICKEN_H || job == JT_ROYAL_CHICKEN_B ? MSI_BATTLEFIELD_MSG_REQUEST_JOINWAIT : MSI_CHIKENOFF);
+        notice = LookupMessage(g_session.GetDisplayJob() == JT_ROYAL_CHICKEN || g_session.GetDisplayJob() == JT_ROYAL_CHICKEN_H || g_session.GetDisplayJob() == JT_ROYAL_CHICKEN_B
+                                 ? MSI_BATTLEFIELD_MSG_REQUEST_JOINWAIT
+                                 : MSI_CHIKENOFF);
       } else if (StateFlag22(g_session.m_jobFlags)) {
         notice = LookupMessage(MSI_MADOOFF);
       } else if (StateFlag19(g_session.m_jobFlags) || StateFlag23(g_session.m_jobFlags) || StateFlag24(g_session.m_jobFlags) || StateFlag25(g_session.m_jobFlags) ||
@@ -3174,13 +3148,43 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         this->UpdateCharacterView(0);
       }
 
-      const int bottom = this->geometry.height - this->contentOffset;
       const int half = this->geometry.width / 2;
+      const int bottom = this->geometry.height - this->contentOffset;
       this->m_viewButton->Move(half - 18, IsEquipViewHidden() * 230 + bottom - 40);
       this->m_otherButton->Move(half - 14, bottom + (g_session.replayPacketMode > 0 ? -60 : 170));
       this->Invalidate();
       return 0;
     }
+    case ID_MINI: {
+      const int height = this->geometry.height;
+      if (height == 17) {
+        this->Resize(this->geometry.width, this->m_show);
+      } else {
+        this->m_show = height;
+        this->Resize(this->geometry.width, 17);
+      }
+      g_windowMgr.StoreSnapRectangle(this);
+      g_windowMgr.Promote(this);
+      const int delta = this->geometry.height - height;
+      if (delta != 0) {
+        g_snapMgr.MoveEdge(this, 0, delta, 3);
+      }
+      return 0;
+    }
+    case ID_CLOSE:
+      g_windowMgr.CloseWindow(this->m_viewOther == 1 ? WID_EQUIPWND_VIEWOTHER_1 : WID_EQUIPWND);
+      return 0;
+    case ID_RADIOBTN:
+      for (int index = 0; index < 4; ++index) {
+        this->damageSkinButtons[index + 2]->Invalidate();
+        if (sender == this->damageSkinButtons[index + 2]) {
+          this->damageSkinMode = index;
+          this->damageSkinButtons[index + 2]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+        } else {
+          this->damageSkinButtons[index + 2]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+        }
+      }
+      return 0;
     case ID_EQUIP_OPTION_OPEN:
       if ((g_replayAnimationScaling == 0 || Replay::Instance().header.options.Get(ReplayRecordOption::Item) != 0) && !g_windowMgr.LookupWindow(WID_MERGEITEMWND) &&
           !g_windowMgr.CloseWindow(WID_MERCHANTITEMWND) && g_session.replayPacketMode > 0) {
@@ -3282,7 +3286,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
     return 0;
   case UM_SCROLLHORZ: {
     const int previous = this->m_firstSlot;
-    if (a != 0) {
+    if (a < 0 || a > 0) {
       this->m_firstSlot = previous + a;
     }
     const int last = g_session.damageSkinCount - 4;
@@ -3956,8 +3960,7 @@ void UIItemCollectionWnd::OnCreate(int width, int height) {
   this->m_viewer->Configure(91, 31, width - 98, height - 40, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = 0xFF000000u | RGB(red, green, blue);
-  this->m_viewer->Invalidate();
+  this->m_viewer->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
   this->AddChild(this->m_viewer);
 
   this->m_closeButton = this->AddCloseButton("ESC", 0);
@@ -3973,9 +3976,9 @@ void UIItemCollectionWnd::OnCreate(int width, int height) {
   this->AddChild(this->m_viewButton);
 
   const std::string prefix = "book\\";
-  const char* tooltips[2] = {LookupMessage(MSI_BOOK_READ), LookupMessage(MSI_BOOK_AUTOREAD)};
-  const int ids[2] = {287, 288};
   const char* names[2] = {"책읽기", "책읽기"};
+  const int ids[2] = {287, 288};
+  const char* tooltips[2] = {LookupMessage(MSI_BOOK_READ), LookupMessage(MSI_BOOK_AUTOREAD)};
   for (int index = 0; index < 2; ++index) {
     this->m_readButtons[index] = new UISpriteButton();
     this->m_readButtons[index]->SetSprite((prefix + names[index] + ".spr").c_str());
@@ -4001,8 +4004,9 @@ void UIItemCollectionWnd::OnCreate(int width, int height) {
     this->m_moveInfo->Configure(LookupMessage(MSI_REFUSE_MDENGEON_IS_FULL), 0, 0, 12, 0, 1);
     this->m_moveInfo->SetId(487);
     UIItemMoveInfo* moveInfo = this->m_moveInfo;
-    int textHeight = this->TextHeight(LookupMessage(MSI_REFUSE_MDENGEON_IS_FULL), 0, 0, 12, 0, 0);
-    moveInfo->ResizeToTextClipped(this->TextWidth(LookupMessage(MSI_REFUSE_MDENGEON_IS_FULL), 0, 0, 12, 0, 0) + 1, textHeight);
+    const int textHeight = this->TextHeight(LookupMessage(MSI_REFUSE_MDENGEON_IS_FULL), 0, 0, 12, 0, 0);
+    const int textWidth = this->TextWidth(LookupMessage(MSI_REFUSE_MDENGEON_IS_FULL), 0, 0, 12, 0, 0) + 1;
+    moveInfo->ResizeToTextClipped(textWidth, textHeight);
     this->AddChild(this->m_moveInfo);
   }
 
@@ -4605,34 +4609,41 @@ int UIWhisperWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     this->Move(this->placement->x, this->placement->y);
     return 0;
   }
-  case UM_COMMAND: {
-    if (a != ID_OK) {
-      if (a == ID_CLOSE) {
-        g_windowMgr.Schedule(this);
+  case UM_COMMAND:
+    switch (a) {
+    case ID_OK: {
+      if (HasItemLinkTag(std::string(this->m_edit->Text())) == true) {
+        this->m_edit->SetText("");
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLOSE)), 0xFF, 0, 0, 0);
+        return 0;
       }
-      return 0;
-    }
 
-    if (HasItemLinkTag(std::string(this->m_edit->Text())) == true) {
-      this->m_edit->SetText("");
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLOSE)), 0xFF, 0, 0, 0);
-      return 0;
-    }
+      char text[256];
+      std::strcpy(text, this->m_edit->Text());
+      this->m_edit->PushHistory();
+      g_windowMgr.SetFocus(this->m_edit);
+      if (std::strlen(text) == 0) {
+        return 0;
+      }
 
-    char text[256];
-    std::strcpy(text, this->m_edit->Text());
-    this->m_edit->PushHistory();
-    g_windowMgr.SetFocus(this->m_edit);
-    if (std::strlen(text) == 0) {
-      return 0;
-    }
+      if (g_serviceType == 1 && !ValidateCharacterName(text)) {
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENGLISHONLY)), 0xFF, 0, 0, 0);
+        return 0;
+      }
 
-    if (g_serviceType == 1 && !ValidateCharacterName(text)) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENGLISHONLY)), 0xFF, 0, 0, 0);
-      return 0;
-    }
+      if (this->m_target.size() != 0 && text[0] != '/') {
+        if (this->m_edit->links.size() != 0) {
+          g_windowMgr.SetChatInputText(this->m_edit->LinkedText().c_str());
+        } else if (this->m_edit->itemTags != nullptr) {
+          g_windowMgr.SetChatInputText(this->m_edit->itemTags->linkedText.c_str());
+        } else {
+          g_windowMgr.chatInputText.assign(text, std::strlen(text));
+        }
 
-    if (this->m_target.size() == 0 || text[0] == '/') {
+        g_modeMgr.currentMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<std::intptr_t>(this->m_target.c_str()), 0, 0, 0);
+        return 0;
+      }
+
       if (g_session.ProcessEmotionShortcut(text) != 0) {
         return 0;
       }
@@ -4653,18 +4664,11 @@ int UIWhisperWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       }
       return 0;
     }
-
-    if (this->m_edit->links.size() != 0) {
-      g_windowMgr.SetChatInputText(this->m_edit->LinkedText().c_str());
-    } else if (this->m_edit->itemTags != nullptr) {
-      g_windowMgr.SetChatInputText(this->m_edit->itemTags->linkedText.c_str());
-    } else {
-      g_windowMgr.chatInputText.assign(text, std::strlen(text));
+    case ID_CLOSE:
+      g_windowMgr.Schedule(this);
+      return 0;
     }
-
-    g_modeMgr.currentMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<std::intptr_t>(this->m_target.c_str()), 0, 0, 0);
     return 0;
-  }
   case UM_MENU_SELECTED:
     if (this->m_log[a].value == 11) {
       this->SaveChatLog();
@@ -4699,8 +4703,8 @@ int UIWhisperWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
   }
   case UM_ADDCHAT: {
     char* line = reinterpret_cast<char*>(a);
-    if (g_forbiddenWords.Contains(line)) {
-      std::string masked;
+    if (g_forbiddenWords.Contains(line) == true) {
+      std::string masked("");
       g_forbiddenWords.Mask(line, &masked);
     }
 
@@ -5167,14 +5171,16 @@ int UISayDialogWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     const unsigned char* records = reinterpret_cast<const unsigned char*>(a);
     FramedMessageHeader header;
     std::memcpy(&header, records, sizeof(header));
-    if (header.type == 22500) {
-      unsigned int position = sizeof(header);
-      while (position < static_cast<unsigned int>(b)) {
+    unsigned int position = sizeof(header);
+    if (22500 == header.type) {
+      bool scanning = true;
+      while (scanning && static_cast<unsigned int>(b) > position) {
         std::memcpy(&header, records + position, sizeof(header));
         position += sizeof(header);
         switch (header.type) {
         case 22501:
-          return 0;
+          scanning = false;
+          break;
         case 22503: {
           char text[260];
           std::memset(text, 0, sizeof(text));
@@ -5240,11 +5246,7 @@ int UIExchangeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           return 0;
         }
 
-        std::int64_t money = _atoi64(text);
-        if (money > 0x7FFFFFFF) {
-          money = 0x7FFFFFFF;
-        }
-        int amount = static_cast<int>(MaxInt64(money, 0));
+        int amount = static_cast<int>(MaxInt64((std::min)(_atoi64(text), static_cast<std::int64_t>(0x7FFFFFFF)), 0));
         if (amount < 0) {
           amount = 0;
         }
@@ -5319,11 +5321,12 @@ int UIExchangeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     const unsigned char* records = reinterpret_cast<const unsigned char*>(a);
     FramedMessageHeader header{};
     std::memcpy(&header, records, sizeof(header));
-    if (header.type == 20600) {
-      unsigned int position = sizeof(header);
+    unsigned int position = sizeof(header);
+    if (20600 == header.type) {
       int number = 0;
       short level = 0;
-      while (position < static_cast<unsigned int>(b)) {
+      bool scanning = true;
+      while (scanning && static_cast<unsigned int>(b) > position) {
         std::memcpy(&header, records + position, sizeof(header));
         position += sizeof(header);
         switch (header.type) {
@@ -5380,7 +5383,8 @@ int UIExchangeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           break;
         case 20601:
           this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-          return 0;
+          scanning = false;
+          break;
         default:
           position += header.length;
           break;
@@ -6478,7 +6482,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
     return 0;
 
   case UM_SCROLLVERT:
-    if (g_session.GetList2Size() < 4) {
+    if (g_session.GetNumPurchaseItems() < 4) {
       return 0;
     }
     if (argument1 < 0) {
@@ -6489,8 +6493,8 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
     if (this->m_firstOther < 0) {
       this->m_firstOther = 0;
     }
-    if (this->m_firstOther > g_session.GetList2Size() - 3) {
-      this->m_firstOther = g_session.GetList2Size() - 3;
+    if (this->m_firstOther > g_session.GetNumPurchaseItems() - 3) {
+      this->m_firstOther = g_session.GetNumPurchaseItems() - 3;
     }
     this->m_otherScroll->SetPosition(this->m_firstOther);
     this->m_otherScroll->Invalidate();
@@ -6506,8 +6510,8 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
 
   case UM_SCROLLVERTPAGEDOWN:
     ++this->m_firstOther;
-    if (this->m_firstOther > std::min(g_session.GetList2Size() - 3, 4)) {
-      this->m_firstOther = std::min(g_session.GetList2Size() - 3, 4);
+    if (this->m_firstOther > std::min(g_session.GetNumPurchaseItems() - 3, 4)) {
+      this->m_firstOther = std::min(g_session.GetNumPurchaseItems() - 3, 4);
     }
     this->m_otherScroll->SetPosition(this->m_firstOther);
     this->m_otherScroll->Invalidate();
@@ -6517,7 +6521,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
     this->items.clear();
     const int count = g_session.GetInventoryCategorySize(this->m_tab);
     for (int index = 0; index < count; ++index) {
-      ITEM_INFO item = g_session.GetItem1784At(this->m_tab, index);
+      ITEM_INFO item = g_session.GetInventoryCategoryItemInfoBySequence(this->m_tab, index);
       if (item.identity[1] != 0 && (this->m_tab != 8 || item.bindOnEquip != 0xFFFF)) {
         this->items.push_back(item);
       }
@@ -6562,7 +6566,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
           break;
         }
 
-        const int count = g_session.GetList2Size();
+        const int count = g_session.GetNumPurchaseItems();
         const unsigned int length = (count + 1) * 10;
         if (length > 0x800) {
           break;
@@ -6575,7 +6579,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
           break;
         }
         for (int index = 0; index < count; ++index) {
-          ITEM_INFO item = g_session.GetItem1720At(index);
+          ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(index);
           NCashBuyItem entry;
           entry.itemId = std::atoi(item.itemId.c_str());
           entry.quantity = item.quantity;
@@ -6606,7 +6610,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
         for (int list = 0; list < 9; ++list) {
           const int count = g_session.GetInventoryCategorySize(list);
           for (int index = 0; index < count; ++index) {
-            ITEM_INFO item = g_session.GetItem1784At(list, index);
+            ITEM_INFO item = g_session.GetInventoryCategoryItemInfoBySequence(list, index);
             std::string name(item.displayName);
             if (name.find(query) != std::string::npos && !g_session.HasInventorySearchItem(std::atoi(item.itemId.c_str()))) {
               g_session.inventoryCategories[10].push_back(item);
@@ -6703,27 +6707,27 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       item.Assign(mode->drag);
       g_session.RemoveItem1720ByName(item);
       this->m_totalPrice -= item.quantity * item.prices[1];
-      if (g_session.GetList2Size() == 3) {
+      if (g_session.GetNumPurchaseItems() == 3) {
         this->m_firstOther = 0;
         this->m_otherScroll->SetPosition(0);
         this->m_otherScroll->SetRange(4, 4, 4);
         this->m_otherScroll->Invalidate();
         this->m_otherScroll->Show(0);
-      } else if (g_session.GetList2Size() > 3 && g_session.GetList2Size() < 7) {
-        this->m_otherScroll->SetRange(4, 4, g_session.GetList2Size() + 1);
-        if (this->m_firstOther > g_session.GetList2Size() - 3) {
-          this->m_firstOther = g_session.GetList2Size() - 3;
+      } else if (g_session.GetNumPurchaseItems() > 3 && g_session.GetNumPurchaseItems() < 7) {
+        this->m_otherScroll->SetRange(4, 4, g_session.GetNumPurchaseItems() + 1);
+        if (this->m_firstOther > g_session.GetNumPurchaseItems() - 3) {
+          this->m_firstOther = g_session.GetNumPurchaseItems() - 3;
           this->m_otherScroll->SetPosition(this->m_firstOther);
         }
         this->m_otherScroll->Invalidate();
       }
     } else if (mode->drag.source == 6) {
-      if (g_session.GetList2Size() >= 8) {
+      if (g_session.GetNumPurchaseItems() >= 8) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         return 0;
       }
       if (this->m_tab == 8) {
-        const int owned = g_session.GetItem1720QuantityByItemId(mode->drag.name.c_str());
+        const int owned = g_session.GetPurchaseItemNumByItemId(mode->drag.name.c_str());
         for (ITEM_INFO& entry : this->items) {
           if (std::atoi(entry.itemId.c_str()) == std::atoi(mode->drag.name.c_str())) {
             if (entry.quantity <= 0) {
@@ -6746,15 +6750,15 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       item.bindOnEquip = static_cast<std::uint16_t>(this->m_selectedIndex);
       g_session.MergeItem1720ByName(item);
       this->m_totalPrice += item.quantity * item.prices[1];
-      if (g_session.GetList2Size() >= 4 && g_session.GetList2Size() < 8) {
+      if (g_session.GetNumPurchaseItems() >= 4 && g_session.GetNumPurchaseItems() < 8) {
         int total;
-        if (g_session.GetList2Size() == 4) {
+        if (g_session.GetNumPurchaseItems() == 4) {
           this->m_firstOther = 1;
           this->m_otherScroll->Show(1);
           total = 5;
         } else {
-          this->m_firstOther = g_session.GetList2Size() - 3;
-          total = g_session.GetList2Size() + 1;
+          this->m_firstOther = g_session.GetNumPurchaseItems() - 3;
+          total = g_session.GetNumPurchaseItems() + 1;
         }
         this->m_otherScroll->SetRange(4, 4, total);
         this->m_otherScroll->SetPosition(this->m_firstOther);
@@ -6763,9 +6767,9 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
     }
 
     this->m_otherItems.clear();
-    const int count = g_session.GetList2Size();
+    const int count = g_session.GetNumPurchaseItems();
     for (int index = 0; index < count; ++index) {
-      ITEM_INFO other = g_session.GetItem1720At(index);
+      ITEM_INFO other = g_session.GetPurchaseItemInfoBySequence(index);
       if (other.identity[1] != 0) {
         this->m_otherItems.push_back(other);
       }
@@ -6783,7 +6787,7 @@ int UInCashWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
 // OFFSET: 0x008F5AA0
 // FUNCTION: fn_12312
 void UInCashWnd::OnWheel(int delta) {
-  if (g_session.GetList2Size() < 4) {
+  if (g_session.GetNumPurchaseItems() < 4) {
     return;
   }
   if (delta < 0) {
@@ -7180,7 +7184,7 @@ ITEM_INFO UInCashWnd::ItemAt(int x, int y) {
     if (y >= top && y <= top + this->m_rowHeight) {
       index = this->m_firstOther + row;
       this->m_selected = index;
-      if (lists.GetList2Size() <= index) {
+      if (lists.GetNumPurchaseItems() <= index) {
         return ITEM_INFO(0);
       }
       break;
@@ -10095,24 +10099,24 @@ void UInCashWnd::OnLBtnDblClk(int x, int y) {
   this->m_otherItems.erase(this->m_otherItems.begin(), this->m_otherItems.end());
 
   const CSession& lists = g_session;
-  const int count = lists.GetList2Size();
+  const int count = lists.GetNumPurchaseItems();
   for (int index = 0; index < count; ++index) {
-    ITEM_INFO other = g_session.GetItem1720At(index);
+    ITEM_INFO other = g_session.GetPurchaseItemInfoBySequence(index);
     if (other.identity[1] > 0) {
       this->m_otherItems.push_back(other);
     }
   }
 
-  if (lists.GetList2Size() == 3) {
+  if (lists.GetNumPurchaseItems() == 3) {
     this->m_firstOther = 0;
     this->m_otherScroll->SetPosition(0);
     this->m_otherScroll->SetRange(4, 4, 4);
     this->m_otherScroll->Invalidate();
     this->m_otherScroll->Show(0);
-  } else if (lists.GetList2Size() > 3 && lists.GetList2Size() < 7) {
-    this->m_otherScroll->SetRange(4, 4, lists.GetList2Size() + 1);
-    if (this->m_firstOther > lists.GetList2Size() - 3) {
-      this->m_firstOther = lists.GetList2Size() - 3;
+  } else if (lists.GetNumPurchaseItems() > 3 && lists.GetNumPurchaseItems() < 7) {
+    this->m_otherScroll->SetRange(4, 4, lists.GetNumPurchaseItems() + 1);
+    if (this->m_firstOther > lists.GetNumPurchaseItems() - 3) {
+      this->m_firstOther = lists.GetNumPurchaseItems() - 3;
       this->m_otherScroll->SetPosition(this->m_firstOther);
     }
     this->m_otherScroll->Invalidate();
@@ -12413,10 +12417,15 @@ void UIExchangeWnd::Paint() {
     this->FillRegion(283, 21, 272, 310, RGB(red, green, blue));
   }
   int row = 0;
-  for (const ITEM_INFO& item : this->m_myItems) {
-    if (g_session.IsPetEgg(std::atoi(item.itemId.c_str())) != 0 && item.damaged != 0) {
+  int index = 0;
+  for (auto it = this->m_myItems.begin(); it != this->m_myItems.end(); ++it, ++index) {
+    if (index < 0) {
       continue;
     }
+    if (g_session.IsPetEgg(std::atoi(it->itemId.c_str())) != 0 && it->damaged != 0) {
+      continue;
+    }
+    const ITEM_INFO& item = *it;
     const int y = this->m_rowHeight * row;
     this->DrawItemAndQuantity(16, y + 21, item, 0, 0);
     this->DrawFittedItemName(48, y + 29, &item, 0, 0, 12, 1);
@@ -12428,33 +12437,40 @@ void UIExchangeWnd::Paint() {
     }
     ++row;
   }
-  row = 0;
-  for (const ITEM_INFO& item : this->m_otherItems) {
-    if (g_session.IsPetEgg(std::atoi(item.itemId.c_str())) != 0 && item.damaged != 0) {
+  int otherRow = 0;
+  int otherIndex = 0;
+  for (auto it = this->m_otherItems.begin(); it != this->m_otherItems.end(); ++it, ++otherIndex) {
+    if (otherIndex < 0) {
       continue;
     }
-    const int y = this->m_rowHeight * row;
+    if (g_session.IsPetEgg(std::atoi(it->itemId.c_str())) != 0 && it->damaged != 0) {
+      continue;
+    }
+    const ITEM_INFO& item = *it;
+    const int y = this->m_rowHeight * otherRow;
     this->DrawItemAndQuantity(295, y + 21, item, 0, 0);
     this->DrawFittedItemName(327, y + 29, &item, 0, 0, 12, 1);
     if (0 < item.grade) {
       this->DrawBitmap(295, y + 33, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))), true);
     }
-    if (row == 9) {
+    if (otherRow == 9) {
       break;
     }
-    ++row;
+    ++otherRow;
   }
   char grouped[32];
   char amount[128];
   int length = std::sprintf(amount, "%s", FormatGroupedInteger(g_session.exchangeMoney, grouped, sizeof(grouped)));
   PriceColors colors = PriceColor(g_session.exchangeMoney);
-  this->DrawRightAlignedText(219, 331, amount, length, 1, 16, colors.primary & 0xFFFFFF, 0);
-  this->DrawRightAlignedText(220, 331, amount, length, 1, 16, colors.primary & 0xFFFFFF, 0);
+  COLORREF textColor = RGB(GetRValue(colors.primary), GetGValue(colors.primary), GetBValue(colors.primary));
+  this->DrawRightAlignedText(219, 331, amount, length, 1, 16, textColor, 0);
+  this->DrawRightAlignedText(220, 331, amount, length, 1, 16, textColor, 0);
   this->DrawRightAlignedText(220, 332, amount, length, 1, 16, 0x323232, 0);
   length = std::sprintf(amount, "%s", FormatGroupedInteger(g_session.otherExchangeMoney, grouped, sizeof(grouped)));
   colors = PriceColor(g_session.otherExchangeMoney);
-  this->DrawRightAlignedText(499, 331, amount, length, 1, 16, colors.primary & 0xFFFFFF, 0);
-  this->DrawRightAlignedText(500, 331, amount, length, 1, 16, colors.primary & 0xFFFFFF, 0);
+  textColor = RGB(GetRValue(colors.primary), GetGValue(colors.primary), GetBValue(colors.primary));
+  this->DrawRightAlignedText(499, 331, amount, length, 1, 16, textColor, 0);
+  this->DrawRightAlignedText(500, 331, amount, length, 1, 16, textColor, 0);
   this->DrawRightAlignedText(500, 332, amount, length, 1, 16, 0x323232, 0);
 }
 
@@ -12473,13 +12489,12 @@ int UIItemCollectionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t ar
   switch (message) {
   case UM_SETINFO: {
     this->m_placement = reinterpret_cast<ItemCollectionWndInfo*>(argument1);
-    ItemCollectionWndInfo* placement = this->m_placement;
-    if (!placement->IsValid()) {
-      placement->Reset();
+    if (!this->m_placement->IsValid()) {
+      this->m_placement->Reset();
       this->Move((g_renderer->viewport.width - 640) / 2 + this->m_placement->x, this->m_placement->y * g_renderer->viewport.height / 480);
       return 0;
     }
-    this->Move(placement->x, placement->y);
+    this->Move(this->m_placement->x, this->m_placement->y);
     return 0;
   }
   case UM_COMMAND:
@@ -12572,7 +12587,7 @@ int UIItemCollectionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t ar
       }
     }
     this->m_item.expireTime = item->expireTime;
-    this->m_compare = this->m_item.identified == 1 && !this->m_item.IsApprenticeItem() && this->m_item.IsEquipment();
+    this->m_compare = this->m_item.identified == 1 && !this->m_item.IsApprenticeItem() && this->m_item.IsEquipment() == true;
     this->m_optionCount = this->m_item.optionCount;
     if (this->m_compare) {
       if (this->geometry.height != 144) {
@@ -12585,7 +12600,11 @@ int UIItemCollectionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t ar
     }
     this->m_bitmapName = "유저인터페이스\\collection\\" + std::string(this->m_item.ResourcePath()) + ".bmp";
     const std::vector<const char*>& descriptions = this->m_item.Description();
-    this->m_viewButton->Move(6, argument2 != 0 ? -100 : IsItemCard(std::atoi(this->m_item.itemId.c_str())) * 100 - 94);
+    int viewY = IsItemCard(std::atoi(this->m_item.itemId.c_str())) * 100 - 94;
+    if (argument2 != 0) {
+      viewY = -100;
+    }
+    this->m_viewButton->Move(6, viewY);
     CGameMode* mode = g_modeMgr.GetGameMode();
     if (mode->HasInventoryItem(std::atoi(this->m_item.itemId.c_str()))) {
       const int y = IsBookItem(std::atoi(this->m_item.itemId.c_str())) * 100 - 94;

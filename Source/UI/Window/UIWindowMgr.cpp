@@ -277,6 +277,10 @@ struct BankingCheckPacket {
   /* 0002 */ std::uint32_t aid;
 };
 
+struct HeaderOnlyPacket {
+  /* 0000 */ std::int16_t id;
+};
+
 struct ShortcutRotatePacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ std::uint16_t option;
@@ -633,6 +637,11 @@ UIWindow* UIWindowMgr::LookupWindow(WindowId id) {
     return found != this->windows.end() ? found->second : nullptr;
   }
   }
+}
+
+// OFFSET: 0x00AA6430
+// FUNCTION: fn_17228
+void UIWindowMgr::OnChatWndCreated() {
 }
 
 // OFFSET: 0x00AA1800
@@ -1877,7 +1886,8 @@ int UIWindowMgr::SendNotice(int selector, std::intptr_t a, std::intptr_t b, std:
     if (existing == this->namedWindows.end()) {
       UIWhisperWnd* window = new UIWhisperWnd();
       window->SetSize(280, 120);
-      this->rendered.push_back(window);
+      UIWindow* const added = window;
+      this->rendered.push_back(added);
       window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&this->m_whisperPlacement), 0, 0, 0);
       window->Show(1);
       window->m_target = name;
@@ -1888,7 +1898,8 @@ int UIWindowMgr::SendNotice(int selector, std::intptr_t a, std::intptr_t b, std:
         window->m_name = name + "  (" + reinterpret_cast<const char*>(b) + ")  *^_^*";
       }
       if (c != 0) {
-        window->m_code = std::string(reinterpret_cast<const char*>(c));
+        std::string code(reinterpret_cast<const char*>(c));
+        window->m_code = std::move(code);
       }
       const int count = static_cast<int>(this->namedWindows.size());
       if (count != 0) {
@@ -1947,9 +1958,10 @@ int UIWindowMgr::SendNotice(int selector, std::intptr_t a, std::intptr_t b, std:
       std::vector<std::string> lines;
       WrapPlainText(text, lines, 94);
       for (unsigned int index = 0; index < lines.size(); ++index) {
-        std::string line;
-        line = lines[index];
-        this->pendingNoticeLines.push_back({line, static_cast<std::uint32_t>(b)});
+        WindowTextEntry entry;
+        entry.text = lines[index];
+        entry.color = static_cast<std::uint32_t>(b);
+        this->pendingNoticeLines.push_back(entry);
       }
     }
     break;
@@ -2322,23 +2334,24 @@ void UIWindowMgr::DrawLoginOverlay() {
         this->loginDragRegion = 3;
       }
 
-      const float columns = static_cast<float>(quarter);
-      const float mouseX = static_cast<float>(g_mouse.x);
-      if (mouseX > columns * 3.3f + this->loginButtonPanelOffset.x && mouseX < columns * 3.9f + this->loginButtonPanelOffset.x &&
+      if (static_cast<float>(g_mouse.x) > static_cast<float>(quarter) * 3.3f + this->loginButtonPanelOffset.x &&
+          static_cast<float>(g_mouse.x) < static_cast<float>(quarter) * 3.9f + this->loginButtonPanelOffset.x &&
           static_cast<float>(g_mouse.y) > static_cast<float>(third) * 2.4f + this->loginButtonPanelOffset.y &&
           static_cast<float>(g_mouse.y) < static_cast<float>(third) * 2.8f + this->loginButtonPanelOffset.y) {
         this->loginDragRegion = 2;
       }
 
-      if (static_cast<float>(g_mouse.x) > columns * 0.1f + this->loginGridX && static_cast<float>(g_mouse.x) < columns * 1.8f + this->loginGridX &&
+      if (static_cast<float>(g_mouse.x) > static_cast<float>(quarter) * 0.1f + this->loginGridX &&
+          static_cast<float>(g_mouse.x) < static_cast<float>(quarter) * 1.8f + this->loginGridX &&
           static_cast<float>(g_mouse.y) > static_cast<float>(third) * 0.3f + this->loginGridY &&
           static_cast<float>(g_mouse.y) < static_cast<float>(third) * 1.2f + this->loginGridY) {
         this->loginDragRegion = 1;
       }
 
-      if (g_serviceType != 0 && static_cast<signed char>(g_startupSecondPhase) > 0 && static_cast<float>(g_mouse.x) > columns * 2.2f + this->loginSidePanelOffset.x &&
-          static_cast<float>(g_mouse.x) < columns * 3.5f + this->loginSidePanelOffset.x && g_mouse.y > this->loginSidePanelOffset.y &&
-          g_mouse.y < this->loginSidePanelOffset.y + third * 3) {
+      if (g_serviceType != 0 && static_cast<signed char>(g_startupSecondPhase) > 0 &&
+          static_cast<float>(g_mouse.x) > static_cast<float>(quarter) * 2.2f + this->loginSidePanelOffset.x &&
+          static_cast<float>(g_mouse.x) < static_cast<float>(quarter) * 3.5f + this->loginSidePanelOffset.x &&
+          g_mouse.y > this->loginSidePanelOffset.y && g_mouse.y < this->loginSidePanelOffset.y + third * 3) {
         this->loginDragRegion = 5;
       }
 
@@ -2684,20 +2697,26 @@ bool UIWindowMgr::ProcessHotkeyAction(int action, int pressed) {
   return false;
 }
 
+// INLINED
+static __forceinline void SaveWindowRectangle(std::map<int, SavedWindowRectangle*>& savedRectangles, int id, UIWindow* window) {
+  if (window) {
+    if (savedRectangles.find(id) != savedRectangles.end()) {
+      savedRectangles[id]->x = window->geometry.x;
+      savedRectangles[id]->y = window->geometry.y;
+      savedRectangles[id]->width = window->geometry.width;
+      savedRectangles[id]->height = window->geometry.height;
+    } else {
+      savedRectangles[id] = new SavedWindowRectangle(window->geometry.x, window->geometry.y, window->geometry.width, window->geometry.height);
+    }
+  }
+}
+
 // OFFSET: 0x00A8CF20
 // FUNCTION: fn_17143
 bool UIWindowMgr::CloseWindow(int id) {
-  UIWindow* window = this->LookupWindow(static_cast<WindowId>(id));
-  if (window) {
-    if (this->savedRectangles.find(id) != this->savedRectangles.end()) {
-      this->savedRectangles[id]->x = window->geometry.x;
-      this->savedRectangles[id]->y = window->geometry.y;
-      this->savedRectangles[id]->width = window->geometry.width;
-      this->savedRectangles[id]->height = window->geometry.height;
-    } else {
-      this->savedRectangles[id] = new SavedWindowRectangle(window->geometry.x, window->geometry.y, window->geometry.width, window->geometry.height);
-    }
-  }
+  const WindowId windowId = static_cast<WindowId>(id);
+  UIWindow* window = this->LookupWindow(windowId);
+  SaveWindowRectangle(this->savedRectangles, id, window);
 
   bool closed = false;
   g_modeMgr.GetGameMode();
@@ -3836,7 +3855,16 @@ bool UIWindowMgr::CloseWindow(int id) {
       closed = true;
     }
     break;
-  default:
+  case WID_JOINTO_BATTLEFIELDWND:
+  case WID_ENTRYQUEUESTANDBYWND:
+  case WID_ENTRYQUEUEREQUESTWND:
+  case WID_ENTRYQUEUEHELPWND:
+  case WID_MERGEITEMWND:
+  case WID_MERCHANTITEMPURCHASEMSGWND:
+  case WID_MERCHANTITEMLOGWND_MODE_0:
+  case WID_MERCHANTITEMLOGWND_MODE_1:
+  case WID_RENEWDETAILQUESTINFOWND:
+  case WID_RPIMAGEWND2:
     if (UIWindow* found = this->LookupWindow(static_cast<WindowId>(id))) {
       this->Schedule(found);
       closed = true;
@@ -3923,8 +3951,9 @@ bool UIWindowMgr::CloseWindow(int id) {
     break;
   case WID_RODEXINBOXWND:
     if (this->rodexInboxWnd) {
-      std::int16_t packet = 0x9E9;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
+      HeaderOnlyPacket packet;
+      packet.id = 0x9E9;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       this->Schedule(this->rodexInboxWnd);
       this->rodexInboxWnd = nullptr;
       closed = true;
@@ -3935,8 +3964,9 @@ bool UIWindowMgr::CloseWindow(int id) {
     break;
   case WID_RODEXCOMPOSEWND:
     if (this->rodexComposeWnd) {
-      std::int16_t packet = 0xA03;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
+      HeaderOnlyPacket packet;
+      packet.id = 0xA03;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       g_session.RestoreSelectionItems();
       g_session.ClearItemQuantities();
       this->Schedule(this->rodexComposeWnd);
@@ -3968,8 +3998,9 @@ bool UIWindowMgr::CloseWindow(int id) {
     break;
   case WID_ROULLETTEWND:
     if (this->roulletteWnd) {
-      std::int16_t packet = 0xA1D;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
+      HeaderOnlyPacket packet;
+      packet.id = 0xA1D;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       g_rouletteMgr->Reset();
       this->Schedule(this->roulletteWnd);
       this->roulletteWnd = nullptr;
@@ -4054,8 +4085,9 @@ bool UIWindowMgr::CloseWindow(int id) {
       this->Schedule(this->cashShopWnd);
       this->cashShopWnd = nullptr;
       closed = true;
-      std::int16_t packet = 0x84A;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
+      HeaderOnlyPacket packet;
+      packet.id = 0x84A;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     }
     break;
   case WID_TIPBOXWND:
@@ -4116,9 +4148,15 @@ bool UIWindowMgr::CloseWindow(int id) {
       closed = true;
     }
     break;
+  default:
+    if (UIWindow* found = this->LookupWindow(static_cast<WindowId>(id))) {
+      this->Schedule(found);
+      closed = true;
+    }
+    break;
   }
 
-  auto entry = this->windows.find(static_cast<WindowId>(id));
+  auto entry = this->windows.find(windowId);
   if (entry != this->windows.end()) {
     this->windows.erase(entry);
   }
@@ -4227,7 +4265,7 @@ bool UIWindowMgr::ProcessShortcutKey(int action) {
     return false;
   }
 
-  if (static_cast<unsigned int>(hotkey) < 45) {
+  if (static_cast<unsigned int>(hotkey) <= 44) {
     if (this->shortCutWnd) {
       this->shortCutWnd->SendMsg(nullptr, UM_USE_SHORTEN_ITEM, hotkey % 9, hotkey / 9, 0, 0);
     }
@@ -4507,7 +4545,6 @@ bool UIWindowMgr::ProcessShortcutKey(int action) {
       packet.id = ID_CZ_REQ_BANKING_CHECK;
       packet.aid = g_session.m_aid;
       CRagConnection& connection = GetRagConnection();
-      GetRagConnection();
       connection.Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     }
     break;
@@ -4529,7 +4566,6 @@ bool UIWindowMgr::ProcessShortcutKey(int action) {
       packet.state = static_cast<unsigned char>(g_session.alternateShortcutRow);
     }
     CRagConnection& connection = GetRagConnection();
-    GetRagConnection();
     connection.Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }

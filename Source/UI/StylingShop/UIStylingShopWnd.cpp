@@ -983,27 +983,32 @@ std::string UIDisplayCharacter::GetStyleTable(const int& type) {
 bool UIShowInfoWnd::CheckPayment(const int& index, const int& zeny, const int& itemId, const int& costumeItemId) {
   if (zeny) {
     UICheckBox* check = this->m_checks[index];
+    bool enough;
     if (g_session.m_zeny >= zeny) {
+      enough = true;
       check->SetTooltip("");
-      return true;
+    } else {
+      check->SetTooltip(LookupMessage(g_session.m_zeny + g_session.m_bankBalance >= zeny ? 2820 : 2780));
+      enough = false;
     }
-
-    check->SetTooltip(LookupMessage(g_session.m_zeny + g_session.m_bankBalance < zeny ? 2780 : 2820));
-    return false;
+    return enough;
   }
 
   if (itemId) {
-    if (std::atoi(g_session.LookupClientItem(itemId, 0).itemId.c_str()) != itemId) {
-      return false;
+    if (std::atoi(g_session.LookupClientItem(itemId, 0).itemId.c_str()) == itemId) {
+      return true;
     }
-  } else if (costumeItemId) {
-    if (std::atoi(g_session.LookupClientItem(costumeItemId, 0).itemId.c_str()) != costumeItemId) {
-      return false;
+  } else {
+    if (!costumeItemId) {
+      return true;
     }
-    this->m_checks[index]->SetBitmaps("유저인터페이스\\styleshop\\check_disable.bmp", "유저인터페이스\\styleshop\\Notcheck.bmp");
+    if (std::atoi(g_session.LookupClientItem(costumeItemId, 0).itemId.c_str()) == costumeItemId) {
+      this->m_checks[index]->SetBitmaps("유저인터페이스\\styleshop\\check_disable.bmp", "유저인터페이스\\styleshop\\Notcheck.bmp");
+      return true;
+    }
   }
 
-  return true;
+  return false;
 }
 
 // OFFSET: 0x0082B680
@@ -1482,7 +1487,7 @@ int UIStylingShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
 #pragma pack(push, 1)
 struct StyleChangeHeader {
   /* 0000 */ unsigned short packetType;
-  /* 0002 */ unsigned short packetLength;
+  /* 0002 */ short packetLength;
   /* 0004 */ unsigned short count;
 };
 
@@ -1835,8 +1840,7 @@ bool UIShowInfoWnd::SendStyleChange() {
   SecureZeroMemory(&header, sizeof(header));
   header.packetType = ID_CZ_REQ_STYLE_CHANGE_V3;
   const unsigned short count = static_cast<unsigned short>(this->m_list.size());
-  const short length = count * 8 + 6;
-  header.packetLength = length;
+  header.packetLength = count * 8 + 6;
 
   memset(&packet[sizeof(header)], 0, sizeof(packet) - sizeof(header));
   *reinterpret_cast<StyleChangeHeader*>(packet) = header;
@@ -1845,8 +1849,8 @@ bool UIShowInfoWnd::SendStyleChange() {
   bool changed = false;
   int index = 0;
   for (std::list<int>::iterator it = this->m_list.begin(); it != this->m_list.end(); ++it, ++index) {
-    int kind = 0;
     int value = 0;
+    int kind = 0;
     const int type = *it;
     if (type == STYLE_TABLE_HEAD_PALETTE) {
       if (this->m_checks[index]->geometry.state != 0) {
@@ -1903,11 +1907,11 @@ bool UIShowInfoWnd::SendStyleChange() {
 
     const int offset = index * 8 + 6;
     StyleChangeItem item = {kind, value};
-    memcpy_s(&packet[offset], length - offset, &item, sizeof(item));
+    memcpy_s(&packet[offset], header.packetLength - offset, &item, sizeof(item));
   }
 
   if (changed == true) {
-    GetRagConnection().Send(length, packet);
+    GetRagConnection().Send(header.packetLength, packet);
     return true;
   }
 

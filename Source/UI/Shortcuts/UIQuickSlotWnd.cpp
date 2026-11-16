@@ -101,11 +101,10 @@ void UIQuickSlotWnd::OnMouseHover(int x, int y) {
   if (id == 0) {
     text.clear();
   } else if (this->m_entries[this->m_selected].skill) {
-    LuaScript& script = *g_session.m_hotkeyScript;
     CSkillInfo skill = g_session.LookupSkill(id);
     const int level = this->m_entries[this->m_selected].count;
-    const int sp = skill.UseSpAmount(script, level);
-    const int ap = skill.UseApAmount(script, level);
+    const int sp = skill.UseSpAmount(level);
+    const int ap = skill.UseApAmount(level);
     if (SkillUsesPercentSp(static_cast<int>(skill.id))) {
       text = SkillUseTextPercent(skill.DisplayName(), level, sp, ap);
     } else {
@@ -237,7 +236,7 @@ int UIQuickSlotWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
         }
       } else {
         ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(source.itemId), 1);
-        if (item.identity[1] != 0 && item.identified != 0) {
+        if (item.identity[1] > 0 && item.identified != 0) {
           entry.id = source.itemId;
         }
       }
@@ -263,7 +262,7 @@ int UIQuickSlotWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
       }
 
       ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(entry.id), 1);
-      if (item.identity[1] != 0) {
+      if (item.identity[1] > 0) {
         CGameMode* mode = g_modeMgr.GetGameMode();
         switch (item.identity[0]) {
         case UM_DEFPUSH:

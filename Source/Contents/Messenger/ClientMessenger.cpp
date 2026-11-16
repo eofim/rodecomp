@@ -5652,44 +5652,44 @@ void CSession::ResetSlots() {
 
 // OFFSET: 0x00DDF8B0
 // FUNCTION: fn_23428
-int CSession::GetList0Size() const {
+int CSession::GetNumInventoryItems() const {
   return static_cast<int>(this->m_inventoryItems.size());
 }
 
 // OFFSET: 0x00DDF8C0
 // FUNCTION: fn_23429
-int CSession::GetList11Size() const {
-  return static_cast<int>(this->merchantPurchaseSavedItems.size());
+int CSession::GetNumMerchantPurchaseSavedItems() const {
+  return static_cast<int>(this->m_merchantPurchaseSavedItems.size());
 }
 
 // OFFSET: 0x00DDF8D0
 // FUNCTION: fn_23430
-int CSession::GetList6Size() const {
-  return static_cast<int>(this->merchantShopItems.size());
+int CSession::GetNumMerchantShopItems() const {
+  return static_cast<int>(this->m_merchantShopItems.size());
 }
 
 // OFFSET: 0x00DDF8E0
 // FUNCTION: fn_23431
-int CSession::GetList8Size() const {
-  return static_cast<int>(this->merchantMyShopItems.size());
+int CSession::GetNumMerchantMyShopItems() const {
+  return static_cast<int>(this->m_merchantMyShopItems.size());
 }
 
 // OFFSET: 0x00DDF8F0
 // FUNCTION: fn_23432
-int CSession::GetList9Size() const {
-  return static_cast<int>(this->merchantPurchaseItems.size());
+int CSession::GetNumMerchantPurchaseItems() const {
+  return static_cast<int>(this->m_merchantPurchaseItems.size());
 }
 
 // OFFSET: 0x00DDF900
 // FUNCTION: fn_23433
-int CSession::GetList10Size() const {
-  return static_cast<int>(this->merchantHopeToSellItems.size());
+int CSession::GetNumMerchantHopeToSellItems() const {
+  return static_cast<int>(this->m_merchantHopeToSellItems.size());
 }
 
 // OFFSET: 0x00DDF910
 // FUNCTION: fn_23434
-int CSession::GetList7Size() const {
-  return static_cast<int>(this->merchantMirrorItems.size());
+int CSession::GetNumMerchantMirrorItems() const {
+  return static_cast<int>(this->m_merchantMirrorItems.size());
 }
 
 // OFFSET: 0x00DDF920
@@ -5706,26 +5706,26 @@ int CSession::GetInventoryCategorySize(int index) const {
 
 // OFFSET: 0x00DDF9E0
 // FUNCTION: fn_23437
-int CSession::GetList2Size() const {
-  return static_cast<int>(this->purchaseItems.size());
+int CSession::GetNumPurchaseItems() const {
+  return static_cast<int>(this->m_purchaseItems.size());
 }
 
 // OFFSET: 0x00DDF9F0
 // FUNCTION: fn_23438
-int CSession::GetList4Size() const {
-  return static_cast<int>(this->storageItems.size());
+int CSession::GetNumStorageItems() const {
+  return static_cast<int>(this->m_storageItems.size());
 }
 
 // OFFSET: 0x00DDFA00
 // FUNCTION: fn_23439
-int CSession::GetList1Size() const {
-  return static_cast<int>(this->shopItems.size());
+int CSession::GetNumShopItems() const {
+  return static_cast<int>(this->m_shopItems.size());
 }
 
 // OFFSET: 0x00DDFA10
 // FUNCTION: fn_23440
-int CSession::GetList5Size() const {
-  return static_cast<int>(this->cartItems.size());
+int CSession::GetNumCartItems() const {
+  return static_cast<int>(this->m_cartItems.size());
 }
 
 // OFFSET: 0x00DD8380
@@ -5764,9 +5764,9 @@ void CSession::KeepEquipment() {
 // OFFSET: 0x00DD8540
 // FUNCTION: fn_23307
 void CSession::ClearTradeItems() {
-  this->purchaseItems.erase(this->purchaseItems.begin(), this->purchaseItems.end());
-  this->storageItems.erase(this->storageItems.begin(), this->storageItems.end());
-  this->shopItems.erase(this->shopItems.begin(), this->shopItems.end());
+  this->m_purchaseItems.erase(this->m_purchaseItems.begin(), this->m_purchaseItems.end());
+  this->m_storageItems.erase(this->m_storageItems.begin(), this->m_storageItems.end());
+  this->m_shopItems.erase(this->m_shopItems.begin(), this->m_shopItems.end());
 }
 
 // OFFSET: 0x00DD8660
@@ -7086,6 +7086,75 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadItems() {
 
           unsigned int hash = HashName(itemType.c_str());
           switch (hash) {
+          case 0x47F48D1C:
+            for (int index = 0; index < count; ++index) {
+              if (stats[index] == 0) {
+                continue;
+              }
+              int variable;
+              switch (index) {
+              case 2:
+                variable = 41;
+                break;
+              case 3:
+                variable = 200;
+                break;
+              case 4:
+                variable = 13;
+                break;
+              case 5:
+                variable = 16;
+                break;
+              case 6:
+                variable = 15;
+                break;
+              case 7:
+                variable = 17;
+                break;
+              case 8:
+                variable = 14;
+                break;
+              case 9:
+                variable = 18;
+                break;
+              case 11:
+                variable = 219;
+                break;
+              case 12:
+                variable = 222;
+                break;
+              case 13:
+                variable = 220;
+                break;
+              case 14:
+                variable = 221;
+                break;
+              case 15:
+                variable = 223;
+                break;
+              case 16:
+                variable = 224;
+                break;
+              case 0:
+                info.values.try_emplace(0, stats[index]);
+                continue;
+              case 1:
+                info.values.try_emplace(1, stats[index]);
+                continue;
+              case 10:
+                info.values.try_emplace(2, stats[index]);
+                continue;
+              default:
+                continue;
+              }
+              auto found = this->statVariables.find(variable);
+              if (found == this->statVariables.end()) {
+                ShowErrorDialog(std::format("Not available stat type: {0}", variable), 0);
+              } else {
+                info.statProperties.try_emplace(found->second.value, stats[index]);
+              }
+            }
+            break;
           case 0x0F1AAAA6:
             for (int index = 0; index < count; ++index) {
               if (stats[index] == 0) {
@@ -7123,9 +7192,6 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadItems() {
               case 9:
                 variable = 47;
                 break;
-              case 10:
-                info.values.try_emplace(2, stats[index]);
-                continue;
               case 11:
                 variable = 219;
                 break;
@@ -7144,75 +7210,9 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadItems() {
               case 16:
                 variable = 224;
                 break;
-              default:
-                continue;
-              }
-              auto found = this->statVariables.find(variable);
-              if (found == this->statVariables.end()) {
-                ShowErrorDialog(std::format("Not available stat type: {0}", variable), 0);
-              } else {
-                info.statProperties.try_emplace(found->second.value, stats[index]);
-              }
-            }
-            break;
-          case 0x47F48D1C:
-            for (int index = 0; index < count; ++index) {
-              if (stats[index] == 0) {
-                continue;
-              }
-              int variable;
-              switch (index) {
-              case 0:
-                info.values.try_emplace(0, stats[index]);
-                continue;
-              case 1:
-                info.values.try_emplace(1, stats[index]);
-                continue;
-              case 2:
-                variable = 41;
-                break;
-              case 3:
-                variable = 200;
-                break;
-              case 4:
-                variable = 13;
-                break;
-              case 5:
-                variable = 16;
-                break;
-              case 6:
-                variable = 15;
-                break;
-              case 7:
-                variable = 17;
-                break;
-              case 8:
-                variable = 14;
-                break;
-              case 9:
-                variable = 18;
-                break;
               case 10:
                 info.values.try_emplace(2, stats[index]);
                 continue;
-              case 11:
-                variable = 219;
-                break;
-              case 12:
-                variable = 222;
-                break;
-              case 13:
-                variable = 220;
-                break;
-              case 14:
-                variable = 221;
-                break;
-              case 15:
-                variable = 223;
-                break;
-              case 16:
-                variable = 224;
-                break;
               default:
                 continue;
               }
@@ -7249,9 +7249,6 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadItems() {
               }
               int variable;
               switch (index) {
-              case 0:
-                info.values.try_emplace(1, stats[index]);
-                continue;
               case 1:
                 variable = 41;
                 break;
@@ -7273,9 +7270,6 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadItems() {
               case 7:
                 variable = 18;
                 break;
-              case 8:
-                info.values.try_emplace(2, stats[index]);
-                continue;
               case 9:
                 variable = 219;
                 break;
@@ -7294,6 +7288,12 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadItems() {
               case 14:
                 variable = 224;
                 break;
+              case 0:
+                info.values.try_emplace(1, stats[index]);
+                continue;
+              case 8:
+                info.values.try_emplace(2, stats[index]);
+                continue;
               default:
                 continue;
               }

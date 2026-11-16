@@ -101,7 +101,7 @@ public:
 // FUNCTION: fn_08785
 void CSkillAction_SS_REIKETSUHOU::OnGroundSkillEffect(vector3d position, int level, int argument3) {
   EffectLists* effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("reiketsuhou_bottom"), position.x, position.y, position.z, 0, -1, 0, 0);
+  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("reiketsuhou_bottom"), position, 0, -1, 0, 0);
 
   const int counts[] = {5, 5, 5, 5, 5, 6, 6, 6, 7, 7};
   const int count = counts[std::min<unsigned int>(level, 10) - 1];
@@ -112,7 +112,7 @@ void CSkillAction_SS_REIKETSUHOU::OnGroundSkillEffect(vector3d position, int lev
     const int rollZ = std::rand() % (count * 50 + 1);
     spot.z += ((rollZ >= 0 ? rollZ : 0) - count * 50 * 0.5f) * 0.1f;
     effects = g_effectMgr;
-    if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("reiketsuhou"), spot.x, spot.y, spot.z, 0, -1, 0, 0)) {
+    if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("reiketsuhou"), spot, 0, -1, 0, 0)) {
       effect->SetDelay(index * 80);
     }
   }
@@ -812,7 +812,7 @@ void CSkillAction_SS_KUNAIWAIKYOKU::OnGroundSkillEffect(vector3d position, int a
     const float angle = ScreenAngle(&shadow->render.position.x, &position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
     const vector3d spot = shadow->render.position;
     EffectLists* effects = g_effectMgr;
-    if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("kunaiwaikyoku"), spot.x, spot.y, spot.z, 0, -1, 0, 0)) {
+    if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("kunaiwaikyoku"), spot, 0, -1, 0, 0)) {
       effect->SetAngle(angle);
     }
   }
@@ -897,10 +897,10 @@ void CSkillAction_SS_SEKIENHOU::OnSkillCast(int level, CGameActor* source) {
 // FUNCTION: fn_08781
 void CSkillAction_SS_SEKIENHOU::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
   if (target) {
-    g_effectMgr->Spawn(0, EF_TETRA_VORTEX_FIRE_GROUND, target->render.position.x, target->render.position.y, target->render.position.z, 0, -1, 0, 0);
+    g_effectMgr->Spawn(0, EF_TETRA_VORTEX_FIRE_GROUND, target->render.position, 0, -1, 0, 0);
     const vector3d position = target->render.position;
     EffectLists* effects = g_effectMgr;
-    if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("new_sekienhou"), position.x, position.y, position.z, 0, -1, 0, 0)) {
+    if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("new_sekienhou"), position, 0, -1, 0, 0)) {
       effect->SetAngle(270.0f);
     }
   }
