@@ -1,11 +1,16 @@
 #include "UI/Window/FrameSkin.h"
 #include "Resource/ResourceMgr.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Resource/Bitmap/TextureNames.h"
 #include "UI/Window/UIRegisterMgr.h"
 #include "UI/Window/WindowBorder.h"
 
 #include <new>
 #include <utility>
+
+template __forceinline
+std::_Tree_find_result<std::map<int, std::pair<int, int>>::_Mybase::_Nodeptr>
+std::map<int, std::pair<int, int>>::_Mybase::_Find_lower_bound<int>(const int&) const;
 
 // GLOBAL: gl_25106
 template <>
@@ -49,8 +54,8 @@ void CUIFrameWnd::RefreshSkinColors() {
   }
 
   if (this->m_hasSkinColors) {
-    this->m_backgroundColor = SkinPaletteColor(this->m_backgroundCell, this->m_resolveSkin);
-    this->m_borderColor = SkinPaletteColor(this->m_borderCell, this->m_resolveSkin);
+    this->m_backgroundColor = g_skinInfo.PaletteColor(this->m_backgroundCell, this->m_resolveSkin);
+    this->m_borderColor = g_skinInfo.PaletteColor(this->m_borderCell, this->m_resolveSkin);
   }
 
   for (UIWindow* child : this->m_children) {
@@ -81,6 +86,6 @@ void CUIFrameWnd::SetSkinColors(int backgroundColumn, int backgroundRow, int bor
   this->m_borderCell.row = borderRow;
   this->m_hasSkinColors = true;
 
-  this->m_backgroundColor = SkinPaletteColor(this->m_backgroundCell, this->m_resolveSkin);
-  this->m_borderColor = SkinPaletteColor(this->m_borderCell, this->m_resolveSkin);
+  this->m_backgroundColor = g_skinInfo.PaletteColor(this->m_backgroundCell, this->m_resolveSkin);
+  this->m_borderColor = g_skinInfo.PaletteColor(this->m_borderCell, this->m_resolveSkin);
 }

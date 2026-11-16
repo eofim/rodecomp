@@ -9,6 +9,9 @@
 #include <vector>
 
 struct vector3d;
+struct RenderCommand;
+
+typedef void (*ParticleSubmit)(RenderCommand* primitive, int flags);
 
 struct EffectEvent {
   /* 0000 */ int kind;
@@ -20,7 +23,7 @@ struct EffectEvent {
 class CEffect {
 public:
   explicit CEffect(int id);
-  virtual void SetRenderFunc(int argument);
+  virtual void SetRenderFunc(ParticleSubmit argument);
   virtual void Open();
   virtual void CheckRange();
   virtual void OnProcess() {}
@@ -44,7 +47,7 @@ public:
   virtual void SetFlags(int argument);
   virtual void SetScale(float argument);
   virtual void SetAlpha(float argument);
-  virtual void SetWindowOffset(int argument1, int argument2, int argument3, int argument4, int argument5);
+  virtual void SetWindowOffset(vector3d offset, int attachToWindow, int windowId);
   virtual vector3d GetWindowOffset();
   virtual void SetFlipX(int argument);
   virtual void SetFlipY(int argument);
@@ -54,7 +57,7 @@ public:
   virtual void EnableTimeLimit();
   virtual void EnableGroundRender();
   virtual bool IsVisible();
-  void AddEvent(int kind, const char* text, int frame, int argument);
+  void AddEvent(int kind, const char* text, int frame, float argument);
   void SetActor(std::uint32_t aid);
   void SetSourceActor(std::uint32_t aid);
   void SetEventFrame(int kind, int frame);
@@ -82,7 +85,7 @@ public:
   /* 0034 */ unsigned char outsideRange;
   /* 0035 */ unsigned char padding_0035[3];
   /* 0038 */ int range;
-  /* 003C */ unsigned char areaParameters[8];
+  /* 003C */ unsigned char padding_003C[8];
   /* 0044 */ float areaSize;
   /* 0048 */ float scaleParameter;
   /* 004C */ int baseAngle;

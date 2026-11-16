@@ -36,6 +36,7 @@
 #include "Contents/Map/MapSkyMgr.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skills/ClientSkills.h"
+#include "Contents/Actors/Skill.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Sound/SoundMgr.h"
 #include "Contents/Sprites/SpriteLayerDrawing.h"
@@ -421,7 +422,7 @@ void CGrannyPc::SetState(int state, int resetPosition) {
     if (current == ST_DAMAGE || current == ST_ATTACK || this->healthState != 0 || current == ST_BEGIN_SKILL) {
       this->SetAction(0x20, 4, 0);
     }
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->waitingUseItemAck = 0;
+    g_modeMgr.GetGameMode()->waitingUseItemAck = 0;
     break;
   case ST_SKILL:
     if (current == ST_SIT) {
@@ -456,11 +457,11 @@ void CGrannyPc::SetState(int state, int resetPosition) {
       (static_cast<std::int64_t>(this->secondaryWeapon) << 32) | static_cast<std::uint32_t>(this->weapon)
     );
     CGameActor::SetState(weaponAllowed ? 9 : 2, resetPosition);
-    this->attackMotion = AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
+    this->attackMotion = g_session.AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
     bool usesArrow = false;
     g_session.m_hotkeyScript->Call("IsItemUsingArrow", "d>b", this->weapon, &usesArrow);
     if (usesArrow == true) {
-      CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* mode = g_modeMgr.GetGameMode();
       mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
@@ -476,9 +477,9 @@ void CGrannyPc::SetState(int state, int resetPosition) {
       (static_cast<std::int64_t>(this->secondaryWeapon) << 32) | static_cast<std::uint32_t>(this->weapon)
     );
     CGameActor::SetState(weaponAllowed ? 9 : 2, resetPosition);
-    this->attackMotion = AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
+    this->attackMotion = g_session.AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
     if ((this->weapon == 14 && this->secondaryWeapon == 0) || (this->weapon == 13 && this->secondaryWeapon == 0)) {
-      CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* mode = g_modeMgr.GetGameMode();
       mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
@@ -557,7 +558,7 @@ void CPc::SetModifyFactorOfmotionSpeed(int value) {
   int speed = value;
 
   if (weapon > 105) {
-    weapon = GetWeaponViewValue(weapon);
+    weapon = g_session.GetWeaponViewValue(weapon);
   }
 
   if (weapon != 11) {
@@ -677,7 +678,7 @@ void CPc::LoadEquipAction(int slot, const char* name) {
 
   const int baseJob = JobNames::BaseJob(this->GetEffectiveJob(-1));
   const int costumeJob = this->GetBodyCostume();
-  const std::string actionName = g_equipmentResourceMgr->GetBodyResourceName(0, baseJob, this->sex, costumeJob, 0);
+  const std::string actionName = g_session.GetBodyActionResourceName(baseJob, this->sex, costumeJob, 0);
   CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load(actionName));
   if (!action) {
     return;
@@ -874,13 +875,13 @@ void CPc::RenderBodyOutline(int layer, const float* position, float x, float y, 
     tagRECT box;
     std::uint32_t quadColor;
     if (this->GetMonsterTransformJob() != JT_THANATOS) {
-      this->PrepareSprite(layer, layer, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, reinterpret_cast<int*>(&box), &quadColor, 0, 0, 0);
+      this->PrepareSprite(layer, layer, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &quadColor, 0, 0, 0);
       if (g_cameraDistance >= 320.0f) {
         quad.bottomRhw = bottomRhw - 0.0000025f;
         quad.topRhw = topRhw - 0.0000025f;
       }
     } else {
-      this->PrepareSprite(index, index, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, reinterpret_cast<int*>(&box), &quadColor, 0, 0, 0);
+      this->PrepareSprite(index, index, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &quadColor, 0, 0, 0);
       if (this->render.state == ST_STAND && index == 1) {
         quad.bottomRhw = bottomRhw + 0.000008f;
         quad.topRhw = topRhw + 0.00008f;
@@ -894,7 +895,7 @@ void CPc::RenderBodyOutline(int layer, const float* position, float x, float y, 
       quad.color = color & 0xFFFFFF | 0x46000000;
     }
 
-    if (this->render.visibilityOptions[1] != 0) {
+    if (this->render.trackBounds != 0) {
       bounds.Include(&quad.top);
     }
 
@@ -1040,7 +1041,7 @@ const ActionFrame& CPc::SelectStanceFrame(int layer, CActRes* actRes, int* anima
 // OFFSET: 0x00DA99A0
 // FUNCTION: fn_22569
 void CPc::ApplyLayerEffects(
-  SpriteQuad* quad, const SpriteFrameCell* cell, int layer, const int* box, float shiftX, float distance, float bottomRhw, float topRhw,
+  SpriteQuad* quad, const SpriteFrameCell* cell, int layer, const tagRECT* box, float shiftX, float distance, float bottomRhw, float topRhw,
   float screenX, float screenY, const std::uint32_t* palette, const SpriteRleImage* image, int* blend, int offsetX, int offsetY
 ) {
   for (const ActiveSkillEffect& effect : g_activeSkillEffects) {
@@ -1061,11 +1062,11 @@ void CPc::ApplyLayerEffects(
   }
 
   if ((this->render.flags & 4) != 0 && layer == 5) {
-    if (!this->render.effectPhaseBytes[1]) {
+    if (!this->render.blinkSkipped) {
       this->DrawQuad(*quad, palette, layer, 0.0f, 0.0f, 0);
-      this->render.effectPhaseBytes[1] = 1;
+      this->render.blinkSkipped = 1;
     } else {
-      this->render.effectPhaseBytes[1] = 0;
+      this->render.blinkSkipped = 0;
     }
   }
 
@@ -1079,17 +1080,17 @@ void CPc::ApplyLayerEffects(
 
   SpriteQuad jitter;
   if ((this->render.flags & 8) != 0 && layer <= 4 && (this->render.flags & 0x30000) == 0) {
-    if (++this->render.effectPhaseBytes[2] > 180) {
-      this->render.effectPhaseBytes[2] = 0;
+    if (++this->render.wavePhase > 180) {
+      this->render.wavePhase = 0;
     }
 
-    float wave = g_sinTable[this->render.effectPhaseBytes[2]] + 3.0f;
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    float wave = g_sinTable[this->render.wavePhase] + 3.0f;
+    CGameMode* mode = g_modeMgr.GetGameMode();
     float spread = 400.0f / mode->camera->camera.desiredDistance * wave;
-    jitter.top = static_cast<float>(box[1]) - spread - static_cast<float>(hover);
-    jitter.bottom = static_cast<float>(box[3]) + spread - static_cast<float>(hover);
-    float left = static_cast<float>(box[0]) + shiftX;
-    float right = static_cast<float>(box[2]) + shiftX;
+    jitter.top = static_cast<float>(box->top) - spread - static_cast<float>(hover);
+    jitter.bottom = static_cast<float>(box->bottom) + spread - static_cast<float>(hover);
+    float left = static_cast<float>(box->left) + shiftX;
+    float right = static_cast<float>(box->right) + shiftX;
     if (left > right) {
       left += spread;
       right -= spread;
@@ -1108,13 +1109,13 @@ void CPc::ApplyLayerEffects(
     jitter.image = image;
     this->DrawQuad(jitter, palette, 5, 0.0f, 0.0f, 0);
 
-    wave = g_sinTable[this->render.effectPhaseBytes[2]];
-    mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    wave = g_sinTable[this->render.wavePhase];
+    mode = g_modeMgr.GetGameMode();
     spread = 400.0f / mode->camera->camera.desiredDistance * (wave + wave + 5.0f);
-    jitter.top = static_cast<float>(box[1]) - spread - static_cast<float>(hover);
-    jitter.bottom = static_cast<float>(box[3]) + spread - static_cast<float>(hover);
-    left = static_cast<float>(box[0]) + shiftX;
-    right = static_cast<float>(box[2]) + shiftX;
+    jitter.top = static_cast<float>(box->top) - spread - static_cast<float>(hover);
+    jitter.bottom = static_cast<float>(box->bottom) + spread - static_cast<float>(hover);
+    left = static_cast<float>(box->left) + shiftX;
+    right = static_cast<float>(box->right) + shiftX;
     if (left > right) {
       left += spread;
       right -= spread;
@@ -1137,10 +1138,10 @@ void CPc::ApplyLayerEffects(
     for (int step = 1, depth = 3; depth <= 6; ++step, depth += 3) {
       const unsigned char alpha = this->render.outlineAlpha;
       const float distanceScale = g_renderer->ScaleDistance(distance);
-      const float factor = GetSkillFactor(this->GetEffectiveJob(-1)) * distanceScale * (static_cast<float>(step) * 0.01f + 1.0f);
+      const float factor = g_session.GetSkillFactor(this->GetEffectiveJob(-1)) * distanceScale * (static_cast<float>(step) * 0.01f + 1.0f);
       const float shift =
         g_renderer->UiScaleX() * (static_cast<float>(static_cast<int>(this->render.spriteOffsetX)) * this->render.scale) * factor;
-      const int boxTop = box[1];
+      const int boxTop = box->top;
       const float top = static_cast<float>(static_cast<double>(cell->y + offsetY) * factor * cell->scaleY * scale + screenY);
       const float bottom = static_cast<float>(
         static_cast<double>((static_cast<short>(image->doubleHeight) + 1) * image->height + cell->y + offsetY) * factor * cell->scaleY *
@@ -1153,11 +1154,11 @@ void CPc::ApplyLayerEffects(
       if ((cell->mirrored & 1) != 0) {
         left = static_cast<double>((static_cast<short>(image->doubleWidth) + 1) * image->width + cell->x + offsetX) * factor * cell->scaleX;
         right = static_cast<double>(offsetX + cell->x) * factor * cell->scaleX;
-        if (boxTop >= g_renderer->viewport.height || boxTop <= 0 || box[2] >= g_renderer->viewport.width || box[0] <= 0) {
+        if (boxTop >= g_renderer->viewport.height || boxTop <= 0 || box->right >= g_renderer->viewport.width || box->left <= 0) {
           continue;
         }
       } else {
-        if (boxTop >= g_renderer->viewport.height || box[3] <= 0 || box[0] >= g_renderer->viewport.width || box[2] <= 0) {
+        if (boxTop >= g_renderer->viewport.height || box->bottom <= 0 || box->left >= g_renderer->viewport.width || box->right <= 0) {
           continue;
         }
         left = static_cast<double>(cell->x + offsetX) * factor * cell->scaleX;
@@ -1191,24 +1192,24 @@ void CPc::ApplyLayerEffects(
   if ((this->render.flags & 0x10000) != 0) {
     const short level = this->render.effectPhase;
     const short alpha = static_cast<short>(255 - level * 20);
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     const float rise = 400.0f / mode->camera->camera.desiredDistance * static_cast<float>(level * 20);
-    quad->top = static_cast<float>(box[1]) - rise;
-    quad->bottom = static_cast<float>(box[3]) - rise;
+    quad->top = static_cast<float>(box->top) - rise;
+    quad->bottom = static_cast<float>(box->bottom) - rise;
     quad->color = (std::max<short>(alpha, 0) << 24) + 0xFFFFFF;
   }
 
   if ((this->render.flags & 0x20000) != 0) {
     const int riseUnits = (25 - this->render.tintPhase) * 20;
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     short alpha = static_cast<short>((this->render.tintPhase - 10) * 17);
     if (alpha > 255) {
       alpha = 255;
     }
     const float rise = std::max(400.0f / mode->camera->camera.desiredDistance * static_cast<float>(riseUnits), 0.0f);
-    quad->top = static_cast<float>(box[1]) - rise;
+    quad->top = static_cast<float>(box->top) - rise;
     quad->color = (std::max<short>(alpha, 0) << 24) + 0xFFFFFF;
-    quad->bottom = static_cast<float>(box[3]) - rise;
+    quad->bottom = static_cast<float>(box->bottom) - rise;
   }
 
   if (hover != 0) {
@@ -1222,10 +1223,10 @@ void CPc::ApplyLayerEffects(
       *blend = 5;
     }
 
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     const float sink = 24000.0f / mode->camera->camera.desiredDistance;
-    quad->top = static_cast<float>(box[1]) + sink;
-    quad->bottom = static_cast<float>(box[3]) + sink;
+    quad->top = static_cast<float>(box->top) + sink;
+    quad->bottom = static_cast<float>(box->bottom) + sink;
   }
 }
 
@@ -1329,7 +1330,7 @@ void CPc::SetSprWeapon2(int first, int second) {
     return;
   }
 
-  if (GetWeaponViewValue(shieldItem) > 0) {
+  if (g_session.GetWeaponViewValue(shieldItem) > 0) {
     int weaponType = this->GetDualWieldWeaponType(weaponItem, shieldItem);
     switch (this->GetEffectiveJob(-1)) {
       case JT_ASSASSIN:
@@ -1383,7 +1384,7 @@ void CPc::SetSprWeapon2(int first, int second) {
     return;
   }
 
-  int viewType = GetWeaponViewValue(this->weapon);
+  int viewType = g_session.GetWeaponViewValue(this->weapon);
   const std::string actName = g_session.GetWeaponActName(viewJob, this->sex, viewType, weaponItem, this->bodyStyle);
   if (ResourceMgr::Instance().Exists(actName.c_str())) {
     this->LoadEquipAction(5, actName.c_str());
@@ -1391,7 +1392,7 @@ void CPc::SetSprWeapon2(int first, int second) {
     this->LoadEquipSprite(5, sprName.c_str());
     viewType = this->MapMotion(viewType);
   } else {
-    viewType = GetWeaponViewValue(weaponItem);
+    viewType = g_session.GetWeaponViewValue(weaponItem);
     if (viewType == -1 || viewType == 0 || weaponItem == 1599) {
       return;
     }
@@ -1894,7 +1895,7 @@ void CGrannyPc::RenderCached(const matrix& view, int layer, C3dGrannyModelRes* m
 
   this->brightness = (this->alpha << 24) + 0xFFFFFF;
   g_modeMgr.GetGameMode();
-  CView* camera = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera;
+  CView* camera = g_modeMgr.GetGameMode()->camera;
   bool attached = false;
   matrix rotation;
   rotation.MakeXRotation(1.570796f);
@@ -1925,12 +1926,12 @@ void CGrannyPc::RenderCached(const matrix& view, int layer, C3dGrannyModelRes* m
   }
 
   for (int mesh = 0; mesh < model->instance->meshCount; ++mesh) {
-    const GrannyPNT332Vertex* source = reinterpret_cast<const GrannyPNT332Vertex*>(model->GetRigidVertices(mesh));
+    const GrannyPNT332Vertex* source = static_cast<const GrannyPNT332Vertex*>(model->GetRigidVertices(mesh));
     if (!source) {
       if (layer == 0) {
-        source = reinterpret_cast<const GrannyPNT332Vertex*>(this->vertices[mesh]);
+        source = this->vertices[mesh];
       } else {
-        source = reinterpret_cast<const GrannyPNT332Vertex*>(this->layerVertices[layer][mesh]);
+        source = this->layerVertices[layer][mesh];
       }
 
       if (!source) {
@@ -1984,7 +1985,7 @@ void CGrannyPc::RenderCached(const matrix& view, int layer, C3dGrannyModelRes* m
   }
 
   if (model == this->model) {
-    if (this->model->ProjectBounds(bounds, view, rotation, camera->frame.eye)) {
+    if (this->model->ProjectBounds(bounds, view, rotation, &camera->frame.eye.x)) {
       this->SetRenderInfo(bounds, screenX, screenY);
     } else {
       this->SetTlvert(screenX, screenY);
@@ -2032,13 +2033,13 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
     tagRECT box;
     std::uint32_t color;
     if (this->GetMonsterTransformJob() != JT_THANATOS) {
-      this->PrepareSprite(layer, layer, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, reinterpret_cast<int*>(&box), &color, 0, 0, 0);
+      this->PrepareSprite(layer, layer, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, 0, 0, 0);
       if (g_cameraDistance <= 320.0f) {
         quad.bottomRhw = bottomRhw - 0.0000025f;
         quad.topRhw = topRhw - 0.0000025f;
       }
     } else {
-      this->PrepareSprite(index, index, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, reinterpret_cast<int*>(&box), &color, 0, 0, 0);
+      this->PrepareSprite(index, index, distanceScale, *cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, 0, 0, 0);
       if (this->render.state == ST_STAND && index == 1) {
         quad.bottomRhw = bottomRhw + 0.000008f;
         quad.topRhw = topRhw + 0.00008f;
@@ -2051,7 +2052,7 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
     }
 
     quad.image = image;
-    if (this->render.visibilityOptions[1] != 0) {
+    if (this->render.trackBounds != 0) {
       bounds.Include(&quad.top);
     }
 
@@ -2061,7 +2062,7 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
       palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->render.name.c_str()))->palette;
     }
 
-    this->ApplyLayerEffects(&quad, cell, 0, reinterpret_cast<const int*>(&box), scale, bottomRhw, bottomRhw, topRhw, x, y, palette, image, &blend, 0, 0);
+    this->ApplyLayerEffects(&quad, cell, 0, &box, scale, bottomRhw, bottomRhw, topRhw, x, y, palette, image, &blend, 0, 0);
     if (IsScreenShakeActive()) {
       this->DrawFlippedQuad(quad, palette, 0x101, x, y, 0);
     } else {
@@ -2072,7 +2073,7 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
   }
 
   this->SetRenderInfo(&bounds.left, x, y);
-  this->render.effectPhaseBytes[0] = 1;
+  this->render.flagsResetPending = 1;
 }
 
 // OFFSET: 0x00DAD4D0
@@ -2128,16 +2129,16 @@ void CPc::RenderOverlaySprite(const float* matrix, int) {
     float bottomRhw;
     float topRhw;
     SpriteQuad quad;
-    int box[4];
+    tagRECT box;
     std::uint32_t color;
-    if (!this->PrepareSprite(0, count, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, box, &color, 0, 0, 0)) {
+    if (!this->PrepareSprite(0, count, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, 0, 0, 0)) {
       continue;
     }
 
     ++count;
     drawn = true;
     quad.image = image;
-    if (this->render.visibilityOptions[1] != 0) {
+    if (this->render.trackBounds != 0) {
       bounds.Include(&quad.top);
     }
 
@@ -2183,7 +2184,7 @@ bool CGrannyPc::OnProcess() {
 
   if (this->isPlayHitWave != 0) {
     const vector3d& player =
-      static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player)->render.position;
+      static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player)->render.position;
     g_soundMgr->PlayWave(
       this->hitWaveName, this->render.position.x - player.x, 0.0f,
       this->render.position.z - player.z, 250, 40, 1.0f, 0
@@ -2254,7 +2255,7 @@ bool CPc::OnProcess() {
 
   if (this->isPlayHitWave != 0) {
     const vector3d& player =
-      static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player)->render.position;
+      static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player)->render.position;
     g_soundMgr->PlayWave(
       this->hitWaveName, this->render.position.x - player.x, 0.0f,
       this->render.position.z - player.z, 250, 40, 1.0f, 0
@@ -2266,7 +2267,7 @@ bool CPc::OnProcess() {
   if (!StateFlag02(this->stateFlags) && !StateFlag06(this->stateFlags) && !StateFlag01(this->stateFlags)) {
     if (show) {
       if (!this->msgEffect) {
-        CMsgEffect* effect = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->SpawnMsgEffect(44, &this->render.position, this->render.accountId, true);
+        CMsgEffect* effect = g_modeMgr.GetGameMode()->SpawnMsgEffect(44, &this->render.position, this->render.accountId, true);
         this->AddMsgEffect(effect);
         effect->SendMsg(this, AM_SET_MASTER_POINTER, 0, 0, 0, 0, 0, 0);
         this->msgEffect = effect;
@@ -2288,10 +2289,10 @@ bool CPc::OnProcess() {
 void CPc::Render(int argument) {
   bool hasEffect = false;
   if (StateFlag14(this->stateFlags)) {
-    static_cast<CPlayer*>(this)->UpdateFootprints(1);
+    this->UpdateFootprints(1);
   }
   if ((this->render.flags & 0x8000) != 0) {
-    static_cast<CPlayer*>(this)->UpdateFootprints(2);
+    this->UpdateFootprints(2);
   }
 
   for (const ActiveSkillEffect& effect : g_activeSkillEffects) {
@@ -2359,8 +2360,8 @@ void CPc::DrawLayers(const float* matrix, int blendMode, char blendVariant) {
 // OFFSET: 0x00DABF50
 // FUNCTION: fn_22589
 void CGrannyPc::UpdateGaugeWindow() {
-  if (static_cast<UIWindow*>(this->gaugeWindow) != nullptr) {
-    static_cast<UIWindow*>(this->gaugeWindow)->Move(
+  if (this->gaugeWindow != nullptr) {
+    this->gaugeWindow->Move(
       this->render.screenX - 30,
       static_cast<int>(static_cast<float>(g_renderer->viewport.height * 12 / 480) * this->render.distanceScale + static_cast<float>(this->render.screenY))
     );
@@ -2371,8 +2372,8 @@ void CGrannyPc::UpdateGaugeWindow() {
 // OFFSET: 0x00DABFC0
 // FUNCTION: fn_22590
 void CPc::UpdateGaugeWindow() {
-  if (static_cast<UIWindow*>(this->gaugeWindow) != nullptr) {
-    static_cast<UIWindow*>(this->gaugeWindow)->Move(
+  if (this->gaugeWindow != nullptr) {
+    this->gaugeWindow->Move(
       this->render.screenX - 30,
       static_cast<int>(static_cast<float>(g_renderer->viewport.height * 12 / 480) * this->render.distanceScale + static_cast<float>(this->render.screenY))
     );
@@ -2437,7 +2438,7 @@ void CPc::SetSprAct2(int first, int second, int third, int fourth, int fifth, in
   this->accessory = sixth;
   this->accessory2 = seventh;
   this->accessory3 = eighth;
-  this->shield = GetWeaponViewValue(fifth) < 0 ? fifth : 0;
+  this->shield = g_session.GetWeaponViewValue(fifth) < 0 ? fifth : 0;
   this->headPalette = ninth;
   this->render.bodyPalette = tenth;
   this->render.bodyPalette = g_session.GetBodyStyle(first, tenth, this->bodyStyle);
@@ -2595,7 +2596,7 @@ __declspec(noinline) void CPlayer::UpdateMsgEffect(bool show) {
   if (!StateFlag02(this->stateFlags) && !StateFlag06(this->stateFlags) && !StateFlag01(this->stateFlags)) {
     if (show) {
       if (!this->msgEffect) {
-        CMsgEffect* effect = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->SpawnMsgEffect(44, &this->render.position, this->render.accountId, true);
+        CMsgEffect* effect = g_modeMgr.GetGameMode()->SpawnMsgEffect(44, &this->render.position, this->render.accountId, true);
         this->AddMsgEffect(effect);
         effect->SendMsg(this, AM_SET_MASTER_POINTER, 0, 0, 0, 0, 0, 0);
         this->msgEffect = effect;
@@ -2642,10 +2643,10 @@ void CGrannyPc::SetSprActFull(int first, int second, int third, int fourth, int 
   this->instance = GrannyInstantiateModel(this->model->model);
   for (int mesh = 0; mesh < this->model->instance->meshCount; ++mesh) {
     ModelRenderCommand* command = new ModelRenderCommand;
-    this->commands[mesh] = reinterpret_cast<RenderCommand*>(command);
-    reinterpret_cast<RenderCommand*>(command)->AllocateTriangles(this->model->GetTriangleCount(mesh));
-    this->vertices[mesh] = new RenderVertex[this->model->GetTriangleCount(mesh) * 3];
-    std::memset(this->vertices[mesh], 0, this->model->GetTriangleCount(mesh) * 3 * sizeof(RenderVertex));
+    this->commands[mesh] = command;
+    command->AllocateTriangles(this->model->GetTriangleCount(mesh));
+    this->vertices[mesh] = new GrannyPNT332Vertex[this->model->GetTriangleCount(mesh) * 3];
+    std::memset(this->vertices[mesh], 0, this->model->GetTriangleCount(mesh) * 3 * sizeof(GrannyPNT332Vertex));
   }
 
   this->lastClock = GrannyGetSystemSeconds();
@@ -2673,10 +2674,10 @@ void CGrannyPc::SetSprActFull(int first, int second, int third, int fourth, int 
   this->layerModels[1] = static_cast<C3dGrannyModelRes*>(ResourceMgr::Instance().Load(name));
   for (int mesh = 0; mesh < this->layerModels[1]->instance->meshCount; ++mesh) {
     ModelRenderCommand* command = new ModelRenderCommand;
-    this->layerCommands[1][mesh] = reinterpret_cast<RenderCommand*>(command);
-    reinterpret_cast<RenderCommand*>(command)->AllocateTriangles(this->layerModels[1]->GetTriangleCount(mesh));
-    this->layerVertices[1][mesh] = new RenderVertex[this->layerModels[1]->GetTriangleCount(mesh) * 3];
-    std::memset(this->layerVertices[1][mesh], 0, this->layerModels[1]->GetTriangleCount(mesh) * 3 * sizeof(RenderVertex));
+    this->layerCommands[1][mesh] = command;
+    command->AllocateTriangles(this->layerModels[1]->GetTriangleCount(mesh));
+    this->layerVertices[1][mesh] = new GrannyPNT332Vertex[this->layerModels[1]->GetTriangleCount(mesh) * 3];
+    std::memset(this->layerVertices[1][mesh], 0, this->layerModels[1]->GetTriangleCount(mesh) * 3 * sizeof(GrannyPNT332Vertex));
   }
 
   tag[1] = 'b';
@@ -2685,10 +2686,10 @@ void CGrannyPc::SetSprActFull(int first, int second, int third, int fourth, int 
   this->layerModels[2]->RebindMeshes(*this->model);
   for (int mesh = 0; mesh < this->layerModels[2]->instance->meshCount; ++mesh) {
     ModelRenderCommand* command = new ModelRenderCommand;
-    this->layerCommands[2][mesh] = reinterpret_cast<RenderCommand*>(command);
-    reinterpret_cast<RenderCommand*>(command)->AllocateTriangles(this->layerModels[2]->GetTriangleCount(mesh));
-    this->layerVertices[2][mesh] = new RenderVertex[this->layerModels[2]->GetTriangleCount(mesh) * 3];
-    std::memset(this->layerVertices[2][mesh], 0, this->layerModels[2]->GetTriangleCount(mesh) * 3 * sizeof(RenderVertex));
+    this->layerCommands[2][mesh] = command;
+    command->AllocateTriangles(this->layerModels[2]->GetTriangleCount(mesh));
+    this->layerVertices[2][mesh] = new GrannyPNT332Vertex[this->layerModels[2]->GetTriangleCount(mesh) * 3];
+    std::memset(this->layerVertices[2][mesh], 0, this->layerModels[2]->GetTriangleCount(mesh) * 3 * sizeof(GrannyPNT332Vertex));
   }
 
   tag[1] = 'p';
@@ -2697,10 +2698,10 @@ void CGrannyPc::SetSprActFull(int first, int second, int third, int fourth, int 
   this->layerModels[3]->RebindMeshes(*this->model);
   for (int mesh = 0; mesh < this->layerModels[3]->instance->meshCount; ++mesh) {
     ModelRenderCommand* command = new ModelRenderCommand;
-    this->layerCommands[3][mesh] = reinterpret_cast<RenderCommand*>(command);
-    reinterpret_cast<RenderCommand*>(command)->AllocateTriangles(this->layerModels[3]->GetTriangleCount(mesh));
-    this->layerVertices[3][mesh] = new RenderVertex[this->layerModels[3]->GetTriangleCount(mesh) * 3];
-    std::memset(this->layerVertices[3][mesh], 0, this->layerModels[3]->GetTriangleCount(mesh) * 3 * sizeof(RenderVertex));
+    this->layerCommands[3][mesh] = command;
+    command->AllocateTriangles(this->layerModels[3]->GetTriangleCount(mesh));
+    this->layerVertices[3][mesh] = new GrannyPNT332Vertex[this->layerModels[3]->GetTriangleCount(mesh) * 3];
+    std::memset(this->layerVertices[3][mesh], 0, this->layerModels[3]->GetTriangleCount(mesh) * 3 * sizeof(GrannyPNT332Vertex));
   }
 
   tag[1] = 'l';
@@ -2709,10 +2710,10 @@ void CGrannyPc::SetSprActFull(int first, int second, int third, int fourth, int 
   this->layerModels[4]->RebindMeshes(*this->model);
   for (int mesh = 0; mesh < this->layerModels[4]->instance->meshCount; ++mesh) {
     ModelRenderCommand* command = new ModelRenderCommand;
-    this->layerCommands[4][mesh] = reinterpret_cast<RenderCommand*>(command);
-    reinterpret_cast<RenderCommand*>(command)->AllocateTriangles(this->layerModels[4]->GetTriangleCount(mesh));
-    this->layerVertices[4][mesh] = new RenderVertex[this->layerModels[4]->GetTriangleCount(mesh) * 3];
-    std::memset(this->layerVertices[4][mesh], 0, this->layerModels[4]->GetTriangleCount(mesh) * 3 * sizeof(RenderVertex));
+    this->layerCommands[4][mesh] = command;
+    command->AllocateTriangles(this->layerModels[4]->GetTriangleCount(mesh));
+    this->layerVertices[4][mesh] = new GrannyPNT332Vertex[this->layerModels[4]->GetTriangleCount(mesh) * 3];
+    std::memset(this->layerVertices[4][mesh], 0, this->layerModels[4]->GetTriangleCount(mesh) * 3 * sizeof(GrannyPNT332Vertex));
   }
 
   if (this->layerModels[1]) {
@@ -2846,7 +2847,7 @@ bool CPlayer::OnProcess() {
     this->ModifyArgb(8, 8, 8, 8);
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (this->preMoveOn != 0 && timeGetTime() > (g_session.m_averagePing >> 1) + this->preMoveStartTick) {
     PlayerMoveRequest request;
     mode->WorldSubcell(
@@ -2867,7 +2868,7 @@ bool CPlayer::OnProcess() {
 
   if (this->isPlayHitWave != 0) {
     const vector3d& player =
-      static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player)->render.position;
+      static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player)->render.position;
     g_soundMgr->PlayWave(
       this->hitWaveName, this->render.position.x - player.x, 0.0f,
       this->render.position.z - player.z, 250, 40, 1.0f, 0
@@ -2890,11 +2891,11 @@ bool CPlayer::OnProcess() {
 // OFFSET: 0x00DB5980
 // FUNCTION: fn_22667
 void CPlayer::UpdatePendingAction() {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   switch (this->proceedType) {
   case PT_ATTACK:
   case PT_ATTACK_2: {
-    CGameActor* target = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(this->proceedTargetGid));
+    CGameActor* target = mode->scene->GetGameActorByAID(this->proceedTargetGid);
     if (target == nullptr) {
       break;
     }
@@ -2974,7 +2975,7 @@ void CPlayer::UpdatePendingAction() {
     if (this->proceedTargetGid == g_session.m_aid) {
       target = this;
     } else {
-      target = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(this->proceedTargetGid));
+      target = mode->scene->GetGameActorByAID(this->proceedTargetGid);
     }
     if (target == nullptr) {
       break;
@@ -3087,7 +3088,7 @@ void CPlayer::UpdatePendingAction() {
     return;
   }
   case PT_TOUCH_SKILL: {
-    CGameActor* skill = static_cast<CGameActor*>(mode->scene->GetSkillByAID(this->proceedTargetGid));
+    CGameActor* skill = mode->scene->GetSkillByAID(this->proceedTargetGid);
     if (skill == nullptr) {
       break;
     }
@@ -3840,7 +3841,7 @@ struct PlayerSkillRequest {
 void CPlayer::SendMsg(
   CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
 ) {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   switch (message) {
   case AM_REQ_GROUND_SKILL: {
     PlayerSkillRequest request;
@@ -3858,7 +3859,7 @@ void CPlayer::SendMsg(
       int row = 0;
       int subColumn = 0;
       int subRow = 0;
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())
+      g_modeMgr.GetGameMode()
         ->WorldSubcell(this->render.position.x, this->render.position.z, column, row, subColumn, subRow);
       MovementRouteInterpolation route;
       if (g_pathFinder.FindPath(timeGetTime(), column, row, subColumn, subRow, this->gSkillDx, this->gSkillDy, 150, route, 15) == true) {
@@ -4248,7 +4249,7 @@ void CGrannyPc::RenderModel(
   }
 
   if (model == this->model) {
-    if (this->model->ProjectBounds(bounds, view, rotation, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.eye)) {
+    if (this->model->ProjectBounds(bounds, view, rotation, &g_modeMgr.GetGameMode()->camera->frame.eye.x)) {
       this->SetRenderInfo(bounds, screenX, screenY);
     } else {
       this->SetTlvert(screenX, screenY);
@@ -4265,11 +4266,11 @@ CPlayer::CPlayer() {
 // OFFSET: 0x00DB5340
 // FUNCTION: fn_22665
 void CPlayer::Initialize() {
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())
+  g_modeMgr.GetGameMode()
     ->CellCenter(g_session.m_playerX, g_session.m_playerY, this->render.position.x, this->render.position.z);
-  this->render.position.y = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->terrain
+  this->render.position.y = g_modeMgr.GetGameMode()->scene->terrain
                               ->Height(this->render.position.x, this->render.position.z);
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())
+  g_modeMgr.GetGameMode()
     ->WorldCell(this->render.position.x, this->render.position.z, this->destCellX, this->destCellZ);
 
   this->gSkillDx = 0;
@@ -4285,7 +4286,7 @@ void CPlayer::Initialize() {
   this->totalAttackReqCnt = 0;
   this->isAttackRequest = 0;
   this->proceedTargetGid = 0;
-  this->render.visibilityOptions[1] = 1;
+  this->render.trackBounds = 1;
   this->skillId = 0;
   this->skillUseLevel = 0;
   this->tickOfMoveForAttack = timeGetTime() - 1200;
@@ -4400,8 +4401,8 @@ void CPc::SetState(int state, int resetPosition) {
       case JT_STAR_EMPEROR:
       case JT_STAR_EMPEROR_B:
       case JT_SKY_EMPEROR:
-        if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.desiredDistance > g_serviceOptionJitterScale) {
-          static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.desiredDistance = g_serviceOptionJitterScale;
+        if (g_modeMgr.GetGameMode()->camera->camera.desiredDistance > g_serviceOptionJitterScale) {
+          g_modeMgr.GetGameMode()->camera->camera.desiredDistance = g_serviceOptionJitterScale;
         }
         break;
       }
@@ -4442,7 +4443,7 @@ void CPc::SetState(int state, int resetPosition) {
       }
       break;
     }
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->waitingUseItemAck = 0;
+    g_modeMgr.GetGameMode()->waitingUseItemAck = 0;
     break;
   case ST_SKILL:
     if (this->render.specialMotionLocked == 1 || this->render.state == ST_SIT) {
@@ -4527,14 +4528,14 @@ void CPc::SetState(int state, int resetPosition) {
       if (this->IsArrowEffectSuppressed() == true) {
         this->SetArrowEffectSuppressed(false);
       } else {
-        CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+        CGameMode* mode = g_modeMgr.GetGameMode();
         mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->render.speed * this->attackMotion, 0);
       }
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
 
     if (g_session.IsDoramJob(this->GetEffectiveJob(-1)) == true && this->alternateDoramAppearance[0] == 1) {
-      CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* mode = g_modeMgr.GetGameMode();
       mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, this->GetEffectiveJob(-1));
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
@@ -4551,7 +4552,7 @@ void CPc::SetState(int state, int resetPosition) {
     CGameActor::SetState(weaponAllowed ? 9 : 2, resetPosition);
     this->attackMotion = AttackMotionLength(this->GetEffectiveJob(-1), this->sex, this->weapon, weaponAllowed);
     if ((this->weapon == 14 && this->secondaryWeapon == 0) || (this->weapon == 13 && this->secondaryWeapon == 0)) {
-      CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* mode = g_modeMgr.GetGameMode();
       mode->SpawnArrowEffect(&this->render.position, this->hitTargetAid, this->attackMotion * this->render.speed, 0);
       this->attackMotion = 8.0f / this->render.speed + this->attackMotion;
     }
@@ -4616,7 +4617,7 @@ void CGrannyPc::Render(int argument) {
 // OFFSET: 0x00DADA40
 // FUNCTION: fn_22600
 void CGrannyPc::RenderShadow(int argument, vector3d lightDirection, bool cached) {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const float sine = ClientSine(static_cast<int>(this->angle) + 90);
   const float cosine = ClientCosine(static_cast<int>(this->angle) + 90);
   lightDirection.x = -18.0f;
@@ -4656,8 +4657,8 @@ void CGrannyPc::RenderShadow(int argument, vector3d lightDirection, bool cached)
   GroundGeometry* ground = mode->scene->ground;
   column -= 2;
   row -= 2;
-  const float groundSine = std::sin(0.0f);
-  const float groundCosine = std::cos(0.0f);
+  const float groundSine = ClientSin(0.0f);
+  const float groundCosine = ClientCos(0.0f);
 
 
   for (int i = 0; i < 5; ++i) {
@@ -4755,7 +4756,7 @@ struct PcMoveEntry {
 void CPc::SendMsg(
   CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
 ) {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   switch (message) {
   case AM_SET_HEAD_DIR:
     if (this->render.state == ST_STAND || this->render.state == ST_SIT) {
@@ -4774,8 +4775,8 @@ void CPc::SendMsg(
       this->gaugeWindow->SetSize(60, 5);
       g_windowMgr.AddRenderedFront(this->gaugeWindow);
     }
-    static_cast<UIPcGage*>(this->gaugeWindow)->SetValues(static_cast<int>(b), static_cast<int>(c));
-    static_cast<UIPcGage*>(this->gaugeWindow)->SetLimits(0, 0);
+    this->gaugeWindow->SetValues(static_cast<int>(b), static_cast<int>(c));
+    this->gaugeWindow->SetLimits(0, 0);
     this->gaugeWindow->Move(this->render.screenX - 30, ScaleByScreenHeight(12) + this->render.screenY);
     break;
   case AM_STANDENTRY: {
@@ -4874,7 +4875,7 @@ void CPc::SendMsg(
   case AM_INITSTANDENTRY: {
     PcStandEntry* entry = reinterpret_cast<PcStandEntry*>(static_cast<std::intptr_t>(b));
     this->render.accountId = entry->aid;
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
     gameMode->CellCenter(entry->cellX, entry->cellY, this->render.position.x, this->render.position.z);
     this->render.position.y =
       gameMode->scene->terrain->Height(this->render.position.x, this->render.position.z);
@@ -4919,7 +4920,7 @@ void CPc::SendMsg(
     PcStandEntry* entry = reinterpret_cast<PcStandEntry*>(static_cast<std::intptr_t>(b));
     this->bodyStyle = entry->bodyStyle;
     this->render.accountId = entry->aid;
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
     gameMode->CellCenter(entry->cellX, entry->cellY, this->render.position.x, this->render.position.z);
     this->render.position.y =
       gameMode->scene->terrain->Height(this->render.position.x, this->render.position.z);
@@ -5177,7 +5178,7 @@ void CPc::SendMsg(
 void CGrannyPc::SendMsg(
   CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
 ) {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   switch (message) {
   case AM_SET_HEAD_DIR:
     if (this->render.state == ST_STAND || this->render.state == ST_SIT) {
@@ -5196,8 +5197,8 @@ void CGrannyPc::SendMsg(
       this->gaugeWindow->SetSize(60, 5);
       g_windowMgr.AddRenderedFront(this->gaugeWindow);
     }
-    static_cast<UIPcGage*>(this->gaugeWindow)->SetValues(static_cast<int>(b), static_cast<int>(c));
-    static_cast<UIPcGage*>(this->gaugeWindow)->SetLimits(0, 0);
+    this->gaugeWindow->SetValues(static_cast<int>(b), static_cast<int>(c));
+    this->gaugeWindow->SetLimits(0, 0);
     this->gaugeWindow->Move(this->render.screenX - 30, ScaleByScreenHeight(12) + this->render.screenY);
     break;
   case AM_STANDENTRY: {
@@ -5289,7 +5290,7 @@ void CGrannyPc::SendMsg(
   case AM_INITSTANDENTRY2: {
     PcStandEntry* entry = reinterpret_cast<PcStandEntry*>(static_cast<std::intptr_t>(b));
     this->render.accountId = entry->aid;
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
     gameMode->CellCenter(entry->cellX, entry->cellY, this->render.position.x, this->render.position.z);
     this->render.position.y =
       gameMode->scene->terrain->Height(this->render.position.x, this->render.position.z);
@@ -5450,7 +5451,7 @@ bool CGrannyPc::ProcessState() {
     this->ProcessMotion();
     const int frames = static_cast<int>(this->GetElapsedFrames());
     if (this->hitTargetAid != 0 && frames % 34 == 0) {
-      CRenderObject* target = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(this->hitTargetAid);
+      CRenderObject* target = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(this->hitTargetAid);
       if (target) {
         this->Face(target->render.position.x, target->render.position.z);
       }
@@ -5501,7 +5502,7 @@ bool CPc::ProcessState() {
     this->ProcessMotion();
     const int frames = static_cast<int>(this->GetElapsedFrames());
     if (this->hitTargetAid != 0 && frames % 34 == 0) {
-      CRenderObject* target = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(this->hitTargetAid);
+      CRenderObject* target = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(this->hitTargetAid);
       if (target) {
         this->Face(target->render.position.x, target->render.position.z);
       }
@@ -5585,7 +5586,7 @@ void CPlayer::SetState(int state, int resetPosition) {
   }
 
   if (state == ST_DEAD) {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     mode->SendMsg(MM_HIDEMOUSEPOINTER, 0, 0, 0, 0);
     mode->LaunchDummyEffect(&this->render.position, 0x174, 300, 0);
     g_screenShakeDuration = 0;

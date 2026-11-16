@@ -27,8 +27,8 @@ public:
   void DrawLightmappedPrimitive(LightmappedPrimitive* primitive) override;
   void DrawPrimitive(RenderCommand* primitive) override;
   bool RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture) override;
-  bool SaveBitmap(const char* filename, CBitmapRes* overlay) override;
-  bool SaveJpeg(const char* filename, CBitmapRes* overlay) override;
+  int SaveBitmap(const char* filename, CBitmapRes* overlay) override;
+  int SaveJpeg(const char* filename, CBitmapRes* overlay) override;
   void CleanupTextures() override;
   bool SaveLogo(std::string filename) override;
   int LockBackBuffer() override;
@@ -36,8 +36,10 @@ public:
 
   void SetTextureMode(int mode);
   void DrawDepthQueue(bool sort, std::vector<DepthPrimitive>& queue);
+  void DrawOpaqueQueues();
   void DrawOpaqueQueues(RenderQueues& queues);
   void DrawGroundQueues();
+  void DrawAlphaQueues();
   void DrawAlphaQueues(RenderQueues& queues, unsigned char twoPass);
   void DrawAuxiliaryQueue();
   void DrawBaseQueue();

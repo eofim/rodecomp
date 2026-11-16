@@ -17,7 +17,6 @@
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Math/Vector3d.h"
 
-#include <bit>
 
 // OFFSET: 0x00B4DAE0
 // FUNCTION: fn_18979
@@ -40,12 +39,12 @@ void CEffect::Close() {}
 
 // OFFSET: 0x00B4DE40
 // FUNCTION: fn_18984
-void CEffect::AddEvent(int kind, const char* text, int frame, int argument) {
+void CEffect::AddEvent(int kind, const char* text, int frame, float argument) {
   EffectEvent event;
   event.kind = kind;
   event.text = text ? text : "";
   event.frame = frame;
-  event.argument = std::bit_cast<float>(argument);
+  event.argument = argument;
   this->events.push_back(event);
 }
 
@@ -141,7 +140,7 @@ void CEffect::Update(std::uint32_t aid) {
     return;
   }
 
-  const vector3d player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.position;
+  const vector3d player = g_modeMgr.GetGameMode()->scene->player->render.position;
   for (auto event = this->events.begin(); this->events.end() != event; ++event) {
     if (this->frame != event->frame) {
       continue;
@@ -171,17 +170,15 @@ vector3d PlayerPosition() {
   position.z = 0.0f;
   position.x = 0.0f;
   position.y = 0.0f;
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (CPlayer* player = mode->scene->player) {
-    position.x = player->render.position.x;
-    position.y = player->render.position.y;
-    position.z = player->render.position.z;
+    position = player->render.position;
     return position;
   }
 
-  mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  mode = g_modeMgr.GetGameMode();
   mode->CellCenter(g_session.m_playerX, g_session.m_playerY, position.x, position.z);
-  mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  mode = g_modeMgr.GetGameMode();
   position.y = mode->scene->terrain->Height(position.x, position.z);
   return position;
 }
@@ -189,7 +186,8 @@ vector3d PlayerPosition() {
 // OFFSET: 0x00B4E510
 // FUNCTION: fn_18994
 void CEffect::CheckRange() {
-  const vector3d player = PlayerPosition();
+  vector3d player;
+  player = PlayerPosition();
   const float x = player.x - this->position[0];
   const float y = player.y - this->position[1];
   const float z = player.z - this->position[2];
@@ -200,9 +198,10 @@ void CEffect::CheckRange() {
 // OFFSET: 0x00B4E630
 // FUNCTION: fn_18998
 bool CEffect::InRange() {
-  const vector3d player = PlayerPosition();
-  const float y = player.y - this->position[1];
+  vector3d player;
+  player = PlayerPosition();
   const float x = player.x - this->position[0];
+  const float y = player.y - this->position[1];
   const float z = player.z - this->position[2];
   return SquareRoot(y * y + x * x + z * z) < static_cast<float>(this->range);
 }

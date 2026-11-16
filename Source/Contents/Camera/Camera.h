@@ -31,6 +31,7 @@ public:
   virtual void Update();
 
   matrix AlternateView(float yaw) const;
+  void Forward(float* output) const;
   void Refresh();
 
   void Apply();
@@ -38,12 +39,15 @@ public:
   void SetAmplitudes(float horizontal, float distance, float pitch);
   void AddDistance(float delta);
   void AddPitch(float delta);
+  void AddYaw(float delta);
+  void Smooth();
+  void SetUp(const vector3d& up);
 
   /* 0004 */ CameraShake shake;
   /* 0020 */ CameraState camera;
-  /* 0050 */ float backupCurrentTarget[3];
+  /* 0050 */ vector3d backupCurrentTarget;
   /* 005C */ unsigned char backupCurrentAnglesAndDistance[0xC];
-  /* 0068 */ float backupDesiredTarget[3];
+  /* 0068 */ vector3d backupDesiredTarget;
   /* 0074 */ unsigned char backupDesiredAnglesAndDistance[0xC];
   /* 0080 */ CameraFrame frame;
   /* 00F8 */ WorldViewSpatial spatial;

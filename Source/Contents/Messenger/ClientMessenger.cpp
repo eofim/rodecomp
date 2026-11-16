@@ -18,11 +18,13 @@
 #include "Script/LuaInstance.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
+#include "UI/Party/UIMiniPartyWnd.h"
 #include "UI/Buttons/UITextButton.h"
 #include "Resource/World/TerrainResource.h"
 #include "Contents/Actors/Pc.h"
 #include "Client/Application/ErrorDialog.h"
 #include "UI/CashShop/UIMileageWnd.h"
+#include "UI/Gauges/UIPcGage.h"
 #include "Network/TextEncoding.h"
 #include "Utility/Text/StringUtil.h"
 #include "Contents/World/World.h"
@@ -42,6 +44,8 @@
 #include "Utility/Cipher/XorBytes.h"
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
+#include "Contents/Messenger/MessengerWindows.h"
+#include "Contents/Messenger/EquipmentPropertyStore.h"
 
 #include <algorithm>
 #include <array>
@@ -81,6 +85,9 @@ struct EquipmentValueC {
   /* 0000 */ int value;
 };
 template __declspec(noinline) std::unordered_map<int, EquipmentValueC>::unordered_map();
+template __declspec(noinline) std::unordered_map<int, int>::~unordered_map();
+template __declspec(noinline) std::string std::format<const char*&, int&>(const std::_Fmt_string<const char*&, int&>, const char*&, int&);
+template __declspec(noinline) std::string std::format<unsigned int&, int&>(const std::_Fmt_string<unsigned int&, int&>, unsigned int&, int&);
 template __declspec(noinline) void std::_Tree_val<std::_Tree_simple_types<unsigned int>>::_Erase_tree<std::allocator<std::_Tree_node<unsigned int, void*>>>(
   std::allocator<std::_Tree_node<unsigned int, void*>>&, std::_Tree_node<unsigned int, void*>*
 ) noexcept;
@@ -124,20 +131,6 @@ struct EquipmentPropertyGroup {
   std::map<std::int64_t, EquipmentPropertyDefinition*>& GetDefinitions();
 };
 
-struct EquipmentPropertyStore {
-  /* 0000 */ std::map<unsigned int, std::map<unsigned int, EquipmentProperty*>> properties;
-  /* 0008 */ std::unordered_map<std::string, std::string> names;
-
-  EquipmentPropertyStore();
-  ~EquipmentPropertyStore();
-  void Clear();
-  std::map<unsigned int, std::map<unsigned int, EquipmentProperty*>>& GetProperties();
-  int GetCount();
-  std::unordered_map<std::string, std::string>& GetNames();
-  EquipmentPropertyStore& operator+=(EquipmentPropertyStore& other);
-  EquipmentPropertyStore& operator+=(EquipmentProperty* property);
-  void RemoveDuplicateNames();
-};
 
 namespace EquipmentProperties {
   class CEquipmentProperties {
@@ -329,7 +322,7 @@ namespace EquipmentProperties {
     /* 0004 */ CLuaInstance script;
     /* 000C */ bool loadValid;
     /* 000D */ bool m_dirty = false;
-    /* 0010 */ int padding_0010;
+    /* 0010 */ int unknown_0010;
     /* 0014 */ int shopId;
     /* 0018 */ EquipmentPropertyStore* store;
     /* 001C */ CEquipment* currentEquipment;
@@ -364,7 +357,7 @@ namespace EquipmentProperties {
     CEquipmentInfo* FindEquipmentInfo(const int& key);
     CLuaInstance& GetScript();
     EquipmentPropertyDefinition* FindRandomOptionDefinition(const int& key);
-    std::list<unsigned int>* FindSkillGroup(const int& key);
+    std::list<unsigned int>* FindSkillGroup(const unsigned int& key);
     std::unordered_map<int, EquipmentValueC>& GetDisplayValues();
     bool HasFunctionPair(const std::uint64_t& key);
     EquipmentPropertyDefinition* FindDefinition(const std::uint64_t& key);
@@ -382,7 +375,7 @@ namespace EquipmentProperties {
     void AddExpansion(const int& kind, const int& itemId, bool notify);
     void RemoveExpansion(const int& kind, const int& itemId);
     void RefreshExpansion(const int& kind, const int& itemId);
-    void RefreshWearable(const int& key);
+    void RefreshWearable(const std::uint32_t& key);
     int GetGradeBonus(const int& first, const int& second, const int& third);
     void LoadADSkill();
     void LoadCombiitem();
@@ -488,6 +481,7 @@ namespace EquipmentProperties {
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(EquipmentProperties::CEquipmentInfo) == 0x44);
+template __declspec(noinline) std::unordered_map<int, int, EquipmentProperties::CEquipmentValueHash>::~unordered_map();
 static_assert(offsetof(EquipmentProperties::CEquipment, m_properties) == 0xC);
 static_assert(offsetof(EquipmentProperties::CEquipment, m_pretend) == 0x34);
 static_assert(sizeof(EquipmentProperties::CEquipment) == 0x38);
@@ -583,7 +577,7 @@ __declspec(noinline) std::map<std::int64_t, EquipmentPropertyDefinition*>& Equip
 // OFFSET: 0x006A1AA0
 // FUNCTION: fn_06013
 EquipmentProperties::CEquipmentPropertiesMgr::CEquipmentPropertiesMgr()
-    : loadValid(1), padding_0010(-1), shopId(-1), store(new EquipmentPropertyStore), currentEquipment(0), notifyWindow(0) {
+    : loadValid(1), unknown_0010(-1), shopId(-1), store(new EquipmentPropertyStore), currentEquipment(0), notifyWindow(0) {
 }
 
 // OFFSET: 0x006ABE90
@@ -1182,11 +1176,13 @@ std::string EquipmentProperties::CEquipmentProperties2Dim::Describe(bool detaile
     }
     switch (hash) {
     case 0xA2AF91ED: {
-      const int& skillId = CEquipmentPropertiesMgr::GetInstance()->GetConstantValue(entry->first);
+      CEquipmentPropertiesMgr* manager = CEquipmentPropertiesMgr::GetInstance();
+      const int key = entry->first;
+      const int skillId = manager->GetConstantValue(key);
       if (skillId == 0) {
         continue;
       }
-      argument = CSkillInfo::DisplayName(*g_session.m_hotkeyScript, skillId);
+      argument = CSkillInfo::DisplayName(skillId);
       if (argument.size() == 0) {
         continue;
       }
@@ -1203,7 +1199,7 @@ std::string EquipmentProperties::CEquipmentProperties2Dim::Describe(bool detaile
           if (argument.size() != 0) {
             argument += ", ";
           }
-          argument += CSkillInfo::DisplayName(*g_session.m_hotkeyScript, skillId);
+          argument += CSkillInfo::DisplayName(skillId);
         }
         if (argument.size() != 0) {
           argument += " ";
@@ -1211,7 +1207,7 @@ std::string EquipmentProperties::CEquipmentProperties2Dim::Describe(bool detaile
       }
       break;
     case 0x78BA6385:
-      argument = CSkillInfo::DisplayName(*g_session.m_hotkeyScript, entry->first);
+      argument = CSkillInfo::DisplayName(entry->first);
       if (argument.size() == 0) {
         continue;
       }
@@ -1262,7 +1258,7 @@ std::string EquipmentProperties::CEquipmentProperties2Dim::Describe(bool detaile
                                                         std::make_wformat_args(DecodeText(g_textCodePage, number), DecodeText(g_textCodePage, argument))));
         break;
       case 2: {
-        const int index = negative == true ? nonPositive ^ 1 : nonPositive;
+        const int index = negative != true ? nonPositive : nonPositive ^ 1;
         if (index == 1) {
           text += "{~}";
         }
@@ -2113,9 +2109,9 @@ int GetEquipLocationIndex(const int& mask) {
 
 // OFFSET: 0x006AD880
 // FUNCTION: fn_06187
-__declspec(noinline) std::list<unsigned int>* EquipmentProperties::CEquipmentPropertiesMgr::FindSkillGroup(const int& key) {
+__declspec(noinline) std::list<unsigned int>* EquipmentProperties::CEquipmentPropertiesMgr::FindSkillGroup(const unsigned int& key) {
   auto found = this->skillGroups.find(key);
-  if (found == this->skillGroups.end()) {
+  if (this->skillGroups.end() == found) {
     return nullptr;
   }
   return &found->second;
@@ -2637,9 +2633,10 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadRefiningBonus() {
     while (lua_next(state, -2) != 0) {
       if (this->loadValid) {
         std::string key;
-        int result = 0;
+        int result;
         int type = lua_type(this->script.GetState(), -2);
         if (type == LUA_TSTRING) {
+          result = 0;
           key = lua_tolstring(this->script.GetState(), -2, nullptr);
         } else {
           result = (type != LUA_TNIL) + 1;
@@ -2656,11 +2653,7 @@ void EquipmentProperties::CEquipmentPropertiesMgr::LoadRefiningBonus() {
           }
           if (this->loadValid) {
             int kind = 0;
-            unsigned int hash = 5381;
-            for (const char* character = key.c_str(); *character != '\0'; ++character) {
-              hash = hash * 33 + *character;
-            }
-            switch (hash) {
+            switch (HashName(key.c_str())) {
             case 0xC3B9E8CE:
               kind = 1;
               break;
@@ -4795,7 +4788,7 @@ int GetLocation(lua_State* state) {
 int GetMapName(lua_State* state) {
   std::string mapName;
   if (g_modeMgr.GetGameMode() != nullptr) {
-    mapName = std::string(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->mapName);
+    mapName = std::string(g_modeMgr.GetGameMode()->mapName);
   }
   mapName = mapName.substr(0, mapName.find(".rsw"));
   lua_pushstring(state, mapName.c_str());
@@ -5062,7 +5055,7 @@ void CSession::AddPartyMember(MessengerMember& member) {
   member.color = MemberColor(index);
   this->m_partyMembers.push_back(member);
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode && (mode->scene->isPKZone != 0 || mode->scene->isEventPVPMode != 0)) {
     EffectActor* actor = static_cast<EffectActor*>(mode->scene->GetGameActorByAID(member.accountId));
     if (actor && !actor->HasId(EF_PARTY)) {
@@ -5203,18 +5196,13 @@ void CSession::SetPartyLeader(std::uint32_t accountId, int leader) {
   }
 }
 
-struct ItemNotificationWindow : UIWindow {
-  /* 007C */ unsigned char padding_007C[0x38];
-  /* 00B4 */ MessengerMember member;
-};
-
 // OFFSET: 0x00AAAF10
 // FUNCTION: fn_17276
 __declspec(noinline) void UIWindowMgr::NotifyItemWindows(int accountId, int lower, int upper) {
   for (UIWindow* window : this->snapExcluded) {
     bool matches;
     {
-      MessengerMember member = static_cast<ItemNotificationWindow*>(window)->member;
+      MessengerMember member = static_cast<UIMiniPartyWnd*>(window)->m_member;
       matches = member.accountId == accountId;
     }
     if (matches) {
@@ -5545,7 +5533,7 @@ bool CGameMode::IsWithinRange(const int& x1, const int& y1, const int& x2, const
 bool CGameMode::IsRegisterCell(int x, int y) {
   for (auto it = this->actorPosList.begin(); it != this->actorPosList.end(); ++it) {
     if (it->second.first == x && it->second.second == y) {
-      CGameActor* actor = static_cast<CGameActor*>(this->scene->GetGameActorByAID(it->first));
+      CGameActor* actor = this->scene->GetGameActorByAID(it->first);
       if (actor == nullptr) {
         return true;
       }
@@ -6001,7 +5989,7 @@ UIWindow* UIWindowMgr::FindItemWindow(int accountId) {
   for (UIWindow* window : this->snapExcluded) {
     bool matches;
     {
-      MessengerMember member = static_cast<ItemNotificationWindow*>(window)->member;
+      MessengerMember member = static_cast<UIMiniPartyWnd*>(window)->m_member;
       matches = member.accountId == accountId;
     }
     if (matches) {
@@ -6020,7 +6008,7 @@ void UIWindowMgr::NotifyMemberWindows(const MessengerMember* target) {
   for (UIWindow* window : this->snapExcluded) {
     bool matches;
     {
-      MessengerMember member = static_cast<ItemNotificationWindow*>(window)->member;
+      MessengerMember member = static_cast<UIMiniPartyWnd*>(window)->m_member;
       matches = target->accountId == member.accountId;
     }
     if (matches) {
@@ -6403,7 +6391,7 @@ void EquipmentProperties::CEquipmentPropertiesMgr::UnequipWearable(const int& ma
 
 // OFFSET: 0x006B71F0
 // FUNCTION: fn_06205
-void EquipmentProperties::CEquipmentPropertiesMgr::RefreshWearable(const int& key) {
+void EquipmentProperties::CEquipmentPropertiesMgr::RefreshWearable(const std::uint32_t& key) {
   const int index = key;
   auto found = this->properties1.find(index);
   if (found == this->properties1.end()) {

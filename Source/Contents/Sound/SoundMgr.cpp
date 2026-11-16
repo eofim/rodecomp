@@ -37,6 +37,22 @@ extern "C" __declspec(dllimport) void __stdcall AIL_close_digital_driver(void* d
 extern "C" __declspec(dllimport) void __stdcall AIL_shutdown();
 extern "C" __declspec(dllimport) void __stdcall AIL_pause_stream(void* stream, int paused);
 extern "C" __declspec(dllimport) int __stdcall AIL_stream_volume(void* stream);
+extern "C" __declspec(dllimport) const char* __stdcall AIL_set_redist_directory(const char* directory);
+extern "C" __declspec(dllimport) int __stdcall AIL_startup();
+extern "C" __declspec(dllimport) int __stdcall AIL_set_preference(unsigned int preference, int value);
+extern "C" __declspec(dllimport) void* __stdcall AIL_open_digital_driver(unsigned int rate, int bits, int channels, unsigned int flags);
+extern "C" __declspec(dllimport) void* __stdcall AIL_allocate_sample_handle(void* driver);
+extern "C" __declspec(dllimport) int __stdcall AIL_enumerate_3D_providers(MilesEnumeration* enumerator, MilesProvider* provider, const char** name);
+extern "C" __declspec(dllimport) int __stdcall AIL_open_3D_provider(MilesProvider provider);
+extern "C" __declspec(dllimport) int __stdcall AIL_3D_speaker_type(MilesProvider provider);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_3D_speaker_type(MilesProvider provider, int speakerType);
+extern "C" __declspec(dllimport) void* __stdcall AIL_open_3D_listener(MilesProvider provider);
+extern "C" __declspec(dllimport) void* __stdcall AIL_allocate_3D_sample_handle(MilesProvider provider);
+extern "C" __declspec(dllimport) unsigned int __stdcall AIL_sample_status(void* sample);
+extern "C" __declspec(dllimport) void __stdcall AIL_init_sample(void* sample);
+extern "C" __declspec(dllimport) int __stdcall AIL_set_sample_file(void* sample, const void* data, int block);
+extern "C" __declspec(dllimport) void __stdcall AIL_set_sample_volume(void* sample, int volume);
+extern "C" __declspec(dllimport) void __stdcall AIL_start_sample(void* sample);
 
 // STATIC: 0x0138BE7C
 // GLOBAL: gl_24457
@@ -46,7 +62,7 @@ namespace {
   // OFFSET: 0x00401090
   // FUNCTION: fn_45443
   void ShutdownMilesAtExit() {
-    MilesRuntime::Get().shutdown();
+    AIL_shutdown();
   }
 }
 
@@ -154,11 +170,10 @@ bool CSoundMgr::Initialize() {
     break;
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-  miles.setRedistDirectory(".\\");
+  AIL_set_redist_directory(".\\");
 
   std::atexit(&ShutdownMilesAtExit);
-  miles.startup();
+  AIL_startup();
 
   this->channels = configuration.mode == 1 ? 1 : 2;
 
@@ -189,8 +204,8 @@ bool CSoundMgr::Initialize() {
     break;
   }
 
-  miles.setPreference(15, configuration.preference15);
-  this->driver = miles.openDigitalDriver(this->rate, this->bits, this->channels, 1);
+  AIL_set_preference(15, configuration.preference15);
+  this->driver = AIL_open_digital_driver(this->rate, this->bits, this->channels, 1);
 
   if (!this->driver) {
     return false;
@@ -200,7 +215,7 @@ bool CSoundMgr::Initialize() {
 
   if (configuration.mode == 1) {
     for (int i = 0; i < this->sampleCount; ++i) {
-      this->samples[i] = miles.allocateSample(this->driver);
+      this->samples[i] = AIL_allocate_sample_handle(this->driver);
 
       if (!this->samples[i]) {
         break;
@@ -218,7 +233,7 @@ bool CSoundMgr::Initialize() {
 
   int index = 0;
 
-  while (miles.enumerate3DProviders(&this->enumerator, &this->providers[index], &this->providerNames[index])) {
+  while (AIL_enumerate_3D_providers(&this->enumerator, &this->providers[index], &this->providerNames[index])) {
     if (std::strcmp(this->providerNames[index], configuration.providerName) == 0) {
       this->provider = this->providers[index];
       break;
@@ -231,22 +246,22 @@ bool CSoundMgr::Initialize() {
     return true;
   }
 
-  if (miles.open3DProvider(this->provider) != 0) {
+  if (AIL_open_3D_provider(this->provider) != 0) {
     return false;
   }
 
-  if (miles.speakerType(this->provider) != -1) {
-    miles.setSpeakerType(this->provider, configuration.speakerType);
+  if (AIL_3D_speaker_type(this->provider) != -1) {
+    AIL_set_3D_speaker_type(this->provider, configuration.speakerType);
   }
 
-  this->listener = miles.open3DListener(this->provider);
+  this->listener = AIL_open_3D_listener(this->provider);
 
   if (!this->listener) {
     return false;
   }
 
   for (int i = 0; i < this->sample3DCount; ++i) {
-    this->samples3D[i] = miles.allocate3DSample(this->provider);
+    this->samples3D[i] = AIL_allocate_3D_sample_handle(this->provider);
 
     if (!this->samples3D[i]) {
       break;
@@ -306,18 +321,16 @@ void CSoundMgr::Shutdown() {
     return;
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-
   if (this->provider) {
     for (void*& sample : this->samples3D) {
       if (sample) {
-        miles.release3DSample(sample);
+        AIL_release_3D_sample_handle(sample);
         sample = nullptr;
       }
     }
 
-    miles.close3DListener(this->listener);
-    miles.close3DProvider(this->provider);
+    AIL_close_3D_listener(this->listener);
+    AIL_close_3D_provider(this->provider);
     this->provider = 0;
   }
 
@@ -325,17 +338,17 @@ void CSoundMgr::Shutdown() {
 
   for (void*& sample : this->samples) {
     if (sample) {
-      miles.releaseSample(sample);
+      AIL_release_sample_handle(sample);
       sample = nullptr;
     }
   }
 
   if (this->driver) {
-    miles.closeDigitalDriver(this->driver);
+    AIL_close_digital_driver(this->driver);
     this->driver = nullptr;
   }
 
-  miles.shutdown();
+  AIL_shutdown();
 }
 
 // OFFSET: 0x00639880
@@ -377,14 +390,14 @@ unsigned __stdcall CSoundMgr::FadeThread(void* direction) {
       }
 
       CSoundMgr* sound = g_soundMgr;
-      const int volume = CSoundMgr::Volume(sound);
+      const int volume = sound->Volume();
 
       if (sound->targetVolume <= volume) {
         break;
       }
 
       const int next = sound->streamVolume + 1;
-      CSoundMgr::SetVolume(sound, next);
+      sound->SetVolume(next);
       Sleep(10);
     }
   } else {
@@ -400,7 +413,7 @@ unsigned __stdcall CSoundMgr::FadeThread(void* direction) {
       }
 
       const int next = sound->streamVolume - 1;
-      CSoundMgr::SetVolume(sound, next);
+      sound->SetVolume(next);
       Sleep(10);
     }
   }
@@ -410,8 +423,12 @@ unsigned __stdcall CSoundMgr::FadeThread(void* direction) {
 
 // OFFSET: 0x00639A60
 // FUNCTION: fn_04756
-int CSoundMgr::Volume(const CSoundMgr* sound) {
-  return sound ? sound->streamVolume : 0;
+int CSoundMgr::Volume() const {
+  if (!this) {
+    return 0;
+  }
+
+  return this->streamVolume;
 }
 
 // OFFSET: 0x00639A70
@@ -445,17 +462,16 @@ void CSoundMgr::Unused(int, int) {
 
 // OFFSET: 0x00639AF0
 // FUNCTION: fn_04760
-void CSoundMgr::Pause(CSoundMgr* sound, int paused) {
-  if (!sound || !sound->stream) {
+void CSoundMgr::Pause(int paused) {
+  if (!this || !this->stream) {
     return;
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-  miles.pauseStream(sound->stream, paused);
-  miles.streamVolume(sound->stream);
+  AIL_pause_stream(this->stream, paused);
+  AIL_stream_volume(this->stream);
 
   if (paused == 0) {
-    sound->currentName = sound->defaultName;
+    this->currentName = this->defaultName;
   }
 }
 
@@ -469,27 +485,25 @@ bool CSoundMgr::PlayData3D(const void* data, const float& x, const float& y, con
     return this->PlayData2D(data, x, y, z, 250, 40, 1.0f);
   }
 
-  MilesRuntime& miles = MilesRuntime::Get();
-
   for (int i = 0; i < this->sample3DCount; ++i) {
     if (!this->samples3D[i]) {
       continue;
     }
 
-    if (miles.sample3DStatus(this->samples3D[i]) != 2) {
+    if (AIL_3D_sample_status(this->samples3D[i]) != 2) {
       continue;
     }
 
-    if (!miles.set3DSampleFile(this->samples3D[i], data)) {
+    if (!AIL_set_3D_sample_file(this->samples3D[i], data)) {
       return false;
     }
 
-    miles.set3DSampleEffectsLevel(this->samples3D[i], this->effectsEnabled ? 1.0f : 0.0f);
-    miles.set3DPosition(this->samples3D[i], x, y, z);
-    miles.set3DOrientation(this->samples3D[i], -x, -y, -z, 0.0f, 1.0f, 0.0f);
-    miles.set3DSampleVolume(this->samples3D[i], volume);
-    miles.set3DSampleDistances(this->samples3D[i], static_cast<float>(maximumDistance), static_cast<float>(minimumDistance));
-    miles.start3DSample(this->samples3D[i]);
+    AIL_set_3D_sample_effects_level(this->samples3D[i], this->effectsEnabled ? 1.0f : 0.0f);
+    AIL_set_3D_position(this->samples3D[i], x, y, z);
+    AIL_set_3D_orientation(this->samples3D[i], -x, -y, -z, 0.0f, 1.0f, 0.0f);
+    AIL_set_3D_sample_volume(this->samples3D[i], volume);
+    AIL_set_3D_sample_distances(this->samples3D[i], static_cast<float>(maximumDistance), static_cast<float>(minimumDistance));
+    AIL_start_3D_sample(this->samples3D[i]);
 
     return true;
   }
@@ -537,21 +551,19 @@ bool CSoundMgr::PlayData2D(const void* data, const float& x, const float& y, con
   const float scaledVolume = static_cast<float>(volume) * scale;
   volume = static_cast<int>(scaledVolume);
 
-  MilesRuntime& miles = MilesRuntime::Get();
-
   for (int i = 0; i < this->sampleCount; ++i) {
     if (!this->samples[i]) {
       continue;
     }
 
-    if (miles.sampleStatus(this->samples[i]) != 2) {
+    if (AIL_sample_status(this->samples[i]) != 2) {
       continue;
     }
 
-    miles.initSample(this->samples[i]);
-    miles.setSampleFile(this->samples[i], data, 0);
-    miles.setSampleVolume(this->samples[i], volume);
-    miles.startSample(this->samples[i]);
+    AIL_init_sample(this->samples[i]);
+    AIL_set_sample_file(this->samples[i], data, 0);
+    AIL_set_sample_volume(this->samples[i], volume);
+    AIL_start_sample(this->samples[i]);
 
     return true;
   }
@@ -699,19 +711,18 @@ void CSoundMgr::SetRoom(int room) {
 
 // OFFSET: 0x0063A5A0
 // FUNCTION: fn_04769
-void CSoundMgr::SetVolume(CSoundMgr* sound, int volume) {
-  if (!sound) {
+void CSoundMgr::SetVolume(int volume) {
+  if (!this) {
     return;
   }
 
-  sound->streamVolume = volume > 127 ? 127 : (volume < 0 ? 0 : volume);
-  MilesRuntime& miles = MilesRuntime::Get();
+  this->streamVolume = volume > 127 ? 127 : (volume < 0 ? 0 : volume);
 
-  if (sound->stream) {
-    miles.setStreamVolume(sound->stream, sound->streamVolume);
+  if (this->stream) {
+    AIL_set_stream_volume(this->stream, this->streamVolume);
   }
 
-  if (sound->secondaryStream) {
-    miles.setStreamVolume(sound->secondaryStream, sound->streamVolume);
+  if (this->secondaryStream) {
+    AIL_set_stream_volume(this->secondaryStream, this->streamVolume);
   }
 }

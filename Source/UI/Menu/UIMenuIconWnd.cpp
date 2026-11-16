@@ -6,6 +6,7 @@
 
 #include "Client/Application/ApplicationWindow.h"
 #include "Client/Mode/CMode.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Replay/Replay.h"
 #include "Client/Session/Session.h"
@@ -30,6 +31,7 @@
 #include "Contents/Guild/GuildInfo.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Navigation/UINavigationV4Wnd.h"
 #pragma pack(push, 1)
 struct MenuIconBankingCheckPacket {
   /* 0000 */ std::int16_t id;

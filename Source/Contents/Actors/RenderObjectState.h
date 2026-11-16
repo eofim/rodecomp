@@ -2,6 +2,7 @@
 #define RAGNAROK_SOURCE_CONTENTS_ACTORS_RENDEROBJECTSTATE_H
 
 #include "Contents/InstantVar.h"
+#include "Render/Drawing/SpriteGeometry.h"
 #include "Utility/Math/Vector3d.h"
 
 #include <cstddef>
@@ -11,6 +12,15 @@
 class ResourceMgr;
 class CSprRes;
 class CActRes;
+
+struct ActorTintColor {
+  /* 0000 */ std::uint8_t alpha;
+  /* 0001 */ std::uint8_t red;
+  /* 0002 */ std::uint8_t green;
+  /* 0003 */ std::uint8_t blue;
+};
+
+static_assert(sizeof(ActorTintColor) == 4);
 
 struct RenderObjectState {
   RenderObjectState();
@@ -44,9 +54,18 @@ struct RenderObjectState {
   /* 0084 */ std::uint32_t overrideColor;
   /* 0088 */ std::uint32_t started;
   /* 008C */ std::uint32_t motionStartTime;
-  /* 0090 */ std::uint32_t savedTintColor;
-  /* 0094 */ std::uint32_t targetTintColor;
-  /* 0098 */ std::uint32_t color;
+  union {
+    /* 0090 */ std::uint32_t savedTintColor;
+    /* 0090 */ ActorTintColor savedTintChannels;
+  };
+  union {
+    /* 0094 */ std::uint32_t targetTintColor;
+    /* 0094 */ ActorTintColor targetTintChannels;
+  };
+  union {
+    /* 0098 */ std::uint32_t color;
+    /* 0098 */ SpriteColor colorChannels;
+  };
   /* 009C */ bool isLieOnGround;
   /* 009D */ bool isMotionFinished;
   /* 009E */ bool isMotionFreezed;
@@ -57,7 +76,10 @@ struct RenderObjectState {
   /* 00A3 */ unsigned char colorLocked;
   union {
     /* 00A4 */ std::uint16_t visibilityState;
-    /* 00A4 */ unsigned char visibilityOptions[2];
+    struct {
+      /* 00A4 */ unsigned char shadowVisible;
+      /* 00A5 */ unsigned char trackBounds;
+    };
   };
   /* 00A6 */ unsigned char padding_00A6[2];
   /* 00A8 */ std::uint32_t isCharacter;
@@ -85,11 +107,19 @@ struct RenderObjectState {
   /* 00E8 */ std::uint32_t flags;
   union {
     /* 00EC */ std::uint32_t effectPhaseState;
-    /* 00EC */ unsigned char effectPhaseBytes[4];
+    struct {
+      /* 00EC */ unsigned char flagsResetPending;
+      /* 00ED */ unsigned char blinkSkipped;
+      /* 00EE */ unsigned char wavePhase;
+      /* 00EF */ unsigned char trailPhase;
+    };
   };
   union {
     /* 00F0 */ std::uint16_t pulsePhaseState;
-    /* 00F0 */ unsigned char pulsePhases[2];
+    struct {
+      /* 00F0 */ unsigned char shrinkPhase;
+      /* 00F1 */ unsigned char growPhase;
+    };
   };
   /* 00F2 */ unsigned char outlineAlpha;
   /* 00F3 */ unsigned char padding_00F3;
@@ -107,7 +137,7 @@ struct RenderObjectState {
       /* 00FF */ unsigned char padding_00FF;
     };
   };
-  /* 0100 */ unsigned char padding_0100;
+  /* 0100 */ unsigned char sequenceReset;
   /* 0101 */ unsigned char padding_0101[3];
   /* 0104 */ CSprRes* sprite;
   /* 0108 */ CActRes* action;
@@ -123,12 +153,25 @@ struct RenderObjectState {
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(RenderObjectState) == 296);
+static_assert(offsetof(RenderObjectState, savedTintColor) == 0x80);
+static_assert(offsetof(RenderObjectState, savedTintChannels) == 0x80);
+static_assert(offsetof(RenderObjectState, targetTintColor) == 0x84);
+static_assert(offsetof(RenderObjectState, targetTintChannels) == 0x84);
+static_assert(offsetof(RenderObjectState, color) == 0x88);
+static_assert(offsetof(RenderObjectState, colorChannels) == 0x88);
 static_assert(offsetof(RenderObjectState, sequenceAnimation) == 0xA5);
 static_assert(offsetof(RenderObjectState, sequenceAnimations) == 0xA7);
 static_assert(offsetof(RenderObjectState, sequenceFrames) == 0xAC);
 static_assert(offsetof(RenderObjectState, sequenceFinishAnimation) == 0xB3);
 static_assert(offsetof(RenderObjectState, sequenceLoop) == 0xBC);
 static_assert(offsetof(RenderObjectState, sequenceDeadline) == 0xD4);
+static_assert(offsetof(RenderObjectState, shadowVisible) == 0x94);
+static_assert(offsetof(RenderObjectState, trackBounds) == 0x95);
+static_assert(offsetof(RenderObjectState, flagsResetPending) == 0xDC);
+static_assert(offsetof(RenderObjectState, trailPhase) == 0xDF);
+static_assert(offsetof(RenderObjectState, shrinkPhase) == 0xE0);
+static_assert(offsetof(RenderObjectState, growPhase) == 0xE1);
+static_assert(offsetof(RenderObjectState, sequenceReset) == 0xF0);
 #endif
 
 #endif

@@ -119,9 +119,9 @@ void UITransBalloonText::OnCreate(int, int) {
   this->m_rectangle.y = this->geometry.y;
   this->m_rectangle.width = this->geometry.width;
   this->m_rectangle.height = this->geometry.height;
-  this->m_rectangle.padding_00B0 = 0;
+  this->m_rectangle.borderStyle = 0;
   this->m_rectangle.color = 1711276032u;
-  this->m_rectangle.padding_00B8 = 0;
+  this->m_rectangle.flags = 0;
   this->m_fontMode = 0;
 }
 
@@ -139,7 +139,7 @@ void UITransBalloonText::Paint() {
   }
 
   this->ClearSurface(0xFFFF00FF);
-  DrawRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, this->m_borderColor);
+  this->DrawRoundedOutline(0, 0, this->geometry.width, this->geometry.height, this->m_borderColor);
   std::uint32_t color = this->m_textColor;
   int y = 4;
   int height = this->m_fontHeight;

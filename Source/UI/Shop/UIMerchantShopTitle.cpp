@@ -2,6 +2,7 @@
 #include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceOptions.h"
@@ -35,8 +36,8 @@ void UIMerchantShopTitle::OnCreate(int, int) {
 void UIMerchantShopTitle::Paint() {
   this->ClearSurface(0xFFFF00FF);
   const std::uint32_t color = this->ownerAid == g_session.storeSearchOwnerAid ? 0x7DFAFF : 0xFFFFFF;
-  DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height - 6, color);
-  DrawRoundedBorder(*this, 2, 2, this->geometry.width - 4, this->geometry.height - 10, 0xC3C3C3);
+  this->DrawFilledRoundedOutline(0, 0, this->geometry.width, this->geometry.height - 6, color);
+  this->DrawRoundedOutline(2, 2, this->geometry.width - 4, this->geometry.height - 10, 0xC3C3C3);
   const char* icon = this->buyingShop != 0 ? "유저인터페이스\\buyingshop.bmp" : "유저인터페이스\\shop.bmp";
   this->DrawBitmap(3, 3, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(icon))), true);
 }
@@ -48,7 +49,7 @@ void UIMerchantShopTitle::OnLBtnDown(int, int) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (this->buyingShop != 0) {
     if (g_windowMgr.merchantItemPurchaseWnd == 0) {
       mode->SendMsg(MM_REQ_CLICK_TO_BUYING_STORE, this->ownerAid, 0, 0, 0);
@@ -61,7 +62,7 @@ void UIMerchantShopTitle::OnLBtnDown(int, int) {
 // OFFSET: 0x0085E920
 // FUNCTION: fn_10832
 void UIMerchantShopTitle::OnLBtnDblClk(int, int) {
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (this->buyingShop != 0) {
     if (g_windowMgr.merchantItemPurchaseWnd == 0) {
       mode->SendMsg(MM_REQ_CLICK_TO_BUYING_STORE, this->ownerAid, 0, 0, 0);
@@ -75,9 +76,9 @@ void UIMerchantShopTitle::OnLBtnDblClk(int, int) {
 // FUNCTION: fn_10878
 void UIMerchantShopTitle::ResetCursor(int x, int y) {
   if (x >= 0 && x < this->geometry.width && y >= 0 && y <= this->geometry.height) {
-    g_modeMgr.gameMode->SetCursorAction(2);
+    g_modeMgr.currentMode->SetCursorAction(2);
   } else {
-    g_modeMgr.gameMode->SetCursorAction(0);
+    g_modeMgr.currentMode->SetCursorAction(0);
   }
 }
 
@@ -85,7 +86,7 @@ void UIMerchantShopTitle::ResetCursor(int x, int y) {
 // FUNCTION: fn_10886
 void UIMerchantShopTitle::OnRBtnDown(int, int) {
   if (g_serviceOptions.Get(TT_SHOPPING_ON_OFF)) {
-    g_modeMgr.gameMode->SendMsg(MM_RELEASE_QUEST_SH, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_RELEASE_QUEST_SH, 0, 0, 0, 0);
     g_session.ClearItems1760And1748();
   }
 }

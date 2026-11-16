@@ -26,6 +26,8 @@
 #include <cstdlib>
 #include <shellapi.h>
 
+template __declspec(noinline) std::string::~basic_string() noexcept;
+
 // INLINED
 __forceinline void UITextViewer::Activate(UITextButton* button, int id) {
   switch (id) {
@@ -131,7 +133,7 @@ __forceinline void UITextViewer::Activate(UITextButton* button, int id) {
   case LINE_SEGMENT_QUEST:
     if (button) {
       const int value = std::atoi(button->GetLine(0).c_str());
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ReceiveServiceRequest(6, value);
+      g_modeMgr.GetGameMode()->ReceiveServiceRequest(6, value);
     }
 
     break;
@@ -166,11 +168,10 @@ __forceinline void UITextViewer::AppendText(char* text, int width, int carriageR
     display = RemoveTextLinkInfo(display);
 
     if (g_windowMgr.chatWnd) {
-      display = static_cast<UINewChatWnd*>(g_windowMgr.chatWnd)->ConvertChat(display);
+      display = g_windowMgr.chatWnd->ConvertChat(display);
     }
 
-    std::string navigation;
-    DisplayNavigationLink(navigation, display);
+    std::string navigation = g_navigationLinkParser->DisplayNavigationLink(display);
     display = DisplayQuestTextTag(navigation);
 
     if (pixels) {
@@ -252,11 +253,10 @@ int UITextViewer::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       display = RemoveTextLinkInfo(display);
 
       if (g_windowMgr.chatWnd) {
-        display = static_cast<UINewChatWnd*>(g_windowMgr.chatWnd)->ConvertChat(display);
+        display = g_windowMgr.chatWnd->ConvertChat(display);
       }
 
-      std::string navigation;
-      DisplayNavigationLink(navigation, display);
+      std::string navigation = g_navigationLinkParser->DisplayNavigationLink(display);
       display = DisplayQuestTextTag(navigation);
 
       if (pixels) {
@@ -387,7 +387,7 @@ int UITextViewer::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       break;
     case LINE_SEGMENT_QUEST:
       if (button) {
-        static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ReceiveServiceRequest(6, std::atoi(button->GetLine(0).c_str()));
+        g_modeMgr.GetGameMode()->ReceiveServiceRequest(6, std::atoi(button->GetLine(0).c_str()));
       }
       break;
     default:

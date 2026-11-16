@@ -276,12 +276,12 @@ void UIGradeEnchantWnd::Paint() {
     int capacity = sizeof(description);
 
     int y = 118;
-    for (const GradeEnchantMaterial& material : this->materials) {
+    for (auto material = this->materials.begin(); material != this->materials.end(); ++material) {
       ITEM_INFO itemInfo;
-      itemInfo.SetItemId(material.itemId);
+      itemInfo.SetItemId(material->itemId);
       itemInfo.GetIdDisplayName(description, capacity, 0);
-      DrawItemIcon(*this, ResourceMgr::Instance(), 170, y - 9, itemInfo, 0);
-      std::string text = FormatOwnedString(LookupMessage(MSI_NO_ITEM_FOR_EXCHANGE), description, material.amount);
+      this->DrawItemIcon(170, y - 9, itemInfo, 0);
+      std::string text = FormatOwnedString(LookupMessage(MSI_NO_ITEM_FOR_EXCHANGE), description, material->amount);
       this->DrawAlignedText(203, y, text, 180, 0, 0, 0, 0, 11, 0, 0);
       y += 40;
     }
@@ -290,7 +290,7 @@ void UIGradeEnchantWnd::Paint() {
       ITEM_INFO itemInfo;
       itemInfo.SetItemId(this->info.blessingItemId);
       itemInfo.GetIdDisplayName(description, capacity, 0);
-      DrawItemIcon(*this, ResourceMgr::Instance(), 195, 228, itemInfo, 0);
+      this->DrawItemIcon(195, 228, itemInfo, 0);
       std::string text = FormatOwnedString(LookupMessage(MSI_NO_ITEM_FOR_EXCHANGE), description, this->blessingAmount);
       this->DrawAlignedText(228, 237, text, 160, 0, 0xFFFFFF, 0, 0, 11, 1, 1);
     }
@@ -298,15 +298,17 @@ void UIGradeEnchantWnd::Paint() {
     this->UpdateEnchantMessages();
 
     const int count = static_cast<int>(this->messageIds.size());
-    for (int i = 0; i < 3; ++i) {
-      if (i < count) {
-        const int itemY = 46 + i * 16;
-        this->DrawBitmap(152, itemY, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\caution.bmp").c_str()))), true);
-        const int msgId = this->messageIds[i];
-        if (msgId == 3711 || msgId == 3822) {
-          this->DrawAlignedText(166, itemY, LookupMessage(msgId), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
-        } else {
-          this->DrawAlignedText(166, itemY, LookupMessage(msgId), 228, 0, 0x00A0ADC, 0, 0, 11, 1, 0);
+    if (count > 0) {
+      for (int i = 0; i < 3; ++i) {
+        if (i < count) {
+          const int itemY = 46 + i * 16;
+          this->DrawBitmap(152, itemY, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\caution.bmp").c_str()))), true);
+          const int msgId = this->messageIds[i];
+          if (msgId == 3711 || msgId == 3822) {
+            this->DrawAlignedText(166, itemY, LookupMessage(msgId), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
+          } else {
+            this->DrawAlignedText(166, itemY, LookupMessage(msgId), 228, 0, 0x00A0ADC, 0, 0, 11, 1, 0);
+          }
         }
       }
     }
@@ -322,15 +324,19 @@ void UIGradeEnchantWnd::Paint() {
   }
 
   if (this->item.identity[1] > 0) {
-    DrawItemIcon(*this, ResourceMgr::Instance(), 64, 125, this->item, 0);
+    this->DrawItemIcon(64, 125, this->item, 0);
     if (this->item.grade > 0) {
       this->DrawBitmap(64, 137, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", this->item.grade).c_str()))), true);
     }
   }
 
-  if (this->state == 1 || this->state == 2) {
+  switch (this->state) {
+  case 1:
+  case 2: {
     std::string rate = FormatOwnedString("%d%%", this->SuccessRate());
     this->DrawAlignedText(39, 88, rate, 74, 6, 0xFFFFFF, 0, 29, 28, 1, 1);
+    break;
+  }
   }
 }
 
@@ -369,7 +375,7 @@ void UIGradeEnchantWnd::OnLBtnDown(int x, int y) {
   }
 
   if (this->state == 1 && this->item.identity[1] > 0 && x >= 64 && x <= 110 && y >= 125 && y <= 171) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(33, this->item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(33, this->item, 1, -1);
   }
 }
 
@@ -412,7 +418,7 @@ void UIGradeEnchant_BtnEnhancedUp::OnMouseHover(int x, int y) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode == nullptr) {
     return;
   }
@@ -594,7 +600,7 @@ int UIGradeEnchantWnd::SendMsg(
         return -1;
       }
 
-      if (dropped.identity[1] != 0 && dropped.identified == 1) {
+      if (dropped.identity[1] > 0 && dropped.identified == 1) {
         GradeEnchantSelectPacket packet;
         packet.id = ID_CZ_GRADE_ENCHANT_SELECT_EQUIPMENT;
         packet.index = static_cast<std::uint16_t>(argument1);

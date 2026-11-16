@@ -1,6 +1,26 @@
 #include "Contents/Actors/ActorNameCard.h"
 
+#include <cstddef>
 #include <cstring>
+
+#pragma pack(push, 1)
+struct ActorNameCacheHeader {
+  /* 0000 */ std::size_t count;
+};
+
+struct ActorNameCardRecord {
+  /* 0000 */ std::uint32_t id;
+  /* 0004 */ int nameLength;
+};
+
+struct ActorNameStringRecord {
+  /* 0000 */ int length;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(ActorNameCacheHeader) == 4);
+static_assert(sizeof(ActorNameCardRecord) == 8);
+static_assert(sizeof(ActorNameStringRecord) == 4);
 
 template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const std::uint32_t, CActorNameCard>>>, std::_Iterator_base0>&
 std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const std::uint32_t, CActorNameCard>>>, std::_Iterator_base0>::operator++() noexcept;
@@ -14,7 +34,7 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
 
   std::vector<char> buffer(0x400);
   std::size_t offset = 4;
-  *reinterpret_cast<std::size_t*>(&buffer[0]) = this->cards.size();
+  reinterpret_cast<ActorNameCacheHeader*>(buffer.data())->count = this->cards.size();
 
   for (auto it = this->cards.begin(); it != this->cards.end(); ++it) {
     const CActorNameCard& card = it->second;
@@ -23,10 +43,10 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
       buffer.resize(needed + 1, 0);
     }
 
-    *reinterpret_cast<std::uint32_t*>(&buffer[offset]) = it->first;
+    reinterpret_cast<ActorNameCardRecord*>(&buffer[offset])->id = it->first;
 
     int length = static_cast<int>(card.name.size());
-    *reinterpret_cast<int*>(&buffer[offset + 4]) = length;
+    reinterpret_cast<ActorNameCardRecord*>(&buffer[offset])->nameLength = length;
     offset += 8;
     if (length > 0) {
       std::memcpy(&buffer[offset], card.name.c_str(), length);
@@ -34,7 +54,7 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
     }
 
     length = static_cast<int>(card.partyName.size());
-    *reinterpret_cast<int*>(&buffer[offset]) = length;
+    reinterpret_cast<ActorNameStringRecord*>(&buffer[offset])->length = length;
     offset += 4;
     if (length > 0) {
       std::memcpy(&buffer[offset], card.partyName.c_str(), length);
@@ -42,7 +62,7 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
     }
 
     length = static_cast<int>(card.guildName.size());
-    *reinterpret_cast<int*>(&buffer[offset]) = length;
+    reinterpret_cast<ActorNameStringRecord*>(&buffer[offset])->length = length;
     offset += 4;
     if (length > 0) {
       std::memcpy(&buffer[offset], card.guildName.c_str(), length);
@@ -50,7 +70,7 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
     }
 
     length = static_cast<int>(card.clanName.size());
-    *reinterpret_cast<int*>(&buffer[offset]) = length;
+    reinterpret_cast<ActorNameStringRecord*>(&buffer[offset])->length = length;
     offset += 4;
     if (length > 0) {
       std::memcpy(&buffer[offset], card.clanName.c_str(), length);
@@ -64,47 +84,47 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
 
 // OFFSET: 0x005C05B0
 // FUNCTION: fn_03506
-std::size_t CActorNameCardHolder::Load(const std::vector<char>& input) {
+std::size_t CActorNameCardHolder::Load(const std::vector<unsigned char>& input) {
   if (input.empty()) {
     return 0;
   }
 
   this->cards.clear();
+  std::size_t offset = 4;
   int count;
   std::memcpy(&count, input.data(), sizeof(count));
   std::string text;
-  std::size_t offset = 4;
   for (int index = 0; index < count; ++index) {
-    std::uint32_t id;
-    std::memcpy(&id, input.data() + offset, sizeof(id));
+    int id;
+    std::memcpy(&id, input.data() + offset + offsetof(ActorNameCardRecord, id), sizeof(id));
     this->cards[id].Reset();
 
     int length;
-    std::memcpy(&length, input.data() + offset + 4, sizeof(length));
-    offset += 8;
+    std::memcpy(&length, input.data() + offset + offsetof(ActorNameCardRecord, nameLength), sizeof(length));
+    offset += sizeof(ActorNameCardRecord);
     if (length > 0) {
-      this->cards[id].name.assign(&input[offset], length);
+      this->cards[id].name.assign(reinterpret_cast<const char*>(&input[offset]), length);
       offset += length;
     }
 
     std::memcpy(&length, input.data() + offset, sizeof(length));
     offset += 4;
     if (length > 0) {
-      this->cards[id].partyName.assign(&input[offset], length);
+      this->cards[id].partyName.assign(reinterpret_cast<const char*>(&input[offset]), length);
       offset += length;
     }
 
     std::memcpy(&length, input.data() + offset, sizeof(length));
     offset += 4;
     if (length > 0) {
-      this->cards[id].guildName.assign(&input[offset], length);
+      this->cards[id].guildName.assign(reinterpret_cast<const char*>(&input[offset]), length);
       offset += length;
     }
 
     std::memcpy(&length, input.data() + offset, sizeof(length));
     offset += 4;
     if (length > 0) {
-      this->cards[id].clanName.assign(&input[offset], length);
+      this->cards[id].clanName.assign(reinterpret_cast<const char*>(&input[offset]), length);
       offset += length;
     }
   }

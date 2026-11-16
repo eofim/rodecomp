@@ -4,6 +4,7 @@
 #include "UI/Window/UIEnums.h"
 
 #include "Client/Mode/ModeDragState.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Replay/Replay.h"
 #include "Client/Session/Session.h"
@@ -19,6 +20,7 @@
 #include "UI/Window/WindowManagerWindows.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Items/UIItemWnd.h"
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -69,7 +71,7 @@ void UIMakeTargetProcessWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     }
   }
 
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x009A0690
@@ -131,9 +133,9 @@ void UIMakeTargetProcessWnd::Paint() {
     const ITEM_INFO* material = this->materials;
     for (int x = 8; x < 104; x += 32, ++material) {
       auto* bar = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\btnbar_right2.bmp")));
-      DrawItemSlotBackground(*this, x - 4, this->geometry.height - bar->image.height - 32);
+      this->DrawItemSlotFrame(x - 4, this->geometry.height - bar->image.height - 32);
       if (material->identity[1] > 0) {
-        DrawItemIcon(*this, ResourceMgr::Instance(), x, this->geometry.height - bar->image.height - 28, *material, 0);
+        this->DrawItemIcon(x, this->geometry.height - bar->image.height - 28, *material, 0);
       }
     }
     break;
@@ -161,7 +163,7 @@ void UIMakeTargetProcessWnd::Paint() {
 void UIMakeTargetProcessWnd::OnLBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
   if (item.identity[1] > 0) {
-    g_modeMgr.gameMode->SendMsg(MM_BEGIN_DRAG_FROM_METALPROCESSWND, reinterpret_cast<int>(item.itemId.c_str()), 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_BEGIN_DRAG_FROM_METALPROCESSWND, reinterpret_cast<int>(item.itemId.c_str()), 0, 0, 0);
   } else {
     this->UIFrameWnd::OnLBtnDown(x, y);
   }

@@ -82,8 +82,8 @@ void CUIMacroReport::OnInit() {
   this->Move((g_renderer->viewport.width - this->geometry.width) / 2, (g_renderer->viewport.height - this->geometry.height) / 2);
 
   if (g_modeMgr.GetGameMode()) {
-    this->targetId = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->menuTargetAid;
-    this->targetName = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->menuTargetName;
+    this->targetId = g_modeMgr.GetGameMode()->menuTargetAid;
+    this->targetName = g_modeMgr.GetGameMode()->menuTargetName;
   }
 }
 
@@ -117,7 +117,7 @@ CUIFrameWnd* CreateMacroReport() {
 
 // OFFSET: 0x004955B0
 // FUNCTION: fn_45550
-static bool s_registered = [] {
+static bool registered = [] {
   std::function<CUIFrameWnd*()> factory = CreateMacroReport;
   Singleton<CUIRegisterMgr>::GetInstance()->Register(10005, factory);
   return true;
@@ -171,7 +171,7 @@ void CUIMacroReport::OnCreate(int width, int height) {
   CUIImageButton* menuButton = new CUIImageButton();
   menuButton->SetSize(11, 11);
   menuButton->Move(3, 3);
-  menuButton->SetOnClick([this]() { this->OnButtonClick(); });
+  menuButton->onClick = [this]() { this->OnButtonClick(); };
   menuButton->disabled = 0;
   menuButton->Invalidate();
   {

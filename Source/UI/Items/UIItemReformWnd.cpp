@@ -203,7 +203,7 @@ void UIItemReformWnd_Item::Paint() {
   this->ClearSurface(0xFFFF00FF);
   if (this->item) {
     ResourceMgr& resources = ResourceMgr::Instance();
-    this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(resources.Load(Resolve(FormatOwnedString("유저인터페이스\\item\\%s.bmp", ItemResourcePath(*this->item)).c_str()))), true);
+    this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(resources.Load(Resolve(FormatOwnedString("유저인터페이스\\item\\%s.bmp", this->item->ResourcePath()).c_str()))), true);
   }
 }
 
@@ -220,9 +220,9 @@ void UIItemReformWnd_List::Paint() {
       } else {
         image = index == this->hoverIndex ? "유저인터페이스\\ItemReform\\btn_reform_item_over.bmp" : "유저인터페이스\\ItemReform\\btn_reform_item.bmp";
       }
-      this->DrawBitmap(0, this->itemHeight * row, &static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(image)))->image, true);
+      this->DrawBitmap(0, this->itemHeight * row, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(image))), true);
       const ITEM_INFO& item = this->items[this->scrollPosition + row];
-      DrawItemIcon(*this, ResourceMgr::Instance(), 15, this->itemHeight * row + 4, item, 1);
+      this->DrawItemIcon(15, this->itemHeight * row + 4, item, 1);
       this->DrawTextAt(42, this->itemHeight * row + 10, this->FitDisplayText(160, item.DisplayName(0).c_str(), 0, 12, 0).c_str(), 0, 0,
         12, 0, 0, 0
       );
@@ -261,7 +261,7 @@ void UIItemReformWnd_Item::OnMouseHover(int x, int y) {
     this->ToScreen(screenX, screenY);
     const int tipX = screenX + 5;
     const int tipY = screenY - 5;
-    CMode* mode = g_modeMgr.gameMode;
+    CMode* mode = g_modeMgr.currentMode;
     mode->ShowTooltip(this->item->DisplayName(0).c_str(), tipX, tipY, 0xFFFFFFFFu, 0, 1);
   }
 }
@@ -384,7 +384,7 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
     memcpy_s(this->resultItem.options, sizeof(this->resultItem.options), this->selectedItem->options, this->selectedItem->optionCount * 5);
   } else if (info->randomOptionCode != "G0") {
     this->resultItem.optionCount = 1;
-    *reinterpret_cast<short*>(this->resultItem.options) = g_itemOptionPlaceholderId;
+    this->resultItem.options[0].id = g_itemOptionPlaceholderId;
   }
   if (info->preserveSocketItem == 1) {
     std::memcpy(this->resultItem.cards, this->selectedItem->cards, sizeof(this->resultItem.cards));
@@ -543,7 +543,7 @@ int UIItemReformWnd_List::SendMsg(
         }
         bool emptySocket = true;
         if (info->isEmptySocket == 1) {
-          for (unsigned int slot = std::min(ItemSlotsCount(item), 4); slot < 4; ++slot) {
+          for (unsigned int slot = std::min(item.SlotCount(), 4); slot < 4; ++slot) {
             if (static_cast<int>(slot) < 4 && static_cast<int>(item.cards[slot]) > 0) {
               emptySocket = false;
               break;

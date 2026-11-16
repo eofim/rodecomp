@@ -56,7 +56,7 @@ void CNavigationManager::DrawRoute(const float* matrix) {
 
   int playerX = 0;
   int playerY = 0;
-  if (CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) {
+  if (CGameMode* mode = g_modeMgr.GetGameMode()) {
     mode->PlayerCell(&playerX, &playerY);
   }
 
@@ -86,7 +86,7 @@ void CNavigationManager::DrawRoute(const float* matrix) {
       }
     }
 
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     if (mode && mode->scene && mode->scene->ground) {
       GroundGeometry* ground = mode->scene->ground;
       ground->DrawTerrainOverlay(
@@ -312,7 +312,7 @@ std::string CNavigationManager::RouteText() {
     }
   }
 
-  this->routeText.assign(buffer, std::strlen(buffer));
+  this->routeText = buffer;
   return this->routeText;
 }
 
@@ -541,7 +541,7 @@ std::string CNavigationManager::DestinationTitle() {
   if (this->viewMode == 2) {
     NaviCell cell;
     this->data.GetCell(&cell);
-    CNaviInfo* info = this->data.info;
+    CNaviInfo* info = this->data.GetInfo();
     if (info != nullptr) {
       this->destinationTitle.assign(info->GetTitle());
     }
@@ -662,7 +662,7 @@ bool CNavigationManager::StartNavigation(std::string name, int type, unsigned ch
   }
   if (!this->hideWindow) {
     if (g_windowMgr.navigationWnd) {
-      static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->RefreshLayout();
+      g_windowMgr.navigationWnd->RefreshLayout();
     } else {
       g_windowMgr.EnsureWindow(WID_NAVIGATIONV4WND);
     }
@@ -750,7 +750,21 @@ struct ReplayTaggedRecordHeader {
   /* 0000 */ std::uint16_t id;
   /* 0002 */ std::uint32_t bytes;
 };
+
+struct NaviStateListRecord {
+  /* 0000 */ int count;
+};
+
+struct NaviStateDataRecord {
+  /* 0000 */ char mapName[20];
+  /* 0014 */ int x;
+  /* 0018 */ int y;
+  /* 001C */ int nameLength;
+};
 #pragma pack(pop)
+
+static_assert(sizeof(NaviStateListRecord) == 4);
+static_assert(sizeof(NaviStateDataRecord) == 0x20);
 
 // INLINED
 __forceinline std::vector<unsigned char> MakeReplayTaggedRecord(std::uint16_t id, const void* data, std::uint32_t bytes) {
@@ -782,25 +796,25 @@ __forceinline std::vector<char> WriteLink(CNavi_Link* link) {
 
     reinterpret_cast<NaviObjectRecord*>(buffer.data())->type = type;
     reinterpret_cast<NaviObjectRecord*>(buffer.data())->index = index;
-    std::memcpy(buffer.data() + 8, &cell, sizeof(cell));
+    std::memcpy(&reinterpret_cast<NaviObjectRecord*>(buffer.data())->cellX, &cell, sizeof(cell));
 
     std::int16_t length = static_cast<std::int16_t>(name.size());
     reinterpret_cast<NaviObjectRecord*>(buffer.data())->nameLength = length;
     std::memcpy(buffer.data() + 0x12, name.c_str(), length);
     std::size_t offset = length + 0x12;
     length = static_cast<std::int16_t>(title.size());
-    *reinterpret_cast<std::int16_t*>(buffer.data() + offset) = length;
+    reinterpret_cast<NaviStringRecord*>(buffer.data() + offset)->length = length;
     offset += 2;
     std::memcpy(buffer.data() + offset, title.c_str(), length);
     offset += length;
     length = static_cast<std::int16_t>(map.size());
-    *reinterpret_cast<std::int16_t*>(buffer.data() + offset) = length;
+    reinterpret_cast<NaviStringRecord*>(buffer.data() + offset)->length = length;
     offset += 2;
     std::memcpy(buffer.data() + offset, map.c_str(), length);
     offset += length;
-    std::memcpy(buffer.data() + offset, &linkedCell, sizeof(linkedCell));
+    std::memcpy(&reinterpret_cast<NaviLinkedMapRecord*>(buffer.data() + offset)->cellX, &linkedCell, sizeof(linkedCell));
     length = static_cast<std::int16_t>(linkedMap.size());
-    *reinterpret_cast<std::int16_t*>(buffer.data() + offset + 8) = length;
+    reinterpret_cast<NaviLinkedMapRecord*>(buffer.data() + offset)->nameLength = length;
     offset += 10;
     std::memcpy(buffer.data() + offset, linkedMap.c_str(), length);
   }
@@ -903,20 +917,20 @@ std::vector<unsigned char> CNavigationManager::WriteStates() {
 
   buffer.resize(4, 0);
   std::size_t offset = 4;
-  *reinterpret_cast<int*>(buffer.data()) = static_cast<int>(this->states.size());
+  reinterpret_cast<NaviStateListRecord*>(buffer.data())->count = static_cast<int>(this->states.size());
   for (auto it = this->states.begin(); it != this->states.end(); ++it) {
     CNaviInfo* info = static_cast<CNaviInfo*>(it->object);
     if (info == nullptr) {
       continue;
     }
     buffer.resize(it->name.size() + 0x24 + offset, 0);
-    *reinterpret_cast<int*>(buffer.data() + offset) = it->type;
+    reinterpret_cast<NaviTargetRecord*>(buffer.data() + offset)->type = it->type;
     offset += 4;
-    std::memcpy(buffer.data() + offset, info->GetName(), info->GetNameLength());
-    *reinterpret_cast<int*>(buffer.data() + offset + 0x14) = it->x;
-    *reinterpret_cast<int*>(buffer.data() + offset + 0x18) = it->y;
+    std::memcpy(reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->mapName, info->GetName(), info->GetNameLength());
+    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->x = it->x;
+    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->y = it->y;
     const int length = static_cast<int>(it->name.size());
-    *reinterpret_cast<int*>(buffer.data() + offset + 0x1C) = length;
+    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->nameLength = length;
     offset += 0x20;
     if (length > 0) {
       std::memcpy(buffer.data() + offset, it->name.c_str(), length);
@@ -1168,7 +1182,7 @@ CNavi_Object* CNaviData::FindMobByTitle(std::string title) {
 // FUNCTION: fn_19621
 void CNavigationManager::RefreshSearch() {
   if (this->data.Search(this->searchText, this->searchType, this->states) && g_windowMgr.navigationWnd) {
-    static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->FillRouteGroups();
+    g_windowMgr.navigationWnd->FillRouteGroups();
   }
 }
 
@@ -1308,8 +1322,8 @@ bool CNavigationManager::SetDestinationMap(std::string mapName, int x, int y) {
     UIWindow* window = g_windowMgr.navigationWnd;
     window->geometry.targetAlpha = 255;
     window->geometry.alphaStart = timeGetTime();
-    static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->RefreshLayout();
-    static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->LayoutWithDetails();
+    g_windowMgr.navigationWnd->RefreshLayout();
+    g_windowMgr.navigationWnd->LayoutWithDetails();
     g_windowMgr.navigationWnd->Invalidate();
   }
 
@@ -1657,7 +1671,7 @@ void CNavigationManager::CancelRoute() {
   if (!this->hideWindow) {
     this->viewMode = 1;
     if (g_windowMgr.navigationWnd != nullptr) {
-      static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->RefreshLayout();
+      g_windowMgr.navigationWnd->RefreshLayout();
     }
   }
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_NAVIGATION_RS_POSTMAP_SUCCESS)), 0x62B0FF, 0, 0, 0);
@@ -1691,7 +1705,7 @@ __declspec(noinline) int CNavigationManager::Navigate(int cellX, int cellY) {
     }
 
     if (sameMap) {
-      if (CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) {
+      if (CGameMode* mode = g_modeMgr.GetGameMode()) {
         int playerX;
         int playerY;
         mode->PlayerCell(&playerX, &playerY);
@@ -1870,7 +1884,7 @@ int CNavigationManager::LoadReplayState(const std::vector<unsigned char>& data) 
           }
         }
 
-        CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+        CGameMode* mode = g_modeMgr.GetGameMode();
         if (mode) {
           CWorld* scene = mode->scene;
           if (scene) {

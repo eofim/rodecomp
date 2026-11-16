@@ -1,3 +1,4 @@
+#include <new>
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/CGameMode.h"
@@ -26,6 +27,9 @@
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
+#include "UI/Items/UIIllustWnd.h"
+#include "UI/Navigation/UIMiniMapWnd.h"
+#include "UI/Navigation/UIMinimapZoomWnd.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -58,6 +62,25 @@ __forceinline const char* TimeFontSpriteName() {
 
 // GLOBAL: gl_25107
 CFile g_whisperFile;
+
+namespace {
+struct PrimitivePoolAccess : RenderPrimitivePool {
+  // INLINED
+  inline RenderPrimitive* AcquireLocal() {
+    if (this->m_current == this->m_commands.end()) {
+      this->m_commands.emplace_back();
+      this->m_current = this->m_commands.end();
+      return &this->m_commands.back();
+    }
+
+    RenderPrimitive* command = &*this->m_current;
+    ++this->m_current;
+    new (command) RenderPrimitive;
+
+    return command;
+  }
+};
+}
 
 // OFFSET: 0x00CCFCE0
 // FUNCTION: fn_21246
@@ -295,7 +318,7 @@ void CGameMode::DrawMiniMap() {
 // OFFSET: 0x00CD1450
 // FUNCTION: fn_21256
 void CGameMode::DrawMiniMapTriangle(float x, float y, float size, std::uint32_t color) {
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = static_cast<PrimitivePoolAccess&>(g_renderer->primitives).AcquireLocal();
   primitive->texture = g_texMgr.Default();
   RenderVertex* vertices = primitive->vertices;
   const float bottomZ = RhwToDepth(0.0999f);
@@ -352,23 +375,26 @@ void CGameMode::DrawMiniMapMarker(
   const int height = this->scene->terrain->height;
   const int longest = width >= height ? width : height;
   const double originX = static_cast<double>(g_renderer->viewport.width - 144) + 64.0;
-  const float mapWidth = static_cast<float>(width) * 128.0f / static_cast<float>(longest);
-  const float mapHeight = static_cast<float>(height) * 128.0f / static_cast<float>(longest);
-  if (static_cast<float>(x) < 0.0f || static_cast<float>(y) < 0.0f) {
+  const double mapWidth = static_cast<float>(width) * 128.0f / static_cast<float>(longest);
+  const double mapHeight = static_cast<float>(height) * 128.0f / static_cast<float>(longest);
+  const float markerX = static_cast<float>(x);
+  const float markerY = static_cast<float>(y);
+  if (markerX < 0.0f || markerY < 0.0f) {
     return;
   }
 
+  const float marginX = (128.0f - static_cast<float>(mapWidth)) * 0.5f;
   const float viewWidth = view.right - view.left;
+  const float viewLeft = view.left * 128.0f / viewWidth;
+  const float marginY = (128.0f - static_cast<float>(mapHeight)) * 0.5f;
+  const double offsetX = (static_cast<double>(static_cast<float>(x) * static_cast<float>(mapWidth) / static_cast<float>(width)) + marginX) / viewWidth;
   const float viewHeight = view.bottom - view.top;
+  const float viewTop = view.top * 128.0f / viewHeight;
+  const double offsetY =
+    (mapHeight - static_cast<double>(static_cast<float>(y) * static_cast<float>(mapHeight) / static_cast<float>(height)) + marginY) / viewHeight;
   const double left = originX - 64.0;
-  const double offsetY = (static_cast<double>(mapHeight) - static_cast<double>(static_cast<float>(y) * mapHeight / static_cast<float>(height)) +
-                          static_cast<double>((128.0f - mapHeight) * 0.5f)) /
-                         static_cast<double>(viewHeight);
-  double drawX = (left - static_cast<double>(view.left * 128.0f / viewWidth)) +
-                 (static_cast<double>(static_cast<float>(x) * mapWidth / static_cast<float>(width)) +
-                  static_cast<double>((128.0f - mapWidth) * 0.5f)) /
-                   static_cast<double>(viewWidth);
-  double drawY = (16.0 - static_cast<double>(view.top * 128.0f / viewHeight)) + offsetY;
+  double drawX = (left - viewLeft) + offsetX;
+  double drawY = (16.0 - viewTop) + offsetY;
 
   if (clamp) {
     int direction = 0;
@@ -405,12 +431,13 @@ void CGameMode::DrawMiniMapMarker(
   rect.top = static_cast<int>(drawY - size);
   rect.right = static_cast<int>(size + drawX);
   rect.bottom = static_cast<int>(size + drawY);
-  const TextureRegion region = {0.0f, 0.0f, 1.0f, 1.0f};
 
   if (kind == 0) {
-    this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, g_texMgr.Load(texture.c_str(), 0, false, true, false), region);
+    CTexture* marker = g_texMgr.Load(texture.c_str(), 0, false, true, false);
+    this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, marker, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
   } else if (kind == 5) {
-    this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, g_texMgr.Load(texture.c_str(), 0, false, true, false), region);
+    CTexture* marker = g_texMgr.Load(texture.c_str(), 0, false, true, false);
+    this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, marker, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
     if (g_windowMgr.miniMapWnd && (s_lastMarkerX != x || s_lastMarkerY != y)) {
       s_lastMarkerX = x;
       s_lastMarkerY = y;
@@ -425,8 +452,10 @@ void CGameMode::DrawMiniMapMarker(
     border.top = rect.top - 1;
     border.right = rect.right + 1;
     border.bottom = rect.bottom + 1;
-    this->DrawTexture(border, 0, 0.0999f, 0x99FFFFFF, g_texMgr.Default(), region);
-    this->DrawTexture(rect, 0, 0.0999f, color, g_texMgr.Default(), region);
+    CTexture* white = g_texMgr.Default();
+    this->DrawTexture(border, 0, 0.0999f, 0x99FFFFFF, white, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
+    white = g_texMgr.Default();
+    this->DrawTexture(rect, 0, 0.0999f, color, white, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
     if (g_windowMgr.miniMapWnd) {
       g_windowMgr.miniMapWnd->SendMsg(nullptr, UM_MINIMAP_SET_MARK_POS, x, y, 0, 0);
     }
@@ -442,17 +471,21 @@ void CGameMode::DrawMiniMapMarker(
     vertical.top = static_cast<int>(drawY - arm);
     vertical.right = rect.right;
     vertical.bottom = static_cast<int>(arm + drawY);
-    this->DrawTexture(horizontal, 0, 0.0999f, color, g_texMgr.Default(), region);
-    this->DrawTexture(vertical, 0, 0.0999f, color, g_texMgr.Default(), region);
+    CTexture* white = g_texMgr.Default();
+    this->DrawTexture(horizontal, 0, 0.0999f, color, white, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
+    white = g_texMgr.Default();
+    this->DrawTexture(vertical, 0, 0.0999f, color, white, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
   } else if (kind == 4) {
+    const int angle = static_cast<int>(180.0f - this->scene->player->render.angle);
     RECT shadow;
     shadow.left = rect.left - 2;
     shadow.top = rect.top - 2;
     shadow.right = rect.right + 2;
     shadow.bottom = rect.bottom + 4;
-    const int angle = static_cast<int>(180.0f - this->scene->player->render.angle);
-    this->DrawTexture(shadow, angle, 0.0999f, 0x77333333, g_texMgr.Load(texture.c_str(), 0, false, true, false), region);
-    this->DrawTexture(rect, angle, 0.0999f, color, g_texMgr.Load(texture.c_str(), 0, false, true, false), region);
+    CTexture* marker = g_texMgr.Load(texture.c_str(), 0, false, true, false);
+    this->DrawTexture(shadow, angle, 0.0999f, 0x77333333, marker, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
+    marker = g_texMgr.Load(texture.c_str(), 0, false, true, false);
+    this->DrawTexture(rect, angle, 0.0999f, color, marker, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
     if (s_lastPlayerX != x || s_lastPlayerY != y) {
       s_lastPlayerX = x;
       s_lastPlayerY = y;
@@ -468,7 +501,8 @@ void CGameMode::DrawMiniMapMarker(
       g_windowMgr.LookupWindow(WID_MINIMAPZOOMWND)->SendMsg(nullptr, UM_COMMAND, 0x1C5, color, rect.left, rect.top);
     } else {
       g_windowMgr.LookupWindow(WID_MINIMAPZOOMWND)->SendMsg(nullptr, UM_COMMAND, 0x1C7, color, rect.left, rect.top);
-      this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, g_texMgr.Load(texture.c_str(), 0, false, true, false), region);
+      CTexture* marker = g_texMgr.Load(texture.c_str(), 0, false, true, false);
+      this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, marker, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
     }
   }
 }
@@ -555,7 +589,7 @@ int g_minimapCoordinateDigitValues[4];
 // OFFSET: 0x00CD2A10
 // FUNCTION: fn_21261
 void CGameMode::DrawMiniMapNumber() {
-  if (this->skillUseType == nullptr || this->skillUseLevel == 0) {
+  if (this->skillUseType == 0 || this->skillUseLevel == 0) {
     return;
   }
 

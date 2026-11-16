@@ -80,6 +80,14 @@
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
+#include "Contents/Messenger/MessengerWindows.h"
+#include "UI/Items/UIEquipWnd.h"
+#include "UI/Items/UIItemStoreWnd.h"
+#include "UI/Shop/UIMerchantItemWnd.h"
+#include "UI/Shop/UIMerchantMirrorItemWnd.h"
+#include "UI/Skill/UINewSkillListWnd.h"
+#include "UI/Status/UIHomunInfoWnd.h"
+#include "UI/Status/UIMerInfoWnd.h"
 
 template __declspec(noinline) void std::vector<SearchStoreResult>::_Destroy(SearchStoreResult*, SearchStoreResult*);
 
@@ -110,7 +118,7 @@ namespace EquipmentProperties {
 class CEquipmentPropertiesMgr {
 public:
   static CEquipmentPropertiesMgr* GetInstance();
-  void RefreshWearable(const int& key);
+  void RefreshWearable(const std::uint32_t& key);
 };
 }
 
@@ -672,7 +680,7 @@ int CSession::IsFriendName(const char* name) const {
 // OFFSET: 0x00E1DFB0
 // FUNCTION: fn_23889
 int CSession::GetSiegeMode() const {
-  return static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->isSiegeMode;
+  return g_modeMgr.GetGameMode()->scene->isSiegeMode;
 }
 
 // OFFSET: 0x00DDB4D0
@@ -1800,7 +1808,7 @@ void CSession::RemovePartyMemberByName(const char* name) {
       continue;
     }
 
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     if (mode == nullptr) {
       return;
     }
@@ -1881,13 +1889,13 @@ bool CSession::IsPartyRecommendTarget(std::uint32_t aid) {
     return false;
   }
 
-  CGameActor* actor = static_cast<CGameActor*>(g_session.FindGameActor(aid));
+  CGameActor* actor = g_session.FindGameActor(aid);
 
   if (!actor) {
     return false;
   }
 
-  const std::string name = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(aid);
+  const std::string name = g_modeMgr.GetGameMode()->ActorName(aid);
   if (g_session.PartyByName(name.c_str()).valid == 0) {
     return false;
   }
@@ -1907,7 +1915,7 @@ int CSession::GetBodyStyle(int job, int style, int renderJob) {
     return job <= JT_THIEF_H;
   }
 
-  return static_cast<unsigned>(job - JT_NOVICE_H) <= 6;
+  return static_cast<unsigned>(g_session.GetBodyStyleJob(job) - JT_NOVICE_H) < 7;
 }
 
 // OFFSET: 0x00E2F920
@@ -2047,7 +2055,7 @@ void CSession::UpdateFriendName(std::uint32_t characterId, const char* name) {
   for (auto it = this->m_friends.begin(); it != this->m_friends.end(); ++it) {
     if (it->characterId == characterId) {
       if (std::strlen(name) == 0) {
-        g_modeMgr.gameMode->SendMsg(MM_DELETE_FRIEND, it->accountId, it->characterId, 0, 0);
+        g_modeMgr.currentMode->SendMsg(MM_DELETE_FRIEND, it->accountId, it->characterId, 0, 0);
         this->m_friends.erase(it);
       } else {
         it->name = name;
@@ -2066,7 +2074,7 @@ void CSession::UpdateFriendName(std::uint32_t characterId, const char* name) {
 void CSession::SetCostumeItem(unsigned int index, const ITEM_INFO& item) {
   if (index <= 9) {
     this->costumeItems[index] = item;
-    EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshWearable(reinterpret_cast<const int&>(item.identity[3]));
+    EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshWearable(item.identity[3]);
   }
 }
 
@@ -2092,7 +2100,7 @@ void CSession::SetEquippedArrowIndex(std::uint32_t value) {
   this->equippedArrowIndex = value;
   this->InvalidateWindowFrames();
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (!mode) {
     return;
   }
@@ -2121,7 +2129,7 @@ void CSession::SetEquippedArrowIndex(std::uint32_t value) {
 void CSession::SetEquippedItem(unsigned int index, const ITEM_INFO& item) {
   if (index <= 9) {
     this->equippedItems[index] = item;
-    EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshWearable(reinterpret_cast<const int&>(item.identity[3]));
+    EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshWearable(item.identity[3]);
   }
 }
 
@@ -2308,7 +2316,7 @@ void CSession::RefreshHpSpWindows() {
     static_cast<UIWindow*>(g_windowMgr.basicInfoWnd)->InvalidateChildren();
   }
 
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->NotifyItemBounds();
+  g_modeMgr.GetGameMode()->NotifyItemBounds();
 }
 
 // OFFSET: 0x00DF9460
@@ -2563,7 +2571,7 @@ void CSession::RefreshSkillTree() {
   }
 
   if (g_windowMgr.basicInfoWnd) {
-    UIBasicInfoWnd* info = static_cast<UIBasicInfoWnd*>(g_windowMgr.basicInfoWnd);
+    UIBasicInfoWnd* info = g_windowMgr.basicInfoWnd;
     info->SetHeight(info->geometry.height);
   }
 }
@@ -2638,7 +2646,7 @@ void CSession::HiFriends(char* text) {
 
   for (auto it = this->m_friends.begin(); it != this->m_friends.end(); ++it) {
     g_windowMgr.chatInputText = greeting.c_str();
-    g_modeMgr.gameMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<int>(it->name.c_str()), 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<int>(it->name.c_str()), 0, 0, 0);
     if (++g_pendingWhisperCount > 40) {
       g_pendingWhisperCount = 40;
     }
@@ -2964,7 +2972,7 @@ void CSession::Init() {
   this->m_whisperOption0 = 0;
   this->m_timeAttackStart = 0;
   this->m_timeAttackCountdown = 0;
-  this->unknown_07B0 = 0;
+  this->m_timeAttackEnd = 0;
   this->m_timeAttackVisible = 0;
   this->m_serviceOption229 = 0;
   this->m_isSiegeZone = 0;
@@ -3114,7 +3122,7 @@ void CSession::Init() {
   this->m_itemDescendingOrder = false;
   this->m_showMenuIcon = true;
   this->m_homunculusAutoFeed = false;
-  this->unknown_7F80 = -1;
+  this->m_selectedIndex = -1;
   this->m_overweightThresholdPercent = 50;
   this->m_loginModeFlag = false;
   this->m_showRankingSchedule = -1;
@@ -3124,7 +3132,7 @@ void CSession::Init() {
 // OFFSET: 0x00DF7C40
 // FUNCTION: fn_23508
 void CSession::ResetCharacterState() {
-  *reinterpret_cast<float*>(&this->m_navigationPlayerMap[0x18]) = SquareRoot(50.0f);
+  this->unknown_1620[1] = SquareRoot(50.0f);
 
   const int roll = std::rand() % 1024;
   const int randomValue = (roll >= 0 ? roll : 0) + 1;
@@ -3192,7 +3200,7 @@ void CSession::ResetCharacterState() {
   this->cartMaxWeight = 0;
   this->m_vendingSlotCount = 13;
   this->m_buyingStoreSlotCount = 5;
-  this->playerTeam[0] = 0;
+  this->playerTeam = 0;
   this->m_score1 = -1;
   this->m_score2 = -1;
   this->chatFont = 0;
@@ -3209,12 +3217,12 @@ void CSession::ResetCharacterState() {
   this->quitAllowed = 0;
   this->sessionFlag = 0;
   g_session.m_mapTransitionFlag = 0;
-  this->unknown_5564 = 0;
+  this->m_playerMessage82Arg = 0;
   this->adoptionSkillAvailable = 0;
   this->m_randomLoadingScreen = 1;
   this->guildLeader = 0;
   this->showTimer = 0;
-  this->mouseAndChannelOptions[0] = 1;
+  this->m_showBattleFieldIcon = true;
 
   MEMORYSTATUS memoryStatus = {};
   memoryStatus.dwLength = sizeof(memoryStatus);
@@ -3275,7 +3283,7 @@ void CSession::ClearItemContainers() {
   g_session.m_skillBundle.skills.clear();
   this->m_friends.erase(this->m_friends.begin(), this->m_friends.end());
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode != nullptr) {
     for (std::list<MessengerMember>::iterator it = this->m_partyMembers.begin(); it != this->m_partyMembers.end(); ++it) {
       CRenderObject* actor = mode->scene->GetGameActorByAidIncludeMe(it->accountId);

@@ -109,7 +109,7 @@ void UIParaItemPurchaseWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
   if (drag->source == 3) {
     switch (drag->type) {
@@ -196,7 +196,7 @@ void UIParaResultWnd::OnMouseHover(int x, int y) {
       text = FormatOwnedString("%s %d -> %s Zeny", item.DisplayName(0).c_str(), item.prices[0], amount);
     }
 
-    g_modeMgr.gameMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
   }
 }
 
@@ -239,14 +239,14 @@ void UIParaResultWnd::OnCreate(int width, int height) {
 
   this->resizer = new UIResizer();
   this->resizer->SetSize(16, 16);
-  static_cast<UIResizer*>(this->resizer)->SetDirection(7);
-  static_cast<UIResizer*>(this->resizer)->SetBitmapName("유저인터페이스\\btn_resize.bmp");
+  this->resizer->SetDirection(7);
+  this->resizer->SetBitmapName("유저인터페이스\\btn_resize.bmp");
   this->resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
-  static_cast<UIResizer*>(this->resizer)->SetColors(0xFFFF00FF, 0xFFFF00FF);
+  this->resizer->SetColors(0xFFFF00FF, 0xFFFF00FF);
   this->AddChild(this->resizer);
 
   this->scrollBar = new UIScrollBar();
-  static_cast<UIScrollBar*>(this->scrollBar)->Configure(this->geometry.width - 15, 14, 1, this->geometry.height - this->headerHeight - this->footerHeight - 17);
+  this->scrollBar->Configure(this->geometry.width - 15, 14, 1, this->geometry.height - this->headerHeight - this->footerHeight - 17);
   this->AddChild(this->scrollBar);
 
   {
@@ -254,10 +254,10 @@ void UIParaResultWnd::OnCreate(int width, int height) {
     const int x = this->geometry.width - 61;
     const int y = this->geometry.height - 24;
     this->buttons[0] = new UIBitmapButton();
-    static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap((prefix + "btn_ok.bmp").c_str(), 0, 0);
-    static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap((prefix + "btn_ok_a.bmp").c_str(), 1, 0);
-    static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap((prefix + "btn_ok_b.bmp").c_str(), 2, 0);
-    this->buttons[0]->SetSize(static_cast<UIBitmapButton*>(this->buttons[0])->BitmapWidth(), static_cast<UIBitmapButton*>(this->buttons[0])->BitmapHeight());
+    this->buttons[0]->SetBitmap((prefix + "btn_ok.bmp").c_str(), 0, 0);
+    this->buttons[0]->SetBitmap((prefix + "btn_ok_a.bmp").c_str(), 1, 0);
+    this->buttons[0]->SetBitmap((prefix + "btn_ok_b.bmp").c_str(), 2, 0);
+    this->buttons[0]->SetSize(this->buttons[0]->BitmapWidth(), this->buttons[0]->BitmapHeight());
     this->buttons[0]->Move(x, y);
     this->buttons[0]->SetId(184);
     this->AddChild(this->buttons[0]);
@@ -285,7 +285,7 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     this->Move(this->saved->x, this->saved->y);
     return 0;
   case UM_DROP: {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     ModeDragState& drag = mode->drag;
     switch (drag.type) {
     case TYPE_ARMOR:
@@ -374,7 +374,7 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
   }
   case UM_COMMAND: {
     this->RecordResponse(static_cast<int>(a), b, c, d);
-    CMode* mode = g_modeMgr.gameMode;
+    CMode* mode = g_modeMgr.currentMode;
     switch (a) {
     case ID_OK: {
       ITEM_INFO item = g_session.GetItem1720At(0);
@@ -509,7 +509,7 @@ int UIParaItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     break;
   case UM_DROP:
     if (a == 0) {
-      CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* mode = g_modeMgr.GetGameMode();
       const ModeDragState& drag = mode->drag;
       ITEM_INFO item;
       item.Assign(drag);
@@ -599,7 +599,7 @@ int UIParaResultWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     return 0;
   case UM_COMMAND: {
     this->RecordResponse(static_cast<int>(a), b, c, d);
-    CMode* mode = g_modeMgr.gameMode;
+    CMode* mode = g_modeMgr.currentMode;
     if (a == 184) {
       mode->SendMsg(MM_NPC_MARKET_CLOSE, 0, 0, 0, 0);
       mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
@@ -703,7 +703,7 @@ void UIParaItemShopWnd::Paint() {
   const int footer = this->showFooter == 1 ? this->footerHeight : 0;
   const int rows = (height - footer) / 32;
   for (int row = 0; row < rows; ++row) {
-    DrawItemSlotBackground(*this, 30, titleHeight + row * 32);
+    this->DrawItemSlotFrame(30, titleHeight + row * 32);
   }
 
   int index = 0;
@@ -726,9 +726,9 @@ void UIParaItemShopWnd::Paint() {
     }
 
     if (this->sellMode == 1 || it->quantity != 0) {
-      DrawItemWithQuantity(*this, ResourceMgr::Instance(), 34, top + 4, *it, 0, 0);
+      this->DrawItemAndQuantity(34, top + 4, *it, 0, 0);
     } else {
-      DrawItemWithQuantityAuxiliary(*this, 1, 34, top + 4, *it, 0, 0);
+      this->DrawItemAndQuantityAuxiliary(1, 34, top + 4, *it, 0, 0);
     }
 
     this->DrawWrappedItemName(70, top + 12, 120, &*it, 0, 0, 12);

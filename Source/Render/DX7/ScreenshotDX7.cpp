@@ -31,7 +31,7 @@ namespace {
 
 // OFFSET: 0x0055D860
 // FUNCTION: fn_02109
-bool CRendererDX7::SaveBitmap(const char* filename, CBitmapRes* overlay) {
+int CRendererDX7::SaveBitmap(const char* filename, CBitmapRes* overlay) {
   if (!this->LockBackBuffer()) {
     return false;
   }
@@ -73,7 +73,7 @@ bool CRendererDX7::SaveBitmap(const char* filename, CBitmapRes* overlay) {
   const DWORD redExpansion = owner ? owner->red.expansion : 8;
   const DWORD greenExpansion = owner ? owner->green.expansion : 8;
   const DWORD blueExpansion = owner ? owner->blue.expansion : 8;
-  const std::uint16_t transparent = reinterpret_cast<const DeviceOwnerDX7Handle&>(g_deviceOwnerDX7).PackColor(255, 0, 255);
+  const std::uint16_t transparent = DeviceOwnerDX7Handle(g_deviceOwnerDX7).PackColor(255, 0, 255);
   unsigned char row[10800];
 
   for (int y = this->viewport.height - 1; y >= 0; --y) {
@@ -144,7 +144,7 @@ bool CRendererDX7::SaveBitmap(const char* filename, CBitmapRes* overlay) {
 
 // OFFSET: 0x0055DDF0
 // FUNCTION: fn_02110
-bool CRendererDX7::SaveJpeg(const char* filename, CBitmapRes* overlay) {
+int CRendererDX7::SaveJpeg(const char* filename, CBitmapRes* overlay) {
   if (!this->LockBackBuffer()) {
     return false;
   }

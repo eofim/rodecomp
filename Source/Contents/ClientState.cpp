@@ -14,6 +14,7 @@
 #include "UI/EntryQueue/UIEntryQueueWnd.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
+#include "UI/Items/UIEquipWnd.h"
 
 #include <cstdint>
 #include <cstring>
@@ -206,7 +207,7 @@ std::uint32_t CSession::ReadReplayStats(const std::vector<unsigned char>& data) 
     case 2052: {
       std::memcpy(&this->madogearType, data.data() + offset, header.bytes);
       offset += header.bytes;
-      CPlayer* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
+      CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
       if (player) {
         player->SetMadogearType(this->madogearType);
         if (this->madogearType) {
@@ -957,7 +958,7 @@ void CSession::UpdateBodyStyle(int job, int style, int renderJob) {
   } else if (static_cast<unsigned>(job - 4001) <= 21) {
     this->m_bodyStyle = job <= 4007;
   } else {
-    this->m_bodyStyle = static_cast<unsigned>(job - 4001) <= 6;
+    this->m_bodyStyle = static_cast<unsigned>(g_session.GetBodyStyleJob(job) - 4001) <= 6;
   }
 }
 
@@ -1075,7 +1076,7 @@ std::uint32_t CSession::ReadReplayEntryQueue(const std::vector<unsigned char>& d
       std::memset(queueName, 0, sizeof(queueName));
       std::memcpy(queueName, data.data() + offset, header.bytes);
       offset += header.bytes;
-      g_entryQueueMgr->SetQueueName(*reinterpret_cast<const EntryQueueName*>(queueName));
+      g_entryQueueMgr->SetQueueName(queueName);
       break;
     }
     case 6514: {
@@ -1083,7 +1084,7 @@ std::uint32_t CSession::ReadReplayEntryQueue(const std::vector<unsigned char>& d
       std::memset(characterName, 0, sizeof(characterName));
       std::memcpy(characterName, data.data() + offset, header.bytes);
       offset += header.bytes;
-      g_entryQueueMgr->SetCharacterName(*reinterpret_cast<const EntryQueueName*>(characterName));
+      g_entryQueueMgr->SetCharacterName(characterName);
       break;
     }
     case 6515: {
@@ -1153,11 +1154,11 @@ std::uint32_t CSession::ReadReplayCharacter(const std::vector<unsigned char>& da
       offset += header.bytes;
       break;
     case 1012:
-      std::memcpy(&this->m_navigationPlayerMap[0x14], data.data() + offset, header.bytes);
+      std::memcpy(&this->unknown_1620[0], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 1013:
-      std::memcpy(&this->m_navigationPlayerMap[0x18], data.data() + offset, header.bytes);
+      std::memcpy(&this->unknown_1620[1], data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 1014:
@@ -1433,7 +1434,7 @@ std::uint32_t CSession::ReadReplayCharacter(const std::vector<unsigned char>& da
       offset += header.bytes;
       break;
     case 1082:
-      std::memcpy(this->playerTeam, data.data() + offset, header.bytes);
+      std::memcpy(&this->playerTeam, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 1083:
@@ -1477,7 +1478,7 @@ std::uint32_t CSession::ReadReplayCharacter(const std::vector<unsigned char>& da
       offset += header.bytes;
       break;
     case 1093:
-      std::memcpy(&this->unknown_549C, data.data() + offset, header.bytes);
+      std::memcpy(&this->m_replayValue1093, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
     case 1094:

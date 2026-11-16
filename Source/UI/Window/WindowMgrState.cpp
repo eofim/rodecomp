@@ -2,6 +2,7 @@ struct RenderSystemHolder;
 __declspec(noinline) RenderSystemHolder* GetRenderSystemHolder();
 
 #include "Client/Mode/ModeMessage.h"
+#include "Render/Drawing/BitmapDrawing.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/Hotkeys/InterfaceHotkey.h"
@@ -38,6 +39,13 @@ __declspec(noinline) RenderSystemHolder* GetRenderSystemHolder();
 #include "UI/Window/UIWindow.h"
 #include "UI/Chat/UINewChatWnd.h"
 #include "UI/Window/UIWindowMgr.h"
+#include "UI/Dialogs/UIChooseWnd.h"
+#include "UI/Dialogs/UISayDialogWnd.h"
+#include "UI/Guild/UIGuildWnd.h"
+#include "UI/Items/UIMakeTargetListWnd.h"
+#include "UI/Lists/UIComboBoxWnd.h"
+#include "UI/Login/UIPasswordWnd.h"
+#include "UI/Navigation/UIChooseWarpWnd.h"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -682,7 +690,7 @@ void UIWindowMgr::SaveVisibleWindowIds() {
 // OFFSET: 0x00AAB8A0
 // FUNCTION: fn_17282
 void UIWindowMgr::UpdateNavigationList() {
-  if (this->navigationWnd && !g_navigationManager.expandedMap && static_cast<UINavigationV4Wnd*>(this->navigationWnd)->IsListShown()) {
+  if (this->navigationWnd && !g_navigationManager.expandedMap && this->navigationWnd->IsListShown()) {
     this->navigationWnd->SendMsg(nullptr, UM_COMMAND, ID_MINI, 0, 0, 0);
   }
 }
@@ -1027,11 +1035,11 @@ void UIWindowMgr::SaveUIRectInfo() {
 // FUNCTION: fn_17264
 void UIWindowMgr::RefreshWindow01C8Edits() {
   if (this->chatWnd) {
-    if (this->hoverWindow == static_cast<UINewChatWnd*>(this->chatWnd)->m_chatEdit) {
-      static_cast<UINewChatWnd*>(this->chatWnd)->m_chatEdit->SetText("");
+    if (this->hoverWindow == this->chatWnd->m_chatEdit) {
+      this->chatWnd->m_chatEdit->SetText("");
     }
 
-    UIEditCtrl* edit = static_cast<UIEditCtrl*>(static_cast<UINewChatWnd*>(this->chatWnd)->m_whisperEdit);
+    UIEditCtrl* edit = static_cast<UIEditCtrl*>(this->chatWnd->m_whisperEdit);
     if (this->hoverWindow == edit) {
       edit->SetText(edit->Text());
     }
@@ -1061,7 +1069,7 @@ void UIWindowMgr::SetBackgroundSurface(CBitmapRes* bitmap) {
 // OFFSET: 0x00AAA050
 // FUNCTION: fn_17266
 void UIWindowMgr::SendFlagEffect(int hotkey) {
-  CMode* mode = g_modeMgr.gameMode;
+  CMode* mode = g_modeMgr.currentMode;
   if (!mode) {
     return;
   }
@@ -1130,7 +1138,7 @@ void UIWindowMgr::FocusWindow01C8Edit() {
     return;
   }
 
-  UIWindow* edit = static_cast<UINewChatWnd*>(this->chatWnd)->m_chatEdit;
+  UIWindow* edit = this->chatWnd->m_chatEdit;
   if (this->hoverWindow) {
     this->hoverWindow->OnFinishEdit(!edit ? false : edit->GetEditWindow() == this->hoverWindow);
   }
@@ -1159,12 +1167,12 @@ void UIWindowMgr::RestoreHiddenWindows() {
     }
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode && mode->canRotateView == 1) {
     this->EnsureWindow(WID_MINIMAPZOOMWND);
   }
 
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->RefreshEffect164();
+  g_modeMgr.GetGameMode()->scene->player->RefreshEffect164();
   this->windowVisibilityState = 1;
 
   for (std::map<int, UIWindow*>::iterator it = this->overlays.begin(); it != this->overlays.end(); ++it) {
@@ -1199,7 +1207,7 @@ int UIWindowMgr::RunEmailAddress() {
   this->modalResponse = 0;
   this->modalWindows.push_back(window);
   int response;
-  CMode* pump = g_modeMgr.gameMode;
+  CMode* pump = g_modeMgr.currentMode;
 
   for (;;) {
     if (g_modalImmediate != 0) {
@@ -1237,7 +1245,7 @@ int UIWindowMgr::RunEmailAddress() {
 
     if (pump) {
       pump->Update();
-      pump = g_modeMgr.gameMode;
+      pump = g_modeMgr.currentMode;
     }
 
     if (g_session.GetOption(20) > 0) {
@@ -1256,4 +1264,9 @@ int UIWindowMgr::RunEmailAddress() {
 
   this->RestoreInput();
   return response;
+}
+
+// INLINED
+void DrawBitmapResource(int x, int y, const CBitmapRes* bitmap) {
+  g_windowMgr.DrawBitmapResource(x, y, bitmap);
 }

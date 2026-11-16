@@ -37,6 +37,7 @@
 
 #include "Resource/MSGSTRINGID.h"
 #include "Network/Packets/PacketId.h"
+#include "UI/Rodex/UIRodexInboxWnd.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -199,7 +200,7 @@ void UIRodexContentsWnd::Paint() {
     this->DrawBitmap(
       x - 4, 319, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\shadow_item_on.bmp"))), true
     );
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, 309, *item, 0, 0);
+    this->DrawItemAndQuantity(x, 309, *item, 0, 0);
     if (0 < item->grade) {
       this->DrawBitmap(
         x, 321, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item->grade).c_str()))),
@@ -227,10 +228,18 @@ void UIRodexContentsWnd::OnMouseHover(int x, int y) {
     int tooltipY = 290;
     this->ToScreen(tooltipX, tooltipY);
     if (item.identified == 1 && item.optionCount != 0) {
-      g_modeMgr.gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
-                    g_session.GetItemNameColor(item), 0, 1);
+      CMode* gameMode = g_modeMgr.currentMode;
+      std::uint32_t color = g_session.GetItemNameColor(item);
+      int screenX = tooltipX;
+      int screenY = tooltipY;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), screenX, screenY,
+                    color, 0, 1);
     } else {
-      g_modeMgr.gameMode->ShowTooltip(item.DisplayName(0).c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+      CMode* gameMode = g_modeMgr.currentMode;
+      std::uint32_t color = g_session.GetItemNameColor(item);
+      int screenX = tooltipX;
+      int screenY = tooltipY;
+      gameMode->ShowTooltip(item.DisplayName(0).c_str(), screenX, screenY, color, 0, 1);
     }
   }
 }
@@ -259,7 +268,7 @@ int UIRodexContentsWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       break;
     case ID_BUTTON1:
       if (this->m_items.size() != 0) {
-        if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsMenuWindowOpen() == 1) {
+        if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == 1) {
           break;
         }
         RodexMailAttachmentRequestPacket packet;
@@ -275,7 +284,7 @@ int UIRodexContentsWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       break;
     case ID_BUTTON2:
       if (this->m_zeny > 0) {
-        if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsMenuWindowOpen() == 1) {
+        if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == 1) {
           break;
         }
         RodexMailAttachmentRequestPacket packet;
@@ -397,15 +406,14 @@ void UIRodexContentsWnd::SetMailContents(std::string title, std::string sender, 
   this->m_contents->Move(15, 81);
   this->m_contents->maximum = 1000;
 
-  const bool selected = g_skinInfo.Selected();
   const SkinPaletteCell cell = {1, 2};
-  const std::uint32_t color = SkinPaletteColor(cell, selected);
+  const std::uint32_t color = g_skinInfo.PaletteColor(cell, g_skinInfo.Selected());
   this->m_contents->Background(color & 0xFF, (color & 0xFFFF) >> 8, (color >> 16) & 0xFF);
   this->m_contents->TextColor(0x31, 0x31, 0x31, 0xFFFFFFFF);
   UIRodexEditCtrl3* contents = this->m_contents;
   contents->disabled = 1;
   contents->Invalidate();
-  reinterpret_cast<unsigned char*>(&this->m_contents->editFlags)[1] = 1;
+  this->m_contents->multiline = 1;
   this->m_contents->SetId(504);
 
   if (text.find("<NAVIL>") == std::string::npos && text.find("</NAVIL>") == std::string::npos) {

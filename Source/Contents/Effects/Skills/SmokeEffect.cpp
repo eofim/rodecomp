@@ -27,7 +27,7 @@ void CSmokeEffect::Close() {
 // FUNCTION: fn_19177
 void CSmokeEffect::Open() {
   for (int i = 0; i < 4; ++i) {
-    CSpriteParticle* particle = static_cast<CSpriteParticle*>(CreateSpriteParticle(reinterpret_cast<const vector3d*>(this->position), 1));
+    CSpriteParticle* particle = static_cast<CSpriteParticle*>(CreateSpriteParticle(&this->positionVector, 1));
     if (particle) {
       particle->effectId = this->id;
       particle->columnIndex = i;
@@ -54,7 +54,7 @@ void CSmokeEffect::OnProcess() {
     position.y = this->position[1];
     position.z = this->position[2];
     if (particle) {
-      matrix& rotation = *reinterpret_cast<matrix*>(particle->rotationStorage);
+      matrix& rotation = particle->rotation;
       float& angle = particle->angle;
       float& spin = particle->spin;
       if (particle->elapsedFrames < 50) {

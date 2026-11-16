@@ -25,7 +25,7 @@ struct RenderSystemHolder {
   CTexture* CreateTexture(std::uint32_t width, std::uint32_t height, std::int32_t format, bool dynamic, bool renderTarget);
   CSurface* CreateSurfaceOrTexture(std::uint32_t width, std::uint32_t height);
   HRESULT Close();
-  void DestroySurface(CSurface* surface);
+  void DestroyRenderer(CRenderer* renderer);
   void UpdateOption();
   void RestoreDisplayMode();
   void PrepareErrorDialog();
@@ -40,7 +40,6 @@ struct RenderSystemHolder {
   std::shared_ptr<CSurface> BackBufferSurface() const;
 };
 
-int DrawBackBufferText(int x, int y, const char* text, COLORREF color);
 
 // OFFSET: 0x0055D340
 // FUNCTION: fn_02102
@@ -70,7 +69,7 @@ public:
     int x, int y, const CSprRes& sprite, const ActionFrame& frame, const std::uint32_t* palette
   ) override;
   void DrawSurface(
-    int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, bool mirrored, int scaleX, int scaleY, int filter
+    int x, int y, CSurface* source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, int mirrored, int scaleX, int scaleY, int filter
   ) override;
   void Fill(const RECT* rectangle, std::uint32_t color) override;
   void Draw(int x, int y, int width, int height, std::uint32_t color) override;

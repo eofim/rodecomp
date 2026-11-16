@@ -51,6 +51,7 @@
 #include "UI/Lists/UIScrollBar.h"
 #include "UI/Navigation/UIScrollBarNavi.h"
 #include "UI/Text/ColoredText.h"
+#include "UI/Text/PixelTextWrapping.h"
 #include "Render/Textures/TextureCache.h"
 #include "UI/Text/TextWrapping.h"
 #include "UI/Window/WindowBorder.h"
@@ -80,6 +81,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <mbstring.h>
 #include <functional>
 #include <set>
 #include <span>
@@ -264,7 +266,7 @@ bool UIWindow::CanHitTest() {
 // OFFSET: 0x00A7BB00
 // FUNCTION: fn_16933
 void UIWindow::DragAndDrop(int, int, std::intptr_t) {
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x005CA0F0
@@ -367,7 +369,7 @@ void UIWindow::OnMouseCheck(int, int) {
 // OFFSET: 0x00A81D60
 // FUNCTION: fn_16988
 void UIWindow::ResetCursor(int, int) {
-  g_modeMgr.gameMode->SetCursorAction(0);
+  g_modeMgr.currentMode->SetCursorAction(0);
 }
 
 // OFFSET: 0x005C7240
@@ -588,10 +590,10 @@ RenderPrimitive* UIWindow::DrawPrimitive() {
     static_cast<CDCBitmap*>(this->geometry.surface)->UploadTexture(this->m_texture);
   }
 
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
   primitive->texture = this->m_texture;
-  const float width = static_cast<float>(std::bit_cast<std::int32_t>(this->m_texture->TextureWidth()));
-  const float height = static_cast<float>(std::bit_cast<std::int32_t>(this->m_texture->TextureHeight()));
+  const float width = static_cast<float>(static_cast<std::int32_t>(this->m_texture->TextureWidth()));
+  const float height = static_cast<float>(static_cast<std::int32_t>(this->m_texture->TextureHeight()));
   primitive->quad[0].x = static_cast<float>(this->geometry.x);
   primitive->quad[0].y = static_cast<float>(this->geometry.y);
   primitive->quad[0].u = g_textureOffsetX / width;
@@ -904,7 +906,9 @@ int UIWindow::TextWidth(const char* text, unsigned bytes, int family, int height
 
   TextContext context(*this->geometry.surface);
   context.SetFont(family, height, bold, italic);
-  return context.Measure(text, bytes).cx;
+  SIZE size;
+  context.Measure(text, bytes, &size);
+  return size.cx;
 }
 
 // OFFSET: 0x00A7D760
@@ -924,10 +928,7 @@ int UIWindow::ColoredTextWidth(const char* text, unsigned bytes, int family, int
   int width = this->TextWidth(text, bytes, family, height, bold, 0);
   std::uint32_t color = 0;
   if (ParseColorCode(SegmentEnd(text, text + bytes), color) && color) {
-    TextContext context(*this->geometry.surface);
-    context.SetFont(0, 12, 0, 0);
-    const int marker = context.Measure("^000000", 7).cx;
-    width += (3 - marker) * 2;
+    width += (3 - this->TextWidth("^000000", 7, 0, 12, 0, 0)) * 2;
   }
 
   return width;
@@ -963,7 +964,8 @@ void UIWindow::DrawVerticalText(int x, int y, const char* text, unsigned bytes, 
   context.SetColor(color);
   for (const char* current = text; current < end;) {
     const char* const next = CharNextExA(static_cast<WORD>(g_textCodePage), current, 0);
-    const SIZE size = context.Measure(current, static_cast<int>(next - current));
+    SIZE size;
+    context.Measure(current, static_cast<int>(next - current), &size);
     current = next;
     if (widest < size.cx) {
       widest = size.cx;
@@ -976,7 +978,8 @@ void UIWindow::DrawVerticalText(int x, int y, const char* text, unsigned bytes, 
 
   for (const char* current = text; current < end;) {
     const char* const next = CharNextExA(static_cast<WORD>(g_textCodePage), current, 0);
-    const SIZE size = context.Measure(text, static_cast<int>(next - text));
+    SIZE size;
+    context.Measure(text, static_cast<int>(next - text), &size);
     context.Draw(x + (widest - size.cx) / 2, y, text, static_cast<int>(next - text));
     current = next;
     text = next;
@@ -992,7 +995,9 @@ void UIWindow::DrawCenteredText(int x, int y, const char* text, int width, int f
   context.SetColor(color);
   const int bytes = static_cast<int>(std::strlen(text));
   if (width) {
-    const int extent = context.Measure(text, bytes).cx;
+    SIZE size;
+    context.Measure(text, bytes, &size);
+    const int extent = size.cx;
     context.Draw(static_cast<int>((width - extent) * 0.5 + x), y, text, static_cast<int>(std::strlen(text)));
   } else {
     context.Draw(x, y, text, bytes);
@@ -1010,7 +1015,8 @@ void UIWindow::DrawCenteredOutlinedText(
 
   TextContext context(*this->geometry.surface);
   context.SetFont(family, height, bold, 0);
-  const SIZE size = context.Measure(text, static_cast<int>(std::strlen(text)));
+  SIZE size;
+  context.Measure(text, static_cast<int>(std::strlen(text)), &size);
   const int left = static_cast<int>((width - size.cx) * 0.5f + x);
   context.SetColor(outline);
   context.Draw(left - 1, y, text, bytes);
@@ -1032,7 +1038,8 @@ void UIWindow::DrawVerticalOutlinedText(
 
   TextContext context(*this->geometry.surface);
   context.SetFont(family, height, bold, 0);
-  const SIZE size = context.Measure(text, bytes);
+  SIZE size;
+  context.Measure(text, bytes, &size);
   context.SetColor(outline);
   context.Draw(x + size.cy - 1, y, text, bytes);
   context.Draw(x + size.cy + 1, y, text, bytes);
@@ -1051,7 +1058,8 @@ void UIWindow::DrawRightAlignedText(int right, int y, const char* text, int byte
 
   TextContext context(*this->geometry.surface);
   context.SetFont(family, height, bold, 0);
-  const SIZE size = context.Measure(text, static_cast<int>(std::strlen(text)));
+  SIZE size;
+  context.Measure(text, static_cast<int>(std::strlen(text)), &size);
   context.SetColor(color);
   context.Draw(right - size.cx, y, text, bytes);
 }
@@ -1160,8 +1168,8 @@ void UIWindow::DrawEmboldenedText(int x, int y, const char* text, std::uint32_t 
 // OFFSET: 0x00A7C470
 // FUNCTION: fn_16944
 void UIWindow::FlushPrimitives() {
-  for (RenderPrimitive* primitive : this->m_overlayPrimitives) {
-    static_cast<CRendererDX9*>(g_renderer)->Submit(primitive, 513);
+  for (auto it = this->m_overlayPrimitives.begin(); it != this->m_overlayPrimitives.end(); ++it) {
+    static_cast<CRendererDX9*>(g_renderer)->Submit(*it, 513);
   }
 
   this->m_overlayPrimitives.clear();
@@ -1299,7 +1307,9 @@ int UIWindow::TextHeight(const char* text, unsigned bytes, int family, int heigh
 
   TextContext context(*this->geometry.surface);
   context.SetFont(family, height, bold, italic);
-  return context.Measure(text, bytes).cy;
+  SIZE size;
+  context.Measure(text, bytes, &size);
+  return size.cy;
 }
 
 // OFFSET: 0x00A80230
@@ -1327,7 +1337,9 @@ int UIWindow::VerticalTextHeight(const char* text, unsigned bytes, int family, i
 
   while (text < end) {
     const char* next = CharNextExA(static_cast<WORD>(g_textCodePage), text, 0);
-    total += context.Measure(text, static_cast<int>(next - text)).cy;
+    SIZE size;
+    context.Measure(text, static_cast<int>(next - text), &size);
+    total += size.cy;
     text = next;
   }
 
@@ -1338,7 +1350,9 @@ int UIWindow::VerticalTextHeight(const char* text, unsigned bytes, int family, i
 // FUNCTION: fn_16973
 SIZE UIWindow::TextSize(const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic
 ) {
-  SIZE size = {};
+  SIZE size;
+  size.cx = 0;
+  size.cy = 0;
   if (!text) {
     return size;
   }
@@ -1352,7 +1366,7 @@ SIZE UIWindow::TextSize(const char* text, unsigned bytes, int family, int height
 
   TextContext context(*this->geometry.surface);
   context.SetFont(family, height, bold, italic);
-  size = context.Measure(text, bytes);
+  context.Measure(text, bytes, &size);
   return size;
 }
 
@@ -1360,7 +1374,9 @@ SIZE UIWindow::TextSize(const char* text, unsigned bytes, int family, int height
 // FUNCTION: fn_16974
 SIZE UIWindow::VerticalTextSize(const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic
 ) {
-  SIZE size = {};
+  SIZE size;
+  size.cx = 0;
+  size.cy = 0;
   if (!text) {
     return size;
   }
@@ -1382,7 +1398,10 @@ SIZE UIWindow::VerticalTextSize(const char* text, unsigned bytes, int family, in
 
   while (text < end) {
     const char* next = CharNextExA(static_cast<WORD>(g_textCodePage), text, 0);
-    const SIZE part = context.Measure(text, static_cast<int>(next - text));
+    SIZE part;
+    part.cx = 0;
+    part.cy = 0;
+    context.Measure(text, static_cast<int>(next - text), &part);
     if (size.cx < part.cx) {
       size.cx = part.cx;
     }
@@ -1448,12 +1467,10 @@ std::string UIWindow::FitDisplayText(int width, const char* text, int family, in
   display = RemoveTextLinkInfo(display);
 
   if (g_windowMgr.chatWnd) {
-    display = static_cast<UINewChatWnd*>(g_windowMgr.chatWnd)->ConvertChat(std::move(display));
+    display = g_windowMgr.chatWnd->ConvertChat(std::move(display));
   }
 
-  std::string navigation;
-  DisplayNavigationLink(navigation, display);
-  display = std::move(navigation);
+  display = g_navigationLinkParser->DisplayNavigationLink(display);
   display = DisplayQuestTextTag(display);
 
   const int textWidth = this->TextWidth(display.c_str(), 0, family, height, bold, 0);
@@ -1502,11 +1519,10 @@ std::string UIWindow::FitVerticalDisplayText(int height, const char* text, int f
   display = static_cast<const std::string&>(RemoveTextLinkInfo(display));
 
   if (g_windowMgr.chatWnd) {
-    display = static_cast<UINewChatWnd*>(g_windowMgr.chatWnd)->ConvertChat(std::move(display));
+    display = g_windowMgr.chatWnd->ConvertChat(std::move(display));
   }
 
-  std::string navigation;
-  DisplayNavigationLink(navigation, display);
+  std::string navigation = g_navigationLinkParser->DisplayNavigationLink(display);
   display = std::move(navigation);
   display = static_cast<const std::string&>(DisplayQuestTextTag(display));
 
@@ -1547,23 +1563,23 @@ const char* UIWindow::TruncateText(const char* text, int maxBytes) {
     const char* end = text + std::strlen(text);
     while (current < end) {
       const int previous = bytes;
-      const char* next = g_serverLanguage->NextChar(current, static_cast<int>(end - current));
-      bytes += static_cast<int>(next - current);
+      const char* last = current;
+      current = g_serverLanguage->NextChar(current, static_cast<int>(end - current));
+      bytes += static_cast<int>(current - last);
       if (bytes > maxBytes) {
         bytes = previous;
         break;
       }
-      current = next;
     }
 
     if (bytes > 0) {
-      char* buffer = static_cast<char*>(std::malloc(bytes + 1));
+      char* buffer = new char[bytes + 1];
       std::memcpy(buffer, text, bytes);
       buffer[bytes] = '\0';
       // GLOBAL: gl_25070
       static std::string truncated;
       truncated = buffer;
-      std::free(buffer);
+      delete[] buffer;
       return truncated.c_str();
     }
   }
@@ -1621,6 +1637,128 @@ void UIWindow::WrapTextWithBreaks(const char* text, std::vector<std::string>* li
       breaks->push_back(newline);
       offset += bytes;
     }
+  }
+}
+
+// OFFSET: 0x00A82310
+// FUNCTION: fn_16993
+void UIWindow::WrapPixelText(const char* text, std::vector<std::string>& lines, int width) {
+  if (!text) {
+    return;
+  }
+
+  const int bytes = static_cast<int>(std::strlen(text));
+  if (bytes == 0) {
+    return;
+  }
+
+  if (this->TextWidth(text, bytes, 0, 12, 0, 0) <= 0) {
+    return;
+  }
+
+  const char* end = text + bytes;
+  int offset = 0;
+
+  for (int row = 0; offset < bytes; ++row) {
+    if (row > 1000) {
+      return;
+    }
+
+    const char* begin = text + offset;
+    const char* current = begin;
+    int count = 0;
+    int extent = 0;
+    bool newline = false;
+
+    for (int step = 0; current < end; ++step) {
+      if (step > 1000) {
+        break;
+      }
+
+      const int previous = count;
+      const char* next = g_serverLanguage->NextChar(current, static_cast<int>(end - current));
+      const int length = static_cast<int>(next - current);
+
+      extent = (extent + this->TextWidth(current, length, 0, 12, 0, 0));
+      count = (count + length);
+
+      if (length == 1 && (*current == '\r' || *current == '\n')) {
+        this->TextWidth("\n", 1, 0, 12, 0, 0);
+        newline = true;
+
+        if (current + 1 < end && current[1] == '\n') {
+          ++count;
+        }
+
+        break;
+      }
+
+      if (*current == '^') {
+        const unsigned char red = static_cast<unsigned char>(g_hexDigits[current[1]] * 16 + g_hexDigits[current[2]]);
+        const unsigned char green = static_cast<unsigned char>(g_hexDigits[current[3]] * 16 + g_hexDigits[current[4]]);
+        const unsigned char blue = static_cast<unsigned char>(g_hexDigits[current[5]] * 16 + g_hexDigits[current[6]]);
+        const std::uint32_t color = red | (green << 8) | (blue << 16);
+
+        if (color != 0) {
+          extent = (extent - this->TextWidth("^000000", 7, 0, 12, 0, 0));
+        } else {
+          char* code = new char[8];
+          std::memcpy(code, current, 7);
+          code[7] = '\0';
+
+          if (std::strcmp(code, "^000000") == 0) {
+            extent = (extent - this->TextWidth("^000000", 7, 0, 12, 0, 0));
+          }
+
+          delete[] code;
+        }
+      }
+
+      if (*current == '[') {
+        const auto* close = _mbsstr(reinterpret_cast<const unsigned char*>(current), reinterpret_cast<const unsigned char*>("]"));
+
+        if (close) {
+          const int bracketBytes = static_cast<int>(reinterpret_cast<const char*>(close) - current) + 1;
+          const int bracketWidth = this->TextWidth(current, bracketBytes, 0, 12, 0, 0);
+          const int characterWidth = this->TextWidth(current, length, 0, 12, 0, 0);
+
+          if (((extent + bracketWidth) - characterWidth) > width && bracketWidth <= width) {
+            count = previous;
+            break;
+          }
+        }
+      }
+
+      if (extent > width) {
+        count = previous;
+        break;
+      }
+
+      current = next;
+    }
+
+    if (count <= 0) {
+      continue;
+    }
+
+    char* buffer = new char[count + 1];
+    std::memcpy(buffer, begin, count);
+
+    if (newline) {
+      buffer[count - 1] = '\0';
+
+      if (std::strlen(buffer) == 0) {
+        lines.push_back(" ");
+      } else {
+        lines.push_back(buffer);
+      }
+    } else {
+      buffer[count] = '\0';
+      lines.push_back(buffer);
+    }
+
+    delete[] buffer;
+    offset = (offset + count);
   }
 }
 
@@ -2236,44 +2374,44 @@ void UIListBox_NaviSearch::Paint() {
 // FUNCTION: fn_03581
 void UINavigationV4Wnd::OnCreate(int, int) {
   this->expandedCloseButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->expandedCloseButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_close_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->expandedCloseButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_close_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->expandedCloseButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_close_press.bmp", 2, 0);
-  this->expandedCloseButton->SetSize(static_cast<UIBitmapButton*>(this->expandedCloseButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->expandedCloseButton)->BitmapHeight());
+  this->expandedCloseButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_close_normal.bmp", 0, 0);
+  this->expandedCloseButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_close_over.bmp", 1, 0);
+  this->expandedCloseButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_close_press.bmp", 2, 0);
+  this->expandedCloseButton->SetSize(this->expandedCloseButton->BitmapWidth(), this->expandedCloseButton->BitmapHeight());
   this->expandedCloseButton->SetId(ID_CLOSE);
-  static_cast<UIBitmapButton*>(this->expandedCloseButton)->SetTooltip(LookupMessage(MSI_ZENY_LOTTO_BUY_10));
+  this->expandedCloseButton->SetTooltip(LookupMessage(MSI_ZENY_LOTTO_BUY_10));
   this->AddChild(this->expandedCloseButton);
 
   this->maximizeButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->maximizeButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_maximize_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->maximizeButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_maximize_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->maximizeButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_maximize_press.bmp", 2, 0);
-  this->maximizeButton->SetSize(static_cast<UIBitmapButton*>(this->maximizeButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->maximizeButton)->BitmapHeight());
+  this->maximizeButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_maximize_normal.bmp", 0, 0);
+  this->maximizeButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_maximize_over.bmp", 1, 0);
+  this->maximizeButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_maximize_press.bmp", 2, 0);
+  this->maximizeButton->SetSize(this->maximizeButton->BitmapWidth(), this->maximizeButton->BitmapHeight());
   this->maximizeButton->SetId(ID_BASE);
-  static_cast<UIBitmapButton*>(this->maximizeButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_ALL));
+  this->maximizeButton->SetTooltip(LookupMessage(MSI_NAVIGATION_ALL));
   this->AddChild(this->maximizeButton);
 
   this->minimizeCheck = new UICheckBox();
   this->minimizeCheck->SetSize(110, 12);
-  static_cast<UICheckBox*>(this->minimizeCheck)->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", "Minimize");
-  static_cast<UICheckBox*>(this->minimizeCheck)->SetChecked(0);
-  static_cast<UICheckBox*>(this->minimizeCheck)->SetTooltip(LookupMessage(MSI_NAVIGATION_MAP));
+  this->minimizeCheck->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", "Minimize");
+  this->minimizeCheck->SetChecked(0);
+  this->minimizeCheck->SetTooltip(LookupMessage(MSI_NAVIGATION_MAP));
   this->AddChild(this->minimizeCheck);
 
   this->roadIconButton = new UIBitmapButton();
   this->SetRoadIcon(g_navigationManager.viewIcon);
-  this->roadIconButton->SetSize(static_cast<UIBitmapButton*>(this->roadIconButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->roadIconButton)->BitmapHeight());
+  this->roadIconButton->SetSize(this->roadIconButton->BitmapWidth(), this->roadIconButton->BitmapHeight());
   this->roadIconButton->SetId(ID_BUTTON1);
-  static_cast<UIBitmapButton*>(this->roadIconButton)->SetTooltip(LookupMessage(MSI_TAREN_LOGINREFUSE_FAIL_NOTACTIVATED));
+  this->roadIconButton->SetTooltip(LookupMessage(MSI_TAREN_LOGINREFUSE_FAIL_NOTACTIVATED));
   this->AddChild(this->roadIconButton);
 
   this->roadListButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->roadListButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_roadlistwnd_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->roadListButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_roadlistwnd_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->roadListButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_roadlistwnd_press.bmp", 2, 0);
-  this->roadListButton->SetSize(static_cast<UIBitmapButton*>(this->roadListButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->roadListButton)->BitmapHeight());
+  this->roadListButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_roadlistwnd_normal.bmp", 0, 0);
+  this->roadListButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_roadlistwnd_over.bmp", 1, 0);
+  this->roadListButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_roadlistwnd_press.bmp", 2, 0);
+  this->roadListButton->SetSize(this->roadListButton->BitmapWidth(), this->roadListButton->BitmapHeight());
   this->roadListButton->SetId(NAVI_BUTTON_ROAD_LIST);
-  static_cast<UIBitmapButton*>(this->roadListButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_SEARCHTORUITE));
+  this->roadListButton->SetTooltip(LookupMessage(MSI_NAVIGATION_SEARCHTORUITE));
   this->AddChild(this->roadListButton);
 
   this->roadList = new UIListBox_NaviSearch();
@@ -2294,35 +2432,35 @@ void UINavigationV4Wnd::OnCreate(int, int) {
 
   this->filterCheck = new UICheckBox();
   this->filterCheck->SetSize(110, 12);
-  static_cast<UICheckBox*>(this->filterCheck)->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", "service");
+  this->filterCheck->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", "service");
   this->filterCheck->SetId(ID_CHECK);
-  static_cast<UICheckBox*>(this->filterCheck)->SetChecked(g_navigationManager.allowGates);
-  static_cast<UICheckBox*>(this->filterCheck)->SetTooltip(LookupMessage(MSI_NAVIGATION_V4_HELP));
+  this->filterCheck->SetChecked(g_navigationManager.allowGates);
+  this->filterCheck->SetTooltip(LookupMessage(MSI_NAVIGATION_V4_HELP));
   this->AddChild(this->filterCheck);
 
   this->shareButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->shareButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_share_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->shareButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_share_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->shareButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_share_press.bmp", 2, 0);
-  this->shareButton->SetSize(static_cast<UIBitmapButton*>(this->shareButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->shareButton)->BitmapHeight());
+  this->shareButton->SetBitmap("유저인터페이스\\private_airplane\\btn_share_normal.bmp", 0, 0);
+  this->shareButton->SetBitmap("유저인터페이스\\private_airplane\\btn_share_over.bmp", 1, 0);
+  this->shareButton->SetBitmap("유저인터페이스\\private_airplane\\btn_share_press.bmp", 2, 0);
+  this->shareButton->SetSize(this->shareButton->BitmapWidth(), this->shareButton->BitmapHeight());
   this->shareButton->SetId(ID_PREVIEW);
-  static_cast<UIBitmapButton*>(this->shareButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_SHARE_DESC));
+  this->shareButton->SetTooltip(LookupMessage(MSI_NAVIGATION_SHARE_DESC));
   this->AddChild(this->shareButton);
 
   this->findButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->findButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_find_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->findButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_find_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->findButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_find_press.bmp", 2, 0);
-  this->findButton->SetSize(static_cast<UIBitmapButton*>(this->findButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->findButton)->BitmapHeight());
+  this->findButton->SetBitmap("유저인터페이스\\private_airplane\\btn_find_normal.bmp", 0, 0);
+  this->findButton->SetBitmap("유저인터페이스\\private_airplane\\btn_find_over.bmp", 1, 0);
+  this->findButton->SetBitmap("유저인터페이스\\private_airplane\\btn_find_press.bmp", 2, 0);
+  this->findButton->SetSize(this->findButton->BitmapWidth(), this->findButton->BitmapHeight());
   this->findButton->SetId(NAVI_BUTTON_FIND);
-  static_cast<UIBitmapButton*>(this->findButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_VIEWCHANGE));
+  this->findButton->SetTooltip(LookupMessage(MSI_NAVIGATION_VIEWCHANGE));
   this->AddChild(this->findButton);
 
   this->moveButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->moveButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_move_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->moveButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_move_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->moveButton)->SetBitmap("유저인터페이스\\private_airplane\\btn_move_press.bmp", 2, 0);
-  this->moveButton->SetSize(static_cast<UIBitmapButton*>(this->moveButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->moveButton)->BitmapHeight());
+  this->moveButton->SetBitmap("유저인터페이스\\private_airplane\\btn_move_normal.bmp", 0, 0);
+  this->moveButton->SetBitmap("유저인터페이스\\private_airplane\\btn_move_over.bmp", 1, 0);
+  this->moveButton->SetBitmap("유저인터페이스\\private_airplane\\btn_move_press.bmp", 2, 0);
+  this->moveButton->SetSize(this->moveButton->BitmapWidth(), this->moveButton->BitmapHeight());
   this->moveButton->SetId(NAVI_BUTTON_PRIVATE_AIRPLANE);
   this->AddChild(this->moveButton);
 
@@ -2336,61 +2474,61 @@ void UINavigationV4Wnd::OnCreate(int, int) {
   this->minimizeButton = this->AddMinimizeButton(LookupMessage(MSI_NAVIGATION_MAP), 0);
 
   this->helpButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->helpButton)->SetBitmap("유저인터페이스\\navigation_interface\\NaviHelp_off.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->helpButton)->SetBitmap("유저인터페이스\\navigation_interface\\NaviHelp_on.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->helpButton)->SetBitmap("유저인터페이스\\navigation_interface\\NaviHelp_on.bmp", 2, 0);
-  this->helpButton->SetSize(static_cast<UIBitmapButton*>(this->helpButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->helpButton)->BitmapHeight());
+  this->helpButton->SetBitmap("유저인터페이스\\navigation_interface\\NaviHelp_off.bmp", 0, 0);
+  this->helpButton->SetBitmap("유저인터페이스\\navigation_interface\\NaviHelp_on.bmp", 1, 0);
+  this->helpButton->SetBitmap("유저인터페이스\\navigation_interface\\NaviHelp_on.bmp", 2, 0);
+  this->helpButton->SetSize(this->helpButton->BitmapWidth(), this->helpButton->BitmapHeight());
   this->helpButton->SetId(ID_HELP);
-  static_cast<UIBitmapButton*>(this->helpButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_NPC));
+  this->helpButton->SetTooltip(LookupMessage(MSI_NAVIGATION_NPC));
   this->AddChild(this->helpButton);
 
   this->dataButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->dataButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_Navidata_Open_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->dataButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_Navidata_Open_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->dataButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_Navidata_Open_press.bmp", 2, 0);
-  this->dataButton->SetSize(static_cast<UIBitmapButton*>(this->dataButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->dataButton)->BitmapHeight());
+  this->dataButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_Navidata_Open_normal.bmp", 0, 0);
+  this->dataButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_Navidata_Open_over.bmp", 1, 0);
+  this->dataButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_Navidata_Open_press.bmp", 2, 0);
+  this->dataButton->SetSize(this->dataButton->BitmapWidth(), this->dataButton->BitmapHeight());
   this->dataButton->SetId(NAVI_BUTTON_DATA);
-  static_cast<UIBitmapButton*>(this->dataButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_MINI));
+  this->dataButton->SetTooltip(LookupMessage(MSI_NAVIGATION_MINI));
   this->AddChild(this->dataButton);
 
   this->searchEdit = new UIBitmapEditCtrl;
   this->searchEdit->SetSize(113, 18);
-  static_cast<UIBitmapEditCtrl*>(this->searchEdit)->maximum = 30;
-  static_cast<UIBitmapEditCtrl*>(this->searchEdit)->SetBitmapName("유저인터페이스\\navigation_interface3\\bg_search.bmp");
+  this->searchEdit->maximum = 30;
+  this->searchEdit->SetBitmapName("유저인터페이스\\navigation_interface3\\bg_search.bmp");
   this->searchEdit->SetId(NAVI_SEARCH_EDIT);
   this->AddChild(this->searchEdit);
 
   this->searchButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->searchButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_normal.bmp", 3, 0);
-  static_cast<UIBitmapButton*>(this->searchButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_normal.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->searchButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->searchButton)->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_press.bmp", 2, 0);
-  this->searchButton->SetSize(static_cast<UIBitmapButton*>(this->searchButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->searchButton)->BitmapHeight());
+  this->searchButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_normal.bmp", 3, 0);
+  this->searchButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_normal.bmp", 0, 0);
+  this->searchButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_over.bmp", 1, 0);
+  this->searchButton->SetBitmap("유저인터페이스\\navigation_interface3\\btn_searchbar_press.bmp", 2, 0);
+  this->searchButton->SetSize(this->searchButton->BitmapWidth(), this->searchButton->BitmapHeight());
   this->searchButton->SetId(ID_SEARCH);
-  static_cast<UIBitmapButton*>(this->searchButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_SEARCHINFO));
+  this->searchButton->SetTooltip(LookupMessage(MSI_NAVIGATION_SEARCHINFO));
   this->AddChild(this->searchButton);
 
   this->backButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->backButton)->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back.bmp", 3, 0);
-  static_cast<UIBitmapButton*>(this->backButton)->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->backButton)->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back_on.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->backButton)->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back_on.bmp", 2, 0);
-  this->backButton->SetSize(static_cast<UIBitmapButton*>(this->backButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->backButton)->BitmapHeight());
+  this->backButton->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back.bmp", 3, 0);
+  this->backButton->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back.bmp", 0, 0);
+  this->backButton->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back_on.bmp", 1, 0);
+  this->backButton->SetBitmap("유저인터페이스\\navigation_interface3\\bt_back_on.bmp", 2, 0);
+  this->backButton->SetSize(this->backButton->BitmapWidth(), this->backButton->BitmapHeight());
   this->backButton->SetId(ID_CHARGE);
-  static_cast<UIBitmapButton*>(this->backButton)->SetTooltip(LookupMessage(MSI_NAVIGATION_ICONTIP));
+  this->backButton->SetTooltip(LookupMessage(MSI_NAVIGATION_ICONTIP));
   this->AddChild(this->backButton);
 
   this->searchType = new UIComboBox_BmpWnd();
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->dropdownHeight = 67;
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->Create(61, 18, "유저인터페이스\\navigation_interface3\\dropdown_on", "유저인터페이스\\navigation_interface3\\bg_combo.bmp");
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->SetBorderColor(100, 100, 100);
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->SetColor(232, 232, 232);
+  this->searchType->dropdownHeight = 67;
+  this->searchType->Create(61, 18, "유저인터페이스\\navigation_interface3\\dropdown_on", "유저인터페이스\\navigation_interface3\\bg_combo.bmp");
+  this->searchType->SetBorderColor(100, 100, 100);
+  this->searchType->SetColor(232, 232, 232);
   this->AddChild(this->searchType);
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->AddOption(LookupMessage(MSI_NAVIGATION_MOB), 0);
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->AddOption(LookupMessage(MSI_NAVIGATION_SETSTRING), 0);
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->AddOption(LookupMessage(MSI_NAVIGATION_SCROLL), 0);
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->AddOption(LookupMessage(MSI_NAVIGATION_USESCROLL), 0);
-  static_cast<UIComboBox_BmpWnd*>(this->searchType)->Select(g_navigationManager.searchType);
+  this->searchType->AddOption(LookupMessage(MSI_NAVIGATION_MOB), 0);
+  this->searchType->AddOption(LookupMessage(MSI_NAVIGATION_SETSTRING), 0);
+  this->searchType->AddOption(LookupMessage(MSI_NAVIGATION_SCROLL), 0);
+  this->searchType->AddOption(LookupMessage(MSI_NAVIGATION_USESCROLL), 0);
+  this->searchType->Select(g_navigationManager.searchType);
 
   this->RefreshLayout();
 }
@@ -2414,8 +2552,8 @@ void UINavigationroadiconWnd::OnCreate(int, int) {
 // FUNCTION: fn_03588
 void UINavigationV4Wnd::Paint() {
   if (g_navigationManager.expandedMap == true) {
-    DrawFilledRoundedBorder(*this, 0, 0, 0x86, 0x3d, 0xffffff);
-    DrawFilledRoundedBorder(*this, 1, 0x11, 0x84, 0x2b, 0);
+    this->DrawFilledRoundedOutline(0, 0, 0x86, 0x3d, 0xffffff);
+    this->DrawFilledRoundedOutline(1, 0x11, 0x84, 0x2b, 0);
     this->DrawTextAt(3, 3, LookupMessage(MSI_NAVIGATION_MOB_S_S), 0, 0, 12, 0, 0, 0);
     if (g_navigationManager.destinationText.size() != 0) {
       this->DrawBitmap(
@@ -2609,8 +2747,8 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       break;
     }
     case ID_SEARCH:
-      if (static_cast<UIEditCtrl*>(this->searchEdit)->Length() != 0 && !g_navigationManager.expandedMap) {
-        g_navigationManager.searchText = static_cast<UIEditCtrl*>(this->searchEdit)->Text();
+      if (this->searchEdit->Length() != 0 && !g_navigationManager.expandedMap) {
+        g_navigationManager.searchText = this->searchEdit->Text();
         g_navigationManager.UpdateSearchResults();
         this->searchList->Clear();
         this->searchList->Invalidate();
@@ -2796,7 +2934,7 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
           window->SendMsg(nullptr, UM_RESOLVE_PLAYER_TAGS, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_TO_BLOCK_WHISPER_FAILED1)), 0, 0, 0);
         }
 
-        std::string mapName = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->MapName();
+        std::string mapName = g_modeMgr.GetGameMode()->MapName();
         mapName = mapName.substr(0, mapName.find(".rsw")) + ".gat";
         if (!g_privateAirplaneItems->IsStartableMap(mapName)) {
           window->SendMsg(nullptr, UM_RESOLVE_PLAYER_TAGS, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENTER_ONE_LINE_WITHOUT_LINE_BREAKS)), 0, 0, 0);
@@ -2814,9 +2952,9 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
           window->SendMsg(nullptr, UM_REFRESHBUTTON, 0, 0, 0, 0);
         }
 
-        CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-        if (mode->scene && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player &&
-            static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.state == 3) {
+        CGameMode* mode = g_modeMgr.GetGameMode();
+        if (mode->scene && g_modeMgr.GetGameMode()->scene->player &&
+            g_modeMgr.GetGameMode()->scene->player->render.state == 3) {
           window->SendMsg(nullptr, UM_RESOLVE_PLAYER_TAGS, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_REGISTER_ADVENTURER_AGENCY2)), 0, 0, 0);
           window->SendMsg(nullptr, UM_REFRESHBUTTON, 0, 0, 0, 0);
         }
@@ -2849,7 +2987,7 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     break;
 
   case UM_DEFPUSH:
-    if (sender == this->searchEdit && static_cast<UIEditCtrl*>(this->searchEdit)->Length() > 0) {
+    if (sender == this->searchEdit && this->searchEdit->Length() > 0) {
       this->SendMsg(this->searchEdit, UM_COMMAND, ID_SEARCH, 0, 0, 0);
     }
     break;
@@ -2992,10 +3130,13 @@ void UINavigationRuideWnd::RefreshRoute() {
     std::sprintf(text, "%s (%d %d)", node->GetInfo()->GetName(), x, y);
 
     UIListBox_NaviSearch* list = this->routeList;
+    int icon;
     if (index == 0) {
-      list->icons.push_back(100);
+      icon = 100;
+      list->icons.push_back(icon);
     } else {
-      list->icons.push_back(200);
+      icon = 200;
+      list->icons.push_back(icon);
     }
     list->AddLine(text);
     list->Invalidate();
@@ -3013,7 +3154,8 @@ void UINavigationRuideWnd::RefreshRoute() {
   }
 
   UIListBox_NaviSearch* list = this->routeList;
-  list->icons.push_back(300);
+  int icon = 300;
+  list->icons.push_back(icon);
   list->AddLine(text);
   list->Invalidate();
 }
@@ -3493,9 +3635,9 @@ void UINavigationV4Wnd::SetRoadIcon(int slot) {
   std::sprintf(over, "유저인터페이스\\navigation_interface3\\btn_roadIocn_select%d_over.bmp", slot);
   std::sprintf(press, "유저인터페이스\\navigation_interface3\\btn_roadIocn_select%d_press.bmp", slot);
 
-  static_cast<UIBitmapButton*>(this->roadIconButton)->SetBitmap(normal, 0, 0);
-  static_cast<UIBitmapButton*>(this->roadIconButton)->SetBitmap(over, 1, 0);
-  static_cast<UIBitmapButton*>(this->roadIconButton)->SetBitmap(press, 2, 0);
+  this->roadIconButton->SetBitmap(normal, 0, 0);
+  this->roadIconButton->SetBitmap(over, 1, 0);
+  this->roadIconButton->SetBitmap(press, 2, 0);
   this->roadIconButton->Invalidate();
   g_navigationManager.BuildGridLabels();
 }
@@ -3835,7 +3977,9 @@ std::list<int> UIWindow::WrapText(std::string text, std::list<std::string>* line
       if (bytes) {
         TextContext context(*this->geometry.surface);
         context.SetFont(family, height, bold, 0);
-        characterWidth = context.Measure(measured, bytes).cx;
+        SIZE size;
+        context.Measure(measured, bytes, &size);
+        characterWidth = size.cx;
       }
     }
 

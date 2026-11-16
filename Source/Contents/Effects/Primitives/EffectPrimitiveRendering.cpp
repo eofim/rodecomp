@@ -748,9 +748,7 @@ void CEffectPrim::Render(int argument) {
       RenderVertex bottom{0, 0, 0, 0, 0, 0xFF000000u, 0, 0};
       g_renderer->viewport.Project(position, wtm.values, bottom);
       this->state.triangles[0].vertices[0].x = top.x;
-      this->state.triangles[0].vertices[2].x = bottom.x;
-      this->state.triangles[0].vertices[2].y = bottom.y;
-      this->state.triangles[0].vertices[2].z = bottom.z;
+      this->state.triangles[0].vertices[2] = bottom;
       this->state.triangles[0].vertices[0].y = top.y;
       this->state.triangles[0].vertices[0].z = top.z;
       this->state.triangles[0].vertices[0].rhw = 0.999999f;
@@ -803,18 +801,10 @@ __declspec(safebuffers) void CEffectPrim::RenderTeiRect(
 
   if (f1 == 0) {
     const vector3d& position = this->render.position;
-    vec1.x += position.x;
-    vec1.y += position.y;
-    vec1.z += position.z;
-    vec2.x += position.x;
-    vec2.y += position.y;
-    vec2.z += position.z;
-    vec3.x += position.x;
-    vec3.y += position.y;
-    vec3.z += position.z;
-    vec4.x += position.x;
-    vec4.y += position.y;
-    vec4.z += position.z;
+    vec1 += position;
+    vec2 += position;
+    vec3 += position;
+    vec4 += position;
   }
 
   alignas(16) RenderVertex vertex;
@@ -1207,18 +1197,10 @@ __declspec(safebuffers) void CEffectPrim::RenderTeiRect(
   }
 
   const vector3d& position = this->render.position;
-  vec1.x += position.x;
-  vec1.y += position.y;
-  vec1.z += position.z;
-  vec2.x += position.x;
-  vec2.y += position.y;
-  vec2.z += position.z;
-  vec3.x += position.x;
-  vec3.y += position.y;
-  vec3.z += position.z;
-  vec4.x += position.x;
-  vec4.y += position.y;
-  vec4.z += position.z;
+  vec1 += position;
+  vec2 += position;
+  vec3 += position;
+  vec4 += position;
 
   alignas(16) RenderVertex vertex;
   this->state.triangles[*rpCnt].sourceBlend = 5;
@@ -1302,18 +1284,10 @@ __declspec(safebuffers) void CEffectPrim::RenderTeiRect(
   const float bottom = static_cast<float>(texPart + 1) / 21.0f;
 
   const vector3d& position = this->render.position;
-  vec1.x += position.x;
-  vec1.y += position.y;
-  vec1.z += position.z;
-  vec2.x += position.x;
-  vec2.y += position.y;
-  vec2.z += position.z;
-  vec3.x += position.x;
-  vec3.y += position.y;
-  vec3.z += position.z;
-  vec4.x += position.x;
-  vec4.y += position.y;
-  vec4.z += position.z;
+  vec1 += position;
+  vec2 += position;
+  vec3 += position;
+  vec4 += position;
 
   alignas(16) RenderVertex vertex;
   this->state.triangles[*rpCnt].sourceBlend = 5;
@@ -1807,13 +1781,12 @@ void CEffectPrim::RenderHermode(matrix& wtm) {
     vector3d vec4 = slot.vecTNow;
     vec4.y -= slot.distance;
 
-    const unsigned char shade = static_cast<unsigned char>(slot.flag1[0]);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecBPre, slot.vecBNow, slot.vecTNow, slot.vecTPre, wtm, 0, 0, 0, shade, shade, 250, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecBPre, slot.vecBNow, vec2, vec1, wtm, 0, 0, 0, shade, shade, 220, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecBNow, slot.vecTNow, vec4, vec2, wtm, 0, 0, 0, shade, shade, 190, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecTNow, slot.vecTPre, vec3, vec4, wtm, 0, 0, 0, shade, shade, 130, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecTPre, slot.vecBPre, vec1, vec3, wtm, 0, 0, 0, shade, shade, 160, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec4, vec3, wtm, 0, 0, 0, shade, shade, 250, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecBPre, slot.vecBNow, slot.vecTNow, slot.vecTPre, wtm, 0, 0, 0, static_cast<unsigned char>(slot.flag1[0]), static_cast<unsigned char>(slot.flag1[0]), 250, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecBPre, slot.vecBNow, vec2, vec1, wtm, 0, 0, 0, static_cast<unsigned char>(slot.flag1[0]), static_cast<unsigned char>(slot.flag1[0]), 220, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecBNow, slot.vecTNow, vec4, vec2, wtm, 0, 0, 0, static_cast<unsigned char>(slot.flag1[0]), static_cast<unsigned char>(slot.flag1[0]), 190, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecTNow, slot.vecTPre, vec3, vec4, wtm, 0, 0, 0, static_cast<unsigned char>(slot.flag1[0]), static_cast<unsigned char>(slot.flag1[0]), 130, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, slot.vecTPre, slot.vecBPre, vec1, vec3, wtm, 0, 0, 0, static_cast<unsigned char>(slot.flag1[0]), static_cast<unsigned char>(slot.flag1[0]), 160, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec4, vec3, wtm, 0, 0, 0, static_cast<unsigned char>(slot.flag1[0]), static_cast<unsigned char>(slot.flag1[0]), 250, 0.0f, 1.0f, 0.0f, 1.0f, 0);
   }
 }
 
@@ -1858,12 +1831,8 @@ void CEffectPrim::RenderHitLine3(matrix& wtm) {
 
       std::int16_t angle;
       Get_Angle(vecA.x - vecB.x, vecA.z - vecB.z, &angle);
-      vecA.x += slot.vecBNow.x;
-      vecA.y += slot.vecBNow.y;
-      vecA.z += slot.vecBNow.z;
-      vecB.x += slot.vecBNow.x;
-      vecB.y += slot.vecBNow.y;
-      vecB.z += slot.vecBNow.z;
+      vecA += slot.vecBNow;
+      vecB += slot.vecBNow;
       angle += 90;
 
       if (angle >= 360) {
@@ -1991,12 +1960,8 @@ void CEffectPrim::RenderHitLine(matrix& wtm) {
 
       std::int16_t angle;
       Get_Angle(vecA.x - vecB.x, vecA.z - vecB.z, &angle);
-      vecA.x += slot.vecBNow.x;
-      vecA.y += slot.vecBNow.y;
-      vecA.z += slot.vecBNow.z;
-      vecB.x += slot.vecBNow.x;
-      vecB.y += slot.vecBNow.y;
-      vecB.z += slot.vecBNow.z;
+      vecA += slot.vecBNow;
+      vecB += slot.vecBNow;
       angle = static_cast<std::int16_t>((angle + 90) % 360);
 
       for (int i = 0; i <= 3; ++i) {
@@ -2036,40 +2001,38 @@ void CEffectPrim::RenderMagnum2(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    EffectPrimitiveSlot& slot = this->state.slots[ec];
-
-    if (rpCnt >= 256 || slot.life != 1) {
+    if (rpCnt >= 256 || this->state.slots[ec].life != 1) {
       continue;
     }
 
-    const int step = slot.fullDisplayAngle / 20;
+    const int step = this->state.slots[ec].fullDisplayAngle / 20;
     int order = 0;
 
-    for (int count = 0; count <= slot.fullDisplayAngle; count += step) {
-      int angle = slot.rotStart + count;
+    for (int count = 0; count <= this->state.slots[ec].fullDisplayAngle; count += step) {
+      int angle = this->state.slots[ec].rotStart + count;
 
       if (angle >= 360) {
         angle -= 360;
       }
 
-      if (slot.fullDisplayAngle == 360 && order == 20) {
-        angle = slot.rotStart;
+      if (this->state.slots[ec].fullDisplayAngle == 360 && order == 20) {
+        angle = this->state.slots[ec].rotStart;
       }
 
       const float cs1 = g_cosTable[angle];
       const float sn1 = g_sinTable[angle];
-      slot.vecBNow.x = cs1 * slot.distance;
-      slot.vecBNow.y = -3.0f;
-      slot.vecBNow.z = sn1 * slot.distance;
+      this->state.slots[ec].vecBNow.x = cs1 * this->state.slots[ec].distance;
+      this->state.slots[ec].vecBNow.y = -3.0f;
+      this->state.slots[ec].vecBNow.z = sn1 * this->state.slots[ec].distance;
 
-      const float rx = g_cosTable[slot.riseAngle] * slot.maxHeight;
-      const float ry = g_sinTable[slot.riseAngle] * slot.maxHeight;
-      slot.vecTNow.x = cs1 * rx + slot.vecBNow.x;
-      slot.vecTNow.y = -(ry + 3.0f);
-      slot.vecTNow.z = sn1 * rx + slot.vecBNow.z;
+      const float rx = g_cosTable[this->state.slots[ec].riseAngle] * this->state.slots[ec].maxHeight;
+      const float ry = g_sinTable[this->state.slots[ec].riseAngle] * this->state.slots[ec].maxHeight;
+      this->state.slots[ec].vecTNow.x = cs1 * rx + this->state.slots[ec].vecBNow.x;
+      this->state.slots[ec].vecTNow.y = -(ry + 3.0f);
+      this->state.slots[ec].vecTNow.z = sn1 * rx + this->state.slots[ec].vecBNow.z;
 
-      if (order > 0 && slot.alphaB > 0) {
-        this->RenderTeiRect(&rpCnt, order - 1, slot.alphaB, slot.alphaB, slot.vecBPre, slot.vecBNow, slot.vecTNow, slot.vecTPre, wtm, 0);
+      if (order > 0 && this->state.slots[ec].alphaB > 0) {
+        this->RenderTeiRect(&rpCnt, order - 1, this->state.slots[ec].alphaB, this->state.slots[ec].alphaB, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, 0);
       }
 
       ++order;
@@ -2078,8 +2041,8 @@ void CEffectPrim::RenderMagnum2(matrix& wtm) {
         order = 20;
       }
 
-      slot.vecBPre = slot.vecBNow;
-      slot.vecTPre = slot.vecTNow;
+      this->state.slots[ec].vecBPre = this->state.slots[ec].vecBNow;
+      this->state.slots[ec].vecTPre = this->state.slots[ec].vecTNow;
     }
   }
 }
@@ -2187,39 +2150,36 @@ __declspec(safebuffers) void CEffectPrim::RenderGrid(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    const EffectPrimitiveSlot& slot = this->state.slots[ec];
 
-    if (slot.life != 1 || slot.alphaB <= 0) {
+    if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
       continue;
     }
 
     for (int x = -150; x < 150; x += 30) {
       for (int z = -90; z < 90; z += 30) {
-        const float size = slot.distance;
-        const float base = slot.maxHeight;
-        vec1.x = base + static_cast<float>(x);
+        vec1.x = this->state.slots[ec].maxHeight + static_cast<float>(x);
         vec1.y = -10.0f;
-        vec1.z = base + static_cast<float>(z);
-        vec2.x = size + static_cast<float>(x) + base;
+        vec1.z = this->state.slots[ec].maxHeight + static_cast<float>(z);
+        vec2.x = this->state.slots[ec].distance + static_cast<float>(x) + this->state.slots[ec].maxHeight;
         vec2.y = -10.0f;
         vec2.z = vec1.z;
         vec3.x = vec2.x;
         vec3.y = -10.0f;
-        vec3.z = size + static_cast<float>(z) + base;
+        vec3.z = this->state.slots[ec].distance + static_cast<float>(z) + this->state.slots[ec].maxHeight;
         vec4.x = vec1.x;
         vec4.y = -10.0f;
         vec4.z = vec3.z;
         this->Tei_TowardScreen(vec1, vec2, vec3, vec4, this->state.slots[0].alphaT, this->state.slots[1].alphaT);
 
-        const char color = slot.flag1[10];
+        const char color = this->state.slots[ec].flag1[10];
         if (color == 0) {
-          this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+          this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
         } else if (color == 1) {
-          this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 0, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+          this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 0, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
         } else if (color == 3) {
-          this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+          this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
         } else {
-          this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 0, 0, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+          this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 0, 0, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
         }
       }
     }
@@ -2308,7 +2268,7 @@ __declspec(safebuffers) void CEffectPrim::RenderSMA3(matrix&) {
 
   if (slot.flag1[0] == 0) {
     if (slot.process % 8 == 0) {
-      CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* gameMode = g_modeMgr.GetGameMode();
       CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SMA2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       if (effect) {
         vector3d position = slot.vecBNow;
@@ -2317,7 +2277,7 @@ __declspec(safebuffers) void CEffectPrim::RenderSMA3(matrix&) {
       }
     }
   } else if (slot.flag1[0] == 1) {
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
     CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SMA3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
       vector3d position = slot.vecBNow;
@@ -2325,7 +2285,7 @@ __declspec(safebuffers) void CEffectPrim::RenderSMA3(matrix&) {
     }
   } else if (slot.flag1[0] == 99) {
     if (slot.process % 8 == 0) {
-      CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* gameMode = g_modeMgr.GetGameMode();
       CRagEffect* effect = gameMode->scene->player->LaunchEffect(EF_SMA_BLACK2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       if (effect) {
         vector3d position = slot.vecBNow;
@@ -2345,27 +2305,30 @@ void CEffectPrim::RenderBeam(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    const EffectPrimitiveSlot& slot = this->state.slots[ec];
-
-    if (slot.life != 1 || slot.alphaB <= 0) {
+    if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
       continue;
     }
 
-    const float lift = slot.height[3];
-    const float length = slot.distance * g_sinTable[slot.fullDisplayAngle] + slot.distance;
-    const float reach = length * g_cosTable[slot.riseAngle];
-    vec2.Set(reach * g_cosTable[slot.rotStart], length * g_sinTable[slot.riseAngle] - lift, reach * g_sinTable[slot.rotStart]);
+    const float length = this->state.slots[ec].distance * g_sinTable[this->state.slots[ec].fullDisplayAngle] + this->state.slots[ec].distance;
+    const float reach = length * g_cosTable[this->state.slots[ec].riseAngle];
+    vec2.Set(
+      reach * g_cosTable[this->state.slots[ec].rotStart], length * g_sinTable[this->state.slots[ec].riseAngle] - this->state.slots[ec].height[3],
+      reach * g_sinTable[this->state.slots[ec].rotStart]
+    );
     vec3 = vec2;
-    const unsigned char red = static_cast<unsigned char>(static_cast<int>(slot.height[0]));
-    const unsigned char green = static_cast<unsigned char>(static_cast<int>(slot.height[1]));
-    const unsigned char blue = static_cast<unsigned char>(static_cast<int>(slot.height[2]));
 
-    vec1.Set(0.5f, -lift, 0.0f);
-    vec4.Set(-0.5f, -lift, 0.0f);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 0, 0, 0, red, green, blue, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-    vec1.Set(0.0f, -lift, 0.5f);
-    vec4.Set(0.0f, -lift, -0.5f);
-    this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 0, 0, 0, red, green, blue, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    vec1.Set(0.5f, -this->state.slots[ec].height[3], 0.0f);
+    vec4.Set(-0.5f, -this->state.slots[ec].height[3], 0.0f);
+    this->RenderTeiRect(
+      &rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 0, 0, 0, static_cast<unsigned char>(this->state.slots[ec].height[0]),
+      static_cast<unsigned char>(this->state.slots[ec].height[1]), static_cast<unsigned char>(this->state.slots[ec].height[2]), 0.0f, 1.0f, 0.0f, 1.0f, 0
+    );
+    vec1.Set(0.0f, -this->state.slots[ec].height[3], 0.5f);
+    vec4.Set(0.0f, -this->state.slots[ec].height[3], -0.5f);
+    this->RenderTeiRect(
+      &rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 0, 0, 0, static_cast<unsigned char>(this->state.slots[ec].height[0]),
+      static_cast<unsigned char>(this->state.slots[ec].height[1]), static_cast<unsigned char>(this->state.slots[ec].height[2]), 0.0f, 1.0f, 0.0f, 1.0f, 0
+    );
   }
 }
 
@@ -2464,23 +2427,22 @@ void CEffectPrim::RenderFloorRect(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    const EffectPrimitiveSlot& slot = this->state.slots[ec];
-
-    if (slot.life != 1 || slot.alphaB <= 0) {
+    if (this->state.slots[ec].life != 1) {
+      continue;
+    }
+    const short alpha = this->state.slots[ec].alphaB;
+    if (alpha <= 0) {
       continue;
     }
 
-    const int rot = slot.riseAngle;
-    const float back = slot.maxHeight;
-    const float width = slot.height[0];
-    const float length = slot.distance;
+    const int rot = this->state.slots[ec].riseAngle;
+    const float back = this->state.slots[ec].maxHeight;
+    const float width = this->state.slots[ec].height[0];
 
-    int angle = rot - 90;
-    if (angle < 0) {
-      angle += 360;
-    }
+    int angle = rot >= 90 ? rot - 90 : rot + 270;
     const float widthX = width * g_cosTable[angle];
     const float widthZ = width * g_sinTable[angle];
+    angle = rot >= 90 ? rot - 90 : rot + 270;
     const float baseX = back * g_cosTable[angle] + widthX;
     const float baseZ = back * g_sinTable[angle] + widthZ;
 
@@ -2488,18 +2450,15 @@ void CEffectPrim::RenderFloorRect(matrix& wtm) {
     if (angle < 0) {
       angle += 360;
     }
-    vec4.Set(length * g_cosTable[angle] + baseX, 0.0f, length * g_sinTable[angle] + baseZ);
+    vec4.Set(this->state.slots[ec].distance * g_cosTable[angle] + baseX, 0.0f, this->state.slots[ec].distance * g_sinTable[angle] + baseZ);
 
     angle = rot - 180;
     if (angle < 0) {
       angle += 360;
     }
-    vec3.Set(length * g_cosTable[angle] + baseX, 0.0f, length * g_sinTable[angle] + baseZ);
+    vec3.Set(this->state.slots[ec].distance * g_cosTable[angle] + baseX, 0.0f, this->state.slots[ec].distance * g_sinTable[angle] + baseZ);
 
-    angle = rot + 90;
-    if (angle >= 360) {
-      angle -= 360;
-    }
+    angle = rot < 270 ? rot + 90 : rot - 270;
     const float sideX = back * g_cosTable[angle] + widthX;
     const float sideZ = back * g_sinTable[angle] + widthZ;
 
@@ -2507,15 +2466,15 @@ void CEffectPrim::RenderFloorRect(matrix& wtm) {
     if (angle < 0) {
       angle += 360;
     }
-    vec1.Set(length * g_cosTable[angle] + sideX, 0.0f, length * g_sinTable[angle] + sideZ);
+    vec1.Set(this->state.slots[ec].distance * g_cosTable[angle] + sideX, 0.0f, this->state.slots[ec].distance * g_sinTable[angle] + sideZ);
 
     angle = rot - 180;
     if (angle < 0) {
       angle += 360;
     }
-    vec2.Set(length * g_cosTable[angle] + sideX, 0.0f, length * g_sinTable[angle] + sideZ);
+    vec2.Set(this->state.slots[ec].distance * g_cosTable[angle] + sideX, 0.0f, this->state.slots[ec].distance * g_sinTable[angle] + sideZ);
 
-    this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+    this->RenderTeiRect(&rpCnt, alpha, vec1, vec2, vec3, vec4, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
   }
 }
 
@@ -2797,7 +2756,7 @@ void CEffectPrim::RenderColorPanel(matrix& wtm) {
 
     const int angle = slot.rotStart;
     const float size = slot.height[2];
-    const float half = size * 0.5f;
+    const float half = size * g_depthAverageHalf;
     const int opposite = angle < 180 ? angle + 180 : angle - 180;
     const float top = half - slot.height[4];
     const float preX = half * g_cosTable[angle] - g_sinTable[angle] * 0.0f;
@@ -3213,7 +3172,7 @@ void CEffectPrim::RenderFieldPanel(matrix& wtm) {
       continue;
     }
 
-    const bool field = std::string(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->mapName) == "ecl_fild01.rsw";
+    const bool field = std::string(g_modeMgr.GetGameMode()->mapName) == "ecl_fild01.rsw";
     if (field && slot.alphaB > 100) {
       slot.alphaB = 100;
     }
@@ -3464,11 +3423,11 @@ void CEffectPrim::RenderFanBeam(matrix& wtm) {
       continue;
     }
 
-    const float mode = slot.height[4];
-    const float length = slot.distance;
-    const float lift = slot.height[0];
-    const float rotCos = g_cosTable[slot.rotStart];
-    const float rotSin = g_sinTable[slot.rotStart];
+    float mode = slot.height[4];
+    float length = slot.distance;
+    float lift = slot.height[0];
+    float rotCos = g_cosTable[slot.rotStart];
+    float rotSin = g_sinTable[slot.rotStart];
     vec3.Set(0.0f, lift, 0.0f);
     vec4.Set(0.0f, lift, 0.0f);
 
@@ -3496,6 +3455,13 @@ void CEffectPrim::RenderFanBeam(matrix& wtm) {
       this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 0, 0, 0, 0, 250, 250, 0.0f, 1.0f, 0.0f, 1.0f, 0);
     }
 
+    mode = slot.height[4];
+    length = slot.distance;
+    lift = slot.height[0];
+    rotCos = g_cosTable[slot.rotStart];
+    rotSin = g_sinTable[slot.rotStart];
+    vec3.Set(0.0f, lift, 0.0f);
+    vec4.Set(0.0f, lift, 0.0f);
     spread = mode == 2.0f ? 2 : 5;
     left = slot.riseAngle - spread;
     if (left < 0) {
@@ -4013,7 +3979,7 @@ __declspec(safebuffers) void CEffectPrim::RenderHaloLayers(matrix& wtm) {
     }
 
     for (int i = 10; i >= 1; --i) {
-      const char mode = this->state.slots[ec].flag1[4];
+      char mode = this->state.slots[ec].flag1[4];
       int angle1;
       int angle2;
       if (mode == 6 || mode == 7) {
@@ -4046,6 +4012,7 @@ __declspec(safebuffers) void CEffectPrim::RenderHaloLayers(matrix& wtm) {
       vec3.Set(this->state.slots[ec].height[0] + this->state.slots[ec].vecTNow.x, 0.0f, this->state.slots[ec].vecTNow.z);
       vec4.Set(this->state.slots[ec].height[0] + this->state.slots[ec].vecTPre.x, 0.0f, this->state.slots[ec].vecTPre.z);
       this->Tei_TowardScreen(vec1, vec2, vec3, vec4, this->state.slots[0].alphaT, this->state.slots[1].alphaT);
+      mode = this->state.slots[ec].flag1[4];
       const float lift = mode == 2 || mode == 4 || mode == 6 || mode == 7 ? 40.0f : 30.0f;
       vec1.y -= lift;
       vec2.y -= lift;
@@ -4067,6 +4034,7 @@ __declspec(safebuffers) void CEffectPrim::RenderHaloLayers(matrix& wtm) {
         }
       }
 
+      mode = this->state.slots[ec].flag1[4];
       if (mode == 5 || mode == 6 || mode == 7) {
         this->state.slots[ec].vecBPre = {this->state.slots[ec].vecBPre.x * 1.1f, this->state.slots[ec].vecBPre.y * 1.1f, this->state.slots[ec].vecBPre.z * 1.1f};
         this->state.slots[ec].vecBNow = {this->state.slots[ec].vecBNow.x * 1.1f, this->state.slots[ec].vecBNow.y * 1.1f, this->state.slots[ec].vecBNow.z * 1.1f};
@@ -5043,8 +5011,8 @@ __declspec(safebuffers) void CEffectPrim::RenderSoulLink(matrix& wtm) {
       CRagEffect* effect = nullptr;
 
       if (static_cast<float>(g_session.m_aid) == slot.height[10]) {
-        effect = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->LaunchEffect(EF_SOULLIGHT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      } else if (auto* actor = static_cast<CGameActor*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10])))) {
+        effect = g_modeMgr.GetGameMode()->scene->player->LaunchEffect(EF_SOULLIGHT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      } else if (auto* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(static_cast<std::uint32_t>(slot.height[10]))) {
         effect = actor->LaunchEffect(EF_SOULLIGHT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
 
@@ -5135,17 +5103,16 @@ void CEffectPrim::RenderSphereWind(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    const EffectPrimitiveSlot& slot = this->state.slots[ec];
 
-    if (slot.life != 1) {
+    if (this->state.slots[ec].life != 1) {
       continue;
     }
 
-    const int step = slot.fullDisplayAngle / 20;
+    const int step = this->state.slots[ec].fullDisplayAngle / 20;
     int order = 0;
 
-    for (int count = 0; count <= slot.fullDisplayAngle; count += step) {
-      int angle = slot.rotStart + count;
+    for (int count = 0; count <= this->state.slots[ec].fullDisplayAngle; count += step) {
+      int angle = this->state.slots[ec].rotStart + count;
 
       if (angle >= 360) {
         angle -= 360;
@@ -5153,19 +5120,19 @@ void CEffectPrim::RenderSphereWind(matrix& wtm) {
         angle += 360;
       }
 
-      if (slot.fullDisplayAngle == 360 && order == 20) {
-        angle = slot.rotStart;
+      if (this->state.slots[ec].fullDisplayAngle == 360 && order == 20) {
+        angle = this->state.slots[ec].rotStart;
       }
 
       const float cs1 = g_cosTable[angle];
       const float sn1 = g_sinTable[angle];
-      const vector3d vecM{cs1 * (g_cosTable[slot.riseAngle] * slot.distance), cs1 * (g_sinTable[slot.riseAngle] * slot.distance), sn1 * slot.distance};
-      const vector3d vecA{-(slot.maxHeight * g_sinTable[slot.riseAngle]), slot.maxHeight * g_cosTable[slot.riseAngle], 0.0f};
-      vec2.Set(vecM.x + vecA.x, vecM.y + vecA.y + slot.height[0], vecM.z + vecA.z);
-      vec4.Set(vecM.x - vecA.x, vecM.y - vecA.y + slot.height[0], vecM.z - vecA.z);
+      const vector3d vecM{cs1 * (g_cosTable[this->state.slots[ec].riseAngle] * this->state.slots[ec].distance), cs1 * (g_sinTable[this->state.slots[ec].riseAngle] * this->state.slots[ec].distance), sn1 * this->state.slots[ec].distance};
+      const vector3d vecA{-(this->state.slots[ec].maxHeight * g_sinTable[this->state.slots[ec].riseAngle]), this->state.slots[ec].maxHeight * g_cosTable[this->state.slots[ec].riseAngle], 0.0f};
+      vec2.Set(vecM.x + vecA.x, vecM.y + vecA.y + this->state.slots[ec].height[0], vecM.z + vecA.z);
+      vec4.Set(vecM.x - vecA.x, vecM.y - vecA.y + this->state.slots[ec].height[0], vecM.z - vecA.z);
 
       if (order > 0) {
-        this->RenderTeiRect(&rpCnt, order - 1, slot.alphaB, slot.alphaB, vec1, vec2, vec4, vec3, wtm, 0);
+        this->RenderTeiRect(&rpCnt, order - 1, this->state.slots[ec].alphaB, this->state.slots[ec].alphaB, vec1, vec2, vec4, vec3, wtm, 0);
       }
 
       ++order;
@@ -6423,6 +6390,7 @@ __declspec(safebuffers) void CEffectPrim::RenderChemical(matrix& wtm) {
       continue;
     }
 
+    const short alpha = slot.alphaB;
     vec1.Set(0.0f, 0.0f, 0.0f);
     vec4.Set(0.0f, 0.0f, 0.0f);
 
@@ -6439,7 +6407,7 @@ __declspec(safebuffers) void CEffectPrim::RenderChemical(matrix& wtm) {
     vec3.Set(g_cosTable[angle] * slot.distance, 0.0f, g_sinTable[angle] * slot.distance);
 
     this->Tei_TowardScreen(vec1, vec2, vec3, vec4, this->state.slots[0].alphaT, this->state.slots[1].alphaT);
-    angle = static_cast<int>(slot.alphaB * 0.5f);
+    angle = static_cast<int>(alpha * g_depthAverageHalf);
     this->RenderTeiRect(&rpCnt, static_cast<short>(angle), vec1, vec2, vec3, vec4, wtm, 0, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 
     vec4 = {0.0f, 0.0f, 0.0f};
@@ -6830,8 +6798,8 @@ void CEffectPrim::RenderMagicTarget(matrix& wtm) {
       continue;
     }
 
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
-    const GroundGeometry* ground = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->ground;
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
+    const GroundGeometry* ground = g_modeMgr.GetGameMode()->scene->ground;
     int column;
     int row;
     gameMode->WorldCell(this->render.position.x, this->render.position.z, column, row);
@@ -6842,11 +6810,11 @@ void CEffectPrim::RenderMagicTarget(matrix& wtm) {
     const float cs = g_cosTable[slot.rotStart];
 
     for (int z = 0; z < 7; ++z) {
+      const float z0 = static_cast<float>(z) - 3.5f;
+      const float z1 = static_cast<float>(z + 1) - 3.5f;
       for (int x = 0; x < 7; ++x) {
         const float x0 = static_cast<float>(x) - 3.5f;
         const float x1 = static_cast<float>(x + 1) - 3.5f;
-        const float z0 = static_cast<float>(z) - 3.5f;
-        const float z1 = static_cast<float>(z + 1) - 3.5f;
         const float u00 = z0 * sn + x0 * cs;
         const float v00 = z0 * cs - x0 * sn;
         const float u10 = x1 * cs + z0 * sn;
@@ -6983,7 +6951,7 @@ void CEffectPrim::Render2DPrimitive() {
     if (g_overrideColor == 1) {
       g_cooldownOwner->ClearReverseCommands();
     } else {
-      g_cooldownOwner->Drawing().SubmitReverse(g_renderer->queues, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
+      g_cooldownOwner->Drawing().SubmitReverse();
     }
   }
 }
@@ -6991,7 +6959,7 @@ void CEffectPrim::Render2DPrimitive() {
 // OFFSET: 0x00BCB660
 // FUNCTION: fn_19861
 void CEffectPrim::RenderSegmentSprites2(matrix& wtm) {
-  CSprRes* sprite = static_cast<CGameActor*>(static_cast<CRenderObject*>(this))->GetSprite();
+  CSprRes* sprite = this->GetSprite();
   CActRes* action = this->GetActRes();
   if (this->state.numSegment <= 0) {
     return;
@@ -7117,18 +7085,10 @@ void CEffectPrim::RenderSphere(matrix& wtm) {
       vec4.z = m4[5] * 0.0f + m4[2] * 0.0f + this->state.radius * m4[8] + m4[11];
 
       const vector3d& position = this->render.position;
-      vec1.x += position.x;
-      vec1.y += position.y;
-      vec1.z += position.z;
-      vec2.x += position.x;
-      vec2.y += position.y;
-      vec2.z += position.z;
-      vec3.x += position.x;
-      vec3.y += position.y;
-      vec3.z += position.z;
-      vec4.x += position.x;
-      vec4.y += position.y;
-      vec4.z += position.z;
+      vec1 += position;
+      vec2 += position;
+      vec3 += position;
+      vec4 += position;
 
       const float nextU = u + uStep;
       const float nextV = v + vStep;
@@ -7282,18 +7242,10 @@ __declspec(safebuffers) void CEffectPrim::RenderTeiFacingSlots(matrix& wtm) {
     this->Tei_TowardScreen(vec1, vec2, vec3, vec4, this->state.slots[0].alphaT, this->state.slots[1].alphaT);
 
     const vector3d& base = slot.vecBNow;
-    vec1.x += base.x;
-    vec1.y += base.y;
-    vec1.z += base.z;
-    vec2.x += base.x;
-    vec2.y += base.y;
-    vec2.z += base.z;
-    vec3.x += base.x;
-    vec3.y += base.y;
-    vec3.z += base.z;
-    vec4.x += base.x;
-    vec4.y += base.y;
-    vec4.z += base.z;
+    vec1 += base;
+    vec2 += base;
+    vec3 += base;
+    vec4 += base;
 
     switch (kind) {
     case 0:

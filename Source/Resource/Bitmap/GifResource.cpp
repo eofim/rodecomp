@@ -63,7 +63,7 @@ CBitmapRes::CBitmapRes() {
 
 // OFFSET: 0x0074A250
 // FUNCTION: fn_07862
-CGifRes::CGifRes() : loopCount(0), padding_0132(0), currentFrame(0), lastFrameTime(0), animated(false), frameChanged(false) {
+CGifRes::CGifRes() : loopCount(0), unknown_0132(0), currentFrame(0), lastFrameTime(0), animated(false), frameChanged(false) {
 }
 
 // INLINED
@@ -94,8 +94,7 @@ bool CGifRes::Load(const char* name) {
 // OFFSET: 0x00749B60
 // FUNCTION: fn_07854
 bool CGifRes::Decode(const char* name, const void* data, int bytes, bool iconOnly) {
-  const unsigned char* signature = static_cast<const unsigned char*>(data);
-  if (signature[0] == 'G' && signature[1] == 'I' && signature[2] == 'F') {
+  if (IsGifSignature(data)) {
     return this->DecodeGif(data, bytes, iconOnly);
   }
 
@@ -137,7 +136,7 @@ void CGifRes::Unload() {
 
   this->frames.clear();
   this->loopCount = 0;
-  this->padding_0132 = 0;
+  this->unknown_0132 = 0;
   this->currentFrame = 0;
 
   if (this->image.pixels) {
@@ -240,7 +239,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
 
   std::uint8_t transparent = 0;
   std::uint8_t transparentIndex = 0;
-  std::uint16_t delay = 0;
+  unsigned int delay = 0;
   while (bytes > cursor - start) {
     std::uint8_t blockType;
     memcpy_s(&blockType, sizeof(blockType), cursor, sizeof(blockType));
@@ -259,7 +258,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
         cursor += sizeof(control);
         transparentIndex = control.transparentIndex;
         transparent = control.flags & 1;
-        delay = std::max<std::uint16_t>(10, control.delay);
+        delay = std::max<unsigned int>(10, control.delay);
         break;
       }
       case 0xFF: {

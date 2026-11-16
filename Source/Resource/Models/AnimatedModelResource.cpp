@@ -34,7 +34,7 @@ AnimatedModelFrame::~AnimatedModelFrame() {
 
 // INLINED
 AnimatedModelNode::AnimatedModelNode()
-    : model(nullptr), parent(nullptr), vertexCount(0), faceCount(0), faceNormals(nullptr), frames(nullptr), faces(nullptr), textures(nullptr) {
+    : model(nullptr), parent(nullptr), vertexCount(0), faceCount(0), faceColors(nullptr), frames(nullptr), faces(nullptr), textures(nullptr) {
 }
 
 // INLINED
@@ -49,9 +49,9 @@ AnimatedModelNode::~AnimatedModelNode() {
     this->faces = nullptr;
   }
 
-  if (this->faceNormals) {
-    delete[] this->faceNormals;
-    this->faceNormals = nullptr;
+  if (this->faceColors) {
+    delete[] this->faceColors;
+    this->faceColors = nullptr;
   }
 
   if (this->textures) {
@@ -77,7 +77,7 @@ C3dAnimModelRes::C3dAnimModelRes() {
   this->origin.x = 0.0f;
   this->origin.y = 0.0f;
   this->origin.z = 0.0f;
-  this->padding_0150 = 0;
+  this->unknown_0150 = 0;
   this->alpha = 255;
 }
 
@@ -112,7 +112,6 @@ void C3dAnimModelRes::Unload() {
 // OFFSET: 0x00752390
 // FUNCTION: fn_07958
 bool C3dAnimModelRes::Load(const char* name) {
-  std::string rootName;
   CFile file;
 
   if (!file.Open(name, 0, true, false)) {
@@ -151,6 +150,7 @@ bool C3dAnimModelRes::Load(const char* name) {
     names[index] = std::string(field);
   }
 
+  std::string rootName;
   file.Read(field, sizeof(field));
   rootName = std::string(field);
   int nodeCount;
@@ -164,7 +164,7 @@ bool C3dAnimModelRes::Load(const char* name) {
     file.Read(&header, 4);
 
     if (header != 0x12345678u) {
-      ShowErrorDialog(GetRenderSystemHolder()->system, "data corrupt", 0);
+      ShowErrorDialog("data corrupt", 0);
       return false;
     }
 
@@ -204,7 +204,7 @@ bool C3dAnimModelRes::Load(const char* name) {
     }
 
     file.Read(&node->faceCount, 4);
-    node->faceNormals = new std::array<float, 3>[node->faceCount];
+    node->faceColors = new std::array<std::uint32_t, 3>[node->faceCount];
     node->faces = new AnimatedModelFace[node->faceCount];
     file.Read(node->faces, node->faceCount * 24);
     this->nodes.push_back(node);

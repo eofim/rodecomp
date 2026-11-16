@@ -12,10 +12,12 @@
 
 class BinkMovies;
 class CItem;
+class CGameActor;
 class CGameMode;
 class CGameObject;
 class CPlayer;
 class CRenderObject;
+class CSkill;
 class GroundGeometry;
 
 struct CellFloatPos {
@@ -41,15 +43,16 @@ public:
   void LoadMapEffects();
   void CellOrigin(int column, int row, float& x, float& z) const;
   void Clear();
+  void ClearChildren();
   void OnExitFrame();
   void OnProcess();
   bool RemoveItem(std::uint32_t aid);
   bool FindActorInCell(const float* position, std::function<bool(std::uint32_t)> predicate) const;
-  CRenderObject* GetGameActorByAID(std::uint32_t aid) const;
-  CRenderObject* GetGameActorByAidIncludeMe(std::uint32_t aid) const;
-  __declspec(noinline) CRenderObject* GetSkillByAID(std::uint32_t aid) const;
+  CGameActor* GetGameActorByAID(std::uint32_t aid) const;
+  CGameActor* GetGameActorByAidIncludeMe(std::uint32_t aid) const;
+  __declspec(noinline) CSkill* GetSkillByAID(std::uint32_t aid) const;
   CItem* GetItemByAID(std::uint32_t aid) const;
-  CRenderObject* GetActorByGID(int gid) const;
+  CGameActor* GetActorByGID(int gid) const;
   void RemovePcPos(std::uint32_t aid, bool notify);
   void RemovePcPosForMove(std::uint32_t aid, bool notify);
   void ClearActorCells();
@@ -66,22 +69,22 @@ public:
   void AddPcPosUnindexed(std::uint32_t aid, const CellFloatPos& cell);
   void InitWorld();
   void InitializeSpatial();
-  void RemoveObject(CRenderObject* object);
+  void RemoveObject(CGameObject* object);
   void SendObjectMessage(CGameObject* sender, std::uint64_t identity, int message, int a, int b, int c, int d);
   static unsigned long __stdcall LoadDeferredModels(void* parameter);
   void FinishModelLoading();
 
   /* 0004 */ CGameMode* gameMode;
-  /* 0008 */ std::list<CRenderObject*> objects;
-  /* 0010 */ std::list<CRenderObject*> actors;
-  /* 0018 */ std::list<CRenderObject*> items;
-  /* 0020 */ std::list<CRenderObject*> skills;
+  /* 0008 */ std::list<CGameObject*> objects;
+  /* 0010 */ std::list<CGameActor*> actors;
+  /* 0018 */ std::list<CItem*> items;
+  /* 0020 */ std::list<CSkill*> skills;
   /* 0028 */ GroundGeometry* ground;
   /* 002C */ CPlayer* player;
   /* 0030 */ C3dAttr* terrain;
   /* 0034 */ std::vector<C3dActor*> models;
   /* 0040 */ int published;
-  /* 0044 */ int pending;
+  /* 0044 */ long pending;
   /* 0048 */ int isPKZone;
   /* 004C */ int isSiegeMode;
   /* 0050 */ int isBattleFieldMode;

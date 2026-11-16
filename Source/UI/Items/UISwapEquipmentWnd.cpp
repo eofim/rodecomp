@@ -32,6 +32,7 @@
 #include "Utility/Text/FormatString.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Items/UIEquipWnd.h"
 #include <windows.h>
 #include <timeapi.h>
 
@@ -57,7 +58,7 @@ void UISwapEquipmentWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   ITEM_INFO item(0);
   unsigned char equipped = 0;
   switch (drag->source) {
@@ -92,7 +93,7 @@ void UISwapEquipmentWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     }
   }
 
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x0082FD90
@@ -124,7 +125,7 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
         const int row = slot & 3;
         if (slot < 8) {
           const int iconY = row * 26 + 48;
-          DrawItemIcon(*this, ResourceMgr::Instance(), xCoords[slot / 4 + 2], iconY, item, 0);
+          this->DrawItemIcon(xCoords[slot / 4 + 2], iconY, item, 0);
           this->DrawItemName(xCoords[slot / 4], yCoords[row], 70, &item, 0, 0, 12);
           if (0 < item.grade) {
             this->DrawBitmap(
@@ -134,7 +135,7 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
             );
           }
         } else {
-          DrawItemIcon(*this, ResourceMgr::Instance(), xCoords[row + 2], 22, item, 0);
+          this->DrawItemIcon(xCoords[row + 2], 22, item, 0);
           this->DrawItemName(xCoords[slot - 8], 30, 70, &item, 0, 0, 12);
         }
       } else {
@@ -151,7 +152,7 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
             const char* id = item.itemId.c_str();
             const int iconX = xCoords[slot / 4 + 2];
             std::memset(path, 0, sizeof(path));
-            g_session.IconPath(path, id, 1);
+            g_session.IconPath(id, path, 1);
             CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
             const int row = slot & 3;
             if (bitmap) {
@@ -169,7 +170,7 @@ void UISwapEquipmentWnd::DrawEquipmentSlots() {
             const char* id = item.itemId.c_str();
             const int iconX = xCoords[(slot & 3) + 2];
             std::memset(path, 0, sizeof(path));
-            g_session.IconPath(path, id, 1);
+            g_session.IconPath(id, path, 1);
             CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
             if (bitmap) {
               this->DrawAuxiliary(1, iconX, 22, bitmap, true, false);
@@ -211,7 +212,7 @@ int UISwapEquipmentWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SWAP_EQUIPITEM_FAIL_CHAT)), 0xFF, 0, 0, 0);
         return 1;
       }
-      if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->isPlayerDead) {
+      if (g_modeMgr.GetGameMode()->isPlayerDead) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SWAP_EQUIPITEM_FAIL_MERCHANTSHOP)), 0xFF, 0, 0, 0);
         return 1;
       }
@@ -227,7 +228,7 @@ int UISwapEquipmentWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MDUNGEON_CREATE_FAIL_PARTY_ONLINE)), 0xFF, 0, 0, 0);
         return 1;
       }
-      if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->actorWindows[3]) {
+      if (g_modeMgr.GetGameMode()->scene->player->actorWindows[3]) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SWAP_EQUIPITEM_FAIL_USE_NPC)), 0xFF, 0, 0, 0);
         return 1;
       }
@@ -385,7 +386,7 @@ void UISwapEquipmentWnd::Paint() {
   if (g_session.swapArrowIndex != 0) {
     ITEM_INFO dragItem = g_session.LookupClientItemByIdentity(g_session.swapArrowIndex);
     if (dragItem.identity[1] > 0) {
-      DrawItemIcon(*this, ResourceMgr::Instance(), this->geometry.width / 2 - 24, 27, dragItem, 0);
+      this->DrawItemIcon(this->geometry.width / 2 - 24, 27, dragItem, 0);
       this->DrawFittedItemName(this->geometry.width / 2 - 24, 51, &dragItem, 0, 0, 12, 0);
     }
   }
@@ -401,7 +402,7 @@ void UISwapEquipmentWnd::OnLBtnDblClk(int x, int y) {
   ITEM_INFO item = this->ItemAtPoint(x, y);
   if (item.identity[1] > 0 && item.quantity > 0) {
     const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
-    CMode* mode = g_modeMgr.gameMode;
+    CMode* mode = g_modeMgr.currentMode;
     if (GetAsyncKeyState(VK_CONTROL)) {
       mode->SendMsg(MM_SWAP_EQUIPMENT_BY_INDEX, reinterpret_cast<int>(&item), 0, 0, 0);
     } else {
@@ -419,19 +420,19 @@ void UISwapEquipmentWnd::OnLBtnDown(int x, int y) {
   }
 
   const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   mode->drag.BeginItem(g_windowMgr, this->equipmentPage == 2 ? 18 : 17, item, item.quantity, slots.values[2]);
 
   if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
     if (g_windowMgr.GetHoverWindow() && item.identified != 0) {
       if (g_windowMgr.GetHoverWindow()->geometry.id == 492) {
-        static_cast<UINpcTextEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->InsertItemTag(item);
+        g_windowMgr.npcTextEditDialogWnd->InsertItemTag(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 490) {
         static_cast<UIChatEditCtrl*>(g_windowMgr.GetHoverWindow())->InsertItemLink(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 493) {
         static_cast<UIChatEditCtrl*>(ChatWindow()->m_chatEdit)->InsertItemLink(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 491) {
-        static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->InsertItemTag(item);
+        g_windowMgr.rodexComposeWnd->InsertItemTag(item);
       } else if (g_windowMgr.GetHoverWindow()->geometry.id == 494) {
         static_cast<UIChatEditCtrl*>(g_windowMgr.GetHoverWindow())->InsertItemLink(item);
       }
@@ -478,7 +479,7 @@ void UISwapEquipmentWnd::OnMouseHover(int x, int y) {
   this->hoverSecondarySlot = -1;
   this->hoverTertiarySlot = -1;
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode->drag.source == 1) {
     if (!((x >= 6 && x < 30) || (x >= 251 && x < 275))) {
       return;

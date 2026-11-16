@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Contents/Actors/GameActor.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIWindow.h"
@@ -7,6 +8,7 @@
 #include "UI/Party/UIMiniPartyWnd.h"
 #include <algorithm>
 #include "Client/Session/Session.h"
+#include "Contents/Messenger/MessengerWindows.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/RenderObject.h"
@@ -14,6 +16,9 @@
 #include "Resource/World/TerrainResource.h"
 #include "UI/Chat/UIChatRoomTitle.h"
 #include "UI/Shop/UIMerchantShopTitle.h"
+#include "UI/Chat/UINewChatWnd.h"
+#include "UI/Dialogs/UIBookWnd.h"
+#include "UI/Login/UIChangeNameWnd.h"
 #include <typeinfo>
 
 // STATIC: 0x014576A0
@@ -32,7 +37,7 @@ bool UIWindowMgr::IsOrderFixed(int id) {
   case WID_MACROREPORTERWND: case WID_VIEWCAMERAINFOWND: case WID_REFININGWND: case WID_MINIPARTYWND: case WID_MENUICONWND: case WID_RPIMAGEWND2: case WID_DISCONNECTEDSERVERMSGWND: case WID_GRADEENCHANTWND: case WID_BALLOONOPENBTN: case WID_MACROBLACKLISTCHECKWND: case 600: case WID_EXCHANGEUI: case WID_DEBUFFREMOVEWND:
     return true;
   case 145: {
-    UIWindow* window = g_windowMgr.LookupWindow(145);
+    UIWindow* window = g_windowMgr.LookupWindow(static_cast<WindowId>(145));
     if (window && window->geometry.visible) {
       return false;
     }
@@ -98,7 +103,7 @@ bool UIWindowMgr::IsDropDownChild(const UIWindow* window) {
     return false;
   }
 
-  return static_cast<CUIDropDownBox*>(this->dropDownBoxWnd)->HasChild(window);
+  return this->dropDownBoxWnd->HasChild(window);
 }
 
 // OFFSET: 0x00A96E60
@@ -162,7 +167,7 @@ int UIWindowMgr::Window4F250Ready() {
   if (window == nullptr) {
     return false;
   }
-  if (*reinterpret_cast<void**>(reinterpret_cast<char*>(window) + 0xB4) == nullptr) {
+  if (static_cast<UIDragMiniPartyWnd*>(window)->member.valid == 0) {
     return false;
   }
   if (window->geometry.state != 0) {
@@ -182,7 +187,7 @@ bool UIWindowMgr::HasPendingDialog() {
 // OFFSET: 0x00A97200
 // FUNCTION: fn_17201
 bool UIWindowMgr::HasTitleAtActorCell(std::uint32_t aid) {
-  CRenderObject* actor = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAidIncludeMe(aid);
+  CRenderObject* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAidIncludeMe(aid);
   if (actor == nullptr) {
     return true;
   }
@@ -191,7 +196,7 @@ bool UIWindowMgr::HasTitleAtActorCell(std::uint32_t aid) {
   int titleRow = 0;
   int actorColumn = 0;
   int actorRow = 0;
-  C3dAttr*& terrain = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->terrain;
+  C3dAttr*& terrain = g_modeMgr.GetGameMode()->scene->terrain;
   terrain->SpatialCell(actor->render.position.x, actor->render.position.z, actorColumn, actorRow);
   for (UIWindow*& window : this->rendered) {
     CRenderObject* owner;
@@ -203,7 +208,7 @@ bool UIWindowMgr::HasTitleAtActorCell(std::uint32_t aid) {
         return true;
       }
 
-      const std::uint32_t ownerAid = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->FindChatRoomActorId(roomId);
+      const std::uint32_t ownerAid = g_modeMgr.GetGameMode()->FindChatRoomActorId(roomId);
       if (ownerAid == 0) {
         return true;
       }
@@ -229,7 +234,7 @@ bool UIWindowMgr::HasTitleAtActorCell(std::uint32_t aid) {
 // OFFSET: 0x00A97490
 // FUNCTION: fn_17204
 void UIWindowMgr::CancelActiveDialog() {
-  UIWindow* window = this->changeNameWnd ? this->changeNameWnd : this->bookWnd;
+  UIWindow* window = this->changeNameWnd ? static_cast<UIWindow*>(this->changeNameWnd) : this->bookWnd;
   if (window) {
     window->SendMsg(nullptr, UM_LEFTPUSH, 0, 0, 0, 0);
     return;

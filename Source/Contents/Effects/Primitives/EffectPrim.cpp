@@ -1,5 +1,8 @@
 #include "Contents/Effects/Primitives/EffectPrim.h"
 #include "Contents/Effects/Core/RagEffect.h"
+#include "Contents/World/World.h"
+#include "Client/Mode/ModeMgr.h"
+#include "Client/Mode/CGameMode.h"
 
 #include <cstring>
 
@@ -12,9 +15,9 @@ __forceinline EffectPrimitiveState::EffectPrimitiveState(RenderObjectState& rend
   this->count = 0;
   this->pattern = 0;
   this->renderFlag = 1;
-  this->changeFlags.x = 0;
-  this->changeFlags.y = 0;
-  this->changeFlags.z = 0;
+  this->masterReached = 0;
+  this->alphaSpeedCycle = 0;
+  this->alphaCycle = 0;
   this->chRadiSpeed = 0;
   this->isDisappear = 0;
   this->changePointReached = 0;
@@ -148,18 +151,15 @@ void CEffectPrim::HandleMasterMessage(CGameObject*, int message, int a, int, int
 
 // OFFSET: 0x00C1DE70
 // FUNCTION: fn_20076
-CEffectPrim* CreateEffectParticle(
-  CRagEffect& master, const RenderObjectState& masterRender, int type, float x, float y, float z,
-  std::list<CRenderObject*>& worldObjects
-) {
+CEffectPrim* CRagEffect::LaunchEffectPrim(int type, vector3d deltaPos) {
   auto* particle = new CEffectPrim();
   if (!particle) {
     return nullptr;
   }
 
-  particle->Initialize(master, type, x, y, z);
-  master.state.primList.push_back(&particle->state);
-  worldObjects.push_back(particle);
+  particle->Initialize(*this, type, deltaPos.x, deltaPos.y, deltaPos.z);
+  this->state.primList.push_back(&particle->state);
+  g_modeMgr.GetGameMode()->scene->objects.push_back(particle);
 
   return particle;
 }

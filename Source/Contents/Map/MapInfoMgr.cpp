@@ -40,27 +40,29 @@ MapNameDisplay::MapNameDisplay(std::string name, std::string subName, std::strin
 
     this->m_dc = CreateBitmapDC(this->m_width, this->m_height, false);
     this->m_dc->Fill(nullptr, 0);
-    static_cast<CDCBitmap*>(this->m_dc)->SetAlpha(true);
+    this->m_dc->SetAlpha(true);
 
     TextContext text(*this->m_dc);
     text.SetColor(0xFFFFFF);
-    const int family = g_serviceType == 0 ? 29 : 0;
+    const int family = g_serviceType != 0 ? 0 : 29;
 
     text.SetFont(family, static_cast<int>(scale * 16.0f), 1, 0);
-    SIZE size = text.Measure(name.c_str(), static_cast<int>(std::strlen(name.c_str())));
+    SIZE nameSize;
+    text.Measure(name.c_str(), static_cast<int>(std::strlen(name.c_str())), &nameSize);
     text.Draw(
-      static_cast<int>(static_cast<float>(this->m_width - size.cx) * 0.5f), static_cast<int>(scale * 72.0f), name.c_str(),
+      static_cast<int>(static_cast<float>(this->m_width - nameSize.cx) * 0.5f), static_cast<int>(scale * 72.0f), name.c_str(),
       static_cast<int>(std::strlen(name.c_str()))
     );
 
     text.SetFont(family, static_cast<int>(scale * 44.0f), 1, 0);
-    size = text.Measure(subName.c_str(), static_cast<int>(std::strlen(subName.c_str())));
+    SIZE subNameSize;
+    text.Measure(subName.c_str(), static_cast<int>(std::strlen(subName.c_str())), &subNameSize);
     text.Draw(
-      static_cast<int>(static_cast<float>(this->m_width - size.cx) * 0.5f), static_cast<int>(scale * 95.0f), subName.c_str(),
+      static_cast<int>(static_cast<float>(this->m_width - subNameSize.cx) * 0.5f), static_cast<int>(scale * 95.0f), subName.c_str(),
       static_cast<int>(std::strlen(subName.c_str()))
     );
 
-    static_cast<CDCBitmap*>(this->m_dc)->SetAlpha(static_cast<unsigned char>(0xFF));
+    this->m_dc->SetAlpha(static_cast<unsigned char>(0xFF));
     this->m_startTime = timeGetTime();
   }
 }

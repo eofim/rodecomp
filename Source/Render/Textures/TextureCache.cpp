@@ -84,8 +84,8 @@ CTexture* TextureCache::Create(const char* name, int option, bool fullSize, bool
   CTexture* texture;
 
   if (std::strstr(name, ".bik")) {
-    if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene) {
-      BinkMovies* movies = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->movies;
+    if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->scene) {
+      BinkMovies* movies = g_modeMgr.GetGameMode()->scene->movies;
 
       if (movies) {
         NamedBinkMovie* movie = movies->Get(std::string(name), 1);
@@ -232,4 +232,17 @@ void TextureCache::ClearUnused() {
   HeapCompact(GetProcessHeap(), 0);
 
   GetRenderSystemHolder()->RestoreDisplayMode();
+}
+
+#include "Render/Renderer.h"
+#include "Render/Textures/SpriteAtlas.h"
+
+// INLINED
+void CRenderer::DrawOverlays(CRenderSystemBase& system) {
+  this->DrawOverlays();
+}
+
+// INLINED
+void SpriteAtlas::ClearExpired(std::uint32_t reuseDelay) {
+  this->ClearExpired();
 }

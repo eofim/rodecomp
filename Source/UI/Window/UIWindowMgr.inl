@@ -6,6 +6,7 @@
 #include "Contents/Configuration/ServiceOptions.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
+#include "UI/Shortcuts/UIShortCutWnd.h"
 
 // INLINED
 inline bool UIWindowMgr::ShowShortcutWindow(int value) {
@@ -25,7 +26,7 @@ inline bool UIWindowMgr::ShowShortcutWindow(int value) {
     g_windowMgr.EnsureWindow(159);
   }
 
-  UIWindow* companion = g_windowMgr.LookupWindow(159);
+  UIWindow* companion = g_windowMgr.LookupWindow(WID_QUIKSLOTWND);
 
   if (companion) {
     companion->Show(value);

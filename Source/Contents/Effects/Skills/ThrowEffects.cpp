@@ -347,7 +347,7 @@ void CThrowItemEffect::OnProcess() {
       if (target->alpha > 0) {
         matrix view;
         std::memcpy(view.values, g_identityMatrix, sizeof(view.values));
-        view.MakeXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
+        view.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
         view.AppendYRotation(rotation / 180.0f * 3.141592f);
 
         matrix scale;
@@ -369,7 +369,7 @@ void CThrowItemEffect::OnProcess() {
           CRenderObject* object = FindRenderObject(this->actor);
 
           if (object != nullptr) {
-            float& objectAngle = *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(object) + 0x4C);
+            float& objectAngle = object->render.angle;
             objectAngle = static_cast<float>(static_cast<int>(objectAngle + 45.0f) % 360);
           }
         }

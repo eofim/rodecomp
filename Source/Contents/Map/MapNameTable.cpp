@@ -9,6 +9,7 @@
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -79,8 +80,10 @@ bool CSession::LoadMapPosTable() {
       } else if (fields.size() < 3) {
         fields.push_back(std::string(start, cursor));
       } else {
-        const std::string last(start, cursor);
-        fields.push_back(last);
+        {
+          const std::string last(start, cursor);
+          fields.push_back(last);
+        }
         const int bottom = std::atoi(fields[3].c_str());
         const int right = std::atoi(fields[2].c_str());
         const int top = std::atoi(fields[1].c_str());
@@ -97,22 +100,16 @@ bool CSession::LoadMapPosTable() {
         position.rect = rect;
         position.valid = 1;
 
-        if (boundsValid == 0) {
-          bounds = rect;
-          boundsValid = 1;
-        } else {
-          if (bounds.right < right) {
-            bounds.right = right;
-          }
-          if (bounds.bottom < bottom) {
-            bounds.bottom = bottom;
-          }
-          if (rect.left < bounds.left) {
-            bounds.left = rect.left;
-          }
+        if (boundsValid != 0) {
+          bounds.right = std::max(bounds.right, right);
+          bounds.bottom = std::max(bounds.bottom, bottom);
+          bounds.left = std::min(bounds.left, rect.left);
           if (top < bounds.top) {
             bounds.top = top;
           }
+        } else {
+          bounds = rect;
+          boundsValid = 1;
         }
 
         token.clear();
@@ -150,7 +147,7 @@ static __forceinline void ScaleMapRect(MapPosRect* rect) {
 
 // OFFSET: 0x00DE4FF0
 // FUNCTION: fn_45471
-bool CSession::ScaleMapPositions() {
+BOOL CSession::ScaleMapPositions() {
   for (int index = 0; index < this->m_mapPosListCount; ++index) {
     for (std::map<std::string, MapPosEntry>::iterator it = this->m_mapPosLists[index].begin(); it != this->m_mapPosLists[index].end(); ++it) {
       ScaleMapRect(&it->second.rect);
@@ -161,5 +158,5 @@ bool CSession::ScaleMapPositions() {
     ScaleMapRect(&it->second.rect);
   }
 
-  return true;
+  return TRUE;
 }

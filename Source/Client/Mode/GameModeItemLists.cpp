@@ -28,11 +28,7 @@ public:
 
 namespace {
 #pragma pack(push, 1)
-  struct EquipListOption {
-    /* 0000 */ std::int16_t id;
-    /* 0002 */ std::int16_t value;
-    /* 0004 */ unsigned char param;
-  };
+  using EquipListOption = ItemOptionRecord;
 
   struct EquipListRecord {
     /* 0000 */ std::int16_t index;
@@ -90,7 +86,7 @@ namespace {
     item.optionCount = CountEquipListOptions(options);
     item.grade = 0;
     for (int index = 0; index < item.optionCount; ++index) {
-      reinterpret_cast<EquipListOption*>(item.options)[index] = options[index];
+      item.options[index] = options[index];
     }
   }
 }
@@ -101,24 +97,9 @@ namespace {
 void CGameMode::ReceiveEquipListPart(unsigned char listType, int count, const unsigned char* data) {
   const EquipListRecord* records = reinterpret_cast<const EquipListRecord*>(data);
   switch (listType) {
-  case INVTYPE_STORAGE:
-  case INVTYPE_GUILD_STORAGE:
-    for (int i = 0; i < count; ++i) {
-      const EquipListRecord record = records[i];
-      if (record.location == 0x8000) {
-        continue;
-      }
-
-      EquipListOption options[5];
-      std::memcpy(options, record.options, sizeof(options));
-      ITEM_INFO item;
-      FillEquipListItem(item, record, options);
-      g_session.AddCartItem(item, 0);
-    }
-    break;
   case INVTYPE_INVENTORY:
-    for (int i = 0; i < count; ++i) {
-      const EquipListRecord record = records[i];
+    for (int remaining = count; remaining > 0; --remaining, ++records) {
+      const EquipListRecord record = *records;
       EquipListOption options[5];
       std::memcpy(options, record.options, sizeof(options));
       ITEM_INFO item;
@@ -157,13 +138,28 @@ void CGameMode::ReceiveEquipListPart(unsigned char listType, int count, const un
     }
     break;
   case INVTYPE_CART:
-    for (int i = 0; i < count; ++i) {
-      const EquipListRecord record = records[i];
+    for (int remaining = count; remaining > 0; --remaining, ++records) {
+      const EquipListRecord record = *records;
       EquipListOption options[5];
       std::memcpy(options, record.options, sizeof(options));
       ITEM_INFO item;
       FillEquipListItem(item, record, options);
       g_session.AddMerchantShopItem(item);
+    }
+    break;
+  case INVTYPE_STORAGE:
+  case INVTYPE_GUILD_STORAGE:
+    for (int remaining = count; remaining > 0; --remaining, ++records) {
+      const EquipListRecord record = *records;
+      if (record.location == 0x8000) {
+        continue;
+      }
+
+      EquipListOption options[5];
+      std::memcpy(options, record.options, sizeof(options));
+      ITEM_INFO item;
+      FillEquipListItem(item, record, options);
+      g_session.AddCartItem(item, 0);
     }
     break;
   }

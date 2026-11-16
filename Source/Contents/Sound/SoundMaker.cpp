@@ -35,6 +35,7 @@
 #include "Render/Drawing/SpriteGeometry.h"
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Math/ScalarConversion.h"
+#include <cstring>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -67,15 +68,13 @@ CGndRiser::CGndRiser() {
 // FUNCTION: fn_22356
 CHalluNPC::CHalluNPC(CGameActor* source) {
   this->render.visible = 1;
-  this->render.visibilityOptions[0] = 0;
+  this->render.shadowVisible = 0;
   this->render.motionStartTime = timeGetTime();
   this->SetSexBit(source->sex);
   this->SetActorJob(source->GetEffectiveJob(-1));
   this->isRiding = source->isRiding;
   this->SetMonsterTransformJob(source->GetMonsterTransformJob());
-  this->render.position.x = source->render.position.x;
-  this->render.position.y = source->render.position.y;
-  this->render.position.z = source->render.position.z;
+  this->render.position = source->render.position;
   this->render.distanceScale = source->render.distanceScale;
   this->render.spriteOffsetX = source->render.spriteOffsetX;
   this->render.scale = source->render.scale;
@@ -103,7 +102,7 @@ CHalluNPC::CHalluNPC(CGameActor* source) {
 // FUNCTION: fn_22359
 CHalluPlant::CHalluPlant() {
   this->render.visible = 1;
-  this->render.visibilityOptions[0] = 0;
+  this->render.shadowVisible = 0;
   this->render.motionStartTime = timeGetTime();
   this->SetSexBit(0);
   this->SetActorJob(1079);
@@ -239,7 +238,7 @@ bool CSoundMaker::OnProcess() {
     return true;
   }
 
-  const auto* player = static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player);
+  const auto* player = static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player);
   if (!player) {
     return true;
   }
@@ -306,12 +305,12 @@ float* CPc::GetExtent(float* extent) const {
 // OFFSET: 0x00DA2FA0
 // FUNCTION: fn_22397
 bool CBlurPC::OnProcess() {
-  CWorld* scene = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
+  CWorld* scene = g_modeMgr.GetGameMode()->scene;
   if (scene) {
     const CRenderObject* owner = scene->GetGameActorByAidIncludeMe(this->render.accountId);
     if (owner && 0 != (owner->render.flags & 0x10)) {
       this->render.flags = 0x10;
-      this->render.pulsePhases[0] = 45;
+      this->render.shrinkPhase = 45;
     }
   }
 
@@ -326,12 +325,12 @@ bool CBlurPC::OnProcess() {
 // OFFSET: 0x00DA3240
 // FUNCTION: fn_22401
 bool CHalluPC2::OnProcess() {
-  CWorld* scene = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
+  CWorld* scene = g_modeMgr.GetGameMode()->scene;
   if (scene) {
     const CRenderObject* owner = scene->GetGameActorByAidIncludeMe(this->render.accountId);
     if (owner && 0 != (owner->render.flags & 0x10)) {
       this->render.flags = 0x10;
-      this->render.pulsePhases[0] = 45;
+      this->render.shrinkPhase = 45;
     }
   }
 
@@ -447,7 +446,7 @@ void CMasterChaser::ClearChaseState() {
 // OFFSET: 0x00DA3F50
 // FUNCTION: fn_22408
 void CNpc::RegisterPos() {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   int column;
   int row;
   mode->WorldCell(this->render.position.x, this->render.position.z, column, row);
@@ -503,7 +502,7 @@ bool CGndRiser::OnProcess() {
     return false;
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode) {
     GroundGeometry* ground = mode->scene->ground;
     const float half = static_cast<float>(this->lifetime / 2);
@@ -559,9 +558,12 @@ void CBlurPC::SendMsg(
         this->render.color &= (static_cast<int>(b) << 24) + 0xFFFFFF;
         this->destCellZ = static_cast<int>(c) << 24;
         return;
-      case BM_MOTIONY:
-        this->motionY = *reinterpret_cast<const float*>(&b);
+      case BM_MOTIONY: {
+        float motionY;
+        std::memcpy(&motionY, &b, sizeof(motionY));
+        this->motionY = motionY;
         return;
+      }
       case BM_MOTION_FREEZE:
         this->render.isMotionFreezed = 1;
         return;
@@ -592,7 +594,7 @@ void CGndRiser::SendMsg(
     this->render.motionStartTime = timeGetTime();
     this->lifetime = 30;
 
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     if (mode) {
       mode->WorldCell(this->render.position.x, this->render.position.z, this->screenX, this->screenY);
       this->screenX /= 2;
@@ -618,9 +620,12 @@ void CHalluNPC::SendMsg(
         this->render.color &= (static_cast<int>(b) << 24) + 0xFFFFFF;
         this->fadeStep = static_cast<int>(c) << 24;
         return;
-      case BM_MOTIONY:
-        this->hallucinationOffset = *reinterpret_cast<const float*>(&b);
+      case BM_MOTIONY: {
+        float offset;
+        std::memcpy(&offset, &b, sizeof(offset));
+        this->hallucinationOffset = offset;
         return;
+      }
       case BM_MOTION_FREEZE:
         this->render.isMotionFreezed = 1;
         return;
@@ -643,9 +648,12 @@ void CHalluPC2::SendMsg(
         this->render.color &= (static_cast<int>(b) << 24) + 0xFFFFFF;
         this->destCellZ = static_cast<int>(c) << 24;
         return;
-      case BM_MOTIONY:
-        this->motionY = *reinterpret_cast<const float*>(&b);
+      case BM_MOTIONY: {
+        float motionY;
+        std::memcpy(&motionY, &b, sizeof(motionY));
+        this->motionY = motionY;
         return;
+      }
       case BM_MOTION_FREEZE:
         this->render.isMotionFreezed = 1;
         return;
@@ -668,9 +676,12 @@ void CHalluPC::SendMsg(
         this->render.color &= (static_cast<int>(b) << 24) + 0xFFFFFF;
         this->destCellZ = static_cast<int>(c) << 24;
         return;
-      case BM_MOTIONY:
-        this->motionY = *reinterpret_cast<const float*>(&b);
+      case BM_MOTIONY: {
+        float motionY;
+        std::memcpy(&motionY, &b, sizeof(motionY));
+        this->motionY = motionY;
         return;
+      }
       case BM_MOTION_FREEZE:
         this->render.isMotionFreezed = 1;
         return;
@@ -738,37 +749,37 @@ void CNpc::SendMsg(
         this->playerGaugeWindow = new UIPlayerGage();
         switch (this->objectType) {
           case NPC_HO_TYPE: {
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
+            this->playerGaugeWindow->SetFirstValues(
               [] { return static_cast<std::int64_t>(g_session.m_homunHp); },
               [] { return static_cast<std::int64_t>(g_session.m_homunMaxHp); }
             );
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetSecondValues(
+            this->playerGaugeWindow->SetSecondValues(
               [] { return static_cast<std::int64_t>(g_session.m_homunSp); },
               [] { return static_cast<std::int64_t>(g_session.homunMaxSp); }
             );
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetThirdValues(
+            this->playerGaugeWindow->SetThirdValues(
               [] { return static_cast<std::int64_t>(g_session.homunHunger); },
               [] { return static_cast<std::int64_t>(g_session.homunMaxHunger); }
             );
             this->playerGaugeWindow->SetSize(60, 13);
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->actorKind = 8;
+            this->playerGaugeWindow->actorKind = 8;
             break;
           }
           case 7: {
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetThirdValues(
+            this->playerGaugeWindow->SetThirdValues(
               [] { return static_cast<std::int64_t>(g_session.petHunger); },
               [] { return static_cast<std::int64_t>(g_session.m_petMaxHunger); }
             );
             this->playerGaugeWindow->SetSize(60, 5);
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->actorKind = 7;
+            this->playerGaugeWindow->actorKind = 7;
             break;
           }
           case NPC_MERSOL_TYPE: {
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
+            this->playerGaugeWindow->SetFirstValues(
               [] { return static_cast<std::int64_t>(g_session.m_mercenaryHp); },
               [] { return static_cast<std::int64_t>(g_session.m_mercenaryMaxHp); }
             );
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetSecondValues(
+            this->playerGaugeWindow->SetSecondValues(
               [] { return static_cast<std::int64_t>(g_session.m_mercenarySp); },
               [] { return static_cast<std::int64_t>(g_session.m_mercenaryMaxSp); }
             );
@@ -776,11 +787,11 @@ void CNpc::SendMsg(
             break;
           }
           case NPC_ELEMENTAL_TYPE: {
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
+            this->playerGaugeWindow->SetFirstValues(
               [] { return static_cast<std::int64_t>(g_session.elementalHp); },
               [] { return static_cast<std::int64_t>(g_session.elementalMaxHp); }
             );
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetSecondValues(
+            this->playerGaugeWindow->SetSecondValues(
               [] { return static_cast<std::int64_t>(g_session.elementalSp); },
               [] { return static_cast<std::int64_t>(g_session.elementalMaxSp); }
             );
@@ -788,21 +799,21 @@ void CNpc::SendMsg(
             break;
           }
           case NPC_ABR_TYPE: {
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
+            this->playerGaugeWindow->SetFirstValues(
               [this] { return g_session.FindSummonHp(this->render.accountId); },
               [this] { return g_session.FindSummonMaxHp(this->render.accountId); }
             );
             this->playerGaugeWindow->SetSize(60, 5);
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->actorKind = 13;
+            this->playerGaugeWindow->actorKind = 13;
             break;
           }
           case NPC_BIONIC_TYPE: {
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->SetFirstValues(
+            this->playerGaugeWindow->SetFirstValues(
               [this] { return g_session.FindSummonHp(this->render.accountId); },
               [this] { return g_session.FindSummonMaxHp(this->render.accountId); }
             );
             this->playerGaugeWindow->SetSize(60, 5);
-            static_cast<UIPlayerGage*>(this->playerGaugeWindow)->actorKind = 14;
+            this->playerGaugeWindow->actorKind = 14;
             break;
           }
         }
@@ -829,8 +840,8 @@ void CNpc::SendMsg(
         return;
       }
     }
-    static_cast<UIPcGage*>(this->pcGaugeWindow)->SetValues(static_cast<int>(b), static_cast<int>(c));
-    static_cast<UIPcGage*>(this->pcGaugeWindow)->SetLimits(0, 0);
+    this->pcGaugeWindow->SetValues(static_cast<int>(b), static_cast<int>(c));
+    this->pcGaugeWindow->SetLimits(0, 0);
     const int y = this->render.screenY + ScaleByScreenHeight(12);
     this->pcGaugeWindow->Move(this->render.screenX - 30, y);
     return;
@@ -1170,7 +1181,7 @@ void CNpc::UpdateBubblePositions() {
 CHalluPC2::CHalluPC2(CPc* source) {
   this->sourcePc = source;
   this->render.visible = 1;
-  this->render.visibilityOptions[0] = 0;
+  this->render.shadowVisible = 0;
   this->render.motionStartTime = timeGetTime();
   this->SetSexBit(source->sex);
   this->SetActorJob(source->GetEffectiveJob(-1));
@@ -1215,7 +1226,7 @@ CHalluPC2::CHalluPC2(CPc* source) {
 CBlurPC::CBlurPC(CPc* source) {
   this->blurSource = source;
   this->render.visible = 1;
-  this->render.visibilityOptions[0] = 0;
+  this->render.shadowVisible = 0;
   this->render.motionStartTime = timeGetTime();
   this->SetSexBit(source->sex);
   this->SetActorJob(source->GetEffectiveJob(-1));
@@ -1259,7 +1270,7 @@ CBlurPC::CBlurPC(CPc* source) {
 CHalluPC::CHalluPC(CPc* source) {
   this->sourcePc = source;
   this->render.visible = 1;
-  this->render.visibilityOptions[0] = 0;
+  this->render.shadowVisible = 0;
   this->render.motionStartTime = timeGetTime();
   this->SetSexBit(source->sex);
   this->SetActorJob(source->GetEffectiveJob(-1));
@@ -1308,7 +1319,7 @@ void CNpc::UpdateMinimapMarker() {
     return;
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   MinimapMarker* marker = mode->FindMinimapMarker(this->render.accountId);
   if (marker && marker->effectType != 9999) {
     if (this->attachedEffect && marker->effectType == this->minimapMarkerCell[0] && marker->questIconId == this->minimapMarkerCell[1]) {
@@ -1528,12 +1539,12 @@ void CHalluPC2::Render(int argument) {
 // FUNCTION: fn_22414
 void CHalluPC::Render(int argument) {
   const float* matrix = reinterpret_cast<const float*>(argument);
-  CWorld* scene = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
+  CWorld* scene = g_modeMgr.GetGameMode()->scene;
   if (scene) {
     CRenderObject* source = scene->GetGameActorByAidIncludeMe(this->render.accountId);
     if (source && (source->render.flags & 0x10) != 0) {
       this->render.flags = 0x10;
-      this->render.pulsePhases[0] = 45;
+      this->render.shrinkPhase = 45;
     }
   }
 
@@ -1615,7 +1626,7 @@ void CNpc::SetState(int state, int) {
     case JT_HIDDEN_WARP_NPC:
       break;
     default: {
-      CGameActor* actor = static_cast<CGameActor*>(g_session.FindGameActor(this->render.accountId));
+      CGameActor* actor = g_session.FindGameActor(this->render.accountId);
       bool isDisguised = false;
       if (actor && actor->objectType == 12) {
         isDisguised = true;
@@ -1635,7 +1646,7 @@ void CNpc::SetState(int state, int) {
       switch (state) {
         case ST_STAND:
           this->render.isLieOnGround = false;
-          this->render.visibilityOptions[1] = 1;
+          this->render.trackBounds = 1;
           this->SetAction(0, 4, 0);
           if (this->healthState != 0) {
             int hungerLevel = g_session.GetPetHungryState(g_session.petHunger);
@@ -1758,7 +1769,7 @@ void CNpc::SetState(int state, int) {
           }
           this->render.isLieOnGround = true;
           this->render.isMotionFreezed = false;
-          this->render.visibilityOptions[1] = 0;
+          this->render.trackBounds = 0;
           if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
             this->SetAction(64, 4, 1);
             this->UnRegisterPos();

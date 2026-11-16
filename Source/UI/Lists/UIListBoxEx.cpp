@@ -7,10 +7,16 @@
 #include "Contents/Skin/SkinMgr.h"
 #include "UI/Text/ColoredText.h"
 #include "UI/Lists/UIListBox.h"
+#include "UI/Lists/UIComboBoxEx.h"
 #include "UI/Lists/UIListBoxEx.h"
 #include "UI/Lists/UIScrollBar.h"
 
 #include <algorithm>
+
+// OFFSET: 0x0086CD40
+// FUNCTION: fn_11037
+UIComboBoxEx::UIComboBoxEx() : UIListBoxEx(), targetId(10041) {
+}
 
 // OFFSET: 0x0086DA90
 // FUNCTION: fn_11056
@@ -18,7 +24,7 @@ UIListBoxEx::UIListBoxEx()
     : UIWindow(0), backgroundRed(255), backgroundGreen(255), backgroundBlue(255), selected(0), topLine(0), horizontalOffset(0), contentWidth(0),
       verticalOverflow(0), bottomMargin(0), verticalBar(nullptr), horizontalBar(nullptr), transparent(0), lineHeight(16), selectionColor(0) {
   const SkinPaletteCell cell = {2, 2};
-  this->selectionColor = SkinPaletteColor(cell, g_skinInfo.Selected());
+  this->selectionColor = g_skinInfo.PaletteColor(cell, g_skinInfo.Selected());
 }
 
 // OFFSET: 0x00873710
@@ -57,6 +63,21 @@ void UIListBoxEx::OnCreate(int width, int height) {
   horizontal->OnCreate((width - 13), horizontalHeight);
   horizontal->OnSize((width - 13), horizontalHeight);
   this->AddChild(this->horizontalBar);
+}
+
+// OFFSET: 0x00897580
+// FUNCTION: fn_11530
+void UIComboBoxEx::Resize(int width, int height) {
+  this->UIListBoxEx::Resize(width, height);
+  this->topLine = 0;
+  this->verticalBar->position = this->topLine;
+
+  if (this->verticalOverflow != 0) {
+    this->verticalBar->Move((width - 13), 0);
+    this->verticalBar->Invalidate();
+  } else {
+    this->verticalBar->Move((width - 13), 0);
+  }
 }
 
 // OFFSET: 0x00897750
@@ -119,7 +140,7 @@ void UIListBoxEx::Refresh() {
     bar->position = bar->maximum;
   }
 
-  bar->Invalidate();
+  this->verticalBar->Invalidate();
 }
 
 // OFFSET: 0x008905A0

@@ -284,7 +284,7 @@ void UIBmpRadioBtn::OnMouseHover(int, int) {
     int screenX = 0, screenY = -20;
     this->ToScreen(screenX, screenY);
 
-    g_modeMgr.gameMode->ShowTooltip(this->m_tooltip.c_str(), screenX, screenY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(this->m_tooltip.c_str(), screenX, screenY, -1, false, true);
   }
 }
 
@@ -403,7 +403,7 @@ void UICaptchaImage::OnMouseHover(int, int) {
     int screenX = 0, screenY = -20;
     this->ToScreen(screenX, screenY);
 
-    g_modeMgr.gameMode->ShowTooltip(this->m_tooltip.c_str(), screenX, screenY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(this->m_tooltip.c_str(), screenX, screenY, -1, false, true);
   }
 }
 
@@ -422,7 +422,7 @@ void UIBarGraph4::OnMouseHover(int, int) {
   std::memset(text, 0, sizeof(text));
   const int permille = static_cast<int>(static_cast<float>(*this->m_current) / static_cast<float>(*this->m_maximum) * 1000.0f);
   std::sprintf(text, "%.1f %%", static_cast<float>(permille) * 0.1f);
-  g_modeMgr.gameMode->ShowTooltip(text, screenX, screenY, -1, false, true);
+  g_modeMgr.currentMode->ShowTooltip(text, screenX, screenY, -1, false, true);
 }
 
 // OFFSET: 0x008918D0
@@ -440,7 +440,7 @@ void UIINT64BarGraph::OnMouseHover(int, int) {
   std::memset(text, 0, sizeof(text));
   const int permille = static_cast<int>(static_cast<double>(this->m_current) / static_cast<double>(this->m_maximum) * 1000.0);
   std::sprintf(text, "%.1f %%", static_cast<float>(permille) * 0.1f);
-  g_modeMgr.gameMode->ShowTooltip(text, screenX, screenY, -1, false, true);
+  g_modeMgr.currentMode->ShowTooltip(text, screenX, screenY, -1, false, true);
 }
 
 // OFFSET: 0x00891A40
@@ -477,7 +477,7 @@ void UITabControl::OnMouseHover(int x, int y) {
   x = TabOffset(*this, index);
   y = -20;
   this->ToScreen(x, y);
-  g_modeMgr.gameMode->ShowTooltip(this->tooltips[index].c_str(), x, y, -1, false, true);
+  g_modeMgr.currentMode->ShowTooltip(this->tooltips[index].c_str(), x, y, -1, false, true);
 }
 
 // OFFSET: 0x00822660
@@ -522,7 +522,7 @@ void UIBasicItemCtrl::OnMouseHover(int, int) {
   this->ToScreen(screenX, screenY);
 
   if (!text.empty()) {
-    g_modeMgr.gameMode->ShowTooltip(text.c_str(), screenX, screenY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(text.c_str(), screenX, screenY, -1, false, true);
   }
 }
 
@@ -543,14 +543,14 @@ void UIBasicSkillCtrl::OnMouseHover(int, int) {
   const int ap = skill.UseApAmount(script, skill.level);
   std::string text;
 
-  if (SkillUsesPercentSp(static_cast<int>(skill.id))) {
+  if (g_session.SkillUsesPercentSp(static_cast<int>(skill.id))) {
     text = SkillUseTextPercent(skill.DisplayName(), skill.level, sp, ap);
   } else {
     text = SkillUseTextFlat(skill.DisplayName(), skill.level, sp, ap);
   }
 
   if (!text.empty()) {
-    g_modeMgr.gameMode->ShowTooltip(text.c_str(), screenX, screenY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(text.c_str(), screenX, screenY, -1, false, true);
   }
 }
 
@@ -611,7 +611,7 @@ void UIMemberListBox::OnMouseHover(int, int y) {
   int screenX = -4;
   y -= y % this->lineHeight;
   this->ToScreen(screenX, y);
-  g_modeMgr.gameMode->ShowTooltip(this->lines[line].c_str(), screenX, y, -1, false, true);
+  g_modeMgr.currentMode->ShowTooltip(this->lines[line].c_str(), screenX, y, -1, false, true);
 }
 
 // OFFSET: 0x00891E40
@@ -630,7 +630,7 @@ void UIStaticItem::OnMouseHover(int, int) {
 
   this->ToScreen(screenX, screenY);
 
-  g_modeMgr.gameMode->ShowTooltip(text, screenX, screenY, -1, false, true);
+  g_modeMgr.currentMode->ShowTooltip(text, screenX, screenY, -1, false, true);
 }
 
 // OFFSET: 0x00892040
@@ -1028,14 +1028,14 @@ void UITreeView::OnMouseMove(int x, int y) {
 // OFFSET: 0x00892560
 // FUNCTION: fn_11473
 void UIImgMenu::ResetCursor(int, int) {
-  g_modeMgr.gameMode->SetCursorAction(2);
+  g_modeMgr.currentMode->SetCursorAction(2);
 }
 
 // OFFSET: 0x008925A0
 // FUNCTION: fn_11475
 void UIString::ResetCursor(int, int) {
   if (!this->link.empty() || !this->image.empty()) {
-    g_modeMgr.gameMode->SetCursorAction(2);
+    g_modeMgr.currentMode->SetCursorAction(2);
   }
 }
 
@@ -1054,7 +1054,7 @@ void UITVTextButton::ResetCursor(int x, int y) {
   if (this->m_disabled != 0) {
     UIWindow::ResetCursor(x, y);
   } else {
-    g_modeMgr.gameMode->SetCursorAction(0);
+    g_modeMgr.currentMode->SetCursorAction(0);
   }
 }
 
@@ -1500,7 +1500,7 @@ void UITabControl::FillTab(int index, int x, int y, int width, int height, std::
 void UIStaticItem::Paint() {
   char path[260];
   std::memset(path, 0, sizeof(path));
-  g_session.IconPath(path, this->m_item.itemId.c_str(), this->m_item.identified);
+  g_session.IconPath(this->m_item.itemId.c_str(), path, this->m_item.identified);
 
   auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
   if (!bitmap) {
@@ -1526,7 +1526,7 @@ void UITVTextButton::Paint() {
 
   if (this->drawBackground != 0) {
     if (this->m_border != 0) {
-      DrawRoundedBorder(*this, inset - 1, 0, this->geometry.width, this->geometry.height, this->m_borderColor);
+      this->DrawRoundedOutline(inset - 1, 0, this->geometry.width, this->geometry.height, this->m_borderColor);
     }
 
     if (this->m_fill != 0) {
@@ -1957,6 +1957,18 @@ const std::string& UITextButton::GetLine(std::size_t index) const {
   } catch (...) {
     return g_emptyString;
   }
+}
+
+// OFFSET: 0x0086E410
+// FUNCTION: fn_11070
+UIScrollBar2::UIScrollBar2() : UIScrollBar() {
+  this->arrowLength = 10;
+}
+
+// OFFSET: 0x0086E470
+// FUNCTION: fn_11071
+UIScrollBar3::UIScrollBar3() : UIScrollBar() {
+  this->arrowLength = 9;
 }
 
 // OFFSET: 0x0088D750
@@ -2441,7 +2453,7 @@ void UIComboBox::Paint() {
 // OFFSET: 0x0088F1C0
 // FUNCTION: fn_11387
 void UIStaticItem_Illust::Paint() {
-  const std::string path = "유저인터페이스\\collection\\" + std::string(ItemResourcePath(this->m_item)) + ".bmp";
+  const std::string path = "유저인터페이스\\collection\\" + std::string(this->m_item.ResourcePath()) + ".bmp";
   auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path.c_str())));
   if (!bitmap) {
     bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\collection\\사과.bmp")));
@@ -2817,7 +2829,7 @@ void UIItemTagOnMail::PlaceTagButton(UIWindow* button, const std::string& name, 
 
   unsigned line = 0;
   int consumed = 0;
-  UIRodexComposeWnd* compose = static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd);
+  UIRodexComposeWnd* compose = g_windowMgr.rodexComposeWnd;
   const int left = compose->m_contents->geometry.x;
   const int top = compose->m_contents->geometry.y;
   const int lineHeight = compose->m_contents->lineHeight;
@@ -2849,7 +2861,7 @@ void UIItemTagOnMail::PlaceTagButton(UIWindow* button, const std::string& name, 
 // OFFSET: 0x00884C40
 // FUNCTION: fn_11312
 void UIItemTagOnMegaPhone::PlaceTagButton(UIWindow* button, const std::string& name, const int& x, int) {
-  UINpcTextEditDialogWnd* owner = static_cast<UINpcTextEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd);
+  UINpcTextEditDialogWnd* owner = g_windowMgr.npcTextEditDialogWnd;
   if (!owner || owner->edit->geometry.id != 492) {
     return;
   }
@@ -2860,7 +2872,7 @@ void UIItemTagOnMegaPhone::PlaceTagButton(UIWindow* button, const std::string& n
   unsigned bytes = 0;
   const int width = owner->MeasureText(name.c_str(), bytes);
   button->Move(
-    this->textWidth + width > static_cast<UINpcEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->edit->geometry.width ? 1000
+    this->textWidth + width > g_windowMgr.npcTextEditDialogWnd->edit->geometry.width ? 1000
     : position != 0                                                                                                     ? position
                                                                                                                         : left + 2 + width,
     top + 1
@@ -2906,7 +2918,7 @@ void UIItemTagButton::OnLBtnDown(int x, int y) {
 // FUNCTION: fn_11433
 void UIComboBox::OnLBtnUp(int x, int y) {
   this->selected = this->LineAt(x, y);
-  if (UIWindow* target = g_windowMgr.LookupWindow(this->targetId)) {
+  if (UIWindow* target = g_windowMgr.LookupWindow(static_cast<WindowId>(this->targetId))) {
     target->SendMsg(nullptr, UM_COMBOBOX_SELECTED, this->selected, 0, 0, 0);
     g_windowMgr.CloseWindow(WID_COMBOBOXWND);
     return;
@@ -2933,7 +2945,7 @@ void UIComboBoxID::OnLBtnUp(int x, int y) {
 
   this->selected = line;
 
-  if (UIWindow* target = g_windowMgr.LookupWindow(this->targetId)) {
+  if (UIWindow* target = g_windowMgr.LookupWindow(static_cast<WindowId>(this->targetId))) {
     const auto found = this->lineData.find(this->selected);
     if (found != this->lineData.end()) {
       target->SendMsg(nullptr, UM_COMBOBOX_SELECTED, this->lines[this->selected].id, found->second, 0, 0);
@@ -2977,7 +2989,7 @@ void UISlotBmpButton::SetSlot(int slot, int fallback) {
     return;
   }
 
-  const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, this->m_slot, 0, 0, 0));
+  const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, this->m_slot, 0, 0, 0));
   if (!info) {
     this->icon->Show(0);
     return;
@@ -3043,8 +3055,8 @@ void UIListBoxTitle::Paint() {
     if (index == this->selected) {
       this->FillRegion(0, (index - first) * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->selectionColor);
     } else {
-      const int* const titles = reinterpret_cast<const int*>(g_windowCloseValue);
-      const int* const titlesEnd = reinterpret_cast<const int*>(g_savedWindowCloseValue);
+      const int* const titles = g_windowCloseValue;
+      const int* const titlesEnd = g_savedWindowCloseValue;
       if (std::find(titles, titlesEnd, this->lines[index].id) != titlesEnd) {
         this->FillRegion(0, (index - first) * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->titleColor);
       }
@@ -3253,7 +3265,7 @@ void UIRechargeGage::Paint() {
 void UIImgMenu::OnLBtnUp(int x, int y) {
   this->hovered = this->ItemAt(x, y);
   if (this->hovered != -1 && !this->disabledItems[this->hovered]) {
-    if (UIWindow* target = g_windowMgr.LookupWindow(this->callerWindowId)) {
+    if (UIWindow* target = g_windowMgr.LookupWindow(static_cast<WindowId>(this->callerWindowId))) {
       target->SendMsg(nullptr, UM_MENU_SELECTED, this->hovered, this->geometry.id, 0, 0);
     }
     g_windowMgr.CloseWindow(0x7A);
@@ -3491,7 +3503,7 @@ void UIString::Paint() {
   if (!this->image.empty()) {
     char path[128];
     std::memset(path, 0, sizeof(path));
-    g_session.IconPath(path, this->image.c_str(), 0);
+    g_session.IconPath(this->image.c_str(), path, 0);
     CRes* res = ResourceMgr::Instance().Load(Resolve(path));
     if (!res) {
       return;
@@ -3579,7 +3591,7 @@ void UISlotBmpButton::Paint() {
   }
 
   if (this->m_slot >= 0) {
-    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, this->m_slot, 0, 0, 0));
+    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, this->m_slot, 0, 0, 0));
     if (info) {
       if (info->nameChangeCount > 0 || info->slotChangeCount > 0) {
         if (this->m_inRange) {

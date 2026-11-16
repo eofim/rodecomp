@@ -51,8 +51,7 @@ void CLanguageBase::DeleteSelection() {
   }
 
   const int begin = std::min(this->anchor, this->cursor);
-  const int length = std::abs(this->cursor - this->anchor);
-  this->text.erase(static_cast<std::size_t>(begin), length);
+  this->text.erase(static_cast<std::size_t>(begin), std::abs(this->cursor - this->anchor));
   this->anchor = begin;
   this->cursor = begin;
 
@@ -401,11 +400,6 @@ UIChatHisBox2::UIChatHisBox2()
 // OFFSET: 0x0086C830
 // FUNCTION: fn_11031
 UIChatHisBox3::UIChatHisBox3() : UIChatHisBox2(), autoScroll(1), fontHeight(12) {
-}
-
-// OFFSET: 0x00999FF0
-// FUNCTION: fn_13536
-UIColoringTextViewer::UIColoringTextViewer() : UIListBox(), color(0), lineLimit(0) {
 }
 
 // OFFSET: 0x007ECF50

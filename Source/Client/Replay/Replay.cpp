@@ -70,11 +70,42 @@ struct ReplayMetadataTag {
     std::memcpy(this, source, sizeof(*this));
   }
 };
+
+struct ReplayStatusPacket {
+  /* 0000 */ std::uint16_t id;
+  /* 0002 */ std::uint16_t status;
+  /* 0004 */ std::uint32_t accountId;
+  /* 0008 */ unsigned char enabled;
+  /* 0009 */ std::uint32_t remaining;
+  /* 000D */ std::uint32_t total;
+  /* 0011 */ std::uint32_t mode;
+  /* 0015 */ unsigned char padding_0015[8];
+};
+
+struct ReplaySkillInfo {
+  /* 0000 */ std::uint16_t id;
+  /* 0002 */ int type;
+  /* 0006 */ std::int16_t level;
+  /* 0008 */ std::int16_t spCost;
+  /* 000A */ std::int16_t range;
+  /* 000C */ char name[24];
+  /* 0024 */ unsigned char upgradable;
+};
+
+struct ReplaySkillInfoListHeader {
+  /* 0000 */ std::uint16_t id;
+  /* 0002 */ std::uint16_t bytes;
+};
+
 #pragma pack(pop)
 
 static_assert(sizeof(ReplayTaggedRecordHeader) == 6);
+static_assert(sizeof(ReplaySkillInfo) == 0x25);
+static_assert(sizeof(ReplaySkillInfoListHeader) == 4);
 static_assert(sizeof(ReplayMetadataTag) == 6);
 static_assert(sizeof(ReplayRecordHeader) == 10);
+static_assert(sizeof(ReplayStatusPacket) == 29);
+static_assert(offsetof(ReplayStatusPacket, mode) == 17);
 
 // OFFSET: 0x006DA340
 // FUNCTION: fn_06623
@@ -108,7 +139,7 @@ template <class Record> static void AppendRecord(std::vector<unsigned char>& rec
 
 // OFFSET: 0x00E3DBA0
 // FUNCTION: fn_24195
-std::vector<unsigned char> BuildEntryQueueReplayRecords() {
+std::vector<unsigned char> CSession::BuildEntryQueueReplayRecords() {
   std::vector<unsigned char> records;
   AppendRecord(records, MakeReplayRecord(6500, nullptr, 0));
   if (g_entryQueueMgr->current != nullptr) {
@@ -215,7 +246,6 @@ bool Replay::WriteSection(int id, const std::vector<unsigned char>& bytes, int e
 
   const std::uint32_t sectionBytes = this->sections[id].bytes;
   if (sectionBytes != 0) {
-    auto* words = reinterpret_cast<std::uint32_t*>(data);
     this->cipherBase = this->header.key0 >> 5;
     const int count = sectionBytes / 4;
     this->cipherIndex = 0;
@@ -223,7 +253,10 @@ bool Replay::WriteSection(int id, const std::vector<unsigned char>& bytes, int e
 
     for (int index = 0; index < count; ++index) {
       ++this->cipherIndex;
-      words[index] ^= (this->cipherBase + this->cipherIndex) * this->cipherKey;
+      std::uint32_t word;
+      std::memcpy(&word, data + index * sizeof(word), sizeof(word));
+      word ^= (this->cipherBase + this->cipherIndex) * this->cipherKey;
+      std::memcpy(data + index * sizeof(word), &word, sizeof(word));
     }
   }
 
@@ -927,44 +960,44 @@ void Replay::RestartClock() {
 // FUNCTION: fn_24196
 std::vector<unsigned char> CSession::BuildStatusReplayPacket() {
   std::vector<unsigned char> packet(29, 0);
-  unsigned char* data = packet.data();
-  *reinterpret_cast<std::uint16_t*>(data) = 0x983;
-  *reinterpret_cast<std::uint16_t*>(data + 2) = 0x2A1;
-  *reinterpret_cast<std::uint32_t*>(data + 9) = 9999;
-  *reinterpret_cast<std::uint32_t*>(data + 4) = this->m_aid;
-  data[8] = 1;
-  *reinterpret_cast<std::uint32_t*>(data + 13) = 9999;
-  *reinterpret_cast<std::uint32_t*>(data + 17) = this->replayPacketMode;
+  auto* data = reinterpret_cast<ReplayStatusPacket*>(packet.data());
+  data->id = 0x983;
+  data->status = 0x2A1;
+  data->remaining = 9999;
+  data->accountId = this->m_aid;
+  data->enabled = 1;
+  data->total = 9999;
+  data->mode = this->replayPacketMode;
   return packet;
 }
 
 // OFFSET: 0x00E31240
 // FUNCTION: fn_24172
 std::vector<unsigned char> BuildSkillInfoListPacket(std::uint16_t id, const std::list<CSkillInfo>& skills) {
-  const int bytes = static_cast<int>(skills.size()) * 37 + 4;
+  const int bytes = static_cast<int>(skills.size()) * sizeof(ReplaySkillInfo) + sizeof(ReplaySkillInfoListHeader);
   std::vector<unsigned char> packet(bytes, 0);
-  unsigned char* data = packet.data();
-  *reinterpret_cast<std::uint16_t*>(data) = id;
-  *reinterpret_cast<std::uint16_t*>(data + 2) = static_cast<std::uint16_t>(bytes);
-  unsigned char* record = data + 4;
+  ReplaySkillInfoListHeader* header = reinterpret_cast<ReplaySkillInfoListHeader*>(packet.data());
+  header->id = id;
+  header->bytes = static_cast<std::uint16_t>(bytes);
+  ReplaySkillInfo* record = reinterpret_cast<ReplaySkillInfo*>(header + 1);
   for (const CSkillInfo& skill : skills) {
-    *reinterpret_cast<std::uint16_t*>(record) = static_cast<std::uint16_t>(skill.id);
-    *reinterpret_cast<std::uint32_t*>(record + 2) = skill.type;
-    *reinterpret_cast<std::uint16_t*>(record + 6) = static_cast<std::uint16_t>(skill.level);
-    *reinterpret_cast<std::uint16_t*>(record + 8) = static_cast<std::uint16_t>(skill.spCost);
-    record[36] = skill.upgradable != 0;
-    *reinterpret_cast<std::uint16_t*>(record + 10) = static_cast<std::uint16_t>(skill.range);
+    record->id = static_cast<std::uint16_t>(skill.id);
+    record->type = skill.type;
+    record->level = static_cast<std::int16_t>(skill.level);
+    record->spCost = static_cast<std::int16_t>(skill.spCost);
+    record->upgradable = skill.upgradable != 0;
+    record->range = static_cast<std::int16_t>(skill.range);
     const char* name = skill.name;
-    std::memcpy(record + 12, name, (std::min)(std::strlen(name), std::size_t{24}));
-    record[35] = 0;
-    record += 37;
+    std::memcpy(record->name, name, (std::min)(std::strlen(name), sizeof(record->name)));
+    record->name[sizeof(record->name) - 1] = 0;
+    ++record;
   }
   return packet;
 }
 
 // OFFSET: 0x00E44640
 // FUNCTION: fn_24205
-std::vector<unsigned char> BuildRenewQuestReplayRecords() {
+std::vector<unsigned char> CSession::BuildRenewQuestReplayRecords() {
   std::vector<unsigned char> records;
   AppendRecord(records, MakeReplayRecord(3500, nullptr, 0));
   {
@@ -1146,7 +1179,7 @@ std::vector<unsigned char> CSession::BuildCompanionReplayRecords() {
 namespace {
 #pragma pack(push, 1)
 struct ReplayShopNameRecord {
-  /* 0000 */ std::int16_t padding_0000;
+  /* 0000 */ std::int16_t reserved;
   /* 0002 */ char name[16];
   /* 0012 */ int shopId;
 };
@@ -1190,8 +1223,8 @@ std::vector<unsigned char> CSession::BuildCharacterReplayRecords() {
   AppendRecord(records, MakeReplayRecord(1000, nullptr, 0));
   AppendRecord(records, MakeReplayRecord(1010, &this->m_aid, sizeof(this->m_aid)));
   AppendRecord(records, MakeReplayRecord(1011, &this->m_gid, sizeof(this->m_gid)));
-  AppendRecord(records, MakeReplayRecord(1012, &this->m_navigationPlayerMap[0x14], 4));
-  AppendRecord(records, MakeReplayRecord(1013, &this->m_navigationPlayerMap[0x18], 4));
+  AppendRecord(records, MakeReplayRecord(1012, &this->unknown_1620[0], sizeof(this->unknown_1620[0])));
+  AppendRecord(records, MakeReplayRecord(1013, &this->unknown_1620[1], sizeof(this->unknown_1620[1])));
   AppendRecord(records, MakeReplayRecord(1014, &this->m_job, sizeof(this->m_job)));
   AppendRecord(records, MakeReplayRecord(1015, &this->m_exp, 8));
   AppendRecord(records, MakeReplayRecord(1016, &this->m_level, sizeof(this->m_level)));
@@ -1260,7 +1293,7 @@ std::vector<unsigned char> CSession::BuildCharacterReplayRecords() {
   AppendRecord(records, MakeReplayRecord(1079, &this->m_equipViewLook[7], 4));
   AppendRecord(records, MakeReplayRecord(1080, &this->m_equipViewLook[8], 4));
   AppendRecord(records, MakeReplayRecord(1081, this->m_equipViewName, 0x18));
-  AppendRecord(records, MakeReplayRecord(1082, this->playerTeam, 1));
+  AppendRecord(records, MakeReplayRecord(1082, &this->playerTeam, 1));
   AppendRecord(records, MakeReplayRecord(1083, &this->m_score1, sizeof(this->m_score1)));
   AppendRecord(records, MakeReplayRecord(1084, &this->m_score2, sizeof(this->m_score2)));
   AppendRecord(records, MakeReplayRecord(1085, &this->chatFont, 1));
@@ -1271,7 +1304,7 @@ std::vector<unsigned char> CSession::BuildCharacterReplayRecords() {
   AppendRecord(records, MakeReplayRecord(1090, &this->m_vendingSlotCount, 4));
   AppendRecord(records, MakeReplayRecord(1091, &this->m_buyingStoreSlotCount, 4));
   AppendRecord(records, MakeReplayRecord(1092, &this->m_chatTarget, sizeof(this->m_chatTarget)));
-  AppendRecord(records, MakeReplayRecord(1093, &this->unknown_549C, sizeof(this->unknown_549C)));
+  AppendRecord(records, MakeReplayRecord(1093, &this->m_replayValue1093, sizeof(this->m_replayValue1093)));
   AppendRecord(records, MakeReplayRecord(1094, &this->partyExpShare, sizeof(this->partyExpShare)));
   AppendRecord(records, MakeReplayRecord(1095, &this->partyItemCollect, sizeof(this->partyItemCollect)));
   AppendRecord(records, MakeReplayRecord(1096, &this->partyItemDistribute, sizeof(this->partyItemDistribute)));
@@ -1292,7 +1325,7 @@ std::vector<unsigned char> CSession::BuildShopReplayRecords() {
   AppendRecord(records, MakeReplayRecord(7500, nullptr, 0));
   for (auto it = this->m_nameToId.begin(); it != this->m_nameToId.end(); ++it) {
     ReplayShopNameRecord value;
-    value.padding_0000 = 0;
+    value.reserved = 0;
     value.shopId = it->second;
     std::memset(value.name, 0, sizeof(value.name));
     const std::size_t length = it->first.size();

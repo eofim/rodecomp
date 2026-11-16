@@ -226,7 +226,7 @@ void UIRoMapWnd::DrawKafraIcon(float x, float y) {
 
   const int height = static_cast<int>(static_cast<float>(image->height) * scale);
   const int halfWidth = static_cast<int>(static_cast<float>(image->width) * scale * g_depthAverageHalf);
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
   RenderVertex* vertices = primitive->vertices;
   const float left = x - static_cast<float>(halfWidth);
   const float right = static_cast<float>(halfWidth) + x;
@@ -264,10 +264,10 @@ void UIRoMapWnd::DrawKafraIcon(float x, float y) {
   primitive->sourceBlend = 2;
   primitive->destinationBlend = 4;
   g_renderer->queues.Submit(primitive, 513, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
-  this->m_kafraTop = static_cast<int>(vertices[0].y);
-  this->m_kafraBottom = static_cast<int>(vertices[3].y);
-  this->m_kafraLeft = static_cast<int>(vertices[0].x);
-  this->m_kafraRight = static_cast<int>(vertices[3].x);
+  this->m_kafraBounds.top = static_cast<int>(vertices[0].y);
+  this->m_kafraBounds.bottom = static_cast<int>(vertices[3].y);
+  this->m_kafraBounds.left = static_cast<int>(vertices[0].x);
+  this->m_kafraBounds.right = static_cast<int>(vertices[3].x);
 }
 
 // OFFSET: 0x00917D70
@@ -351,15 +351,14 @@ void UIRoMapWnd::DrawSelectedMapPreview() {
 
   if (this->selectedRecord->mapIndex < 100) {
     const WorldViewRecord* record = this->selectedRecord;
-    DrawRoundedBorder(
-      *this, record->screenLeft, record->screenTop, record->screenRight - record->screenLeft, record->screenBottom - record->screenTop,
+    this->DrawRoundedOutline(record->screenLeft, record->screenTop, record->screenRight - record->screenLeft, record->screenBottom - record->screenTop,
       g_worldMapNameColor
     );
   }
 
   {
     const WorldViewRecord* record = this->selectedRecord;
-    DrawRoundedBorder(*this, record->left, record->top, record->right - record->left, record->bottom - record->top, g_worldMapNameColor);
+    this->DrawRoundedOutline(record->left, record->top, record->right - record->left, record->bottom - record->top, g_worldMapNameColor);
   }
 
   WorldViewRecord* record = this->selectedRecord;

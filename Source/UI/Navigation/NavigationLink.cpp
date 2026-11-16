@@ -425,9 +425,9 @@ std::pair<bool, std::string> NavigationLinkParser::RemoveLineBreakTag(std::strin
 
 // OFFSET: 0x00833550
 // FUNCTION: fn_10411
-void DisplayNavigationLink(std::string& output, std::string value) {
+std::string NavigationLinkParser::DisplayNavigationLink(std::string value) {
   std::string text = value;
-  output = text;
+  std::string output = text;
   const auto begin = text.find(g_naviLinkTag);
 
   if (begin != std::string::npos) {
@@ -445,6 +445,13 @@ void DisplayNavigationLink(std::string& output, std::string value) {
       output += rest;
     }
   }
+
+  return output;
+}
+
+// INLINED
+void DisplayNavigationLink(std::string& output, std::string value) {
+  output = g_navigationLinkParser->DisplayNavigationLink(value);
 }
 
 // OFFSET: 0x00833A20
@@ -703,7 +710,7 @@ void UIItemImage::Paint() {
 
   this->ClearSurface(0xFFFF00FF);
   char path[128] = {};
-  g_session.IconPath(path, this->m_itemId.c_str(), 1);
+  g_session.IconPath(this->m_itemId.c_str(), path, 1);
   CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
 
   if (bitmap) {
@@ -719,7 +726,7 @@ CCreateLineInfo::CCreateLineInfo(
 )
     : m_align(align), m_newSegment(true), m_height(0) {
   if (parent && (this->m_parent = parent, text)) {
-    this->m_text.assign(text, std::strlen(text));
+    this->m_text = text;
     this->m_width = width;
     this->m_lineSpacing = lineSpacing;
     this->m_defaultColor = color;
@@ -1729,8 +1736,8 @@ void UIItemImage::OnMouseHover(int, int) {
   int y = -17;
   this->ToScreen(x, y);
 
-  if (g_modeMgr.gameMode) {
-    CMode* tooltip = g_modeMgr.gameMode;
+  if (g_modeMgr.currentMode) {
+    CMode* tooltip = g_modeMgr.currentMode;
     const std::uint32_t color = g_session.GetItemNameColor(item);
     tooltip->ShowTooltip(item.DisplayName(0).c_str(), x, y, color, 0, 1);
   }
@@ -1863,5 +1870,5 @@ void RequestTextButtonService(UITextButton* button) {
   }
 
   const int value = std::atoi(button->GetLine(0).c_str());
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ReceiveServiceRequest(6, value);
+  g_modeMgr.GetGameMode()->ReceiveServiceRequest(6, value);
 }

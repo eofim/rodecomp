@@ -107,6 +107,14 @@ UICheckAttendanceWnd_Banner::UICheckAttendanceWnd_Banner()
 UICheckAttendanceWnd_Banner::~UICheckAttendanceWnd_Banner() {
 }
 
+namespace {
+// INLINED
+inline void SetButtonText(UIBmpTextButton* button, std::string value) {
+  button->text = value;
+  button->Invalidate();
+}
+}
+
 // OFFSET: 0x007DCF50
 // FUNCTION: fn_09639
 void UICheckAttendanceWnd::OnCreate(int, int) {
@@ -128,7 +136,7 @@ void UICheckAttendanceWnd::OnCreate(int, int) {
   this->m_notice->SetBitmap("유저인터페이스\\check_attendance\\bt_ok_normal.bmp", 1, 0);
   this->m_notice->SetBitmap("유저인터페이스\\check_attendance\\bt_ok_press.bmp", 2, 0);
   this->m_notice->SetSize(this->m_notice->BitmapWidth(), this->m_notice->BitmapHeight());
-  this->m_notice->SetText(LookupMessage(MSI_ZENY_LOTTO_BUY_10));
+  SetButtonText(this->m_notice, LookupMessage(MSI_ZENY_LOTTO_BUY_10));
   this->m_notice->AddTextStyle(0, 14, 0x313131, 1, 1, -1000, -1000);
   this->m_notice->AddTextStyle(1, 14, 0x313131, 1, 1, -1000, -1000);
   this->m_notice->AddTextStyle(2, 14, 0x313131, 1, 1, -1000, -1000);
@@ -255,14 +263,14 @@ void UICheckAttendanceWnd_Banner::OnLBtnUp(int x, int y) {
     return;
   }
 
-  if (g_windowMgr.LookupWindow(this->m_entries[this->m_current].action)) {
+  if (g_windowMgr.LookupWindow(static_cast<WindowId>(this->m_entries[this->m_current].action))) {
     return;
   }
 
   if (this->m_current < this->m_entries.size()) {
     const AttendanceBanner& entry = this->m_entries[this->m_current];
     if (entry.action == 318) {
-      g_modeMgr.gameMode->SendMsg(MM_REQUEST_CASH_SHOP, entry.argument, 0, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_REQUEST_CASH_SHOP, entry.argument, 0, 0, 0);
     } else {
       g_windowMgr.EnsureWindow(entry.action);
     }
@@ -289,14 +297,14 @@ void UICheckAttendanceWnd::OnMouseHover(int x, int y) {
     int tipX = 0;
     int tipY = -20;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(name, tipX + x, tipY + y, 0xFFFFFFFFu, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(name, tipX + x, tipY + y, 0xFFFFFFFFu, 0, 1);
   }
 }
 
 // OFFSET: 0x007DDEF0
 // FUNCTION: fn_09646
 void UICheckAttendanceWnd_Banner::ResetCursor(int, int) {
-  g_modeMgr.gameMode->SetCursorAction(2);
+  g_modeMgr.currentMode->SetCursorAction(2);
 }
 
 // OFFSET: 0x007DDF00

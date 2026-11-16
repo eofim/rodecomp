@@ -15,6 +15,7 @@
 #include "Resource/World/WorldResource.h"
 
 #include "Utility/Math/ScalarConversion.h"
+#include <bit>
 #include <cstring>
 
 // OFFSET: 0x00AC1D30
@@ -41,9 +42,9 @@ void GroundGeometry::DrawLightmapped(const float* matrix, const GroundQuad& quad
       lightUV[corner][0] = quad.vertices[corner].lightU;
       lightUV[corner][1] = quad.vertices[corner].lightV;
 
-      std::uint32_t color = quad.vertices[corner].color;
-      reinterpret_cast<SpriteColor&>(color).alpha = 0x80;
-      vertices[corner].diffuse = color;
+      SpriteColor color = quad.vertices[corner].colorChannels;
+      color.alpha = 0x80;
+      vertices[corner].diffuseChannels = color;
     }
   } else {
     for (unsigned corner = 0; corner < 4; ++corner) {
@@ -52,12 +53,11 @@ void GroundGeometry::DrawLightmapped(const float* matrix, const GroundQuad& quad
       lightUV[corner][0] = quad.vertices[corner].lightU;
       lightUV[corner][1] = quad.vertices[corner].lightV;
 
-      std::uint32_t color = quad.vertices[corner].color;
-      SpriteColor& channels = reinterpret_cast<SpriteColor&>(color);
+      SpriteColor channels = quad.vertices[corner].colorChannels;
       channels.red = static_cast<std::uint8_t>(channels.red * scales[0]);
       channels.green = static_cast<std::uint8_t>(channels.green * scales[1]);
       channels.blue = static_cast<std::uint8_t>(channels.blue * scales[2]);
-      vertices[corner].diffuse = std::bit_cast<std::uint32_t>(channels);
+      vertices[corner].diffuseChannels = channels;
     }
   }
 

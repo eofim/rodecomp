@@ -24,7 +24,7 @@ struct granny_control;
 struct granny_model_instance;
 struct CRagEffect;
 class CMsgEffect;
-class UIWindow;
+class UIPcGage;
 
 int GetSlotLayer(int slot);
 bool IsReadyOrAttackAction(int action);
@@ -38,6 +38,7 @@ public:
     CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
   ) override;
   void Render(int argument) override;
+  void UpdateFootprints(int kind);
 
   bool ProcessState() override;
   void SetState(int state, int resetPosition) override;
@@ -83,7 +84,7 @@ public:
   bool IsDrawOnTop();
   const ActionFrame& SelectStanceFrame(int layer, CActRes* actRes, int* animation, int* frame, bool* replaced);
   void ApplyLayerEffects(
-    SpriteQuad* quad, const SpriteFrameCell* cell, int layer, const int* box, float shiftX, float distance, float bottomRhw,
+    SpriteQuad* quad, const SpriteFrameCell* cell, int layer, const tagRECT* box, float shiftX, float distance, float bottomRhw,
     float topRhw, float screenX, float screenY, const std::uint32_t* palette, const SpriteRleImage* image, int* blend, int offsetX,
     int offsetY
   );
@@ -132,14 +133,14 @@ public:
   /* 0468 */ vector3d footprintPosition;
   /* 0474 */ int renderWithoutLayer;
   /* 0478 */ std::string headPaletteName;
-  /* 0490 */ UIWindow* gaugeWindow;
+  /* 0490 */ UIPcGage* gaugeWindow;
   /* 0494 */ int pkRank;
   /* 0498 */ int pkTotal;
   /* 049C */ int robe;
   /* 04A0 */ int blend;
   /* 04A4 */ int layerCellX;
   /* 04A8 */ int layerCellY;
-  /* 04AC */ std::map<int, std::pair<int, int>> padding_04AC;
+  /* 04AC */ std::map<int, std::pair<int, int>> unknown_04AC;
   /* 04B4 */ std::vector<CSprRes*> equipSprites;
   /* 04C0 */ std::vector<CActRes*> equipActions;
   /* 04CC */ int pkState;
@@ -217,7 +218,6 @@ public:
   void RegisterPos() override;
   void UnRegisterPos() override;
   void RefreshEffect164();
-  void UpdateFootprints(int kind);
   void UpdateMsgEffect(bool show);
   void ApplyFollowOffset(CGameActor* target, float x, float z, int* row, int* column);
   float AdjustFollowDistance(CGameActor* target, float distance);
@@ -312,7 +312,7 @@ public:
   /* 0454 */ int shield;
   /* 0458 */ unsigned char padding_0458[8];
   /* 0460 */ std::string headPaletteName;
-  /* 0478 */ UIWindow* gaugeWindow;
+  /* 0478 */ UIPcGage* gaugeWindow;
   /* 047C */ int pkRank;
   /* 0480 */ int pkTotal;
   /* 0484 */ C3dGrannyModelRes* model;
@@ -320,8 +320,8 @@ public:
   /* 04B0 */ granny_model_instance* instance;
   /* 04B4 */ RenderCommand* commands[30];
   /* 052C */ RenderCommand* layerCommands[10][30];
-  /* 09DC */ RenderVertex* vertices[30];
-  /* 0A54 */ RenderVertex* layerVertices[10][30];
+  /* 09DC */ GrannyPNT332Vertex* vertices[30];
+  /* 0A54 */ GrannyPNT332Vertex* layerVertices[10][30];
   /* 0F04 */ granny_system_clock clock;
   /* 0F14 */ granny_system_clock lastClock;
   /* 0F24 */ float animationTime;
@@ -332,7 +332,7 @@ public:
   /* 0F35 */ unsigned char padding_0F35[0x03];
   /* 0F38 */ unsigned brightness;
   /* 0F3C */ int motion;
-  /* 0F40 */ unsigned char currentFrame[4];
+  /* 0F40 */ unsigned char padding_0F40[4];
   /* 0F44 */ char modelName[0x104];
   /* 1048 */ unsigned char padding_1048[8];
   /* 1050 */ granny_control* controls[20];

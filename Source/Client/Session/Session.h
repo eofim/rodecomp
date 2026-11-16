@@ -49,15 +49,31 @@ struct BlockedCharacter {
   /* 0004 */ char expireDate[20];
 };
 
+struct GuildStorageLogEntry {
+  /* 0000 */ int logId = 0;
+  /* 0004 */ int quantity = 0;
+  /* 0008 */ unsigned char operation = 0;
+  /* 0009 */ char characterName[24] = {};
+  /* 0021 */ char timestamp[24] = {};
+  /* 003C */ std::string itemName;
+  /* 0054 */ unsigned char identified = 0;
+  /* 0058 */ int itemType = 0;
+  /* 005C */ int refineLevel = 0;
+  /* 0060 */ unsigned char cards[16] = {};
+  /* 0070 */ unsigned char category = 0;
+  /* 0072 */ std::int16_t grade = 0;
+};
+
 struct SessionRecord6144 {
-  /* 0000 */ std::uint16_t completionFlags = 0;
+  /* 0000 */ unsigned char registered = 0;
+  /* 0001 */ unsigned char completed = 0;
   /* 0004 */ std::uint32_t objectives[10] = {};
   /* 002C */ int completedAt = 0;
   /* 0030 */ std::uint8_t rewarded = 0;
   /* 0031 */ std::uint8_t padding_0031;
-  /* 0032 */ std::int16_t year;
-  /* 0034 */ std::int16_t month;
-  /* 0036 */ std::int16_t day;
+  /* 0032 */ std::uint16_t year;
+  /* 0034 */ std::uint16_t month;
+  /* 0036 */ std::uint16_t day;
 
   void SplitDate(__time32_t time, std::uint16_t& year, std::uint16_t& month, std::uint16_t& day) const;
 };
@@ -172,7 +188,23 @@ struct SubChatWndInfo {
   /* 0038 */ int y;
   /* 003C */ int width;
   /* 0040 */ int height;
+
+  SubChatWndInfo& operator=(const SubChatWndInfo& other);
 };
+
+// OFFSET: 0x00914AD0
+// FUNCTION: fn_12545
+inline SubChatWndInfo& SubChatWndInfo::operator=(const SubChatWndInfo& other) {
+  this->name = other.name;
+  for (int index = 0; index < 25; ++index) {
+    this->options[index] = other.options[index];
+  }
+  this->x = other.x;
+  this->y = other.y;
+  this->width = other.width;
+  this->height = other.height;
+  return *this;
+}
 
 struct SessionEntry00A4 {
   /* 0000 */ std::string name;
@@ -191,11 +223,17 @@ static_assert(sizeof(SessionTraits) == 0x50);
 
 class CSession {
 public:
-  void IconPath(char* output, const char* id, int identified);
+  void IconPath(const char* id, char* output, int identified);
   ITEM_INFO LookupClientItemByIdentity(std::uint32_t id) const;
+  float GetSkillFactor(int job) const;
+  unsigned BaseJob(unsigned job) const;
   HotkeyInfo GetHotkeyInfo(int tab, int index) const;
   int HotkeyCount(int tab) const;
+  int HotkeyIndex(int tab, int index) const;
+  bool SkillUsesPercentSp(int id) const;
   std::string ShortcutFilename(std::uint32_t identifier) const;
+  void SaveEmotionHotkeys() const;
+  bool LoadEmotionHotkeyDefaults();
   const char* ItemDragResource(const char* id, int identified);
   const char* SkillDragResource(const char* name);
   /* 0000 */ std::uint32_t mapPropertyId;
@@ -241,15 +279,10 @@ public:
   /* 0798 */ int m_serverTimeAdjustCount;
   /* 079C */ int m_timeAttackMode;
   /* 07A0 */ std::uint32_t m_averagePing;
-  union {
-    /* 07A4 */ unsigned char timeAttackState[0x10];
-    struct {
-      /* 07A4 */ std::uint32_t m_timeAttackCountdown;
-      /* 07A8 */ std::uint32_t m_timeAttackStart;
-      /* 07AC */ int m_timeAttackVisible;
-      /* 07B0 */ int unknown_07B0;
-    };
-  };
+  /* 07A4 */ std::uint32_t m_timeAttackCountdown;
+  /* 07A8 */ std::uint32_t m_timeAttackStart;
+  /* 07AC */ int m_timeAttackVisible;
+  /* 07B0 */ int m_timeAttackEnd;
   /* 07B4 */ unsigned char m_playerNameKey[0x40];
   /* 07F4 */ char m_selectedAccountText[0x40];
   /* 0834 */ BlockedCharacter m_blockedCharacters[68];
@@ -289,7 +322,8 @@ public:
   /* 0F18 */ int m_playerX;
   /* 0F1C */ int m_playerY;
   /* 0F20 */ int m_playerDir;
-  /* 0F24 */ unsigned char playerTeam[0x04];
+  /* 0F24 */ unsigned char playerTeam;
+  /* 0F25 */ unsigned char padding_0F25[3];
   /* 0F28 */ int m_score1;
   /* 0F2C */ int m_score2;
   /* 0F30 */ std::int8_t chatFont;
@@ -343,7 +377,8 @@ public:
   /* 1600 */ int m_monsterTalkId;
   /* 1604 */ std::uint32_t m_aid;
   /* 1608 */ std::uint32_t m_gid;
-  /* 160C */ char m_navigationPlayerMap[0x1C];
+  /* 160C */ char m_navigationPlayerMap[0x14];
+  /* 1620 */ float unknown_1620[2];
   /* 1628 */ int m_job;
   /* 162C */ unsigned char padding_162C[4];
   /* 1630 */ std::int64_t m_exp;
@@ -447,10 +482,10 @@ public:
   /* 5338 */ int randomStatIndexD;
   /* 533C */ int randomStatIndexE;
   /* 5340 */ int randomStatValues[12];
-  /* 5370 */ unsigned char replayStatValuesA[0x30];
-  /* 53A0 */ unsigned char replayStatValuesB[0x30];
-  /* 53D0 */ unsigned char replayStatValuesC[0x30];
-  /* 5400 */ unsigned char replayStatValuesD[0x30];
+  /* 5370 */ int replayStatValuesA[12];
+  /* 53A0 */ int replayStatValuesB[12];
+  /* 53D0 */ int replayStatValuesC[12];
+  /* 5400 */ int replayStatValuesD[12];
   /* 5430 */ CCommonObject m_tableLoader;
   /* 5440 */ std::list<ShortcutCooldownRecord> m_requestTimers;
   /* 5448 */ int showTimer;
@@ -476,7 +511,7 @@ public:
   /* 5490 */ unsigned char unknown_5490[4];
   /* 5494 */ DWORD m_itemSendTick;
   /* 5498 */ int m_chatTarget;
-  /* 549C */ int unknown_549C;
+  /* 549C */ int m_replayValue1093;
   /* 54A0 */ int partyExpShare;
   /* 54A4 */ int partyItemCollect;
   /* 54A8 */ int partyItemDistribute;
@@ -491,7 +526,7 @@ public:
   /* 5558 */ int currentSex;
   /* 555C */ unsigned char padding_555C[4];
   /* 5560 */ std::uint32_t m_loginAcceptTime;
-  /* 5564 */ std::uint16_t unknown_5564;
+  /* 5564 */ std::uint16_t m_playerMessage82Arg;
   /* 5566 */ bool m_playerMessage82Pending;
   /* 5567 */ unsigned char padding_5567;
   /* 5568 */ int hp;
@@ -591,17 +626,12 @@ public:
   /* 59D0 */ int blockedCharacterCount;
   /* 59D4 */ int m_validSlotCount;
   /* 59D8 */ LuaScript* m_hotkeyScript;
-  union {
-    /* 59DC */ unsigned char mouseAndChannelOptions[0x19C];
-    struct {
-      /* 59DC */ bool m_showBattleFieldIcon;
+  /* 59DC */ bool m_showBattleFieldIcon;
   /* 59DD */ unsigned char padding_59DD[3];
   /* 59E0 */ int m_statusIconIds[100];
-      /* 5B70 */ bool m_lockMouse;
-      /* 5B71 */ unsigned char padding_5B71[3];
-      /* 5B74 */ int m_channelCopId;
-    };
-  };
+  /* 5B70 */ bool m_lockMouse;
+  /* 5B71 */ unsigned char padding_5B71[3];
+  /* 5B74 */ int m_channelCopId;
   /* 5B78 */ PartyBookingMgr m_partyBooking;
   /* 5BBC */ int m_partyBookingLevelLimit;
   /* 5BC0 */ int elementalGid;
@@ -637,7 +667,9 @@ public:
   /* 5C30 */ int m_buyingStoreMode;
   /* 5C34 */ int m_buyingStoreDbNumber;
   /* 5C38 */ int m_buyingStoreNoPermission;
-  /* 5C3C */ unsigned char padding_5C3C[0x2C];
+  /* 5C3C */ unsigned char padding_5C3C[0x04];
+  /* 5C40 */ std::vector<GuildStorageLogEntry> guildStorageLogs[3];
+  /* 5C64 */ unsigned char padding_5C64[0x04];
   /* 5C68 */ ITEM_INFO selectionItems[5];
   /* 6140 */ std::uint16_t achievementResult;
   /* 6144 */ std::map<int, SessionRecord6144> achievements;
@@ -719,7 +751,7 @@ public:
   /* 7F75 */ unsigned char padding_7F75[3];
   /* 7F78 */ unsigned long m_swapEquipmentTick;
   /* 7F7C */ bool m_homunculusAutoFeed;
-  /* 7F80 */ int unknown_7F80;
+  /* 7F80 */ int m_selectedIndex;
   /* 7F84 */ int m_overweightThresholdPercent;
   /* 7F88 */ bool m_loginModeFlag;
   /* 7F8C */ int m_priorityClass;
@@ -815,7 +847,7 @@ public:
   bool LoadExceptionMinimapNameTable();
   bool LoadMapNameTable();
   bool LoadMapPosTable();
-  bool ScaleMapPositions();
+  BOOL ScaleMapPositions();
   bool LoadFogParameters();
   void SetCostumeItem(unsigned int index, const ITEM_INFO& item);
   void SetEquippedItem(unsigned int index, const ITEM_INFO& item);
@@ -839,7 +871,11 @@ public:
   int GetSiegeMode() const;
   int IsPlayerJobId(int job) const;
   bool IsVisibleJob(int job) const;
+  float AttackMotionLength(int job, int appearance, int equipment, int attackMode) const;
   int GetRealWeaponId(int weapon) const;
+  int GetWeaponViewValue(int weapon) const;
+  int GetDualWieldWeaponType(int first, int second) const;
+  bool IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const;
   int GetBattleFieldMode() const;
   bool IsShadowItemType(int type) const;
   bool IsConsumableItemType(int type) const;
@@ -1037,7 +1073,7 @@ public:
   __declspec(noinline) int HomunSkillLevel(int skillId) const;
   __declspec(noinline) int UseLevel(int id) const;
   int SkillLevel(int id) const;
-  CRenderObject* FindGameActor(std::uint32_t aid) const;
+  CGameActor* FindGameActor(std::uint32_t aid) const;
   int GetPetTargetAid() const;
   const char* GetJobName(unsigned job, int sex);
   void InitJobNameTable();
@@ -1154,6 +1190,8 @@ public:
   std::vector<unsigned char> BuildReservedReplayRecords(); std::vector<unsigned char> BuildShopReplayRecords(); std::vector<unsigned char> BuildExtraReplayRecords(); std::vector<unsigned char> BuildStatsReplayRecords();
   std::vector<unsigned char> BuildItemReplayRecords();
   std::vector<unsigned char> BuildCompanionReplayRecords();
+  std::vector<unsigned char> BuildEntryQueueReplayRecords();
+  std::vector<unsigned char> BuildRenewQuestReplayRecords();
   std::vector<unsigned char> BuildMessengerReplayRecords();
   std::vector<unsigned char> BuildSkillListReplayPacket(short id);
   void SetHomunculusAutoFeed(bool enabled);
@@ -1219,8 +1257,8 @@ public:
   std::string GetAccessorySprName(int job, int sex, int head, int accessory);
   std::string GetShieldActName(int job, int sex, int shield, int costumeJob);
   std::string GetShieldSprName(int job, int sex, int shield, int costumeJob);
-  std::string GetRobeActName(int job, int sex, int robe, bool riding, int unused, int costumeJob);
-  std::string GetRobeSprName(int job, int sex, int robe, bool riding, int unused, int costumeJob);
+  std::string GetRobeActName(int job, int unused, int sex, int robe, bool riding, int costumeJob);
+  std::string GetRobeSprName(int job, int unused, int sex, int robe, bool riding, int costumeJob);
   std::string GetRobeName(unsigned int robe);
   std::string GetBodyPalName(int job, int sex, int palette, int costumeJob, int costume, int unused);
   std::string GetBodySprName(int job, int sex, int costumeJob, int costume);
@@ -1301,6 +1339,7 @@ public:
   void RefreshMerchantMyShopItems();
   bool IsPartyRecommendTarget(std::uint32_t aid);
   int GetBodyStyle(int job, int style, int renderJob);
+  int GetBodyStyleJob(int job);
   int GetSessionIndex() const;
   void RefreshMessengerGroupWindow();
   void RefreshItem1740Window();
@@ -1334,7 +1373,6 @@ public:
   void SetSwapArrowIndex(std::uint32_t value);
   void ResolvePendingActorName(std::uint32_t id, const char* name);
   void HiFriends(char* text);
-  void sub_DE4FF0();
   std::pair<int, int> GetShopEntry(unsigned int index, int key);
   bool HasCharacterName(std::string name);
   void SetEquippedArrowIndex(std::uint32_t value);
@@ -1378,12 +1416,22 @@ static_assert(offsetof(SubChatWndInfo, x) == 0x34);
 static_assert(offsetof(CSession, m_timeAttackCountdown) == 0x7A4);
 static_assert(offsetof(CSession, m_timeAttackStart) == 0x7A8);
 static_assert(offsetof(CSession, m_timeAttackVisible) == 0x7AC);
+static_assert(offsetof(CSession, m_timeAttackEnd) == 0x7B0);
+static_assert(offsetof(CSession, playerTeam) == 0xF24);
+static_assert(offsetof(CSession, replayStatValuesA) == 0x5370);
+static_assert(offsetof(CSession, replayStatValuesD) == 0x5400);
+static_assert(offsetof(CSession, m_replayValue1093) == 0x549C);
+static_assert(offsetof(CSession, m_playerMessage82Arg) == 0x5564);
+static_assert(offsetof(CSession, m_showBattleFieldIcon) == 0x59DC);
 static_assert(offsetof(CSession, m_whisperRecord) == 0x5554);
 static_assert(offsetof(CSession, m_noSubChatWnds) == 0x73C);
 static_assert(offsetof(CSession, m_subChatWnds) == 0x744);
 static_assert(offsetof(CSession, m_prohibitionLog) == 0x754);
 static_assert(offsetof(CSession, m_mapPositions) == 0x5310);
 static_assert(offsetof(CSession, m_mapPosListCount) == 0x5328);
+static_assert(offsetof(SessionRecord6144, registered) == 0x0);
+static_assert(offsetof(SessionRecord6144, completed) == 0x1);
+static_assert(offsetof(SessionRecord6144, objectives) == 0x4);
 static_assert(offsetof(SessionRecord6144, completedAt) == 0x2C);
 static_assert(offsetof(SessionRecord6144, rewarded) == 0x30);
 static_assert(offsetof(CSession, m_additionalSkills) == 0x4);
@@ -1437,8 +1485,9 @@ static_assert(offsetof(CSession, m_mileageWndActive) == 0x5C04);
 static_assert(offsetof(CSession, m_monsterInfoActorId) == 0x5C18);
 static_assert(offsetof(CSession, replayPacketMode) == 0x5C1C);
 static_assert(offsetof(CSession, m_buyingStoreMode) == 0x5C30);
+static_assert(offsetof(CSession, guildStorageLogs) == 0x5C40);
 static_assert(offsetof(CSession, selectionItems) == 0x5C68);
-static_assert(offsetof(CSession, unknown_7F80) == 0x7F80);
+static_assert(offsetof(CSession, m_selectedIndex) == 0x7F80);
 static_assert(offsetof(CSession, m_loginModeFlag) == 0x7F88);
 static_assert(offsetof(CSession, m_priorityClass) == 0x7F8C);
 static_assert(offsetof(CSession, storeItemLimit) == 0xF4C);
@@ -1576,28 +1625,5 @@ static_assert(offsetof(CSession, m_loginAccountId) == 0x56E4);
 static_assert(offsetof(CSession, m_passwordWndAccountId) == 0x56E8);
 static_assert(offsetof(CSession, m_partyBookingLevelLimit) == 0x5BBC);
 #endif
-
-
-// INLINED
-inline __declspec(noinline) void CSession::sub_DE4FF0() {
-  const float scaleX = static_cast<float>(g_renderer->viewport.width) / 1280.0f;
-  const float scaleY = static_cast<float>(g_renderer->viewport.height - 17) / 1024.0f;
-
-  for (int i = 0; i < this->m_mapPosListCount; ++i) {
-    for (std::pair<const std::string, MapPosEntry>& entry : this->m_mapPosLists[i]) {
-      entry.second.rect.left = static_cast<int>(static_cast<float>(entry.second.rect.left) * scaleX + 0.5);
-      entry.second.rect.top = static_cast<int>(static_cast<float>(entry.second.rect.top) * scaleY + 0.5) + 17;
-      entry.second.rect.right = static_cast<int>(static_cast<float>(entry.second.rect.right) * scaleX + 0.5);
-      entry.second.rect.bottom = static_cast<int>(static_cast<float>(entry.second.rect.bottom) * scaleY + 0.5) + 17;
-    }
-  }
-
-  for (std::pair<const int, MapPosEntry>& entry : this->m_mapPosBounds) {
-    entry.second.rect.left = static_cast<int>(static_cast<float>(entry.second.rect.left) * scaleX + 0.5);
-    entry.second.rect.top = static_cast<int>(static_cast<float>(entry.second.rect.top) * scaleY + 0.5) + 17;
-    entry.second.rect.right = static_cast<int>(static_cast<float>(entry.second.rect.right) * scaleX + 0.5);
-    entry.second.rect.bottom = static_cast<int>(static_cast<float>(entry.second.rect.bottom) * scaleY + 0.5) + 17;
-  }
-}
 
 #endif

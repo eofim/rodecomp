@@ -93,7 +93,7 @@ void CGraffiSkill::BuildTexture() {
     this->m_penX = x;
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   this->m_angle = mode->scene->player->render.angle;
 }
 
@@ -108,7 +108,7 @@ bool CGraffiSkill::OnProcess() {
 void CGraffiSkill::Render(int argument) {
   const int cellX = this->m_cellX;
   const int cellY = this->m_cellY;
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   GroundGeometry* ground = mode->scene->ground;
   const float sine = ClientSin(this->m_angle / 180.0f * 3.141592f);
   const float cosine = ClientCos(this->m_angle / 180.0f * 3.141592f);
@@ -153,4 +153,17 @@ void CGraffiSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64
   }
 
   this->CGameActor::SendMsg(sender, message, b, c, d, 0, 0, 0);
+}
+
+#include "Contents/Skills/SkillInfo.h"
+#include "Contents/UserData/NormalItemSlots.h"
+
+// INLINED
+bool CSkillInfo::MatchesShortcut(const NormalItemSlot* slot) const {
+  if (!slot || !this->IsValid()) {
+    return false;
+  }
+
+  const auto requested = slot->value;
+  return requested != 0 && (this->id != slot->itemId || this->level >= requested);
 }

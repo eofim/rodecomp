@@ -16,6 +16,8 @@ class UISpriteButton;
 struct WindowPlacement;
 struct CombinedCardItemCollectionWndInfo;
 
+struct ItemCollectionWndInfo;
+
 class UIItemCollectionWnd : public UIFrameWnd {
 public:
   UIItemCollectionWnd();
@@ -37,11 +39,11 @@ public:
   /* 01B8 */ UISpriteButton* m_readButtons[2];
   /* 01C0 */ std::uint32_t m_previewTick;
   /* 01C4 */ std::string m_bitmapName;
-  /* 01DC */ std::string padding_01DC;
+  /* 01DC */ std::string unknown_01DC;
   /* 01F4 */ unsigned char padding_01F4[0x4];
   /* 01F8 */ int m_kind;
   /* 01FC */ int m_optionCount;
-  /* 0200 */ WindowPlacement* m_placement;
+  /* 0200 */ ItemCollectionWndInfo* m_placement;
   /* 0204 */ UIResizer* m_resizer;
   /* 0208 */ UIBitmapButton* m_closeButton;
   /* 020C */ unsigned char m_compare;

@@ -57,7 +57,7 @@ CCharacterRender::CCharacterRender(int width, int renderHeight)
     : headJob(0), lowerHeadgear(0), upperHeadgear(0), middleHeadgear(0), lowerHeadgearLocation(0),
       upperHeadgearLocation(0), middleHeadgearLocation(0), madogearType(0), riding(0), bodyCostume(0), viewportOffsetX(0), viewportOffsetY(80.0f), bodyBlend(-1),
       bodyCellX(-1), bodyCellY(-1), viewportWidth(width), viewportHeight(renderHeight), cameraDistance(400.0f), cameraPitch(-45.0f),
-      cameraYaw(0.0f), padding_007C(0.0f), padding_0080(0.0f), padding_0084(0.0f), cameraUpX(0.0f), cameraUpY(1.0f), cameraUpZ(0.0f),
+      cameraYaw(0.0f), unknown_007C(0.0f), unknown_0080(0.0f), unknown_0084(0.0f), cameraUpX(0.0f), cameraUpY(1.0f), cameraUpZ(0.0f),
       screenX(0.0f), screenY(0.0f), robe(0), isHelmRobe(0) {
   this->position.x = 0.0f;
   this->position.y = 0.0f;
@@ -74,7 +74,7 @@ CCharacterRender::~CCharacterRender() = default;
 // OFFSET: 0x008105A0
 // FUNCTION: fn_10108
 std::list<CharacterRenderDrawItem> CCharacterRender::BuildDrawList(unsigned char trackBounds, char* boundsUpdated) {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const float* origin = &this->position.x;
   const float* view = mode->camera->frame.view.values;
   float position[3];
@@ -391,7 +391,7 @@ std::list<CharacterRenderDrawItem> CCharacterRender::BuildDrawList(unsigned char
       default: {
         CharacterRenderDrawItem item;
         item.flags = blend;
-        item.command = BuildSpriteQuad(*GetRenderSystemHolder()->system, quad, palette, blend, 0.0f, 0.0f);
+        item.command = this->BuildSpriteQuad(quad, palette, blend, 0.0f, 0.0f);
         commands.push_back(item);
         break;
       }
@@ -422,7 +422,7 @@ std::list<CharacterRenderDrawItem> CCharacterRender::BuildDrawList(unsigned char
     SpriteLayerQuad& entry = it->second;
     entry.quad.bottomRhw = depthBias + maxBottom;
     entry.quad.topRhw = depthBias + maxTop;
-    commands.push_back({entry.blend, BuildSpriteQuad(*GetRenderSystemHolder()->system, entry.quad, entry.palette, entry.blend, 0.0f, 0.0f)});
+    commands.push_back({entry.blend, this->BuildSpriteQuad(entry.quad, entry.palette, entry.blend, 0.0f, 0.0f)});
     depthBias += 0.000001f;
   }
 

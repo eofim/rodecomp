@@ -70,7 +70,7 @@ void CCharacterRender::RenderRobe(
         !drawOnTop
       );
 
-      if (!drawOnTop && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch >= -40.0f) {
+      if (!drawOnTop && g_modeMgr.GetGameMode()->camera->camera.pitch >= -40.0f) {
         quad.bottomRhw = bottomDepth - 0.0000065f;
         quad.topRhw = topDepth - 0.0000065f;
       }
@@ -80,7 +80,7 @@ void CCharacterRender::RenderRobe(
       }
 
       quad.image = image;
-      RenderPrimitive* primitive = BuildSpriteQuad(*GetRenderSystemHolder()->system, quad, sprite->palette, this->bodyBlend, 0.0f, 0.0f);
+      RenderPrimitive* primitive = this->BuildSpriteQuad(quad, sprite->palette, this->bodyBlend, 0.0f, 0.0f);
       primitives.push_back(primitive);
     }
   }

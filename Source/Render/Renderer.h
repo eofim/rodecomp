@@ -20,6 +20,7 @@ class CRenderer {
 public:
   CRenderer();
   virtual ~CRenderer();
+  RenderPrimitive* AcquirePrimitive();
   virtual void SetCamera(const float* eye, const float* target, const float* up) = 0;
   virtual void SetLighting(const float* direction, const float* diffuse, const float* ambient) = 0;
   virtual void SetClearColor(unsigned color) = 0;
@@ -35,8 +36,8 @@ public:
   virtual void DrawLightmappedPrimitive(LightmappedPrimitive* primitive) = 0;
   virtual void DrawPrimitive(RenderCommand* primitive) = 0;
   virtual bool RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture) = 0;
-  virtual bool SaveBitmap(const char* filename, CBitmapRes* overlay) = 0;
-  virtual bool SaveJpeg(const char* filename, CBitmapRes* overlay) = 0;
+  virtual int SaveBitmap(const char* filename, CBitmapRes* overlay) = 0;
+  virtual int SaveJpeg(const char* filename, CBitmapRes* overlay) = 0;
   virtual void CleanupTextures() = 0;
   virtual bool SaveLogo(std::string filename) = 0;
   virtual int LockBackBuffer() = 0;
@@ -50,9 +51,11 @@ public:
   float UiScaleY() const;
   std::uint32_t BlendColor(std::uint32_t base, std::uint32_t overlay);
   void SubmitAuxiliaryPrimitive(LightmappedCommand* primitive);
-  void DrawBattleFieldIcon(CRenderSystemBase& system);
+  void DrawBattleFieldIcon();
+  void DrawOverlays();
   void DrawOverlays(CRenderSystemBase& system);
   __declspec(noinline) void ClearFrame();
+  int DrawBackBufferText(int x, int y, const char* text, COLORREF color);
 
   /* 0004 */ RendererViewport viewport;
   /* 0038 */ unsigned frame;
@@ -61,7 +64,7 @@ public:
   /* 0044 */ float viewDirectionZ;
   /* 0048 */ unsigned char twoPass;
   /* 0049 */ unsigned char padding_0049[3];
-  /* 004C */ int padding_004C;
+  /* 004C */ int unknown_004C;
   /* 0050 */ RenderCommandPool commands;
   /* 0070 */ RenderPrimitivePool primitives;
   /* 0090 */ LightmappedPrimitivePool lightmapped;

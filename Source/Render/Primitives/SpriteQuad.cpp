@@ -1,3 +1,4 @@
+#include "Contents/Actors/CharacterRender.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "Render/Renderer.h"
 #include "Render/Primitives/SpriteQuad.h"
@@ -9,7 +10,7 @@
 
 // OFFSET: 0x00811FC0
 // FUNCTION: fn_10110
-RenderPrimitive* BuildSpriteQuad(CRenderSystemBase& system, const SpriteQuad& quad, const std::uint32_t* palette, int blend, float offsetX, float offsetY) {
+RenderPrimitive* CCharacterRender::BuildSpriteQuad(const SpriteQuad& quad, const std::uint32_t* palette, int blend, float offsetX, float offsetY) const {
   SpriteAtlasRecord record{};
   const SpriteRleImage* image = quad.image;
   CTexture* texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
@@ -27,7 +28,7 @@ RenderPrimitive* BuildSpriteQuad(CRenderSystemBase& system, const SpriteQuad& qu
 
   const float bottomZ = RhwToDepth(quad.bottomRhw);
   const float topZ = RhwToDepth(quad.topRhw);
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
   RenderVertex* vertices = primitive->vertices;
   primitive->texture = texture;
 

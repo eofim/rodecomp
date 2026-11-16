@@ -9,6 +9,7 @@
 #include "Client/Mode/ModeDragState.h"
 #include "Client/Mode/ModeEvents.h"
 #include "Client/Mode/CMode.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "UI/Shortcuts/ShortcutActivation.h"
 #include "Contents/Skills/ClientSkills.h"
@@ -338,7 +339,7 @@ __forceinline void UseShortcutSlot(const NormalItemSlot& slot) {
   if (slot.enabled != 0) {
     CSkillInfo skill = g_session.LookupSkill(slot.itemId);
     if (skill.MatchesShortcut(&slot)) {
-      CMode* mode = g_modeMgr.gameMode;
+      CMode* mode = g_modeMgr.currentMode;
       int level = slot.value;
       if (IsIndexedSkill(static_cast<int>(skill.id))) {
         level = (std::min)(static_cast<int>(slot.value), skill.level);
@@ -355,7 +356,7 @@ __forceinline void UseShortcutSlot(const NormalItemSlot& slot) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   switch (item.identity[0]) {
   case TYPE_HEAL:
   case TYPE_SCHANGE:
@@ -718,8 +719,8 @@ void UIRoMapWnd::OnLBtnUp(int x, int y) {
     g_navigationManager.expandedMap = false;
     g_navigationManager.SearchNavigation(name, 0, false);
     if (g_windowMgr.navigationWnd) {
-      static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->SelectRoute(0);
-      static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->SelectRouteNode(0);
+      g_windowMgr.navigationWnd->SelectRoute(0);
+      g_windowMgr.navigationWnd->SelectRouteNode(0);
     }
     this->UpdateNavigationButtons();
   }
@@ -1181,6 +1182,16 @@ void UISubChatHisWnd::Resize(int width, int height) {
 #include <mbstring.h>
 
 template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
+template __declspec(noinline) std::map<int, SubChatWndInfo>::iterator std::map<int, SubChatWndInfo>::_Mybase::find(const int&);
+template __declspec(noinline) std::map<int, SubChatWndInfo>::iterator std::map<int, SubChatWndInfo>::_Mybase::erase(std::map<int, SubChatWndInfo>::iterator) noexcept;
+template __declspec(noinline) std::map<int, SubChatWndInfo>::map(const std::map<int, SubChatWndInfo>&);
+template __declspec(noinline) void std::map<int, SubChatWndInfo>::_Mybase::clear() noexcept;
+template __declspec(noinline) std::map<int, SubChatWndInfo>::_Mybase::~_Tree() noexcept;
+template __declspec(noinline) SubChatWndInfo& std::map<int, SubChatWndInfo>::operator[](const int&);
+template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, SubChatWndInfo>>>, std::_Iterator_base0>& std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, SubChatWndInfo>>>, std::_Iterator_base0>::operator++() noexcept;
+template __declspec(noinline) std::map<int, UIWindow*>::map(const std::map<int, UIWindow*>&);
+template __declspec(noinline) void std::map<int, UIWindow*>::_Mybase::clear() noexcept;
+template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, UIWindow*>>>, std::_Iterator_base0>& std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, UIWindow*>>>, std::_Iterator_base0>::operator++() noexcept;
 
 // OFFSET: 0x0093C210
 // FUNCTION: fn_12761
@@ -1263,9 +1274,8 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         const std::map<int, SubChatWndInfo> saved(names);
         names.clear();
         int index = 0;
-        for (const auto& entry : saved) {
-          names[index] = entry.second;
-          ++index;
+        for (std::map<int, SubChatWndInfo>::const_iterator it = saved.begin(); it != saved.end(); ++it, ++index) {
+          names[index] = it->second;
         }
       }
       g_windowMgr.ReleaseRetainedWindow(this->m_index);
@@ -1277,10 +1287,9 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         const std::map<int, UIWindow*> saved(retained);
         retained.clear();
         int index = 0;
-        for (const auto& entry : saved) {
-          static_cast<UISubChatHisWnd*>(entry.second)->m_index = index;
-          retained[index] = entry.second;
-          ++index;
+        for (std::map<int, UIWindow*>::const_iterator it = saved.begin(); it != saved.end(); ++it, ++index) {
+          static_cast<UISubChatHisWnd*>(it->second)->m_index = index;
+          retained[index] = it->second;
         }
       }
       return 0;
@@ -1389,26 +1398,26 @@ void UINewChatWnd::OnCreate(int width, int height) {
   {
     std::string name = "유저인터페이스\\basic_interface\\stickoff";
     this->m_headerButton = new UIBitmapButton();
-    static_cast<UIBitmapButton*>(this->m_headerButton)->SetBitmap((name + "_a.bmp").c_str(), 0, 0);
-    static_cast<UIBitmapButton*>(this->m_headerButton)->SetBitmap((name + "_b.bmp").c_str(), 1, 0);
-    static_cast<UIBitmapButton*>(this->m_headerButton)->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
-    static_cast<UIBitmapButton*>(this->m_headerButton)->SetSize(static_cast<UIBitmapButton*>(this->m_headerButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_headerButton)->BitmapHeight());
-    static_cast<UIBitmapButton*>(this->m_headerButton)->Move(this->m_tabWidth * 2 + 4, 4);
-    static_cast<UIBitmapButton*>(this->m_headerButton)->SetId(ID_STICK_OFF);
-    this->AddChild(static_cast<UIBitmapButton*>(this->m_headerButton));
+    this->m_headerButton->SetBitmap((name + "_a.bmp").c_str(), 0, 0);
+    this->m_headerButton->SetBitmap((name + "_b.bmp").c_str(), 1, 0);
+    this->m_headerButton->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
+    this->m_headerButton->SetSize(this->m_headerButton->BitmapWidth(), this->m_headerButton->BitmapHeight());
+    this->m_headerButton->Move(this->m_tabWidth * 2 + 4, 4);
+    this->m_headerButton->SetId(ID_STICK_OFF);
+    this->AddChild(this->m_headerButton);
   }
 
   {
     std::string name = "유저인터페이스\\basic_interface\\battle_option";
     name.append("2", 1);
     this->m_chatModeButton = new UIBitmapButton();
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetBitmap((name + "_a.bmp").c_str(), 0, 0);
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetBitmap((name + "_b.bmp").c_str(), 1, 0);
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetSize(static_cast<UIBitmapButton*>(this->m_chatModeButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_chatModeButton)->BitmapHeight());
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->Move(this->m_tabWidth * 2 + 19, 5);
-    static_cast<UIBitmapButton*>(this->m_chatModeButton)->SetId(ID_OPTION);
-    this->AddChild(static_cast<UIBitmapButton*>(this->m_chatModeButton));
+    this->m_chatModeButton->SetBitmap((name + "_a.bmp").c_str(), 0, 0);
+    this->m_chatModeButton->SetBitmap((name + "_b.bmp").c_str(), 1, 0);
+    this->m_chatModeButton->SetBitmap((name + "_b.bmp").c_str(), 2, 0);
+    this->m_chatModeButton->SetSize(this->m_chatModeButton->BitmapWidth(), this->m_chatModeButton->BitmapHeight());
+    this->m_chatModeButton->Move(this->m_tabWidth * 2 + 19, 5);
+    this->m_chatModeButton->SetId(ID_OPTION);
+    this->AddChild(this->m_chatModeButton);
   }
 
   {
@@ -1466,19 +1475,19 @@ void UINewChatWnd::OnCreate(int width, int height) {
   this->m_chatEdit->SetId(0x1ED);
 
   this->m_whisperEdit = new UIWhisperEditCtrl();
-  static_cast<UIWhisperEditCtrl*>(this->m_whisperEdit)->SetSize(90, 16);
-  static_cast<UIWhisperEditCtrl*>(this->m_whisperEdit)->Move(6, this->geometry.height - this->m_inputAreaHeight + 4);
-  static_cast<UIWhisperEditCtrl*>(this->m_whisperEdit)->maximum = 24;
-  static_cast<UIWhisperEditCtrl*>(this->m_whisperEdit)->Background(240, 240, 240);
-  this->AddChild(static_cast<UIWhisperEditCtrl*>(this->m_whisperEdit));
+  this->m_whisperEdit->SetSize(90, 16);
+  this->m_whisperEdit->Move(6, this->geometry.height - this->m_inputAreaHeight + 4);
+  this->m_whisperEdit->maximum = 24;
+  this->m_whisperEdit->Background(240, 240, 240);
+  this->AddChild(this->m_whisperEdit);
   this->m_message0 = 0xB8;
 
   this->m_inputResizer = new UIResizer();
-  static_cast<UIResizer*>(this->m_inputResizer)->SetBitmapName("유저인터페이스\\basic_interface\\dialog_mid.bmp");
-  static_cast<UIResizer*>(this->m_inputResizer)->SetSize(static_cast<UIResizer*>(this->m_inputResizer)->geometry.width, static_cast<UIResizer*>(this->m_inputResizer)->geometry.height);
-  static_cast<UIResizer*>(this->m_inputResizer)->SetDirection(0);
-  static_cast<UIResizer*>(this->m_inputResizer)->Move(2, this->geometry.height - static_cast<UIResizer*>(this->m_inputResizer)->geometry.height);
-  this->AddChild(static_cast<UIResizer*>(this->m_inputResizer));
+  this->m_inputResizer->SetBitmapName("유저인터페이스\\basic_interface\\dialog_mid.bmp");
+  this->m_inputResizer->SetSize(this->m_inputResizer->geometry.width, this->m_inputResizer->geometry.height);
+  this->m_inputResizer->SetDirection(0);
+  this->m_inputResizer->Move(2, this->geometry.height - this->m_inputResizer->geometry.height);
+  this->AddChild(this->m_inputResizer);
 
   std::string basePath = "유저인터페이스\\basic_interface\\";
   const int base = this->geometry.height - this->m_inputAreaHeight;
@@ -1516,9 +1525,9 @@ void UINewChatWnd::OnCreate(int width, int height) {
   this->m_inputX = screenX + 3;
   this->m_listColor = 0x66000000;
   this->m_inputY = screenY + this->m_inputOffsetY;
-  std::memset(this->m_secondaryStateStorage, 0, sizeof(this->m_secondaryStateStorage));
+  this->m_listFlags = 0;
   this->m_listWidth = this->geometry.width - 6;
-  std::memset(this->m_primaryStateStorage, 0, sizeof(this->m_primaryStateStorage));
+  this->m_listBorderStyle = 0;
   this->m_listHeight = this->geometry.height - this->m_inputOffsetY - this->m_inputAreaHeight;
 
   if (!g_windowMgr.chatModeChanged) {

@@ -687,14 +687,10 @@ __forceinline static void SelectRagEffectResource(RagEffectState& effect, Servic
 void CRagEffect::Init(EffectActor* parent, int id, vector3d deltaPos) {
   this->state.type = id;
   this->state.parent = parent;
-  this->render.position.x = parent->render.position.x;
-  this->render.position.y = parent->render.position.y;
-  this->render.position.z = parent->render.position.z;
+  this->render.position = parent->render.position;
   this->state.longitude = parent->render.angle;
   this->SetStateDuration(EffectLifetime(this->state.type));
-  this->state.deltaPos[0] = deltaPos.x;
-  this->state.deltaPos[1] = deltaPos.y;
-  this->state.deltaPos[2] = deltaPos.z;
+  this->state.deltaPos = deltaPos;
   char name[64];
   SelectRagEffectResource(this->state, g_serviceOptions, name);
 
@@ -705,10 +701,10 @@ void CRagEffect::Init(EffectActor* parent, int id, vector3d deltaPos) {
       this->state.resource->Lock();
 
       auto* resource = static_cast<CEZeffectRes*>(this->state.resource);
-      this->state.resourceData = &resource->maximumFrame;
-      this->state.endLayer = static_cast<EZeffectData*>(this->state.resourceData)->clipCount;
+      this->state.resourceData = &resource->data;
+      this->state.endLayer = this->state.resourceData->clipCount;
 
-      if (static_cast<EZeffectData*>(this->state.resourceData)->clips[0].frameCount == 0) {
+      if (this->state.resourceData->clips[0].frameCount == 0) {
         --this->state.endLayer;
       }
     }

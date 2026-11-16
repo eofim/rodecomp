@@ -29,11 +29,6 @@ namespace {
   }
 }
 
-// OFFSET: 0x0086CD40
-// FUNCTION: fn_11037
-UIComboBoxEx::UIComboBoxEx() : UIListBoxEx(), targetId(10041) {
-}
-
 // OFFSET: 0x00872C00
 // FUNCTION: fn_11136
 UIComboBoxEx::~UIComboBoxEx() = default;
@@ -52,21 +47,6 @@ void UIComboBoxEx::Configure(int x, int y, int width, int height, unsigned char 
 // FUNCTION: fn_11321
 void UIComboBoxEx::OnCreate(int width, int height) {
   this->UIListBoxEx::OnCreate(width, height);
-}
-
-// OFFSET: 0x00897580
-// FUNCTION: fn_11530
-void UIComboBoxEx::Resize(int width, int height) {
-  this->UIListBoxEx::Resize(width, height);
-  this->topLine = 0;
-  this->verticalBar->position = this->topLine;
-
-  if (this->verticalOverflow != 0) {
-    this->verticalBar->Move((width - 13), 0);
-    this->verticalBar->Invalidate();
-  } else {
-    this->verticalBar->Move((width - 13), 0);
-  }
 }
 
 // OFFSET: 0x00890460
@@ -96,7 +76,7 @@ void UIComboBoxEx::OnLBtnUp(int x, int y) {
   this->selected = this->LineAt(x, y);
   auto& windows = g_windowMgr;
 
-  if (UIWindow* target = windows.LookupWindow(this->targetId)) {
+  if (UIWindow* target = windows.LookupWindow(static_cast<WindowId>(this->targetId))) {
     target->SendMsg(nullptr, UM_COMBOBOX_SELECTED, this->selected, 0, 0, 0);
   } else if (this->parent) {
     this->parent->SendMsg(nullptr, UM_COMBOBOX_SELECTED, this->selected, 0, 0, 0);
@@ -105,17 +85,31 @@ void UIComboBoxEx::OnLBtnUp(int x, int y) {
   windows.CloseWindow(WID_COMBOBOXWND);
 }
 
+namespace {
+// INLINED
+__forceinline void SetBarRange(UIScrollBar* bar, int maximum, int visible, int total) {
+  bar->maximum = maximum;
+  bar->visible = visible;
+  bar->total = total;
+  bar->Invalidate();
+
+  if (bar->position > bar->maximum) {
+    bar->position = bar->maximum;
+  }
+}
+}
+
 // OFFSET: 0x00895C30
 // FUNCTION: fn_11510
 void UIComboBoxEx::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
   const int count = static_cast<int>(this->lines.size());
-  const int overflow = std::max((count - visible), 0);
+  const int overflow = std::ranges::max(count - visible, 0);
   this->verticalOverflow = overflow != 0;
   auto* bar = this->verticalBar;
 
   if (overflow != 0) {
-    bar->SetRange((this->bottomMargin + overflow), visible, count);
+    SetBarRange(bar, (this->bottomMargin + overflow), visible, count);
 
     if (this->selected < this->topLine) {
       this->topLine = this->selected;
@@ -133,7 +127,7 @@ void UIComboBoxEx::Refresh() {
 
     this->verticalBar->position = this->topLine;
   } else {
-    bar->SetRange(0, visible, count);
+    SetBarRange(bar, 0, visible, count);
   }
 
   this->verticalBar->Invalidate();
@@ -148,7 +142,7 @@ void UIComboBoxEx::Refresh() {
 int UIComboBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
   case UM_DEFPUSH:
-    if (UIWindow* target = g_windowMgr.LookupWindow(this->targetId)) {
+    if (UIWindow* target = g_windowMgr.LookupWindow(static_cast<WindowId>(this->targetId))) {
       target->SendMsg(nullptr, UM_COMBOBOX_SELECTED, this->selected, 0, 0, 0);
     }
 
@@ -297,6 +291,13 @@ UIComboBoxEx2::UIComboBoxEx2() : UIComboBoxEx(), alignment(0) {
 // OFFSET: 0x008706D0
 // FUNCTION: fn_11102
 UIComboBoxEx2::~UIComboBoxEx2() = default;
+
+// OFFSET: 0x0086E6E0
+// FUNCTION: fn_11075
+UIScrollBar_Navi::UIScrollBar_Navi() : UIScrollBar() {
+  this->arrowLength = 7;
+  this->thickness = 7;
+}
 
 // OFFSET: 0x00885EE0
 // FUNCTION: fn_11320

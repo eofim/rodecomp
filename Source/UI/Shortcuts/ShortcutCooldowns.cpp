@@ -26,6 +26,7 @@
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Network/Connection/Connection.h"
+#include "Network/Packets/PacketId.h"
 #include "Network/Packets/PacketLengths.h"
 #include "Utility/Text/FormatString.h"
 #include "UI/Shortcuts/ShortcutCooldowns.h"
@@ -306,13 +307,14 @@ void UIRebirthWnd::Paint() {
 // OFFSET: 0x0092DE20
 // FUNCTION: fn_12674
 void UIRoMapWnd::Paint() {
+  static_assert(offsetof(UIRoMapWnd, m_kafraBounds) == 0x218);
   this->ClearSurface(0xFFFF00FF);
   this->DrawMapNames();
   this->DrawRecordBorders();
   this->DrawFieldLabels();
   this->DrawHoverTooltip();
   this->DrawSelectedMapPreview();
-  this->FillSurface(0xFFFF00FF, reinterpret_cast<const RECT*>(&this->m_kafraLeft));
+  this->FillSurface(0xFFFF00FF, &this->m_kafraBounds);
   this->DrawTitleBar(true, "", 0);
   this->FillRegion(0, 16, this->geometry.width, 2, 0xF7DFC6);
 }
@@ -436,7 +438,7 @@ void UIQuickSlotWnd::Paint() {
   if (this->m_selected != -1) {
     const int selectedX = this->m_selected * 29 + 5;
     const SkinPaletteCell cell = {2, 2};
-    this->FillRegion(selectedX, 5, 24, 24, SkinPaletteColor(ResourceMgr::Instance(), cell, g_skinInfo.Selected()));
+    this->FillRegion(selectedX, 5, 24, 24, g_skinInfo.PaletteColor(cell, g_skinInfo.Selected()));
   }
 
   g_session.m_alternateCooldownIcons.clear();
@@ -492,7 +494,9 @@ void UIQuickSlotWnd::OnCreate(int, int) {}
 // OFFSET: 0x00930610
 // FUNCTION: fn_12686
 void UIQuickSlotWnd::OnLBtnDblClk(int x, int y) {
-  if (g_session.GetOption(5) > 0 || static_cast<unsigned>(y) > 23) {
+  const auto& options = g_session.m_options.Values();
+  const auto option = options.find(5);
+  if (static_cast<int>(option == options.end() ? 0 : option->second) > 0 || static_cast<unsigned>(y) > 23) {
     return;
   }
 
@@ -523,33 +527,6 @@ void UIQuickSlotWnd::OnProcess() {
   this->Invalidate();
 }
 
-// OFFSET: 0x0091C4D0
-// FUNCTION: fn_12614
-int UIQuickSlotWnd::SlotX(int slot) {
-  for (int index = 0, value = 5; value < 63; ++index, value += 29) {
-    if (index == slot) {
-      return value;
-    }
-  }
-
-  return -1;
-}
-
-// OFFSET: 0x0091C500
-// FUNCTION: fn_12615
-int UIQuickSlotWnd::SlotAt(int x, int y) {
-  if (y < 0 || y >= 24 || (x > 58 && x < this->geometry.width)) {
-    return -1;
-  }
-
-  const int index = (x - 4) / 29;
-  if (x > index * 29 + 30) {
-    return -1;
-  }
-
-  return index;
-}
-
 // OFFSET: 0x00932E90
 // FUNCTION: fn_12719
 void UISeekPartyWnd::OnProcess() {
@@ -557,7 +534,11 @@ void UISeekPartyWnd::OnProcess() {
   const std::uint32_t now = GetTickCount();
   this->m_frameElapsed = now - this->m_frameTick;
   if (this->m_frameElapsed > this->m_frameDuration) {
-    this->m_level = this->m_level < frameCounts[this->m_type] ? this->m_level + 1 : 0;
+    if (this->m_level < frameCounts[this->m_type]) {
+      this->m_level = this->m_level + 1;
+    } else {
+      this->m_level = 0;
+    }
     this->m_elapsed += this->m_frameDuration;
     this->m_frameTick = now;
     this->Invalidate();
@@ -594,7 +575,7 @@ int UISeekPartyWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
     switch (argument1) {
     case ID_CLOSE: {
       SeekPartyClosePacket packet;
-      packet.id = 0x806;
+      packet.id = ID_CZ_PARTY_BOOKING_REQ_DELETE;
       GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       g_windowMgr.CloseWindow(WID_JOBLISTWND);
       break;
@@ -681,7 +662,8 @@ int g_charViewOffsetY;
 void UISelCharForUServerWnd::Paint() {
   const char* background =
     g_session.characterCount > 12 ? "유저인터페이스\\login_interface\\selCharForIntergration2.bmp" : "유저인터페이스\\login_interface\\selCharForIntergration.bmp";
-  this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background))), false);
+  auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background)));
+  this->DrawBitmap(0, 0, bitmap, false);
 
   for (int index = 0; index < g_session.characterCount; ++index) {
     if (this->m_slotEnabled[index] != 0) {
@@ -705,7 +687,7 @@ void UISelCharForUServerWnd::Paint() {
       int offsetX = 0;
       int offsetY = 0;
       if (g_session.IsDoramJob(slot.job) == true) {
-        const auto* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
+        const auto* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
         int x = 0;
         int y = 0;
         int item = 0;
@@ -839,9 +821,9 @@ void UISerachStoreInfoWnd::Paint() {
   this->DrawRightAlignedText(this->geometry.width - 60, 60, FormatOwnedString(LookupMessage(MSI_SSI_REST_OF_NUMBER_OF_SEARCHES), g_session.storeSearchCount).c_str(), 0, 0, 12, 0, 0);
 
   this->FillRegion(5, 80, this->geometry.width - 10, 20, 0xDFFFFE);
-  DrawRoundedBorder(*this, 5, 80, this->geometry.width - 10, this->m_rowHeight * 10 + 21, 0xC0C0C0);
-  DrawRectangleBorder(*this, 50, 80, 110, 21, 0xC0C0C0);
-  DrawRectangleBorder(*this, 330, 80, 30, 21, 0xC0C0C0);
+  this->DrawRoundedOutline(5, 80, this->geometry.width - 10, this->m_rowHeight * 10 + 21, 0xC0C0C0);
+  this->DrawRectOutline(50, 80, 110, 21, 0xC0C0C0);
+  this->DrawRectOutline(330, 80, 30, 21, 0xC0C0C0);
   this->FillRegion(5, 100, this->geometry.width - 10, 1, 0xC0C0C0);
 
   int x = (110 - this->TextWidth(LookupMessage(MSI_STORE_NAME), 0, 0, 12, 0, 0)) / 2 + 50;
@@ -871,8 +853,8 @@ void UISerachStoreInfoWnd::Paint() {
     if (this->m_hoverRow == row) {
       this->FillRegion(5, this->m_rowHeight * row + 100, this->geometry.width - 10, this->m_rowHeight, 0xFBDFCA);
     }
-    DrawRectangleBorder(*this, 50, this->m_rowHeight * row + 100, 110, this->m_rowHeight + 1, 0xC0C0C0);
-    DrawRectangleBorder(*this, 330, this->m_rowHeight * row + 100, 30, this->m_rowHeight + 1, 0xC0C0C0);
+    this->DrawRectOutline(50, this->m_rowHeight * row + 100, 110, this->m_rowHeight + 1, 0xC0C0C0);
+    this->DrawRectOutline(330, this->m_rowHeight * row + 100, 30, this->m_rowHeight + 1, 0xC0C0C0);
 
     const int next = row + 1;
     if (next < 10) {
@@ -881,7 +863,7 @@ void UISerachStoreInfoWnd::Paint() {
 
     const int top = this->m_rowHeight * row + 100;
     const int y = top + 7;
-    DrawItemIcon(*this, ResourceMgr::Instance(), 13, top, entry->item, 0);
+    this->DrawItemIcon(13, top, entry->item, 0);
     if (0 < entry->item.grade) {
       this->DrawBitmap(
         13, y + 5,

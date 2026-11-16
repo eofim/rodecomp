@@ -1,3 +1,4 @@
+#include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Client/Replay/Replay.h"
@@ -17,6 +18,7 @@
 #include "UI/Buttons/UISpriteButton.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Status/UIBasicInfoWnd.h"
 #include <cstring>
 
 // OFFSET: 0x0084EDD0
@@ -30,6 +32,10 @@ UIButton::UIButton() : UIWindow(0) {
 // OFFSET: 0x00851340
 // FUNCTION: fn_10690
 UIButton::~UIButton() = default;
+
+// OFFSET: 0x008511B0
+// FUNCTION: fn_10689
+UIBitmapButton::~UIBitmapButton() = default;
 
 // OFFSET: 0x00851C70
 // FUNCTION: fn_10698
@@ -157,7 +163,7 @@ void UIButton::OnMouseHover(int x, int y) {
   if (!this->m_tooltip.empty()) {
     int screenX = 0, screenY = -20;
     this->ToScreen(screenX, screenY);
-    g_modeMgr.gameMode->ShowTooltip(this->m_tooltip.c_str(), screenX, screenY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(this->m_tooltip.c_str(), screenX, screenY, -1, false, true);
   }
 
   if (this->m_disabled == 0) {
@@ -184,7 +190,7 @@ void UIButton::ResetCursor(int x, int y) {
     return;
   }
 
-  g_modeMgr.gameMode->SetCursorAction(2);
+  g_modeMgr.currentMode->SetCursorAction(2);
 }
 
 // OFFSET: 0x0085EED0
@@ -209,10 +215,10 @@ void UIButton::OnLBtnUp(int x, int y) {
     if (this->parent) {
       if (g_windowMgr.WindowPolicy(3, this->parent->geometry.id) != 0) {
         int id = this->geometry.id;
-        if (id == ID_CANCEL && g_modeMgr.gameMode && g_modeMgr.gameMode->cursorType == 2) {
+        if (id == ID_CANCEL && g_modeMgr.currentMode && g_modeMgr.currentMode->cursorType == 2) {
           const char* text = LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT);
           if (g_windowMgr.Confirm(text, 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
-            g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
+            g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
           }
         } else {
           if (id == ID_OK || id == ID_SEARCH) {
@@ -224,7 +230,7 @@ void UIButton::OnLBtnUp(int x, int y) {
         }
       }
     } else {
-      g_modeMgr.gameMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
     }
   }
 

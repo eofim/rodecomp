@@ -16,6 +16,20 @@ struct JsonValueLocal {
   }
 };
 
+struct JsonCopiedValue {
+  JsonValue value;
+
+  // INLINED
+  explicit JsonCopiedValue(const JsonValue& other) {
+    reinterpret_cast<void(__thiscall*)(JsonValue*, const JsonValue*)>(JsonCopyConstruct)(&this->value, &other);
+  }
+
+  // INLINED
+  ~JsonCopiedValue() {
+    reinterpret_cast<void(__thiscall*)(JsonValue*)>(JsonDestroy)(&this->value);
+  }
+};
+
 // OFFSET: 0x00509940
 // FUNCTION: fn_00891
 bool JsonCppLoader::GetMapStringBoolValue(const JsonValue& node, const std::string& key, std::map<std::string, bool>* out) {
@@ -26,16 +40,20 @@ bool JsonCppLoader::GetMapStringBoolValue(const JsonValue& node, const std::stri
     return false;
   }
 
-  const JsonObject& members = value.value.GetObject();
-  for (JsonObject::const_iterator member = members.begin(); member != members.end(); ++member) {
-    std::string name = member->first;
-    JsonValue element = member->second;
-    if (element.GetType() != JsonValue::BOOL_VALUE) {
+  const JsonObject* members = value.value.ObjectRange();
+  if (members == nullptr) {
+    return true;
+  }
+  for (const JsonMember& member : *members) {
+    std::string name = member.first;
+    JsonCopiedValue element(member.second);
+    if (element.value.GetType() != JsonValue::BOOL_VALUE) {
       this->Fail("잘못된 데이터가 입력되었습니다. boolValue 가 입력되어야 합니다. (keyName : %s)", key.c_str());
       return false;
     }
 
-    if (!out->insert(std::make_pair(name, element.AsBool())).second) {
+    const std::pair<std::string, bool> item(name, element.value.AsBool());
+    if (!out->insert(item).second) {
       this->Fail("중복키가 입력되었습니다. (keyName : %s)", key.c_str());
       return false;
     }
@@ -60,19 +78,12 @@ bool JsonCppLoader::GetStringValue(const JsonValue& node, const std::string& key
 }
 
 
-// INLINED
-static JsonValue CopyNullJsonValue() {
-  JsonValue value;
-  reinterpret_cast<void(__thiscall*)(JsonValue*, const JsonValue*)>(JsonCopyConstruct)(&value, static_cast<const JsonValue*>(JsonNull()));
-  return value;
-}
-
 struct JsonCppLoaderJsonOptionsGuard {
   JsonCppLoaderJsonOptions* options;
 
   // INLINED
   ~JsonCppLoaderJsonOptionsGuard() {
-    reinterpret_cast<void(__thiscall*)(JsonCppLoaderJsonOptions*)>(JsonOptionsCommonDestroy)(reinterpret_cast<JsonCppLoaderJsonOptions*>(reinterpret_cast<unsigned char*>(this->options) + 8));
+    reinterpret_cast<void(__thiscall*)(JsonCppLoaderCommonJsonOptions*)>(JsonOptionsCommonDestroy)(&this->options->common);
   }
 };
 
@@ -87,7 +98,7 @@ bool JsonCppLoader::LoadBson(const std::string& path) {
 
     JsonCppLoaderBsonOptions optionStorage;
     JsonCppLoaderBsonOptions* options = reinterpret_cast<JsonCppLoaderBsonOptions*(__thiscall*)(JsonCppLoaderBsonOptions*, int)>(BsonDecodeOptionsConstruct)(&optionStorage, 1);
-    reinterpret_cast<JsonCppLoaderParsedValue&>(this->document) = JsonDecodeBsonStream(&file, options);
+    this->document = JsonDecodeBsonStream(&file, options);
     file.close();
   } catch (const std::exception& exception) {
     this->Fail("error : JsonCppLoader::LoadBson failed (reason : %s)", exception.what());
@@ -108,7 +119,7 @@ bool JsonCppLoader::LoadJson(const std::string& path) {
 
     JsonCppLoaderJsonOptions optionStorage;
     JsonCppLoaderJsonOptionsGuard options{reinterpret_cast<JsonCppLoaderJsonOptions*(__thiscall*)(JsonCppLoaderJsonOptions*, int)>(JsonDecodeOptionsConstruct)(&optionStorage, 1)};
-    reinterpret_cast<JsonCppLoaderParsedValue&>(this->document) = JsonParseStream(&file, options.options, JsonCppLoaderJsonHandler{});
+    this->document = JsonParseStream(&file, options.options, JsonCppLoaderJsonHandler{});
     file.close();
   } catch (const std::exception& exception) {
     this->Fail("error : JsonCppLoader::LoadJson failed (reason : %s)", exception.what());
@@ -152,7 +163,7 @@ __declspec(noinline) bool JsonCppLoader::LoadBson(std::vector<unsigned char>& bu
   try {
     JsonCppLoaderBsonOptions optionStorage;
     JsonCppLoaderBsonOptions* options = reinterpret_cast<JsonCppLoaderBsonOptions*(__thiscall*)(JsonCppLoaderBsonOptions*, int)>(BsonDecodeOptionsConstruct)(&optionStorage, 1);
-    reinterpret_cast<JsonCppLoaderParsedValue&>(this->document) = JsonDecodeBsonBuffer(&buffer, options);
+    this->document = JsonDecodeBsonBuffer(&buffer, options);
   } catch (const std::exception& exception) {
     this->Fail("error : JsonCppLoader::LoadBson failed (reason : %s)", exception.what());
     return false;
@@ -177,7 +188,7 @@ __declspec(noinline) bool JsonCppLoader::LoadJson(std::vector<unsigned char>& bu
   try {
     JsonCppLoaderJsonOptions optionStorage;
     JsonCppLoaderJsonOptionsGuard options{reinterpret_cast<JsonCppLoaderJsonOptions*(__thiscall*)(JsonCppLoaderJsonOptions*, int)>(JsonDecodeOptionsConstruct)(&optionStorage, 1)};
-    reinterpret_cast<JsonCppLoaderParsedValue&>(this->document) = JsonParseString(buffer.data(), options.options, JsonCppLoaderJsonHandler{});
+    this->document = JsonParseString(buffer.data(), options.options, JsonCppLoaderJsonHandler{});
   } catch (const std::exception& exception) {
     this->Fail("error : JsonCppLoader::LoadJson failed (reason : %s)", exception.what());
     return false;
@@ -188,13 +199,12 @@ __declspec(noinline) bool JsonCppLoader::LoadJson(std::vector<unsigned char>& bu
 
 // OFFSET: 0x004EEC60
 // FUNCTION: fn_00337
-JsonCppLoader::JsonCppLoader() : document(CopyNullJsonValue()), loaded(false), succeeded(true) {
+JsonCppLoader::JsonCppLoader() : loaded(false), succeeded(true) {
 }
 
 // OFFSET: 0x004F2840
 // FUNCTION: fn_00446
 JsonCppLoader::~JsonCppLoader() {
-  reinterpret_cast<void(__thiscall*)(JsonValue*)>(JsonDestroy)(&this->document);
 }
 
 // OFFSET: 0x004F4180
@@ -229,23 +239,27 @@ bool JsonCppLoader::GetIntValue(const JsonValue& node, const std::string& key, i
 // OFFSET: 0x005087D0
 // FUNCTION: fn_00888
 bool JsonCppLoader::GetMapStringIntValue(const JsonValue& node, const std::string& key, std::map<std::string, int>* out) {
-  JsonValue value;
-  this->GetValue(value, key, node, JsonValue::OBJECT_VALUE);
-  if (value.IsNull()) {
+  JsonValueLocal value;
+  this->GetValue(value.value, key, node, JsonValue::OBJECT_VALUE);
+  if (value.value.IsNull()) {
     this->Fail("key 에 해당하는 데이터를 찾지 못했습니다. (keyName : %s)", key.c_str());
     return false;
   }
 
-  const JsonObject& members = value.GetObject();
-  for (JsonObject::const_iterator member = members.begin(); member != members.end(); ++member) {
-    std::string name = member->first;
-    JsonValue element = member->second;
-    if (element.GetType() != JsonValue::INT64_VALUE) {
+  const JsonObject* members = value.value.ObjectRange();
+  if (members == nullptr) {
+    return true;
+  }
+  for (const JsonMember& member : *members) {
+    std::string name = member.first;
+    JsonCopiedValue element(member.second);
+    if (element.value.GetType() != JsonValue::INT64_VALUE) {
       this->Fail("잘못된 데이터가 입력되었습니다. intValue 가 입력되어야 합니다. (keyName : %s)", key.c_str());
       return false;
     }
 
-    if (!out->insert(std::make_pair(name, element.AsInt())).second) {
+    const std::map<std::string, int>::value_type item(name, element.value.AsInt());
+    if (!out->insert(item).second) {
       this->Fail("중복키가 입력되었습니다. (keyName : %s)", key.c_str());
       return false;
     }
@@ -257,23 +271,27 @@ bool JsonCppLoader::GetMapStringIntValue(const JsonValue& node, const std::strin
 // OFFSET: 0x00508BD0
 // FUNCTION: fn_00889
 bool JsonCppLoader::GetMapStringStringValue(const JsonValue& node, const std::string& key, std::map<std::string, std::string>* out) {
-  JsonValue value;
-  this->GetValue(value, key, node, JsonValue::OBJECT_VALUE);
-  if (value.IsNull() == true) {
+  JsonValueLocal value;
+  this->GetValue(value.value, key, node, JsonValue::OBJECT_VALUE);
+  if (value.value.IsNull() == true) {
     this->Fail("key 에 해당하는 데이터를 찾지 못했습니다. (keyName : %s)", key.c_str());
     return false;
   }
 
-  const JsonObject& members = value.GetObject();
-  for (JsonObject::const_iterator member = members.begin(); member != members.end(); ++member) {
-    std::string name = member->first;
-    JsonValue element = member->second;
-    if (element.GetType() != JsonValue::STRING_VALUE) {
+  const JsonObject* members = value.value.ObjectRange();
+  if (members == nullptr) {
+    return true;
+  }
+  for (const JsonMember& member : *members) {
+    std::string name = member.first;
+    JsonCopiedValue element(member.second);
+    if (element.value.GetType() != JsonValue::STRING_VALUE) {
       this->Fail("잘못된 데이터가 입력되었습니다. stringValue 가 입력되어야 합니다. (keyName : %s)", key.c_str());
       return false;
     }
 
-    if (!out->insert(std::make_pair(name, element.AsString())).second) {
+    const std::map<std::string, std::string>::value_type item(name, element.value.AsString());
+    if (!out->insert(item).second) {
       this->Fail("중복키가 입력되었습니다. (keyName : %s)", key.c_str());
       return false;
     }

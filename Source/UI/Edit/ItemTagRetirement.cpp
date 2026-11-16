@@ -20,14 +20,6 @@
 #include <cstring>
 #include <string>
 
-#pragma pack(push, 1)
-struct ItemLinkOption {
-  /* 0000 */ std::int16_t id;
-  /* 0002 */ std::int16_t value;
-  /* 0004 */ unsigned char parameter;
-};
-#pragma pack(pop)
-
 // OFFSET: 0x00896EB0
 // FUNCTION: fn_11519
 void UIItemTagCtrl::RemoveTagChild(UIWindow* child) {
@@ -118,7 +110,7 @@ bool UIItemTagOnMail::CanInsertTag(const std::string& name, int width) {
   tag += this->FitTextToWidth(name, width / 2);
   tag += ">";
 
-  UIRodexEditCtrl3* contents = static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->m_contents;
+  UIRodexEditCtrl3* contents = g_windowMgr.rodexComposeWnd->m_contents;
   const unsigned int maximum = contents->maximum;
   this->taggedText = contents->text;
   this->taggedText += tag;
@@ -241,7 +233,7 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
 
   link += this->ItemLinkNumberText(item.identity[2]);
 
-  link += Equipment(item) ? "1" : "0";
+  link += item.IsEquipment() ? "1" : "0";
   link += this->ItemLinkNumberText(std::atoi(item.itemId.c_str()));
 
   if (item.refiningLevel != 0) {
@@ -255,7 +247,7 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
   link += this->ItemLinkNumberText(item.grade);
 
   const std::uint32_t* cards = item.cards;
-  int slots = ItemSlotsCount(item);
+  int slots = item.SlotCount();
   if (slots == 0) {
     slots = 4;
   }
@@ -271,7 +263,7 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
     link += this->ItemLinkNumberText(index < 4 ? cards[index] : 0);
   }
 
-  const ItemLinkOption* options = reinterpret_cast<const ItemLinkOption*>(item.options);
+  const ItemOptionRecord* options = item.options;
   for (int index = 0; index < item.optionCount; ++index) {
     link += delimiters[9];
     link += this->ItemLinkNumberText(options[index].id);
@@ -312,9 +304,9 @@ bool UIItemTagOnMegaPhone::CanInsertTag(const std::string& name, int width) {
   tag += ">";
 
   unsigned bytes = 0;
-  this->textWidth = static_cast<UINpcTextEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->MeasureText(tag, bytes);
+  this->textWidth = g_windowMgr.npcTextEditDialogWnd->MeasureText(tag, bytes);
 
-  UIEditCtrl* edit = static_cast<UINpcEditDialogWnd*>(g_windowMgr.npcTextEditDialogWnd)->edit;
+  UIEditCtrl* edit = g_windowMgr.npcTextEditDialogWnd->edit;
   const unsigned int maximum = edit->maximum;
   this->taggedText = edit->text;
   this->taggedText += tag;
@@ -376,7 +368,7 @@ void UIItemTagCtrl::UpdateItemTags() {
         this->PlaceTagButton(entry->child, visible, x, 0);
 
         const int bytes = static_cast<int>(std::strlen(fitted.c_str()));
-        if (!g_windowMgr.rodexComposeWnd || static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->m_contents == g_windowMgr.GetHoverWindow()) {
+        if (!g_windowMgr.rodexComposeWnd || g_windowMgr.rodexComposeWnd->m_contents == g_windowMgr.GetHoverWindow()) {
           const int cursor = g_serverLanguage->cursor;
           const int start = static_cast<int>(prefix.size());
           const int end = start + bytes + 2;

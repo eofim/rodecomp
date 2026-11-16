@@ -38,14 +38,6 @@
 #include <windows.h>
 #include <timeapi.h>
 
-// INLINED
-static vector3d& operator+=(vector3d& target, const vector3d& offset) {
-  target.x += offset.x;
-  target.y += offset.y;
-  target.z += offset.z;
-  return target;
-}
-
 // OFFSET: 0x00CB1930
 // FUNCTION: fn_21099
 void CGameActor::ProcessDamageMessages() {
@@ -59,8 +51,8 @@ void CGameActor::ProcessDamageMessages() {
         notice[0] = '\0';
         partyNotice[0] = '\0';
 
-        std::string targetName = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(targetAid);
-        std::string attackerName = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(attackerAid);
+        std::string targetName = g_modeMgr.GetGameMode()->ActorName(targetAid);
+        std::string attackerName = g_modeMgr.GetGameMode()->ActorName(attackerAid);
 
         std::size_t position = targetName.find('#');
         if (position != std::string::npos) {
@@ -73,12 +65,12 @@ void CGameActor::ProcessDamageMessages() {
         }
 
         if (targetName.empty()) {
-          const CActorNameCard& card = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LookupNameCard(targetAid);
+          const CActorNameCard& card = g_modeMgr.GetGameMode()->LookupNameCard(targetAid);
           targetName.assign(card.displayName.empty() ? std::string(LookupMessage(MSI_WHO_IS)) : card.displayName);
         }
 
         if (attackerName.empty()) {
-          const CActorNameCard& card = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LookupNameCard(attackerAid);
+          const CActorNameCard& card = g_modeMgr.GetGameMode()->LookupNameCard(attackerAid);
           attackerName.assign(card.displayName.empty() ? std::string(LookupMessage(MSI_WHO_IS)) : card.displayName);
         }
 
@@ -117,7 +109,7 @@ void CGameActor::ProcessDamageMessages() {
 // OFFSET: 0x00CB2040
 // FUNCTION: fn_21100
 void CGameActor::RegisterPos() {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   int column;
   int row;
   mode->WorldCell(this->render.position.x, this->render.position.z, column, row);
@@ -138,10 +130,10 @@ bool CGameActor::ProcessState() {
       return false;
     }
     const unsigned int alpha = (static_cast<std::uint32_t>(this->vanishTime) - timeGetTime()) >> 1;
-    reinterpret_cast<unsigned char*>(&this->render.color)[3] = alpha > 255 ? 255 : static_cast<unsigned char>(alpha);
+    this->render.colorChannels.alpha = alpha > 255 ? 255 : static_cast<unsigned char>(alpha);
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   CWorld* world = mode->scene;
   const std::uint32_t serverTime = g_session.GetServerTime();
   int moved = 0;
@@ -151,7 +143,7 @@ bool CGameActor::ProcessState() {
     if (this->isCounter == 0) {
       this->isCounter = 1;
       if (g_session.IsPlayerJobId(this->GetEffectiveJob(-1)) != 0) {
-        if (IsJobWeaponAllowed(this->GetEffectiveJob(-1), this->sex, this->GetWeapon())) {
+        if (g_session.IsJobWeaponAllowed(this->GetEffectiveJob(-1), this->sex, this->GetWeapon())) {
           this->SetAction(0x58, 4, 1);
         } else {
           this->SetAction(0x50, 4, 1);
@@ -297,7 +289,7 @@ bool CGameActor::ProcessState() {
       const int frames = static_cast<int>(this->GetElapsedFrames());
       if (this->hitTargetAid != 0) {
         if (frames % 34 == 0) {
-          CRenderObject* target = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(this->hitTargetAid);
+          CRenderObject* target = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(this->hitTargetAid);
           if (target != nullptr) {
             this->Face(target->render.position.x, target->render.position.z);
           }
@@ -455,7 +447,7 @@ void CGameActor::ResetState() {
   this->render.state = ST_STAND;
   this->render.motionType = 0;
   this->render.speed = 1.0f;
-  this->render.visibilityOptions[0] = 1;
+  this->render.shadowVisible = 1;
   this->accel.x = 0.0f;
   this->accel.y = 0.0f;
   this->accel.z = 0.0f;
@@ -475,7 +467,7 @@ void CGameActor::ResetState() {
   this->hitTargetAid = 0;
   this->attackMotion = -1.0f;
   this->pathStartCell = -1;
-  this->render.visibilityOptions[1] = 1;
+  this->render.trackBounds = 1;
   this->render.motionStartTime = timeGetTime();
   this->petEmotionStartTick = 0;
   this->skillRechargeEndTick = timeGetTime() - 5000;
@@ -671,7 +663,7 @@ void CGameActor::ReleaseAttachments() {
   this->msgEffectList.erase(this->msgEffectList.begin(), this->msgEffectList.end());
 
   if (g_session.GetSiegeMode() && this->sceneNameWindow) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->RemoveNotificationWindow(reinterpret_cast<int>(this->sceneNameWindow));
+    g_modeMgr.GetGameMode()->RemoveNotificationWindow(this->sceneNameWindow);
     g_windowMgr.Schedule(this->sceneNameWindow);
     this->sceneNameWindow = nullptr;
   }
@@ -685,9 +677,9 @@ void CGameActor::ReleaseAttachments() {
 // OFFSET: 0x00CB0220
 // FUNCTION: fn_21092
 void CGameActor::UpdateStateEffects() {
-  if (g_updateTick > 0 && this->render.effectPhaseBytes[0] == 1) {
+  if (g_updateTick > 0 && this->render.flagsResetPending == 1) {
     this->render.flags = 0;
-    this->render.effectPhaseBytes[0] = 0;
+    this->render.flagsResetPending = 0;
   }
 
   if (StateFlagsClear(this->stateFlags)) {
@@ -755,7 +747,7 @@ bool CGameActor::UpdateFadeOut() {
     }
 
     const std::uint32_t remaining = (static_cast<std::uint32_t>(this->vanishTime) - timeGetTime()) / 2;
-    reinterpret_cast<unsigned char*>(&this->render.color)[3] = static_cast<unsigned char>(remaining > 0xFF ? 0xFF : remaining);
+    this->render.colorChannels.alpha = static_cast<unsigned char>(remaining > 0xFF ? 0xFF : remaining);
   }
 
   return true;
@@ -916,7 +908,7 @@ CGameObject* CGameActor::GetEffectCounter(int effectId) {
 float CGameActor::GetNameOffset() {
   float scale = 1.0f;
   if ((this->render.flags & 0x10) != 0) {
-    const unsigned int angle = this->render.pulsePhases[0] * 4 + 90;
+    const unsigned int angle = this->render.shrinkPhase * 4 + 90;
     if (angle > 270) {
       scale = 0.5f;
     } else {
@@ -1083,13 +1075,13 @@ float CGameActor::GetNameHeight() {
 
 // OFFSET: 0x00CAD990
 // FUNCTION: fn_21055
-CSprRes* CGameActor::GetSprite() {
+CSprRes* CRenderObject::GetSprite() {
   return this->render.sprite;
 }
 
 // OFFSET: 0x00CAD9A0
 // FUNCTION: fn_21056
-__declspec(noinline) float CGameActor::GetElapsedFrames() {
+__declspec(noinline) float CRenderObject::GetElapsedFrames() {
   return static_cast<float>(static_cast<double>(timeGetTime() - this->render.motionStartTime) / 24.0);
 }
 
@@ -1192,14 +1184,15 @@ void __stdcall CreateHallucinationPc(
   hallu->render.position.x = position->x;
   hallu->render.position.y = position->y;
   hallu->render.position.z = position->z;
-  unsigned char* const argb = reinterpret_cast<unsigned char*>(&hallu->render.color);
+  SpriteColor& argb = hallu->render.colorChannels;
   if (alpha != -1) {
-    argb[3] = static_cast<unsigned char>(alpha);
+    argb.alpha = static_cast<unsigned char>(alpha);
   }
-  *reinterpret_cast<std::uint16_t*>(argb + 1) = 0xFFFF;
-  argb[0] = 0xFF;
+  argb.green = 0xFF;
+  argb.red = 0xFF;
+  argb.blue = 0xFF;
 
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->objects.push_back(hallu);
+  g_modeMgr.GetGameMode()->scene->objects.push_back(hallu);
   delete pc;
 }
 

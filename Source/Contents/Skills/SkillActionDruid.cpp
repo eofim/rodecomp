@@ -41,15 +41,15 @@ public:
 
 class CSkillAction_DamageWereRaptorForm : public CSkillAction_AnimalForm, public CSkillAction_Direction {
 public:
-  void SpawnAttack00Effect(int sourceActor, CGameActor* target);
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void SpawnAttack00Effect(CGameActor* source, CGameActor* target);
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
   bool IsInForm(CGameActor* actor) override;
   void PlayFormAttackEffect(CGameActor* actor) override;
 };
 
 class CSkillAction_DamageWereWolfForm : public CSkillAction_AnimalForm {
 public:
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
   bool IsInForm(CGameActor* actor) override;
   void PlayFormAttackEffect(CGameActor* actor) override;
 };
@@ -121,7 +121,7 @@ class CSkillAction_DR_HUNGER : public CSkillAction_DamageWereWolfForm {
 public:
   int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillHit(int caster, CGameActor* target, CGameActor* argument3) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_DR_CRUEL_BITE : public CSkillAction_DamageWereWolfForm {
@@ -162,7 +162,7 @@ class CSkillAction_DR_SHOOTING_FEATHER : public CSkillAction_DamageWereRaptorFor
 public:
   int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_DR_FLICKING_TONADO : public CSkillAction_DamageWereRaptorForm {
@@ -202,7 +202,7 @@ public:
   int GetSkillCastMotion() override;
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_Icing : public CSkillAction {
@@ -210,7 +210,7 @@ public:
   int GetSkillCastMotion() override;
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CEfstAction_NATURE_PROTECTION : public CEfstAction_BasicAction {
@@ -283,7 +283,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_DR_WIND_BOMB : public CSkillAction {
@@ -292,7 +292,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_DR_AROUND_FLOWER : public CSkillAction_Earthing {
@@ -458,8 +458,7 @@ void CSkillAction_DR_HUNGER::OnSkillEffect(int level, CGameActor* source, CGameA
 
 // OFFSET: 0x00620BE0
 // FUNCTION: fn_04479
-void CSkillAction_DR_HUNGER::OnSkillHit(int caster, CGameActor* target, CGameActor* argument3) {
-  CGameActor* source = reinterpret_cast<CGameActor*>(caster);
+void CSkillAction_DR_HUNGER::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
   if (!source) {
     return;
   }
@@ -580,7 +579,7 @@ void CSkillAction_DR_LOW_FLIGHT::OnSkillEffect(int level, CGameActor* source, CG
   }
 
   const float angle = ScreenAngle(
-    &source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values
+    &source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values
   );
   const int direction = this->GetDirection(angle);
   if (!this->IsValidDirection(direction)) {
@@ -980,18 +979,18 @@ void CSkillAction_DR_CUTTING_WIND::OnSkillEffect(int level, CGameActor* source, 
     thread_local EncryptedName<sizeof(bytes), 0x4F1791FB1503C713ULL> name(bytes);
     return name.Text();
   }()), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
-    effect->SetAngle(ScreenAngle(&target->render.position.x, &source->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values));
+    effect->SetAngle(ScreenAngle(&target->render.position.x, &source->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values));
   }
 }
 
 // OFFSET: 0x00623F70
 // FUNCTION: fn_04541
-void CSkillAction_DR_CUTTING_WIND::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (!source) {
+void CSkillAction_DR_CUTTING_WIND::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (!target) {
     return;
   }
 
-  g_effectMgr->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId([] {
+  g_effectMgr->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId([] {
     constexpr std::array<std::uint8_t, 17> effectSourceArray = OBFUSCATE_SOURCE("cutting_wind_hit", 0xA1A55B4D1597EDD3ULL);
     const std::uint8_t (&effectSource)[17] = effectSourceArray._Elems;
     thread_local EncryptedName<sizeof(effectSource), 0xA1A55B4D1597EDD3ULL> effectName(effectSource);
@@ -1041,13 +1040,13 @@ void CSkillAction_DR_WIND_BOMB::OnSkillEffect(int level, CGameActor* source, CGa
 
 // OFFSET: 0x00624430
 // FUNCTION: fn_04546
-void CSkillAction_DR_WIND_BOMB::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (!source) {
+void CSkillAction_DR_WIND_BOMB::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (!target) {
     return;
   }
 
   EffectLists* effects = g_effectMgr;
-  effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId([] {
+  effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId([] {
     constexpr auto bytesText = OBFUSCATE_SOURCE("wind_bomb_hit", 0x91E147EBBD47C39FULL);
     const auto& bytes = bytesText.data;
     thread_local EncryptedName<sizeof(bytes), 0x91E147EBBD47C39FULL> name(bytes);
@@ -1272,14 +1271,14 @@ void CSkillAction_DR_SHOOTING_FEATHER::OnSkillEffect(int level, CGameActor* sour
     thread_local EncryptedName<sizeof(bytes), 0x93E7A3A1F587CDC5ULL> name(bytes);
     return name.Text();
   }()), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
-    effect->SetAngle(ScreenAngle(&source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values));
+    effect->SetAngle(ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values));
   }
 }
 
 // OFFSET: 0x00621830
 // FUNCTION: fn_04496
-void CSkillAction_DR_SHOOTING_FEATHER::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  this->SpawnAttack00Effect(level, source);
+void CSkillAction_DR_SHOOTING_FEATHER::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  this->SpawnAttack00Effect(source, target);
 }
 
 // OFFSET: 0x0061FF40

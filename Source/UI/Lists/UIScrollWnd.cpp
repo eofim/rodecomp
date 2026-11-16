@@ -1,3 +1,4 @@
+#include <new>
 #include "Render/DeviceContext/DCSurface.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Lists/UIScrollWnd.h"
@@ -12,6 +13,25 @@
 #include <cstdlib>
 #include <list>
 #include <utility>
+
+namespace {
+struct PrimitivePoolAccess : RenderPrimitivePool {
+  // INLINED
+  inline RenderPrimitive* AcquireLocal() {
+    if (this->m_current == this->m_commands.end()) {
+      this->m_commands.emplace_back();
+      this->m_current = this->m_commands.end();
+      return &this->m_commands.back();
+    }
+
+    RenderPrimitive* command = &*this->m_current;
+    ++this->m_current;
+    new (command) RenderPrimitive;
+
+    return command;
+  }
+};
+}
 
 // OFFSET: 0x009AC040
 // FUNCTION: fn_13770
@@ -228,10 +248,10 @@ RenderPrimitive* UIScrollWnd::DrawPrimitive() {
 // OFFSET: 0x009AD100
 // FUNCTION: fn_13782
 RenderPrimitive* UIScrollWnd::BuildPrimitive(int x, int y, int sourceX, int sourceY, int width, int height, CTexture* texture, std::uint32_t color) {
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = static_cast<PrimitivePoolAccess&>(g_renderer->primitives).AcquireLocal();
   primitive->texture = texture;
-  const std::int32_t textureWidth = std::bit_cast<std::int32_t>(texture->TextureWidth());
-  const std::int32_t textureHeight = std::bit_cast<std::int32_t>(texture->TextureHeight());
+  const std::int32_t textureWidth = static_cast<std::int32_t>(texture->TextureWidth());
+  const std::int32_t textureHeight = static_cast<std::int32_t>(texture->TextureHeight());
   primitive->quad[0].x = static_cast<float>(x);
   primitive->quad[0].y = static_cast<float>(y);
   primitive->quad[0].u = (static_cast<float>(sourceX) + g_textureOffsetX) / static_cast<float>(textureWidth);

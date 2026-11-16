@@ -65,15 +65,6 @@ namespace {
     script.Call("GetOriginalHotKeyListSize", "d>d", tab + 1, &count);
     return index >= count ? -1 : index;
   }
-
-  void SetWindowText(UIWindow* window, const char* text) {
-    if (!window) {
-      return;
-    }
-    using SetTextFn = void(__thiscall*)(UIWindow*, const char*);
-    void** vtable = *reinterpret_cast<void***>(window);
-    reinterpret_cast<SetTextFn>(vtable[53])(window, text);
-  }
 }
 
 // OFFSET: 0x0091FFD0
@@ -130,30 +121,30 @@ void UIHotKeyWnd::OnCreate(int, int) {
 
   this->m_optionCheckBox = new UICheckBox();
   this->m_optionCheckBox->SetSize(150, 12);
-  static_cast<UICheckBox*>(this->m_optionCheckBox)->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", LookupMessage(MSI_CHATMODE_ONOFF));
+  this->m_optionCheckBox->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", LookupMessage(MSI_CHATMODE_ONOFF));
   this->m_optionCheckBox->Move(80, this->geometry.height - 22);
-  static_cast<UICheckBox*>(this->m_optionCheckBox)->SetChecked(g_windowMgr.chatModeChanged);
+  this->m_optionCheckBox->SetChecked(g_windowMgr.chatModeChanged);
   this->AddChild(this->m_optionCheckBox);
 
   this->m_prevButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->m_prevButton)->SetBitmap("유저인터페이스\\basic_interface\\arw_left.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->m_prevButton)->SetBitmap("유저인터페이스\\basic_interface\\arw_left.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->m_prevButton)->SetBitmap("유저인터페이스\\basic_interface\\arw_left.bmp", 2, 0);
-  this->m_prevButton->SetSize(static_cast<UIBitmapButton*>(this->m_prevButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_prevButton)->BitmapHeight());
+  this->m_prevButton->SetBitmap("유저인터페이스\\basic_interface\\arw_left.bmp", 0, 0);
+  this->m_prevButton->SetBitmap("유저인터페이스\\basic_interface\\arw_left.bmp", 1, 0);
+  this->m_prevButton->SetBitmap("유저인터페이스\\basic_interface\\arw_left.bmp", 2, 0);
+  this->m_prevButton->SetSize(this->m_prevButton->BitmapWidth(), this->m_prevButton->BitmapHeight());
   this->m_prevButton->Move(this->geometry.width - 80, 25);
   this->m_prevButton->Enable(0);
-  static_cast<UIBitmapButton*>(this->m_prevButton)->SetTooltip(LookupMessage(MSI_PREV_PAGE));
+  this->m_prevButton->SetTooltip(LookupMessage(MSI_PREV_PAGE));
   this->m_prevButton->SetId(316);
   this->AddChild(this->m_prevButton);
 
   this->m_nextButton = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->m_nextButton)->SetBitmap("유저인터페이스\\basic_interface\\arw_right.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->m_nextButton)->SetBitmap("유저인터페이스\\basic_interface\\arw_right.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->m_nextButton)->SetBitmap("유저인터페이스\\basic_interface\\arw_right.bmp", 2, 0);
-  this->m_nextButton->SetSize(static_cast<UIBitmapButton*>(this->m_nextButton)->BitmapWidth(), static_cast<UIBitmapButton*>(this->m_nextButton)->BitmapHeight());
+  this->m_nextButton->SetBitmap("유저인터페이스\\basic_interface\\arw_right.bmp", 0, 0);
+  this->m_nextButton->SetBitmap("유저인터페이스\\basic_interface\\arw_right.bmp", 1, 0);
+  this->m_nextButton->SetBitmap("유저인터페이스\\basic_interface\\arw_right.bmp", 2, 0);
+  this->m_nextButton->SetSize(this->m_nextButton->BitmapWidth(), this->m_nextButton->BitmapHeight());
   this->m_nextButton->Move(this->geometry.width - 20, 25);
   this->m_nextButton->Enable(0);
-  static_cast<UIBitmapButton*>(this->m_nextButton)->SetTooltip(LookupMessage(MSI_NEXT_PAGE));
+  this->m_nextButton->SetTooltip(LookupMessage(MSI_NEXT_PAGE));
   this->m_nextButton->SetId(317);
   this->AddChild(this->m_nextButton);
 }
@@ -256,15 +247,16 @@ void UIHotKeyWnd::OnLBtnDown(int x, int y) {
   const int previous = this->m_selectedRow;
   this->m_selectedRow = this->RowFromPoint(x, y);
 
-  const int count = HotkeyCount(*g_session.m_hotkeyScript, this->m_tab);
+  const int count = g_session.HotkeyCount(this->m_tab);
 
   if (this->m_selectedRow + (this->m_page * 9 - 9) * 4 < count) {
     if (this->m_selectedRow > -1) {
       int screenX = 0;
       int screenY = 0;
       this->ToScreen(screenX, screenY);
+      UIBalloonText* target = this->m_balloon;
       const char* text = LookupMessage(MSI_HOTKEYWND_NOTICE1);
-      this->m_balloon->SetText(text, 0x3C);
+      target->SetText(text, 0x3C);
       {
         UIBalloonText* balloon = this->m_balloon;
         balloon->m_textColor = 0xFFFFFF;
@@ -327,7 +319,7 @@ void UIHotKeyWnd::OnMouseHover(int x, int y) {
 
   const HotkeyEntry entry = this->GetHotkey(this->m_tab, index + (this->m_page * 9 - 9) * 4, true);
   if (entry.info.description.size() > 0) {
-    g_modeMgr.gameMode->ShowTooltip(entry.info.description.c_str(), x0 + screenX, y0 + screenY, 0xFFFFFFFF, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(entry.info.description.c_str(), x0 + screenX, y0 + screenY, 0xFFFFFFFF, 0, 1);
   }
 }
 
@@ -354,14 +346,14 @@ void UISerachStoreInfoWnd::OnMouseHover(int x, int y) {
           text = text.substr(0, end);
         }
 
-        g_modeMgr.gameMode->SetCursorAction(2);
+        g_modeMgr.currentMode->SetCursorAction(2);
       }
     } else {
       text = item.DisplayName(0);
     }
 
     if (text.size() != 0) {
-      g_modeMgr.gameMode->ShowTooltip(text.c_str(), screenX, screenY, g_session.GetItemNameColor(item), 0, 1);
+      g_modeMgr.currentMode->ShowTooltip(text.c_str(), screenX, screenY, g_session.GetItemNameColor(item), 0, 1);
     }
   }
 
@@ -386,7 +378,7 @@ void UIHotKeyWnd::Paint() {
   this->m_buttonBarHeight = this->DrawButtonBar(2, 0, 1);
   this->DrawPanelBackground(this->m_titleHeight, 0, "");
 
-  const int count = HotkeyCount(*g_session.m_hotkeyScript, this->m_tab);
+  const int count = g_session.HotkeyCount(this->m_tab);
   int visibleRow = 0;
 
   for (int row = 0; row < count; ++row) {
@@ -466,7 +458,7 @@ void UIHotKeyWnd::Paint() {
   const int innerHeight =
     this->geometry.height - 2 * this->m_verticalMargin - this->m_tabHeight - this->m_titleHeight - this->m_buttonBarHeight;
 
-  DrawRectangleBorder(*this, this->m_horizontalMargin, bottomY, innerWidth, innerHeight, 0xC0C0C0);
+  this->DrawRectOutline(this->m_horizontalMargin, bottomY, innerWidth, innerHeight, 0xC0C0C0);
   this->FillRegion(this->geometry.width / 2, bottomY, 1, innerHeight, 0xC0C0C0);
   this->FillRegion(this->m_horizontalMargin, bottomY - 3, 1, 3, 0xC0C0C0);
   this->FillRegion(this->geometry.width - this->m_horizontalMargin - 1, bottomY - 3, 1, 3, 0xC0C0C0);
@@ -489,7 +481,7 @@ void UIHotKeyWnd::ReloadHotkeys() {
 
   for (int position = 0; position < 4; ++position) {
     const int tab = g_userHotkeyMgr->TabAt(position);
-    const int count = HotkeyCount(*g_session.m_hotkeyScript, tab);
+    const int count = g_session.HotkeyCount(tab);
     for (int row = 0; row < count; ++row) {
       const int index = ResolveHotkeyIndex(*g_session.m_hotkeyScript, tab, row);
       if (index == -1) {

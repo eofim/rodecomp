@@ -47,8 +47,8 @@ void UIShortCutWnd::OnMouseHover(int x, int y) {
     const std::string text = FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity);
     window.ToScreen(tooltipX, tooltipY);
 
-    if (g_modeMgr.gameMode) {
-      g_modeMgr.gameMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, -1, 0, 1);
+    if (g_modeMgr.currentMode) {
+      g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, -1, 0, 1);
     }
 
     return;
@@ -58,9 +58,9 @@ void UIShortCutWnd::OnMouseHover(int x, int y) {
   HotkeyInfo hotkey;
   const int bank = g_session.GetOption(10);
   if (bank == 0) {
-    hotkey = GetHotkeyInfo(*g_session.m_hotkeyScript, 0, index);
+    hotkey = g_session.GetHotkeyInfo(0, index);
   } else if (bank == 1) {
-    hotkey = GetHotkeyInfo(*g_session.m_hotkeyScript, 3, index);
+    hotkey = g_session.GetHotkeyInfo(3, index);
   }
 
   if (!hotkey.description.empty()) {
@@ -100,5 +100,5 @@ void UIShortCutWnd::OnMouseHover(int x, int y) {
     }
   }
 
-  g_modeMgr.gameMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, -1, 0, 1);
+  g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, -1, 0, 1);
 }

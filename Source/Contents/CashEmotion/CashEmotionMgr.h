@@ -161,7 +161,7 @@ public:
   void AddShortcut(const std::string& name, int packId, int emotionId);
   bool PlaySearchedEmotion(const std::string& name);
   bool IsChatProhibitEmotion(int emotionId);
-  bool IsPackAvailable(unsigned int now, int packId);
+  __declspec(noinline) bool IsPackAvailable(unsigned int now, int packId);
   bool IsOwnedPack(int packId);
   void RemoveOwnedPack(int packId, bool refresh, bool clearExpiry);
   CashEmotionPackRefresh RefreshUnownedPacks();
@@ -208,7 +208,7 @@ protected:
   /* 0118 */ std::unordered_map<std::string, int> m_emotionIds;
   /* 0138 */ std::unordered_map<CashEmotionSpecial, int, CashEmotionSpecialHash> m_specials;
   /* 0158 */ std::unordered_map<std::string, CashEmotionCommand*> m_shortcuts;
-  /* 0178 */ std::unordered_map<std::string, int> m_commands;
+  /* 0178 */ std::unordered_map<std::string, CashEmotionCommand*> m_commands;
   /* 0198 */ std::vector<int> packOrder;
   /* 01A4 */ std::vector<int> m_ownedPacks;
   /* 01B0 */ std::list<std::pair<int, Timestamp>> m_expiry;

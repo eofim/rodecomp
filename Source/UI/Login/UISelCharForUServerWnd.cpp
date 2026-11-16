@@ -9,6 +9,7 @@
 #include "Contents/Tables/MessageTable.h"
 #include "Client/Session/Session.h"
 #include "Network/Connection/Connection.h"
+#include "Network/Packets/PacketId.h"
 #include "Network/Packets/PacketLengths.h"
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Buttons/UICheckBox.h"
@@ -78,7 +79,7 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
   }
 
   for (int index = 0; index < g_session.characterCount; ++index) {
-    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
+    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
     if (!info) {
       continue;
     }
@@ -147,7 +148,7 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
     int count = 0;
     for (int index = 0; index < g_session.characterCount; ++index) {
       if (this->m_checkBoxes[index]->geometry.state != 0) {
-        CMode* mode = g_modeMgr.gameMode;
+        CMode* mode = g_modeMgr.currentMode;
         const int* character = reinterpret_cast<const int*>(mode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
         if (character) {
           characterIds[count++] = *character;
@@ -157,7 +158,7 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
 
     if (count != 0) {
       PACKET_CZ_SELECT_CHARACTERS packet;
-      packet.id = 0x28C;
+      packet.id = ID_CH_SELECT_CHAR_GOINGTOBEUSED;
       packet.accountId = g_session.m_aid;
       packet.count = count;
       std::memcpy(packet.characterIds, characterIds, sizeof(packet.characterIds));
@@ -192,7 +193,9 @@ void UISelCharForUServerWnd::OnMouseMove(int x, int y) {
 // OFFSET: 0x0093F1F0
 // FUNCTION: fn_12777
 void UISelCharForUServerWnd::UpdateCharInfoBalloon(int x, int y, std::uint32_t color) {
-  const unsigned char red = (color >> 16) & 0xFF;
+  const int red = (color >> 16) & 0xFF;
+  const int green = (color >> 8) & 0xFF;
+  const int blue = color & 0xFF;
   if (!this->characterInfoBalloon) {
     this->characterInfoBalloon = new UICharInfoBalloonText();
     this->characterInfoBalloon->SetSize(140, 200);
@@ -203,7 +206,7 @@ void UISelCharForUServerWnd::UpdateCharInfoBalloon(int x, int y, std::uint32_t c
   this->characterInfoLines.clear();
   if (x > 26 && x < this->geometry.width - 26 && static_cast<unsigned>(y - 95) < 270 && (y > 249 || y < 211)) {
     const int index = (y - 95) / 135 * this->m_columns + (x - 27) / 81;
-    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
+    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
     if (info) {
       char name[25];
       std::memcpy(name, info->name, sizeof(info->name));
@@ -242,7 +245,7 @@ void UISelCharForUServerWnd::UpdateCharInfoBalloon(int x, int y, std::uint32_t c
 
       this->characterInfoBalloon->Resize(width, 200);
       this->characterInfoBalloon->m_outlineColor = 0;
-      this->characterInfoBalloon->m_textColor = ((color & 0xFF) << 16) | (color & 0xFF00) | red;
+      this->characterInfoBalloon->m_textColor = RGB(red, green, blue);
       this->characterInfoBalloon->SetBackground(0x88000000);
       this->characterInfoBalloon->m_lines = this->characterInfoLines;
 

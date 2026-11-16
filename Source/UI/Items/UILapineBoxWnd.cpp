@@ -57,11 +57,12 @@ void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
     return;
   }
 
+  const int quantity = this->quantity;
   UILapineBox_IngredientListWnd* list = static_cast<UILapineBox_IngredientListWnd*>(this->parent);
   UILapineBoxWnd* box = static_cast<UILapineBoxWnd*>(list->parent);
   if (box->items.size() < static_cast<std::size_t>(box->maxItems)) {
     if (list->SendMsg(list, UM_DECITEM, id, 0, 0, 0) >= 0) {
-      box->AddIngredient(id, this->quantity);
+      static_cast<UILapineBoxWnd*>(list->parent)->AddIngredient(id, quantity);
     }
   }
 }
@@ -70,7 +71,7 @@ void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
 // FUNCTION: fn_04162
 void UIIngredientInfoWnd::OnLBtnDown(int x, int y) {
   if (this->insufficient != 1 && this->item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(27, this->item, this->quantity, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(27, this->item, this->quantity, -1);
   }
 }
 
@@ -96,7 +97,7 @@ void UIIngredientInfoWnd::OnMouseHover(int x, int y) {
     int tipX = 0;
     int tipY = -20;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(this->tooltip.c_str(), tipX, tipY, -1, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(this->tooltip.c_str(), tipX, tipY, -1, 0, 1);
   }
 }
 
@@ -121,8 +122,8 @@ void UILapineBoxWnd::OnLBtnDown(int x, int y) {
 
   const ITEM_INFO item = this->ReadMaterial(x, y);
 
-  if (item.identity[1] != 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(0x1A, item, item.quantity, -1);
+  if (item.identity[1] > 0) {
+    g_modeMgr.GetGameMode()->BeginDragItem(0x1A, item, item.quantity, -1);
   }
 }
 
@@ -147,7 +148,7 @@ void UILapineBoxWnd::OnMouseHover(int x, int y) {
     }
 
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(item.displayName.c_str(), tipX, tipY, -1, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(item.displayName.c_str(), tipX, tipY, -1, 0, 1);
   }
 }
 
@@ -257,9 +258,9 @@ bool UILapineBox_IngredientListWnd::CanUseIngredient(std::uint32_t identity) {
     this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEMSHOP_CURRENCY)), 0, 0, 0);
   }
 
-  if (Equipment(item) == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
+  if (item.IsEquipment() == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
     const std::uint32_t* cards = item.cards;
-    for (int index = 0; index < ItemSlotsCount(item); ++index) {
+    for (int index = 0; index < item.SlotCount(); ++index) {
       if (index < 4 && static_cast<int>(cards[index]) > 0) {
         this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PURCHASEWND_TOTAL)), 0, 0, 0);
         return true;
@@ -559,7 +560,7 @@ void UIIngredientInfoWnd::SetIngredientItem(std::uint32_t id) {
   char name[260];
   std::memset(name, 0, sizeof(name));
   char* highlight = nullptr;
-  std::size_t remaining = sizeof(name);
+  int remaining = sizeof(name);
   char* cursor = name;
   int highlightColor;
   this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);

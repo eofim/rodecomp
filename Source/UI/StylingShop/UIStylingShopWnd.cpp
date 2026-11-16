@@ -9,6 +9,7 @@
 #include "UI/StylingShop/UIStylingShopWnd.h"
 #include "Client/Mode/ModeEvents.h"
 #include "Client/Session/Session.h"
+#include "Network/Packets/PacketId.h"
 #include "Contents/Jobs/JobId.h"
 #include "Contents/Tables/MessageTable.h"
 #include "File/File.h"
@@ -159,10 +160,10 @@ void UIStylingShopButton::OnLBtnUp(int, int) {
   if (this->parent) {
     if (g_windowMgr.WindowPolicy(3, this->parent->geometry.id) != 0) {
       int id = this->geometry.id;
-      if (id == ID_CANCEL && g_modeMgr.gameMode && g_modeMgr.gameMode->cursorType == 2) {
+      if (id == ID_CANCEL && g_modeMgr.currentMode && g_modeMgr.currentMode->cursorType == 2) {
         const char* text = LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT);
         if (g_windowMgr.Confirm(text, 2, true, false, 0, "Message", 280, 120, 0) == 187) {
-          g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
+          g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         }
       } else {
         if (id == ID_OK || id == ID_SEARCH) {
@@ -174,7 +175,7 @@ void UIStylingShopButton::OnLBtnUp(int, int) {
       }
     }
   } else {
-    g_modeMgr.gameMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
   }
 
   this->Invalidate();
@@ -191,7 +192,7 @@ void UIStylingShopButton::OnMouseHover(int, int) {
   int screenX = 0;
   int screenY = -20;
   this->ToScreen(screenX, screenY);
-  g_modeMgr.gameMode->ShowTooltip("No Color", screenX, screenY, -1, false, true);
+  g_modeMgr.currentMode->ShowTooltip("No Color", screenX, screenY, -1, false, true);
 }
 
 // OFFSET: 0x0082A210
@@ -672,12 +673,12 @@ void UIStylingShopWnd::SetBuyEnabled(bool enabled) {
   const char* hover;
   const char* pressed;
   if (enabled) {
-    this->m_buyButton->SetArgument(0);
+    this->m_buyButton->m_argument = 0;
     normal = "유저인터페이스\\styleshop\\btn_buy_out.bmp";
     hover = "유저인터페이스\\styleshop\\btn_buy_over.bmp";
     pressed = "유저인터페이스\\styleshop\\btn_buy_down.bmp";
   } else {
-    this->m_buyButton->SetArgument(1);
+    this->m_buyButton->m_argument = 1;
     pressed = "유저인터페이스\\styleshop\\btn_buy_disable.bmp";
     hover = pressed;
     normal = pressed;
@@ -1449,7 +1450,7 @@ int UIStylingShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
     g_windowMgr.CloseWindow(WID_STYLINGSHOPWND);
     break;
   case ID_BUY:
-    if (this->m_buyButton->Argument() == 0 &&
+    if (this->m_buyButton->m_argument == 0 &&
         g_windowMgr.Confirm(LookupMessage(MSI_ASK_MOVE_BY_PRIVATE_AIRPLANE), 2, false, false, 0, "Message", 280, 120, 0) != 188) {
       for (std::map<UIWindow*, UIStylingshopTabParentWnd*>::iterator it = this->m_tabs.begin(); it != this->m_tabs.end(); ++it) {
         UIStylingshopTabParentWnd* tab = it->second;
@@ -1578,7 +1579,7 @@ void UIStylingShopWnd::OnCreate(int, int) {
   this->m_preview->Show(0);
   this->AddChild(this->m_preview);
 
-  this->m_buyButton = static_cast<UIStylingShopButton*>(new (std::nothrow) UIBitmapButton());
+  this->m_buyButton = new (std::nothrow) UIBitmapButton();
   this->m_buyButton->SetBitmap("유저인터페이스\\styleshop\\btn_buy_out.bmp", 0, 0);
   this->m_buyButton->SetBitmap("유저인터페이스\\styleshop\\btn_buy_over.bmp", 1, 0);
   this->m_buyButton->SetBitmap("유저인터페이스\\styleshop\\btn_buy_down.bmp", 2, 0);
@@ -1611,7 +1612,7 @@ void UIDisplayCharacter::Paint() {
     this->DrawBitmap(this->shadowX, this->shadowY, shadow, false);
   }
 
-  CPlayer* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
+  CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
   if (!player) {
     return;
   }
@@ -1830,9 +1831,9 @@ void UIShowInfoWnd::Paint() {
 // FUNCTION: fn_10318
 bool UIShowInfoWnd::SendStyleChange() {
   char packet[2048];
-  StyleChangeHeader header = {0xBF7, 0, 0};
+  StyleChangeHeader header = {ID_CZ_REQ_STYLE_CHANGE_V3, 0, 0};
   SecureZeroMemory(&header, sizeof(header));
-  header.packetType = 0xBF7;
+  header.packetType = ID_CZ_REQ_STYLE_CHANGE_V3;
   const unsigned short count = static_cast<unsigned short>(this->m_list.size());
   const short length = count * 8 + 6;
   header.packetLength = length;
@@ -1950,7 +1951,7 @@ void UIAccessoryShowCase::AddAccessories(int& loaded, int& skipped, const char* 
     char path[128] = {};
     char id[32] = {};
     std::sprintf(id, "%d", itemId);
-    g_session.IconPath(path, id, 1);
+    g_session.IconPath(id, path, 1);
 
     UIAccBitmapButton* button = new (std::nothrow) UIAccBitmapButton();
     button->SetBitmap(path, 0, 0);

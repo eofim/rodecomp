@@ -29,6 +29,7 @@ class UITextViewer;
 struct ModeDragState;
 struct ITEM_INFO;
 class UIItemTagButton;
+struct PriceColors;
 
 class UIWindow : public UIRPData {
   friend class UIWindowMgr;
@@ -125,12 +126,15 @@ public:
   void FillRegion(int x, int y, int width, int height, std::uint32_t color);
   std::string FitTextToWidth(const std::string& text, int width);
   void DrawRectOutline(int x, int y, int width, int height, std::uint32_t color);
+  PriceColors PriceColor(std::int64_t amount);
   void DrawRoundedOutline(int x, int y, int width, int height, std::uint32_t color);
   void DrawFilledRoundedOutline(int x, int y, int width, int height, std::uint32_t color);
   void FillTriangleRegion(int x0, int y0, int x1, int y1, int x2, int y2, std::uint32_t color);
   int TextWidth(const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic);
   void WrapPixelText(const char* text, std::vector<std::string>& lines, int width);
   int ColoredTextWidth(const char* text, unsigned bytes, int family, int height, unsigned char bold);
+  const char* SegmentEnd(const char* text, const char* end);
+  const char* ParseColorCode(const char* text, std::uint32_t& color);
   void DrawTextAt(int x, int y, const char* text, int bytes, int family, int height, std::uint32_t color, unsigned char bold,
     unsigned char italic
   );
@@ -180,6 +184,11 @@ public:
   void DrawBitmapRegion(int x, int y, CBitmapRes* bitmap, bool transparent, bool whole, int left, int top, int right, int bottom);
   void DrawAuxiliaryScaled(int mode, int x, int y, int width, int height, CBitmapRes* bitmap, int option, bool rebuild);
   void DrawAuxiliary(int mode, int x, int y, CBitmapRes* bitmap, bool transparent, bool rebuild);
+  void DrawItemIcon(int x, int y, const ITEM_INFO& item, unsigned char identified);
+  void DrawItemIconFromId(int x, int y, const char* id, unsigned char identified);
+  void DrawItemSlotFrame(int x, int y);
+  void DrawItemAndQuantity(int x, int y, const ITEM_INFO& item, unsigned char identified, unsigned char plain);
+  void DrawItemAndQuantityAuxiliary(int mode, int x, int y, const ITEM_INFO& item, unsigned char identified, unsigned char plain);
   void DrawAmount(int amount, std::string text, int x, int y);
   int TextHeight(const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic);
   int VerticalTextHeight(const char* text, unsigned bytes, int family, int height, unsigned char bold);
@@ -243,7 +252,7 @@ protected:
   /* 0050 */ std::list<UIWindow*> m_children;
   /* 0058 */ int m_dirty;
   /* 005C */ std::vector<RenderPrimitive*> m_overlayPrimitives;
-  /* 0068 */ std::vector<RenderPrimitive*> padding_0068;
+  /* 0068 */ std::vector<RenderPrimitive*> unknown_0068;
   /* 0074 */ std::uint32_t m_uid;
   /* 0078 */ unsigned char m_cached;
   /* 0079 */ unsigned char m_clip;

@@ -31,8 +31,7 @@ __forceinline int ClampedRandom(int range) {
 // OFFSET: 0x00B6F400
 // FUNCTION: fn_19120
 void CPokJukEffect::SpawnParticles() {
-  int row = 0;
-  for (int rowStart = 0; rowStart < 640; rowStart += 160) {
+  for (int row = 0; row < 4; ++row) {
     for (int column = 0; column < 160; ++column) {
       CParticle* particle = CreateParticle(&this->positionVector, 5);
       if (particle) {
@@ -50,7 +49,7 @@ void CPokJukEffect::SpawnParticles() {
         particle->InitParticleQuad(particle->vertices);
         this->particles.push_back(particle);
 
-        const int index = column + rowStart;
+        const int index = row * 160 + column;
         switch (ClampedRandom(5)) {
         case 0:
           particle->SetColor(70, 70, 255);
@@ -79,8 +78,6 @@ void CPokJukEffect::SpawnParticles() {
         }
       }
     }
-
-    ++row;
   }
 }
 
@@ -200,8 +197,8 @@ void CPokJukEffect::Render() {
     CParticle* particle = *it;
 
     if (particle && particle->alpha > 0) {
-      float shrink = 0.0f;
       const int index = particle->rowIndex * 160 + particle->columnIndex;
+      float shrink = 0.0f;
 
       for (int layer = 0; layer < 2; ++layer) {
         ZeroVector3d corners[4];
@@ -222,9 +219,7 @@ void CPokJukEffect::Render() {
         const vector3d& base = this->trails[index][layer];
 
         for (int corner = 0; corner < 4; ++corner) {
-          corners[corner].x += base.x;
-          corners[corner].y += base.y;
-          corners[corner].z += base.z;
+          corners[corner] += base;
         }
 
         particle->vertices[0].x = corners[3].x;
@@ -269,8 +264,8 @@ void CPokJukEffect::Render() {
 // OFFSET: 0x00B70540
 // FUNCTION: fn_19126
 void CPokJukEffect::FaceCamera(vector3d* corners) {
-  const int yaw = 360 - static_cast<int>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw);
-  const int pitch = (450 - static_cast<int>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch)) % 360;
+  const int yaw = 360 - static_cast<int>(g_modeMgr.GetGameMode()->camera->camera.yaw);
+  const int pitch = (450 - static_cast<int>(g_modeMgr.GetGameMode()->camera->camera.pitch)) % 360;
 
   for (int corner = 0; corner < 4; ++corner) {
     const float z = corners[corner].z;

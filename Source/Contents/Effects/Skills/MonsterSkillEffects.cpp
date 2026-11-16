@@ -36,6 +36,7 @@
 #include <cstring>
 #include <timeapi.h>
 #include <format>
+#include <utility>
 
 namespace {
 // INLINED
@@ -58,34 +59,24 @@ static void SetScreenVertex(RenderVertex& vertex, float x, float y, std::uint32_
 }
 
 // INLINED
-static CEZ2STRParticle* AsParticle(EZ2STREmitter* emitter) {
-  return reinterpret_cast<CEZ2STRParticle*>(emitter);
-}
-
-// INLINED
-static CSpriteParticle* AsSprite(EZ2STREmitter* emitter) {
-  return reinterpret_cast<CSpriteParticle*>(emitter);
-}
-
-// INLINED
-static bool IsEmitterAlive(const EZ2STREmitter* emitter) {
-  if (0.0f == emitter->lifetime) {
+static bool IsEmitterAlive(const CParticle* emitter) {
+  if (0.0f == emitter->life) {
     return true;
   }
 
-  return emitter->lifetime * 60.0f > static_cast<float>(emitter->elapsed);
+  return emitter->life * 60.0f > static_cast<float>(emitter->elapsedFrames);
 }
 
 // OFFSET: 0x0070C070
 // FUNCTION: fn_07123
 bool CCrimsonArrowEffect::IsAlive() {
-  EZ2STREmitter* emitter = this->emitter;
+  CEZ2STRParticle* emitter = this->emitter;
   if (emitter) {
-    if (0.0f == emitter->lifetime) {
+    if (0.0f == emitter->life) {
       return true;
     }
 
-    return emitter->lifetime * 60.0f > static_cast<float>(emitter->elapsed);
+    return emitter->life * 60.0f > static_cast<float>(emitter->elapsedFrames);
   }
 
   return false;
@@ -103,7 +94,7 @@ void CCrimsonArrowEffect::OnProcess() {
     return;
   }
 
-  EZ2STREmitter* emitter = this->emitter;
+  CEZ2STRParticle* emitter = this->emitter;
   const vector3d base = {this->position[0], this->position[1], this->position[2]};
   const float y = emitter->offset.y + base.y;
   const float z = emitter->offset.z + base.z;
@@ -111,14 +102,14 @@ void CCrimsonArrowEffect::OnProcess() {
   emitter->position.y = y;
   emitter->position.z = z;
   emitter->position.x = x;
-  AsParticle(this->emitter)->Process(0.0f, 0.0f, 0.0f);
+  this->emitter->Process(0.0f, 0.0f, 0.0f);
 }
 
 // OFFSET: 0x0070C120
 // FUNCTION: fn_07125
 void CCrimsonArrowEffect::Render() {
   if (this->emitter) {
-    AsParticle(this->emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -221,7 +212,7 @@ void CSprArrowEffect::OnProcess() {
   }
 
   this->spriteParticle->angle =
-      this->heading - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
+      this->heading - g_modeMgr.GetGameMode()->camera->camera.yaw;
   this->spriteParticle->position.x = time * this->velocityX + this->startX + this->spriteParticle->velocity.x;
   this->spriteParticle->position.y = this->velocityY * time + this->startY + this->spriteParticle->velocity.y;
   this->spriteParticle->position.z = this->velocityZ * time + this->startZ + this->spriteParticle->velocity.z;
@@ -408,7 +399,7 @@ void CStemSpearEffect::Open() {
       continue;
     }
 
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    CSpriteParticle* emitter = particle;
 
     particle->effectId = this->id;
     particle->columnIndex = i;
@@ -433,10 +424,10 @@ void CStemSpearEffect::Open() {
     if (direction < 0.0f) {
       direction += 360.0f;
     }
-    emitter->baseAngle = static_cast<int>(direction);
+    emitter->angleParameter = static_cast<int>(direction);
     const float distance = SquareRoot(dx * dx + dz * dz);
-    emitter->speed = distance / static_cast<float>(this->effectLifetime);
-    emitter->elapsed = -(this->effectLifetime / 4) * i;
+    emitter->frameDelay = distance / static_cast<float>(this->effectLifetime);
+    emitter->elapsedFrames = -(this->effectLifetime / 4) * i;
     this->emitters.push_back(particle);
   }
 }
@@ -467,19 +458,19 @@ CSvgSpiritEffect::CSvgSpiritEffect() : CEffect(1128), emitter(nullptr) {
 // FUNCTION: fn_07154
 void CStemSpearEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(*it);
-    if (emitter->elapsed >= 0) {
+    CSpriteParticle* emitter = *it;
+    if (emitter->elapsedFrames >= 0) {
       this->SetSourceActor(this->sourceActor);
-      emitter->angle = static_cast<float>(emitter->baseAngle) - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
+      emitter->angle = static_cast<float>(emitter->angleParameter) - g_modeMgr.GetGameMode()->camera->camera.yaw;
 
       const float dy = this->sourcePosition[1] - this->position[1];
       const float dx = this->sourcePosition[0] - this->position[0];
       const float dz = this->sourcePosition[2] - this->position[2];
       const float inverse = 1.0f / SquareRoot(dy * dy + dx * dx + dz * dz);
 
-      emitter->velocity.x += dx * inverse * emitter->speed;
-      emitter->velocity.z += dz * inverse * emitter->speed;
-      emitter->velocity.y += dy * inverse * emitter->speed;
+      emitter->velocity.x += dx * inverse * emitter->frameDelay;
+      emitter->velocity.z += dz * inverse * emitter->frameDelay;
+      emitter->velocity.y += dy * inverse * emitter->frameDelay;
 
       emitter->position.x = this->position[0] + emitter->velocity.x;
       emitter->position.z = this->position[2] + emitter->velocity.z;
@@ -490,7 +481,7 @@ void CStemSpearEffect::OnProcess() {
       }
     }
 
-    ++emitter->elapsed;
+    ++emitter->elapsedFrames;
   }
 }
 
@@ -507,26 +498,26 @@ void CStemSpearEffect::Render() {
 // OFFSET: 0x0070DB30
 // FUNCTION: fn_07160
 bool CSvgSpiritEffect::IsAlive() {
-  return this->emitter->elapsed < this->effectLifetime;
+  return this->emitter->elapsedFrames < this->effectLifetime;
 }
 
 // OFFSET: 0x0070DB50
 // FUNCTION: fn_07161
 void CSvgSpiritEffect::OnProcess() {
-  if (this->emitter->elapsed >= 0) {
+  if (this->emitter->elapsedFrames >= 0) {
     this->SetSourceActor(this->sourceActor);
-    EZ2STREmitter* spirit = this->emitter;
-    spirit->angle = static_cast<float>(spirit->baseAngle) - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
+    CSpriteParticle* spirit = this->emitter;
+    spirit->angle = static_cast<float>(spirit->angleParameter) - g_modeMgr.GetGameMode()->camera->camera.yaw;
 
     const float dy = this->sourcePosition[1] - this->position[1];
     const float dx = this->sourcePosition[0] - this->position[0];
     const float dz = this->sourcePosition[2] - this->position[2];
     const float inverse = 1.0f / SquareRoot(dy * dy + dx * dx + dz * dz);
 
-    EZ2STREmitter* emitter = this->emitter;
-    emitter->velocity.x += dx * inverse * emitter->speed;
-    emitter->velocity.y += dy * inverse * emitter->speed;
-    emitter->velocity.z += dz * inverse * emitter->speed;
+    CSpriteParticle* emitter = this->emitter;
+    emitter->velocity.x += dx * inverse * emitter->frameDelay;
+    emitter->velocity.y += dy * inverse * emitter->frameDelay;
+    emitter->velocity.z += dz * inverse * emitter->frameDelay;
 
     const vector3d position = {this->position[0] + emitter->velocity.x, this->position[1] - 10.0f, this->position[2] + emitter->velocity.z};
     this->emitter->position = position;
@@ -536,15 +527,15 @@ void CSvgSpiritEffect::OnProcess() {
     }
   }
 
-  ++this->emitter->elapsed;
+  ++this->emitter->elapsedFrames;
 }
 
 // OFFSET: 0x0070DCD0
 // FUNCTION: fn_07162
 void CSvgSpiritEffect::Render() {
-  EZ2STREmitter* emitter = this->emitter;
-  if (emitter->elapsed > 0 && emitter->elapsed < this->effectLifetime) {
-    AsSprite(emitter)->Draw(1);
+  CSpriteParticle* emitter = this->emitter;
+  if (emitter->elapsedFrames > 0 && emitter->elapsedFrames < this->effectLifetime) {
+    emitter->Draw(1);
   }
 }
 
@@ -605,7 +596,7 @@ bool CCurseOfCubeEffect::IsAlive() {
 // FUNCTION: fn_07180
 void CCurseOfCubeEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -627,9 +618,7 @@ void CWarningPlaneEffect::AddPlane(vector3d position) {
     particle->scale = 2.5f;
     particle->alpha = 150;
     particle->SetColor(255, 0, 0);
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
+    particle->position = position;
     particle->InitParticleQuad(particle->vertices);
     this->emitters.push_back(particle);
   }
@@ -700,7 +689,7 @@ void CWarningPlaneEffect::OnProcess() {
       matrix rotation;
       std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
       rotation.MakeXRotation(1.570796f);
-      rotation.AppendYRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw / -180.0f * 3.141592f);
+      rotation.AppendYRotation(g_modeMgr.GetGameMode()->camera->camera.yaw / -180.0f * 3.141592f);
 
       matrix scale;
       std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
@@ -743,7 +732,7 @@ void CWarningPlaneEffect::Render() {
 // FUNCTION: fn_07196
 void CCylinderEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(reinterpret_cast<EZ2STREmitter*>(*it));
+    CParticle* particle = *it;
     if (!particle) {
       continue;
     }
@@ -777,13 +766,13 @@ bool CDancingKnifeEffect::IsAlive() {
 void CDancingKnifeEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 
   for (auto it = this->secondStrikeEmitters.begin(); it != this->secondStrikeEmitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -796,20 +785,20 @@ CEternalSlashAttackEffect::CEternalSlashAttackEffect() : CEffect(-1) {
 // OFFSET: 0x00710C80
 // FUNCTION: fn_07209
 void CEternalSlashAttackEffect::Open() {
-  EZ2STREmitter* bottom =
-      reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
+  CEZ2STRParticle* bottom =
+      static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   if (bottom) {
-    AsParticle(bottom)->Load(std::string("eternal_slash\\eternal_slash_bottom\\eternal_slash_bottom.str"));
+    bottom->Load(std::string("eternal_slash\\eternal_slash_bottom\\eternal_slash_bottom.str"));
     bottom->offset.x = 0.0f;
     bottom->offset.y = -13.0f;
     bottom->offset.z = 0.0f;
     this->emitters.push_back(bottom);
   }
 
-  EZ2STREmitter* slash =
-      reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+  CEZ2STRParticle* slash =
+      static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (slash) {
-    AsParticle(slash)->Load(std::string("eternal_slash\\eternal_slash\\eternal_slash.str"));
+    slash->Load(std::string("eternal_slash\\eternal_slash\\eternal_slash.str"));
     slash->offset.x = 0.0f;
     slash->offset.y = -13.0f;
     slash->offset.z = 0.0f;
@@ -821,7 +810,7 @@ void CEternalSlashAttackEffect::Open() {
 // FUNCTION: fn_07210
 bool CEternalSlashAttackEffect::IsAlive() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (emitter && IsEmitterAlive(emitter) == true) {
       return true;
     }
@@ -834,7 +823,7 @@ bool CEternalSlashAttackEffect::IsAlive() {
 // FUNCTION: fn_07211
 void CEternalSlashAttackEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (!emitter) {
       continue;
     }
@@ -843,7 +832,7 @@ void CEternalSlashAttackEffect::OnProcess() {
     emitter->position.x = base.x + emitter->offset.x;
     emitter->position.y = base.y + emitter->offset.y;
     emitter->position.z = base.z + emitter->offset.z;
-    AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+    emitter->Process(0.0f, 0.0f, 0.0f);
   }
 }
 
@@ -852,7 +841,7 @@ void CEternalSlashAttackEffect::OnProcess() {
 void CEternalSlashAttackEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -879,19 +868,19 @@ void CEternalSlashCountEffect::Open() {
   particle->offsetX = 0.0f;
   particle->offsetY = -25.0f;
   particle->offsetZ = 0.0f;
-  this->emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+  this->emitter = particle;
 }
 
 // OFFSET: 0x00711340
 // FUNCTION: fn_07217
 bool CEternalSlashCountEffect::IsAlive() {
-  EZ2STREmitter* emitter = this->emitter;
+  CEZ2STRParticle* emitter = this->emitter;
   if (emitter) {
-    if (0.0f == emitter->lifetime) {
+    if (0.0f == emitter->life) {
       return true;
     }
 
-    return static_cast<float>(emitter->elapsed) < emitter->lifetime * 60.0f;
+    return static_cast<float>(emitter->elapsedFrames) < emitter->life * 60.0f;
   }
 
   return false;
@@ -904,7 +893,7 @@ void CEternalSlashCountEffect::OnProcess() {
     return;
   }
 
-  EZ2STREmitter* emitter = this->emitter;
+  CEZ2STRParticle* emitter = this->emitter;
   const vector3d base = {this->position[0], this->position[1], this->position[2]};
   const float y = emitter->offset.y + base.y;
   const float z = emitter->offset.z + base.z;
@@ -912,14 +901,14 @@ void CEternalSlashCountEffect::OnProcess() {
   emitter->position.y = y;
   emitter->position.z = z;
   emitter->position.x = x;
-  AsParticle(this->emitter)->Process(0.0f, 0.0f, 0.0f);
+  this->emitter->Process(0.0f, 0.0f, 0.0f);
 }
 
 // OFFSET: 0x007113F0
 // FUNCTION: fn_07219
 void CEternalSlashCountEffect::Render() {
   if (this->emitter) {
-    AsParticle(this->emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -933,13 +922,13 @@ CFallenAngelEffect::CFallenAngelEffect() : CEffect(EF_FALLEN_ANGEL), emitter(nul
 void CFallenAngelEffect::Open() {
   if (!this->emitter) {
     CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-    this->emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    this->emitter = particle;
     particle->Open("RL_fallen_angel\\Penne.str");
   } else {
-    AsParticle(this->emitter)->Restart();
+    this->emitter->Restart();
   }
 
-  AsParticle(this->emitter)->InitParticleQuad(AsParticle(this->emitter)->vertices);
+  this->emitter->InitParticleQuad(this->emitter->vertices);
   this->startX = this->position[0];
   this->startY = this->position[1];
   this->startZ = this->position[2];
@@ -948,11 +937,11 @@ void CFallenAngelEffect::Open() {
 // OFFSET: 0x00711690
 // FUNCTION: fn_07224
 bool CFallenAngelEffect::IsAlive() {
-  if (0.0f == this->emitter->lifetime) {
+  if (0.0f == this->emitter->life) {
     return true;
   }
 
-  return static_cast<float>(this->emitter->elapsed) < this->emitter->lifetime * 60.0f;
+  return static_cast<float>(this->emitter->elapsedFrames) < this->emitter->life * 60.0f;
 }
 
 // OFFSET: 0x007116D0
@@ -963,20 +952,20 @@ void CFallenAngelEffect::OnProcess() {
   const float dz = this->startZ - this->position[2];
   const float speed = 1.0f / SquareRoot(dx * dx + 0.0f + dz * dz);
 
-  EZ2STREmitter* emitter = this->emitter;
+  CEZ2STRParticle* emitter = this->emitter;
   emitter->position.x = start.x + dx * speed * 0.09f;
   emitter->position.y = start.y + speed * 0.0f;
   emitter->position.z = start.z + dz * speed * 0.09f;
 
-  AsParticle(this->emitter)->Process(0.0f, -80.0f, 0.0f);
-  this->emitter->elapsed++;
+  this->emitter->Process(0.0f, -80.0f, 0.0f);
+  this->emitter->elapsedFrames++;
 }
 
 // OFFSET: 0x007117F0
 // FUNCTION: fn_07226
 void CFallenAngelEffect::Render() {
   if (this->emitter) {
-    AsParticle(this->emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -986,13 +975,11 @@ void CFallenAngelEffect::SetPosition(vector3d position) {
   vector3d target = position;
   target.y += (g_cameraDistance - 230.0f) * 0.0625f + 10.0f;
 
-  EZ2STREmitter* emitter = this->emitter;
+  CEZ2STRParticle* emitter = this->emitter;
   this->position[0] = target.x;
   this->position[1] = target.y;
   this->position[2] = target.z;
-  emitter->position.x = target.x;
-  emitter->position.y = target.y;
-  emitter->position.z = target.z;
+  emitter->position = target;
 }
 
 // OFFSET: 0x007118C0
@@ -1004,7 +991,7 @@ CFloralFlareRoad::CFloralFlareRoad() : CEffect(EF_FLORAL_FLARE_ROAD) {
 // FUNCTION: fn_07231
 void CFloralFlareRoad::Open() {
   CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
-  this->emitter = reinterpret_cast<EZ2STREmitter*>(bottom);
+  this->emitter = bottom;
   bottom->Load(std::string("froral_flareroad\\froral_flareroad_bottom\\froral_flareroad_bottom.str"));
 
   for (int delay = 0; delay < 4500; delay += 300) {
@@ -1017,7 +1004,7 @@ void CFloralFlareRoad::Open() {
     position.z = ClientCosine(angleZ) * static_cast<float>(distanceZ) + position.z;
 
     CEZ2STRParticle* flare = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
-    EZ2STREmitter* flareEmitter = reinterpret_cast<EZ2STREmitter*>(flare);
+    CEZ2STRParticle* flareEmitter = flare;
     flare->Load(std::string("froral_flareroad\\froral_flareroad\\froral_flareroad.str"));
     flare->m_delay = delay;
     this->emitters.push_back(flareEmitter);
@@ -1035,18 +1022,18 @@ bool CFloralFlareRoad::IsAlive() {
 // FUNCTION: fn_07233
 void CFloralFlareRoad::OnProcess() {
   if (this->emitter) {
-    AsParticle(this->emitter)->Process(0.0f, -80.0f, 0.0f);
+    this->emitter->Process(0.0f, -80.0f, 0.0f);
   }
 
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (IsEmitterAlive(emitter) == true) {
       if (*it) {
-        AsParticle(emitter)->Process(0.0f, -80.0f, 0.0f);
+        emitter->Process(0.0f, -80.0f, 0.0f);
       }
       ++it;
     } else {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       it = this->emitters.erase(it);
     }
   }
@@ -1056,13 +1043,13 @@ void CFloralFlareRoad::OnProcess() {
 // FUNCTION: fn_07234
 void CFloralFlareRoad::Render() {
   if (this->emitter) {
-    AsParticle(this->emitter)
-      ->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->emitter
+      ->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -1147,19 +1134,19 @@ CParticle* CFootprintEffect::SpawnFootprint() {
   particle->InitParticleQuad(particle->vertices);
 
   const float angle =
-    ScreenAngle(&this->lastPosition.x, this->position, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values) + 90.0f;
+    ScreenAngle(&this->lastPosition.x, this->position, g_modeMgr.GetGameMode()->camera->frame.view.values) + 90.0f;
   const float scale = this->scaleParameter;
   matrix world;
   world.SetScale(scale, scale, 0.0f);
   world.AppendXRotation(1.570796f);
-  world.AppendYRotation((angle + static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw) / 180.0f * 3.141592f);
+  world.AppendYRotation((angle + g_modeMgr.GetGameMode()->camera->camera.yaw) / 180.0f * 3.141592f);
   world.AppendTranslate(this->position);
 
   for (int i = 0; i < 4; ++i) {
     RenderVertex& vertex = particle->vertices[i];
     const float x = vertex.x * world.values[0] + vertex.y * world.values[3] + 0.0f * world.values[6] + world.values[9];
     const float z = vertex.x * world.values[2] + vertex.y * world.values[5] + 0.0f * world.values[8] + world.values[11];
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     float y = mode->scene->terrain->PlaneHeight(x, z) - 2.0f;
     if (this->lastGroundHeight != -1000.0f && y - this->lastGroundHeight > 5.0f) {
       y = this->lastGroundHeight;
@@ -1184,15 +1171,15 @@ void CFootprintEffect::OnProcess() {
   const float dy = this->position[1] - this->lastPosition.y;
   const float dz = this->position[2] - this->lastPosition.z;
   if (static_cast<double>(dx * dx + dy * dy + dz * dz) > this->stepDistance) {
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(this->SpawnFootprint());
+    CParticle* emitter = this->SpawnFootprint();
     if (emitter) {
       this->emitters.emplace_back(emitter);
     }
   }
 
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    EZ2STREmitter* emitter = *it;
-    CParticle* particle = AsParticle(emitter);
+    CParticle* emitter = *it;
+    CParticle* particle = emitter;
     if (IsEmitterAlive(emitter)) {
       particle->alpha = static_cast<int>(std::max(static_cast<float>(particle->alpha) - particle->speedParameter, 0.0f));
       ++particle->elapsedFrames;
@@ -1207,8 +1194,8 @@ void CFootprintEffect::OnProcess() {
 // OFFSET: 0x00712C50
 // FUNCTION: fn_07244
 void CFootprintEffect::Render() {
-  for (EZ2STREmitter* emitter : this->emitters) {
-    AsParticle(emitter)->Render(true, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
+  for (CParticle* emitter : this->emitters) {
+    emitter->Render(true, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
   }
 }
 
@@ -1222,13 +1209,13 @@ CFootprintStrEffect::CFootprintStrEffect()
 // OFFSET: 0x007130E0
 // FUNCTION: fn_07247
 void CFootprintStrEffect::Close() {
-  for (EZ2STREmitter* emitter : this->emitters) {
-    FreeParticle(AsParticle(emitter));
+  for (CEZ2STRParticle* emitter : this->emitters) {
+    FreeParticle(emitter);
   }
   this->emitters.clear();
 
-  for (EZ2STREmitter* emitter : this->topEmitters) {
-    FreeParticle(AsParticle(emitter));
+  for (CEZ2STRParticle* emitter : this->topEmitters) {
+    FreeParticle(emitter);
   }
   this->topEmitters.clear();
 }
@@ -1306,17 +1293,17 @@ void CFootprintStrEffect::SpawnFootprint() {
   point.z =
     (direction.x * rotation.values[2] + direction.y * rotation.values[5] + direction.z * rotation.values[8] + rotation.values[11]) * gap * side +
     this->position[2];
-  point.y = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->terrain->Height(point.x, point.z);
+  point.y = g_modeMgr.GetGameMode()->scene->terrain->Height(point.x, point.z);
   vector3d spawn = point;
 
   const std::string& bottom = this->leftFoot ? this->leftBottomFile : this->rightBottomFile;
   if (bottom.size() != 0) {
     CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&spawn, 5));
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    CEZ2STRParticle* emitter = particle;
     if (particle) {
       float angle;
       if (this->adjustAngle) {
-        angle = ScreenAngle(&this->lastPosition.x, &spawn.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values) + 90.0f;
+        angle = ScreenAngle(&this->lastPosition.x, &spawn.x, g_modeMgr.GetGameMode()->camera->frame.view.values) + 90.0f;
       } else {
         angle = 0.0f;
       }
@@ -1333,7 +1320,7 @@ void CFootprintStrEffect::SpawnFootprint() {
     spawn.y = point.y + static_cast<float>(-this->topHeight);
     spawn.z = point.z + 0.0f;
     CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&spawn, 5));
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    CEZ2STRParticle* emitter = particle;
     if (particle) {
       particle->Open(top);
       particle->depthOffset = 0.000035f;
@@ -1359,7 +1346,7 @@ void CFootprintStrEffect::OnProcess() {
   }
 
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CEZ2STRParticle* particle = *it;
     if (particle->Process(0.0f, 0.0f, 0.0f)) {
       ++it;
     } else {
@@ -1369,7 +1356,7 @@ void CFootprintStrEffect::OnProcess() {
   }
 
   for (auto it = this->topEmitters.begin(); it != this->topEmitters.end();) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CEZ2STRParticle* particle = *it;
     if (particle->Process(0.0f, 0.0f, 0.0f)) {
       ++it;
     } else {
@@ -1382,12 +1369,12 @@ void CFootprintStrEffect::OnProcess() {
 // OFFSET: 0x00713F70
 // FUNCTION: fn_07253
 void CFootprintStrEffect::Render() {
-  for (EZ2STREmitter* emitter : this->emitters) {
-    AsParticle(emitter)->DrawGround(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+  for (CEZ2STRParticle* emitter : this->emitters) {
+    emitter->DrawGround(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 
-  for (EZ2STREmitter* emitter : this->topEmitters) {
-    AsParticle(emitter)->DrawBillboards(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+  for (CEZ2STRParticle* emitter : this->topEmitters) {
+    emitter->DrawBillboards(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -1406,7 +1393,7 @@ CFromTheAbyssEffect::CFromTheAbyssEffect() : CEffect(-1), maxLevel(5), level(0) 
 void CFromTheAbyssEffect::Close() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     if (it->second.emitter) {
-      FreeParticle(AsParticle(it->second.emitter));
+      FreeParticle(it->second.emitter);
     }
   }
   this->particles.clear();
@@ -1433,13 +1420,13 @@ void CFromTheAbyssEffect::OnProcess() {
 }
 
 // INLINED
-static __forceinline void FollowAbyssOwner(const CFromTheAbyssEffect* effect, EZ2STREmitter* emitter) {
+static __forceinline void FollowAbyssOwner(const CFromTheAbyssEffect* effect, CEZ2STRParticle* emitter) {
   const vector3d origin = *&effect->positionVector;
-  const matrix& view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
+  const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
   const vector3d viewPosition = {origin.x * view.values[0] + origin.y * view.values[3] + origin.z * view.values[6] + view.values[9],
                                  origin.x * view.values[1] + origin.y * view.values[4] + origin.z * view.values[7] + view.values[10],
                                  origin.x * view.values[2] + origin.y * view.values[5] + origin.z * view.values[8] + view.values[11]};
-  const matrix& inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse;
+  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
   const float viewX = viewPosition.x + emitter->offset.x;
   const float viewY = viewPosition.y + emitter->offset.y;
   const float viewZ = viewPosition.z + emitter->offset.z;
@@ -1454,7 +1441,7 @@ static __forceinline void FollowAbyssOwner(const CFromTheAbyssEffect* effect, EZ
 // OFFSET: 0x007154A0
 // FUNCTION: fn_07269
 void CFromTheAbyssEffect::UpdateParticle(long long key, AbyssParticle particle) {
-  EZ2STREmitter* emitter = particle.emitter;
+  CEZ2STRParticle* emitter = particle.emitter;
   if (!emitter) {
     return;
   }
@@ -1462,7 +1449,7 @@ void CFromTheAbyssEffect::UpdateParticle(long long key, AbyssParticle particle) 
   switch (particle.kind) {
   case 3:
     if (IsEmitterAlive(emitter) != true) {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       AbyssParticle& entry = this->particles[key];
       entry.kind = 0;
       entry.emitter = nullptr;
@@ -1475,15 +1462,15 @@ void CFromTheAbyssEffect::UpdateParticle(long long key, AbyssParticle particle) 
     break;
   case 1:
     if (IsEmitterAlive(emitter) != true) {
-      const double scale = AsParticle(emitter)->m_scale;
+      const double scale = emitter->m_scale;
       const vector3d offset = emitter->offset;
-      FreeParticle(AsParticle(emitter));
-      EZ2STREmitter* dying =
-          reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+      FreeParticle(emitter);
+      CEZ2STRParticle* dying =
+          static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
       if (dying) {
-        AsParticle(dying)->Load("from_the_abyss\\from_the_abyss_shadowball\\from_the_abyss_shadowball.str");
-        dying->looping = 1;
-        AsParticle(dying)->m_scale = static_cast<float>(scale);
+        dying->Load("from_the_abyss\\from_the_abyss_shadowball\\from_the_abyss_shadowball.str");
+        dying->m_loop = 1;
+        dying->m_scale = static_cast<float>(scale);
         dying->offset = offset;
       }
 
@@ -1498,16 +1485,16 @@ void CFromTheAbyssEffect::UpdateParticle(long long key, AbyssParticle particle) 
     return;
   }
 
-  AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+  emitter->Process(0.0f, 0.0f, 0.0f);
 }
 
 // OFFSET: 0x00715C80
 // FUNCTION: fn_07270
 void CFromTheAbyssEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    EZ2STREmitter* emitter = it->second.emitter;
+    CEZ2STRParticle* emitter = it->second.emitter;
     if (emitter) {
-      AsParticle(emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -1523,14 +1510,14 @@ void CFromTheAbyssEffect::SetLevel(long long level) {
     for (long long i = this->level; i < level; ++i) {
       auto it = this->particles.find(i);
       if (it != this->particles.end() && it->second.emitter) {
-        FreeParticle(AsParticle(it->second.emitter));
+        FreeParticle(it->second.emitter);
       }
 
-      EZ2STREmitter* emitter =
-          reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+      CEZ2STRParticle* emitter =
+          static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
       if (emitter) {
-        AsParticle(emitter)->Load("from_the_abyss\\from_the_abyss_shadowball_create\\from_the_abyss_shadowball_create.str");
-        AsParticle(emitter)->m_scale = this->waves[i].scale;
+        emitter->Load("from_the_abyss\\from_the_abyss_shadowball_create\\from_the_abyss_shadowball_create.str");
+        emitter->m_scale = this->waves[i].scale;
         emitter->offset.x = this->waves[i].offset.x;
         emitter->offset.y = this->waves[i].offset.y;
         emitter->offset.z = this->waves[i].offset.z;
@@ -1543,15 +1530,15 @@ void CFromTheAbyssEffect::SetLevel(long long level) {
     for (long long i = this->level - 1; i > level - 1; --i) {
       auto it = this->particles.find(i);
       if (it != this->particles.end() && it->second.emitter) {
-        EZ2STREmitter* previous = it->second.emitter;
-        const double scale = AsParticle(previous)->m_scale;
+        CEZ2STRParticle* previous = it->second.emitter;
+        const double scale = previous->m_scale;
         const vector3d offset = previous->offset;
-        FreeParticle(AsParticle(previous));
-        EZ2STREmitter* emitter =
-            reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+        FreeParticle(previous);
+        CEZ2STRParticle* emitter =
+            static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
         if (emitter) {
-          AsParticle(emitter)->Load("from_the_abyss\\from_the_abyss_shadowball_die\\from_the_abyss_shadowball_die.str");
-          AsParticle(emitter)->m_scale = static_cast<float>(scale);
+          emitter->Load("from_the_abyss\\from_the_abyss_shadowball_die\\from_the_abyss_shadowball_die.str");
+          emitter->m_scale = static_cast<float>(scale);
           emitter->offset.x = offset.x;
           emitter->offset.y = offset.y;
           emitter->offset.z = offset.z;
@@ -1696,7 +1683,7 @@ bool CGaleStorm::IsAlive() {
 void CGaleStorm::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -1708,8 +1695,8 @@ void CGravityControlEffect::Render() {
     return;
   }
 
-  AsParticle(reinterpret_cast<EZ2STREmitter*>(this->target))
-      ->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+  this->target
+      ->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
 }
 
 // OFFSET: 0x007184D0
@@ -1798,7 +1785,7 @@ void CHawkVumerangEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
     CEZ2STRParticle* particle = *it;
     if (particle) {
-      particle->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -1813,33 +1800,30 @@ CDropItemEffect::CDropItemEffect()
 // OFFSET: 0x00719400
 // FUNCTION: fn_07307
 void CDropItemEffect::Open() {
-  if (!static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene) {
+  if (!g_modeMgr.GetGameMode()->scene) {
     return;
   }
 
   for (int i = 0; i < this->emitterCount; ++i) {
-    EZ2STREmitter* emitter =
-        reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(reinterpret_cast<const vector3d*>(this->CEffect::position), 5));
+    CEZ2STRParticle* emitter = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->CEffect::positionVector, 5));
     if (!emitter) {
       return;
     }
 
-    AsParticle(emitter)->InitParticleQuad(AsParticle(emitter)->vertices);
+    emitter->InitParticleQuad(emitter->vertices);
     this->emitters.push_back(emitter);
   }
 
   this->OpenEmitters();
   this->InitEvents();
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetItemByAID(this->actor);
+  g_modeMgr.GetGameMode()->scene->GetItemByAID(this->actor);
   this->position.x = this->CEffect::position[0];
   this->position.y = this->CEffect::position[1];
   this->position.z = this->CEffect::position[2];
   for (std::size_t i = 0; i < this->emitters.size(); ++i) {
-    EZ2STREmitter* emitter = this->emitters[i];
+    CEZ2STRParticle* emitter = this->emitters[i];
     if (emitter) {
-      emitter->position.x = this->position.x;
-      emitter->position.y = this->position.y;
-      emitter->position.z = this->position.z;
+      emitter->position = this->position;
     }
   }
 }
@@ -1849,8 +1833,8 @@ void CDropItemEffect::Open() {
 void CDropItemEffect::InitEvents() {
   for (std::size_t i = 0; i < this->emitters.size(); ++i) {
     if (this->emitters[i]) {
-      this->emitters[i]->looping = 1;
-      AsParticle(this->emitters[i])->flags = 13;
+      this->emitters[i]->m_loop = 1;
+      this->emitters[i]->flags = 13;
     }
   }
 
@@ -1864,7 +1848,7 @@ bool CDropItemEffect::IsAlive() {
     return false;
   }
 
-  if (!static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetItemByAID(this->actor)) {
+  if (!g_modeMgr.GetGameMode()->scene->GetItemByAID(this->actor)) {
     return false;
   }
 
@@ -1876,33 +1860,33 @@ bool CDropItemEffect::IsAlive() {
 void CDropItemEffect::OpenEmitters() {
   switch (this->id) {
   case EF_DROPITEM_PURPLE:
-    AsParticle(this->emitters[0])->Open("new_dropitem\\dropitem_purple\\dropitem_purple\\dropitem_purple.str");
-    AsParticle(this->emitters[1])->Open("new_dropitem\\dropitem_purple\\dropitem_purple_bottom\\dropitem_purple_bottom.str");
+    this->emitters[0]->Open("new_dropitem\\dropitem_purple\\dropitem_purple\\dropitem_purple.str");
+    this->emitters[1]->Open("new_dropitem\\dropitem_purple\\dropitem_purple_bottom\\dropitem_purple_bottom.str");
     this->soundName = "drop_purple.wav";
     break;
   case EF_DROPITEM_YELLOW:
-    AsParticle(this->emitters[0])->Open("new_dropitem\\dropitem_yellow\\dropitem_yellow\\dropitem_yellow.str");
-    AsParticle(this->emitters[1])->Open("new_dropitem\\dropitem_yellow\\dropitem_yellow_bottom\\dropitem_yellow_bottom.str");
+    this->emitters[0]->Open("new_dropitem\\dropitem_yellow\\dropitem_yellow\\dropitem_yellow.str");
+    this->emitters[1]->Open("new_dropitem\\dropitem_yellow\\dropitem_yellow_bottom\\dropitem_yellow_bottom.str");
     this->soundName = "drop_yellow.wav";
     break;
   case EF_DROPITEM_BLUE:
-    AsParticle(this->emitters[0])->Open("new_dropitem\\dropitem_blue\\dropitem_blue\\dropitem_blue.str");
-    AsParticle(this->emitters[1])->Open("new_dropitem\\dropitem_blue\\dropitem_blue_bottom\\dropitem_blue_bottom.str");
+    this->emitters[0]->Open("new_dropitem\\dropitem_blue\\dropitem_blue\\dropitem_blue.str");
+    this->emitters[1]->Open("new_dropitem\\dropitem_blue\\dropitem_blue_bottom\\dropitem_blue_bottom.str");
     this->soundName = "drop_blue.wav";
     break;
   case EF_DROPITEM_GREEN:
-    AsParticle(this->emitters[0])->Open("new_dropitem\\dropitem_green\\dropitem_green\\dropitem_green.str");
-    AsParticle(this->emitters[1])->Open("new_dropitem\\dropitem_green\\dropitem_green_bottom\\dropitem_green_bottom.str");
+    this->emitters[0]->Open("new_dropitem\\dropitem_green\\dropitem_green\\dropitem_green.str");
+    this->emitters[1]->Open("new_dropitem\\dropitem_green\\dropitem_green_bottom\\dropitem_green_bottom.str");
     this->soundName = "drop_green.wav";
     break;
   case EF_DROPITEM_RED:
-    AsParticle(this->emitters[0])->Open("new_dropitem\\dropitem_red\\dropitem_red\\dropitem_red.str");
-    AsParticle(this->emitters[1])->Open("new_dropitem\\dropitem_red\\dropitem_red_bottom\\dropitem_red_bottom.str");
+    this->emitters[0]->Open("new_dropitem\\dropitem_red\\dropitem_red\\dropitem_red.str");
+    this->emitters[1]->Open("new_dropitem\\dropitem_red\\dropitem_red_bottom\\dropitem_red_bottom.str");
     this->soundName = "drop_red.wav";
     break;
   default:
-    AsParticle(this->emitters[0])->Open("new_dropitem\\dropitem_pink\\dropitem_pink\\dropitem_pink.str");
-    AsParticle(this->emitters[1])->Open("new_dropitem\\dropitem_pink\\dropitem_pink_bottom\\dropitem_pink_bottom.str");
+    this->emitters[0]->Open("new_dropitem\\dropitem_pink\\dropitem_pink\\dropitem_pink.str");
+    this->emitters[1]->Open("new_dropitem\\dropitem_pink\\dropitem_pink_bottom\\dropitem_pink_bottom.str");
     this->soundName = "drop_pink.wav";
     break;
   }
@@ -1913,8 +1897,8 @@ void CDropItemEffect::OpenEmitters() {
 void CDropItemEffect::OnProcess() {
   for (std::size_t i = 0; i < this->emitters.size(); ++i) {
     if (this->emitters[i]) {
-      AsParticle(this->emitters[i])->Process(0.0f, 0.0f, 0.0f);
-      this->emitters[i]->elapsed++;
+      this->emitters[i]->Process(0.0f, 0.0f, 0.0f);
+      this->emitters[i]->elapsedFrames++;
     }
   }
 }
@@ -1924,7 +1908,7 @@ void CDropItemEffect::OnProcess() {
 void CDropItemEffect::Render() {
   for (std::size_t i = 0; i < this->emitters.size(); ++i) {
     if (this->emitters[i]) {
-      AsParticle(this->emitters[i])->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      this->emitters[i]->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -2019,7 +2003,7 @@ void CJupitelThunderHit::OnProcess() {
       } else {
         const float scale = static_cast<float>(particle->elapsedFrames) * particle->speedParameter;
         matrix rotation;
-        rotation.MakeXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
+        rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
         matrix scaling;
         scaling.SetScale(scale, scale, 1.0f);
         matrix transform;
@@ -2045,7 +2029,7 @@ void CJupitelThunderHit::OnProcess() {
       particle->SetTexture(this->textures[index]);
       particle->animationState = static_cast<unsigned char>(index);
       matrix rotation;
-      rotation.MakeXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
+      rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
       matrix scaling;
       scaling.SetScale(particle->scale, particle->scale, 1.0f);
       matrix transform;
@@ -2090,23 +2074,23 @@ CNewCloudKillEffect::~CNewCloudKillEffect() {
 // FUNCTION: fn_07333
 void CNewCloudKillEffect::Close() {
   for (auto it = this->circleEmitters.begin(); it != this->circleEmitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->circleEmitters.clear();
   for (auto it = this->cloudEmitters.begin(); it != this->cloudEmitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->cloudEmitters.clear();
   for (auto it = this->smokeEmitters.begin(); it != this->smokeEmitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->smokeEmitters.clear();
   for (auto it = this->lightningEmitters.begin(); it != this->lightningEmitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->lightningEmitters.clear();
   for (auto it = this->mistEmitters.begin(); it != this->mistEmitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->mistEmitters.clear();
 }
@@ -2124,7 +2108,7 @@ void CNewCloudKillEffect::OnProcess() {
 
   for (auto it = this->circleEmitters.begin(); it != this->circleEmitters.end(); ++it) {
     if (now - static_cast<unsigned int>(this->circleResetTime) > 5000) {
-      CEZ2STRParticle* particle = AsParticle(*it);
+      CParticle* particle = *it;
       particle->alpha = 0xFF;
       particle->angle = 0.0f;
       particle->elapsedFrames = 60;
@@ -2132,7 +2116,7 @@ void CNewCloudKillEffect::OnProcess() {
       particle->InitParticleQuad(particle->vertices);
     }
 
-    if (CEZ2STRParticle* particle = AsParticle(*it)) {
+    if (CParticle* particle = (*it)) {
       if (particle->elapsedFrames == 0) {
         particle->animationState = 1;
       } else {
@@ -2158,7 +2142,7 @@ void CNewCloudKillEffect::OnProcess() {
       }
     }
 
-    --AsParticle(*it)->elapsedFrames;
+    --(*it)->elapsedFrames;
   }
 
   if (now - static_cast<unsigned int>(this->circleResetTime) > 5000) {
@@ -2167,10 +2151,10 @@ void CNewCloudKillEffect::OnProcess() {
 
   for (auto it = this->cloudEmitters.begin(); it != this->cloudEmitters.end(); ++it) {
     if (now - static_cast<unsigned int>(this->cloudResetTime) > 5000) {
-      ResetCloudParticle(AsParticle(*it));
+      ResetCloudParticle(*it);
     }
 
-    if (CEZ2STRParticle* particle = AsParticle(*it)) {
+    if (CParticle* particle = (*it)) {
       int alpha = std::max(particle->alpha - 3, 0);
       particle->alpha = alpha;
       if (alpha == 0) {
@@ -2193,7 +2177,7 @@ void CNewCloudKillEffect::OnProcess() {
         matrix rotation;
         rotation.MakeZRotation(static_cast<float>(angle) / 180.0f * 3.141592f);
         rotation.AppendXRotation(
-            static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f
+            g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f
         );
 
         matrix scale;
@@ -2211,9 +2195,9 @@ void CNewCloudKillEffect::OnProcess() {
   }
 
   for (auto it = this->smokeEmitters.begin(); it != this->smokeEmitters.end(); ++it) {
-    ++AsParticle(*it)->elapsedFrames;
-    CEZ2STRParticle* particle = AsParticle(*it);
-    if (AsParticle(*it)->elapsedFrames <= 0 || particle == nullptr) {
+    ++(*it)->elapsedFrames;
+    CParticle* particle = *it;
+    if ((*it)->elapsedFrames <= 0 || particle == nullptr) {
       continue;
     }
 
@@ -2248,7 +2232,7 @@ void CNewCloudKillEffect::OnProcess() {
 
     matrix rotation;
     rotation.MakeXRotation(
-        static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f
+        g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f
     );
 
     matrix transform;
@@ -2257,7 +2241,7 @@ void CNewCloudKillEffect::OnProcess() {
   }
 
   for (auto it = this->lightningEmitters.begin(); it != this->lightningEmitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CParticle* particle = *it;
     if (particle->elapsedFrames >= particle->phaseParameter) {
       ResetLightning(particle);
     } else {
@@ -2271,7 +2255,7 @@ void CNewCloudKillEffect::OnProcess() {
       matrix rotation;
       rotation.MakeZRotation(particle->angle / 180.0f * 3.141592f);
       rotation.AppendXRotation(
-          static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f
+          g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f
       );
 
       matrix transform;
@@ -2280,24 +2264,27 @@ void CNewCloudKillEffect::OnProcess() {
 
       matrix yaw;
       yaw.MakeYRotation(
-          static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw / 180.0f * 3.141592f
+          g_modeMgr.GetGameMode()->camera->camera.yaw / 180.0f * 3.141592f
       );
 
-      particle->position.x = yaw.values[0] * particle->offsetX + yaw.values[3] * particle->offsetY +
-                             yaw.values[6] * particle->offsetZ + yaw.values[9] + this->position[0];
-      particle->position.y = yaw.values[1] * particle->offsetX + yaw.values[4] * particle->offsetY +
-                             yaw.values[7] * particle->offsetZ + yaw.values[10] + this->position[1];
-      particle->position.z = yaw.values[2] * particle->offsetX + yaw.values[5] * particle->offsetY +
-                             yaw.values[8] * particle->offsetZ + yaw.values[11] + this->position[2];
+      const float offsetX = particle->offsetX;
+      const float offsetY = particle->offsetY;
+      const float offsetZ = particle->offsetZ;
+      particle->position.x = yaw.values[0] * offsetX + yaw.values[3] * offsetY +
+                             yaw.values[6] * offsetZ + yaw.values[9] + this->position[0];
+      particle->position.y = yaw.values[1] * offsetX + yaw.values[4] * offsetY +
+                             yaw.values[7] * offsetZ + yaw.values[10] + this->position[1];
+      particle->position.z = yaw.values[2] * offsetX + yaw.values[5] * offsetY +
+                             yaw.values[8] * offsetZ + yaw.values[11] + this->position[2];
     }
 
-    ++AsParticle(*it)->elapsedFrames;
+    ++(*it)->elapsedFrames;
   }
 
   for (auto it = this->mistEmitters.begin(); it != this->mistEmitters.end(); ++it) {
-    ++AsParticle(*it)->elapsedFrames;
-    CEZ2STRParticle* particle = AsParticle(*it);
-    if (AsParticle(*it)->elapsedFrames <= 0 || particle == nullptr) {
+    ++(*it)->elapsedFrames;
+    CParticle* particle = *it;
+    if ((*it)->elapsedFrames <= 0 || particle == nullptr) {
       continue;
     }
 
@@ -2332,7 +2319,7 @@ void CNewCloudKillEffect::OnProcess() {
 
     matrix rotation;
     rotation.MakeXRotation(
-        static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f
+        g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f
     );
 
     matrix transform;
@@ -2350,7 +2337,7 @@ CPetitioEffect::CPetitioEffect() : CEffect(EF_PETITIO) {
 // FUNCTION: fn_07346
 void CPetitioEffect::Close() {
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
     it = this->emitters.erase(it);
   }
 }
@@ -2359,12 +2346,12 @@ void CPetitioEffect::Close() {
 // FUNCTION: fn_07347
 void CPetitioEffect::Open() {
   CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
-  EZ2STREmitter* bottomEmitter = reinterpret_cast<EZ2STREmitter*>(bottom);
+  CEZ2STRParticle* bottomEmitter = bottom;
   bottom->Load(std::string("petitio\\petitio_bottom\\petitio_bottom.str"));
   this->emitters.push_back(bottomEmitter);
 
   CEZ2STRParticle* petitio = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-  EZ2STREmitter* petitioEmitter = reinterpret_cast<EZ2STREmitter*>(petitio);
+  CEZ2STRParticle* petitioEmitter = petitio;
   petitio->Load(std::string("petitio\\petitio\\petitio.str"));
   this->emitters.push_back(petitioEmitter);
 
@@ -2376,7 +2363,7 @@ void CPetitioEffect::Open() {
 // FUNCTION: fn_07348
 bool CPetitioEffect::IsAlive() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (IsEmitterAlive(emitter) == true) {
       return true;
     }
@@ -2389,16 +2376,14 @@ bool CPetitioEffect::IsAlive() {
 // FUNCTION: fn_07349
 void CPetitioEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (!emitter) {
       continue;
     }
 
-    CEZ2STRParticle* particle = AsParticle(emitter);
+    CEZ2STRParticle* particle = emitter;
     const vector3d position = {this->position[0] + 0.0f, this->position[1] - 12.0f, this->position[2] + 0.0f};
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
+    particle->position = position;
     particle->Process(0.0f, 0.0f, 0.0f);
   }
 }
@@ -2408,7 +2393,7 @@ void CPetitioEffect::OnProcess() {
 void CPetitioEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -2442,12 +2427,12 @@ void CPneumaticusProcellaEffect::Open() {
   }
 
   this->emitter =
-      reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
+      static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   if (this->emitter) {
-    AsParticle(this->emitter)
+    this->emitter
         ->Load(std::string("pneumaticusprocella\\pneumaticusprocella_target\\pneumaticusprocella_target.str"));
-    AsParticle(this->emitter)->m_loop = true;
-    AsParticle(this->emitter)->m_scale = static_cast<float>(scale);
+    this->emitter->m_loop = true;
+    this->emitter->m_scale = static_cast<float>(scale);
   }
 
   scale += 0.6f;
@@ -2458,14 +2443,14 @@ void CPneumaticusProcellaEffect::Open() {
     const double z = scale * offsetsZ[ClampedRandom(9)];
     const int delay = ClampedRandom(200) + (i + i / 10 * 20) * 100;
 
-    EZ2STREmitter* emitter =
-        reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+    CEZ2STRParticle* emitter =
+        static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
     if (emitter) {
       char name[260] = {};
       StringFormat(name, sizeof(name), static_cast<std::size_t>(-1),
                    "pneumaticusprocella\\pneumaticusprocella\\pneumaticusprocella_%d.str", std::max(rand() % 4, 1));
-      AsParticle(emitter)->Load(std::string(name));
-      AsParticle(emitter)->m_delay = delay;
+      emitter->Load(std::string(name));
+      emitter->m_delay = delay;
       emitter->offset.y = -25.0f;
       emitter->offset.x = static_cast<float>(x);
       emitter->offset.z = static_cast<float>(z);
@@ -2480,12 +2465,12 @@ void CPneumaticusProcellaEffect::Open() {
 // FUNCTION: fn_07356
 void CPneumaticusProcellaEffect::Render() {
   if (this->emitter) {
-    AsParticle(this->emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 
   for (auto it = this->emitters.begin(); it < this->emitters.end(); ++it) {
     if (*it) {
-      AsParticle(*it)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -2494,29 +2479,29 @@ void CPneumaticusProcellaEffect::Render() {
 // FUNCTION: fn_07355
 void CPneumaticusProcellaEffect::OnProcess() {
   if (this->emitter) {
-    AsParticle(this->emitter)->Process(0.0f, -80.0f, 0.0f);
+    this->emitter->Process(0.0f, -80.0f, 0.0f);
   }
 
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (!emitter) {
       continue;
     }
 
     if (IsEmitterAlive(emitter) != true) {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       *it = nullptr;
       continue;
     }
 
-    CEZ2STRParticle* particle = AsParticle(emitter);
+    CEZ2STRParticle* particle = emitter;
     const float x = this->position[0] + emitter->offset.x;
     const float y = this->position[1] + emitter->offset.y;
     const float z = this->position[2] + emitter->offset.z;
     particle->position.x = x;
     particle->position.y = y;
     particle->position.z = z;
-    AsParticle(*it)->Process(0.0f, -80.0f, 0.0f);
+    (*it)->Process(0.0f, -80.0f, 0.0f);
   }
 }
 
@@ -2536,29 +2521,29 @@ void CRandomHitEffect::Open() {
   const double angles[3] = {0.0, 320.0, 40.0};
 
   this->emitter =
-      reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+      static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (this->emitter) {
     switch (this->id) {
     case EF_SECOND_FAITH_HIT: {
-      AsParticle(this->emitter)->Load(std::string("4ig_secondfalth\\secondfalth_hit\\secondfalth_hit.str"));
+      this->emitter->Load(std::string("4ig_secondfalth\\secondfalth_hit\\secondfalth_hit.str"));
       const int index = static_cast<int>(s_randomHitIndex);
-      AsParticle(this->emitter)->m_angle = static_cast<float>(angles[index]);
+      this->emitter->m_angle = static_cast<float>(angles[index]);
       vector3d& offset = this->emitter->offset;
       offset.x = static_cast<float>(offsetsX[index]);
       offset.y = static_cast<float>(offsetsY[index]);
       offset.z = 0.0f;
-      AsParticle(this->emitter)->m_delay = index * 200;
+      this->emitter->m_delay = index * 200;
       break;
     }
     case EF_SECOND_JUDGEMENT: {
-      AsParticle(this->emitter)->Load(std::string("4iq_secondjudgement\\secondjudgement\\secondjudgement.str"));
+      this->emitter->Load(std::string("4iq_secondjudgement\\secondjudgement\\secondjudgement.str"));
       const int index = static_cast<int>(s_randomHitIndex);
-      AsParticle(this->emitter)->m_angle = static_cast<float>(angles[index]);
+      this->emitter->m_angle = static_cast<float>(angles[index]);
       vector3d& offset = this->emitter->offset;
       offset.x = static_cast<float>(offsetsX[index]);
       offset.y = static_cast<float>(offsetsY[index]);
       offset.z = 0.0f;
-      AsParticle(this->emitter)->m_delay = index * 200;
+      this->emitter->m_delay = index * 200;
       break;
     }
     }
@@ -2578,7 +2563,7 @@ void CRandomHitEffect::OnProcess() {
     return;
   }
 
-  CEZ2STRParticle* particle = AsParticle(this->emitter);
+  CEZ2STRParticle* particle = this->emitter;
   particle->position.x = this->position[0] + this->emitter->offset.x;
   particle->position.y = this->position[1] + this->emitter->offset.y;
   particle->position.z = this->position[2] + this->emitter->offset.z;
@@ -2590,7 +2575,7 @@ void CRandomHitEffect::OnProcess() {
 // FUNCTION: fn_07363
 void CRandomHitEffect::Render() {
   if (this->emitter) {
-    AsParticle(this->emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -2731,7 +2716,7 @@ bool CRandomOptEffect::IsAlive() {
     return false;
   }
 
-  CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
+  CWorld* world = g_modeMgr.GetGameMode()->scene;
   if (!world) {
     return false;
   }
@@ -2872,28 +2857,26 @@ CSavageImpactEffect::CSavageImpactEffect() : CEffect(EF_SAVAGE_IMPACT) {
 // OFFSET: 0x00722460
 // FUNCTION: fn_07385
 bool CSavageImpactEffect::IsAlive() {
-  if (0.0f == this->emitter->lifetime) {
+  if (0.0f == this->emitter->life) {
     return true;
   }
 
-  return static_cast<float>(this->emitter->elapsed) < this->emitter->lifetime * 60.0f;
+  return static_cast<float>(this->emitter->elapsedFrames) < this->emitter->life * 60.0f;
 }
 
 // OFFSET: 0x007224A0
 // FUNCTION: fn_07386
 void CSavageImpactEffect::OnProcess() {
-  CEZ2STRParticle* particle = AsParticle(this->emitter);
+  CEZ2STRParticle* particle = this->emitter;
   const vector3d position = {this->position[0] + 0.0f, this->position[1] - 12.0f, this->position[2] + 0.0f};
-  particle->position.x = position.x;
-  particle->position.y = position.y;
-  particle->position.z = position.z;
+  particle->position = position;
   particle->Process(0.0f, 0.0f, 0.0f);
 }
 
 // OFFSET: 0x00722560
 // FUNCTION: fn_07387
 void CSavageImpactEffect::Render() {
-  AsParticle(this->emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+  this->emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
 }
 
 // OFFSET: 0x007226A0
@@ -2930,8 +2913,9 @@ void CServantWeaponNewEffect::AddWeapon() {
     if (particle) {
       particle->Load(std::string("DRAGON_KNIGHT\\DK_SERVANTWEAPON\\servantweapon_cast\\servantweapon_cast.str"));
       particle->m_scale = 0.12f;
-      reinterpret_cast<EZ2STREmitter*>(particle)->angle = angle;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+      particle->angle = angle;
+      CEZ2STRParticle* emitter = particle;
+      this->emitters.push_back(std::move(emitter));
       this->AddEvent(0, "effect\\DK_SERVANTWEAPON.wav", this->frame, 0);
     }
   }
@@ -2940,11 +2924,11 @@ void CServantWeaponNewEffect::AddWeapon() {
 // OFFSET: 0x00722F20
 // FUNCTION: fn_07395
 void CServantWeaponEffect::SetShoot(int column) {
-  EZ2STREmitter* emitter =
-      reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
-  AsParticle(emitter)->Load(std::string("servantweapon\\servantweapon_shoot\\servantweapon_shoot.str"));
+  CEZ2STRParticle* emitter =
+      static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
+  emitter->Load(std::string("servantweapon\\servantweapon_shoot\\servantweapon_shoot.str"));
   if (this->emitters[2][column] != nullptr) {
-    FreeParticle(AsParticle(this->emitters[2][column]));
+    FreeParticle(this->emitters[2][column]);
   }
   this->emitters[2][column] = emitter;
 }
@@ -2953,12 +2937,12 @@ void CServantWeaponEffect::SetShoot(int column) {
 // FUNCTION: fn_07396
 void CServantWeaponEffect::SetPhantomShot(long long column) {
   if (column < 5) {
-    EZ2STREmitter* emitter =
-        reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
+    CEZ2STRParticle* emitter =
+        static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
     if (emitter) {
-      AsParticle(emitter)->Load(std::string("servant_phantom\\servant_phantom_shot\\servant_phantom_shot.str"));
+      emitter->Load(std::string("servant_phantom\\servant_phantom_shot\\servant_phantom_shot.str"));
       if (this->emitters[2][column] != nullptr) {
-        FreeParticle(AsParticle(this->emitters[2][column]));
+        FreeParticle(this->emitters[2][column]);
       }
       this->emitters[2][column] = emitter;
     }
@@ -2968,11 +2952,11 @@ void CServantWeaponEffect::SetPhantomShot(long long column) {
 // OFFSET: 0x00723210
 // FUNCTION: fn_07397
 void CServantWeaponEffect::SetSignShot(int column) {
-  EZ2STREmitter* emitter =
-      reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
-  AsParticle(emitter)->Load(std::string("servant_sign\\servant_sign_shot\\servant_sign_shot.str"));
+  CEZ2STRParticle* emitter =
+      static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
+  emitter->Load(std::string("servant_sign\\servant_sign_shot\\servant_sign_shot.str"));
   if (this->emitters[2][column] != nullptr) {
-    FreeParticle(AsParticle(this->emitters[2][column]));
+    FreeParticle(this->emitters[2][column]);
   }
   this->emitters[2][column] = emitter;
 }
@@ -2980,12 +2964,12 @@ void CServantWeaponEffect::SetSignShot(int column) {
 // OFFSET: 0x007233D0
 // FUNCTION: fn_07399
 void CServantWeaponNewEffect::Close() {
-  for (EZ2STREmitter* emitter : this->emitters) {
-    FreeParticle(AsParticle(emitter));
+  for (CEZ2STRParticle* emitter : this->emitters) {
+    FreeParticle(emitter);
   }
   this->emitters.clear();
-  for (EZ2STREmitter* trail : this->trails) {
-    FreeParticle(AsParticle(trail));
+  for (CEZ2STRParticle* trail : this->trails) {
+    FreeParticle(trail);
   }
   this->trails.clear();
 }
@@ -3013,9 +2997,9 @@ void CServantWeaponEffect::Open() {
         continue;
       }
 
-      EZ2STREmitter* emitter =
-          reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
-      AsParticle(emitter)->Load(std::string("servantweapon\\servantweapon_cast\\servantweapon_cast.str"));
+      CEZ2STRParticle* emitter =
+          static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
+      emitter->Load(std::string("servantweapon\\servantweapon_cast\\servantweapon_cast.str"));
       this->emitters[1][column] = emitter;
     }
   }
@@ -3041,7 +3025,7 @@ bool CServantWeaponNewEffect::IsAlive() {
 
 // OFFSET: 0x00723D90
 // FUNCTION: fn_07404
-EZ2STREmitter* CServantWeaponNewEffect::CreateShot(float angle, int skill) {
+CEZ2STRParticle* CServantWeaponNewEffect::CreateShot(float angle, int skill) {
   CEZ2STRParticle* particle =
       static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (!particle) {
@@ -3065,29 +3049,29 @@ EZ2STREmitter* CServantWeaponNewEffect::CreateShot(float angle, int skill) {
   }
 
   particle->m_scale = 0.12f;
-  EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+  CEZ2STRParticle* emitter = particle;
   emitter->angle = angle;
   return emitter;
 }
 
 // INLINED
-static __forceinline bool IsServantEmitterAlive(EZ2STREmitter* emitter) {
-  if (emitter->lifetime == 0.0f) {
+static __forceinline bool IsServantEmitterAlive(CEZ2STRParticle* emitter) {
+  if (emitter->life == 0.0f) {
     return true;
   }
 
-  return emitter->lifetime * 60.0f > static_cast<float>(emitter->elapsed);
+  return emitter->life * 60.0f > static_cast<float>(emitter->elapsedFrames);
 }
 
 // INLINED
-static __forceinline void PlaceServantEmitter(CServantWeaponEffect* effect, EZ2STREmitter* emitter, unsigned int column) {
+static __forceinline void PlaceServantEmitter(CServantWeaponEffect* effect, CEZ2STRParticle* emitter, unsigned int column) {
   if (column >= 5) {
     return;
   }
 
   const vector3d position = *&effect->positionVector;
-  const matrix view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
-  const matrix& inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse;
+  const matrix view = g_modeMgr.GetGameMode()->camera->frame.view;
+  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
   const vector3d& offset = effect->offsets[column];
   const float viewX =
       position.x * view.values[0] + position.y * view.values[3] + position.z * view.values[6] + view.values[9] + offset.x;
@@ -3098,15 +3082,15 @@ static __forceinline void PlaceServantEmitter(CServantWeaponEffect* effect, EZ2S
   emitter->position.x = viewX * inverse.values[0] + viewY * inverse.values[3] + viewZ * inverse.values[6] + inverse.values[9];
   emitter->position.y = viewX * inverse.values[1] + viewY * inverse.values[4] + viewZ * inverse.values[7] + inverse.values[10];
   emitter->position.z = viewX * inverse.values[2] + viewY * inverse.values[5] + viewZ * inverse.values[8] + inverse.values[11];
-  AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
-  ++emitter->elapsed;
+  emitter->Process(0.0f, 0.0f, 0.0f);
+  ++emitter->elapsedFrames;
 }
 
 // OFFSET: 0x00724100
 // FUNCTION: fn_07405
 void CServantWeaponEffect::OnProcess() {
   for (int column = 0; column < 5; ++column) {
-    EZ2STREmitter* emitter = this->emitters[0][column];
+    CEZ2STRParticle* emitter = this->emitters[0][column];
     if (emitter != nullptr) {
       PlaceServantEmitter(this, emitter, column);
     }
@@ -3116,14 +3100,14 @@ void CServantWeaponEffect::OnProcess() {
       if (IsServantEmitterAlive(emitter) == true) {
         PlaceServantEmitter(this, emitter, column);
       } else {
-        FreeParticle(AsParticle(emitter));
+        FreeParticle(emitter);
         this->emitters[1][column] = nullptr;
         if (this->emitters[0][column] == nullptr) {
           CEZ2STRParticle* particle =
               static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
           particle->Load(std::string("servantweapon\\servantweapon\\servantweapon.str"));
           particle->m_loop = true;
-          this->emitters[0][column] = reinterpret_cast<EZ2STREmitter*>(particle);
+          this->emitters[0][column] = particle;
         }
       }
     }
@@ -3133,7 +3117,7 @@ void CServantWeaponEffect::OnProcess() {
       if (IsServantEmitterAlive(emitter) == true) {
         PlaceServantEmitter(this, emitter, column);
       } else {
-        FreeParticle(AsParticle(emitter));
+        FreeParticle(emitter);
         this->emitters[2][column] = nullptr;
       }
     }
@@ -3141,7 +3125,7 @@ void CServantWeaponEffect::OnProcess() {
 }
 
 // INLINED
-static __forceinline void OrbitServantEmitter(const CServantWeaponNewEffect* effect, EZ2STREmitter* emitter) {
+static __forceinline void OrbitServantEmitter(const CServantWeaponNewEffect* effect, CEZ2STRParticle* emitter) {
   const float radians = emitter->angle / 180.0f * 3.141592f;
   const float sine = ClientSin(radians) * 13.0f;
   const float cosine = ClientCos(radians) * 13.0f;
@@ -3154,7 +3138,7 @@ static __forceinline void OrbitServantEmitter(const CServantWeaponNewEffect* eff
 // FUNCTION: fn_07406
 void CServantWeaponNewEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    if (!AsParticle(*it)->Process(0.0f, 0.0f, 0.0f)) {
+    if (!(*it)->Process(0.0f, 0.0f, 0.0f)) {
       const float angle = (*it)->angle;
       CEZ2STRParticle* particle =
           static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
@@ -3162,11 +3146,11 @@ void CServantWeaponNewEffect::OnProcess() {
         particle->Load(std::string("DRAGON_KNIGHT\\DK_SERVANTWEAPON\\servantweapon\\servantweapon.str"));
         particle->m_loop = true;
         particle->m_scale = 0.12f;
-        reinterpret_cast<EZ2STREmitter*>(particle)->angle = angle;
-        FreeParticle(AsParticle(*it));
-        *it = reinterpret_cast<EZ2STREmitter*>(particle);
+        particle->angle = angle;
+        FreeParticle(*it);
+        *it = particle;
       } else {
-        FreeParticle(AsParticle(*it));
+        FreeParticle(*it);
         it = this->emitters.erase(it);
         continue;
       }
@@ -3177,8 +3161,8 @@ void CServantWeaponNewEffect::OnProcess() {
   }
 
   for (auto it = this->trails.begin(); it != this->trails.end();) {
-    if (!AsParticle(*it)->Process(0.0f, 0.0f, 0.0f)) {
-      FreeParticle(AsParticle(*it));
+    if (!(*it)->Process(0.0f, 0.0f, 0.0f)) {
+      FreeParticle(*it);
       it = this->trails.erase(it);
       continue;
     }
@@ -3193,13 +3177,13 @@ void CServantWeaponNewEffect::OnProcess() {
 void CServantWeaponEffect::Render() {
   for (int column = 0; column < 5; ++column) {
     if (this->emitters[0][column] != nullptr) {
-      AsParticle(this->emitters[0][column])->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      this->emitters[0][column]->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
     if (this->emitters[1][column] != nullptr) {
-      AsParticle(this->emitters[1][column])->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      this->emitters[1][column]->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
     if (this->emitters[2][column] != nullptr) {
-      AsParticle(this->emitters[2][column])->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      this->emitters[2][column]->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -3207,12 +3191,12 @@ void CServantWeaponEffect::Render() {
 // OFFSET: 0x00724F40
 // FUNCTION: fn_07408
 void CServantWeaponNewEffect::Render() {
-  for (EZ2STREmitter* emitter : this->emitters) {
-    AsParticle(emitter)->DrawBillboards(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+  for (CEZ2STRParticle* emitter : this->emitters) {
+    emitter->DrawBillboards(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 
-  for (EZ2STREmitter* trail : this->trails) {
-    AsParticle(trail)->DrawBillboards(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+  for (CEZ2STRParticle* trail : this->trails) {
+    trail->DrawBillboards(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -3220,10 +3204,10 @@ void CServantWeaponNewEffect::Render() {
 // FUNCTION: fn_07409
 void CServantWeaponNewEffect::Shoot(int skill) {
   if (!this->emitters.empty()) {
-    EZ2STREmitter* weapon = this->emitters.back();
-    EZ2STREmitter* shot = this->CreateShot(weapon->angle, skill);
+    CEZ2STRParticle* weapon = this->emitters.back();
+    CEZ2STRParticle* shot = this->CreateShot(weapon->angle, skill);
     if (shot) {
-      FreeParticle(AsParticle(weapon));
+      FreeParticle(weapon);
       this->emitters.pop_back();
       this->trails.push_back(shot);
       this->AddEvent(0, "effect\\DK_SERVANTWEAPON.wav", this->frame, 0);
@@ -3269,7 +3253,7 @@ void CNewCloudKillEffect::Open() {
   this->cloudResetTime = static_cast<int>(timeGetTime());
 
   CParticle* circle = CreateParticle(&this->positionVector, 5);
-  EZ2STREmitter* circleEmitter = reinterpret_cast<EZ2STREmitter*>(circle);
+  CParticle* circleEmitter = circle;
   if (circle) {
     circle->SetTexture("effect\\new_cloud_kill\\ef_cloud_circle.tga");
     circle->effectId = this->id;
@@ -3287,7 +3271,7 @@ void CNewCloudKillEffect::Open() {
 
   for (int i = 0; i < 100; ++i) {
     CParticle* particle = CreateParticle(&this->positionVector, 5);
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    CParticle* emitter = particle;
     if (particle) {
       particle->effectId = this->id;
       particle->columnIndex = i;
@@ -3301,7 +3285,7 @@ void CNewCloudKillEffect::Open() {
 
   for (int i = 0; i < 30; ++i) {
     CParticle* particle = CreateParticle(&this->positionVector, 5);
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    CParticle* emitter = particle;
     if (particle) {
       particle->effectId = this->id;
       particle->columnIndex = i;
@@ -3315,7 +3299,7 @@ void CNewCloudKillEffect::Open() {
   }
 
   CParticle* lightning = CreateParticle(&this->positionVector, 5);
-  EZ2STREmitter* lightningEmitter = reinterpret_cast<EZ2STREmitter*>(lightning);
+  CParticle* lightningEmitter = lightning;
   if (lightning) {
     lightning->effectId = this->id;
     lightning->columnIndex = 1;
@@ -3331,7 +3315,7 @@ void CNewCloudKillEffect::Open() {
 
   for (int i = 0; i < 30; ++i) {
     CParticle* particle = CreateParticle(&this->positionVector, 5);
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+    CParticle* emitter = particle;
     if (particle) {
       particle->effectId = this->id;
       particle->columnIndex = i;
@@ -3348,7 +3332,7 @@ void CNewCloudKillEffect::Open() {
 // OFFSET: 0x0071DB70
 // FUNCTION: fn_07337
 void CNewCloudKillEffect::ResetCloudParticle(CParticle* particle) {
-  particle->frameParameters[0] = ClampedRandom(2);
+  particle->frameIndex = ClampedRandom(2);
 
   const int angle = ClampedRandom(360);
   const float x = g_cosTable[angle] * 18.0f;
@@ -3368,7 +3352,7 @@ void CNewCloudKillEffect::ResetCloudParticle(CParticle* particle) {
 void CNewCloudKillEffect::ResetLightning(CParticle* particle) {
   particle->scale = static_cast<float>(ClampedRandom(5)) + 10.0f;
   particle->animationState = 10;
-  particle->frameParameters[0] = ClampedRandom(4);
+  particle->frameIndex = ClampedRandom(4);
   particle->phaseParameter = ClampedRandom(50) + 10;
   particle->angle = static_cast<float>(ClampedRandom(360));
   particle->offsetZ = static_cast<float>(ClampedRandom(10)) - 5.0f;
@@ -3395,7 +3379,7 @@ void CNewCloudKillEffect::ResetSmokeParticle(CParticle* particle) {
   particle->offsetZ = offset.z;
   particle->offsetX = offset.x;
 
-  particle->frameParameters[0] = ClampedRandom(4);
+  particle->frameIndex = ClampedRandom(4);
   particle->effectParameter = ClampedRandom(151) + 50;
   particle->speedParameter = static_cast<float>(ClampedRandom(10)) * 0.01f + 0.05f;
 }
@@ -3431,7 +3415,7 @@ void CTunaPartyEffect::Close() {
 // FUNCTION: fn_07175
 void CCurseOfCubeEffect::Close() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->emitters.clear();
 }
@@ -3449,7 +3433,7 @@ void CWarningPlaneEffect::Close() {
 // FUNCTION: fn_07208
 void CEternalSlashAttackEffect::Close() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->emitters.clear();
 }
@@ -3467,7 +3451,7 @@ void CFullScreenEffect::Close() {
 // FUNCTION: fn_07284
 void CGaleStorm::Close() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->emitters.clear();
 }
@@ -3512,7 +3496,7 @@ void CStemSpearEffect::Close() {
 // FUNCTION: fn_07158
 void CSvgSpiritEffect::Close() {
   if (this->emitter != nullptr) {
-    FreeParticle(AsParticle(this->emitter));
+    FreeParticle(this->emitter);
     this->emitter = nullptr;
   }
 }
@@ -3521,7 +3505,7 @@ void CSvgSpiritEffect::Close() {
 // FUNCTION: fn_07215
 void CEternalSlashCountEffect::Close() {
   if (this->emitter != nullptr) {
-    FreeParticle(AsParticle(this->emitter));
+    FreeParticle(this->emitter);
     this->emitter = nullptr;
   }
 }
@@ -3530,7 +3514,7 @@ void CEternalSlashCountEffect::Close() {
 // FUNCTION: fn_07359
 void CRandomHitEffect::Close() {
   if (this->emitter != nullptr) {
-    FreeParticle(AsParticle(this->emitter));
+    FreeParticle(this->emitter);
     this->emitter = nullptr;
   }
 }
@@ -3538,13 +3522,13 @@ void CRandomHitEffect::Close() {
 // OFFSET: 0x00711570
 // FUNCTION: fn_07222
 void CFallenAngelEffect::Close() {
-  FreeParticle(AsParticle(this->emitter));
+  FreeParticle(this->emitter);
 }
 
 // OFFSET: 0x007221B0
 // FUNCTION: fn_07383
 void CSavageImpactEffect::Close() {
-  FreeParticle(AsParticle(this->emitter));
+  FreeParticle(this->emitter);
 }
 
 // OFFSET: 0x007193B0
@@ -3552,7 +3536,7 @@ void CSavageImpactEffect::Close() {
 void CDropItemEffect::Close() {
   for (std::size_t i = 0; i < this->emitters.size(); ++i) {
     if (this->emitters[i] != nullptr) {
-      FreeParticle(AsParticle(this->emitters[i]));
+      FreeParticle(this->emitters[i]);
     }
   }
 }
@@ -3560,9 +3544,9 @@ void CDropItemEffect::Close() {
 // OFFSET: 0x00711A20
 // FUNCTION: fn_07230
 void CFloralFlareRoad::Close() {
-  FreeParticle(AsParticle(this->emitter));
+  FreeParticle(this->emitter);
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->emitters.clear();
 }
@@ -3571,12 +3555,12 @@ void CFloralFlareRoad::Close() {
 // FUNCTION: fn_07353
 void CPneumaticusProcellaEffect::Close() {
   if (this->emitter != nullptr) {
-    FreeParticle(AsParticle(this->emitter));
+    FreeParticle(this->emitter);
     this->emitter = nullptr;
   }
-  for (std::vector<EZ2STREmitter*>::iterator it = this->emitters.begin(); it < this->emitters.end(); ++it) {
+  for (std::vector<CEZ2STRParticle*>::iterator it = this->emitters.begin(); it < this->emitters.end(); ++it) {
     if (*it != nullptr) {
-      FreeParticle(AsParticle(*it));
+      FreeParticle(*it);
       *it = nullptr;
     }
   }
@@ -3588,15 +3572,15 @@ void CPneumaticusProcellaEffect::Close() {
 void CServantWeaponEffect::Close() {
   for (int column = 0; column < 5; ++column) {
     if (this->emitters[0][column] != nullptr) {
-      FreeParticle(AsParticle(this->emitters[0][column]));
+      FreeParticle(this->emitters[0][column]);
       this->emitters[0][column] = nullptr;
     }
     if (this->emitters[1][column] != nullptr) {
-      FreeParticle(AsParticle(this->emitters[1][column]));
+      FreeParticle(this->emitters[1][column]);
       this->emitters[1][column] = nullptr;
     }
     if (this->emitters[2][column] != nullptr) {
-      FreeParticle(AsParticle(this->emitters[2][column]));
+      FreeParticle(this->emitters[2][column]);
       this->emitters[2][column] = nullptr;
     }
   }
@@ -3605,8 +3589,8 @@ void CServantWeaponEffect::Close() {
 // OFFSET: 0x00712350
 // FUNCTION: fn_07237
 void CFootprintEffect::Close() {
-  for (EZ2STREmitter* emitter : this->emitters) {
-    FreeParticle(AsParticle(emitter));
+  for (CParticle* emitter : this->emitters) {
+    FreeParticle(emitter);
   }
   this->emitters.clear();
 }
@@ -3615,11 +3599,11 @@ void CFootprintEffect::Close() {
 // FUNCTION: fn_07201
 void CDancingKnifeEffect::Close() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->emitters.clear();
   for (auto it = this->secondStrikeEmitters.begin(); it != this->secondStrikeEmitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->secondStrikeEmitters.clear();
 }
@@ -3671,9 +3655,9 @@ void CSevereRainStorm::SpawnParticles() {
       position.z = (static_cast<float>(ClampedRandom(451)) - 225.0f) * 0.1f + position.z;
 
       CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
-      EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+      CEZ2STRParticle* emitter = particle;
       particle->Open(std::string("diamond_storm\\diamond_storm\\diamond_storm.str"));
-      this->emitters.push_back(emitter);
+      this->emitters.emplace_back(emitter);
     }
     break;
   case EF_CROSS_RAIN:
@@ -3688,9 +3672,9 @@ void CSevereRainStorm::SpawnParticles() {
       position.z = (static_cast<float>(ClampedRandom(range)) - half) * 0.1f + position.z;
 
       CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
-      EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+      CEZ2STRParticle* emitter = particle;
       particle->Load(std::string("crossrain\\cross_rain\\cross_rain.str"));
-      this->emitters.push_back(emitter);
+      this->emitters.emplace_back(emitter);
     }
     break;
   case EF_SKE_TWINKLING_GALAXY:
@@ -3742,7 +3726,7 @@ void CSevereRainStorm::SpawnCrossRain() {
   position.y -= 10.0f;
 
   CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
-  EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(particle);
+  CEZ2STRParticle* emitter = particle;
   particle->Load(std::string("IMPERIAL_GUARD\\IG_CROSS_RAIN\\new_crossrain\\new_cross_rain\\new_cross_rain.str"));
   this->emitters.push_back(emitter);
 }
@@ -3762,19 +3746,15 @@ void CSevereRainStorm::SpawnGrenades() {
     CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
     if (particle) {
       particle->Load(std::string("NIGHT_WATCH\\NW_GRENADES_DROPPING\\grenades_dropping_bottom\\grenades_dropping_bottom.str"));
-      particle->position.x = position.x;
-      particle->position.y = position.y;
-      particle->position.z = position.z;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+      particle->position = position;
+      this->emitters.push_back(std::move(particle));
     }
 
     particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
     if (particle) {
       particle->Load(std::string("NIGHT_WATCH\\NW_GRENADES_DROPPING\\grenades_dropping\\grenades_dropping.str"));
-      particle->position.x = position.x;
-      particle->position.y = position.y;
-      particle->position.z = position.z;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+      particle->position = position;
+      this->emitters.push_back(std::move(particle));
     }
   }
 }
@@ -3793,7 +3773,8 @@ void CSevereRainStorm::SpawnBombardHits() {
       particle->Load(std::string("NIGHT_WATCH\\NW_MISSION_BOMBARD\\mission_bombard\\mission_bombard_hit.str"));
       particle->position = position;
       particle->m_scale = static_cast<float>(ClampedRandom(51) + 50) * 0.01f;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+      CEZ2STRParticle* emitter = particle;
+      this->emitters.push_back(std::move(emitter));
     }
   }
 }
@@ -3810,11 +3791,11 @@ void CSevereRainStorm::SpawnCrystalRain() {
 
   CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 13));
   particle->Load(std::string("rain_of_crystal\\rain_of_crystal_attack_bottom\\rain_of_crystal_attack_bottom.str"));
-  this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+  this->emitters.push_back(std::move(particle));
 
   particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
   particle->Load(std::string("rain_of_crystal\\rain_of_crystal_attack\\rain_of_crystal_attack.str"));
-  this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+  this->emitters.push_back(std::move(particle));
 
   if (rand() % 7 == 0) {
     this->AddEvent(0, "effect\\AG_RAIN_OF_CRYSTAL.wav", this->frame + 1, 0);
@@ -3844,28 +3825,28 @@ void CSevereRainStorm::SpawnSevereRain() {
     particle->Open(std::string("new_severerainstorm\\new_severerainstorm\\new_severerainstorm.str"));
   }
   particle->flags = 5;
-  this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+  this->emitters.push_back(std::move(particle));
 }
 
 // OFFSET: 0x00726E30
 // FUNCTION: fn_07419
-void CSevereRainStorm::SpawnTwinklingGalaxy(int index) {
-  EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 13));
+__declspec(noinline) void CSevereRainStorm::SpawnTwinklingGalaxy(int index) {
+  CEZ2STRParticle* emitter = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   if (emitter) {
-    AsParticle(emitter)->Load(std::string("SKY_EMPEROR\\SKE_TWINKLING_GALAXY\\twinkling_galaxy_bottom\\ske_twinkling_galaxy_bottom.str"));
+    emitter->Load(std::string("SKY_EMPEROR\\SKE_TWINKLING_GALAXY\\twinkling_galaxy_bottom\\ske_twinkling_galaxy_bottom.str"));
     emitter->offset.x = 0.2f;
     emitter->offset.y = -13.5f;
     emitter->offset.z = 0.0f;
-    this->emitters.push_back(emitter);
+    this->emitters.emplace_back(emitter);
   }
 
-  emitter = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+  emitter = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (emitter) {
-    AsParticle(emitter)->Load(FormatOwnedString("SKY_EMPEROR\\SKE_TWINKLING_GALAXY\\twinkling_galaxy\\ske_twinkling_galaxy%02d.str", index));
+    emitter->Load(FormatOwnedString("SKY_EMPEROR\\SKE_TWINKLING_GALAXY\\twinkling_galaxy\\ske_twinkling_galaxy%02d.str", index));
     emitter->offset.x = 0.2f;
     emitter->offset.y = -13.5f;
     emitter->offset.z = 0.0f;
-    this->emitters.push_back(emitter);
+    this->emitters.emplace_back(emitter);
   }
 
   this->AddEvent(0, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
@@ -3887,19 +3868,17 @@ void CSevereRainStorm::SpawnStarCannon() {
   CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   if (particle) {
     particle->Load(std::string("SKY_EMPEROR\\SKE_STAR_CANNON\\star_cannon_bottom\\ske_star_cannon_bottom.str"));
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
-    this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+    particle->position = position;
+    CEZ2STRParticle* emitter = particle;
+    this->emitters.push_back(std::move(emitter));
   }
 
   particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (particle) {
     particle->Load(std::string("SKY_EMPEROR\\SKE_STAR_CANNON\\star_cannon\\ske_star_cannon.str"));
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
-    this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+    particle->position = position;
+    CEZ2STRParticle* emitter = particle;
+    this->emitters.push_back(std::move(emitter));
   }
 
   this->AddEvent(0, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
@@ -3921,19 +3900,17 @@ void CSevereRainStorm::SpawnGalaxyStar() {
   CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   if (particle) {
     particle->Load(std::string("SKY_EMPEROR\\SKE_TWINKLING_GALAXY\\twinkling_galaxy_bottom\\ske_twinkling_galaxy_bottom.str"));
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
-    this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+    particle->position = position;
+    CEZ2STRParticle* emitter = particle;
+    this->emitters.push_back(std::move(emitter));
   }
 
   particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   if (particle) {
     particle->Load(std::string("SKY_EMPEROR\\SKE_TWINKLING_GALAXY\\twinkling_galaxy\\ske_twinkling_galaxy03.str"));
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
-    this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+    particle->position = position;
+    CEZ2STRParticle* emitter = particle;
+    this->emitters.push_back(std::move(emitter));
   }
 
   this->AddEvent(0, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
@@ -3943,7 +3920,7 @@ void CSevereRainStorm::SpawnGalaxyStar() {
 // FUNCTION: fn_07422
 void CSevereRainStorm::Close() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    FreeParticle(AsParticle(*it));
+    FreeParticle(*it);
   }
   this->emitters.clear();
 }
@@ -3997,11 +3974,11 @@ bool CSevereRainStorm::IsAlive() {
 void CSevereRainStorm::OnProcess() {
   this->SpawnParticles();
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    EZ2STREmitter* emitter = *it;
-    if (emitter->lifetime >= 0.0f) {
+    CEZ2STRParticle* emitter = *it;
+    if (emitter->life >= 0.0f) {
       if (this->id == EF_SKE_TWINKLING_GALAXY && emitter) {
-        const matrix& view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
-        const matrix& inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse;
+        const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+        const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
         const vector3d position = *&this->positionVector;
 
         const float vx = position.y * view.values[3] + position.x * view.values[0] + position.z * view.values[6] + view.values[9] +
@@ -4014,16 +3991,16 @@ void CSevereRainStorm::OnProcess() {
         emitter->position.x = vy * inverse.values[3] + vx * inverse.values[0] + vz * inverse.values[6] + inverse.values[9];
         emitter->position.y = vx * inverse.values[1] + vy * inverse.values[4] + vz * inverse.values[7] + inverse.values[10];
         emitter->position.z = vx * inverse.values[2] + vy * inverse.values[5] + vz * inverse.values[8] + inverse.values[11];
-        AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+        emitter->Process(0.0f, 0.0f, 0.0f);
       }
 
       emitter = *it;
       if (emitter) {
-        AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+        emitter->Process(0.0f, 0.0f, 0.0f);
       }
       ++it;
     } else {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       it = this->emitters.erase(it);
     }
   }
@@ -4034,9 +4011,9 @@ void CSevereRainStorm::OnProcess() {
 // FUNCTION: fn_07426
 void CSevereRainStorm::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (emitter) {
-      AsParticle(emitter)->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 }
@@ -4050,7 +4027,7 @@ CCrimsonArrowEffect::CCrimsonArrowEffect() : CEffect(-1), emitter(nullptr) {
 // FUNCTION: fn_07121
 void CCrimsonArrowEffect::Close() {
   if (this->emitter) {
-    FreeParticle(AsParticle(this->emitter));
+    FreeParticle(this->emitter);
     this->emitter = nullptr;
   }
 }
@@ -4063,7 +4040,7 @@ void CCrimsonArrowEffect::Open() {
     return;
   }
 
-  vector3d to = *reinterpret_cast<const vector3d*>(this->sourcePosition);
+  vector3d to = this->sourcePositionVector;
   vector3d from = *&this->positionVector;
   float fromReciprocalDepth = 0.0f;
   float toReciprocalDepth = 0.0f;
@@ -4071,8 +4048,8 @@ void CCrimsonArrowEffect::Open() {
   float fromY;
   float toX;
   float toY;
-  g_renderer->ProjectViewport(&from.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
-  g_renderer->ProjectViewport(&to.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
+  g_renderer->ProjectViewport(&from.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
+  g_renderer->ProjectViewport(&to.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
 
   const float dx = toX - fromX;
   const float dy = toY - fromY;
@@ -4082,7 +4059,7 @@ void CCrimsonArrowEffect::Open() {
     angle = 360.0 - angle;
   }
 
-  EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(arrow);
+  CEZ2STRParticle* emitter = arrow;
   switch (this->id) {
   case EF_CRIMSONARROW:
     arrow->Load("crimsonarrow\\crimsonarrow\\crimsonarrow.str");
@@ -4154,14 +4131,12 @@ void CTunaPartyEffect::OnProcess() {
     const float cosine = ClientCos(phase) * 10.0f;
     const float sine = ClientSin(phase) * 10.0f;
     const vector3d position = {this->position[0] + sine, this->position[1] - 10.0f, this->position[2] + cosine};
-    particle->position.x = position.x;
-    particle->position.y = position.y;
-    particle->position.z = position.z;
+    particle->position = position;
     float angle = phase / 3.141592f * 180.0f;
     if (angle > 360.0f) {
       angle -= static_cast<float>(static_cast<int>(angle / 360.0f) * 360);
     }
-    angle -= static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
+    angle -= g_modeMgr.GetGameMode()->camera->camera.yaw;
     if (angle < 0.0f) {
       angle += 360.0f;
     }
@@ -4198,18 +4173,18 @@ void CRootTwistEffect::Open() {
 // OFFSET: 0x0070D9B0
 // FUNCTION: fn_07159
 void CSvgSpiritEffect::Open() {
-  this->emitter = reinterpret_cast<EZ2STREmitter*>(CreateSpriteParticle(&this->positionVector, 0x101));
+  this->emitter = static_cast<CSpriteParticle*>(CreateSpriteParticle(&this->positionVector, 0x101));
   if (!this->emitter) {
     return;
   }
 
-  CSpriteParticle* sprite = AsSprite(this->emitter);
+  CSpriteParticle* sprite = this->emitter;
   sprite->effectId = this->id;
   sprite->columnIndex = 0;
   sprite->rowIndex = 0;
   sprite->groupIndex = 1;
-  AsSprite(this->emitter)->SetSprite("몬스터\\svg_spirit.spr");
-  AsSprite(this->emitter)->SetAction("몬스터\\svg_spirit.act");
+  this->emitter->SetSprite("몬스터\\svg_spirit.spr");
+  this->emitter->SetAction("몬스터\\svg_spirit.act");
   this->emitter->velocity = {0.0f, 0.0f, 0.0f};
   this->effectLifetime = 16;
   const float deltaX = this->sourcePosition[0] - this->position[0];
@@ -4222,10 +4197,10 @@ void CSvgSpiritEffect::Open() {
   if (angle < 0.0f) {
     angle += 360.0f;
   }
-  this->emitter->baseAngle = static_cast<int>(angle);
+  this->emitter->angleParameter = static_cast<int>(angle);
   const float distance = SquareRoot(deltaX * deltaX + deltaZ * deltaZ);
-  this->emitter->speed = distance / static_cast<float>(this->effectLifetime);
-  this->emitter->elapsed = 0;
+  this->emitter->frameDelay = distance / static_cast<float>(this->effectLifetime);
+  this->emitter->elapsedFrames = 0;
 }
 
 // OFFSET: 0x0070E240
@@ -4253,14 +4228,15 @@ void CCurseOfCubeEffect::SpawnShock() {
     return;
   }
 
-  this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(particle));
+  CEZ2STRParticle* emitter = particle;
+  this->emitters.push_back(std::move(emitter));
 }
 
 // OFFSET: 0x0071F0C0
 // FUNCTION: fn_07342
 void CNewCloudKillEffect::Render() {
   for (auto it = this->circleEmitters.begin(); it != this->circleEmitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CParticle* particle = *it;
     if (particle->animationState != 0 || !*it) {
       continue;
     }
@@ -4269,34 +4245,34 @@ void CNewCloudKillEffect::Render() {
   }
 
   for (auto it = this->cloudEmitters.begin(); it != this->cloudEmitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CParticle* particle = *it;
     if (particle->animationState != 0 || !*it) {
       continue;
     }
 
-    const int frame = static_cast<signed char>(particle->frameParameters[0]);
+    const int frame = particle->frameIndex;
     const ParticleQuad quad = {false, 0.5f, 0.75f, static_cast<float>(frame + 1) * 0.25f, static_cast<float>(frame + 2) * 0.25f, false, true};
     particle->Render(quad);
   }
 
   for (auto it = this->smokeEmitters.begin(); it != this->smokeEmitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CParticle* particle = *it;
     if (particle->elapsedFrames <= 0 || !*it) {
       continue;
     }
 
-    const int frame = static_cast<signed char>(particle->frameParameters[0]);
+    const int frame = particle->frameIndex;
     const ParticleQuad quad = {false, 0.0f, 0.25f, static_cast<float>(frame) * 0.25f, static_cast<float>(frame + 1) * 0.25f, false, true};
     particle->Render(quad);
   }
 
   for (auto it = this->lightningEmitters.begin(); it != this->lightningEmitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CParticle* particle = *it;
     if (static_cast<signed char>(particle->animationState) <= 0 || !*it) {
       continue;
     }
 
-    const int frame = static_cast<signed char>(particle->frameParameters[0]);
+    const int frame = particle->frameIndex;
     const int column = frame % 2;
     const int row = frame / 2;
     const ParticleQuad quad = {false,
@@ -4310,7 +4286,7 @@ void CNewCloudKillEffect::Render() {
   }
 
   for (auto it = this->mistEmitters.begin(); it != this->mistEmitters.end(); ++it) {
-    CEZ2STRParticle* particle = AsParticle(*it);
+    CParticle* particle = *it;
     if (particle->elapsedFrames <= 0 || !*it) {
       continue;
     }
@@ -4325,11 +4301,11 @@ void CNewCloudKillEffect::Render() {
 void CDancingKnifeEffect::SpawnFirstStrike() {
   CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
   bottom->Load(std::string("dancing_knife\\dancing_knife_bottom\\dancing_knife_skill_bottom_01.str"));
-  this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(bottom));
+  this->emitters.push_back(bottom);
 
   CEZ2STRParticle* knife = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   knife->Load(std::string("dancing_knife\\dancing_knife\\dancing_knife_skill_01.str"));
-  this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(knife));
+  this->emitters.push_back(knife);
 }
 
 // OFFSET: 0x007104F0
@@ -4341,13 +4317,13 @@ void CDancingKnifeEffect::SpawnSecondStrike() {
   bottom->Load(std::string("dancing_knife\\dancing_knife_bottom\\dancing_knife_skill_bottom_02.str"));
   bottom->m_loop = true;
   bottom->m_actorId = this->actor;
-  this->secondStrikeEmitters.push_back(reinterpret_cast<EZ2STREmitter*>(bottom));
+  this->secondStrikeEmitters.push_back(bottom);
 
   CEZ2STRParticle* knife = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   knife->Load(std::string("dancing_knife\\dancing_knife\\dancing_knife_skill_02.str"));
   knife->m_loop = true;
   knife->m_actorId = this->actor;
-  this->secondStrikeEmitters.push_back(reinterpret_cast<EZ2STREmitter*>(knife));
+  this->secondStrikeEmitters.push_back(knife);
 }
 
 // OFFSET: 0x00710800
@@ -4362,17 +4338,17 @@ void CDancingKnifeEffect::Open() {
 // FUNCTION: fn_07204
 void CDancingKnifeEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (IsEmitterAlive(emitter) == true) {
       if (emitter) {
         emitter->position.x = this->position[0] + 0.0f;
         emitter->position.y = this->position[1] - 12.0f;
         emitter->position.z = this->position[2] + 0.0f;
-        AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+        emitter->Process(0.0f, 0.0f, 0.0f);
       }
       ++it;
     } else {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       it = this->emitters.erase(it);
     }
   }
@@ -4382,12 +4358,12 @@ void CDancingKnifeEffect::OnProcess() {
   }
 
   for (auto it = this->secondStrikeEmitters.begin(); it != this->secondStrikeEmitters.end(); ++it) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (emitter) {
       emitter->position.x = this->position[0] + 0.0f;
       emitter->position.y = this->position[1] - 12.0f;
       emitter->position.z = this->position[2] + 0.0f;
-      AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+      emitter->Process(0.0f, 0.0f, 0.0f);
     }
   }
 }
@@ -4401,13 +4377,13 @@ void CCurseOfCubeEffect::SpawnLoop() {
     if (bottom) {
       bottom->Open("NPC_CURSE_OF_RED_CUBE\\npc_cur_r_cube\\npc_cur_r_cube_bottom_loop.str");
       bottom->m_loop = true;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(bottom));
+      this->emitters.push_back(bottom);
     }
     CEZ2STRParticle* cube = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
     if (cube) {
       cube->Open("NPC_CURSE_OF_RED_CUBE\\npc_cur_r_cube\\npc_cur_r_cube_loop.str");
       cube->m_loop = true;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(cube));
+      this->emitters.push_back(cube);
     }
     break;
   }
@@ -4416,13 +4392,13 @@ void CCurseOfCubeEffect::SpawnLoop() {
     if (bottom) {
       bottom->Open("NPC_CURSE_OF_BLUE_CUBE\\npc_cur_b_cube\\npc_cur_b_cube_bottom_loop.str");
       bottom->m_loop = true;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(bottom));
+      this->emitters.push_back(bottom);
     }
     CEZ2STRParticle* cube = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
     if (cube) {
       cube->Open("NPC_CURSE_OF_BLUE_CUBE\\npc_cur_b_cube\\npc_cur_b_cube_loop.str");
       cube->m_loop = true;
-      this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(cube));
+      this->emitters.push_back(cube);
     }
     break;
   }
@@ -4435,13 +4411,13 @@ void CCurseOfCubeEffect::SpawnStart() {
   switch (this->id) {
   case EF_NPC_CURSE_OF_RED_CUBE: {
     CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
-    EZ2STREmitter* bottomEmitter = reinterpret_cast<EZ2STREmitter*>(bottom);
+    CEZ2STRParticle* bottomEmitter = bottom;
     if (bottom) {
       bottom->Open("NPC_CURSE_OF_RED_CUBE\\npc_cur_r_cube\\npc_cur_r_cube_bottom_start.str");
       this->emitters.push_back(bottomEmitter);
     }
     CEZ2STRParticle* cube = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-    EZ2STREmitter* cubeEmitter = reinterpret_cast<EZ2STREmitter*>(cube);
+    CEZ2STRParticle* cubeEmitter = cube;
     if (cube) {
       cube->Open("NPC_CURSE_OF_RED_CUBE\\npc_cur_r_cube\\npc_cur_r_cube_start.str");
       this->emitters.push_back(cubeEmitter);
@@ -4450,13 +4426,13 @@ void CCurseOfCubeEffect::SpawnStart() {
   }
   case EF_NPC_CURSE_OF_BLUE_CUBE: {
     CEZ2STRParticle* bottom = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
-    EZ2STREmitter* bottomEmitter = reinterpret_cast<EZ2STREmitter*>(bottom);
+    CEZ2STRParticle* bottomEmitter = bottom;
     if (bottom) {
       bottom->Open("NPC_CURSE_OF_BLUE_CUBE\\npc_cur_b_cube\\npc_cur_b_cube_bottom_start.str");
       this->emitters.push_back(bottomEmitter);
     }
     CEZ2STRParticle* cube = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-    EZ2STREmitter* cubeEmitter = reinterpret_cast<EZ2STREmitter*>(cube);
+    CEZ2STRParticle* cubeEmitter = cube;
     if (cube) {
       cube->Open("NPC_CURSE_OF_BLUE_CUBE\\npc_cur_b_cube\\npc_cur_b_cube_start.str");
       this->emitters.push_back(cubeEmitter);
@@ -4470,16 +4446,16 @@ void CCurseOfCubeEffect::SpawnStart() {
 // FUNCTION: fn_07179
 void CCurseOfCubeEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (IsEmitterAlive(emitter)) {
       if (emitter) {
         const vector3d position = *&this->positionVector;
-        const matrix& view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
+        const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
         const vector3d viewPosition = {
             position.x * view.values[0] + position.y * view.values[3] + position.z * view.values[6] + view.values[9],
             position.x * view.values[1] + position.y * view.values[4] + position.z * view.values[7] + view.values[10],
             position.x * view.values[2] + position.y * view.values[5] + position.z * view.values[8] + view.values[11]};
-        const matrix& inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse;
+        const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
 
         const float vx = viewPosition.x + this->viewOffsetX;
         const float vy = viewPosition.y + this->viewOffsetY;
@@ -4491,11 +4467,11 @@ void CCurseOfCubeEffect::OnProcess() {
         emitter->position.x = worldX;
         emitter->position.y = worldY;
         emitter->position.z = worldZ;
-        AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+        emitter->Process(0.0f, 0.0f, 0.0f);
       }
       ++it;
     } else {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       it = this->emitters.erase(it);
     }
   }
@@ -4567,7 +4543,7 @@ __declspec(noinline) vector3d* CylinderSlice::ComputePoints(vector3d points[2], 
 // FUNCTION: fn_07195
 void CCylinderEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    EZ2STREmitter* emitter = reinterpret_cast<EZ2STREmitter*>(*it);
+    CParticle* emitter = *it;
     vector3d& position = emitter->position;
     position.x = this->position[0];
     position.y = this->position[1];
@@ -4576,7 +4552,7 @@ void CCylinderEffect::OnProcess() {
       continue;
     }
 
-    CEZ2STRParticle* particle = AsParticle(emitter);
+    CParticle* particle = emitter;
     float& angle = particle->angle;
     const double baseAngle = angle;
 
@@ -4620,12 +4596,10 @@ void CSpriteMableEffect::OnProcess() {
     const float offsetY = ClientSin(bob) * 3.0f - 6.0f;
     const float offsetZ = ClientCos(yaw) * 6.0f;
     const vector3d vectorValue = {offsetX + this->position[0], offsetY + this->position[1], offsetZ + this->position[2]};
-    particle->position.x = vectorValue.x;
-    particle->position.y = vectorValue.y;
-    particle->position.z = vectorValue.z;
+    particle->position = vectorValue;
 
     int angle = static_cast<int>(static_cast<float>(static_cast<int>(yaw / 3.141592f * 180.0f) % 360) -
-                                 static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw);
+                                 g_modeMgr.GetGameMode()->camera->camera.yaw);
     if (angle < 0) {
       angle += 360;
     }
@@ -4640,8 +4614,8 @@ void CSpriteMableEffect::OnProcess() {
 // FUNCTION: fn_07289
 void CGravityControlEffect::Close() {
   if (this->target) {
-    FreeParticle(reinterpret_cast<CParticle*>(this->target));
-    this->target = 0;
+    FreeParticle(this->target);
+    this->target = nullptr;
   }
 
   CGameActor* actor = static_cast<CGameActor*>(FindRenderObject(this->actor));
@@ -4649,13 +4623,13 @@ void CGravityControlEffect::Close() {
     return;
   }
 
-  actor->render.position.y = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->terrain->Height(actor->render.position.x, actor->render.position.z);
+  actor->render.position.y = g_modeMgr.GetGameMode()->scene->terrain->Height(actor->render.position.x, actor->render.position.z);
   actor->positionDelta.x = 0.0f;
   actor->positionDelta.y = 0.0f;
   actor->positionDelta.z = 0.0f;
 
   if (this->id == 0x4B1) {
-    CRenderObject* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
+    CRenderObject* player = g_modeMgr.GetGameMode()->scene->player;
     const vector3d playerPosition = player->render.position;
     g_soundMgr->PlayWave("effect\\t_공격력.wav", this->position[0] - playerPosition.x, 0.0f, this->position[2] - playerPosition.z, 250, 40, 1.0f, 0);
   }
@@ -4671,7 +4645,7 @@ void CGravityControlEffect::OnProcess() {
 
   this->heightOffset = std::max(this->heightOffset - g_depthAverageHalf, this->minimumHeightOffset);
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const float z = actor->render.position.z;
   const float x = actor->render.position.x;
   const float height = mode->scene->terrain->Height(x, z);
@@ -4683,12 +4657,12 @@ void CGravityControlEffect::OnProcess() {
   actor->render.position.y = height + this->heightOffset;
 
   if (this->target) {
-    AsParticle(reinterpret_cast<EZ2STREmitter*>(this->target))->Process(0.0f, 0.0f, 0.0f);
-    EZ2STREmitter* target = reinterpret_cast<EZ2STREmitter*>(this->target);
+    this->target->Process(0.0f, 0.0f, 0.0f);
+    CEZ2STRParticle* target = this->target;
     target->position.x = this->position[0];
     target->position.y = this->position[1];
     target->position.z = this->position[2];
-    ++reinterpret_cast<EZ2STREmitter*>(this->target)->elapsed;
+    ++this->target->elapsedFrames;
   }
 }
 
@@ -4704,7 +4678,7 @@ void CGaleStorm::SpawnArrow() {
   position.z = static_cast<float>(offsetZ) - static_cast<float>(this->count * 5) * 0.5f + position.z;
 
   CEZ2STRParticle* arrow = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
-  EZ2STREmitter* arrowEmitter = reinterpret_cast<EZ2STREmitter*>(arrow);
+  CEZ2STRParticle* arrowEmitter = arrow;
   if (arrow) {
     arrow->Load(std::string("galestorm\\galestorm_arrow\\galestorm_arrow.str"));
     this->emitters.push_back(arrowEmitter);
@@ -4729,7 +4703,7 @@ void CGaleStorm::SpawnStorm() {
   CEZ2STRParticle* storm = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
   if (storm) {
     storm->Load(std::string("galestorm\\galestorm\\galestorm.str"));
-    this->emitters.push_back(reinterpret_cast<EZ2STREmitter*>(storm));
+    this->emitters.push_back(storm);
   }
 }
 
@@ -4747,14 +4721,14 @@ void CGaleStorm::OnProcess() {
   }
 
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    EZ2STREmitter* emitter = *it;
+    CEZ2STRParticle* emitter = *it;
     if (IsEmitterAlive(emitter) == true) {
       if (*it) {
-        AsParticle(emitter)->Process(0.0f, 0.0f, 0.0f);
+        emitter->Process(0.0f, 0.0f, 0.0f);
       }
       ++it;
     } else {
-      FreeParticle(AsParticle(emitter));
+      FreeParticle(emitter);
       it = this->emitters.erase(it);
     }
   }
@@ -4770,7 +4744,7 @@ void CGravityControlEffect::Open() {
       particle->m_loop = true;
       particle->Open("WL_TELEKINESIS_INTENSE.str");
       particle->InitParticleQuad(particle->vertices);
-      this->target = reinterpret_cast<int>(particle);
+      this->target = particle;
     }
     break;
   }
@@ -4834,7 +4808,7 @@ void CRichsCoinEffect::OnProcess() {
       particle->position.x = sine + this->position[0];
       particle->position.y = this->position[1] - 10.0f;
 
-      float degrees = angle / 3.141592f * 180.0f - static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw;
+      float degrees = angle / 3.141592f * 180.0f - g_modeMgr.GetGameMode()->camera->camera.yaw;
       if (degrees > 360.0f) {
         degrees = static_cast<float>(static_cast<int>(degrees) % 360);
       }
@@ -4870,7 +4844,7 @@ void CRichsCoinEffect::OnProcess() {
 // OFFSET: 0x007221C0
 // FUNCTION: fn_07384
 void CSavageImpactEffect::Open() {
-  this->emitter = reinterpret_cast<EZ2STREmitter*>(CreateEZ2STRParticle(&this->positionVector, 5));
+  this->emitter = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
   float toReciprocalDepth = 0.0f;
   float fromReciprocalDepth = 0.0f;
   this->offset.x = this->sourcePosition[0] - this->position[0];
@@ -4881,8 +4855,8 @@ void CSavageImpactEffect::Open() {
   float fromY;
   float toX;
   float toY;
-  g_renderer->ProjectViewport(this->position, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
-  g_renderer->ProjectViewport(this->sourcePosition, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
+  g_renderer->ProjectViewport(this->position, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
+  g_renderer->ProjectViewport(this->sourcePosition, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
 
   const float dx = toX - fromX;
   const float dy = toY - fromY;
@@ -4891,7 +4865,7 @@ void CSavageImpactEffect::Open() {
     angle = 360.0 - angle;
   }
 
-  AsParticle(this->emitter)->Load(std::string("savage_impact\\savage_impact\\savage_impact.str"));
-  AsParticle(this->emitter)->m_angle = static_cast<float>(angle);
+  this->emitter->Load(std::string("savage_impact\\savage_impact\\savage_impact.str"));
+  this->emitter->m_angle = static_cast<float>(angle);
   this->AddEvent(0, "effect\\SHC_SAVAGE_IMPACT.wav", 0, 0);
 }

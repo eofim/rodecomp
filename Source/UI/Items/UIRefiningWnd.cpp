@@ -220,7 +220,7 @@ int UIRefiningWnd::SlotAt(int x, int y) {
 
 // OFFSET: 0x007F55A0
 // FUNCTION: fn_09906
-__declspec(safebuffers) void UIRefiningWnd::ApplyResult() {
+void UIRefiningWnd::ApplyResult() {
   this->notice->SetNotice("", 0, 0);
   this->item = this->nextItem;
   this->refiningButton->Enable(0);
@@ -296,13 +296,10 @@ __declspec(safebuffers) void UIRefiningWnd::ApplyResult() {
   } else {
     bool same = true;
     if (this->materials.size() == count) {
-      for (auto it = this->materials.begin(); it != this->materials.end(); ++it) {
-        auto found = this->nextMaterials.begin();
-        for (; found != this->nextMaterials.end(); ++found) {
-          if (it->itemId == found->itemId) {
-            break;
-          }
-        }
+      for (const RefiningMaterial& material : this->materials) {
+        auto found = std::find_if(this->nextMaterials.begin(), this->nextMaterials.end(), [&material](const RefiningMaterial& next) {
+          return material.itemId == next.itemId;
+        });
         if (found == this->nextMaterials.end()) {
           same = false;
           break;
@@ -314,12 +311,10 @@ __declspec(safebuffers) void UIRefiningWnd::ApplyResult() {
 
     this->materials = this->nextMaterials;
 
-    unsigned char level = 0;
-    if (this->item.identity[1] > 0 && this->materials.size() > 0 && this->selectedMaterial >= 0 &&
-        this->materials.size() > static_cast<unsigned>(this->selectedMaterial)) {
-      level = this->materials[this->selectedMaterial].successRate;
-    }
-    this->againButton->remainingCount = level;
+    this->againButton->remainingCount = this->item.identity[1] > 0 && this->materials.size() > 0 && this->selectedMaterial >= 0 &&
+        this->materials.size() > static_cast<unsigned>(this->selectedMaterial)
+      ? this->materials[this->selectedMaterial].successRate
+      : 0;
     this->againButton->Invalidate();
 
     if (!same) {
@@ -448,7 +443,7 @@ void UIRefiningWnd::OnLBtnDown(int x, int y) {
   }
 
   if (this->state == REFINING_STATE_READY && this->item.identity[1] > 0 && static_cast<unsigned>(x - 109) <= 46 && static_cast<unsigned>(y - 201) <= 46) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(28, this->item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(28, this->item, 1, -1);
   }
 }
 
@@ -475,9 +470,10 @@ void UIRefiningWnd::OnLBtnUp(int x, int y) {
       return;
     }
 
+    auto* const button = this->refiningButton;
     this->selectedMaterial = slot;
-    this->refiningButton->cost = this->SelectedMaterialValue();
-    this->refiningButton->Invalidate();
+    button->cost = this->SelectedMaterialValue();
+    button->Invalidate();
 
     if (this->materials[slot].successRate <= 99 && this->catalystEnabled == 0) {
       int message;
@@ -558,7 +554,7 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
     int tipX = 81;
     int tipY = 150;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(name, tipX, tipY - 20, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(name, tipX, tipY - 20, -1, false, true);
     return;
   }
 
@@ -570,7 +566,7 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
     int tipX = 161;
     int tipY = 150;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(name, tipX, tipY - 20, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(name, tipX, tipY - 20, -1, false, true);
     return;
   }
 
@@ -599,7 +595,7 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
     int tipX = slot * 49 + 11;
     int tipY = 35;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(name, tipX, tipY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(name, tipX, tipY, -1, false, true);
   }
 }
 
@@ -877,7 +873,7 @@ int UIRefiningWnd::SendMsg(
 
 // OFFSET: 0x007F87B0
 // FUNCTION: fn_09924
-void UIRefiningWnd::ApplyItem(int id, int count, RefiningMaterial* materials, int catalystCount) {
+void UIRefiningWnd::ApplyItem(int id, int count, const RefiningMaterial* materials, int catalystCount) {
   switch (this->state) {
   case REFINING_STATE_WAIT:
   case REFINING_STATE_READY: {
@@ -897,7 +893,7 @@ void UIRefiningWnd::ApplyItem(int id, int count, RefiningMaterial* materials, in
     char text[0x104];
     std::memset(text, 0, sizeof(text));
     char* highlight = nullptr;
-    std::size_t remaining = sizeof(text);
+    int remaining = sizeof(text);
     char* cursor = text;
     this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
     if (this->item.identified == 1 && this->item.optionCount != 0) {
@@ -955,7 +951,7 @@ void UIRefiningWnd::ApplyItem(int id, int count, RefiningMaterial* materials, in
     char text[0x104];
     std::memset(text, 0, sizeof(text));
     char* cursor = nullptr;
-    std::size_t remaining = sizeof(text);
+    int remaining = sizeof(text);
     char* name = text;
     this->BuildItemName(&this->nextItem, &highlightColor, &breaks, &name, &remaining, &cursor, 1, 0);
     if (this->nextItem.identified == 1 && this->nextItem.optionCount != 0) {
@@ -1074,9 +1070,9 @@ void UIRefining_Notice::SetNotice(const char* value, int duration, unsigned char
 
 // OFFSET: 0x007F6280
 // FUNCTION: fn_09908
-__declspec(safebuffers) void UIRefiningWnd::Paint() {
+void UIRefiningWnd::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  DrawRectangleBorder(*this, 0, 17, 264, 302, 0xC2C2C2);
+  this->DrawRectOutline(0, 17, 264, 302, 0xC2C2C2);
 
   std::string background;
   switch (this->state) {
@@ -1087,7 +1083,7 @@ __declspec(safebuffers) void UIRefiningWnd::Paint() {
     background = static_cast<const std::string&>(FormatOwnedString("유저인터페이스\\refining_renewal\\bg_refining%s_ready_%02d.bmp", this->catalystCount > 0 ? "A" : "B", this->frame));
     break;
   case REFINING_STATE_PROCESS:
-    if (this->frame < 9) {
+    if (this->frame <= 8) {
       background = static_cast<const std::string&>(FormatOwnedString("유저인터페이스\\refining_renewal\\bg_refining%s_process_%02d.bmp", this->catalystEnabled == 1 ? "A" : "B", this->frame));
     } else {
       background = static_cast<const std::string&>(FormatOwnedString("유저인터페이스\\refining_renewal\\bg_refining_process_%02d.bmp", this->frame));
@@ -1103,9 +1099,7 @@ __declspec(safebuffers) void UIRefiningWnd::Paint() {
     break;
   }
 
-  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background.c_str())));
-  this->DrawBitmap(1, 17, bitmap, false);
-
+  this->DrawBitmap(1, 17, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background.c_str()))), false);
 
   if (this->state == REFINING_STATE_READY) {
     if (this->selectedMaterial >= 0) {
@@ -1115,8 +1109,7 @@ __declspec(safebuffers) void UIRefiningWnd::Paint() {
     }
 
     if (this->catalystEnabled == 1) {
-      bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\refining_renewal\\slot_select_red.bmp")));
-      this->DrawBitmap(207, 55, bitmap, false);
+      this->DrawBitmap(207, 55, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\refining_renewal\\slot_select_red.bmp"))), false);
     }
 
     const char* color = "^CA152E";
@@ -1126,11 +1119,11 @@ __declspec(safebuffers) void UIRefiningWnd::Paint() {
       ITEM_INFO icon;
       icon.SetItemId(material->itemId);
       const int owned = LookupClientItem(g_session.m_inventoryItems, material->itemId, 0).quantity;
-      DrawItemIcon(*this, ResourceMgr::Instance(), x + 12, 69, icon, 0);
+      this->DrawItemIcon(x + 12, 69, icon, 0);
       const std::string count = FormatOwnedString("%s%d^000000/1", owned != 0 ? "" : color, owned);
       this->DrawFormattedText(x, 107, count, 48, 6, 0, 12, 0, 0);
       if (index == this->selectedMaterial && (this->state == REFINING_STATE_READY || (this->state == REFINING_STATE_PROCESS && this->frame == 0))) {
-        DrawItemIcon(*this, ResourceMgr::Instance(), 81, 150, icon, 0);
+        this->DrawItemIcon(81, 150, icon, 0);
       }
       ++index;
       x += 49;
@@ -1140,17 +1133,17 @@ __declspec(safebuffers) void UIRefiningWnd::Paint() {
       ITEM_INFO icon;
       icon.SetItemId(this->catalystItemId);
       const int owned = LookupClientItem(g_session.m_inventoryItems, this->catalystItemId, 0).quantity;
-      DrawItemIcon(*this, ResourceMgr::Instance(), 218, 69, icon, 0);
+      this->DrawItemIcon(218, 69, icon, 0);
       const std::string count = FormatOwnedString("%s%d^000000/%d", this->catalystCount <= owned ? "" : color, owned, this->catalystCount);
       this->DrawFormattedText(206, 107, count, 48, 6, 0, 12, 0, 0);
       if (this->catalystEnabled == 1 && (this->state == REFINING_STATE_READY || (this->state == REFINING_STATE_PROCESS && this->frame < 13))) {
-        DrawItemIcon(*this, ResourceMgr::Instance(), 161, 150, icon, 0);
+        this->DrawItemIcon(161, 150, icon, 0);
       }
     }
   }
 
   if (this->item.identity[1] > 0) {
-    DrawItemIcon(*this, ResourceMgr::Instance(), 120, 212, this->item, 0);
+    this->DrawItemIcon(120, 212, this->item, 0);
     if (0 < this->item.grade) {
       this->DrawBitmap(120, 224,
         static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", this->item.grade).c_str()))),

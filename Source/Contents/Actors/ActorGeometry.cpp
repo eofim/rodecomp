@@ -17,6 +17,14 @@
 #include <cstdlib>
 #include <windows.h>
 
+#if defined(_WIN32) && !defined(_WIN64)
+static_assert(sizeof(tagRECT) == 0x10);
+static_assert(offsetof(tagRECT, left) == 0x0);
+static_assert(offsetof(tagRECT, top) == 0x4);
+static_assert(offsetof(tagRECT, right) == 0x8);
+static_assert(offsetof(tagRECT, bottom) == 0xC);
+#endif
+
 // OFFSET: 0x00CA9580
 // FUNCTION: fn_21007
 float __stdcall CRenderObject::Heading(float x, float z, float targetX, float targetZ) {
@@ -75,7 +83,7 @@ float CRenderObject::CalcDist(float x, float y, float z) const {
 // FUNCTION: fn_21011
 bool CRenderObject::PrepareSprite(
   int unused, int layer, float scale, const SpriteFrameCell& cell, float x, float y, const float* position, float shift, float* bottomDepth,
-  float* topDepth, const SpriteRleImage* image, SpriteQuad* quad, int* bounds, std::uint32_t* color, int offsetX, int offsetY, int flags
+  float* topDepth, const SpriteRleImage* image, SpriteQuad* quad, tagRECT* bounds, std::uint32_t* color, int offsetX, int offsetY, int flags
 ) {
   const float depthBias = this->render.distanceScale * g_cameraScaleX;
   const double scaleY = static_cast<double>(scale * cell.scaleY * this->render.scale);
@@ -161,16 +169,16 @@ bool CRenderObject::PrepareSprite(
   quad->bottomRhw = *bottomDepth;
   quad->topRhw = *topDepth;
   quad->angle = static_cast<float>(cell.rotation + static_cast<int>(this->render.spriteAngle));
-  bounds[0] = static_cast<int>(left);
-  bounds[1] = static_cast<int>(top);
-  bounds[2] = static_cast<int>(right);
-  bounds[3] = static_cast<int>(bottom);
+  bounds->left = static_cast<int>(left);
+  bounds->top = static_cast<int>(top);
+  bounds->right = static_cast<int>(right);
+  bounds->bottom = static_cast<int>(bottom);
 
   float lightRed = 1.0f;
   float lightGreen = 1.0f;
   float lightBlue = 1.0f;
   if (this->render.useGroundLighting == 1 && g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF)) {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     GroundGeometry* ground = mode->scene->ground;
     if (ground->IsNewVer()) {
       int column = 0;
@@ -187,11 +195,11 @@ bool CRenderObject::PrepareSprite(
   if (this->render.isSingleColor && this->render.overrideColor != 0xFFFF0000) {
     *color = this->render.overrideColor;
   } else {
-    SpriteColor& channels = *reinterpret_cast<SpriteColor*>(color);
-    channels.alpha = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 24) & 0xFF) * alpha) / 255.0f));
-    channels.red = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.color & 0xFF) * red) / 255.0f));
-    channels.green = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 8) & 0xFF) * green) / 255.0f));
-    channels.blue = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 16) & 0xFF) * blue) / 255.0f));
+    unsigned char* channels = reinterpret_cast<unsigned char*>(color);
+    channels[3] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 24) & 0xFF) * alpha) / 255.0f));
+    channels[2] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.color & 0xFF) * red) / 255.0f));
+    channels[1] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 8) & 0xFF) * green) / 255.0f));
+    channels[0] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 16) & 0xFF) * blue) / 255.0f));
   }
   quad->color = *color;
 
@@ -215,18 +223,14 @@ bool CRenderObject::PrepareSprite(
 // OFFSET: 0x00CAD9E0
 // FUNCTION: fn_21057
 bool CRenderObject::GetTargetPos(std::uint32_t targetAid, vector3d& targetPos) const {
-  const CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  const CGameMode* mode = g_modeMgr.GetGameMode();
   bool found = true;
 
   if (targetAid == g_session.m_aid) {
     const vector3d& playerPos = mode->scene->player->render.position;
-    targetPos.x = playerPos.x;
-    targetPos.y = playerPos.y;
-    targetPos.z = playerPos.z;
+    targetPos = playerPos;
   } else if (const CRenderObject* actor = mode->scene->GetGameActorByAID(targetAid)) {
-    targetPos.x = actor->render.position.x;
-    targetPos.y = actor->render.position.y;
-    targetPos.z = actor->render.position.z;
+    targetPos = actor->render.position;
   } else {
     found = false;
     const vector3d& playerPos = mode->scene->player->render.position;

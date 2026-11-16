@@ -1,4 +1,5 @@
 #include "Contents/Skills/ClientSkills.h"
+#include "Contents/Actors/GameActor.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMgr.h"
@@ -21,6 +22,10 @@
 #include "UI/Window/WindowManagerWindows.h"
 #include "Utility/Text/Tokenizer.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "UI/Rodex/UIRodexComposeWnd.h"
+#include "UI/Shortcuts/UIShortCutWnd.h"
+#include "UI/Skill/UINewSkillListWnd.h"
+#include "UI/Skill/UISkillListWnd.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -507,7 +512,7 @@ void CSession::EraseSummonHp(std::int64_t key) {
 int CSession::CountProhibitionLog(std::uint32_t aid) {
   int matches = 0;
   const int count = static_cast<int>(this->m_prohibitionLog.size());
-  const CRenderObject* actor = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(aid);
+  const CRenderObject* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
   if (!actor) {
     return -1;
   }
@@ -586,21 +591,21 @@ void CSession::UpdateAchievementRecord(const AchievementRecordPacket& packet) {
   auto found = this->achievements.find(packet.id);
   if (found != this->achievements.end()) {
     SessionRecord6144& record = found->second;
-    reinterpret_cast<unsigned char*>(&record.completionFlags)[1] = packet.completed;
+    record.completed = packet.completed;
     std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
     record.completedAt = packet.completedAt;
     record.rewarded = packet.rewarded;
-    record.SplitDate(packet.completedAt, reinterpret_cast<std::uint16_t&>(record.year), reinterpret_cast<std::uint16_t&>(record.month), reinterpret_cast<std::uint16_t&>(record.day));
+    record.SplitDate(packet.completedAt, record.year, record.month, record.day);
     return;
   }
 
   SessionRecord6144 record;
-  reinterpret_cast<unsigned char*>(&record.completionFlags)[0] = 1;
-  reinterpret_cast<unsigned char*>(&record.completionFlags)[1] = packet.completed;
+  record.registered = 1;
+  record.completed = packet.completed;
   std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
   record.completedAt = packet.completedAt;
   record.rewarded = packet.rewarded;
-  record.SplitDate(packet.completedAt, reinterpret_cast<std::uint16_t&>(record.year), reinterpret_cast<std::uint16_t&>(record.month), reinterpret_cast<std::uint16_t&>(record.day));
+  record.SplitDate(packet.completedAt, record.year, record.month, record.day);
   this->achievements.insert({packet.id, record});
 }
 
@@ -759,7 +764,7 @@ void CSession::ResetCostumeItems() {
 
 // OFFSET: 0x00E08B40
 // FUNCTION: fn_23770
-float GetSkillFactor(int job) {
+float CSession::GetSkillFactor(int job) const {
   if ((job < JT_NOVICE_B || job > JT_THIEF_B) && job != JT_SUPERNOVICE_B && job != JT_SUPERNOVICE2_B &&
       static_cast<unsigned>(job - JT_KNIGHT_B) > JT_CHICKEN2_B - JT_KNIGHT_B && static_cast<unsigned>(job - JT_RUNE_KNIGHT_B) > JT_MADOGEAR_B - JT_RUNE_KNIGHT_B &&
       static_cast<unsigned>(job - JT_PORING_NOVICE_B) > JT_DOG_CHASER_B - JT_PORING_NOVICE_B && (job < JT_SHEEP_PRIEST_B || job > JT_PIG_BLACKSMITH_B) &&
@@ -778,6 +783,11 @@ float GetSkillFactor(int job) {
   }
 
   return 0.82f;
+}
+
+// INLINED
+float GetSkillFactor(int job) {
+  return g_session.GetSkillFactor(job);
 }
 
 // OFFSET: 0x00E084B0
@@ -814,8 +824,8 @@ int CSession::SkillLevel(int id) const {
 
 // OFFSET: 0x00E094E0
 // FUNCTION: fn_23778
-CRenderObject* CSession::FindGameActor(std::uint32_t aid) const {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+CGameActor* CSession::FindGameActor(std::uint32_t aid) const {
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode == nullptr) {
     return nullptr;
   }
@@ -826,13 +836,13 @@ CRenderObject* CSession::FindGameActor(std::uint32_t aid) const {
 // OFFSET: 0x00E07AA0
 // FUNCTION: fn_23749
 void CSession::AddProhibitionLog(std::uint32_t aid, std::uint32_t minutes) {
-  const CRenderObject* actor = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->GetGameActorByAID(aid);
+  const CRenderObject* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
   if (!actor) {
     return;
   }
 
   std::uint32_t accountId = actor->render.accountId;
-  const std::string actorName = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(aid);
+  const std::string actorName = g_modeMgr.GetGameMode()->ActorName(aid);
 
   ProhibitionLogEntry entry;
   std::strcpy(entry.name, actorName.c_str());
@@ -982,6 +992,12 @@ bool CSession::EquipCostumeItem(const ITEM_INFO& item, const char* name) {
   return true;
 }
 
+// OFFSET: 0x00E098F0
+// FUNCTION: fn_23784
+int CSession::GetBodyStyleJob(int job) {
+  return job;
+}
+
 // OFFSET: 0x00E09900
 // FUNCTION: fn_23785
 ITEM_INFO CSession::GetSelectionItemAt(int index) const {
@@ -1027,7 +1043,7 @@ void CSession::FindLatestCompletedAchievements(int* second, int* first) {
   int bestValue = -1;
   int secondValue;
   for (auto it = this->achievements.begin(); it != this->achievements.end(); ++it) {
-    if (reinterpret_cast<const unsigned char*>(&it->second.completionFlags)[1]) {
+    if (it->second.completed) {
       const int value = it->second.completedAt;
       if (bestValue < value) {
         secondValue = bestValue;

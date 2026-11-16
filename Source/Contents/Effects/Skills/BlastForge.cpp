@@ -25,15 +25,13 @@ static __forceinline void PlaceParticle(CEZ2STRParticle* particle, const float* 
   particle->position.z = position[2];
 
   const vector3d pos = particle->position;
-  const matrix& view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view;
-  const matrix& inverse = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.inverse;
+  const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
 
   vector3d viewPos = TransformPoint(view, pos);
   viewPos.y -= 8.0f;
   const vector3d worldPos = TransformPoint(inverse, viewPos);
-  particle->position.x = worldPos.x;
-  particle->position.y = worldPos.y;
-  particle->position.z = worldPos.z;
+  particle->position = worldPos;
 
   particle->Process(0.0f, 0.0f, 0.0f);
 }
@@ -123,18 +121,18 @@ void CBlastForge::OnProcess() {
 void CBlastForge::Render() {
   if (!this->blastParticle) {
     if (this->loopParticle) {
-      this->loopParticle->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      this->loopParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
     if (this->loopBottomParticle) {
-      this->loopBottomParticle->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+      this->loopBottomParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
     }
   }
 
   if (this->blastParticle) {
-    this->blastParticle->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->blastParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
   if (this->blastBottomParticle) {
-    this->blastBottomParticle->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->blastBottomParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 

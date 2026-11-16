@@ -10,6 +10,10 @@
 class UIChatHisBox;
 class UITabControl;
 class UIEditCtrl;
+class UIChatEditCtrl;
+class UIWhisperEditCtrl;
+class UIResizer;
+class UIBitmapButton;
 
 class UINewChatWnd : public UIFrameWnd {
 public:
@@ -40,16 +44,16 @@ public:
   void ToggleInput();
 
   /* 00B4 */ UIEditCtrl* m_inputEdit;
-  /* 00B8 */ UIWindow* m_inputResizer;
-  /* 00BC */ UIEditCtrl* m_chatEdit;
-  /* 00C0 */ UIWindow* m_whisperEdit;
+  /* 00B8 */ UIResizer* m_inputResizer;
+  /* 00BC */ UIChatEditCtrl* m_chatEdit;
+  /* 00C0 */ UIWhisperEditCtrl* m_whisperEdit;
   /* 00C4 */ int m_inputX;
   /* 00C8 */ int m_inputY;
   /* 00CC */ int m_listWidth;
   /* 00D0 */ int m_listHeight;
-  /* 00D4 */ unsigned char m_primaryStateStorage[0x4];
+  /* 00D4 */ std::uint32_t m_listBorderStyle;
   /* 00D8 */ std::uint32_t m_listColor;
-  /* 00DC */ unsigned char m_secondaryStateStorage[0x4];
+  /* 00DC */ std::uint32_t m_listFlags;
   /* 00E0 */ UIWindow* m_inputButtons[3];
   /* 00EC */ unsigned char padding_00EC[0x4];
   /* 00F0 */ int m_menuMode;
@@ -63,8 +67,8 @@ public:
   /* 011C */ int m_inputOffsetY;
   /* 0120 */ int m_tabWidth;
   /* 0124 */ int m_inputAreaHeight;
-  /* 0128 */ UIWindow* m_headerButton;
-  /* 012C */ UIWindow* m_chatModeButton;
+  /* 0128 */ UIBitmapButton* m_headerButton;
+  /* 012C */ UIBitmapButton* m_chatModeButton;
   /* 0130 */ unsigned char padding_0130[0x8];
   /* 0138 */ UITabControl* m_tabControl;
   /* 013C */ UIWindow* m_suggestions;
@@ -72,7 +76,7 @@ public:
 
 // INLINED
 inline UINewChatWnd* ChatWindow() {
-  return static_cast<UINewChatWnd*>(g_windowMgr.chatWnd);
+  return g_windowMgr.chatWnd;
 }
 
 #endif

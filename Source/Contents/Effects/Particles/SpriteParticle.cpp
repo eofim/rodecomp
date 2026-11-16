@@ -1,3 +1,6 @@
+#include "Render/DX9/RendererDX9.h"
+#include "Render/Primitives/RenderPrimitivePool.h"
+#include <new>
 #include "Contents/Effects/Particles/SpriteParticle.h"
 #include "Contents/Actors/ActorEnums.h"
 #include "Client/Mode/CGameMode.h"
@@ -34,6 +37,25 @@ static __forceinline bool IsParticleActive(const CSpriteParticle* particle) {
     return true;
   }
   return particle->life * 60.0f > static_cast<float>(particle->elapsedFrames);
+}
+
+namespace {
+struct PrimitivePoolAccess : RenderPrimitivePool {
+  // INLINED
+  inline RenderPrimitive* AcquireLocal() {
+    if (this->m_current == this->m_commands.end()) {
+      this->m_commands.emplace_back();
+      this->m_current = this->m_commands.end();
+      return &this->m_commands.back();
+    }
+
+    RenderPrimitive* command = &*this->m_current;
+    ++this->m_current;
+    new (command) RenderPrimitive;
+
+    return command;
+  }
+};
 }
 
 // OFFSET: 0x00B40B60
@@ -115,7 +137,7 @@ void CSpriteParticle::Draw(char mode) {
     return;
   }
 
-  const float* view = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values;
+  const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
   float screenX;
   float screenY;
   float distance;
@@ -151,7 +173,7 @@ void CSpriteParticle::Draw(char mode) {
 
     this->SetQuad(this->vertices, record.v1, record.v0, (cell.mirrored & 1) == 0 ? record.u0 : record.u1, (cell.mirrored & 1) == 0 ? record.u1 : record.u0);
 
-    RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+    RenderPrimitive* primitive = static_cast<PrimitivePoolAccess&>(g_renderer->primitives).AcquireLocal();
     std::memcpy(primitive->vertices, this->vertices, sizeof(this->vertices));
     primitive->texture = texture;
 
@@ -202,8 +224,8 @@ void CSpriteParticle::Draw(char mode) {
     worldScale.SetScale(this->scale, this->scale, 1.0f);
     matrix worldRotation;
     worldRotation.MakeZRotation(ToRadians(this->angle));
-    worldRotation.AppendXRotation(ToRadians(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch));
-    worldRotation.AppendYRotation(ToRadians(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.yaw));
+    worldRotation.AppendXRotation(ToRadians(g_modeMgr.GetGameMode()->camera->camera.pitch));
+    worldRotation.AppendYRotation(ToRadians(g_modeMgr.GetGameMode()->camera->camera.yaw));
     matrix worldTranslate;
     worldTranslate.MakeTranslate(this->position.x, this->position.y, this->position.z);
 
@@ -262,7 +284,7 @@ void CSpriteParticle::Draw(char mode) {
 
     primitive->sourceBlend = 5;
     primitive->destinationBlend = (this->flags != 5) ? 6 : 2;
-    g_renderer->queues.Submit(primitive, static_cast<std::uint16_t>(this->flags), g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
+    static_cast<CRendererDX9*>(g_renderer)->Submit(primitive, static_cast<std::uint16_t>(this->flags));
   }
 }
 

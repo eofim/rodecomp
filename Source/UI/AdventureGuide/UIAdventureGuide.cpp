@@ -32,6 +32,10 @@
 #include <regex>
 #include <utility>
 
+template __declspec(noinline) std::string std::sub_match<std::string::const_iterator>::str() const;
+template __declspec(noinline) void CUIListBox<AdventureGuide::CUISubTab>::UpdateScrollBar();
+template __declspec(noinline) void CUIListBoxEx<AdventureGuide::CUIMonsterInfo, AdventureGuide::CMonsterData>::UpdateScrollBar();
+
 template void CUIListBoxEx<AdventureGuide::CUIMonsterInfo, AdventureGuide::CMonsterData>::UpdateScrollBar();
 template void CUIListBox<AdventureGuide::CUITab>::UpdateScrollBar();
 template void CUIListBox<AdventureGuide::CUISubTab>::UpdateScrollBar();
@@ -481,16 +485,16 @@ void CUIItemInfo::SetDescription(int type, const std::vector<const char*>& descr
       continue;
     }
 
-    std::cmatch match;
+    std::smatch match;
     std::regex pattern("\\^000000");
-    std::regex_search(text.c_str(), text.c_str() + text.size(), match, pattern);
+    std::regex_search(text, match, pattern);
     while (!match.empty()) {
       std::string line = match.prefix().str() + match[0].str();
       this->descriptionViewer->AddLine(line);
       ++lines;
       text = match.suffix().str();
       text.erase(0, text.find_first_not_of(" \r\n\t\v\f"));
-      std::regex_search(text.c_str(), text.c_str() + text.size(), match, pattern);
+      std::regex_search(text, match, pattern);
     }
   }
 }
@@ -928,6 +932,16 @@ void CUIAdventureGuide::OnSelectTab(AdventureGuide::CUITab* tab) {
 
 namespace AdventureGuide {
 
+// OFFSET: 0x009D8F50
+// FUNCTION: fn_14273
+__declspec(noinline) CUICharacterInfo::CUICharacterInfo() : CUIControl(), jobIcon(nullptr), level(nullptr), jobLevel(nullptr), name(nullptr) {
+}
+
+// OFFSET: 0x009D8FE0
+// FUNCTION: fn_14274
+__declspec(noinline) CUIIntro::CUIIntro() : CUIPage(), banner(nullptr), image(nullptr), contents(nullptr) {
+}
+
 // OFFSET: 0x009C5400
 // FUNCTION: fn_14000
 void CUICharacterInfo::OnCreate(int width, int height) {
@@ -1184,7 +1198,7 @@ void CUIQuestInfo::OnCreate(int width, int height) {
   this->stampImage->SetSize(85, 70);
   this->stampImage->Move(250, 10);
   {
-    CUIStaticImage* stamp = static_cast<CUIStaticImage*>(this->stampImage);
+    CUIStaticImage* stamp = this->stampImage;
     stamp->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\stamp_completed.bmp", 0xF14F79170939C7F1ULL)));
   }
   this->AddChild(this->stampImage);
@@ -1498,6 +1512,21 @@ static bool s_registered = [] {
   Singleton<CUIRegisterMgr>::GetInstance()->Register(10002, factory);
   return true;
 }();
+
+namespace AdventureGuide {
+
+// OFFSET: 0x009D94D0
+// FUNCTION: fn_14281
+CUISubTab::CUISubTab() : CUIListItem(), labelText(nullptr), stampImage(nullptr), id(0), questId(0) {
+}
+
+// OFFSET: 0x009D9550
+// FUNCTION: fn_14282
+CUITab::CUITab()
+    : CUIListItem(), labelText(nullptr), subTabs(nullptr), title(), type(7), page(nullptr), collapsedHeight(0) {
+}
+
+}
 
 // OFFSET: 0x009DB280
 // FUNCTION: fn_14306
@@ -1876,7 +1905,7 @@ void CUIMonster::SearchNavigation() {
     g_navigationManager.SetViewMode(1);
     g_navigationManager.ClearSavedTarget();
     g_windowMgr.CloseWindow(WID_NAVIGATIONRUIDEWND);
-    static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->RefreshLayout();
+    g_windowMgr.navigationWnd->RefreshLayout();
     g_windowMgr.Promote(g_windowMgr.LookupWindow(WID_NAVIGATIONV4WND));
   } else {
     g_windowMgr.EnsureWindow(WID_NAVIGATIONV4WND);

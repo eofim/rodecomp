@@ -16,6 +16,7 @@
 
 #include "Resource/MSGSTRINGID.h"
 #include <cstdint>
+#include <new>
 
 namespace {
 #pragma pack(push, 1)
@@ -64,7 +65,27 @@ CEnchantMgr::CEnchantMgr() {
 }
 
 // INLINED
+inline CItemDBToIDMgr* ItemDbToIdMgr() {
+  if (!g_itemDbToIdMgr) {
+    g_itemDbToIdMgr = new (std::nothrow) CItemDBToIDMgr;
+  }
+
+  return g_itemDbToIdMgr;
+}
+
+// INLINED
 CEnchantMgr::~CEnchantMgr() {
+}
+
+// OFFSET: 0x006863F0
+// FUNCTION: fn_05565
+template <>
+CEnchantMgr* Singleton<CEnchantMgr>::GetInstance() {
+  if (!s_instance) {
+    s_instance = new (std::nothrow) CEnchantMgr;
+  }
+
+  return s_instance;
 }
 
 
@@ -129,8 +150,8 @@ void CEnchantMgr::HandleEnchantResult(int messageId, int itemId) {
       effect = EF_UI_ENCHANT_SUCCESS;
       break;
     case ID_CZ_REQUEST_UPGRADE_ENCHANT:
-    case 0xBF0:
-    case 0xBF1:
+    case ID_CZ_REQ_UPGRADE_RANDOM_ENCHANT:
+    case ID_CZ_REQ_UPGRADE_PERFECT_ENCHANT:
       effect = EF_UI_LEVELUP_SUCCESS;
       break;
     case ID_CZ_REQUEST_RESET_ENCHANT:
@@ -145,8 +166,8 @@ void CEnchantMgr::HandleEnchantResult(int messageId, int itemId) {
     case ID_CZ_REQUEST_RANDOM_ENCHANT:
     case ID_CZ_REQUEST_PERFECT_ENCHANT:
     case ID_CZ_REQUEST_UPGRADE_ENCHANT:
-    case 0xBF0:
-    case 0xBF1:
+    case ID_CZ_REQ_UPGRADE_RANDOM_ENCHANT:
+    case ID_CZ_REQ_UPGRADE_PERFECT_ENCHANT:
       effect = EF_UI_ENCHANT_FAIL;
       break;
     case ID_CZ_REQUEST_RESET_ENCHANT:
@@ -223,14 +244,14 @@ void CEnchantMgr::RequestUpgradePerfectEnchant(uint64_t group, int16_t index, in
   }
 
   UpgradePerfectEnchantPacket packet;
-  packet.packetType = 0xBF1;
+  packet.packetType = ID_CZ_REQ_UPGRADE_PERFECT_ENCHANT;
   packet.group = group;
   packet.index = index;
   packet.slot = slot;
   packet.itemId = itemId;
   GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
   m_inputBlocked = true;
-  m_request = EnchantRequest{0xBF1, group, index, slot};
+  m_request = EnchantRequest{ID_CZ_REQ_UPGRADE_PERFECT_ENCHANT, group, index, slot};
 }
 
 // OFFSET: 0x00683FF0
@@ -260,13 +281,13 @@ void CEnchantMgr::RequestUpgradeRandomEnchant(uint64_t group, int16_t index, int
   }
 
   UpgradeEnchantPacket packet;
-  packet.packetType = 0xBF0;
+  packet.packetType = ID_CZ_REQ_UPGRADE_RANDOM_ENCHANT;
   packet.group = group;
   packet.index = index;
   packet.slot = slot;
   GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
   m_inputBlocked = true;
-  m_request = EnchantRequest{0xBF0, group, index, slot};
+  m_request = EnchantRequest{ID_CZ_REQ_UPGRADE_RANDOM_ENCHANT, group, index, slot};
 }
 
 // OFFSET: 0x00686BF0
@@ -309,9 +330,9 @@ int L_AddRandomUpgradeEnchant(lua_State* L) {
   uint64_t rate = static_cast<uint64_t>(lua_tonumber(L, -1));
 
   CEnchantMgr* mgr = CEnchantMgr::GetInstance();
-  int firstItemId = CItemDBToIDMgr::GetInstance()->GetItemID(firstItemName);
+  int firstItemId = ItemDbToIdMgr()->GetItemID(firstItemName);
   if (firstItemId != 0) {
-    int secondItemId = CItemDBToIDMgr::GetInstance()->GetItemID(secondItemName);
+    int secondItemId = ItemDbToIdMgr()->GetItemID(secondItemName);
     if (secondItemId != 0) {
       mgr->m_enchants[static_cast<uint64_t>(id)].options[optionKey].randomUpgrades[firstItemId].rates[secondItemId] = rate;
     }
@@ -337,7 +358,7 @@ int L_AddTargetItem(lua_State* L) {
   uint64_t id = static_cast<uint64_t>(lua_tonumber(L, -2));
   CEnchantMgr* mgr = CEnchantMgr::GetInstance();
   std::string itemName(lua_tostring(L, -1));
-  int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(itemName);
+  int itemId = ItemDbToIdMgr()->GetItemID(itemName);
   if (itemId != 0) {
     mgr->m_enchants[id].targetItems.push_back(itemId);
   }
@@ -369,11 +390,11 @@ int L_ApproveRandomOption(lua_State* L) {
 // FUNCTION: fn_05572
 int L_GetSlotCount(lua_State* L) {
   if (lua_tostring(L, -1) != nullptr) {
-    int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(lua_tostring(L, -1));
+    int itemId = ItemDbToIdMgr()->GetItemID(lua_tostring(L, -1));
     if (itemId != 0) {
       ITEM_INFO item;
       item.SetItemId(itemId);
-      lua_pushnumber(L, ItemSlotsCount(item));
+      lua_pushnumber(L, item.SlotCount());
       return 1;
     }
   }
@@ -533,7 +554,7 @@ void EnchantMgrNullSub() {
 // FUNCTION: fn_05537
 void CEnchantMgr::AddPerfectEnchant(uint64_t group, uint32_t optionKey, const std::string& itemName, uint64_t cost,
                                     const std::map<std::string, int>& materials) {
-  int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(itemName);
+  int itemId = ItemDbToIdMgr()->GetItemID(itemName);
   if (itemId != 0) {
     m_enchants[group].options[optionKey].perfectEnchants[itemId].cost = cost;
     m_enchants[group].options[optionKey].perfectEnchants[itemId].materials = ConvertMaterials(materials);
@@ -544,9 +565,9 @@ void CEnchantMgr::AddPerfectEnchant(uint64_t group, uint32_t optionKey, const st
 // FUNCTION: fn_05538
 void CEnchantMgr::AddPerfectUpgradeEnchant(uint64_t group, uint32_t optionKey, const std::string& baseItemName, const std::string& itemName,
                                            uint64_t cost, const std::map<std::string, int>& materials) {
-  int baseItemId = CItemDBToIDMgr::GetInstance()->GetItemID(baseItemName);
+  int baseItemId = ItemDbToIdMgr()->GetItemID(baseItemName);
   if (baseItemId != 0) {
-    int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(itemName);
+    int itemId = ItemDbToIdMgr()->GetItemID(itemName);
     if (itemId != 0) {
       m_enchants[group].options[optionKey].perfectUpgrades[baseItemId][itemId].cost = cost;
       m_enchants[group].options[optionKey].perfectUpgrades[baseItemId][itemId].materials = ConvertMaterials(materials);
@@ -604,7 +625,7 @@ EnchantInfo* CEnchantMgr::GetEnchantInfo(uint64_t group) {
 std::map<int, int> CEnchantMgr::ConvertMaterials(std::map<std::string, int> materials) {
   std::map<int, int> result;
   for (auto it = materials.begin(); it != materials.end(); ++it) {
-    int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(it->first);
+    int itemId = ItemDbToIdMgr()->GetItemID(it->first);
     if (itemId != 0) {
       result[itemId] = it->second;
     }
@@ -654,7 +675,7 @@ bool CEnchantMgr::Init() {
 void CEnchantMgr::SetEnchant(uint64_t group, uint32_t optionKey, uint32_t slot, const std::map<std::string, uint64_t>& enchants) {
   std::map<int, uint64_t> items;
   for (auto it = enchants.begin(); it != enchants.end(); ++it) {
-    int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(it->first);
+    int itemId = ItemDbToIdMgr()->GetItemID(it->first);
     if (itemId != 0) {
       items[itemId] = it->second;
     }
@@ -913,7 +934,7 @@ int L_SetRandomUpgradeRequire(lua_State* L) {
   }
 
   CEnchantMgr* mgr = CEnchantMgr::GetInstance();
-  int itemId = CItemDBToIDMgr::GetInstance()->GetItemID(itemName);
+  int itemId = ItemDbToIdMgr()->GetItemID(itemName);
   if (itemId != 0) {
     mgr->m_enchants[id].options[optionKey].randomUpgrades[itemId].cost = cost;
     mgr->m_enchants[id].options[optionKey].randomUpgrades[itemId].materials = mgr->ConvertMaterials(materials);

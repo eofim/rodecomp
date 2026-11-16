@@ -7,6 +7,7 @@
 #include "Client/Session/Session.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Network/Connection/Connection.h"
+#include "Network/Packets/PacketId.h"
 #include "Network/Packets/PacketLengths.h"
 #include "UI/Window/InputFocus.h"
 #include "UI/Shop/UIBank_NewWnd.h"
@@ -24,6 +25,9 @@
 #include "UI/Status/UIHomunInfoWnd.h"
 #include "UI/Login/UILoginOTPWnd.h"
 #include "UI/Login/UILoginWnd.h"
+#include "UI/Dialogs/UIMessageBox.h"
+#include "UI/Status/UIPetInfoWnd.h"
+#include "UI/Dialogs/UINormalMB.h"
 #include "UI/Monster/UIMonsterInfoWnd.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Mode/CGameMode.h"
@@ -70,9 +74,29 @@ UIFrameWnd::UIFrameWnd(unsigned char cached)
     : UIWindow(cached), m_dragX(0), m_dragY(0), m_message0(600), m_message1(600) {
 }
 
+// OFFSET: 0x008A4E00
+// FUNCTION: fn_11677
+UICntWnd::~UICntWnd() = default;
+
 // OFFSET: 0x008A4E90
 // FUNCTION: fn_11678
 UIFrameWnd::~UIFrameWnd() = default;
+
+// OFFSET: 0x008A5050
+// FUNCTION: fn_11679
+__declspec(noinline) UILoginWnd::~UILoginWnd() = default;
+
+// OFFSET: 0x008A5220
+// FUNCTION: fn_11680
+UIMessageBox::~UIMessageBox() = default;
+
+// OFFSET: 0x008A54C0
+// FUNCTION: fn_11681
+UIPetInfoWnd::~UIPetInfoWnd() {
+  if (this->feedConfirmationWnd) {
+    g_windowMgr.Schedule(this->feedConfirmationWnd);
+  }
+}
 
 // OFFSET: 0x005C4640
 // FUNCTION: fn_03570
@@ -433,7 +457,7 @@ void UIReplayButton::OnLBtnUp(int x, int y) {
       this->parent->SendMsg(this, UM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
       this->parent->SendMsg(nullptr, UM_REFRESHBUTTON, 0, 0, 0, 0);
     } else {
-      g_modeMgr.gameMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
     }
   }
 
@@ -451,14 +475,14 @@ void UIMonsterInfoWnd::OnMouseHover(int x, int y) {
   int screenX = 0;
   int screenY = 0;
   this->ToScreen(screenX, screenY);
-  std::string name = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ActorName(g_session.m_monsterInfoActorId);
+  std::string name = g_modeMgr.GetGameMode()->ActorName(g_session.m_monsterInfoActorId);
   const std::size_t mark = name.find("#", 0);
   if (mark != std::string::npos) {
     name.erase(mark, name.size());
   }
 
   if (this->TextWidth(name.c_str(), 0, 0, 12, 0, 0) > 100) {
-    g_modeMgr.gameMode->ShowTooltip(name.c_str(), screenX + x, screenY + y, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(name.c_str(), screenX + x, screenY + y, -1, false, true);
   }
 }
 
@@ -470,11 +494,11 @@ int UIAllyGuildAcceptWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     switch (a) {
     case ID_OK:
       g_windowMgr.CloseWindow(WID_ALLYGUILDACCEPTWND);
-      g_modeMgr.gameMode->SendMsg(MM_ALLY_GUILD, this->identity, 1, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_ALLY_GUILD, this->identity, 1, 0, 0);
       break;
     case ID_CANCEL:
       g_windowMgr.CloseWindow(WID_ALLYGUILDACCEPTWND);
-      g_modeMgr.gameMode->SendMsg(MM_ALLY_GUILD, this->identity, 0, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_ALLY_GUILD, this->identity, 0, 0, 0);
       break;
     }
 
@@ -529,7 +553,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     return 0;
   case BANK_BUTTON_DEPOSIT: {
     PACKET_CZ_BANK_TRANSACTION packet;
-    if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsMenuWindowOpen() == true) {
+    if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == true) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_WRONG_GUN)), 255, 0, 0, 0);
       return 0;
     }
@@ -545,7 +569,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->m_status = LookupMessage(MSI_BANK_6_MINI);
     } else {
       packet.amount = static_cast<int>(amount);
-      packet.id = 0x9A7;
+      packet.id = ID_CZ_REQ_BANKING_DEPOSIT;
       packet.aid = g_session.m_aid;
       GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       this->m_status.clear();
@@ -554,7 +578,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   }
   case BANK_BUTTON_WITHDRAW: {
     PACKET_CZ_BANK_TRANSACTION packet;
-    if (g_modeMgr.GetGameMode() && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsMenuWindowOpen() == true) {
+    if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == true) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_WRONG_GUN)), 255, 0, 0, 0);
       return 0;
     }
@@ -570,7 +594,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->m_status = LookupMessage(MSI_ITEMMOVEINFO_CART);
     } else {
       packet.amount = static_cast<int>(amount);
-      packet.id = 0x9A9;
+      packet.id = ID_CZ_REQ_BANKING_WITHDRAW;
       packet.aid = g_session.m_aid;
       GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       this->m_status.clear();
@@ -618,7 +642,7 @@ int UICntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intpt
     return 0;
   case UM_COMMAND:
     if (a == ID_OK) {
-      CMode* mode = g_modeMgr.gameMode;
+      CMode* mode = g_modeMgr.currentMode;
       mode->SendMsg(this->m_event, std::atoi(this->m_edit->Text()), 0, 0, 0);
     }
     g_windowMgr.Schedule(this);
@@ -727,12 +751,12 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           } else if (talkType == 51) {
             talkType = 52;
           }
-          g_modeMgr.gameMode->SendMsg(MM_PROCESS_TALK_TYPE, talkType, reinterpret_cast<int>(parts), 0, 0);
+          g_modeMgr.currentMode->SendMsg(MM_PROCESS_TALK_TYPE, talkType, reinterpret_cast<int>(parts), 0, 0);
         }
       } else {
         g_windowMgr.chatInputText = buffer;
         const std::string name = this->memberList->lines[this->memberList->selected];
-        g_modeMgr.gameMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
+        g_modeMgr.currentMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
       }
 
       this->edit->PushHistory();
@@ -741,7 +765,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       return 0;
     }
     case ID_CLOSE:
-      g_modeMgr.gameMode->SendMsg(MM_REQ_EXIT_ROOM, 0, 0, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_REQ_EXIT_ROOM, 0, 0, 0, 0);
       return 0;
     case ID_NAME:
       g_windowMgr.SelectWhisperName(reinterpret_cast<const char*>(b));
@@ -750,7 +774,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       return 0;
     }
   case UM_MENU_SELECTED: {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     switch (this->menuCommands[a].second) {
     case MENUID_EXPEL: {
       if (this->memberList->selected == -1) {
@@ -1037,7 +1061,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     if (header.tag == 0x5014) {
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ROOM_IS_MADE)), 0xFFFF00, 0, 0, 0);
-      ChatRoomTitleInfo* settings = &static_cast<CGameMode*>(g_modeMgr.GetGameMode())->chatRoom;
+      ChatRoomTitleInfo* settings = &g_modeMgr.GetGameMode()->chatRoom;
       unsigned offset = 6;
       while (offset < size) {
         std::memcpy(&header, data + offset, sizeof(header));
@@ -1140,10 +1164,10 @@ UILoginOTPWnd::UILoginOTPWnd()
 UILoginWnd::UILoginWnd() : UIFrameWnd(0), savedAccounts(), loginTypeCombo(0), loginExtra("G000") {
   this->idEdit = nullptr;
   this->passwordEdit = nullptr;
-  this->padding_00C4 = 0;
+  this->unknown_00C4 = 0;
   this->saveId = 0;
-  this->padding_00CC = 1;
-  this->padding_00D0 = 0;
-  this->padding_00D4 = 0;
+  this->unknown_00CC = 1;
+  this->unknown_00D0 = 0;
+  this->unknown_00D4 = 0;
   this->backgroundWindow = nullptr;
 }

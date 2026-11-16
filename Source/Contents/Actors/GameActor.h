@@ -80,7 +80,7 @@ struct AiMessage {
 };
 
 class CMercenaryAI;
-class UIPcGage;
+class UIMonsterGage;
 
 class CGameActor : public EffectActor {
 public:
@@ -150,7 +150,7 @@ public:
   /* 02F4 */ int lastDamage;
   /* 02F8 */ int hasHp;
   /* 02FC */ int maxHp;
-  /* 0300 */ UIPcGage* hpGaugeWindow;
+  /* 0300 */ UIMonsterGage* hpGaugeWindow;
   /* 0304 */ unsigned char hpGaugeFlags;
   /* 0305 */ unsigned char hasSp;
   /* 0306 */ unsigned char padding_0306[2];
@@ -264,7 +264,6 @@ public:
   __declspec(noinline) int ActionBase(int state);
   void SetMonsterTransformJob(int value);
   void SetShapeShift(int value);
-  void SetMotionTintState(const std::uint32_t* value);
   bool FindRoute(int startX, int startY, int fractionX, int fractionY, int destX, int destY, int speed);
   std::string GetShapeShiftName();
   int MountType();
@@ -298,8 +297,6 @@ public:
   float GetNameOffset();
   float GetNameHeight();
   void SetStackedEffect(int effectId, bool on);
-  CSprRes* GetSprite();
-  float GetElapsedFrames();
   int GetGaugeCurrent();
   int GetGaugeMaximum();
   void ResetTransformJobs();

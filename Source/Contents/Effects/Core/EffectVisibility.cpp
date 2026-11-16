@@ -1,4 +1,5 @@
 #include "Contents/Effects/Core/EffectActor.h"
+#include "Contents/Actors/GameActor.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Core/RagEffect.h"
 #include "Contents/Effects/Core/RagEffectState.h"
@@ -16,8 +17,8 @@ bool CRagEffect::PartyEffectVisible() {
   }
 
   if (this->state.type == 232) {
-    CWorld* scene = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
-    const EffectActor* target = static_cast<const EffectActor*>(scene->GetGameActorByAidIncludeMe(static_cast<std::uint32_t>(this->state.deltaPos[1])));
+    CWorld* scene = g_modeMgr.GetGameMode()->scene;
+    const EffectActor* target = static_cast<const EffectActor*>(scene->GetGameActorByAidIncludeMe(static_cast<std::uint32_t>(this->state.deltaPos.y)));
 
     if (!target) {
       return false;

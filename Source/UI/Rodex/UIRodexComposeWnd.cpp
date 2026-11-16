@@ -41,6 +41,7 @@
 
 #include "Resource/MSGSTRINGID.h"
 #include "Network/Packets/PacketId.h"
+#include "UI/Login/UIPasswordWnd.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -103,14 +104,14 @@ void UIRodexComposeWnd::InsertItemTag(const ITEM_INFO& item) {
     }
   }
 
-  if (!static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->CanInsertTag(item.DisplayName(0), this->m_contents->geometry.width)) {
+  if (!this->m_tagCtrl->CanInsertTag(item.DisplayName(0), this->m_contents->geometry.width)) {
     return;
   }
 
-  static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->taggedText = std::string(this->m_contents->Text());
-  this->m_contents->SetText(static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->AppendTag(item.DisplayName(0)).c_str());
+  this->m_tagCtrl->taggedText = std::string(this->m_contents->Text());
+  this->m_contents->SetText(this->m_tagCtrl->AppendTag(item.DisplayName(0)).c_str());
   this->m_contents->MoveCursorToEnd();
-  static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->AddItemTag(item, 0xd630a9);
+  this->m_tagCtrl->AddItemTag(item, 0xd630a9);
 }
 
 // OFFSET: 0x007FF940
@@ -123,7 +124,7 @@ void UIRodexComposeWnd::InsertSkillTag(int tagId) {
     }
   }
 
-  if (static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->tags.size() >= 3) {
+  if (this->m_tagCtrl->tags.size() >= 3) {
     return;
   }
 
@@ -131,8 +132,8 @@ void UIRodexComposeWnd::InsertSkillTag(int tagId) {
     return;
   }
 
-  std::string tagText = static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->AddSkillTag(tagId, 0xd630a9);
-  static_cast<UIItemTagOnMail*>(this->m_tagCtrl)->taggedText = std::string(this->m_contents->Text());
+  std::string tagText = this->m_tagCtrl->AddSkillTag(tagId, 0xd630a9);
+  this->m_tagCtrl->taggedText = std::string(this->m_contents->Text());
 
   this->m_contents->SetText((this->m_contents->Text() + tagText).c_str());
   this->m_contents->MoveCursorToEnd();
@@ -192,7 +193,7 @@ void UIRodexComposeWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAtPoint(x, y);
   if (item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(15, item, item.quantity, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(15, item, item.quantity, -1);
   }
 }
 
@@ -204,7 +205,7 @@ void UIRodexComposeWnd::OnMouseHover(int x, int y) {
     int tooltipX = this->m_itemIndex * 34 + 30;
     int tooltipY = 290;
     this->ToScreen(tooltipX, tooltipY);
-    CMode* tooltip = g_modeMgr.gameMode;
+    CMode* tooltip = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
       std::uint32_t color = g_session.GetItemNameColor(item);
       tooltip->ShowTooltip(
@@ -249,7 +250,7 @@ UIRodexComposeWnd::UIRodexComposeWnd()
 // INLINED
 UIRodexComposeWnd::~UIRodexComposeWnd() {
   if (this->m_tagCtrl) {
-    static_cast<UIItemTagCtrl*>(this->m_tagCtrl)->ClearTags();
+    this->m_tagCtrl->ClearTags();
     delete this->m_tagCtrl;
   }
 }
@@ -284,7 +285,7 @@ void UIRodexComposeWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
   if (drag->source == 1) {
     if (drag->quantity == 1) {
@@ -390,7 +391,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
           body = this->m_contents->TakePendingText();
         }
 
-        auto* tagCtrl = static_cast<UIItemTagOnMail*>(this->m_tagCtrl);
+        auto* tagCtrl = this->m_tagCtrl;
         if (tagCtrl && tagCtrl->linkedText.size() != 0) {
           body = tagCtrl->linkedText.c_str();
         }
@@ -399,7 +400,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
         mail.recipientId = this->m_recipientId;
         mail.recipient = this->m_confirmedRecipientEdit->Text();
         mail.title = this->m_titleEdit->Text();
-        mail.body = body;
+        mail.body.assign(body.c_str(), body.size());
         mail.zeny = static_cast<int>(zeny);
         g_modeMgr.GetGameMode()->SendMsg(MM_SEND_MAIL, reinterpret_cast<int>(&mail), 0, 0, 0);
         return 0;
@@ -421,7 +422,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     this->Invalidate();
     return 0;
   case UM_DROP: {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     g_modeMgr.GetGameMode()->SendMsg(MM_ADD_MAIL_ITEM, mode->drag.id, mode->drag.quantity, 0, 0);
     g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return 0;
@@ -435,7 +436,7 @@ int UIRodexComposeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     }
     return 0;
   case UM_DECITEM: {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     g_modeMgr.GetGameMode()->SendMsg(MM_REMOVE_RODEX_ITEM, mode->drag.id, mode->drag.quantity, 0, 0);
     g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return 0;
@@ -465,7 +466,7 @@ void UIRodexComposeWnd::Paint() {
   this->DrawRightAlignedText(244, 316, FormatOwnedString("%d", static_cast<std::int16_t>(g_session.achievementResult)).c_str(), 0, 0, 11, 0x737373, 0);
 
   this->FillRegion(35, 347, 95, 16, 0xFFFFFF);
-  DrawRectangleBorder(*this, 35, 347, 95, 16, 0xA6A6A6);
+  this->DrawRectOutline(35, 347, 95, 16, 0xA6A6A6);
 
   this->DrawBitmap(19, 342, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\icon_zeny.bmp"))), true);
 
@@ -507,9 +508,9 @@ void UIRodexComposeWnd::Paint() {
   for (const auto& item : this->m_items) {
     this->DrawBitmap(itemX - 4, 319, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\shadow_item_on.bmp"))), true);
     if (this->m_tax <= g_session.m_zeny) {
-      DrawItemWithQuantity(*this, ResourceMgr::Instance(), itemX, 309, item, 0, 0);
+      this->DrawItemAndQuantity(itemX, 309, item, 0, 0);
     } else {
-      DrawItemWithQuantityAuxiliary(*this, 2, itemX, 309, item, item.identified, 0);
+      this->DrawItemAndQuantityAuxiliary(2, itemX, 309, item, item.identified, 0);
     }
     if (item.grade > 0) {
       this->DrawBitmap(itemX, 321, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", static_cast<int>(item.grade)).c_str()))), true);
@@ -518,18 +519,25 @@ void UIRodexComposeWnd::Paint() {
   }
 
   if (this->m_tagCtrl) {
-    auto* tagCtrl = static_cast<UIItemTagOnMail*>(this->m_tagCtrl);
+    auto* tagCtrl = this->m_tagCtrl;
     tagCtrl->SetLines(this->m_contents->wrappedLines);
     tagCtrl->SetTaggedText(this->m_contents->Text(), this->m_contents->geometry.width);
     tagCtrl->UpdateItemTags();
-    auto* editCtrl3 = static_cast<UIEditCtrl3*>(this->m_tagCtrl);
-    int diff = editCtrl3->verticalCursorStep - editCtrl3->lineHeight;
+    int diff = tagCtrl->linkedText.size() - tagCtrl->taggedText.size();
     this->m_contents->tagTextLength = std::max(0, diff);
     if (tagCtrl->previousTagCount == 0) {
       delete this->m_tagCtrl;
       this->m_tagCtrl = nullptr;
     }
   }
+}
+
+namespace {
+// INLINED
+inline void SetButtonText(UIBmpTextButton* button, std::string value) {
+  button->text = value;
+  button->Invalidate();
+}
 }
 
 // OFFSET: 0x007FFB90
@@ -587,7 +595,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
     this->m_confirmRecipientButton->AddTextStyle(2, 12, 0x313131, 0, 1, textX, textY);
     this->m_confirmRecipientButton->AddTextStyle(3, 12, 0xC2C2C2, 0, 0, textX, textY);
   }
-  this->m_confirmRecipientButton->SetText(LookupMessage(MSI_RODEX_TAB_RETURN));
+  SetButtonText(this->m_confirmRecipientButton, LookupMessage(MSI_RODEX_TAB_RETURN));
   this->m_confirmRecipientButton->Move(0xA2, 0x1A);
   this->m_confirmRecipientButton->SetId(0xD5);
   this->AddChild(this->m_confirmRecipientButton);
@@ -630,7 +638,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
   this->m_contents->maximum = 1000;
   const bool selected = g_skinInfo.Selected();
   const SkinPaletteCell cell = {1, 2};
-  const std::uint32_t color = SkinPaletteColor(ResourceMgr::Instance(), cell, selected);
+  const std::uint32_t color = g_skinInfo.PaletteColor(cell, selected);
   this->m_contents->Background(color & 0xFF, (color & 0xFFFF) >> 8, (color >> 16) & 0xFF);
   this->m_contents->TextColor(0x31, 0x31, 0x31, 0xFFFFFFFF);
   this->AddChild(this->m_contents);

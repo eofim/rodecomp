@@ -47,7 +47,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_SS_KINRYUUHOU : public CSkillAction {
@@ -56,7 +56,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_SS_ANTENPOU : public CSkillAction {
@@ -72,7 +72,7 @@ public:
   int GetSkillCastMotion() override;
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_SS_HITOUAKUMU : public CSkillAction {
@@ -89,7 +89,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_SS_FOUR_CHARM : public CSkillAction {
@@ -153,10 +153,10 @@ void CSkillAction_SS_RAIDENPOU::OnSkillEffect(int level, CGameActor* source, CGa
 
 // OFFSET: 0x00795860
 // FUNCTION: fn_08790
-void CSkillAction_SS_RAIDENPOU::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
+void CSkillAction_SS_RAIDENPOU::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (target) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("new_raidenpou_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("new_raidenpou_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -184,7 +184,7 @@ void CSkillAction_SS_KINRYUUHOU::OnSkillCast(int level, CGameActor* source) {
 // FUNCTION: fn_08794
 void CSkillAction_SS_KINRYUUHOU::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
   if (source && target) {
-    const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values);
+    const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
     EffectLists* effects = g_effectMgr;
     if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("kinryuuhou"), source->render.position, 0, -1, 0, 0)) {
       effect->SetAngle(angle);
@@ -194,10 +194,10 @@ void CSkillAction_SS_KINRYUUHOU::OnSkillEffect(int level, CGameActor* source, CG
 
 // OFFSET: 0x00795BD0
 // FUNCTION: fn_08795
-void CSkillAction_SS_KINRYUUHOU::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
+void CSkillAction_SS_KINRYUUHOU::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (target) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("kinryuuhou_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("kinryuuhou_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -253,10 +253,10 @@ void CSkillAction_SS_KAGEAKUMU::OnSkillCast(int level, CGameActor* source) {
 
 // OFFSET: 0x00795F60
 // FUNCTION: fn_08803
-void CSkillAction_SS_KAGEAKUMU::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
+void CSkillAction_SS_KAGEAKUMU::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  if (target) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("kageakumu"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("kageakumu"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -341,10 +341,10 @@ void CSkillAction_SS_ANKOKURYUUAKUMU::OnSkillEffect(int level, CGameActor* sourc
 
 // OFFSET: 0x00796690
 // FUNCTION: fn_08812
-void CSkillAction_SS_ANKOKURYUUAKUMU::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
+void CSkillAction_SS_ANKOKURYUUAKUMU::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  if (target) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("ankokuryuuakumu_01"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("ankokuryuuakumu_01"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -483,7 +483,7 @@ public:
 
 class CSkillAction_SS_FUUMASHOUAKU_HIT : public CSkillAction {
 public:
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_SS_KUNAIWAIKYOKU : public CSkillAction {
@@ -782,10 +782,10 @@ void CSkillAction_SS_FUUMAKOUCHIKU::OnGroundSkillEffect(vector3d position, int a
 
 // OFFSET: 0x00794350
 // FUNCTION: fn_08769
-void CSkillAction_SS_FUUMASHOUAKU_HIT::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  if (target) {
+void CSkillAction_SS_FUUMASHOUAKU_HIT::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  if (targetSkill) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("fuumakouchiku_blasting"), target->render.position, 0, -1, 0, 0);
+    effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("fuumakouchiku_blasting"), targetSkill->render.position, 0, -1, 0, 0);
   }
 }
 
@@ -809,7 +809,7 @@ void CSkillAction_SS_KUNAIWAIKYOKU::OnSkillCast(int level, CGameActor* source) {
 void CSkillAction_SS_KUNAIWAIKYOKU::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
   CGameActor* shadow = reinterpret_cast<CGameActor*>(argument3);
   if (shadow) {
-    const float angle = ScreenAngle(&shadow->render.position.x, &position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values);
+    const float angle = ScreenAngle(&shadow->render.position.x, &position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
     const vector3d spot = shadow->render.position;
     EffectLists* effects = g_effectMgr;
     if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("kunaiwaikyoku"), spot.x, spot.y, spot.z, 0, -1, 0, 0)) {

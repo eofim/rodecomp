@@ -39,7 +39,7 @@ class CSkillAction_SH_HOGOGONG_STRIKE : public CSkillAction {
 public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_SH_KI_SUL_WATER_SPRAYING : public CSkillAction {
@@ -125,14 +125,14 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_SH_HYUN_ROK_SPIRIT_POWER : public CSkillAction {
 public:
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 // OFFSET: 0x0079EB70
@@ -154,7 +154,7 @@ void CSkillAction_SH_CHUL_HO_SONIC_CLAW::OnSkillEffect(int level, CGameActor* so
     return;
   }
 
-  const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values);
+  const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
   const int waves[12] = {12, 1, 1, 3, 5, 5, 6, 7, 7, 9, 11, 11};
   const int index = static_cast<int>(angle + 105.0f) % 360 / 30;
   if (index >= 0 && static_cast<std::size_t>(index) < sizeof(waves) / sizeof(waves[0])) {
@@ -226,10 +226,10 @@ void CSkillAction_SH_HOGOGONG_STRIKE::OnSkillCast(int level, CGameActor* source)
 
 // OFFSET: 0x0079F2F0
 // FUNCTION: fn_08941
-void CSkillAction_SH_HOGOGONG_STRIKE::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
+void CSkillAction_SH_HOGOGONG_STRIKE::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  if (target) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("hogogong_strike"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("hogogong_strike"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -416,7 +416,7 @@ void CSkillAction_SH_HYUN_ROK_CANNON::OnSkillEffect(int level, CGameActor* sourc
   }
 
   const float angle = ScreenAngle(
-    &source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values
+    &source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values
   );
   EffectLists* effects = g_effectMgr;
   if (CEffect* effect =
@@ -536,12 +536,13 @@ void CSkillAction_SH_CHUL_HO_BATTERING::OnSkillEffect(int level, CGameActor* sou
 
 // OFFSET: 0x007A1630
 // FUNCTION: fn_08971
-void CSkillAction_SH_CHUL_HO_BATTERING::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
-    if (CEffect* effect = g_effectMgr->Spawn(
-          source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chul_ho_battering_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0
+void CSkillAction_SH_CHUL_HO_BATTERING::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (target) {
+    EffectLists* effects = g_effectMgr;
+    if (CEffect* effect = effects->Spawn(
+          target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chul_ho_battering_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0
         )) {
-      effect->SetFlipX(static_cast<bool>(reinterpret_cast<std::uintptr_t>(target) & 1));
+      effect->SetFlipX(static_cast<bool>(hitIndex & 1));
     }
   }
 }
@@ -578,10 +579,10 @@ void CSkillAction_SH_HYUN_ROK_SPIRIT_POWER::OnSkillEffect(int level, CGameActor*
 
 // OFFSET: 0x007A1D10
 // FUNCTION: fn_08974
-void CSkillAction_SH_HYUN_ROK_SPIRIT_POWER::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (source) {
+void CSkillAction_SH_HYUN_ROK_SPIRIT_POWER::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (target) {
     EffectLists* effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("hyun_rok_spirit_power_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("hyun_rok_spirit_power_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 

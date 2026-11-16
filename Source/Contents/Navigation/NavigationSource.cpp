@@ -6,10 +6,13 @@
 #include "Resource/ResourceMgr.h"
 #include "Utility/Text/FormatString.h"
 #include "UI/Navigation/UINavigationWnd.h"
+#include "UI/Navigation/UINavigationV4Wnd.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <windows.h>
+#include <shlwapi.h>
 
 template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
@@ -232,7 +235,7 @@ CNavigationManager::CNavigationManager() {
   for (int i = 0; i < 8; ++i) {
     std::memset(buffer, 0, sizeof(buffer));
     std::sprintf(buffer, "유저인터페이스\\navigation_interface3\\navi_grid%d_%d.tga", this->viewIcon, i);
-    this->labels[i].assign(buffer, std::strlen(buffer));
+    this->labels[i] = buffer;
   }
 
   this->drawDestination = false;
@@ -426,7 +429,7 @@ __forceinline NaviCell CNavigationManager::ParseCell(const char* text) {
 // FUNCTION: fn_19565
 NavigationTarget CNavigationManager::ReadTarget(const char* data, int size) {
   NavigationTarget target;
-  target.type = *reinterpret_cast<const int*>(data);
+  target.type = reinterpret_cast<const NaviTargetRecord*>(data)->type;
   std::vector<char> buffer(size - 3, '\0');
   if (target.type == 1 || target.type == 0) {
     std::memcpy(buffer.data(), data + 4, size - 4);
@@ -458,12 +461,12 @@ CNavi_Object* CNavigationManager::ReadTargetObject(const char* record) {
   std::string name(record + offset, record + offset + length);
   offset += length;
 
-  length = *reinterpret_cast<const std::int16_t*>(record + offset);
+  length = reinterpret_cast<const NaviStringRecord*>(record + offset)->length;
   offset += 2;
   std::string title(record + offset, record + offset + length);
   offset += length;
 
-  length = *reinterpret_cast<const std::int16_t*>(record + offset);
+  length = reinterpret_cast<const NaviStringRecord*>(record + offset)->length;
   offset += 2;
   std::string map(record + offset, record + offset + length);
 
@@ -477,12 +480,11 @@ CNavi_Object* CNavigationManager::ReadTargetObject(const char* record) {
     if (npc != nullptr && std::strcmp(npc->GetName(), name.c_str()) == 0) {
       return npc;
     }
-    return nullptr;
-  }
-
-  CNavi_Object* mob = info->FindMobByName(name.c_str());
-  if (mob != nullptr) {
-    return mob;
+  } else {
+    CNavi_Object* mob = info->FindMobByName(name.c_str());
+    if (mob != nullptr) {
+      return mob;
+    }
   }
   return nullptr;
 }
@@ -496,7 +498,7 @@ std::vector<char> CNavigationManager::WriteTarget(NavigationTarget target) {
   }
 
   buffer.resize(sizeof(int), '\0');
-  *reinterpret_cast<int*>(buffer.data()) = target.type;
+  reinterpret_cast<NaviTargetRecord*>(buffer.data())->type = target.type;
 
   if (target.type == 1 || target.type == 0) {
     std::string name = static_cast<CNaviInfo*>(target.object)->GetName();
@@ -537,16 +539,141 @@ __declspec(noinline) std::vector<char> CNavigationManager::WriteObject(CNavi_Obj
     std::memcpy(buffer.data() + 0x12, name.c_str(), length);
     std::size_t offset = length + 0x12;
     length = static_cast<std::int16_t>(title.size());
-    *reinterpret_cast<std::int16_t*>(buffer.data() + offset) = length;
+    reinterpret_cast<NaviStringRecord*>(buffer.data() + offset)->length = length;
     offset += 2;
     std::memcpy(buffer.data() + offset, title.c_str(), length);
     offset += length;
     length = static_cast<std::int16_t>(map.size());
-    *reinterpret_cast<std::int16_t*>(buffer.data() + offset) = length;
+    reinterpret_cast<NaviStringRecord*>(buffer.data() + offset)->length = length;
     std::memcpy(buffer.data() + offset + 2, map.c_str(), length);
   }
 
   return buffer;
+}
+
+// OFFSET: 0x00B8EC70
+// FUNCTION: fn_19501
+void CNaviInfo::CollectMobsInRange(int minimum, int maximum, std::vector<NavigationTarget>& out) {
+  NavigationTarget target(3, nullptr);
+  const std::vector<CNavi_Object*>::iterator end = this->mobs.end();
+  for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != end; ++it) {
+    NaviCell lower;
+    NaviCell upper;
+    if (minimum <= (*it)->GetCell(&lower)->x && maximum >= (*it)->GetCell(&upper)->x) {
+      NaviCell cell;
+      const NaviCell* position = (*it)->GetCell(&cell);
+      target.x = position->x;
+      target.y = position->y;
+      target.name = (*it)->GetName();
+      target.object = *it;
+      out.push_back(target);
+    }
+  }
+}
+
+// OFFSET: 0x00B8FC40
+// FUNCTION: fn_19505
+void CNaviInfo::CollectMobsByTitle(std::string title, std::vector<NavigationTarget>& out) {
+  NavigationTarget target(3, nullptr);
+  for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != this->mobs.end(); ++it) {
+    if (std::strcmp((*it)->GetTitle(), title.c_str()) == 0) {
+      NaviCell cell;
+      const NaviCell* position = (*it)->GetCell(&cell);
+      target.x = position->x;
+      target.y = position->y;
+      target.name = (*it)->GetName();
+      target.object = *it;
+      out.push_back(target);
+    }
+  }
+}
+
+// OFFSET: 0x00B8E970
+// FUNCTION: fn_19500
+void CNaviInfo::CollectTargets(int type, std::vector<NavigationTarget>& out) {
+  NavigationTarget target(type, nullptr);
+
+  if (std::strstr(this->name.c_str(), "_in") == nullptr && (type == 1 || type == 0)) {
+    target.name = this->name.c_str();
+    target.object = this;
+    target.type = 1;
+    out.push_back(target);
+  }
+
+  if (type == 2 || type == 0) {
+    target.type = 2;
+    const std::vector<CNavi_Object*>::iterator end = this->npcs.end();
+    for (std::vector<CNavi_Object*>::iterator it = this->npcs.begin(); it != end; ++it) {
+      NaviCell cell;
+      const NaviCell* position = (*it)->GetCell(&cell);
+      target.x = position->x;
+      target.y = position->y;
+      target.name = (*it)->GetName();
+      target.object = *it;
+      out.push_back(target);
+    }
+  }
+
+  if (type == 3 || type == 0) {
+    target.type = 3;
+    const std::vector<CNavi_Object*>::iterator end = this->mobs.end();
+    for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != end; ++it) {
+      NaviCell cell;
+      const NaviCell* position = (*it)->GetCell(&cell);
+      target.x = position->x;
+      target.y = position->y;
+      target.name = (*it)->GetName();
+      target.object = *it;
+      out.push_back(target);
+    }
+  }
+}
+
+// OFFSET: 0x00B8EE50
+// FUNCTION: fn_19502
+void CNaviInfo::SearchMap(const std::vector<std::string>& keywords, std::vector<NavigationTarget>& out) {
+  NavigationTarget target(1, nullptr);
+  wchar_t buffer[100];
+  std::memset(buffer, 0, sizeof(buffer));
+
+  std::vector<std::wstring> wideKeywords;
+  for (const std::string& keyword : keywords) {
+    MultiByteToWideChar(CP_ACP, 0, keyword.c_str(), -1, buffer, 100);
+    wideKeywords.push_back(std::wstring(buffer));
+  }
+
+  std::string text = this->name;
+  text.push_back(' ');
+  text += this->title;
+  text.push_back(' ');
+  MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, buffer, 100);
+  const std::wstring wideText(buffer);
+
+  const char* mapName = this->name.c_str();
+  if (std::strcmp(mapName, "gl_in01") != 0 && std::strstr(mapName, "_in") != nullptr) {
+    return;
+  }
+
+  bool matched = true;
+  for (const std::wstring& keyword : wideKeywords) {
+    matched &= StrStrIW(wideText.c_str(), keyword.c_str()) != nullptr;
+  }
+  if (!matched) {
+    return;
+  }
+
+  target.name = this->name;
+  target.object = this;
+  out.push_back(target);
+
+  target.type = 3;
+  for (CNavi_Object* mob : this->mobs) {
+    target.x = -1000;
+    target.y = -1000;
+    target.name = mob->GetName();
+    target.object = mob;
+    out.push_back(target);
+  }
 }
 
 // OFFSET: 0x00B92A70
@@ -576,19 +703,19 @@ CNavi_Link* CNavigationManager::ReadObject(const char* record) {
   std::string name(record + offset, record + offset + length);
   offset += length;
 
-  length = *reinterpret_cast<const std::int16_t*>(record + offset);
+  length = reinterpret_cast<const NaviStringRecord*>(record + offset)->length;
   offset += 2;
   std::string title(record + offset, record + offset + length);
   offset += length;
 
-  length = *reinterpret_cast<const std::int16_t*>(record + offset);
+  length = reinterpret_cast<const NaviStringRecord*>(record + offset)->length;
   offset += 2;
   std::string map(record + offset, record + offset + length);
   offset += length;
 
-  const int linkedCellX = *reinterpret_cast<const int*>(record + offset);
-  const int linkedCellY = *reinterpret_cast<const int*>(record + offset + 4);
-  length = *reinterpret_cast<const std::int16_t*>(record + offset + 8);
+  const int linkedCellX = reinterpret_cast<const NaviLinkedMapRecord*>(record + offset)->cellX;
+  const int linkedCellY = reinterpret_cast<const NaviLinkedMapRecord*>(record + offset)->cellY;
+  length = reinterpret_cast<const NaviLinkedMapRecord*>(record + offset)->nameLength;
   offset += 10;
   std::string linkedMap(record + offset, record + offset + length);
 
@@ -649,7 +776,7 @@ int CNavigationManager::RouteFromPlayer() {
   NaviCell player;
   player.x = 0;
   player.y = 0;
-  if (CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) {
+  if (CGameMode* mode = g_modeMgr.GetGameMode()) {
     mode->PlayerCell(&player.x, &player.y);
   }
 
@@ -702,7 +829,7 @@ int CNavigationManager::RouteFromPlayer() {
     return result;
   }
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode && mode->scene && mode->scene->terrain) {
     this->ground = mode->scene->ground;
     this->pathFinder.attr = mode->scene->terrain;

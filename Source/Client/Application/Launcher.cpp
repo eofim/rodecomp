@@ -1618,7 +1618,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
   ResourceMgr::Instance().UnloadAll();
   g_texMgr.Clear();
   SaveDisplayDeviceSettings();
-  GetRenderSystemHolder()->DestroySurface(reinterpret_cast<CSurface*>(g_renderer));
+  GetRenderSystemHolder()->DestroyRenderer(g_renderer);
   GetRenderSystemHolder()->Close();
 
   MSG message;
@@ -1644,7 +1644,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
     if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {
       g_windowDragging = false;
       if (g_serviceOptions.Get(ServiceOption::ConfineCursor)) {
-        ClipApplicationCursor(hWnd);
+        ClipApplicationCursor();
       }
     }
   }

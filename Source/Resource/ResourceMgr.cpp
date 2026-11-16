@@ -44,7 +44,7 @@ __declspec(noinline) bool ResourceNameLess::operator()(const ResourceName* left,
 
 // INLINED
 ResourceMgr::ResourceMgr() {
-  for (std::uint32_t& value : this->padding_004C) {
+  for (std::uint32_t& value : this->unknown_004C) {
     value = 0;
   }
   InitializeCriticalSection(&this->m_lock);
@@ -123,7 +123,7 @@ bool ResourceMgr::Exists(const char* name) {
     return false;
   }
 
-  const std::string resolved = AddResourcePrefix(normalized, this->m_prefixes[type]);
+  const std::string resolved = ::AddResourcePrefix(normalized, this->m_prefixes[type]);
   if (CRes* existing = this->Find(type, resolved.c_str())) {
     existing->lastUse = timeGetTime();
     return true;
@@ -154,7 +154,7 @@ __forceinline CRes* ResourceMgr::LoadNamed(const char* name) {
       return nullptr;
     }
 
-    resolved = AddResourcePrefix(this->Resolve(normalized), this->m_prefixes[type]);
+    resolved = ::AddResourcePrefix(this->Resolve(normalized), this->m_prefixes[type]);
     if (CRes* existing = this->Find(type, resolved.c_str())) {
       existing->lastUse = timeGetTime();
       return existing;

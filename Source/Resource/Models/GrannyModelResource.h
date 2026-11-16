@@ -55,9 +55,16 @@ struct granny_material_binding {
   /* 0000 */ granny_material* material;
 };
 
+struct granny_vertex_data;
+struct granny_morph_target;
+struct granny_tri_topology;
+
 struct granny_mesh {
   /* 0000 */ const char* name;
-  /* 0004 */ unsigned char vertexAndTopologyData[0x10];
+  /* 0004 */ granny_vertex_data* primaryVertexData;
+  /* 0008 */ std::int32_t morphTargetCount;
+  /* 000C */ granny_morph_target* morphTargets;
+  /* 0010 */ granny_tri_topology* primaryTopology;
   /* 0014 */ std::int32_t materialBindingCount;
   /* 0018 */ granny_material_binding* materialBindings;
 };
@@ -100,6 +107,8 @@ struct GrannyPNT332Vertex {
   /* 000C */ float normal[3];
   /* 0018 */ float uv[2];
 };
+
+static_assert(sizeof(GrannyPNT332Vertex) == 0x20);
 
 struct granny_system_clock {
   /* 0000 */ std::uint32_t data[4];
@@ -232,7 +241,7 @@ public:
   granny_control* PlayAnimation(unsigned action, granny_model_instance* instance, granny_control* control, int loopCount);
   bool ProjectBounds(float* rect, const matrix& view, const matrix& world, const float* eye) const;
   int GetTriangleCount(int mesh) const;
-  unsigned char* GetRigidVertices(int mesh) const;
+  const void* GetRigidVertices(int mesh) const;
   const void* GetMeshRenderData(
     int mesh, CTexture** texture, std::uint16_t** indices, int* triangleCount, matrix* transform, granny_world_pose* pose
   );
@@ -252,7 +261,7 @@ public:
   /* 026C */ int modelCount;
   /* 0270 */ GrannyModelInstance* instance;
   /* 0274 */ int maxBoneCount;
-  /* 0278 */ void* localPose;
+  /* 0278 */ granny_local_pose* localPose;
   /* 027C */ int deformBufferSize;
   /* 0280 */ int animationMode;
   /* 0284 */ int padding_0284;

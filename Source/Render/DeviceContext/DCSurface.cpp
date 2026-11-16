@@ -65,9 +65,9 @@ HRESULT RenderSystemHolder::Close() {
 
 // OFFSET: 0x00569FA0
 // FUNCTION: fn_02279
-void RenderSystemHolder::DestroySurface(CSurface* surface) {
+void RenderSystemHolder::DestroyRenderer(CRenderer* renderer) {
   if (this->system) {
-    this->system->DestroySurface(surface);
+    this->system->DestroyRenderer(renderer);
   }
 }
 
@@ -270,7 +270,7 @@ void CDCSurface::DrawRleSprite(int, int, const CSprRes&, const ActionFrame&, con
 
 // OFFSET: 0x00549240
 // FUNCTION: fn_01871
-void CDCSurface::DrawSurface(int, int, CSurface*, int, int, int, int, bool, int, int, int) {
+void CDCSurface::DrawSurface(int, int, CSurface*, int, int, int, int, int, int, int, int) {
 }
 
 // OFFSET: 0x00549220

@@ -87,6 +87,8 @@
 #include "Utility/Cipher/Obfuscate.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Dialogs/UIMenuWnd.h"
+#include "UI/Login/UISecondPasswordEditWnd.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -107,6 +109,15 @@
 #include <timeapi.h>
 
 #pragma pack(push, 1)
+struct CharacterAuthCodePacket {
+  /* 0000 */ std::int16_t id;
+  /* 0002 */ std::int16_t length;
+  /* 0004 */ int authChallengeId;
+  /* 0008 */ char code[10];
+};
+
+static_assert(sizeof(CharacterAuthCodePacket) == 0x12);
+
 struct CharacterSlotsPacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ std::uint16_t length;
@@ -281,18 +292,8 @@ struct ChangeCharacterNamePacket {
 };
 #pragma pack(pop)
 
-struct CharServerEndpoint {
-  /* 0000 */ char ip[16];
-  /* 0010 */ int port;
-  /* 0014 */ char host[129];
-};
-
-#if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(CharServerEndpoint) == 0x98);
-#endif
-
 // GLOBAL: gl_25386
-CharServerEndpoint g_charServerEndpoint;
+ConnectionEndpoint g_charServerEndpoint;
 
 // GLOBAL: gl_25387
 std::uint32_t g_charServerIp;
@@ -607,7 +608,7 @@ void CLoginMode::ReceiveCharacterSlots(const CharacterSlotsPacket* packet) {
   SecureZeroMemory(this->characters, sizeof(this->characters));
   g_session.characterSlotState = 0;
   this->receivedCharacterCount = 0;
-  this->padding_01DC = 0;
+  this->receivedCharacterPages = 0;
 
   this->slotExtension = packet->extension;
   this->slotExtension.code = htonl(this->slotExtension.code);
@@ -1001,7 +1002,7 @@ void CLoginMode::SubD97780(int value) {
     if (g_serviceType == ServiceThai || g_serviceType == ServicePhilippine) {
       if (static_cast<int>(timeGetTime()) > this->otpStarted + 0x3A98) {
         if (this->waitWnd == nullptr) {
-          this->waitWnd = g_windowMgr.EnsureWindow(WID_WAITWND);
+          this->waitWnd = static_cast<UIWaitWnd*>(g_windowMgr.EnsureWindow(WID_WAITWND));
           if (this->waitWnd == nullptr) {
             break;
           }
@@ -1310,7 +1311,7 @@ void CLoginMode::ReceiveLoginErrorDetail(const LoginErrorDetailPacket* packet) {
     memcpy_s(g_session.m_loginErrorText, sizeof(g_session.m_loginErrorText), packet->text,
       std::min<std::size_t>(sizeof(g_session.m_loginErrorText), length));
     GetRagConnection().Close();
-    g_modeMgr.gameMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
     break;
   }
   case 400:
@@ -1335,7 +1336,7 @@ void CLoginMode::ReceiveLoginErrorDetail(const LoginErrorDetailPacket* packet) {
     const char* parametersText = OBFUSCATE_ARRAY_TEXT("http://ro.gnjoy.com/", 0x8783C33941E15117ULL, char);
     const char* fileText = OBFUSCATE_ARRAY_TEXT("http://ro.gnjoy.com/", 0x1767DDE18D779D8BULL, char);
     ShellExecuteA(nullptr, OBFUSCATE_ARRAY_TEXT("OPEN", 0xC1BB8111EDD183E1ULL, char), fileText, parametersText, nullptr, SW_SHOW);
-    g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
     return;
   }
   case 1200:
@@ -1384,7 +1385,7 @@ void CLoginMode::ReceiveLoginError(const LoginErrorPacket* packet) {
     memcpy_s(g_session.m_loginErrorText, sizeof(g_session.m_loginErrorText), packet->text,
       std::min<std::size_t>(sizeof(g_session.m_loginErrorText), length));
     GetRagConnection().Close();
-    g_modeMgr.gameMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
     break;
   }
   case 400:
@@ -1515,7 +1516,7 @@ ConnectionEndpoint g_zoneServerEndpoint;
 // FUNCTION: fn_22290
 void CLoginMode::ConnectZoneServer(std::uint32_t gid, std::string mapName, std::uint32_t ip, int port, std::string host) {
   g_session.m_gid = gid;
-  g_modeMgr.gameMode->SendMsg(LMM_SELECT_CHARACTER, static_cast<unsigned char>(g_selectedSlotIndex), 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(LMM_SELECT_CHARACTER, static_cast<unsigned char>(g_selectedSlotIndex), 0, 0, 0);
   if (g_windowMgr.newSelectCharWnd) {
     g_windowMgr.Schedule(g_windowMgr.newSelectCharWnd);
   }
@@ -2157,7 +2158,7 @@ CLoginMode::CLoginMode() : wallpaperName(), noticeCommands(), padding_6F2C(), ac
   this->passwordRetryCount = 0;
   SecureZeroMemory(this->characters, sizeof(this->characters));
   this->receivedCharacterCount = 0;
-  this->padding_01DC = 0;
+  this->receivedCharacterPages = 0;
   this->characterDeleted = false;
 }
 
@@ -2327,7 +2328,7 @@ void CLoginMode::PollNetworkStatus() {
 
   memset(g_gameModePacketBuffer, 0, sizeof(g_gameModePacketBuffer));
   if (!GetRagConnection().Update()) {
-    g_modeMgr.gameMode->SendMsg(MM_SOCKETERROR, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_SOCKETERROR, 0, 0, 0, 0);
   }
 
   if (g_charServerAccountIdPending == 1) {
@@ -2342,7 +2343,7 @@ void CLoginMode::PollNetworkStatus() {
     switch (GetRagConnection().GetPacketType(reinterpret_cast<const char*>(g_gameModePacketBuffer))) {
     case ID_AC_ACCEPT_LOGIN:
     case ID_HC_ACCEPT_MAKECHAR:
-    case ID_PING:
+    case ID_CZ_PING:
     case ID_ZC_AID:
     case ID_HC_UPDATE_CHARINFO:
     case ID_AC_SHUTDOWN_INFO:
@@ -2685,7 +2686,7 @@ void CLoginMode::PollNetworkStatus() {
       case 0:
         g_windowMgr.CloseWindow(WID_SECONDPASSWORDINPUTWND);
         g_windowMgr.Confirm(LookupMessage(MSI_SECOND_PASSWDRD_NOT_AVAILABLE_SUCCESS), 0, true, false, 0, "Message", 280, 120, 0);
-        static_cast<UINewSelectCharWnd*>(g_windowMgr.newSelectCharWnd)->EnableButtonById(0x1A2);
+        g_windowMgr.newSelectCharWnd->EnableButtonById(0x1A2);
         g_session.m_passwordWndMode = 1;
         break;
       case 1:
@@ -2701,7 +2702,7 @@ void CLoginMode::PollNetworkStatus() {
       case 0:
         g_windowMgr.CloseWindow(WID_SECONDPASSWORDINPUTWND);
         g_windowMgr.Confirm(LookupMessage(MSI_SECOND_PASSWDRD_AVAILABLE_SUCCESS), 0, true, false, 0, "Message", 280, 120, 0);
-        static_cast<UINewSelectCharWnd*>(g_windowMgr.newSelectCharWnd)->DisableButtonById(0x1A2);
+        g_windowMgr.newSelectCharWnd->DisableButtonById(0x1A2);
         break;
       case 1:
         g_windowMgr.CloseWindow(WID_SECONDPASSWORDINPUTWND);
@@ -2864,7 +2865,7 @@ void CLoginMode::PollNetworkStatus() {
     }
     case ID_HC_UPDATE_CHARINFO2: {
       const CharacterInfoPacket* packet = reinterpret_cast<const CharacterInfoPacket*>(g_gameModePacketBuffer);
-      CharacterInfo* character = reinterpret_cast<CharacterInfo*>(g_modeMgr.gameMode->SendMsg(MM_QUERYCHARICTORINFO, packet->info.slot, 0, 0, 0));
+      CharacterInfo* character = reinterpret_cast<CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, packet->info.slot, 0, 0, 0));
       if (character && character->gid == g_session.m_renameGid) {
         *character = packet->info;
         StringFormat(character->mapName, sizeof(character->mapName), static_cast<std::size_t>(-1), "%s", g_session.GatName2RswName(character->mapName));
@@ -2908,13 +2909,14 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
         : nullptr
     );
     if (buffer) {
-      *reinterpret_cast<std::int16_t*>(buffer) = 0x9A3;
-      *reinterpret_cast<int*>(buffer + 4) = this->authChallengeId;
-      StringFormat(reinterpret_cast<char*>(buffer + 8), 10, static_cast<std::size_t>(-1), this->m_authCode);
-      *reinterpret_cast<std::int16_t*>(buffer + 2) = 14;
-      GetRagConnection().Send(*reinterpret_cast<std::int16_t*>(buffer + 2), buffer);
-      this->waitWnd = g_windowMgr.EnsureWindow(WID_WAITWND);
-      static_cast<UIWaitWnd*>(this->waitWnd)->SetMessage(LookupMessage(MSI_WAITING_RESPONSE_FROM_SERVER), 16, 1);
+      CharacterAuthCodePacket* packet = reinterpret_cast<CharacterAuthCodePacket*>(buffer);
+      packet->id = 0x9A3;
+      packet->authChallengeId = this->authChallengeId;
+      StringFormat(packet->code, 10, static_cast<std::size_t>(-1), this->m_authCode);
+      packet->length = 14;
+      GetRagConnection().Send(packet->length, buffer);
+      this->waitWnd = static_cast<UIWaitWnd*>(g_windowMgr.EnsureWindow(WID_WAITWND));
+      this->waitWnd->SetMessage(LookupMessage(MSI_WAITING_RESPONSE_FROM_SERVER), 16, 1);
       _freea(buffer);
     }
     return 0;
@@ -2984,8 +2986,8 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     packet.id = ID_CT_MOTP;
     memcpy_s(packet.code, sizeof(packet.code), this->m_authCode, sizeof(packet.code));
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
-    this->waitWnd = g_windowMgr.EnsureWindow(WID_WAITWND);
-    static_cast<UIWaitWnd*>(this->waitWnd)->SetMessage(LookupMessage(MSI_WAITING_RESPONSE_FROM_SERVER), 16, 1);
+    this->waitWnd = static_cast<UIWaitWnd*>(g_windowMgr.EnsureWindow(WID_WAITWND));
+    this->waitWnd->SetMessage(LookupMessage(MSI_WAITING_RESPONSE_FROM_SERVER), 16, 1);
     return 0;
   }
   case LMM_CONNECT_TO_ACSVR:
@@ -2997,7 +2999,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     return reinterpret_cast<int>(this->billingInfo);
   case LMM_SET_EMAIL_ADDRESS:
     g_windowMgr.InvalidateAll();
-    strcpy(reinterpret_cast<char*>(this->billingInfo), reinterpret_cast<const char*>(argument1));
+    strcpy(this->billingInfo, reinterpret_cast<const char*>(argument1));
     return 0;
   case LMM_GET_MAKING_CHAR_NAME:
     return reinterpret_cast<int>(&this->makingCharNameFirstByte);
@@ -3089,7 +3091,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
         g_session.InvalidateWindowFrames();
         g_session.m_jobLevel = this->characters[i].jobLevel;
         g_session.InvalidateWindowFrames();
-        g_session.m_characterFlags = this->characters[i].characterFlags[0];
+        g_session.m_characterFlags = this->characters[i].characterFlags;
         g_session.m_head = this->characters[i].head;
         g_session.m_weapon = 0;
         g_session.m_weaponLeft = 0;
@@ -3111,7 +3113,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
   }
   case LMM_GOTOSELECTACCOUNT:
     if (argument2 == 201) {
-      g_modeMgr.gameMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
+      g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
       return 0;
     }
     this->pendingCursorType = 2;
@@ -3150,7 +3152,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     this->pendingCursorType = 3;
     return 0;
   case LMM_SET_LOGIN_EXTRA:
-    strcpy(reinterpret_cast<char*>(this->loginExtra), reinterpret_cast<const char*>(argument1));
+    strcpy(this->loginExtra, reinterpret_cast<const char*>(argument1));
     return 0;
   case LMM_DISCONNECT_ACSVR:
     GetRagConnection().Close();
@@ -3176,11 +3178,11 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     g_session.m_accountName = servers[argument1].address.name;
     const int selected = this->selectedServer;
     const std::uint32_t ip = servers[selected].address.ip;
-    CharServerEndpoint endpoint;
-    wsprintfA(endpoint.ip, OBFUSCATE_BYTES_TEXT("%d.%d.%d.%d", 0xF161095D0DE18F95ULL), ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, ip >> 24);
+    ConnectionEndpoint endpoint;
+    wsprintfA(endpoint.address, OBFUSCATE_BYTES_TEXT("%d.%d.%d.%d", 0xF161095D0DE18F95ULL), ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, ip >> 24);
     const int selected2 = this->selectedServer;
     endpoint.port = servers[selected2].address.port;
-    StringFormat(endpoint.host, sizeof(endpoint.host), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0x2BAD156DE3E1F9D9ULL), servers[selected2].domain);
+    StringFormat(endpoint.overrideAddress, sizeof(endpoint.overrideAddress), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0x2BAD156DE3E1F9D9ULL), servers[selected2].domain);
     g_charServerEndpoint = endpoint;
     g_charServerIp = servers[this->selectedServer].address.ip;
     g_session.m_serverName = servers[this->selectedServer].address.name;
@@ -3242,7 +3244,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     }
   }
   case LMM_SELECT_REPLAY_DATA:
-    reinterpret_cast<unsigned char*>(&GetRagConnection())[0x6C] = 1;
+    GetRagConnection().m_replayMode = 1;
     this->pendingCursorType = 27;
     return 0;
   case LMM_START_REPLAY:
@@ -3250,7 +3252,7 @@ int CLoginMode::SendMsg(int event, int argument1, int argument2, int argument3, 
     this->pendingCursorType = 28;
     return 0;
   case LMM_REPLAY_SELECT_SERVER:
-    reinterpret_cast<unsigned char*>(&GetRagConnection())[0x6C] = 0;
+    GetRagConnection().m_replayMode = 0;
     g_session.m_aid = ReplayFileList::Instance().selectionState;
     g_session.SetFlag(static_cast<char>(ReplayFileList::Instance().dialogState));
     this->pendingCursorType = 6;
@@ -3559,22 +3561,22 @@ void CLoginMode::OnChangeState(int value) {
     this->SendMsg(LMM_RESET_TO_LOGIN, 0, 0, 0, 0);
     break;
   case 38: {
-    CharServerEndpoint endpoint;
+    ConnectionEndpoint endpoint;
     std::memset(&endpoint, 0, sizeof(endpoint));
     if (!std::strstr(g_session.m_launchServerName, "Dev")) {
       const int port = rand() % 3 + 6951;
       const std::array<std::uint8_t, 26> hostSource = OBFUSCATE_SOURCE_BYTES(26, "kro-agency.ragnarok.co.kr", 0x7941D76335CFA14FULL);
       thread_local EncryptedName<sizeof(hostSource), 0x7941D76335CFA14FULL> host(hostSource);
       const char* hostText = host.Text();
-      StringFormat(endpoint.host, sizeof(endpoint.host), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s:%d", 0x7321C3814F8799E1ULL), hostText, port);
+      StringFormat(endpoint.overrideAddress, sizeof(endpoint.overrideAddress), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s:%d", 0x7321C3814F8799E1ULL), hostText, port);
     } else {
       const std::array<std::uint8_t, 34> hostSource = OBFUSCATE_SOURCE_BYTES(34, "kro-qm-agency.ragnarok.co.kr:6951", 0x7115D9F973F913C9ULL);
       thread_local EncryptedName<sizeof(hostSource), 0x7115D9F973F913C9ULL> host(hostSource);
       const char* hostText = host.Text();
-      StringFormat(endpoint.host, sizeof(endpoint.host), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0xCB1D253B7FE1F563ULL), hostText);
+      StringFormat(endpoint.overrideAddress, sizeof(endpoint.overrideAddress), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0xCB1D253B7FE1F563ULL), hostText);
     }
 
-    this->connectionReady = GetRagConnection().Connect(*reinterpret_cast<const ConnectionEndpoint*>(&endpoint));
+    this->connectionReady = GetRagConnection().Connect(endpoint);
     if (!this->connectionReady) {
       GetRagConnection().Close();
       if (g_windowMgr.Confirm(LookupMessage(MSI_SERVER_CONNECTION_FAILED), 1, true, true, 0, "Message", 280, 120, 0) != 0x10D) {
@@ -3593,11 +3595,11 @@ void CLoginMode::OnChangeState(int value) {
     char password[33] = {};
     StringFormat(password, sizeof(password), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0xEF6D1D893F2B2DC5ULL), this->m_password);
     DecryptRijndael256(password, packet.password);
-    StringFormat(packet.extra, sizeof(packet.extra), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0x39A39F87DD5F535BULL), reinterpret_cast<const char*>(this->loginExtra));
+    StringFormat(packet.extra, sizeof(packet.extra), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0x39A39F87DD5F535BULL), this->loginExtra);
     GetRagConnection().Send(sizeof(packet), &packet);
     this->otpStarted = timeGetTime();
-    this->waitWnd = g_windowMgr.EnsureWindow(WID_WAITWND);
-    static_cast<UIWaitWnd*>(this->waitWnd)->SetMessage(LookupMessage(MSI_WAITING_RESPONSE_FROM_SERVER), 16, 1);
+    this->waitWnd = static_cast<UIWaitWnd*>(g_windowMgr.EnsureWindow(WID_WAITWND));
+    this->waitWnd->SetMessage(LookupMessage(MSI_WAITING_RESPONSE_FROM_SERVER), 16, 1);
     break;
   }
   case 2:
@@ -3788,24 +3790,24 @@ void CLoginMode::OnChangeState(int value) {
       OBFUSCATE_BYTES_TEXT("%s", 0x6BA1C1132F033B75ULL);
     }
 
-    CharServerEndpoint endpoint;
-    endpoint.ip[0] = '\0';
+    ConnectionEndpoint endpoint;
+    endpoint.address[0] = '\0';
     endpoint.port = 0;
-    endpoint.host[0] = '\0';
+    endpoint.overrideAddress[0] = '\0';
     const char* address = g_clientInfoAddress;
     const char* port = g_clientInfoPort;
     const char* domain = g_clientInfoDomain;
     if (address) {
-      std::strcpy(endpoint.ip, address);
+      std::strcpy(endpoint.address, address);
     }
     if (domain || address) {
-      std::strcpy(endpoint.host, domain ? domain : address);
+      std::strcpy(endpoint.overrideAddress, domain ? domain : address);
     }
     if (port) {
       endpoint.port = atoi(port);
     }
 
-    this->connectionReady = GetRagConnection().Connect(*reinterpret_cast<const ConnectionEndpoint*>(&endpoint));
+    this->connectionReady = GetRagConnection().Connect(endpoint);
     if (!this->connectionReady) {
       GetRagConnection().Close();
       if (g_windowMgr.Confirm(LookupMessage(MSI_SERVER_CONNECTION_FAILED), 1, true, true, 0, "Message", 280, 120, 0) != 0x10D) {
@@ -3843,7 +3845,7 @@ void CLoginMode::OnChangeState(int value) {
     g_windowMgr.SetBackgroundSurface(static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->wallpaperName.c_str()))));
     g_session.m_partyBooking.Reset();
     GetRagConnection().Close();
-    this->connectionReady = GetRagConnection().Connect(*reinterpret_cast<const ConnectionEndpoint*>(&g_charServerEndpoint));
+    this->connectionReady = GetRagConnection().Connect(g_charServerEndpoint);
     if (!this->connectionReady) {
       GetRagConnection().Close();
       if (g_windowMgr.Confirm(LookupMessage(MSI_SERVER_CONNECTION_FAILED), 1, true, true, 0, "Message", 280, 120, 0) != 0x10D) {
@@ -3889,7 +3891,7 @@ void CLoginMode::OnChangeState(int value) {
     g_windowMgr.SetBackgroundSurface(static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->wallpaperName.c_str()))));
     DeleteCharacterPacket packet;
     packet.id = ID_CH_DELETE_CHAR3;
-    std::strncpy(packet.code, reinterpret_cast<const char*>(this->billingInfo), sizeof(packet.code));
+    std::strncpy(packet.code, this->billingInfo, sizeof(packet.code));
     const CharacterInfo* character = reinterpret_cast<const CharacterInfo*>(this->SendMsg(MM_QUERYCHARICTORINFO, static_cast<unsigned char>(g_selectedSlotIndex), 0, 0, 0));
     packet.gid = character->gid;
     if (g_serviceType == ServiceKorea) {
@@ -3901,7 +3903,7 @@ void CLoginMode::OnChangeState(int value) {
       DeleteCharacterEmailPacket email;
       email.gid = character->gid;
       email.id = ID_CH_DELETE_CHAR2;
-      std::strncpy(email.code, reinterpret_cast<const char*>(this->billingInfo), sizeof(email.code));
+      std::strncpy(email.code, this->billingInfo, sizeof(email.code));
       email.code[49] = '\0';
       GetRagConnection().Send(GetRagConnection().GetPacketSize(email.id), &email);
     } else {

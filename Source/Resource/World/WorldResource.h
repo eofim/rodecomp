@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <list>
 #include <string>
+#include "Utility/Math/Vector3d.h"
 
 class CFile;
 
@@ -14,9 +15,9 @@ struct WorldModelRecord {
   /* 0000 */ char name[40];
   /* 0028 */ char model[80];
   /* 0078 */ char node[80];
-  /* 00C8 */ float position[3]{};
-  /* 00D4 */ float rotation[3]{};
-  /* 00E0 */ float scale[3]{};
+  /* 00C8 */ vector3d position{};
+  /* 00D4 */ vector3d rotation{};
+  /* 00E0 */ vector3d scale{};
   /* 00EC */ int animation;
   /* 00F0 */ int animationType;
   /* 00F4 */ float animationSpeed;
@@ -76,9 +77,9 @@ public:
   /* 0188 */ int waterAnimation;
   /* 018C */ int longitude;
   /* 0190 */ int latitude;
-  /* 0194 */ float lightDirection[3];
-  /* 01A0 */ float diffuse[3];
-  /* 01AC */ float ambient[3];
+  /* 0194 */ vector3d lightDirection;
+  /* 01A0 */ vector3d diffuse;
+  /* 01AC */ vector3d ambient;
   /* 01B8 */ unsigned char major;
   /* 01B9 */ unsigned char minor;
   /* 01BA */ unsigned char padding_01BA[2];

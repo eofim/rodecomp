@@ -142,7 +142,7 @@ void UILapineUpgradeBox_IngredientInfoWnd::Paint() {
     this->DrawBitmap(32, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\lapine\\list_selected_item.bmp"))), false);
   }
 
-  DrawItemIcon(*this, ResourceMgr::Instance(), 4, 3, this->item, 0);
+  this->DrawItemIcon(4, 3, this->item, 0);
 
   this->DrawShadowedText(36, 9, this->FitDisplayText(100, this->item.displayName.c_str(), 0, 12, 0).c_str(), 0, 0, 0xE0E0E0, 0, 12, 0);
 }
@@ -160,7 +160,7 @@ void UILapineUpgradeBoxWnd::Paint() {
   this->DrawCenteredText(35, 63, this->description.c_str(), 156, 0, 11, 0x844A42, 0);
 
   if (this->item.identity[1] > 0) {
-    DrawItemIcon(*this, ResourceMgr::Instance(), 101, 165, this->item, 0);
+    this->DrawItemIcon(101, 165, this->item, 0);
   }
 
   if (this->noticeTick + this->noticeDuration > timeGetTime()) {
@@ -172,7 +172,7 @@ void UILapineUpgradeBoxWnd::Paint() {
 // OFFSET: 0x006035E0
 // FUNCTION: fn_04194
 void UILapineUpgradeBoxWnd::DragAndDrop(int x, int y, std::intptr_t value) {
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (this->item.identity[1] > 0) {
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return;
@@ -221,7 +221,7 @@ void UILapineUpgradeBoxWnd::OnLBtnDown(int x, int y) {
     UIFrameWnd::OnLBtnDown(x, y);
   }
   if (static_cast<unsigned>(x - 101) <= 24 && static_cast<unsigned>(y - 165) <= 24 && this->item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(26, this->item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(26, this->item, 1, -1);
   }
 }
 
@@ -229,7 +229,7 @@ void UILapineUpgradeBoxWnd::OnLBtnDown(int x, int y) {
 // FUNCTION: fn_04206
 void UILapineUpgradeBox_IngredientInfoWnd::OnLBtnDown(int x, int y) {
   if (this->item.identity[1] > 0) {
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->BeginDragItem(27, this->item, this->quantity, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(27, this->item, this->quantity, -1);
   }
 }
 
@@ -292,7 +292,7 @@ void UILapineUpgradeBoxWnd::SetIngredient(int id) {
     char* cursor = name;
     ITEM_INFO item;
     item.SetItemId(id);
-    std::size_t remaining = sizeof(name);
+    int remaining = sizeof(name);
     int highlightColor;
     this->BuildItemName(&item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
     this->title = name;
@@ -317,7 +317,7 @@ void UILapineUpgradeBoxWnd::SetIngredient(int id) {
 // OFFSET: 0x00603680
 // FUNCTION: fn_04196
 void UILapineUpgradeBox_IngredientListWnd::DragAndDrop(int x, int y, std::intptr_t value) {
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
   if (drag->source == 26) {
     this->SendMsg(this, UM_ADDITEM, drag->id, 0, 0, 0);
@@ -469,7 +469,7 @@ void UILapineUpgradeBox_IngredientInfoWnd::OnMouseHover(int x, int y) {
     int tipX = 0;
     int tipY = -20;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(this->tooltip.c_str(), tipX, tipY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(this->tooltip.c_str(), tipX, tipY, -1, false, true);
   }
 }
 
@@ -482,7 +482,7 @@ void UILapineUpgradeBoxWnd::OnMouseHover(int x, int y) {
     int tipX = 101;
     int tipY = 145;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.gameMode->ShowTooltip(this->item.displayName.c_str(), tipX, tipY, -1, false, true);
+    g_modeMgr.currentMode->ShowTooltip(this->item.displayName.c_str(), tipX, tipY, -1, false, true);
   }
 }
 
@@ -547,7 +547,7 @@ __declspec(noinline) void UILapineUpgradeBox_IngredientInfoWnd::SetItem(std::uin
   char name[0x104];
   std::memset(name, 0, sizeof(name));
   char* highlight = nullptr;
-  std::size_t remaining = sizeof(name);
+  int remaining = sizeof(name);
   char* cursor = name;
   int highlightColor;
   this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
@@ -592,7 +592,7 @@ bool UILapineUpgradeBox_IngredientListWnd::CanUseIngredient(std::uint32_t identi
     this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEMSHOP_CURRENCY)), 0, 0, 0);
   }
 
-  if (Equipment(item) == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
+  if (item.IsEquipment() == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
     const std::uint32_t* cards = item.cards;
     const std::uint32_t* cardsEnd = cards + 4;
     if (std::find_if(cards, cardsEnd, [](std::uint32_t card) { return card != 0; }) != cardsEnd) {
@@ -654,7 +654,7 @@ int UILapineUpgradeBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         std::memset(name, 0, sizeof(name));
         int highlightColor = 0;
         char* cursor = name;
-        std::size_t remaining = sizeof(name);
+        int remaining = sizeof(name);
         char* highlight = nullptr;
         this->BuildItemName(&owned, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
 

@@ -25,17 +25,17 @@ void GroundGeometry::DrawWaterCell(
     partition = static_cast<unsigned>(x) + static_cast<unsigned>(z) * static_cast<unsigned>(this->waterColumns);
   }
 
-  GroundWaterSurface& surface = this->waterSurfaces[partition];
+  GroundWater& surface = this->waterSurfaces[partition];
   float middle = level;
   float first = level;
   float last = level;
 
-  if (surface.height != 0.0f) {
+  if (surface.parameters.height != 0.0f) {
     const int sum = column + row;
     const auto wave = [&](int coordinate) {
-      const float angle = static_cast<float>(coordinate) * surface.pitch + surface.phase;
+      const float angle = static_cast<float>(coordinate) * surface.parameters.pitch + surface.phase;
       const int degrees = static_cast<int>(angle);
-      return ClientSine(degrees) * surface.height + level;
+      return ClientSine(degrees) * surface.parameters.height + level;
     };
     middle = wave(sum);
     first = wave(sum - 1);
@@ -77,7 +77,7 @@ void GroundGeometry::DrawWaterCell(
     return;
   }
 
-  RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+  RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
   primitive->SetPosition(0, &vertices[0].x);
   primitive->SetPosition(1, &vertices[1].x);
   primitive->SetPosition(2, &vertices[2].x);

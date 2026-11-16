@@ -112,7 +112,7 @@ __declspec(noinline) bool CNaviData::SetDestination(CNaviInfo* info, int cellX, 
 // OFFSET: 0x00BA1260
 // FUNCTION: fn_19638
 bool CNavigationManager::UpdateGround() {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode == nullptr) {
     return false;
   }
@@ -217,7 +217,7 @@ int CNavigationManager::RequestRoute(int cellX, int cellY) {
 
   int startX = 0;
   int startY = 0;
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode != nullptr) {
     mode->PlayerCell(&startX, &startY);
     this->UpdateGround();
@@ -409,84 +409,6 @@ bool CNaviInfo::IsSearchable(const char* name) const {
   return true;
 }
 
-// OFFSET: 0x00B8E970
-// FUNCTION: fn_19500
-void CNaviInfo::CollectTargets(int type, std::vector<NavigationTarget>& out) {
-  NavigationTarget target(type, nullptr);
-
-  if (std::strstr(this->name.c_str(), "_in") == nullptr && (type == 1 || type == 0)) {
-    target.name = this->name.c_str();
-    target.object = this;
-    target.type = 1;
-    out.push_back(target);
-  }
-
-  if (type == 2 || type == 0) {
-    target.type = 2;
-    const std::vector<CNavi_Object*>::iterator end = this->npcs.end();
-    for (std::vector<CNavi_Object*>::iterator it = this->npcs.begin(); it != end; ++it) {
-      NaviCell cell;
-      const NaviCell* position = (*it)->GetCell(&cell);
-      target.x = position->x;
-      target.y = position->y;
-      target.name = (*it)->GetName();
-      target.object = *it;
-      out.push_back(target);
-    }
-  }
-
-  if (type == 3 || type == 0) {
-    target.type = 3;
-    const std::vector<CNavi_Object*>::iterator end = this->mobs.end();
-    for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != end; ++it) {
-      NaviCell cell;
-      const NaviCell* position = (*it)->GetCell(&cell);
-      target.x = position->x;
-      target.y = position->y;
-      target.name = (*it)->GetName();
-      target.object = *it;
-      out.push_back(target);
-    }
-  }
-}
-
-// OFFSET: 0x00B8EC70
-// FUNCTION: fn_19501
-void CNaviInfo::CollectMobsInRange(int minimum, int maximum, std::vector<NavigationTarget>& out) {
-  NavigationTarget target(3, nullptr);
-  const std::vector<CNavi_Object*>::iterator end = this->mobs.end();
-  for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != end; ++it) {
-    NaviCell lower;
-    NaviCell upper;
-    if (minimum <= (*it)->GetCell(&lower)->x && maximum >= (*it)->GetCell(&upper)->x) {
-      NaviCell cell;
-      const NaviCell* position = (*it)->GetCell(&cell);
-      target.x = position->x;
-      target.y = position->y;
-      target.name = (*it)->GetName();
-      target.object = *it;
-      out.push_back(target);
-    }
-  }
-}
-
-// OFFSET: 0x00B8FC40
-// FUNCTION: fn_19505
-void CNaviInfo::CollectMobsByTitle(std::string title, std::vector<NavigationTarget>& out) {
-  NavigationTarget target(3, nullptr);
-  for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != this->mobs.end(); ++it) {
-    if (std::strcmp((*it)->GetTitle(), title.c_str()) == 0) {
-      NaviCell cell;
-      const NaviCell* position = (*it)->GetCell(&cell);
-      target.x = position->x;
-      target.y = position->y;
-      target.name = (*it)->GetName();
-      target.object = *it;
-      out.push_back(target);
-    }
-  }
-}
-
 // OFFSET: 0x00B8E920
 // FUNCTION: fn_19499
 void CNaviInfo::Search(int type, const std::vector<std::string>& keywords, std::vector<NavigationTarget>& out) {
@@ -496,53 +418,6 @@ void CNaviInfo::Search(int type, const std::vector<std::string>& keywords, std::
   }
   if (type == 3 || type == 0) {
     this->SearchNpcs(keywords, out);
-  }
-}
-
-// OFFSET: 0x00B8EE50
-// FUNCTION: fn_19502
-void CNaviInfo::SearchMap(const std::vector<std::string>& keywords, std::vector<NavigationTarget>& out) {
-  NavigationTarget target(1, nullptr);
-  wchar_t buffer[100];
-  std::memset(buffer, 0, sizeof(buffer));
-
-  std::vector<std::wstring> wideKeywords;
-  for (const std::string& keyword : keywords) {
-    MultiByteToWideChar(CP_ACP, 0, keyword.c_str(), -1, buffer, 100);
-    wideKeywords.push_back(std::wstring(buffer));
-  }
-
-  std::string text = this->name;
-  text.push_back(' ');
-  text += this->title;
-  text.push_back(' ');
-  MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, buffer, 100);
-  const std::wstring wideText(buffer);
-
-  const char* mapName = this->name.c_str();
-  if (std::strcmp(mapName, "gl_in01") != 0 && std::strstr(mapName, "_in") != nullptr) {
-    return;
-  }
-
-  bool matched = true;
-  for (const std::wstring& keyword : wideKeywords) {
-    matched &= StrStrIW(wideText.c_str(), keyword.c_str()) != nullptr;
-  }
-  if (!matched) {
-    return;
-  }
-
-  target.name = this->name;
-  target.object = this;
-  out.push_back(target);
-
-  target.type = 3;
-  for (CNavi_Object* mob : this->mobs) {
-    target.x = -1000;
-    target.y = -1000;
-    target.name = mob->GetName();
-    target.object = mob;
-    out.push_back(target);
   }
 }
 

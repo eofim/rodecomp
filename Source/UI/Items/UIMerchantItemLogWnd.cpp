@@ -51,21 +51,21 @@ void UIMerchantItemLogWnd::OnCreate(int width, int height) {
 
   this->resizer = new UIResizer();
   this->resizer->SetSize(16, 16);
-  static_cast<UIResizer*>(this->resizer)->SetDirection(3);
-  static_cast<UIResizer*>(this->resizer)->SetBitmapName("유저인터페이스\\btn_resize.bmp");
+  this->resizer->SetDirection(3);
+  this->resizer->SetBitmapName("유저인터페이스\\btn_resize.bmp");
   this->resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
-  static_cast<UIResizer*>(this->resizer)->SetColors(0xFFFF00FF, 0xFFFF00FF);
+  this->resizer->SetColors(0xFFFF00FF, 0xFFFF00FF);
   this->AddChild(this->resizer);
 
   this->scrollBar = new UIScrollBar();
-  static_cast<UIScrollBar*>(this->scrollBar)->Configure(this->geometry.width - 15, 14, 1, this->geometry.height - 38);
+  this->scrollBar->Configure(this->geometry.width - 15, 14, 1, this->geometry.height - 38);
   this->AddChild(this->scrollBar);
 
   this->buttons[0] = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\btn_close.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\btn_close_a.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\btn_close_b.bmp", 2, 0);
-  this->buttons[0]->SetSize(static_cast<UIBitmapButton*>(this->buttons[0])->BitmapWidth(), static_cast<UIBitmapButton*>(this->buttons[0])->BitmapHeight());
+  this->buttons[0]->SetBitmap("유저인터페이스\\btn_close.bmp", 0, 0);
+  this->buttons[0]->SetBitmap("유저인터페이스\\btn_close_a.bmp", 1, 0);
+  this->buttons[0]->SetBitmap("유저인터페이스\\btn_close_b.bmp", 2, 0);
+  this->buttons[0]->SetSize(this->buttons[0]->BitmapWidth(), this->buttons[0]->BitmapHeight());
   this->buttons[0]->Move(this->geometry.width - 61, this->geometry.height - 24);
   this->buttons[0]->SetId(201);
   this->AddChild(this->buttons[0]);
@@ -104,7 +104,7 @@ void UIMerchantItemLogWnd::Paint() {
   int slots = (this->geometry.height - 38) / 32;
   y = 17;
   for (int i = 0; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   auto it = this->items.begin();
@@ -125,7 +125,7 @@ void UIMerchantItemLogWnd::Paint() {
 
     const int top = visible / this->columns * 32;
     const int x = visible % this->columns * 32 + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
 
     if (0 < it->grade) {
       this->DrawBitmap(
@@ -172,14 +172,19 @@ void UIMerchantItemLogWnd::OnMouseHover(int x, int y) {
     int tooltipY = (y - 17) / 32 * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
+    CMode* gameMode = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
-      g_modeMgr.gameMode
-          ->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), tooltipX, tooltipY,
-                 g_session.GetItemNameColor(item), 0, 1);
+      std::uint32_t color = g_session.GetItemNameColor(item);
+      int screenX = tooltipX;
+      int screenY = tooltipY;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
+                 color, 0, 1);
     } else {
-      g_modeMgr.gameMode
-          ->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity).c_str(), tooltipX, tooltipY,
-                 g_session.GetItemNameColor(item), 0, 1);
+      std::uint32_t color = g_session.GetItemNameColor(item);
+      int screenX = tooltipX;
+      int screenY = tooltipY;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity).c_str(), screenX, screenY,
+                 color, 0, 1);
     }
   }
 }

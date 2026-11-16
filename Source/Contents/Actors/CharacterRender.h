@@ -41,6 +41,7 @@ public:
   void OffsetLayerDepth(int layer, SpriteQuad& quad, float bottomDepth, float topDepth) const;
   void OffsetAccessoryLayerDepth(int layer, SpriteQuad& quad, float bottomDepth, float topDepth) const;
   RenderPrimitive* DrawShadow(const float* matrix, float scale) const;
+  RenderPrimitive* BuildSpriteQuad(const SpriteQuad& quad, const std::uint32_t* palette, int blend, float offsetX, float offsetY) const;
 
   /* 0004 */ vector3d position;
   /* 0010 */ int job;
@@ -67,9 +68,9 @@ public:
   /* 0070 */ float cameraDistance;
   /* 0074 */ float cameraPitch;
   /* 0078 */ float cameraYaw;
-  /* 007C */ float padding_007C;
-  /* 0080 */ float padding_0080;
-  /* 0084 */ float padding_0084;
+  /* 007C */ float unknown_007C;
+  /* 0080 */ float unknown_0080;
+  /* 0084 */ float unknown_0084;
   /* 0088 */ float cameraUpX;
   /* 008C */ float cameraUpY;
   /* 0090 */ float cameraUpZ;

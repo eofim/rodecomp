@@ -12,6 +12,7 @@
 #include "Contents/Items/WeaponType.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "Contents/Messenger/EquipmentPropertyStore.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Client/Session/Session.h"
 #include "Contents/Actors/GameActor.h"
@@ -38,6 +39,7 @@
 #include "Utility/Math/AffineMatrix.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Items/UIItemParamChangeDisplayWnd.h"
 #include <cstring>
 #include <list>
 #include <new>
@@ -786,13 +788,23 @@ int CSession::GetRealWeaponId(int weapon) const {
   return weapon;
 }
 
+// INLINED
+int __stdcall GetWeaponViewValue(int weapon) {
+  return g_session.GetWeaponViewValue(weapon);
+}
+
+// INLINED
+bool __stdcall IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) {
+  return g_session.IsJobWeaponAllowed(job, slot, weapon);
+}
+
 // OFFSET: 0x00DFB4B0
 // FUNCTION: fn_23583
-bool __stdcall IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) {
+bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const {
   if (weapon >= 105) {
     if (job == JT_ASSASSIN || job == JT_ASSASSIN_H || job == JT_ASSASSIN_B || job == JT_GUILLOTINE_CROSS || job == JT_GUILLOTINE_CROSS_H ||
       job == JT_GUILLOTINE_CROSS_B || job == JT_SHADOW_CROSS) {
-      if (GetWeaponViewValue(static_cast<int>(weapon >> 32)) > 0) {
+      if (g_session.GetWeaponViewValue(static_cast<int>(weapon >> 32)) > 0) {
         weapon = GetDualWieldWeaponType(static_cast<int>(weapon), static_cast<int>(weapon >> 32));
       } else {
         weapon = GetWeaponViewValue(static_cast<int>(weapon));
@@ -1224,7 +1236,7 @@ std::string GetJobTitleString(int job) {
 
 // OFFSET: 0x00E19530
 // FUNCTION: fn_23841
-__declspec(noinline) int __stdcall GetWeaponViewValue(int weapon) {
+__declspec(noinline) int CSession::GetWeaponViewValue(int weapon) const {
   const int value = FindItemDescription(weapon).viewId;
 
   if (weapon > 2100 && weapon < 2200 || static_cast<unsigned>(weapon - 28901) <= 0x61 || static_cast<unsigned>(weapon - 460000) <= 0x270F) {
@@ -1236,7 +1248,7 @@ __declspec(noinline) int __stdcall GetWeaponViewValue(int weapon) {
 
 // OFFSET: 0x00E248F0
 // FUNCTION: fn_23898
-int __stdcall GetDualWieldWeaponType(int first, int second) {
+int CSession::GetDualWieldWeaponType(int first, int second) const {
   int main = first;
   int result = 0;
   int sub;
@@ -1330,19 +1342,19 @@ int CSession::GetPetTargetAid() const {
   std::uint32_t aid = this->m_homunAid;
   CGameMode* mode;
   CRenderObject* actor;
-  if (aid != 0 && (mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) != nullptr &&
+  if (aid != 0 && (mode = g_modeMgr.GetGameMode()) != nullptr &&
       (actor = mode->scene->GetGameActorByAID(aid)) != nullptr) {
     target = static_cast<CGameActor*>(actor)->hitTargetAid;
   }
 
   aid = this->m_mercenaryAid;
-  if (aid != 0 && (mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode())) != nullptr &&
+  if (aid != 0 && (mode = g_modeMgr.GetGameMode()) != nullptr &&
       (actor = mode->scene->GetGameActorByAID(aid)) != nullptr) {
     target = static_cast<CGameActor*>(actor)->hitTargetAid;
   }
 
   if (target > 0) {
-    mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    mode = g_modeMgr.GetGameMode();
     if (mode == nullptr || mode->scene->GetGameActorByAID(target) == nullptr) {
       return 0;
     }
@@ -1353,7 +1365,7 @@ int CSession::GetPetTargetAid() const {
 // OFFSET: 0x00E1D950
 // FUNCTION: fn_23854
 int CSession::GetBattleFieldMode() const {
-  return static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->isBattleFieldMode;
+  return g_modeMgr.GetGameMode()->scene->isBattleFieldMode;
 }
 
 // OFFSET: 0x00E1D970
@@ -1607,15 +1619,14 @@ int CSession::SetHotkeyEntry(char enabled, int id, int value, int slot) {
     }
   }
 
-  NormalItemSlot& target = this->SkillHotkey(slot);
   if (id != 0) {
-    target.enabled = static_cast<unsigned char>(enabled);
-    target.itemId = static_cast<std::uint32_t>(id);
-    target.value = static_cast<std::int16_t>(value);
+    this->SkillHotkey(slot).value = static_cast<std::int16_t>(value);
+    this->SkillHotkey(slot).enabled = static_cast<unsigned char>(enabled);
+    this->SkillHotkey(slot).itemId = static_cast<std::uint32_t>(id);
   } else {
-    target.enabled = 0;
-    target.itemId = 0;
-    target.value = 0;
+    this->SkillHotkey(slot).value = 0;
+    this->SkillHotkey(slot).enabled = 0;
+    this->SkillHotkey(slot).itemId = 0;
   }
 
   return g_modeMgr.GetGameMode()->SendMsg(MM_SHORTCUT_KEY_CHANGE, slot + 36, 0, 0, 0);
@@ -1784,7 +1795,7 @@ public:
 
   /* 0004 */ int m_id;
   /* 0008 */ void* m_info;
-  /* 000C */ unsigned char m_properties[0x28];
+  /* 000C */ EquipmentPropertyStore m_properties;
   /* 0034 */ bool m_pretend;
 };
 
@@ -1956,7 +1967,7 @@ bool CSession::PlaySkillGroundEffect(int skillId, vector3d position) {
       if (g_effectMgr->HasAllocator(effectId)) {
         g_effectMgr->Spawn(0, effectId, position, 0, -1, 0, 0);
       } else {
-        static_cast<CGameMode*>(g_modeMgr.GetGameMode())
+        g_modeMgr.GetGameMode()
           ->LaunchDummyEffect(&position, effectId, EffectLifetime(effectId) + 10, 0);
       }
     }
@@ -2130,7 +2141,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     break;
   case AC_SHOWER: {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     vector3d* sourcePosition = &source->render.position;
     mode->SpawnArrowEffect64(sourcePosition, &target->render.position, 18.0f);
     int column;
@@ -2202,7 +2213,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     break;
   case AM_ACIDTERROR:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x12A, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x12A, source, target, -1);
     }
     break;
   case TF_SPRINKLESAND:
@@ -2210,11 +2221,11 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     break;
   case TF_THROWSTONE:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x134, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x134, source, target, -1);
     }
     break;
   case RG_INTIMIDATE:
-    effect = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->LaunchEffect(EF_INTIMIDATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    effect = g_modeMgr.GetGameMode()->scene->player->LaunchEffect(EF_INTIMIDATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
       vector3d position = source->render.position;
       effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -2287,27 +2298,27 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     break;
   case CR_ACIDDEMONSTRATION: {
     vector3d position = target->render.position;
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchDummyEffect(&position, 0x219, 100, 0);
+    g_modeMgr.GetGameMode()->LaunchDummyEffect(&position, 0x219, 100, 0);
     break;
   }
   case NJ_SYURIKEN:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x265, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x265, source, target, -1);
     }
     break;
   case NJ_KUNAI:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x266, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x266, source, target, -1);
     }
     break;
   case NJ_HUUMA:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x267, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x267, source, target, -1);
     }
     break;
   case NJ_ZENYNAGE:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x268, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x268, source, target, -1);
     }
     break;
   case NJ_KOUENKA:
@@ -2496,7 +2507,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     g_soundMgr->PlayWave("effect\\EF_FireWall.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     break;
   case NPC_EXPULSION:
-    effect = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->LaunchEffect(EF_INTIMIDATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    effect = g_modeMgr.GetGameMode()->scene->player->LaunchEffect(EF_INTIMIDATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
       vector3d position = target->render.position;
       effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -2555,7 +2566,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     break;
   case AS_VENOMKNIFE:
     if (g_modeMgr.GetGameMode() != nullptr) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->LaunchTargetEffect(0x258, source, target, -1);
+      g_modeMgr.GetGameMode()->LaunchTargetEffect(0x258, source, target, -1);
     }
     break;
   case RK_HUNDREDSPEAR:
@@ -2588,7 +2599,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     break;
   case GC_CROSSRIPPERSLASHER: {
-    float angle = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CameraDesiredYaw() + source->render.angle;
+    float angle = g_modeMgr.GetGameMode()->CameraDesiredYaw() + source->render.angle;
     if (angle >= 360.0f) {
       angle -= 360.0f;
     }
@@ -2672,7 +2683,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     break;
   case RA_AIMEDBOLT: {
     g_effectMgr->Spawn(target->render.accountId, EF_NEW_AIMEDBOLT_END, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-    float angle = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CameraDesiredYaw() + source->render.angle;
+    float angle = g_modeMgr.GetGameMode()->CameraDesiredYaw() + source->render.angle;
     if (angle >= 360.0f) {
       angle -= 360.0f;
     }
@@ -2881,7 +2892,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     g_soundMgr->PlayWave("effect\\LG_TRAMPLE.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     break;
   case LG_BANISHINGPOINT: {
-    float angle = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CameraDesiredYaw() + source->render.angle;
+    float angle = g_modeMgr.GetGameMode()->CameraDesiredYaw() + source->render.angle;
     if (angle >= 360.0f) {
       angle -= 360.0f;
     }
@@ -2932,7 +2943,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     break;
   }
   case LG_CANNONSPEAR: {
-    float angle = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CameraDesiredYaw() + source->render.angle;
+    float angle = g_modeMgr.GetGameMode()->CameraDesiredYaw() + source->render.angle;
     if (angle >= 360.0f) {
       angle -= 360.0f;
     }
@@ -3116,7 +3127,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     break;
   case NC_POWERSWING: {
-    float angle = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CameraDesiredYaw() + source->render.angle;
+    float angle = g_modeMgr.GetGameMode()->CameraDesiredYaw() + source->render.angle;
     if (angle >= 360.0f) {
       angle -= 360.0f;
     }
@@ -3215,7 +3226,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     if (machine) {
       static_cast<CAMachineEffect*>(machine)->PlayAttack();
     }
-    CPlayer* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
+    CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
     g_soundMgr->PlayWave(
       "effect\\MT_A_MACHINE.wav", target->render.position.x - player->render.position.x, 0.0f, target->render.position.z - player->render.position.z,
       250, 40, 1.0f, 0

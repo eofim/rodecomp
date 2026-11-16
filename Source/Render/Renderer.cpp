@@ -1,6 +1,7 @@
 #include "Render/Renderer.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/CMode.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
@@ -13,6 +14,7 @@
 #include "Resource/Sprites/ActionResource.h"
 #include "Resource/Sprites/SpriteResource.h"
 
+#include <bit>
 #include <cstdlib>
 #include <cstring>
 #include <windows.h>
@@ -20,7 +22,7 @@
 // OFFSET: 0x00544A60
 // FUNCTION: fn_01820
 std::uint32_t __fastcall sub_544A60(const CRenderer* renderer) {
-  return reinterpret_cast<const std::uint32_t&>(renderer->viewDirectionZ);
+  return std::bit_cast<std::uint32_t>(renderer->viewDirectionZ);
 }
 
 // OFFSET: 0x0055D150
@@ -43,7 +45,7 @@ float CRenderer::UiScaleY() const {
 
 // OFFSET: 0x0055A920
 // FUNCTION: fn_02081
-void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
+void CRenderer::DrawBattleFieldIcon() {
   if (g_session.m_score1 < 0 || g_session.m_score2 < 0) {
     return;
   }
@@ -54,7 +56,7 @@ void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
   rect.top = 26;
   rect.right = this->viewport.width - 232;
   rect.bottom = 74;
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   mode->DrawTexture(rect, 0, 0.0999f, 0xCDFFFFFF, g_texMgr.Load("effect\\사자(A).bmp", 0, false, true, false), region);
 
   rect.left = this->viewport.width - 280;
@@ -108,7 +110,7 @@ void CRenderer::DrawBattleFieldIcon(CRenderSystemBase& system) {
 
 // OFFSET: 0x0055E840
 // FUNCTION: fn_02112
-void CRenderer::DrawOverlays(CRenderSystemBase& system) {
+void CRenderer::DrawOverlays() {
   // GLOBAL: gl_24883
   static char s_bannerState;
   // GLOBAL: gl_24885
@@ -163,7 +165,7 @@ timer:
   }
 
   if (g_session.GetBattleFieldMode() == 1) {
-    this->DrawBattleFieldIcon(system);
+    this->DrawBattleFieldIcon();
   }
 
   if (!g_serviceOptions.Get(TT_EFFECT_ON_OFF) || g_screenShakeDuration <= 0 || g_screenShakeMode == 2 || !this->LockBackBuffer()) {
@@ -208,7 +210,7 @@ timer:
 
 // OFFSET: 0x00560A40
 // FUNCTION: fn_02161
-CRenderer::CRenderer() : frame(0), viewDirectionX(0), viewDirectionY(0), viewDirectionZ(0), twoPass(0), padding_004C(0) {
+CRenderer::CRenderer() : frame(0), viewDirectionX(0), viewDirectionY(0), viewDirectionZ(0), twoPass(0), unknown_004C(0) {
   this->atlas.Initialize(50);
   this->fog.enabled = 0;
   this->fog.dirty = 1;
@@ -218,3 +220,8 @@ CRenderer::CRenderer() : frame(0), viewDirectionX(0), viewDirectionY(0), viewDir
 // OFFSET: 0x00562090
 // FUNCTION: fn_02175
 CRenderer::~CRenderer() = default;
+
+// INLINED
+RenderPrimitive* RenderPrimitivePool::Acquire() {
+  return g_renderer->AcquirePrimitive();
+}

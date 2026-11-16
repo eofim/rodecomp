@@ -23,14 +23,14 @@ class UIEditCtrl;
 
 struct RoMapTooltipBox {
   // INLINED
-  RoMapTooltipBox(int x, int y, int width, int height) : x(x), y(y), width(width), height(height), padding_0010(1) {
+  RoMapTooltipBox(int x, int y, int width, int height) : x(x), y(y), width(width), height(height), unknown_0010(1) {
   }
 
   /* 0000 */ int x;
   /* 0004 */ int y;
   /* 0008 */ int width;
   /* 000C */ int height;
-  /* 0010 */ int padding_0010;
+  /* 0010 */ int unknown_0010;
 };
 
 void SetRoMapMarker(std::string name, const WorldViewArea& area, RoMapMarker& marker);
@@ -101,7 +101,7 @@ private:
   /* 00C0 */ WorldViewRecord* selectedRecord;
   /* 00C4 */ RoMapTooltipBox* hoverTooltip;
   /* 00C8 */ WorldViewArea* previewArea;
-  /* 00CC */ unsigned char padding_00CC;
+  /* 00CC */ unsigned char unknown_00CC;
   /* 00D0 */ CTexture* previewTexture;
   /* 00D4 */ unsigned char m_showLabels;
   /* 00D8 */ std::uint32_t m_lastTime;
@@ -119,16 +119,14 @@ private:
   /* 020C */ UIBitmapButton* m_searchButton;
   /* 0210 */ UIBitmapButton* m_searchListButton;
   /* 0214 */ UIEditCtrl* m_searchEdit;
-  /* 0218 */ int m_kafraLeft;
-  /* 021C */ int m_kafraTop;
-  /* 0220 */ int m_kafraRight;
-  /* 0224 */ int m_kafraBottom;
+  /* 0218 */ RECT m_kafraBounds;
 };
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(RoMapTooltipBox) == 0x14);
 static_assert(sizeof(CKafraMoveMapServiceInfo) == 0x68);
 static_assert(offsetof(CKafraMoveMapServiceInfo, markers) == 0x04);
+static_assert(sizeof(UIRoMapWnd) == 0x228);
 #endif
 
 #endif

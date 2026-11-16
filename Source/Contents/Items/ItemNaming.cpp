@@ -14,6 +14,15 @@
 #include <vector>
 #include "Resource/MSGSTRINGID.h"
 
+#pragma pack(push, 1)
+struct ReplayTaggedRecordHeader {
+  /* 0000 */ std::uint16_t id;
+  /* 0002 */ std::uint32_t bytes;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(ReplayTaggedRecordHeader) == 6);
+
 // GLOBAL: gl_24725
 std::map<int, ItemMoveInfo> g_itemMoveInfo;
 
@@ -28,8 +37,8 @@ std::map<int, std::vector<const char*>> g_bookItemNames;
 
 // OFFSET: 0x006D8810
 // FUNCTION: fn_06597
-bool Equipment(const ITEM_INFO& item) {
-  switch (item.identity[0]) {
+bool ITEM_INFO::IsEquipment() const {
+  switch (this->identity[0]) {
   case TYPE_ARMOR:
   case TYPE_WEAPON:
   case TYPE_BOW:
@@ -85,7 +94,7 @@ bool ITEM_INFO::HasCards() const {
   const bool first = g_itemCardNames.contains(CardId(*this, 0));
   const unsigned id = static_cast<unsigned>(std::atoi(this->itemId.c_str()));
 
-  if (id - 9001u <= 498 || id - 10000u <= 999 || CardId(*this, 0) == 254 || CardId(*this, 0) == 255 || Equipment(*this) != true) {
+  if (id - 9001u <= 498 || id - 10000u <= 999 || CardId(*this, 0) == 254 || CardId(*this, 0) == 255 || this->IsEquipment() != true) {
     return first;
   }
 
@@ -327,7 +336,7 @@ std::string ITEM_INFO::DisplayName(unsigned char detailed) const {
         AppendName(*this, result, text, capacity);
       }
     } else {
-      if (!Equipment(*this) && detailed == 0) {
+      if (!this->IsEquipment() && detailed == 0) {
         AppendName(*this, result, text, capacity);
       } else {
         if (this->refiningLevel > 0) {
@@ -450,18 +459,18 @@ bool IsItemCard(int id) {
 
 // OFFSET: 0x006D7660
 // FUNCTION: fn_06591
-const char* ItemResourcePath(const ITEM_INFO& item) {
-  if (item.identified == 1) {
-    return FindItemDescription(std::atoi(item.itemId.c_str())).identifiedResource;
+const char* ITEM_INFO::ResourcePath() const {
+  if (this->identified == 1) {
+    return FindItemDescription(std::atoi(this->itemId.c_str())).identifiedResource;
   }
 
-  return FindItemDescription(std::atoi(item.itemId.c_str())).unidentifiedResource;
+  return FindItemDescription(std::atoi(this->itemId.c_str())).unidentifiedResource;
 }
 
 // OFFSET: 0x006D76B0
 // FUNCTION: fn_06592
-int ItemSlotsCount(const ITEM_INFO& item) {
-  int id = std::atoi(item.itemId.c_str());
+int ITEM_INFO::SlotCount() const {
+  int id = std::atoi(this->itemId.c_str());
   return FindItemDescription(id).slots;
 }
 
@@ -505,63 +514,9 @@ ItemMoveInfo& FindItemMoveInfo(int id) {
 
 // OFFSET: 0x006D5150
 // FUNCTION: fn_06567
-void __fastcall DestroyReplayTaggedRecordHeader(std::uint16_t* value) {
-  *value = 0;
-  *reinterpret_cast<std::uint32_t*>(value + 1) = 0;
-}
-
-__declspec(noinline) bool LoadItemMoveInfoTable(std::vector<int>& values, const char* name) {
-  values.clear();
-  CFile file;
-  if (g_serverLanguage != nullptr) {
-    name = g_serverLanguage->ServiceName(name);
-  }
-
-  if (!file.Open(name, 0, true, false)) {
-    MessageBoxA(nullptr, "Can't open file", "ErrorMessage", 0);
-    return false;
-  }
-
-  const int size = static_cast<int>(file.GetSize());
-  if (values.capacity() < static_cast<size_t>(size)) {
-    values.reserve(static_cast<size_t>(size));
-  }
-
-  char* buffer = new char[static_cast<size_t>(size) + 1];
-  file.Read(buffer, static_cast<std::uint32_t>(size));
-  buffer[size] = '\0';
-  file.Close();
-
-  char* token = buffer;
-  for (int index = 0; index < size; ++index) {
-    char value = buffer[index];
-    if (value == '/' && buffer[index + 1] == '/') {
-      do {
-        if (value == '\r' || index >= size) {
-          break;
-        }
-        value = buffer[index + 1];
-        ++index;
-      } while (value != '\n');
-      token = buffer + index + 1;
-    }
-
-    switch (value) {
-    case '\t':
-    case ' ':
-      buffer[index] = '\0';
-      values.push_back(std::atoi(token));
-      token = buffer + index + 1;
-      break;
-    case '\n':
-    case '\r':
-      token = buffer + index + 1;
-      break;
-    }
-  }
-
-  delete[] buffer;
-  return true;
+void __fastcall DestroyReplayTaggedRecordHeader(ReplayTaggedRecordHeader* value) {
+  value->id = 0;
+  value->bytes = 0;
 }
 
 // OFFSET: 0x006D78C0
@@ -650,8 +605,9 @@ __declspec(noinline) void LoadItemNameTables() {
     if (ResourceExists("EventNum2ItemDisplayNameTable.txt", 0)) {
       g_tableStorage.LoadTokens(tokens, "EventNum2ItemDisplayNameTable.txt", 0);
       for (std::vector<char*>::iterator token = tokens.begin(); token != tokens.end(); token += 2) {
+        ITEM_DESC& desc = EnsureItemDescription(std::atoi(*token), g_itemDescriptions);
         g_session.ConvertTooltipText(token[1], token[1]);
-        EnsureItemDescription(std::atoi(*token), g_itemDescriptions).unidentifiedName = token[1];
+        desc.unidentifiedName = token[1];
       }
     }
 
@@ -676,8 +632,9 @@ __declspec(noinline) void LoadItemNameTables() {
     if (ResourceExists("EventIdNum2ItemDisplayNameTable.txt", 0)) {
       g_tableStorage.LoadTokens(tokens, "EventIdNum2ItemDisplayNameTable.txt", 0);
       for (std::vector<char*>::iterator token = tokens.begin(); token != tokens.end(); token += 2) {
+        ITEM_DESC& desc = EnsureItemDescription(std::atoi(*token), g_itemDescriptions);
         g_session.ConvertTooltipText(token[1], token[1]);
-        EnsureItemDescription(std::atoi(*token), g_itemDescriptions).identifiedName = token[1];
+        desc.identifiedName = token[1];
       }
     }
 
@@ -786,7 +743,7 @@ __declspec(noinline) void LoadItemNameTables() {
   FindItemCardName(-1, g_itemCardNames) = sorry;
 
   std::vector<int> moveInfo;
-  if (LoadItemMoveInfoTable(moveInfo, "ItemMoveInfoV5.txt") && !moveInfo.empty()) {
+  if (LoadItemIntegerTable(moveInfo, "ItemMoveInfoV5.txt") && !moveInfo.empty()) {
     for (std::vector<int>::iterator value = moveInfo.begin(); value != moveInfo.end(); value += 9) {
       ItemMoveInfo flags;
       flags.itemId = value[0];

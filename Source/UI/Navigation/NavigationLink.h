@@ -19,6 +19,8 @@ struct NavigationLinkParser {
   void SplitMessageArguments(const char* text, std::vector<std::string>& arguments);
   std::string FormatMessageArguments(std::string value, int messageId);
   std::string FormatNavigationLink(std::string value, bool brackets);
+  std::string DisplayNavigationLink(std::string value);
+  int ItemLinkMessageId(const std::string& text);
 
   /* 0000 */ bool m_ready;
 };

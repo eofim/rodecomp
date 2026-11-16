@@ -78,6 +78,15 @@ static int SkillTabOf(int skillId) {
   return 1;
 }
 
+namespace {
+// INLINED
+inline int SessionOption(int id) {
+  const auto entry = g_session.m_options.Values().find(static_cast<int>(id));
+  const std::int64_t value = entry == g_session.m_options.Values().end() ? 0 : entry->second;
+  return static_cast<int>(value);
+}
+}
+
 // OFFSET: 0x009B3E70
 // FUNCTION: fn_13826
 void UINewSkillListWnd::StoreInfo() {
@@ -121,7 +130,7 @@ void UINewSkillListWnd::ApplySkillPoints() {
       CSkillInfo* skill = g_session.m_skillBundle.FindGrouped(id);
       if (skill != nullptr && skill->available != 0) {
         for (int level = skill->learnedLevel + 1; level <= value; ++level) {
-          g_modeMgr.gameMode->SendMsg(MM_UPGRADE_SKILLLEVEL, id, 0, 0, 0);
+          g_modeMgr.currentMode->SendMsg(MM_UPGRADE_SKILLLEVEL, id, 0, 0, 0);
         }
       }
     }
@@ -133,7 +142,7 @@ void UINewSkillListWnd::ApplySkillPoints() {
     for (auto it = pending.begin(); it != pending.end(); ++it, ++current) {
       if (current->available != 0 && current->id == it->id && current->level < it->level) {
         for (int i = 0; i < it->level - current->level; ++i) {
-          g_modeMgr.gameMode->SendMsg(MM_UPGRADE_SKILLLEVEL, current->id, 0, 0, 0);
+          g_modeMgr.currentMode->SendMsg(MM_UPGRADE_SKILLLEVEL, current->id, 0, 0, 0);
         }
       }
     }
@@ -254,7 +263,7 @@ void UINewSkillListWnd::DrawCharacter() {
     const int clipY = y >= 0 ? 0 : y;
     this->geometry.surface->DrawSurface(
       cell.x + offsetX + 48, y >= 0 ? y : 0, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f - clipY), image->width,
-      image->height + clipY, cell.mirrored != 0, image->doubleWidth + 1, image->doubleHeight + 1, 0
+      image->height + clipY, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
 }
@@ -340,7 +349,7 @@ void UINewSkillListWnd::DrawSkillList() {
             const std::uint32_t id = skill.id;
             for (const CSkillInfo& live : this->SkillList(this->m_tab, true)) {
               if (live.id == id && live.level != 0) {
-                const int amount = skill.UseSpAmount(*g_session.m_hotkeyScript, useLevel);
+                const int amount = skill.UseSpAmount(useLevel);
                 if (amount != 0 && useLevel <= skill.level) {
                   sp = amount;
                 }
@@ -350,11 +359,11 @@ void UINewSkillListWnd::DrawSkillList() {
             }
           }
           if (!found) {
-            sp = skill.UseSpAmount(*g_session.m_hotkeyScript, skill.level);
+            sp = skill.UseSpAmount(skill.level);
           }
 
-          const int ap = skill.UseApAmount(*g_session.m_hotkeyScript, useLevel > 0 ? useLevel : skill.level);
-          if (SkillUsesPercentSp(static_cast<int>(skill.id))) {
+          const int ap = skill.UseApAmount(useLevel > 0 ? useLevel : skill.level);
+          if (g_session.SkillUsesPercentSp(static_cast<int>(skill.id))) {
             if (ap != 0) {
               std::sprintf(text, "Sp : %d%%, Ap : %d", sp, ap);
             } else {
@@ -480,7 +489,7 @@ void UINewSkillListWnd::InitTabs() {
   const char* jobTabs[4] = {};
   g_session.m_hotkeyScript->Call(func, "d>ssss", 0, &defaultTabs[0], &defaultTabs[1], &defaultTabs[2], &defaultTabs[3]);
 
-  const int baseJob = JobNames::BaseJob(g_session.GetDisplayJob());
+  const int baseJob = g_session.BaseJob(g_session.GetDisplayJob());
   int jobKey = baseJob;
   switch (baseJob) {
   case JT_NOVICE:
@@ -870,8 +879,8 @@ void UINewSkillListWnd::Paint() {
   const int left = this->m_tabs->geometry.width;
   this->ClearSurface(0xFFFF00FF);
   this->FillRegion(left, this->m_topMargin, this->geometry.width - left, this->geometry.height - this->m_bottomMargin - this->m_topMargin, 0xFFFFFF);
-  DrawRoundedBorder(*this, left, 0, this->geometry.width - left, this->geometry.height, 0xC3C3C3);
-  DrawRoundedBorder(*this, left + 2, 2, this->geometry.width - left - 4, this->geometry.height - 4, 0xC3C3C3);
+  this->DrawRoundedOutline(left, 0, this->geometry.width - left, this->geometry.height, 0xC3C3C3);
+  this->DrawRoundedOutline(left + 2, 2, this->geometry.width - left - 4, this->geometry.height - 4, 0xC3C3C3);
 
   CBitmapRes* bitmap =
     static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\skill_upbar_left.bmp")));
@@ -927,7 +936,7 @@ void UINewSkillListWnd::Paint() {
 // OFFSET: 0x009B2590
 // FUNCTION: fn_13816
 void UINewSkillListWnd::OnLBtnDblClk(int x, int y) {
-  if (g_session.GetOption(5) > 0) {
+  if (SessionOption(5) > 0) {
     return;
   }
 
@@ -974,7 +983,7 @@ void UINewSkillListWnd::OnLBtnDown(int x, int y) {
   if (this->IsSkillArea(x, y) && !this->m_locked && this->m_selectedSkill != -1 && g_replayAnimationScaling == 0) {
     CSkillInfo skill = this->SkillAt(this->m_selectedSkill, false);
     if (skill.available != 0 && skill.level != 0 && skill.type != 0) {
-      CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* gameMode = g_modeMgr.GetGameMode();
       if (gameMode) {
         int level = g_session.UseLevel(skill.id);
         if (level == 0) {
@@ -1025,7 +1034,7 @@ void UINewSkillListWnd::OnMouseHover(int x, int y) {
       int tooltipX = -10;
       int tooltipY = -20;
       this->ToScreen(tooltipX, tooltipY);
-      CMode* mode = g_modeMgr.gameMode;
+      CMode* mode = g_modeMgr.currentMode;
       mode->ShowTooltip((*skill)->DisplayName(), tooltipX + x, tooltipY + y, -1, 0, 1);
     }
   }
@@ -1449,7 +1458,7 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   case UM_USESKILL: {
     const CSkillInfo* skill = reinterpret_cast<const CSkillInfo*>(a);
     if (skill->level != 0) {
-      CMode* gameMode = g_modeMgr.gameMode;
+      CMode* gameMode = g_modeMgr.currentMode;
       gameMode->SendMsg(MM_USING_SKILL, a, g_session.UseLevel(skill->id), 0, 0);
       return 0;
     }

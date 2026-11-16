@@ -4,7 +4,23 @@
 #include "File/File.h"
 #include "Resource/Resource.h"
 
+#include <cstdint>
 #include <vector>
+
+class CTexture;
+
+struct GroundCellRecord {
+  /* 0000 */ float heights[4];
+  /* 0010 */ int tiles[3];
+};
+
+struct GroundTileRecord {
+  /* 0000 */ float u[4];
+  /* 0010 */ float v[4];
+  /* 0020 */ std::int16_t texture;
+  /* 0022 */ std::uint16_t lightmap;
+  /* 0024 */ std::uint32_t color;
+};
 
 struct GroundWaterParameters {
   /* 0000 */ float level;
@@ -17,7 +33,9 @@ struct GroundWaterParameters {
 
 struct GroundWater {
   /* 0000 */ GroundWaterParameters parameters;
-  /* 0018 */ std::uint32_t reserved[3];
+  /* 0018 */ int frame;
+  /* 001C */ float phase;
+  /* 0020 */ CTexture* texture;
 };
 
 struct GroundLegacyLightmap {
@@ -55,8 +73,8 @@ public:
   /* 0174 */ const unsigned char* lightmaps;
   /* 0178 */ const std::uint32_t* legacyLightmapIndices;
   /* 017C */ const GroundLegacyLightmap* legacyLightmaps;
-  /* 0180 */ const unsigned char* tiles;
-  /* 0184 */ const unsigned char* cells;
+  /* 0180 */ const GroundTileRecord* tiles;
+  /* 0184 */ const GroundCellRecord* cells;
 
 private:
   bool Parse();
@@ -67,10 +85,18 @@ private:
 
 static_assert(sizeof(GroundWaterParameters) == 24);
 static_assert(sizeof(GroundWater) == 36);
+static_assert(offsetof(GroundWater, texture) == 0x20);
+static_assert(sizeof(GroundCellRecord) == 28);
+static_assert(offsetof(GroundCellRecord, tiles) == 0x10);
+static_assert(sizeof(GroundTileRecord) == 40);
+static_assert(offsetof(GroundTileRecord, texture) == 0x20);
+static_assert(offsetof(GroundTileRecord, color) == 0x24);
 static_assert(sizeof(GroundLegacyLightmap) == 40);
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(CGndRes) == 0x01B4);
+static_assert(offsetof(CGndRes, tiles) == 0x180);
+static_assert(offsetof(CGndRes, cells) == 0x184);
 #endif
 
 #endif

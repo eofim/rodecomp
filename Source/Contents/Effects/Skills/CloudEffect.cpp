@@ -147,7 +147,7 @@ void CCloud::OnProcess() {
   matrix scale;
   scale.SetScale(this->particle->scale, this->particle->scale, 1.0f);
   matrix rotation;
-  rotation.MakeXRotation(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch / 180.0f * 3.141592f);
+  rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
   matrix transform;
   transform.Compose(scale, rotation);
   this->particle->transform = transform;
@@ -169,7 +169,7 @@ void CCloud::Drift() {
   StepDrift(this->driftZ, this->driftTargetZ);
 
   CParticle* particle = this->particle;
-  vector3d offset = *reinterpret_cast<const vector3d*>(&particle->offsetX);
+  vector3d offset = particle->offset;
   offset.x = g_sinTable[this->driftX] * 0.05f + offset.x;
   offset.z = g_sinTable[this->driftZ] * 0.05f + offset.z;
   particle->offsetX = offset.x;

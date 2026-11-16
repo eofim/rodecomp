@@ -44,18 +44,18 @@ public:
 
 class CSkillAction_DamageWereRaptorForm : public CSkillAction_AnimalForm, public CSkillAction_Direction {
 public:
-  void SpawnAttack00Effect(int sourceActor, CGameActor* target);
-  __declspec(noinline) void SpawnAttack01Effect(int level, CGameActor* source);
-  __declspec(noinline) void SpawnAttack02Effect(int level, CGameActor* source);
+  void SpawnAttack00Effect(CGameActor* source, CGameActor* target);
+  __declspec(noinline) void SpawnAttack01Effect(CGameActor* source, CGameActor* target);
+  __declspec(noinline) void SpawnAttack02Effect(CGameActor* source, CGameActor* target);
   void SpawnDirectionalEffect(CGameActor* source, CGameActor* target, std::string_view name);
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
   bool IsInForm(CGameActor* actor) override;
   void PlayFormAttackEffect(CGameActor* actor) override;
 };
 
 class CSkillAction_DamageWereWolfForm : public CSkillAction_AnimalForm {
 public:
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
   bool IsInForm(CGameActor* actor) override;
   void PlayFormAttackEffect(CGameActor* actor) override;
 };
@@ -65,7 +65,7 @@ public:
   int GetSkillCastMotion() override;
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_Icing : public CSkillAction {
@@ -73,7 +73,7 @@ public:
   int GetSkillCastMotion() override;
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
   void SpawnIcing(CGameActor* target);
 };
 
@@ -82,7 +82,7 @@ public:
   int GetSkillCastMotion() override;
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
   virtual void PlayThunderEffect(CGameActor* source) = 0;
 };
 
@@ -119,7 +119,7 @@ public:
 class CSkillAction_KR_EARTH_DRILL : public CSkillAction_Earthing {
 public:
   int GetSkillAttackMotion() override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_KR_EARTH_STAMP : public CSkillAction_Earthing {
@@ -132,7 +132,7 @@ class CSkillAction_KR_GROUND_BLOOM : public CSkillAction {
 public:
   int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillDamage(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) override;
 };
 
 class CSkillAction_KR_THUNDERING_CALL : public CSkillAction_ThunderingBasic {
@@ -188,7 +188,7 @@ class CSkillAction_KR_FEATHER_SPRINKLE : public CSkillAction_DamageWereRaptorFor
 public:
   int GetSkillAttackMotion() override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_KR_SHARPEN_GUST : public CSkillAction_DamageWereRaptorForm {
@@ -197,7 +197,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_KR_SHARPEN_HAIL : public CSkillAction_DamageWereRaptorForm {
@@ -206,7 +206,7 @@ public:
   int GetSkillAttackMotion() override;
   void OnSkillCast(int level, CGameActor* source) override;
   void OnSkillEffect(int level, CGameActor* source, CGameActor* target) override;
-  void OnSkillHit(int level, CGameActor* source, CGameActor* target) override;
+  void OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) override;
 };
 
 class CSkillAction_KR_IRON_HOWLING : public CSkillAction_DamageWereWolfForm {
@@ -316,16 +316,16 @@ int CSkillAction_KR_EARTH_DRILL::GetSkillAttackMotion() {
 
 // OFFSET: 0x005B0EB0
 // FUNCTION: fn_03349
-void CSkillAction_KR_EARTH_DRILL::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  if (!source) {
+void CSkillAction_KR_EARTH_DRILL::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  if (!target) {
     return;
   }
 
   EffectLists* effects = g_effectMgr;
-  effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("earth_drill", 0xC52FB5FBB94FF917ULL)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+  effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("earth_drill", 0xC52FB5FBB94FF917ULL)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
 
   effects = g_effectMgr;
-  effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("earth_drill_bottom", 0x93E7A3A1F587CDC5ULL)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+  effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("earth_drill_bottom", 0x93E7A3A1F587CDC5ULL)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
 }
 
 // OFFSET: 0x005B1240
@@ -352,13 +352,13 @@ int CSkillAction_KR_GROUND_BLOOM::GetSkillAttackMotion() {
 
 // OFFSET: 0x005B15A0
 // FUNCTION: fn_03353
-void CSkillAction_KR_GROUND_BLOOM::OnSkillDamage(int level, CGameActor* source, CGameActor* target) {
-  if (!source) {
+void CSkillAction_KR_GROUND_BLOOM::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
+  if (!target) {
     return;
   }
 
-  if (CRagEffect* effect = source->LaunchEffect(EF_HIT1, vector3d{0.0f, 0.0f, 0.0f}, 0.0f)) {
-    effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&source->render.position), 0, 0, 0, 0);
+  if (CRagEffect* effect = target->LaunchEffect(EF_HIT1, vector3d{0.0f, 0.0f, 0.0f}, 0.0f)) {
+    effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&target->render.position), 0, 0, 0, 0);
   }
 }
 
@@ -565,8 +565,8 @@ int CSkillAction_KR_FEATHER_SPRINKLE::GetSkillAttackMotion() {
 
 // OFFSET: 0x005B4240
 // FUNCTION: fn_03370
-void CSkillAction_KR_FEATHER_SPRINKLE::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  this->SpawnAttack01Effect(level, source);
+void CSkillAction_KR_FEATHER_SPRINKLE::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  this->SpawnAttack01Effect(source, target);
 }
 
 // OFFSET: 0x005B4260
@@ -591,9 +591,9 @@ void CSkillAction_KR_SHARPEN_GUST::OnSkillCast(int level, CGameActor* source) {
 
 // OFFSET: 0x005B46D0
 // FUNCTION: fn_03375
-void CSkillAction_KR_SHARPEN_GUST::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  this->SpawnAttack01Effect(level, source);
-  this->SpawnAttack02Effect(level, source);
+void CSkillAction_KR_SHARPEN_GUST::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  this->SpawnAttack01Effect(source, target);
+  this->SpawnAttack02Effect(source, target);
 }
 
 // OFFSET: 0x005B4700
@@ -686,8 +686,8 @@ void CSkillAction_KR_SHARPEN_HAIL::OnSkillEffect(int level, CGameActor* source, 
 
 // OFFSET: 0x005B4F70
 // FUNCTION: fn_03380
-void CSkillAction_KR_SHARPEN_HAIL::OnSkillHit(int level, CGameActor* source, CGameActor* target) {
-  this->SpawnAttack01Effect(level, source);
+void CSkillAction_KR_SHARPEN_HAIL::OnSkillHit(CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
+  this->SpawnAttack01Effect(source, target);
 }
 
 // OFFSET: 0x005B4F90
@@ -870,9 +870,7 @@ bool CWhirlwindEffect::OnProcess() {
     return false;
   }
 
-  this->render.position.x = this->state.parent->render.position.x;
-  this->render.position.y = this->state.parent->render.position.y;
-  this->render.position.z = this->state.parent->render.position.z;
+  this->render.position = this->state.parent->render.position;
 
   const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
   const int remaining = std::max(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(this->endTime - now).count()), 0);
@@ -908,7 +906,7 @@ void CSkillAction_KR_NASTY_SLASH::OnSkillEffect(int level, CGameActor* source, C
     return;
   }
 
-  const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values);
+  const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
   constexpr std::array<std::uint8_t, 12> effectSourceArray = OBFUSCATE_SOURCE("nasty_slash", 0x2FF3C5036D070127ULL);
   const std::uint8_t (&effectSource)[12] = effectSourceArray._Elems;
   thread_local EncryptedName<sizeof(effectSource), 0x2FF3C5036D070127ULL> effectName(effectSource);
@@ -939,7 +937,7 @@ void CSkillAction_KR_SHARPEN_GUST::OnSkillEffect(int level, CGameActor* source, 
     return;
   }
 
-  const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values);
+  const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
   EffectLists* effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("sharpen_gust", 0x3F557BE333F95F6DULL)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     effect->SetAngle(angle);

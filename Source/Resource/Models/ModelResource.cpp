@@ -225,17 +225,17 @@ __forceinline void C3dModelResV1::ReadNode(CFile& file, unsigned minor, const st
   int vertexCount = 0;
   file.Read(&vertexCount, 4);
   mesh.vertexCount = vertexCount;
-  ShadeVector* vertices = new ShadeVector[vertexCount];
+  auto* vertices = new std::array<float, 3>[vertexCount];
   file.Read(vertices, static_cast<unsigned>(vertexCount) * 12u);
-  mesh.vertices = reinterpret_cast<std::array<float, 3>*>(vertices);
+  mesh.vertices = vertices;
 
   for (int index = 0; index < vertexCount; ++index) {
-    ShadeVector& vertex = vertices[index];
-    const float y = ((vertex.x * matrix[1] + vertex.y * matrix[4]) + matrix[7] * vertex.z) + matrix[10];
-    const float z = ((vertex.x * matrix[2] + vertex.y * matrix[5]) + matrix[8] * vertex.z) + matrix[11];
-    vertex.x = ((vertex.x * matrix[0] + vertex.y * matrix[3]) + vertex.z * matrix[6]) + matrix[9];
-    vertex.y = y;
-    vertex.z = z;
+    std::array<float, 3>& vertex = vertices[index];
+    const float y = ((vertex[0] * matrix[1] + vertex[1] * matrix[4]) + matrix[7] * vertex[2]) + matrix[10];
+    const float z = ((vertex[0] * matrix[2] + vertex[1] * matrix[5]) + matrix[8] * vertex[2]) + matrix[11];
+    vertex[0] = ((vertex[0] * matrix[0] + vertex[1] * matrix[3]) + vertex[2] * matrix[6]) + matrix[9];
+    vertex[1] = y;
+    vertex[2] = z;
   }
 
   int textureVertexCount = 0;
@@ -375,10 +375,10 @@ bool C3dModelResV1::Load(const char* name) {
       for (int index = 0; index < volumeCount; ++index) {
         auto* volume = new ModelVolume;
         std::memset(volume, 0, 132);
-        unsigned char record[40]{};
-        file.Read(record, sizeof(record));
-        std::memcpy(&volume->flag, record + 36, 4);
-        std::memcpy(volume, record, 36);
+        ModelVolumeRecord record{};
+        file.Read(&record, sizeof(record));
+        volume->flag = record.flag;
+        std::memcpy(volume, &record, sizeof(ModelVolumeRecordV1));
 
         if (volume->flag == 0) {
           volume->size[0] = volume->size[0] + 3.0f;
@@ -391,10 +391,10 @@ bool C3dModelResV1::Load(const char* name) {
       for (int index = 0; index < volumeCount; ++index) {
         auto* volume = new ModelVolume;
         std::memset(volume, 0, 132);
-        unsigned char record[36]{};
-        file.Read(record, sizeof(record));
+        ModelVolumeRecordV1 record{};
+        file.Read(&record, sizeof(record));
         volume->flag = 0;
-        std::memcpy(volume, record, 36);
+        std::memcpy(volume, &record, sizeof(record));
         this->volumes.push_back(volume);
       }
     }
@@ -592,7 +592,7 @@ int C3dGrannyModelRes::GetTriangleCount(int mesh) const {
 
 // OFFSET: 0x007597E0
 // FUNCTION: fn_08016
-unsigned char* C3dGrannyModelRes::GetRigidVertices(int mesh) const {
+const void* C3dGrannyModelRes::GetRigidVertices(int mesh) const {
   const GrannyMeshEntry& entry = this->instance->meshes[mesh];
 
   if (GrannyMeshIsRigid(entry.mesh)) {
@@ -827,7 +827,7 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
   // GLOBAL: gl_24736
   static ShadeVector vertexNormals[30000];
   std::list<int> groups[32];
-  auto faceColors = [this](int index) { return reinterpret_cast<std::uint32_t*>(this->faceNormals[index].data()); };
+  auto faceColors = [this](int index) { return this->faceColors[index].data(); };
 
   switch (shadeType) {
   case 0: {
@@ -1025,11 +1025,10 @@ const void* C3dGrannyModelRes::GetMeshRenderData(
     GrannyDeformVertices(meshes[mesh].deformer, boneIndices, matrices, vertexCount, GrannyGetMeshVertices(meshes[mesh].mesh), this->deformBuffer);
     GrannyGetMeshBytesPerIndex(meshes[mesh].mesh);
     GrannyGetMeshIndices(meshes[mesh].mesh);
-    const void* vertices = this->deformBuffer;
     *indices = meshes[mesh].indices;
     *triangleCount = GrannyGetMeshIndexCount(meshes[mesh].mesh) / 3;
     std::memcpy(transform->values, g_identityMatrix, sizeof(g_identityMatrix));
-    return vertices;
+    return this->deformBuffer;
   }
 
   return nullptr;
@@ -1063,8 +1062,8 @@ granny_world_pose* C3dGrannyModelRes::Animate(float seconds, granny_model_instan
   granny_skeleton* skeleton = GrannyGetSourceSkeleton(instance);
   const std::int32_t boneCount = skeleton->boneCount;
   GrannySetModelClock(instance, seconds);
-  GrannySampleModelAnimations(instance, 0, boneCount, static_cast<granny_local_pose*>(this->localPose));
-  GrannyBuildWorldPose(skeleton, 0, boneCount, static_cast<granny_local_pose*>(this->localPose), nullptr, model->worldPose);
+  GrannySampleModelAnimations(instance, 0, boneCount, this->localPose);
+  GrannyBuildWorldPose(skeleton, 0, boneCount, this->localPose, nullptr, model->worldPose);
   GrannyFreeCompletedModelControls(instance);
   return model->worldPose;
 }
@@ -1096,7 +1095,7 @@ void C3dGrannyModelRes::Release() {
   }
 
   delete[] this->textures;
-  GrannyFreeLocalPose(static_cast<granny_local_pose*>(this->localPose));
+  GrannyFreeLocalPose(this->localPose);
   GrannyFreeFile(this->file);
   delete this->instance;
   this->instance = nullptr;

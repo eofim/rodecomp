@@ -151,8 +151,8 @@ double ScreenAngle(vector3d from, vector3d to) {
   float fromY;
   float toX;
   float toY;
-  g_renderer->ProjectViewport(&from.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
-  g_renderer->ProjectViewport(&to.x, static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
+  g_renderer->ProjectViewport(&from.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
+  g_renderer->ProjectViewport(&to.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
   const float dx = toX - fromX;
   const float dy = toY - fromY;
   double angle = static_cast<float>(std::acos(static_cast<double>(dx / SquareRoot(dy * dy + dx * dx)))) / 3.141592f * 180.0f;
@@ -485,12 +485,12 @@ bool CreateEffectMgr() {
 
 // OFFSET: 0x00B24DE0
 // FUNCTION: fn_18775
-void EffectLists::SpawnLevel99(CRenderObject* actor, unsigned char flag, int extra) {
+void EffectLists::SpawnLevel99(CGameActor* actor, unsigned char flag, int extra) {
   if (!actor || extra != 0) {
     return;
   }
 
-  static_cast<CGameActor*>(actor)->ResetJobEffects();
+  actor->ResetJobEffects();
 
   if (!flag) {
     return;
@@ -5165,7 +5165,7 @@ bool EffectLists::RegisterAllocators() {
 // OFFSET: 0x00B3A430
 // FUNCTION: fn_18787
 bool EffectLists::RegisterAllocator(int id, CAllocator* allocator) {
-  return this->allocators.insert(std::make_pair(id, allocator)).second;
+  return this->allocators.insert({id, allocator}).second;
 }
 
 // OFFSET: 0x00B3AF30

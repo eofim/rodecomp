@@ -252,14 +252,10 @@ struct CEffectPrim : CRenderObject {
   void RenderSegmentSpriteTrail(matrix& wtm);
 
   void Initialize(CRagEffect& master, int type, float x, float y, float z);
+  void GetColorOverride(unsigned char* red, unsigned char* green, unsigned char* blue);
 
   /* 0138 */ EffectPrimitiveState state;
 };
-
-CEffectPrim* CreateEffectParticle(
-  CRagEffect& master, const RenderObjectState& masterRender, int type, float x, float y, float z,
-  std::list<CRenderObject*>& worldObjects
-);
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(CEffectPrim) == 0xFA18);

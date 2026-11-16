@@ -7,6 +7,7 @@
 #include "Render/DeviceContext/DeviceContext.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/ResourceMgr.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "UI/Lists/UIScrollBar.h"
 #include "UI/Lists/UIScrollBarVariants.h"
@@ -58,18 +59,6 @@ template __declspec(noinline) std::string std::operator+(const char* const, cons
 UIListBoxTitle::UIListBoxTitle() {
   this->lineHeight = 0xF;
   this->titleColor = 0x92C0FA;
-}
-
-// OFFSET: 0x0086E410
-// FUNCTION: fn_11070
-UIScrollBar2::UIScrollBar2() : UIScrollBar() {
-  this->arrowLength = 10;
-}
-
-// OFFSET: 0x0086E470
-// FUNCTION: fn_11071
-UIScrollBar3::UIScrollBar3() : UIScrollBar() {
-  this->arrowLength = 9;
 }
 
 // OFFSET: 0x0086E550
@@ -373,7 +362,7 @@ void UIScrollBar::ResetCursor(int x, int y) {
   if (this->maximum == 0) {
     UIWindow::ResetCursor(x, y);
   } else {
-    g_modeMgr.gameMode->SetCursorAction(2);
+    g_modeMgr.currentMode->SetCursorAction(2);
   }
 }
 
@@ -810,7 +799,7 @@ void UIBasicItemCtrl::DrawItemIcon(int x, int y, int, bool compact) {
   }
 
   char path[128];
-  g_session.IconPath(path, FormatOwnedString("%d", id).c_str(), this->m_item.identified);
+  g_session.IconPath(FormatOwnedString("%d", id).c_str(), path, this->m_item.identified);
   auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
   if (bitmap) {
     this->DrawBitmap(x, y, bitmap, true);
@@ -948,7 +937,7 @@ void UIBasicItemCtrl::DragAndDrop(int, int, std::intptr_t argument3) {
       }
     }
   }
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x0087E080
@@ -969,7 +958,7 @@ void UIBasicSkillCtrl::DragAndDrop(int, int, std::intptr_t argument3) {
       }
     }
   }
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x0087E190
@@ -1538,7 +1527,7 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
     }
     break;
   case UM_MOUSE_HOVER_BTN:
-    g_modeMgr.gameMode->SetCursorAction(0);
+    g_modeMgr.currentMode->SetCursorAction(0);
     if (this->dragNode && this->dragNode->id != a) {
       UITreeNode* target = reinterpret_cast<UITreeNode*>(a);
       this->dropNode = target;
@@ -1562,7 +1551,7 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         break;
       }
 
-      g_modeMgr.gameMode->SetCursorAction(2);
+      g_modeMgr.currentMode->SetCursorAction(2);
       UITreeNode* node = this->dragNode;
       UITVTextButton* label = node->labelButton;
       this->RemoveChildNode(node->parent, node->id, true);
@@ -1778,9 +1767,6 @@ void UITabControl::Configure(
 // OFFSET: 0x0087D240
 // FUNCTION: fn_11260
 bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) {
-  if (!this->geometry.surface) {
-    this->Resize(this->tagWidth / 2, 15);
-  }
   const std::string fitted = this->FitTextToWidth(entry->name, this->tagWidth / 2);
   std::string remaining = this->taggedText;
   const int bytes = static_cast<int>(std::strlen(fitted.c_str()));
@@ -1808,10 +1794,10 @@ bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) 
 
     bool atCursor;
     if (before.find("<") != std::string::npos && after.find(">") == std::string::npos) {
-      atCursor = (!g_windowMgr.rodexComposeWnd || static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->m_contents == g_windowMgr.GetHoverWindow()) &&
+      atCursor = (!g_windowMgr.rodexComposeWnd || g_windowMgr.rodexComposeWnd->m_contents == g_windowMgr.GetHoverWindow()) &&
                  absolute + bytes == g_serverLanguage->cursor;
     } else if (before.find("<") == std::string::npos && after.find(">") != std::string::npos) {
-      atCursor = (!g_windowMgr.rodexComposeWnd || static_cast<UIRodexComposeWnd*>(g_windowMgr.rodexComposeWnd)->m_contents == g_windowMgr.GetHoverWindow()) &&
+      atCursor = (!g_windowMgr.rodexComposeWnd || g_windowMgr.rodexComposeWnd->m_contents == g_windowMgr.GetHoverWindow()) &&
                  absolute == g_serverLanguage->cursor;
     } else if (before.find("<") != std::string::npos && after.find(">") != std::string::npos) {
       ++count;
@@ -1870,6 +1856,9 @@ bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) 
 
 #include <mbstring.h>
 
+template __declspec(noinline) std::size_t std::_Traits_find<std::char_traits<char>>(
+    const char* const, std::size_t, std::size_t, const char* const, std::size_t) noexcept;
+
 // GLOBAL: gl_24662
 std::string g_itemLinkTagBegin = "<ITEML>";
 // GLOBAL: gl_24663
@@ -1910,7 +1899,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
     result += prefix;
 
     if (encoded.substr(0, 6) == "00000T") {
-      const int titleId = ItemLinkMessageId(encoded);
+      const int titleId = g_navigationLinkParser->ItemLinkMessageId(encoded);
       if (g_itemTagOwner->maxTipId >= titleId) {
         std::string label;
         const std::string title = g_itemTagOwner->Title(titleId, &label, 17);
@@ -1929,7 +1918,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
     }
 
     std::vector<std::int32_t> fields;
-    DecodeItemLinkFields(encoded, fields);
+    this->DecodeItemLinkFields(encoded, fields);
     ITEM_INFO item;
     if (ItemFromLinkFields(fields, item)) {
       const std::string label = this->BracketName(item.DisplayName(0));
@@ -2014,9 +2003,6 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
     const std::string name = g_navigationLinkParser->FormatNavigationLink(link, false);
     std::string label = "<";
     const int width = this->geometry.width / 2;
-    if (this->geometry.surface == nullptr) {
-      this->Resize(width, 15);
-    }
     label += this->FitTextToWidth(name, width);
     label += ">";
 
@@ -2129,7 +2115,7 @@ void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int& mode)
 
 // OFFSET: 0x0089DC30
 // FUNCTION: fn_11598
-void UIChatHisBox::AddItemLinkLine(const char* text, int& color, int& mode) {
+void UIChatHisBox::AddItemLinkLine(const char* text, std::uint32_t& color, int& mode) {
   if (!_mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>(g_itemLinkTagBegin.c_str())) ||
       !_mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>(g_itemLinkTagEnd.c_str()))) {
     this->UIListBox::AddLine(text);
@@ -2153,15 +2139,15 @@ void UIChatHisBox::AddItemLinkLine(const char* text, int& color, int& mode) {
 
 // OFFSET: 0x0089E0F0
 // FUNCTION: fn_11599
-void UIChatHisBox::AddNavigationLinkLine(const char* text, int& color, int& mode) {
-  if (!g_navigationLinkParser->HasLink(text)) {
+void UIChatHisBox::AddNavigationLinkLine(const char* text, std::uint32_t& color, int& mode) {
+  NavigationLinkParser* const parser = g_navigationLinkParser;
+  if (!parser->HasLink(text)) {
     this->UIListBox::AddLine(text);
     return;
   }
 
   std::vector<std::string> wrapped;
-  std::string display;
-  DisplayNavigationLink(display, text);
+  std::string display = parser->DisplayNavigationLink(text);
   this->WrapLinkText(&mode, &wrapped, display);
   this->RewrapLinkLines(wrapped, mode);
   std::string source = text;
@@ -2188,7 +2174,7 @@ UIListBoxID::UIListBoxID()
   background[1] = 255;
   background[2] = 255;
   const SkinPaletteCell cell = {3, 2};
-  this->selectionColor = SkinPaletteColor(ResourceMgr::Instance(), cell, g_skinInfo.Selected());
+  this->selectionColor = g_skinInfo.PaletteColor(cell, g_skinInfo.Selected());
 }
 
 // OFFSET: 0x0087C2A0

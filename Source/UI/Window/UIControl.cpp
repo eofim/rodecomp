@@ -9,6 +9,7 @@
 #include "Client/Mode/ModeMgr.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/ResourceMgr.h"
+#include "Contents/Skin/SkinMgr.h"
 #include "Resource/Bitmap/TextureNames.h"
 #include "UI/Login/UINewSelectCharWnd.h"
 #include "UI/Window/UIWindowMgr.h"
@@ -531,7 +532,7 @@ void CUIHThumb::OnMouseMove(int x, int) {
 // OFFSET: 0x009F24F0
 // FUNCTION: fn_14714
 void CUIThumb::ResetCursor(int, int) {
-  g_modeMgr.gameMode->SetCursorAction(2);
+  g_modeMgr.currentMode->SetCursorAction(2);
 }
 
 // OFFSET: 0x009F2450
@@ -541,7 +542,7 @@ void CUIThumb::OnMouseHover(int, int) {
     int screenX = 0;
     int screenY = -20;
     this->ToScreen(screenX, screenY);
-    g_modeMgr.gameMode->ShowTooltip(this->tooltip.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(this->tooltip.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
   }
 }
 
@@ -845,7 +846,7 @@ void CUIButton::OnMouseHover(int, int) {
 
   this->ToScreen(screenX, screenY);
 
-  g_modeMgr.gameMode->ShowTooltip(this->tooltip.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
+  g_modeMgr.currentMode->ShowTooltip(this->tooltip.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
 }
 
 // OFFSET: 0x009EEA70
@@ -858,9 +859,9 @@ void CUIButton::OnMouseLeave() {
 // FUNCTION: fn_14633
 void CUIButton::ResetCursor(int, int) {
   if (this->disabled) {
-    g_modeMgr.gameMode->SetCursorAction(0);
+    g_modeMgr.currentMode->SetCursorAction(0);
   } else {
-    g_modeMgr.gameMode->SetCursorAction(2);
+    g_modeMgr.currentMode->SetCursorAction(2);
   }
 }
 
@@ -913,12 +914,12 @@ void CUITextButton::OnMouseHover(int, int) {
     int screenX = 0;
     int screenY = -20;
     this->ToScreen(screenX, screenY);
-    g_modeMgr.gameMode->ShowTooltip(this->tooltipText.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(this->tooltipText.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
   } else {
     int screenX = -6;
     int screenY = -4;
     this->ToScreen(screenX, screenY);
-    g_modeMgr.gameMode->ShowTooltip(this->fullText.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
+    g_modeMgr.currentMode->ShowTooltip(this->fullText.c_str(), screenX, screenY, 0xFFFFFFFFu, 0, 1);
   }
 }
 
@@ -1191,9 +1192,9 @@ void CUITabButton::OnLBtnUp(int, int) {
 // OFFSET: 0x009F1690
 // FUNCTION: fn_14694
 void CUITabButton::LoadSkin(bool resolveSkin) {
-  this->normalColor = SkinPaletteColor(ResourceMgr::Instance(), this->normalCell, resolveSkin);
-  this->selectedColor = SkinPaletteColor(ResourceMgr::Instance(), this->selectedCell, resolveSkin);
-  this->borderColor = SkinPaletteColor(ResourceMgr::Instance(), this->borderCell, resolveSkin);
+  this->normalColor = g_skinInfo.PaletteColor(this->normalCell, resolveSkin);
+  this->selectedColor = g_skinInfo.PaletteColor(this->selectedCell, resolveSkin);
+  this->borderColor = g_skinInfo.PaletteColor(this->borderCell, resolveSkin);
   this->CUIImageTextButton::LoadSkin(resolveSkin);
 }
 
@@ -1248,7 +1249,7 @@ void CUIStaticImage::OnMouseHover(int, int) {
   int x = 0;
   int y = -8;
   this->ToScreen(x, y);
-  g_modeMgr.gameMode->ShowTooltip(this->tooltip.c_str(), x, y, 0xFFFFFFFFu, 0, 1);
+  g_modeMgr.currentMode->ShowTooltip(this->tooltip.c_str(), x, y, 0xFFFFFFFFu, 0, 1);
 }
 
 // OFFSET: 0x009F08A0
@@ -1354,7 +1355,7 @@ void CUITitleBar::SetSecondButton(CUIButton* button) {
 
   const char* behavior = nullptr;
   if (g_session.m_hotkeyScript->Call("GetBeHaviorOfWindow", "d>s", this->parent->geometry.id, &behavior) && behavior) {
-    CUIButton* second = static_cast<CUIButton*>(this->secondButton);
+    CUIButton* second = this->secondButton;
     const std::string text = behavior;
     second->tooltip = text;
   }
@@ -2574,7 +2575,7 @@ void CUIResizer::OnMouseMove(int x, int y) {
 // OFFSET: 0x009E96B0
 // FUNCTION: fn_14507
 void CUIResizer::ResetCursor(int, int) {
-  g_modeMgr.gameMode->SetCursorAction(2);
+  g_modeMgr.currentMode->SetCursorAction(2);
 }
 
 // OFFSET: 0x009E96C0
@@ -2791,7 +2792,7 @@ namespace AdventureGuide {
 // OFFSET: 0x009D9150
 // FUNCTION: fn_14276
 __declspec(noinline) CUIItemInfo::CUIItemInfo()
-    : CUIListItem(), headerControls(), descriptionViewer(nullptr), optionsViewer(nullptr), sourcesViewer(nullptr), itemId(-1), type(21), location(-1),
+    : CUIListItem(), image(nullptr), nameText(nullptr), descriptionViewer(nullptr), optionsViewer(nullptr), sourcesViewer(nullptr), itemId(-1), type(21), location(-1),
       description() {
 }
 
@@ -2805,17 +2806,6 @@ CUIMonsterInfo::CUIMonsterInfo()
 // FUNCTION: fn_14280
 __declspec(noinline) CUIQuestInfo::CUIQuestInfo()
     : CUIListItem(), stampImage(nullptr), titleViewer(nullptr), linesViewer(nullptr), statusViewer(nullptr), title(), questId(0) {
-}
-
-// OFFSET: 0x009D94D0
-// FUNCTION: fn_14281
-CUISubTab::CUISubTab() : CUIListItem(), labelText(nullptr), stampImage(nullptr), id(0), questId(0) {
-}
-
-// OFFSET: 0x009D9550
-// FUNCTION: fn_14282
-CUITab::CUITab()
-    : CUIListItem(), labelText(nullptr), subTabs(nullptr), title(), type(7), page(nullptr), collapsedHeight(0) {
 }
 
 // OFFSET: 0x009D9600
@@ -2837,7 +2827,7 @@ void CUIVScrollBar::ScrollBy(int value) {
 // OFFSET: 0x009F0A70
 // FUNCTION: fn_14670
 void CUIStaticText::OnMouseHover(int x, int y) {
-  if (this->Tooltip().empty()) {
+  if (this->tooltip.empty()) {
     CUIControl::OnMouseHover(x, y);
     return;
   }
@@ -2845,17 +2835,17 @@ void CUIStaticText::OnMouseHover(int x, int y) {
   x = -6;
   y = -4;
   this->ToScreen(x, y);
-  g_modeMgr.gameMode->ShowTooltip(this->Tooltip().c_str(), x, y, 0xFFFFFFFFu, 0, 1);
+  g_modeMgr.currentMode->ShowTooltip(this->tooltip.c_str(), x, y, 0xFFFFFFFFu, 0, 1);
 }
 
 // OFFSET: 0x009F0AE0
 // FUNCTION: fn_14671
 void CUIStaticText::UpdateText() {
-  this->Tooltip().clear();
+  this->tooltip.clear();
   if (this->fitText) {
     this->displayText = this->FitDisplayText(this->geometry.width, this->text.c_str(), this->fontIndex, this->fontHeight, this->bold);
     if (this->displayText != this->text) {
-      this->Tooltip() = this->text;
+      this->tooltip = this->text;
     }
   } else {
     this->displayText = this->text;
@@ -2929,7 +2919,7 @@ void CUIStaticText::SetText(std::string_view value) {
 // OFFSET: 0x009F0E80
 // FUNCTION: fn_14681
 void CUIStaticText::SetTooltip(std::string_view value) {
-  this->Tooltip().assign(value.data(), value.size());
+  this->tooltip.assign(value.data(), value.size());
 }
 
 // OFFSET: 0x009F1D20
@@ -3351,6 +3341,28 @@ CUIRegisterMgr* Singleton<CUIRegisterMgr>::GetInstance() {
   return s_instance;
 }
 
+namespace {
+// INLINED
+inline int MeasureTextWidth(UIWindow* window, const char* text, unsigned bytes, int family, int height, unsigned char bold, unsigned char italic) {
+  if (!text) {
+    return 0;
+  }
+
+  if (!bytes) {
+    bytes = static_cast<unsigned>(std::strlen(text));
+    if (!bytes) {
+      return 0;
+    }
+  }
+
+  TextContext context(*window->geometry.surface);
+  context.SetFont(family, height, bold, italic);
+  SIZE size;
+  context.Measure(text, bytes, &size);
+  return size.cx;
+}
+}
+
 // OFFSET: 0x00A829D0
 // FUNCTION: fn_16994
 const char* UIWindow::ClipTextToWidth(const char* text, int maxWidth, int family, int height, unsigned char bold) {
@@ -3363,7 +3375,9 @@ const char* UIWindow::ClipTextToWidth(const char* text, int maxWidth, int family
   {
     TextContext context(*this->geometry.surface);
     context.SetFont(family, height, bold, 0);
-    ellipsisWidth = context.Measure("...", 3).cx;
+    SIZE size;
+    context.Measure("...", 3, &size);
+    ellipsisWidth = size.cx;
   }
 
   if (width > maxWidth) {
@@ -3378,7 +3392,7 @@ const char* UIWindow::ClipTextToWidth(const char* text, int maxWidth, int family
         const char* start = current;
         current = g_serverLanguage->NextChar(start, static_cast<int>(end - start));
         const int step = static_cast<int>(current - start);
-        total += this->TextWidth(start, step, family, height, bold, 0);
+        total += MeasureTextWidth(this, start, step, family, height, bold, 0);
         bytes += step;
         if (total > maxWidth) {
           bytes = previous;
@@ -3585,10 +3599,9 @@ void CUIVScrollBar::OnCreate(int, int) {
 // OFFSET: 0x009BE1A0
 // FUNCTION: fn_13946
 CUIStaticText::CUIStaticText()
-    : CUIControl(), displayText(), tooltipStorage(), scrollBar(nullptr), tooltipTailStorage(), fitText(false), horizontalAlign(0),
+    : CUIControl(), text(), displayText(), tooltip(), fitText(false), horizontalAlign(0),
       verticalAlign(0), fontIndex(0), fontHeight(12), bold(0), color(0), shadow(false), shadowColor(0xFFFFFF), outline(false), outlineColor(0xFFFFFF), textX(0),
-      textY(0), text() {
-  new (&this->Tooltip()) std::string();
+      textY(0) {
 }
 
 // OFFSET: 0x009DA310
@@ -3644,7 +3657,7 @@ void CUIEditBox::OnCreate(int width, int height) {
   this->edit = new CUIEditCtrl;
   this->edit->SetSize(width, height);
   this->edit->invalidatesParent = 1;
-  reinterpret_cast<unsigned char*>(&this->edit->editFlags)[1] = 1;
+  this->edit->multiline = 1;
   this->AddChild(this->edit);
 }
 

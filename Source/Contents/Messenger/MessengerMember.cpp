@@ -45,6 +45,7 @@
 #include "Client/Mode/CMode.h"
 
 #include "Resource/MSGSTRINGID.h"
+#include "UI/Party/UIPartySettingWnd.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -180,7 +181,7 @@ public:
   /* 00B8 */ UIScrollBar* scrollBar;
   /* 00BC */ UIRadioBtn* tabs[2];
   /* 00C4 */ UIWindow* closeButton;
-  /* 00C8 */ UIWindow* buttons[11];
+  /* 00C8 */ UIBitmapButton* buttons[11];
   /* 00F4 */ UIWindow* resizeButton;
   /* 00F8 */ UIStaticText* titleText;
   /* 00FC */ std::list<MessengerMember> members;
@@ -195,7 +196,7 @@ public:
   /* 01C8 */ UIJobIconButton* jobIcons[40];
   /* 0268 */ int iconIndex;
   /* 026C */ std::vector<MessengerGroupIconPosition> iconPositions;
-  /* 0278 */ UIButton* iconModeButtons[2];
+  /* 0278 */ UIBitmapButton* iconModeButtons[2];
   /* 0280 */ unsigned char hiddenButtons[11];
   /* 028C */ int mode;
 };
@@ -349,7 +350,7 @@ void UIDragMiniPartyWnd::Paint() {
     if (this->member.dead == 1) {
       dead = 1;
     } else if (g_session.m_aid == this->member.accountId) {
-      if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->isPlayerDead == 1) {
+      if (g_modeMgr.GetGameMode()->isPlayerDead == 1) {
         dead = 1;
       }
     }
@@ -777,11 +778,11 @@ void UIMessengerGroupWnd::OnCreate(int, int) {
 
   this->iconModeButtons[0] = this->AddMinimizeButton("", 0);
   this->iconModeButtons[1] = new UIBitmapButton();
-  static_cast<UIBitmapButton*>(this->iconModeButtons[1])->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_out.bmp", 0, 0);
-  static_cast<UIBitmapButton*>(this->iconModeButtons[1])->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_over.bmp", 1, 0);
-  static_cast<UIBitmapButton*>(this->iconModeButtons[1])->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_press.bmp", 2, 0);
+  this->iconModeButtons[1]->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_out.bmp", 0, 0);
+  this->iconModeButtons[1]->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_over.bmp", 1, 0);
+  this->iconModeButtons[1]->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_press.bmp", 2, 0);
   {
-    UIBitmapButton* maximize = static_cast<UIBitmapButton*>(this->iconModeButtons[1]);
+    UIBitmapButton* maximize = this->iconModeButtons[1];
     maximize->SetSize(maximize->BitmapWidth(), maximize->BitmapHeight());
   }
   this->iconModeButtons[1]->Move(this->geometry.width - 28, 3);
@@ -883,24 +884,24 @@ void UIMessengerGroupWnd::OnCreate(int, int) {
       }
 
       if (useDisabledImage == true) {
-        static_cast<UIBitmapButton*>(this->buttons[index])->SetBitmap((prefix + number + "_disable.bmp").c_str(), 0, 0);
-        static_cast<UIBitmapButton*>(this->buttons[index])->SetBitmap((prefix + number + "_disable.bmp").c_str(), 1, 0);
-        static_cast<UIBitmapButton*>(this->buttons[index])->SetBitmap((prefix + number + "_disable.bmp").c_str(), 2, 0);
+        this->buttons[index]->SetBitmap((prefix + number + "_disable.bmp").c_str(), 0, 0);
+        this->buttons[index]->SetBitmap((prefix + number + "_disable.bmp").c_str(), 1, 0);
+        this->buttons[index]->SetBitmap((prefix + number + "_disable.bmp").c_str(), 2, 0);
       } else {
-        static_cast<UIBitmapButton*>(this->buttons[index])->SetBitmap((prefix + number + ".bmp").c_str(), 0, 0);
-        static_cast<UIBitmapButton*>(this->buttons[index])->SetBitmap((prefix + number + "_a.bmp").c_str(), 1, 0);
-        static_cast<UIBitmapButton*>(this->buttons[index])->SetBitmap((prefix + number + "_b.bmp").c_str(), 2, 0);
+        this->buttons[index]->SetBitmap((prefix + number + ".bmp").c_str(), 0, 0);
+        this->buttons[index]->SetBitmap((prefix + number + "_a.bmp").c_str(), 1, 0);
+        this->buttons[index]->SetBitmap((prefix + number + "_b.bmp").c_str(), 2, 0);
       }
 
       this->buttons[index]->SetSize(
-        static_cast<UIBitmapButton*>(this->buttons[index])->BitmapWidth(),
-        static_cast<UIBitmapButton*>(this->buttons[index])->BitmapHeight()
+        this->buttons[index]->BitmapWidth(),
+        this->buttons[index]->BitmapHeight()
       );
       this->buttons[index]->Move(x, this->geometry.height - 40);
       this->buttons[index]->SetId(ids[index]);
-      static_cast<UIBitmapButton*>(this->buttons[index])->SetTooltip(this->mode == 0 ? friendTooltips[index] : partyTooltips[index]);
+      this->buttons[index]->SetTooltip(this->mode == 0 ? friendTooltips[index] : partyTooltips[index]);
       {
-        UIBitmapButton* button = static_cast<UIBitmapButton*>(this->buttons[index]);
+        UIBitmapButton* button = this->buttons[index];
         button->SetDisabled(disabled[index]);
         button->Invalidate();
       }
@@ -928,7 +929,7 @@ void UIMessengerGroupWnd::Paint() {
     g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
   }
-  DrawRectangleBorder(*this, 0, 17, this->geometry.width, this->geometry.height - 38, 0xC0C0C0);
+  this->DrawRectOutline(0, 17, this->geometry.width, this->geometry.height - 38, 0xC0C0C0);
   this->DrawButtonBar(0, 0, 1);
 
   auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\mesbtn_left.bmp")));
@@ -1157,7 +1158,7 @@ void UIMessengerGroupWnd::OnLBtnDown(int x, int y) {
     return;
   }
 
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* gameMode = g_modeMgr.GetGameMode();
   if (!gameMode) {
     return;
   }
@@ -1183,7 +1184,7 @@ void UIMessengerGroupWnd::OnLBtnDown(int x, int y) {
           if (index >= this->scrollTop * this->columns && entry.valid && entry.accountId == selectedMember.accountId) {
             CGameActor* actor = entry.accountId == g_session.m_aid
                                   ? gameMode->scene->player
-                                  : static_cast<CGameActor*>(gameMode->scene->GetGameActorByAID(entry.accountId));
+                                  : gameMode->scene->GetGameActorByAID(entry.accountId);
             if (actor) {
               window->SetGaugeValues(this->gauges[index]->current, this->gauges[index]->maximum);
             } else {
@@ -1221,7 +1222,7 @@ void UIMessengerGroupWnd::OnMouseHover(int x, int y) {
     return;
   }
 
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   if (!mode) {
     return;
   }
@@ -1369,7 +1370,7 @@ void UIMessengerGroupWnd::LayoutButtons() {
 // OFFSET: 0x0073D800
 // FUNCTION: fn_07717
 void UIMessengerGroupWnd::UpdateGauges() {
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* gameMode = g_modeMgr.GetGameMode();
   if (!gameMode || !this->mode) {
     return;
   }
@@ -1390,7 +1391,7 @@ void UIMessengerGroupWnd::UpdateGauges() {
       if (it->accountId == g_session.m_aid) {
         pc = gameMode->scene->player;
       } else {
-        pc = dynamic_cast<CPc*>(static_cast<CGameActor*>(gameMode->scene->GetGameActorByAID(it->accountId)));
+        pc = dynamic_cast<CPc*>(gameMode->scene->GetGameActorByAID(it->accountId));
       }
 
       const int y = shown / this->columns * this->rowHeight + 17;
@@ -1453,7 +1454,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     }
     }
 
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
     if (gameMode && this->mode != 0) {
       int index = 0;
       for (auto it = this->members.begin(); it != this->members.end(); ++it, ++index) {
@@ -1518,27 +1519,27 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     int tooltip;
     if (this->mode == 0) {
       {
-        UIBitmapButton* button = static_cast<UIBitmapButton*>(this->buttons[0]);
+        UIBitmapButton* button = this->buttons[0];
         button->SetDisabled(1);
         button->Invalidate();
       }
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 0, 0);
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 1, 0);
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 2, 0);
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 3, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 0, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 1, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 2, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 3, 0);
       tooltip = 0x62;
     } else {
       {
-        UIBitmapButton* button = static_cast<UIBitmapButton*>(this->buttons[0]);
+        UIBitmapButton* button = this->buttons[0];
         button->SetDisabled(0);
         button->Invalidate();
       }
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01.bmp", 0, 0);
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_a.bmp", 1, 0);
-      static_cast<UIBitmapButton*>(this->buttons[0])->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_b.bmp", 2, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01.bmp", 0, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_a.bmp", 1, 0);
+      this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_b.bmp", 2, 0);
       tooltip = 0xDBA;
     }
-    static_cast<UIBitmapButton*>(this->buttons[0])->SetTooltip(LookupMessage(tooltip));
+    this->buttons[0]->SetTooltip(LookupMessage(tooltip));
     this->LayoutButtons();
     return 0;
   }
@@ -1616,7 +1617,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       if (this->selected != -1) {
         MessengerMember target = this->MemberAtIndex(this->selected);
         if (target.valid) {
-          g_modeMgr.gameMode->SendMsg(MM_REQ_JOIN_GROUP, reinterpret_cast<int>(target.name.c_str()), 0, 0, 0);
+          g_modeMgr.currentMode->SendMsg(MM_REQ_JOIN_GROUP, reinterpret_cast<int>(target.name.c_str()), 0, 0, 0);
         }
       }
       return 0;
@@ -1637,7 +1638,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         MessengerMember target = this->MemberAtIndex(this->selected);
         if (target.valid && !target.offline) {
           if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_YIELD_PARTYMASTER), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
-            g_modeMgr.gameMode->SendMsg(MM_GROUP_CHANGE_MASTER, target.accountId, 0, 0, 0);
+            g_modeMgr.currentMode->SendMsg(MM_GROUP_CHANGE_MASTER, target.accountId, 0, 0, 0);
           }
         } else {
           g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
@@ -1648,7 +1649,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     case 0x3A: {
       MessengerMember target = this->MemberAtIndex(this->selected);
       if (target.valid) {
-        g_modeMgr.gameMode->SendMsg(MM_OPEN_WRITE_RODEX, reinterpret_cast<int>(target.name.c_str()), 0, 0, 0);
+        g_modeMgr.currentMode->SendMsg(MM_OPEN_WRITE_RODEX, reinterpret_cast<int>(target.name.c_str()), 0, 0, 0);
       }
       return 0;
     }
@@ -1736,11 +1737,11 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         if (member.valid) {
           if (this->mode == 0) {
             if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
-              g_modeMgr.gameMode->SendMsg(MM_DELETE_FRIEND, member.accountId, member.characterId, 0, 0);
+              g_modeMgr.currentMode->SendMsg(MM_DELETE_FRIEND, member.accountId, member.characterId, 0, 0);
             }
           } else if (!(member.name == g_session.DecodePlayerName())) {
             if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_EXPEL), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
-              g_modeMgr.gameMode->SendMsg(MM_REQ_EXPEL_GROUP_MEMBER, reinterpret_cast<int>(member.name.c_str()), 0, 0, 0);
+              g_modeMgr.currentMode->SendMsg(MM_REQ_EXPEL_GROUP_MEMBER, reinterpret_cast<int>(member.name.c_str()), 0, 0, 0);
             }
           }
         }
@@ -1754,7 +1755,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         MessengerMember member = this->MemberAtIndex(this->selected);
         if (member.valid && member.name == g_session.DecodePlayerName()) {
           if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_LEAVE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
-            g_modeMgr.gameMode->SendMsg(MM_REQ_LEAVE_GROUP, 0, 0, 0, 0);
+            g_modeMgr.currentMode->SendMsg(MM_REQ_LEAVE_GROUP, 0, 0, 0, 0);
           }
         }
       }
@@ -1783,8 +1784,8 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         secondTip = 0x61;
         firstTip = 0x65;
       }
-      static_cast<UIButton*>(this->buttons[3])->SetTooltip(LookupMessage(firstTip));
-      static_cast<UIButton*>(this->buttons[4])->SetTooltip(LookupMessage(secondTip));
+      this->buttons[3]->SetTooltip(LookupMessage(firstTip));
+      this->buttons[4]->SetTooltip(LookupMessage(secondTip));
       if (this->mode != previous) {
         this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
       }
@@ -1792,7 +1793,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       return 0;
     }
     case 0x22: {
-      CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* gameMode = g_modeMgr.GetGameMode();
       if (!gameMode || this->mode == 0) {
         return 0;
       }
@@ -1869,7 +1870,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     case ID_LEAVE_PARTY:
       if (!g_session.m_lockMouse) {
         if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_LEAVE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
-          g_modeMgr.gameMode->SendMsg(MM_REQ_LEAVE_GROUP, 0, 0, 0, 0);
+          g_modeMgr.currentMode->SendMsg(MM_REQ_LEAVE_GROUP, 0, 0, 0, 0);
           if (g_windowMgr.partyInvitationToWnd) {
             g_windowMgr.CloseWindow(WID_PARTYINVITATIONTOWND);
           }

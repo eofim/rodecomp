@@ -36,12 +36,12 @@ namespace {
   }
 
   // INLINED
-  __forceinline std::list<ShortcutCooldownRecord>::iterator FindCooldownRecord(std::list<ShortcutCooldownRecord>& records, const std::uint32_t& id) {
+  __forceinline std::list<ShortcutCooldownRecord>::iterator FindCooldownRecord(std::list<ShortcutCooldownRecord>& records, const int& id) {
     if (!g_session.IsHomunculusSkill(id) && !g_session.IsMercenarySkill(id)) {
       return std::find_if(records.begin(), records.end(), [&](const ShortcutCooldownRecord& entry) { return entry.id == id; });
     }
 
-    const std::uint32_t group = 9999;
+    const int group = 9999;
     return std::find_if(records.begin(), records.end(), [&](const ShortcutCooldownRecord& entry) { return entry.id == group; });
   }
 
@@ -49,6 +49,33 @@ namespace {
   __forceinline std::list<CooldownState>::iterator FindCooldownState(std::list<CooldownState>& states, const int& slot) {
     return std::find_if(states.begin(), states.end(), [&](const CooldownState& state) { return state.slot == slot; });
   }
+}
+
+// OFFSET: 0x0091C4D0
+// FUNCTION: fn_12614
+int UIQuickSlotWnd::SlotX(int slot) {
+  for (int index = 0, value = 5; value < 63; ++index, value += 29) {
+    if (index == slot) {
+      return value;
+    }
+  }
+
+  return -1;
+}
+
+// OFFSET: 0x0091C500
+// FUNCTION: fn_12615
+int UIQuickSlotWnd::SlotAt(int x, int y) {
+  if (y < 0 || y >= 24 || (x > 58 && x < this->geometry.width)) {
+    return -1;
+  }
+
+  const int index = (x - 4) / 29;
+  if (x > index * 29 + 30) {
+    return -1;
+  }
+
+  return index;
 }
 
 // OFFSET: 0x00917640
@@ -66,20 +93,20 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
 
     if (column != -1) {
       if (9 * g_session.m_hotkeyPage + column == value.slot) {
-        g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         return;
       }
 
       CSkillInfo skill = g_session.LookupSkill(id);
       const int index = 9 * g_session.m_hotkeyPage + column;
       if (skill.level == 0 && skill.available == 0) {
-        g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         return;
       }
 
       if (grid.rows <= g_session.m_hotkeyPage) {
-        if (g_modeMgr.gameMode) {
-          g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        if (g_modeMgr.currentMode) {
+          g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         }
 
         return;
@@ -125,18 +152,18 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
       Refresh(window);
     }
 
-    g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return;
   }
 
   if (value.source == 6 || value.source == 9) {
-    g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return;
   }
 
   ITEM_INFO item = g_session.LookupClientItemByIdentity(value.id);
   if (item.identity[1] == 0 || item.identified == 0) {
-    g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return;
   }
 
@@ -153,8 +180,8 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
         Refresh(window);
       }
 
-      if (g_modeMgr.gameMode) {
-        g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+      if (g_modeMgr.currentMode) {
+        g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
       }
 
       return;
@@ -186,8 +213,8 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
     if (column != -1) {
       const int index = 9 * g_session.m_hotkeyPage + column;
       if (grid.rows <= g_session.m_hotkeyPage) {
-        if (g_modeMgr.gameMode) {
-          g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        if (g_modeMgr.currentMode) {
+          g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         }
 
         return;
@@ -205,7 +232,7 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
   }
   }
 
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 
 namespace {
@@ -313,6 +340,6 @@ void UIQuickSlotWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
     }
   }
 
-  g_modeMgr.gameMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+  g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
 

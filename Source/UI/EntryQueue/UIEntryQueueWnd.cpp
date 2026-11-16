@@ -128,7 +128,7 @@ bool UIEntryQueueRequestWnd::Create() {
   this->m_viewer->Configure(10, 22, 280, 305, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = 0xFF000000u | (blue << 16) | (green << 8) | red;
+  this->m_viewer->backgroundColor = RGB(red, green, blue) | 0xFF000000u;
   this->m_viewer->Invalidate();
   this->AddChild(this->m_viewer);
 
@@ -471,7 +471,7 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     case 0:
       if (g_session.GetMapProperty13() == 1) {
         error = 0x86B;
-      } else if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsActiveSkillEffectId(0x29C)) {
+      } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
         error = 0x86C;
       } else {
         if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_LIST2))) {
@@ -483,7 +483,7 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     case 1:
       if (g_session.GetMapProperty13() == 1) {
         error = 0x86B;
-      } else if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsActiveSkillEffectId(0x29C)) {
+      } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
         error = 0x86C;
       } else if (g_session.PartyCount() == 0) {
         error = 0x86D;
@@ -503,7 +503,7 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
       GuildInfo* guild = &g_guildInfo;
       if (g_session.GetMapProperty13() == 1) {
         error = 0x86B;
-      } else if (static_cast<CGameMode*>(g_modeMgr.GetGameMode())->IsActiveSkillEffectId(0x29C)) {
+      } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
         error = 0x86C;
       } else if (guild->m_guildId < 1) {
         error = 0x870;
@@ -648,7 +648,7 @@ void UIEntryQueueHelpWnd::OnCreate(int width, int height) {
   this->m_viewer->Configure(10, 22, 270, 225, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = 0xFF000000u | (blue << 16) | (green << 8) | red;
+  this->m_viewer->backgroundColor = RGB(red, green, blue) | 0xFF000000u;
   this->m_viewer->Invalidate();
   this->AddChild(this->m_viewer);
 

@@ -219,7 +219,7 @@ void CPowderingEffect::OnProcess() {
     matrix scaleMat;
     scaleMat.SetScale(scale, scale, 1.0f);
 
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     matrix rotation;
     rotation.MakeXRotation(mode->camera->camera.pitch / 180.0f * 3.141592f);
 
@@ -265,9 +265,7 @@ void CPowderingEffect::OnProcess() {
     vector3d velocity = particle->velocity;
     particle->alpha = alpha;
     velocity.y += static_cast<float>(RandomSpan(10)) * 0.01f;
-    particle->velocity.x = velocity.x;
-    particle->velocity.y = velocity.y;
-    particle->velocity.z = velocity.z;
+    particle->velocity = velocity;
     particle->position = {velocity.x + this->position[0], velocity.y + this->position[1], velocity.z + this->position[2]};
     ++particle->elapsedFrames;
   }

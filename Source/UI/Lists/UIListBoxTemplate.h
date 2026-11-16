@@ -87,13 +87,8 @@ public:
   void SetDescription(int type, const std::vector<const char*>& description);
   void SetStatusLines(bool first, bool second, bool third);
 
-  union {
-    /* 00E8 */ unsigned char headerControls[0x08];
-    struct {
-      /* 00E8 */ CUIStaticImage* image;
-      /* 00EC */ CUIStaticText* nameText;
-    };
-  };
+  /* 00E8 */ CUIStaticImage* image;
+  /* 00EC */ CUIStaticText* nameText;
   /* 00F0 */ CUITextViewer* descriptionViewer;
   /* 00F4 */ CUITextViewer* optionsViewer;
   /* 00F8 */ CUITextViewer* sourcesViewer;
@@ -127,7 +122,7 @@ public:
   void SetTip(int id);
   void SetViewerLines(const std::vector<std::string>& lines);
 
-  /* 00E8 */ UIWindow* stampImage;
+  /* 00E8 */ CUIStaticImage* stampImage;
   /* 00EC */ CUITextViewer* titleViewer;
   /* 00F0 */ CUITextViewer* linesViewer;
   /* 00F4 */ CUITextViewer* statusViewer;

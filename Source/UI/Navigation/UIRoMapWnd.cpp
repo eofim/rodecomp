@@ -4,6 +4,7 @@
 #include "UI/Window/UIEnums.h"
 #include "Script/LuaScript.h"
 #include "Client/Mode/CMode.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Map/MapSkyMgr.h"
@@ -74,16 +75,16 @@ __declspec(noinline) void UIRoMapWnd::ClearRecords() {
   this->previewArea = nullptr;
   this->selectedRecord = 0;
   this->hoveredRecord = 0;
-  this->padding_00CC = 0;
+  this->unknown_00CC = 0;
 }
 
 // OFFSET: 0x0091E0F0
 // FUNCTION: fn_12625
 void UIRoMapWnd::ResetKafraBounds() {
-  this->m_kafraTop = 0;
-  this->m_kafraBottom = 0;
-  this->m_kafraLeft = 0;
-  this->m_kafraRight = 0;
+  this->m_kafraBounds.top = 0;
+  this->m_kafraBounds.bottom = 0;
+  this->m_kafraBounds.left = 0;
+  this->m_kafraBounds.right = 0;
 }
 
 // OFFSET: 0x0091EBA0
@@ -171,7 +172,7 @@ void UIRoMapWnd::DrawHoverTooltip() {
   }
 
   this->hoverTooltip = new RoMapTooltipBox(boxX, y, width, height);
-  DrawRoundedBorder(*this, boxX, y, width, height, 0xFFFFFF);
+  this->DrawRoundedOutline(boxX, y, width, height, 0xFFFFFF);
 }
 
 // INLINED
@@ -255,7 +256,7 @@ void UIRoMapWnd::DrawFieldLabels() {
       }
 
       const CWorldViewField* field = *fieldIt;
-      DrawRoundedBorder(*this, field->left, field->top, field->right - field->left, field->bottom - field->top, borderColor);
+      this->DrawRoundedOutline(field->left, field->top, field->right - field->left, field->bottom - field->top, borderColor);
       int y;
       int levelY;
       if (atBottom) {
@@ -337,13 +338,16 @@ void UIRoMapWnd::DrawDungeonLinks() {
       const float endX = static_cast<float>(mapWidth) * g_depthAverageHalf + static_cast<float>(map->left);
       const float endY = static_cast<float>(mapHeight) * g_depthAverageHalf + static_cast<float>(map->top) + 1.0f;
       CTexture* const lineTexture = g_texMgr.Default();
+      std::uint32_t color;
       if (isSelected) {
         DrawScreenLine(ScreenPoint{startX, startY}, ScreenPoint{endX, endY}, 1, lineTexture, (selectColor & 0xFFFFFF) - 0x1000000);
+        color = 0xFFFFFFFF;
       } else {
         DrawScreenLine(ScreenPoint{startX, startY}, ScreenPoint{endX, endY}, 1, lineTexture, lineColor);
+        color = rectColor;
       }
 
-      DrawTexturedRectangle(map->left, map->top, mapWidth, mapHeight, isSelected ? 0xFFFFFFFF : rectColor, positionTexture);
+      DrawTexturedRectangle(map->left, map->top, mapWidth, mapHeight, color, positionTexture);
       x = field->left;
       y = field->top;
     } else {
@@ -596,10 +600,10 @@ void UIRoMapWnd::DrawKafraMarkers(float elapsed) {
   }
 
   this->m_kafraMarkers.Update(this, elapsed);
-  this->m_kafraTop = 0;
-  this->m_kafraBottom = 0;
-  this->m_kafraLeft = 0;
-  this->m_kafraRight = 0;
+  this->m_kafraBounds.top = 0;
+  this->m_kafraBounds.bottom = 0;
+  this->m_kafraBounds.left = 0;
+  this->m_kafraBounds.right = 0;
   if (this->m_kafraMarkers.markers.empty()) {
     return;
   }
@@ -667,10 +671,10 @@ UIRoMapWnd::UIRoMapWnd() : UIFrameWnd(0), previewTexture(nullptr) {
   this->m_comboHeight = 0x12;
   this->m_mouseX = 0;
   this->m_mouseY = 0;
-  this->m_kafraTop = 0;
-  this->m_kafraBottom = 0;
-  this->m_kafraLeft = 0;
-  this->m_kafraRight = 0;
+  this->m_kafraBounds.top = 0;
+  this->m_kafraBounds.bottom = 0;
+  this->m_kafraBounds.left = 0;
+  this->m_kafraBounds.right = 0;
 }
 
 // OFFSET: 0x009144B0
@@ -767,8 +771,8 @@ int UIRoMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       g_navigationManager.expandedMap = false;
       g_navigationManager.SearchNavigation(name, 0, false);
       if (g_windowMgr.LookupWindow(WID_NAVIGATIONV4WND)) {
-        static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->SelectRoute(0);
-        static_cast<UINavigationV4Wnd*>(g_windowMgr.navigationWnd)->SelectRouteNode(0);
+        g_windowMgr.navigationWnd->SelectRoute(0);
+        g_windowMgr.navigationWnd->SelectRouteNode(0);
       }
       this->UpdateNavigationButtons();
       }

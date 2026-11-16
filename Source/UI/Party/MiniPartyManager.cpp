@@ -3,25 +3,32 @@
 #include "Client/Session/Session.h"
 #include "Contents/Messenger/ClientMessenger.h"
 #include "Contents/Messenger/MessengerMember.h"
+#include "Contents/Messenger/MessengerWindows.h"
 #include "UI/Party/MiniPartyGrid.h"
 #include "UI/Party/MiniPartyPlacement.h"
 #include "UI/Dialogs/UIMenuWnd.h"
 #include "UI/Party/UIMiniPartyWnd.h"
 #include "UI/Party/MiniPartyWndAreaMgr.h"
+#include "UI/Navigation/UINavigationV4Wnd.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/WindowManagerWindows.h"
+#include "UI/Login/UIChangeNameWnd.h"
+#include "UI/Login/UINewSelectCharWnd.h"
+#include "UI/Login/UISelCharForUServerWnd.h"
+#include "UI/Login/UIWaitDBSaveWnd.h"
 #include <new>
 
 template __declspec(noinline) std::_List_node<UIWindow*, void*>* std::list<UIWindow*>::_Emplace<UIWindow* const&>(std::_List_node<UIWindow*, void*>* const, UIWindow* const&);
 
-// OFFSET: 0x007435C0
-// FUNCTION: fn_07745
-CMiniPartyWndAreaMgr* CMiniPartyWndAreaMgr::Instance() {
+namespace {
+// INLINED
+inline CMiniPartyWndAreaMgr* MiniPartyArea() {
   if (!g_miniPartyWndAreaMgr) {
     g_miniPartyWndAreaMgr = new (std::nothrow) CMiniPartyWndAreaMgr;
   }
   return g_miniPartyWndAreaMgr;
+}
 }
 
 // OFFSET: 0x00AA9ED0
@@ -31,14 +38,14 @@ void UIWindowMgr::SetScreenSize(int width, int height) {
   this->screenHeight = height;
   this->chatWndX = 0;
   this->chatWndY = height - this->chatWndHeight;
-  CMiniPartyWndAreaMgr::Instance()->BuildAvailableCells();
+  MiniPartyArea()->BuildAvailableCells();
 }
 
 // OFFSET: 0x00AA2510
 // FUNCTION: fn_17214
 void UIWindowMgr::ArrangeMiniPartyWindows() {
   for (UIWindow* window : this->snapExcluded) {
-    const MiniPartyGridPoint position = CMiniPartyWndAreaMgr::Instance()
+    const MiniPartyGridPoint position = MiniPartyArea()
       ->GetCellPosition(static_cast<UIMiniPartyWnd*>(window)->m_cell);
     window->Move(position.x, position.y);
   }
@@ -80,6 +87,60 @@ void UIWindowMgr::AddMiniPartyWindow(UIWindow* window) {
   this->rendered.push_back(window);
   this->snapExcluded.emplace_back(window);
   this->ArrangeMiniPartyWindows();
+}
+
+namespace {
+// INLINED
+__forceinline void PromoteWindow(UIWindowMgr* manager, UIWindow* window) {
+  if (!window || (manager->modal != nullptr && manager->navigationWnd != window)) {
+    return;
+  }
+
+  if (manager->LookupWindow(WID_NEWMAKECHARWND) || manager->LookupWindow(WID_MAKECHARWND) || manager->LookupWindow(WID_SECONDPASSWORDINPUTWND) || manager->LookupWindow(WID_SECONDPASSWORDEDITWND)) {
+    return;
+  }
+
+  int companion = -1;
+
+  if (window->geometry.id == 12) {
+    companion = 234;
+  }
+  if (window->geometry.id == 82) {
+    companion = 250;
+  }
+
+  if (companion != -1) {
+    for (auto it = manager->rendered.begin(); it != manager->rendered.end(); ++it) {
+      if ((*it)->geometry.id == companion) {
+        UIWindow* value = *it;
+        manager->rendered.erase(it);
+        manager->rendered.push_back(value);
+        break;
+      }
+    }
+  }
+
+  const auto entry = std::find(manager->rendered.begin(), manager->rendered.end(), window);
+
+  if (entry != manager->rendered.end()) {
+    manager->rendered.erase(entry);
+    manager->rendered.push_back(window);
+  }
+}
+// INLINED
+inline int TransientWindowReady(UIWindowMgr* manager) {
+  UIWindow* window = manager->transientWnd;
+  if (window == nullptr) {
+    return false;
+  }
+  if (static_cast<UIDragMiniPartyWnd*>(window)->member.valid == 0) {
+    return false;
+  }
+  if (window->geometry.state != 0) {
+    return false;
+  }
+  return true;
+}
 }
 
 // OFFSET: 0x00A96090
@@ -143,7 +204,7 @@ void UIWindowMgr::RebuildMiniPartyWindows() {
     window->SendMsg(nullptr, UM_REFRESHITEM, reinterpret_cast<std::intptr_t>(&member), 0, 0, 0);
     g_session.AddMiniPartyRecord(record.id, record.cell);
 
-    UIMenuWnd* drag = static_cast<UIMenuWnd*>(this->menuWnd);
+    UIMenuWnd* drag = this->menuWnd;
     if (drag != nullptr && drag->m_menuId == 301 && drag->m_targetWindowId == record.cell) {
       const int x = drag->geometry.x;
       const int y = drag->geometry.y;
@@ -152,9 +213,9 @@ void UIWindowMgr::RebuildMiniPartyWindows() {
     }
   }
 
-  if (this->Window4F250Ready()) {
-    this->Promote(this->transientWnd);
+  if (TransientWindowReady(this)) {
+    PromoteWindow(this, this->transientWnd);
   }
 
-  this->Promote(this->menuWnd);
+  PromoteWindow(this, this->menuWnd);
 }

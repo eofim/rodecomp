@@ -125,7 +125,7 @@ CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>::~CUIListBo
 
 // OFFSET: 0x00A486C0
 // FUNCTION: fn_16114
-CUIProbabilityTable* CreateProbabilityTable() {
+CUIFrameWnd* CreateProbabilityTable() {
   return new CUIProbabilityTable();
 }
 
@@ -402,7 +402,7 @@ void CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>::Selec
 // OFFSET: 0x00A4D6A0
 // FUNCTION: fn_16191
 CUIProbabilityTable::CUIProbabilityTable()
-    : m_titleBar(nullptr), m_nameHeader(nullptr), m_searchEdit(nullptr), m_searchButtonStorage{}, m_itemName(nullptr), m_probabilityHeader(nullptr), m_list(nullptr),
+    : m_titleBar(nullptr), m_nameHeader(nullptr), m_searchEdit(nullptr), m_searchButton(nullptr), m_itemName(nullptr), m_probabilityHeader(nullptr), m_list(nullptr),
       m_itemId(0) {
 }
 
@@ -550,7 +550,7 @@ void CUIProbabilityTable::OnCreate(int width, int height) {
   CUIImageButton* systemButton = new CUIImageButton();
   systemButton->SetSize(11, 11);
   systemButton->Move(3, 3);
-  systemButton->SetOnClick([this]() { this->OnButtonClick(); });
+  systemButton->onClick = [this]() { this->OnButtonClick(); };
   systemButton->disabled = 0;
   systemButton->Invalidate();
   systemButton->SetImages(
@@ -631,7 +631,7 @@ void CUIProbabilityTable::OnCreate(int width, int height) {
   this->m_searchEdit->SetEditBounds(0, 0, 0, 0);
   this->m_searchEdit->SetMask(0);
   this->m_searchEdit->SetAlignment(0);
-  this->m_searchEdit->SetOnSubmit([this]() { this->Search(); });
+  this->m_searchEdit->onSubmit = [this]() { this->Search(); };
   this->AddChild(this->m_searchEdit);
 
   this->m_searchButton = new CUIImageButton();

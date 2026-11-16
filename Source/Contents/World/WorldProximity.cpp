@@ -96,14 +96,13 @@ __declspec(noinline) bool CWorld::FindActorInCell(const float* position, std::fu
 // OFFSET: 0x00AC8BA0
 // FUNCTION: fn_17679
 bool CWorld::IsGuildMaster(std::uint32_t aid) {
-  for (CRenderObject* actor : this->actors) {
+  for (CGameActor* actor : this->actors) {
     if (actor->render.accountId == aid) {
-      CGameActor* gameActor = static_cast<CGameActor*>(actor);
-      if (!gameActor) {
+      if (!actor) {
         return false;
       }
 
-      return gameActor->GetPkState() == static_cast<int>(g_guildInfo.masterCharacterId);
+      return actor->GetPkState() == static_cast<int>(g_guildInfo.masterCharacterId);
     }
   }
 
@@ -139,9 +138,9 @@ bool CWorld::IsExistGuildMasterNearby(const float& x, const float& z) {
       float centerZ = 0.0f;
       int column = 0;
       int row = 0;
-      CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* mode = g_modeMgr.GetGameMode();
       mode->WorldCell(actor->render.position.x + 0.5f, actor->render.position.z + 0.5f, column, row);
-      mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      mode = g_modeMgr.GetGameMode();
       mode->CellCenter(column, row, centerX, centerZ);
       return std::fabs(centerX - x) <= static_cast<float>(this->nearbyRange) && std::fabs(centerZ - z) <= static_cast<float>(this->nearbyRange);
     }
@@ -225,14 +224,14 @@ bool WorldProximityRejectB() {
 // FUNCTION: fn_17719
 bool WorldProximityGuildMasterCallback::Invoke(const std::uint32_t& aidRef) {
   const std::uint32_t aid = aidRef;
-  auto it = std::find_if(this->world->actors.begin(), this->world->actors.end(), [aid](CRenderObject* actor) {
+  auto it = std::find_if(this->world->actors.begin(), this->world->actors.end(), [aid](CGameActor* actor) {
     return actor->render.accountId == aid;
   });
   if (it == this->world->actors.end()) {
     return false;
   }
 
-  CGameActor* gameActor = static_cast<CGameActor*>(*it);
+  CGameActor* gameActor = *it;
   if (!gameActor) {
     return false;
   }
@@ -311,7 +310,7 @@ void CWorld::AddPcPosFromCell(std::uint32_t aid, const int* cell) {
   CellFloatPos pos;
   pos.x = 0.0f;
   pos.z = 0.0f;
-  static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CellCenter(cell[0], cell[1], pos.x, pos.z);
+  g_modeMgr.GetGameMode()->CellCenter(cell[0], cell[1], pos.x, pos.z);
   this->AddPcPos(aid, pos);
 }
 

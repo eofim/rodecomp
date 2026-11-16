@@ -67,9 +67,7 @@ void CTriangleShotArrow::Open() {
   this->direction.z *= 0.125f;
   if (length < 40.0f) {
     this->speed = 40.0f / length;
-    this->direction.x *= this->speed;
-    this->direction.y *= this->speed;
-    this->direction.z *= this->speed;
+    this->direction *= this->speed;
   }
 
   const float dx = target.x - this->current.x;
@@ -84,7 +82,7 @@ void CTriangleShotArrow::Open() {
   this->position[1] = this->current.y;
   this->position[2] = this->current.z;
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const float angle = static_cast<float>(atan2(static_cast<double>(target.z - this->current.z), static_cast<double>(target.x - this->current.x)));
   float yaw = mode->CameraDesiredYaw() + angle / 3.141592f * 180.0f;
   if (yaw < 0.0f) {
@@ -120,9 +118,7 @@ void CTriangleShotArrow::OnProcess() {
     this->position[0] = this->current.x;
     this->position[1] = this->current.y;
     this->position[2] = this->current.z;
-    arrow->position.x = this->current.x;
-    arrow->position.y = this->current.y;
-    arrow->position.z = this->current.z;
+    arrow->position = this->current;
     arrow->Process(0.0f, 0.0f, 0.0f);
   }
 
@@ -133,7 +129,7 @@ void CTriangleShotArrow::OnProcess() {
 // FUNCTION: fn_07527
 void CTriangleShotArrow::Render() {
   if (this->arrow) {
-    this->arrow->DrawScreen(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->frame.view);
+    this->arrow->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 

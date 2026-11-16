@@ -14,7 +14,6 @@
 #include "Client/Session/Session.h"
 #include "Contents/Actors/Pc.h"
 #include "Contents/Ground/GroundGeometry.h"
-#include "Contents/Ground/GroundWaterState.h"
 #include "Contents/Movies/BinkMovies.h"
 #include "Contents/World/World.h"
 #include "Render/Renderer.h"
@@ -63,7 +62,7 @@ namespace {
 
   // INLINED
   inline C3dActor* CreateWorldModel(const WorldModelRecord& placement, C3dModelRes& resource, BinkMovies& movies) {
-    resource.RegisterMovies(movies, placement.position);
+    resource.RegisterMovies({placement.position.x, placement.position.y, placement.position.z});
 
     if (!resource.FindNode(placement.node) && resource.nodes.front() == nullptr) {
       return nullptr;
@@ -81,18 +80,9 @@ namespace {
     actor->occlusionEnabled = 0;
     actor->SetSpeed(placement.animationSpeed);
     actor->playback = placement.animation;
-    actor->position[0] = placement.position[0];
-    actor->position[1] = placement.position[1];
-    actor->position[2] = placement.position[2];
-    actor->dirty = 1;
-    actor->rotation[0] = placement.rotation[0];
-    actor->rotation[1] = placement.rotation[1];
-    actor->rotation[2] = placement.rotation[2];
-    actor->dirty = 1;
-    actor->scale[0] = placement.scale[0];
-    actor->scale[1] = placement.scale[1];
-    actor->scale[2] = placement.scale[2];
-    actor->dirty = 1;
+    actor->SetPosition(placement.position);
+    actor->SetRotation(placement.rotation);
+    actor->SetScale(placement.scale);
     actor->commandMode = placement.flag;
     actor->color = static_cast<std::uint32_t>(placement.index);
     actor->Assign(resource);
@@ -124,7 +114,7 @@ DWORD WINAPI CWorld::LoadDeferredModels(void* parameter) {
     }
 
     world->models.push_back(model);
-    std::atomic_ref<int>(world->pending).fetch_add(1, std::memory_order_seq_cst);
+    std::atomic_ref<long>(world->pending).fetch_add(1, std::memory_order_seq_cst);
     Sleep(0);
   }
 
@@ -141,7 +131,7 @@ void CWorld::FinishModelLoading() {
   }
 
   g_deferredWorldModels.clear();
-  std::atomic_ref<int>(this->pending).store(0, std::memory_order_release);
+  std::atomic_ref<long>(this->pending).store(0, std::memory_order_release);
 }
 
 // OFFSET: 0x00AC94C0
@@ -164,15 +154,15 @@ void CWorld::InitWorld() {
   modeBounds[2] = worldRes->bounds[0];
   modeBounds[3] = worldRes->bounds[1];
 
-  g_worldLightDirection[0] = worldRes->lightDirection[0];
-  g_worldLightDirection[1] = worldRes->lightDirection[1];
-  g_worldLightDirection[2] = worldRes->lightDirection[2];
-  g_worldDiffuse[0] = worldRes->diffuse[0];
-  g_worldDiffuse[1] = worldRes->diffuse[1];
-  g_worldDiffuse[2] = worldRes->diffuse[2];
-  g_worldAmbient[0] = worldRes->ambient[0];
-  g_worldAmbient[1] = worldRes->ambient[1];
-  g_worldAmbient[2] = worldRes->ambient[2];
+  g_worldLightDirection[0] = worldRes->lightDirection.x;
+  g_worldLightDirection[1] = worldRes->lightDirection.y;
+  g_worldLightDirection[2] = worldRes->lightDirection.z;
+  g_worldDiffuse[0] = worldRes->diffuse.x;
+  g_worldDiffuse[1] = worldRes->diffuse.y;
+  g_worldDiffuse[2] = worldRes->diffuse.z;
+  g_worldAmbient[0] = worldRes->ambient.x;
+  g_worldAmbient[1] = worldRes->ambient.y;
+  g_worldAmbient[2] = worldRes->ambient.z;
 
   g_renderer->twoPass = worldRes->flag;
   g_renderer->SetLighting(g_worldLightDirection, g_worldDiffuse, g_worldAmbient);
@@ -250,12 +240,12 @@ void CWorld::InitWorld() {
       PumpApplicationMessages();
     }
 
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())
+    g_modeMgr.GetGameMode()
       ->CellCenter(g_session.m_playerX, g_session.m_playerY, g_worldLoadCenter[0], g_worldLoadCenter[2]);
 
-    const float dx = placement->position[0] - g_worldLoadCenter[0];
-    const float dy = placement->position[1] - g_worldLoadCenter[1];
-    const float dz = placement->position[2] - g_worldLoadCenter[2];
+    const float dx = placement->position.x - g_worldLoadCenter[0];
+    const float dy = placement->position.y - g_worldLoadCenter[1];
+    const float dz = placement->position.z - g_worldLoadCenter[2];
     const float squared = dy * dy + dx * dx + dz * dz;
     const float distance = SquareRoot(squared);
 

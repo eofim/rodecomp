@@ -305,7 +305,7 @@ void CEffectPrim::RenderGroundArcStep(matrix& wtm) {
 // OFFSET: 0x00BEC960
 // FUNCTION: fn_19976
 __declspec(safebuffers) void CEffectPrim::RenderSegmentSprites(matrix& wtm) {
-  CSprRes* sprite = static_cast<CGameActor*>(static_cast<CRenderObject*>(this))->GetSprite();
+  CSprRes* sprite = this->GetSprite();
   CActRes* action = this->GetActRes();
 
   for (int ec = 0; ec < 4; ++ec) {
@@ -689,13 +689,14 @@ void CEffectPrim::RenderFanSlice(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
+    EffectPrimitiveSlot& slot = this->state.slots[ec];
+    if (slot.life != 1 || slot.alphaB <= 0) {
       continue;
     }
 
-    const int angle = this->state.slots[ec].riseAngle;
-    const float dist = this->state.slots[ec].distance;
-    const float base = this->state.slots[ec].height[0];
+    const int angle = slot.riseAngle;
+    const float dist = slot.distance;
+    const float base = slot.height[0];
     int leftAngle = angle - 5;
     if (leftAngle < 0) {
       leftAngle += 360;
@@ -704,11 +705,11 @@ void CEffectPrim::RenderFanSlice(matrix& wtm) {
     if (rightAngle >= 360) {
       rightAngle -= 360;
     }
-    left.x = dist * g_cosTable[leftAngle] * g_cosTable[this->state.slots[ec].rotStart];
-    left.y = dist * g_cosTable[leftAngle] * g_sinTable[this->state.slots[ec].rotStart] + base;
+    left.x = dist * g_cosTable[leftAngle] * g_cosTable[slot.rotStart];
+    left.y = dist * g_cosTable[leftAngle] * g_sinTable[slot.rotStart] + base;
     left.z = dist * g_sinTable[leftAngle];
-    right.x = dist * g_cosTable[rightAngle] * g_cosTable[this->state.slots[ec].rotStart];
-    right.y = dist * g_cosTable[rightAngle] * g_sinTable[this->state.slots[ec].rotStart] + base;
+    right.x = dist * g_cosTable[rightAngle] * g_cosTable[slot.rotStart];
+    right.y = dist * g_cosTable[rightAngle] * g_sinTable[slot.rotStart] + base;
     right.z = dist * g_sinTable[rightAngle];
     center.x = 0.0f;
     center.y = base;
@@ -717,7 +718,7 @@ void CEffectPrim::RenderFanSlice(matrix& wtm) {
     center2.y = base;
     center2.z = 0.0f;
 
-    this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, left, right, center, center2, wtm, 0, 0, 0, 0, 0, 255, 0.0f, 1.0f, 0.0f, 1.0f, 1);
+    this->RenderTeiRect(&rpCnt, slot.alphaB, left, right, center, center2, wtm, 0, 0, 0, 0, 0, 255, 0.0f, 1.0f, 0.0f, 1.0f, 1);
   }
 }
 
@@ -790,11 +791,11 @@ void CEffectPrim::RenderFanTrail(matrix& wtm) {
 // OFFSET: 0x00BF0370
 // FUNCTION: fn_19985
 void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
+  int rpCnt = 0;
   vector3d vec1{};
   vector3d vec2{};
   vector3d vec3{};
   vector3d vec4{};
-  int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
     if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
@@ -838,25 +839,25 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       const int low = angle - 15;
       const int backRightAngle = high - 180 < 0 ? high - 180 + 360 : high - 180;
       const int backLeftAngle = low + 180 < 360 ? low + 180 : low + 180 - 360;
-      const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
-      const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
       const float base = this->state.slots[ec].height[0];
       vector3d left;
+      left.z = size * g_sinTable[leftAngle];
+      const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
+      const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
       left.x = size * g_cosTable[leftAngle] * rotCos;
       left.y = size * g_cosTable[leftAngle] * rotSin + base;
-      left.z = size * g_sinTable[leftAngle];
       vector3d right;
+      right.z = size * g_sinTable[rightAngle];
       right.x = size * g_cosTable[rightAngle] * rotCos;
       right.y = size * g_cosTable[rightAngle] * rotSin + base;
-      right.z = size * g_sinTable[rightAngle];
       vector3d backRight;
+      backRight.z = size * g_sinTable[backRightAngle];
       backRight.x = size * g_cosTable[backRightAngle] * rotCos;
       backRight.y = size * g_cosTable[backRightAngle] * rotSin + base;
-      backRight.z = size * g_sinTable[backRightAngle];
       vector3d backLeft;
+      backLeft.z = size * g_sinTable[backLeftAngle];
       backLeft.x = size * g_cosTable[backLeftAngle] * rotCos;
       backLeft.y = size * g_cosTable[backLeftAngle] * rotSin + base;
-      backLeft.z = size * g_sinTable[backLeftAngle];
 
       float remain = dist;
       int dir = this->state.slots[ec].riseAngle;
@@ -990,25 +991,25 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       const int low = angle - 25;
       const int backRightAngle = high - 180 < 0 ? high - 180 + 360 : high - 180;
       const int backLeftAngle = low + 180 < 360 ? low + 180 : low + 180 - 360;
-      const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
-      const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
       const float base = this->state.slots[ec].height[0];
       vector3d left;
+      left.z = size * g_sinTable[leftAngle];
+      const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
+      const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
       left.x = size * g_cosTable[leftAngle] * rotCos;
       left.y = size * g_cosTable[leftAngle] * rotSin + base;
-      left.z = size * g_sinTable[leftAngle];
       vector3d right;
+      right.z = size * g_sinTable[rightAngle];
       right.x = size * g_cosTable[rightAngle] * rotCos;
       right.y = size * g_cosTable[rightAngle] * rotSin + base;
-      right.z = size * g_sinTable[rightAngle];
       vector3d backRight;
+      backRight.z = size * g_sinTable[backRightAngle];
       backRight.x = size * g_cosTable[backRightAngle] * rotCos;
       backRight.y = size * g_cosTable[backRightAngle] * rotSin + base;
-      backRight.z = size * g_sinTable[backRightAngle];
       vector3d backLeft;
+      backLeft.z = size * g_sinTable[backLeftAngle];
       backLeft.x = size * g_cosTable[backLeftAngle] * rotCos;
       backLeft.y = size * g_cosTable[backLeftAngle] * rotSin + base;
-      backLeft.z = size * g_sinTable[backLeftAngle];
 
       float remain = dist;
       int dir = this->state.slots[ec].riseAngle;
@@ -1643,7 +1644,7 @@ void CEffectPrim::RenderPolygonFrames(matrix& wtm) {
 // OFFSET: 0x00BF6AD0
 // FUNCTION: fn_20000
 __declspec(safebuffers) void CEffectPrim::RenderSegmentSpriteGlow(matrix& wtm) {
-  CSprRes* sprite = static_cast<CGameActor*>(static_cast<CRenderObject*>(this))->GetSprite();
+  CSprRes* sprite = this->GetSprite();
   CActRes* action = this->GetActRes();
   const short alpha = static_cast<short>(this->state.alpha);
 
@@ -1706,7 +1707,7 @@ __declspec(safebuffers) void CEffectPrim::RenderSegmentSpriteGlow(matrix& wtm) {
         unsigned char green = static_cast<unsigned char>(cell.color >> 8);
         unsigned char blue = static_cast<unsigned char>(cell.color >> 16);
         quad.image = image;
-        this->state.GetColorOverride(&red, &green, &blue);
+        this->GetColorOverride(&red, &green, &blue);
         const std::uint32_t color = (((((alpha << 8) + red) << 8) + green) << 8) + blue;
         quad.color = color;
         this->DrawQuad(quad, sprite->palette, this->state.slots[ec].flag1[2] == 1 ? 5 : 0x101, 0.0f, 0.0f, 0);

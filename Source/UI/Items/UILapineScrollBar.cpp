@@ -7,6 +7,7 @@
 
 #include "Client/Mode/CMode.h"
 #include "Client/Mode/ModeDragState.h"
+#include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Items/ItemDescription.h"
@@ -139,7 +140,7 @@ UILapineBox_IngredientListWnd::UILapineBox_IngredientListWnd(int width, int heig
 // OFFSET: 0x005FF820
 // FUNCTION: fn_04150
 void UILapineBoxWnd::DragAndDrop(int, int, std::intptr_t value) {
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
   if (this->items.size() < static_cast<unsigned>(this->maxItems) && drag->source == 27) {
     const int result = this->ingredientList->SendMsg(this, UM_DECITEM, drag->id, 0, 0, 0);
@@ -153,7 +154,7 @@ void UILapineBoxWnd::DragAndDrop(int, int, std::intptr_t value) {
 // OFFSET: 0x005FF8B0
 // FUNCTION: fn_04151
 void UILapineBox_IngredientListWnd::DragAndDrop(int, int, std::intptr_t value) {
-  CMode* mode = g_modeMgr.GetGameMode();
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
   if (drag->source == 26) {
     if (this->AddIngredient(drag->id) == 1) {
@@ -235,9 +236,9 @@ void UIIngredientInfoWnd::Paint() {
 
   std::uint32_t color = 0;
   if (this->insufficient == 0) {
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), 4, 3, this->item, 0, 0);
+    this->DrawItemAndQuantity(4, 3, this->item, 0, 0);
   } else {
-    DrawItemWithQuantityAuxiliary(*this, 2, 4, 3, this->item, this->item.identified, 0);
+    this->DrawItemAndQuantityAuxiliary(2, 4, 3, this->item, this->item.identified, 0);
     color = 0x969696;
   }
 
@@ -263,7 +264,7 @@ void UILapineBoxWnd::Paint() {
     int position[2];
     this->MaterialPosition(position, index);
     this->DrawBitmap(position[0] - 4, position[1] + 11, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\lapine\\shadow_item_off.bmp"))), true);
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), position[0], position[1], this->items[index], 0, 0);
+    this->DrawItemAndQuantity(position[0], position[1], this->items[index], 0, 0);
   }
 
   if (timeGetTime() < this->noticeTick + this->noticeDuration) {
@@ -286,7 +287,7 @@ int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
       char name[260];
       std::memset(name, 0, sizeof(name));
       char* highlight = nullptr;
-      std::size_t remaining = sizeof(name);
+      int remaining = sizeof(name);
       char* cursor = name;
       int highlightColor;
       this->BuildItemName(&item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);

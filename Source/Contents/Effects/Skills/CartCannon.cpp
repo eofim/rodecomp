@@ -70,9 +70,7 @@ void CCartCannon::Open() {
 
   if (length < 40.0f) {
     this->speed = 40.0f / length;
-    this->stepDelta.x *= this->speed;
-    this->stepDelta.y *= this->speed;
-    this->stepDelta.z *= this->speed;
+    this->stepDelta *= this->speed;
   }
 
   const float dx = target.x - this->currentPosition.x;
@@ -89,7 +87,7 @@ void CCartCannon::Open() {
   this->position[1] = this->currentPosition.y;
   this->position[2] = this->currentPosition.z;
 
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   const float angle = static_cast<float>(atan2(static_cast<double>(target.z - this->currentPosition.z), static_cast<double>(target.x - this->currentPosition.x)));
   float yaw = mode->CameraDesiredYaw() + angle / 3.141592f * 180.0f;
   if (yaw < 0.0f) {
@@ -131,9 +129,7 @@ void CCartCannon::OnProcess() {
     this->position[1] = this->currentPosition.y;
     this->position[2] = this->currentPosition.z;
 
-    particle->position.x = this->currentPosition.x;
-    particle->position.y = this->currentPosition.y;
-    particle->position.z = this->currentPosition.z;
+    particle->position = this->currentPosition;
     particle->Process(0.0f, 0.0f, 0.0f);
   }
 
@@ -145,7 +141,7 @@ void CCartCannon::OnProcess() {
 void CCartCannon::Render() {
   CEZ2STRParticle* particle = this->particle;
   if (particle) {
-    CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* mode = g_modeMgr.GetGameMode();
     particle->DrawScreen(mode->camera->frame.view);
   }
 }

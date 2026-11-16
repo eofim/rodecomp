@@ -7,7 +7,45 @@ struct vector3d {
   /* 0000 */ float x;
   /* 0004 */ float y;
   /* 0008 */ float z;
+
+  vector3d& operator=(const vector3d& rhs);
+  vector3d& operator+=(const vector3d& rhs);
+  vector3d& operator-=(const vector3d& rhs);
+  vector3d& operator*=(const float& f);
+  vector3d operator*(const float& f);
 };
+
+inline vector3d& vector3d::operator=(const vector3d& rhs) {
+  x = rhs.x;
+  y = rhs.y;
+  z = rhs.z;
+  return *this;
+}
+
+inline vector3d& vector3d::operator+=(const vector3d& rhs) {
+  x += rhs.x;
+  y += rhs.y;
+  z += rhs.z;
+  return *this;
+}
+
+inline vector3d& vector3d::operator-=(const vector3d& rhs) {
+  x -= rhs.x;
+  y -= rhs.y;
+  z -= rhs.z;
+  return *this;
+}
+
+inline vector3d& vector3d::operator*=(const float& f) {
+  x *= f;
+  y *= f;
+  z *= f;
+  return *this;
+}
+
+inline vector3d vector3d::operator*(const float& f) {
+  return vector3d{x * f, y * f, z * f};
+}
 
 static_assert(sizeof(vector3d) == 12);
 #if defined(_WIN32) && !defined(_WIN64)

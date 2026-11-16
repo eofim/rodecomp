@@ -17,6 +17,8 @@ class UIItemTagButton;
 struct ITEM_INFO;
 class UIItemTagOnChat;
 
+class UIScrollBar;
+
 class UIEditCtrl : public UIWindow {
   friend class UIMacroDetectorWnd;
 
@@ -45,7 +47,7 @@ public:
   int MeasureText(const std::string& text, const int& bytes);
   void Border(int red, int green, int blue);
   void TextColor(std::uint32_t primary, std::uint32_t secondary);
-  void TextColor(unsigned char red, unsigned char green, unsigned char blue, std::uint32_t secondary);
+  void TextColor(int red, int green, int blue, std::uint32_t secondary);
   void UpdateLinks();
   void SetCursor(std::size_t position);
   void MoveCursorToEnd();
@@ -139,7 +141,7 @@ public:
 
   /* 011C */ std::list<std::vector<UIItemTagButton*>> entries;
   /* 0124 */ std::vector<std::string> pendingText;
-  /* 0130 */ UIWindow* scrollBar;
+  /* 0130 */ UIScrollBar* scrollBar;
   /* 0134 */ unsigned char scrollEnabled;
   /* 0138 */ int lineHeight;
   /* 013C */ int lineCount;
@@ -150,13 +152,15 @@ public:
   /* 0150 */ int verticalCursorStep;
   /* 0154 */ int previousCursor;
   /* 0158 */ int firstVisibleLine;
-  /* 015C */ short scrollFlags;
+  /* 015C */ unsigned char manualScroll;
+  /* 015D */ unsigned char movingUp;
   /* 015E */ unsigned char movingDown;
   /* 0160 */ char* previousLineText;
   /* 0164 */ char* nextLineText;
   /* 0168 */ std::vector<std::string> wrappedLines;
   /* 0174 */ std::vector<bool> lineBreaks;
-  /* 0184 */ short editFlags;
+  /* 0184 */ unsigned char caretAtLineEnd;
+  /* 0185 */ unsigned char multiline;
 };
 
 class CUIEditCtrl : public UIEditCtrl3 {
@@ -262,14 +266,21 @@ public:
 protected:
 
 public:
-  /* 0084 */ int padding_0084;
-  /* 0088 */ int padding_0088;
+  /* 0084 */ int unknown_0084;
+  /* 0088 */ int unknown_0088;
 };
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(UIEditCtrl) == 0x11C);
 static_assert(sizeof(UIEditCtrlWheel) == 0x11C);
 static_assert(sizeof(UIEditCtrl2) == 0x11C);
+static_assert(sizeof(UIEditCtrl3) == 0x188);
+static_assert(offsetof(UIEditCtrl3, manualScroll) == 0x15C);
+static_assert(offsetof(UIEditCtrl3, movingUp) == 0x15D);
+static_assert(offsetof(UIEditCtrl3, movingDown) == 0x15E);
+static_assert(offsetof(UIEditCtrl3, previousLineText) == 0x160);
+static_assert(offsetof(UIEditCtrl3, caretAtLineEnd) == 0x184);
+static_assert(offsetof(UIEditCtrl3, multiline) == 0x185);
 static_assert(sizeof(UIEditCtrl4) == 0x13C);
 static_assert(sizeof(UIEditCtrl5) == 0x13C);
 #endif

@@ -1,6 +1,7 @@
 #ifndef RAGNAROK_SOURCE_CONTENTS_EFFECTS_PARTICLES_PARTICLE_H
 #define RAGNAROK_SOURCE_CONTENTS_EFFECTS_PARTICLES_PARTICLE_H
 
+#include "Contents/Effects/Core/Effect.h"
 #include "Render/Primitives/RenderPrimitive.h"
 #include "Resource/Effects/EZeffectResource.h"
 #include "UI/Window/UIControl.h"
@@ -33,15 +34,13 @@ struct ParticleQuad {
   /* 0015 */ bool depth;
 };
 
-struct EZeffectData {
-  /* 0000 */ int maximumFrame;
-  /* 0004 */ int fps;
-  /* 0008 */ int clipCount;
-  /* 000C */ int padding_000C;
-  /* 0010 */ EZeffectClip clips[60];
+struct StarParticleState {
+  /* 0000 */ float angles[4];
+  /* 0010 */ float lifetime;
+  /* 0014 */ float texture;
+  /* 0018 */ float baseScale;
+  /* 001C */ float phase;
 };
-
-typedef void (*ParticleSubmit)(RenderCommand* primitive, int flags);
 
 class CParticle {
 public:
@@ -77,24 +76,36 @@ public:
   /* 0048 */ int effectParameter;
   /* 004C */ int phaseParameter;
   /* 0050 */ int angleParameter;
-  /* 0054 */ float animationParameter;
-  /* 0058 */ float animationParameters[20];
+  union {
+    struct {
+      /* 0054 */ float animationParameter;
+      /* 0058 */ float animationParameters[20];
+    };
+    /* 0054 */ StarParticleState starState;
+    /* 0054 */ float animationValues[21];
+  };
   /* 00A8 */ unsigned char animationState;
-  /* 00A9 */ unsigned char frameParameters[0x17];
+  /* 00A9 */ signed char frameIndex;
+  /* 00AA */ unsigned char padding_00AA[0x16];
   /* 00C0 */ float speedParameter;
   /* 00C4 */ float angle;
   /* 00C8 */ int auxiliaryParameter;
   /* 00CC */ float life;
-  /* 00D0 */ float offsetX = 0;
-  /* 00D4 */ float offsetY = 0;
-  /* 00D8 */ float offsetZ = 0;
+  union {
+    /* 00D0 */ vector3d offset = {0.0f, 0.0f, 0.0f};
+    struct {
+      /* 00D0 */ float offsetX;
+      /* 00D4 */ float offsetY;
+      /* 00D8 */ float offsetZ;
+    };
+  };
   /* 00DC */ float originX = 0;
   /* 00E0 */ float originY = 0;
   /* 00E4 */ float originZ = 0;
   /* 00E8 */ int elapsedFrames;
   /* 00EC */ int renderOptions;
   /* 00F0 */ RenderPrimitive primitive;
-  /* 0198 */ unsigned char rotationStorage[0x30];
+  /* 0198 */ matrix rotation;
   /* 01C8 */ matrix transform;
   /* 01F8 */ RenderVertex vertices[4];
   /* 0278 */ vector3d corners[4];
@@ -135,8 +146,8 @@ public:
   /* 3D4C */ int m_cursors[128];
   /* 3F4C */ vector3d m_screen;
   /* 3F58 */ int m_frame;
-  /* 3F5C */ bool m_loop;
-  /* 3F5D */ bool m_hold = false;
+  /* 3F5C */ unsigned char m_loop;
+  /* 3F5D */ unsigned char m_hold = 0;
   /* 3F60 */ std::string m_name;
   /* 3F78 */ std::string m_texturePrefix;
   /* 3F90 */ int m_endFrame;
@@ -159,9 +170,10 @@ public:
   /* 3FD8 */ float m_shiftX;
   /* 3FDC */ float m_shiftY;
   /* 3FE0 */ long long m_lift;
-  /* 3FE8 */ bool m_flipX;
-  /* 3FE9 */ bool m_flipY;
-  /* 3FEA */ short padding_3FEA = 0;
+  /* 3FE8 */ unsigned char m_flipX;
+  /* 3FE9 */ unsigned char m_flipY;
+  /* 3FEA */ unsigned char m_repeatFrame = 0;
+  /* 3FEB */ unsigned char m_followGround = 0;
   /* 3FEC */ float m_screenShiftX = 0;
   /* 3FF0 */ float m_screenShiftY = 0;
   /* 3FF4 */ int padding_3FF4;
@@ -176,12 +188,33 @@ void SubmitParticlePrimitive(RenderCommand* primitive, int flags);
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(ParticleQuad) == 0x18);
 static_assert(offsetof(ParticleQuad, unused) == 0x14);
-static_assert(offsetof(EZeffectData, clips) == 0x10);
+static_assert(sizeof(StarParticleState) == 0x20);
+static_assert(alignof(StarParticleState) == alignof(float));
+static_assert(offsetof(StarParticleState, angles) == 0x0);
+static_assert(offsetof(StarParticleState, lifetime) == 0x10);
+static_assert(offsetof(StarParticleState, texture) == 0x14);
+static_assert(offsetof(StarParticleState, baseScale) == 0x18);
+static_assert(offsetof(StarParticleState, phase) == 0x1C);
+static_assert(sizeof(matrix) == 0x30);
+static_assert(alignof(matrix) == alignof(float));
 static_assert(offsetof(CParticle, texture) == 0x18);
 static_assert(offsetof(CParticle, red) == 0x3C);
 static_assert(offsetof(CParticle, alpha) == 0x44);
+static_assert(offsetof(CParticle, animationParameter) == 0x54);
+static_assert(offsetof(CParticle, animationParameters) == 0x58);
+static_assert(offsetof(CParticle, starState) == 0x54);
+static_assert(offsetof(CParticle, animationValues) == 0x54);
+static_assert(sizeof(CParticle::animationValues) == 0x54);
+static_assert(offsetof(CParticle, animationState) == 0xA8);
+static_assert(offsetof(CParticle, frameIndex) == 0xA9);
+static_assert(offsetof(CParticle, speedParameter) == 0xC0);
 static_assert(offsetof(CParticle, life) == 0xCC);
+static_assert(offsetof(CParticle, offset) == 0xD0);
+static_assert(offsetof(CParticle, offsetX) == 0xD0);
+static_assert(offsetof(CParticle, offsetY) == 0xD4);
+static_assert(offsetof(CParticle, offsetZ) == 0xD8);
 static_assert(offsetof(CParticle, primitive) == 0xF0);
+static_assert(offsetof(CParticle, rotation) == 0x198);
 static_assert(offsetof(CParticle, transform) == 0x1C8);
 static_assert(offsetof(CParticle, vertices) == 0x1F8);
 static_assert(offsetof(CParticle, sourceBlend) == 0x2A8);

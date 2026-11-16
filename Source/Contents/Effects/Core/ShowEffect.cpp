@@ -15,7 +15,7 @@ namespace {
       return nullptr;
     }
 
-    CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
+    CWorld* world = g_modeMgr.GetGameMode()->scene;
     if (!world) {
       return nullptr;
     }
@@ -24,7 +24,7 @@ namespace {
   }
 
   // INLINED
-  bool HasEffect(const std::map<int, int>& effects, int tag) {
+  bool HasEffect(const std::map<int, RagEffectID>& effects, int tag) {
     return effects.find(tag) != effects.end();
   }
 }
@@ -48,7 +48,7 @@ void CShowEffect::Add(int tag, int effectId) {
       return;
     }
 
-    CWorld* world = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene;
+    CWorld* world = g_modeMgr.GetGameMode()->scene;
     if (actorId == g_session.m_aid) {
       EffectActor* player = world->player;
       if (!player || !player->LaunchTaggedEffect(effectId, tag)) {
@@ -62,7 +62,7 @@ void CShowEffect::Add(int tag, int effectId) {
     }
   }
 
-  this->effects[tag] = effectId;
+  this->effects[tag] = static_cast<RagEffectID>(effectId);
 }
 
 // OFFSET: 0x00729910
@@ -75,7 +75,7 @@ void CShowEffect::Close() {
   const std::uint32_t actorId = this->actor;
   CRenderObject* target = FindActor(actorId);
 
-  for (auto it = this->effects.begin(); it != this->effects.end(); ++it) {
+  for (auto it = this->effects.begin(); this->effects.end() != it; ++it) {
     if (target) {
       target->SendMsg(nullptr, AM_DELETE_TAGGED_EFFECT, it->first, static_cast<std::uint32_t>(it->second), 0, 0, 0, 0);
     } else if (g_effectMgr->HasAllocator(it->second)) {

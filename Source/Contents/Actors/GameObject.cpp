@@ -126,7 +126,7 @@ void CGameObject::Render(int) {
 // OFFSET: 0x00CABF10
 // FUNCTION: fn_21041
 int CGameObject::GetDir(float rot) {
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* gameMode = g_modeMgr.GetGameMode();
   int longitude = 0;
 
   if (gameMode) {
@@ -147,7 +147,7 @@ int CGameObject::GetDir(float rot) {
 // OFFSET: 0x00CAB740
 // FUNCTION: fn_21029
 int CGameObject::Get8Dir2(float rot, int flag) {
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* gameMode = g_modeMgr.GetGameMode();
 
   if (!gameMode) {
     return 0;
@@ -177,7 +177,7 @@ int CGameObject::Get8Dir2(float rot, int flag) {
 // OFFSET: 0x00CAB7F0
 // FUNCTION: fn_21030
 int CGameActor::Get8Dir(float angle) {
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* gameMode = g_modeMgr.GetGameMode();
 
   if (!gameMode) {
     return 0;
@@ -210,7 +210,7 @@ int CGameActor::Get8Dir(float angle) {
 // OFFSET: 0x00CAB920
 // FUNCTION: fn_21031
 int CGameObject::Get8Dir(float angle) {
-  CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* gameMode = g_modeMgr.GetGameMode();
 
   if (gameMode) {
     float relative = -gameMode->camera->camera.yaw - angle;
@@ -313,17 +313,17 @@ void CRenderObject::DrawSprite(int argument, bool seasonal, float offset) {
     float bottomRhw;
     float topRhw;
     SpriteQuad quad;
-    int box[4];
+    tagRECT box;
     std::uint32_t color;
-    if (!static_cast<CGameActor*>(this)->PrepareSprite(
-          index, index, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, box, &color, 0, 0, 0
+    if (!this->PrepareSprite(
+          index, index, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, 0, 0, 0
         )) {
       continue;
     }
 
     drawn = true;
     quad.image = image;
-    if (this->render.visibilityOptions[1] != 0) {
+    if (this->render.trackBounds != 0) {
       const float minX = quad.left < quad.right ? quad.left : quad.right;
       const float maxX = quad.left > quad.right ? quad.left : quad.right;
       if (bounds.left > minX) {
@@ -346,7 +346,7 @@ void CRenderObject::DrawSprite(int argument, bool seasonal, float offset) {
     }
 
     int blend = 257;
-    this->DrawSpriteEffects(&quad, &cell, box, scale, bottomRhw, topRhw, palette, image, &blend, color);
+    this->DrawSpriteEffects(&quad, &cell, &box, scale, bottomRhw, topRhw, palette, image, &blend, color);
 
     if (this->render.spriteJob == 0x235) {
       quad.bottomRhw = bottomRhw - 0.0000003f;
@@ -394,7 +394,7 @@ void CRenderObject::DrawSprite(int argument, bool seasonal, float offset) {
     this->SetTlvert(x, y);
   }
 
-  this->render.effectPhaseBytes[0] = 1;
+  this->render.flagsResetPending = 1;
 }
 
 // OFFSET: 0x00CB2830
@@ -667,15 +667,17 @@ void CGameActor::RenderMercenary(const float* matrix, int job) {
       float bottomRhw;
       float topRhw;
       SpriteQuad quad;
-      int box[4];
-      std::uint32_t color;
-      if (!this->PrepareSprite(index, index, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, box, &color, offsetX, offsetY, 0)) {
+      tagRECT box;
+      union {
+        std::uint32_t color;
+        SpriteColor colorChannels;
+      };
+      if (!this->PrepareSprite(index, index, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, offsetX, offsetY, 0)) {
         continue;
       }
 
-      const unsigned char* argb = reinterpret_cast<const unsigned char*>(&color);
       int blend = 0x101;
-      if (argb[3] < 0xFF) {
+      if (colorChannels.alpha < 0xFF) {
         blend = 1;
       }
       drawn = true;
@@ -688,7 +690,7 @@ void CGameActor::RenderMercenary(const float* matrix, int job) {
         quad.topRhw += bias;
       }
 
-      if (this->render.visibilityOptions[1] != 0) {
+      if (this->render.trackBounds != 0) {
         const float minX = quad.left < quad.right ? quad.left : quad.right;
         const float maxX = quad.left > quad.right ? quad.left : quad.right;
         if (bounds[0] > minX) {
@@ -711,7 +713,7 @@ void CGameActor::RenderMercenary(const float* matrix, int job) {
       }
 
       if (layer <= 1) {
-        this->DrawPulseOutline(cell, box, scale, bottomRhw, topRhw, palette, image, color);
+        this->DrawPulseOutline(cell, &box, scale, bottomRhw, topRhw, palette, image, color);
       }
 
       if (IsScreenShakeActive()) {
@@ -728,19 +730,19 @@ void CGameActor::RenderMercenary(const float* matrix, int job) {
     }
   }
 
-  this->render.effectPhaseBytes[0] = 1;
+  this->render.flagsResetPending = 1;
 }
 
 // OFFSET: 0x00CB35F0
 // FUNCTION: fn_21105
 void CRenderObject::DrawShadow(int argument, float scale) {
-  if (this->render.spriteJob == 565 || this->render.visibilityOptions[0] == 0 || this->render.shadowScale == 0.0f || scale == 0.0f) {
+  if (this->render.spriteJob == 565 || this->render.shadowVisible == 0 || this->render.shadowScale == 0.0f || scale == 0.0f) {
     return;
   }
 
   const float* matrix = reinterpret_cast<const float*>(argument);
   const float z = this->render.position.z;
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   float position[3];
   position[0] = this->render.position.x;
   position[1] = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
@@ -919,7 +921,7 @@ void CGameActor::ApplySavedShapeShift() {
   this->shapeShift = pending;
   this->savedShapeShift = 0;
   this->render.isLieOnGround = false;
-  this->render.visibilityOptions[1] = 1;
+  this->render.trackBounds = 1;
   this->render.isMotionFreezed = false;
   this->render.specialMotionLocked = 0;
 
@@ -1079,10 +1081,11 @@ void EffectActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_
       }
       break;
 
-    case AM_IS_HAVE_EFFECT:
+    case AM_IS_HAVE_EFFECT: {
+      int* effectId = reinterpret_cast<int*>(b);
       if (g_effectMgr->HasAllocator(static_cast<int>(b)) == true && sender) {
         if (g_effectMgr->Has(static_cast<CRenderObject*>(sender)->render.accountId, static_cast<int>(b)) == true) {
-          *reinterpret_cast<int*>(static_cast<std::intptr_t>(b)) = -1;
+          *effectId = -1;
         }
         return;
       }
@@ -1091,12 +1094,13 @@ void EffectActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_
         CRagEffect* const effect = *it;
         if (!effect) {
           this->state.effects.erase(it);
-        } else if (*reinterpret_cast<int*>(static_cast<std::intptr_t>(b)) == effect->state.type) {
-          *reinterpret_cast<int*>(static_cast<std::intptr_t>(b)) = -1;
+        } else if (*effectId == effect->state.type) {
+          *effectId = -1;
           return;
         }
       }
       break;
+    }
   }
 }
 
@@ -1188,7 +1192,7 @@ struct PcMoveEntry {
 // OFFSET: 0x00CB4800
 // FUNCTION: fn_21112
 void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) {
-  CGameMode* mode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+  CGameMode* mode = g_modeMgr.GetGameMode();
   bool visible = true;
   if (this->render.accountId != g_session.m_aid) {
     if (StateFlag01(this->stateFlags) || StateFlag02(this->stateFlags) || StateFlag06(this->stateFlags)) {
@@ -1201,7 +1205,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     break;
   case AM_DELETE_PROHIBITEFFECT:
     if (this->statusEffects[10] != 0) {
-      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->RemoveObject(static_cast<CRenderObject*>(this->statusEffects[10]));
+      g_modeMgr.GetGameMode()->scene->RemoveObject(this->statusEffects[10]);
     }
     break;
   case AM_MSGEFFECT_DEAD:
@@ -1684,7 +1688,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     if (g_session.m_aid == attackerAid) {
       attacker = mode->scene->player;
     } else {
-      attacker = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(attackerAid));
+      attacker = mode->scene->GetGameActorByAID(attackerAid);
     }
     if (attacker != nullptr) {
       job = attacker->GetEffectiveJob(-1);
@@ -1747,7 +1751,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
               case JT_ABYSS_CHASER:
                 view = static_cast<int>(weapon);
                 if (view > 1000) {
-                  view = GetWeaponViewValue(view);
+                  view = g_session.GetWeaponViewValue(view);
                 }
                 genericWeapon = false;
                 break;
@@ -1766,7 +1770,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
             if (genericWeapon) {
               std::int64_t weaponView = weapon;
               if (weaponView > 1000) {
-                weaponView = GetWeaponViewValue(static_cast<int>(weaponView));
+                weaponView = g_session.GetWeaponViewValue(static_cast<int>(weaponView));
               }
               view = static_cast<int>(weaponView);
             }
@@ -1796,7 +1800,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           CEffect* effect = g_effectMgr->Spawn(0, EF_NEW_CROSSIMPACT_TARGET, position, 0, -1, 0, 0);
           effect->SetAngle(static_cast<float>(std::max(rand() % 360, 0)));
         } else if (hitEffect == 2132) {
-          const vector3d& playerPosition = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player->render.position;
+          const vector3d& playerPosition = g_modeMgr.GetGameMode()->scene->player->render.position;
           g_soundMgr->PlayWave("effect\\ABC_DEFT_STAB2.wav", playerPosition.x - this->render.position.x, 0.0f, playerPosition.z - this->render.position.z, 250, 40, 1.0f, 0);
         } else if (g_effectMgr->Spawn(this->render.accountId, hitEffect, offset, 0, -1, 0, 0) == nullptr) {
           CRagEffect* effect = this->LaunchEffect(hitEffect, offset, 0.0f);
@@ -1810,7 +1814,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           if (this->render.angle > 360.0f) {
             this->render.angle -= 360.0f;
           }
-        } else if (!CSkillActionMgr::GetInstance()->OnSkillDamage(damageMessage->skillId, reinterpret_cast<int>(attacker), this, reinterpret_cast<CGameActor*>(damageMessage->skillTarget))) {
+        } else if (!CSkillActionMgr::GetInstance()->OnSkillDamage(damageMessage->skillId, attacker, this, damageMessage->skillTarget)) {
           if (g_effectMgr->Spawn(this->render.accountId, skillEffect, offset, 0, -1, 0, 0) == nullptr) {
             CRagEffect* effect = this->LaunchEffect(skillEffect, offset, 0.0f);
             if (effect != nullptr) {
@@ -2067,7 +2071,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     this->SetPropensityInfo(entry->honor, entry->virtue);
     this->moveSpeed = entry->speed;
     this->routeStartTick = entry->moveStartTick;
-    CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+    CGameMode* gameMode = g_modeMgr.GetGameMode();
     gameMode->CellCenter(entry->startX, entry->startY, this->render.position.x, this->render.position.z);
     this->render.position.x += static_cast<float>(gameMode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubX - 8);
     this->render.position.z += static_cast<float>(gameMode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubY - 8);
@@ -2193,10 +2197,9 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
   case AM_CHAT: {
     std::string text(reinterpret_cast<const char*>(static_cast<std::intptr_t>(b)));
     if (g_windowMgr.chatWnd != nullptr) {
-      text = static_cast<UINewChatWnd*>(g_windowMgr.chatWnd)->ConvertChat(std::string(reinterpret_cast<const char*>(static_cast<std::intptr_t>(b))));
+      text = g_windowMgr.chatWnd->ConvertChat(std::string(reinterpret_cast<const char*>(static_cast<std::intptr_t>(b))));
     }
-    std::string linked;
-    DisplayNavigationLink(linked, text);
+    std::string linked = g_navigationLinkParser->DisplayNavigationLink(text);
     text = std::move(linked);
     const char* message = reinterpret_cast<const char*>(static_cast<std::intptr_t>(b));
     if (text.size() != 0) {
@@ -2250,7 +2253,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     this->movementState[5] = static_cast<int>(b);
     this->destCellY = static_cast<int>(c);
     if (found) {
-      CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+      CGameMode* gameMode = g_modeMgr.GetGameMode();
       gameMode->CellCenter(static_cast<int>(b), static_cast<int>(c), this->render.position.x, this->render.position.z);
       this->render.position.y =
         gameMode->scene->terrain->Height(this->render.position.x, this->render.position.z);
@@ -2290,14 +2293,14 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
   case AM_RESURRECTION:
     this->render.state = ST_STAND;
     this->render.isLieOnGround = false;
-    this->render.visibilityOptions[1] = 1;
-    static_cast<CGameMode*>(g_modeMgr.GetGameMode())->waitingUseItemAck = 0;
+    this->render.trackBounds = 1;
+    g_modeMgr.GetGameMode()->waitingUseItemAck = 0;
     this->SetState(ST_STAND, 1);
     break;
   case AM_OUTOFSIGHT:
     this->render.accountId = 0xFFFFFFFF;
     this->levelAuraType = 0;
-    this->render.visibilityOptions[0] = 0;
+    this->render.shadowVisible = 0;
     this->vanishTime = static_cast<int>(timeGetTime() + 510);
     if (this->vanishTime == 0) {
       this->vanishTime = 1;
@@ -2571,7 +2574,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         this->LaunchEffect(effectId, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
       this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_STATUS_STATE, 0, 0, 0, 0, 0);
-      CPlayer* player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
+      CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
       if (player) {
         player->skillEffect = this->LaunchEffect(EF_STATUS_STATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
@@ -2772,7 +2775,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       break;
     }
     case EFST_TING: {
-      const vector3d& player = static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player)->render.position;
+      const vector3d& player = static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player)->render.position;
       g_soundMgr->PlayWave("effect\\T_벽튕김.wav", this->render.position.x - player.x, 0.0f, this->render.position.z - player.z, 250, 40, 1.0f, 0);
       this->LaunchEffect(EF_QUAKEBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       if (this->HasId(EF_RUN)) {
@@ -2827,7 +2830,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         this->isTrickDead = 0;
         this->render.state = ST_STAND;
         this->render.isLieOnGround = false;
-        this->render.visibilityOptions[1] = 1;
+        this->render.trackBounds = 1;
         this->SetState(ST_STAND, 1);
         this->render.isMotionFreezed = false;
       }
@@ -2837,19 +2840,15 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         if (on) {
           g_screenShakeDuration = 10000;
           g_screenShakeMode = 2;
-          CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+          CGameMode* gameMode = g_modeMgr.GetGameMode();
           if (gameMode) {
-            gameMode->camera->frame.up[0] = 0.0f;
-            gameMode->camera->frame.up[1] = -1.0f;
-            gameMode->camera->frame.up[2] = 0.0f;
+            gameMode->camera->SetUp(vector3d{0.0f, -1.0f, 0.0f});
           }
         } else {
           g_screenShakeDuration = 0;
-          CGameMode* gameMode = static_cast<CGameMode*>(g_modeMgr.GetGameMode());
+          CGameMode* gameMode = g_modeMgr.GetGameMode();
           if (gameMode) {
-            gameMode->camera->frame.up[0] = 0.0f;
-            gameMode->camera->frame.up[1] = 1.0f;
-            gameMode->camera->frame.up[2] = 0.0f;
+            gameMode->camera->SetUp(vector3d{0.0f, 1.0f, 0.0f});
           }
         }
       }
@@ -2997,12 +2996,11 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         shade = 0xFF;
         frozen = false;
       }
-      unsigned char* const argb = reinterpret_cast<unsigned char*>(&this->render.color);
       this->render.isMotionFreezed = frozen;
       this->render.colorLocked = frozen;
-      argb[2] = shade;
-      argb[1] = shade;
-      argb[0] = shade;
+      this->render.colorChannels.red = shade;
+      this->render.colorChannels.green = shade;
+      this->render.colorChannels.blue = shade;
       break;
     }
     case EFST_STRIKING:
@@ -3128,9 +3126,9 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       }
       if (this->hpGaugeWindow) {
         if (on) {
-          static_cast<UIMonsterGage*>(this->hpGaugeWindow)->SetMode(0);
+          this->hpGaugeWindow->SetMode(0);
         } else {
-          static_cast<UIMonsterGage*>(this->hpGaugeWindow)->SetMode(1);
+          this->hpGaugeWindow->SetMode(1);
         }
       }
       break;
@@ -3653,7 +3651,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       } else {
         this->render.state = ST_STAND;
         this->render.isLieOnGround = false;
-        this->render.visibilityOptions[1] = 1;
+        this->render.trackBounds = 1;
         this->SetState(ST_STAND, 1);
         this->render.isMotionFreezed = false;
         this->render.specialMotionLocked = 0;
@@ -3719,7 +3717,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       if (on == true) {
         g_effectMgr->Spawn(this->render.accountId, 0x4B1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
         const vector3d& player =
-          static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player)->render.position;
+          static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player)->render.position;
         g_soundMgr->PlayWave(
           "effect\\t_캐스팅.wav", this->render.position.x - player.x, 0.0f,
           this->render.position.z - player.z, 250, 40, 1.0f, 0
@@ -3774,7 +3772,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       if (on == true) {
         g_effectMgr->Spawn(this->render.accountId, EF_SOUL_UNITY, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
         const vector3d& player =
-          static_cast<const CRenderObject*>(static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player)->render.position;
+          static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player)->render.position;
         g_soundMgr->PlayWave(
           "effect\\t_바람방출.wav", this->render.position.x - player.x, 0.0f,
           this->render.position.z - player.z, 250, 40, 1.0f, 0
@@ -3809,7 +3807,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_SOUND_OF_DESTRUCTION: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (!actor) {
         break;
@@ -3823,7 +3821,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_EARTHSHAKER: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (actor->HasId(0x576)) {
         actor->SendMsg(nullptr, AM_DELETE_EFFECT, 0x576, 0, 0, 0, 0, 0);
@@ -3836,7 +3834,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_MAGIC_POISON: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (actor->HasId(EF_PINKBODY)) {
         actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_PINKBODY, 0, 0, 0, 0, 0);
@@ -3849,7 +3847,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_MISTY_FROST: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (actor->HasId(EF_NEW_GRANDCROSS)) {
         actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_NEW_GRANDCROSS, 0, 0, 0, 0, 0);
@@ -3862,7 +3860,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_PRISON: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (actor->HasId(EF_WHITEIMPRISON_STATE)) {
         actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_WHITEIMPRISON_STATE, 0, 0, 0, 0, 0);
@@ -3875,7 +3873,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_MADOGEAR_TYPE: {
       CGameActor* target = this;
       if (this->render.accountId != g_session.m_aid) {
-        target = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(this->render.accountId));
+        target = mode->scene->GetGameActorByAID(this->render.accountId);
       }
       if (!target) {
         break;
@@ -3905,7 +3903,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_RELIEVE_DAMAGE: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (!actor) {
         break;
@@ -3919,7 +3917,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_LOCKON_LASER: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (!actor) {
         break;
@@ -3935,7 +3933,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_HELLS_PLANT_ARMOR: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (!actor) {
         break;
@@ -3958,7 +3956,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         }
         g_overrideColor = 1;
         this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_STATUS_STATE, 0, 0, 0, 0, 0);
-        CPlayer* const player = static_cast<CGameMode*>(g_modeMgr.GetGameMode())->scene->player;
+        CPlayer* const player = g_modeMgr.GetGameMode()->scene->player;
         if (player) {
           player->skillEffect = this->LaunchEffect(EF_STATUS_STATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
         }
@@ -4071,7 +4069,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case EFST_DRAGONIC_AURA: {
       CGameActor* actor = this;
       if (actor->render.accountId != g_session.m_aid) {
-        actor = static_cast<CGameActor*>(mode->scene->GetGameActorByAID(actor->render.accountId));
+        actor = mode->scene->GetGameActorByAID(actor->render.accountId);
       }
       if (!actor) {
         break;
@@ -4333,19 +4331,19 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
   }
   case AM_CHANGE_COLOR: {
     this->render.colorLocked = 1;
-    unsigned char* const saved = reinterpret_cast<unsigned char*>(&this->render.savedTintColor);
-    if (saved[0] == 0 && saved[1] == 0 && saved[2] == 0 && saved[3] == 0) {
-      const unsigned char* const argb = reinterpret_cast<const unsigned char*>(&this->render.color);
-      saved[0] = argb[3];
-      saved[1] = argb[2];
-      saved[2] = argb[1];
-      saved[3] = argb[0];
+    ActorTintColor& saved = this->render.savedTintChannels;
+    if (saved.alpha == 0 && saved.red == 0 && saved.green == 0 && saved.blue == 0) {
+      const SpriteColor& argb = this->render.colorChannels;
+      saved.alpha = argb.alpha;
+      saved.red = argb.red;
+      saved.green = argb.green;
+      saved.blue = argb.blue;
     }
-    unsigned char* const target = reinterpret_cast<unsigned char*>(&this->render.targetTintColor);
-    target[0] = 0xFF;
-    target[1] = static_cast<unsigned char>(b);
-    target[2] = static_cast<unsigned char>(c);
-    target[3] = static_cast<unsigned char>(d);
+    ActorTintColor& target = this->render.targetTintChannels;
+    target.alpha = 0xFF;
+    target.red = static_cast<unsigned char>(b);
+    target.green = static_cast<unsigned char>(c);
+    target.blue = static_cast<unsigned char>(d);
     const std::int64_t red = b;
     const std::int64_t green = c;
     this->render.color = static_cast<std::uint32_t>(red << 16 | green << 8 | static_cast<std::uint32_t>(d) | 0xFF000000);
@@ -4385,7 +4383,7 @@ void CGameActor::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       }
       if (CEffect* fallenAngel = g_effectMgr->Find(this->render.accountId, EF_FALLEN_ANGEL)) {
         vector3d position{0.0f, 0.0f, 0.0f};
-        static_cast<CGameMode*>(g_modeMgr.GetGameMode())->CellCenter(static_cast<int>(b), static_cast<int>(c), position.x, position.z);
+        g_modeMgr.GetGameMode()->CellCenter(static_cast<int>(b), static_cast<int>(c), position.x, position.z);
         position.y = this->render.position.y;
         static_cast<CFallenAngelEffect*>(fallenAngel)->SetPosition(position);
       }

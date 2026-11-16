@@ -18,6 +18,8 @@
 #include "Script/LuaScript.h"
 #include "UI/Window/UIWindow.h"
 
+template __declspec(noinline) std::string::~basic_string() noexcept;
+
 // OFFSET: 0x007E3860
 // FUNCTION: fn_09724
 FuncDrawWNDChar::FuncDrawWNDChar(
@@ -35,10 +37,6 @@ FuncDrawWNDChar::FuncDrawWNDChar(
   this->m_layers[3] = this->m_midAccessory;
   this->m_layers[6] = this->m_robe;
 }
-
-// OFFSET: 0x007D4840
-// FUNCTION: fn_09582
-FuncDrawWNDChar::~FuncDrawWNDChar() = default;
 
 // OFFSET: 0x007E3E60
 // FUNCTION: fn_09727
@@ -147,7 +145,7 @@ void FuncDrawWNDChar::Draw(bool option) {
         g_renderer->atlas.Insert(image, palette, record);
       }
 
-      float scale = GetSkillFactor(this->m_job);
+      float scale = g_session.GetSkillFactor(this->m_job);
       int offsetX = static_cast<int>(static_cast<float>(offset.x) * scale);
       int offsetY = static_cast<int>(static_cast<float>(offset.y) * scale);
       UIWindow* window = this->m_window;

@@ -70,7 +70,7 @@ void CCharacterRender::RenderRobeCommands(
 
       const float bottom = bottomDepth;
       const float top = topDepth;
-      if (!drawOnTop && static_cast<CGameMode*>(g_modeMgr.GetGameMode())->camera->camera.pitch >= -40.0f) {
+      if (!drawOnTop && g_modeMgr.GetGameMode()->camera->camera.pitch >= -40.0f) {
         quad.bottomRhw = bottom - 0.0000065f;
         quad.topRhw = top - 0.0000065f;
       }
@@ -87,7 +87,7 @@ void CCharacterRender::RenderRobeCommands(
       quad.image = image;
       CharacterRenderDrawItem item;
       item.flags = 1;
-      item.command = BuildSpriteQuad(*GetRenderSystemHolder()->system, quad, sprite->palette, 1, 0.0f, 0.0f);
+      item.command = this->BuildSpriteQuad(quad, sprite->palette, 1, 0.0f, 0.0f);
       commands.push_back(item);
     }
   }
