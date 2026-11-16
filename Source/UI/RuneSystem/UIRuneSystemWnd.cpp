@@ -1059,7 +1059,7 @@ void UIDecomlist::Paint() {
     const std::string background = FormatOwnedString("유저인터페이스\\runesystem\\list_decom_item_1_%d.bmp", index == this->m_selected);
     this->DrawBitmap(0, y, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background.c_str()))), true);
 
-    ITEM_INFO item = LookupClientItem(g_session.m_inventoryItems, itemId, 0);
+    ITEM_INFO item = g_session.LookupClientItem(itemId, 0);
     char text[128];
     std::memset(text, 0, sizeof(text));
     g_session.IconPath(item.itemId.c_str(), text, 1);
@@ -1320,7 +1320,7 @@ void UIRuneSystem_ActiveWnd::Paint() {
         icon = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\item\\사과.bmp")));
       }
 
-      ITEM_INFO owned = LookupClientItem(g_session.m_inventoryItems, itemId, 0);
+      ITEM_INFO owned = g_session.LookupClientItem(itemId, 0);
       const bool lacking = required > owned.quantity;
       owned.identified = 1;
       this->DrawBitmap(x, y, lacking ? red : blue, true);
@@ -1362,7 +1362,7 @@ void UIRuneSystem_DecomItemWnd::Paint() {
         icon = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\item\\사과.bmp")));
       }
 
-      ITEM_INFO owned = LookupClientItem(g_session.m_inventoryItems, itemId, 0);
+      ITEM_INFO owned = g_session.LookupClientItem(itemId, 0);
       const bool lacking = required > owned.quantity;
       owned.identified = 1;
       if (icon) {
@@ -1420,8 +1420,8 @@ void UIRuneSystem_tagListWnd::Paint() {
   const std::string background = FormatOwnedString("유저인터페이스\\runesystem\\bg_tag%d.bmp", (this->geometry.y == 44) + 1);
   this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background.c_str()))), true);
   CBitmapRes* empty = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\runesystem\\tag\\bt_tag_bg.bmp")));
-  int x = 22;
-  for (int index = 0; index < this->m_visibleCount; ++index, x += 27) {
+  for (int index = 0; index < this->m_visibleCount; ++index) {
+    const int x = index * 27 + 22;
     CTagData* tag = CRuneSystemMgr::GetInstance()->GetTagByIndex(this->m_firstTag + index);
     if (!tag) {
       this->DrawBitmap(x, 4, empty, true);
@@ -1650,7 +1650,7 @@ int UIRuneSet_Info::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
 // OFFSET: 0x0081ED20
 // FUNCTION: fn_10232
 void UIRune_Decom::SetItem(int itemId) {
-  ITEM_INFO item = LookupClientItem(g_session.m_inventoryItems, itemId, 0);
+  ITEM_INFO item = g_session.LookupClientItem(itemId, 0);
   item.identified = 1;
   if (this->m_itemId != itemId) {
     this->m_itemId = itemId;
@@ -1724,10 +1724,13 @@ void UIRune_ViewInfo::OnCreate(int, int) {
 // OFFSET: 0x0081E5D0
 // FUNCTION: fn_10228
 int UIRune_Decom::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
-  if (message == UM_COMMAND) {
-    if (argument1 == ID_RADIOBTN) {
+  switch (message) {
+  case UM_COMMAND:
+    switch (argument1) {
+    case ID_RADIOBTN:
       this->SelectDecomType(argument2);
-    } else if (argument1 == RUNE_BUTTON_DECOMPOSE) {
+      break;
+    case RUNE_BUTTON_DECOMPOSE:
       g_windowMgr.CloseWindow(WID_RUNESYSTEM_DECOMRESULTWND);
       if (!CRuneSystemMgr::GetInstance()->IsRequestPending() && (!this->parent || this->parent->SendMsg(this, 0x6A, 50, 0, 0, 0) != 0) && this->m_ownedCount) {
         if (static_cast<float>(g_session.m_weight) > static_cast<float>(g_session.m_maxWeight) * 0.7f ||
@@ -1735,7 +1738,7 @@ int UIRune_Decom::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
               g_session.extraInventorySlots + 100) {
           g_windowMgr.Confirm(LookupMessage(MSI_MACRO_USER_REPORT), 0, true, false, 0, "Message", 280, 120, 0);
         } else {
-          ITEM_INFO item = LookupClientItem(g_session.m_inventoryItems, this->m_itemId, 0);
+          ITEM_INFO item = g_session.LookupClientItem(this->m_itemId, 0);
           RuneDecomRequestPacket packet;
           packet.id = ID_CZ_RUNE_REQ_DECOMPOSE;
           packet.itemId = item.GetItemId();
@@ -1745,9 +1748,12 @@ int UIRune_Decom::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
           CRuneSystemMgr::GetInstance()->SetRequestPending(true);
         }
       }
+      break;
     }
-  } else if (message == UM_REFRESH) {
+    break;
+  case UM_REFRESH:
     this->SetItem(this->m_itemId);
+    break;
   }
 
   return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);

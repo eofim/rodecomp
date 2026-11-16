@@ -113,7 +113,7 @@ public:
   virtual int GetId() const;
   virtual int GetType() const;
   virtual int GetIndex() const;
-  virtual std::uint16_t GetFlag() const;
+  virtual int GetFlag() const;
   virtual const char* GetName() const;
   virtual const char* GetTitle() const;
   virtual NaviCell* GetCell(NaviCell* out) const;
@@ -174,6 +174,14 @@ public:
   CNavi_Link* FindLinkAt(int x, int y) override;
   CNavi_Link* FindLinkTo(int x, int y) override;
 };
+
+// OFFSET: 0x00B8D8D0
+// FUNCTION: fn_19436
+inline CNavi_Link::~CNavi_Link() {
+  this->type = 200;
+  this->linkedInfo = nullptr;
+  this->linkedLinks.erase(this->linkedLinks.begin(), this->linkedLinks.end());
+}
 
 #pragma pack(push, 1)
 struct NaviObjectRecord {
@@ -284,6 +292,16 @@ struct NavigationTarget {
   /* 000C */ int y = 0;
   /* 0010 */ std::string name;
 };
+
+// OFFSET: 0x005C2C10
+// FUNCTION: fn_03544
+inline NavigationTarget::~NavigationTarget() {
+  this->type = -1;
+  this->object = nullptr;
+  this->x = -1;
+  this->y = -1;
+  this->name.clear();
+}
 
 class CNaviData {
 public:

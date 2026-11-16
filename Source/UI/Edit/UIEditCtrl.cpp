@@ -1259,7 +1259,7 @@ void UIItemWnd::OnRBtnDown(int x, int y) {
     } else if (HIBYTE(GetAsyncKeyState(VK_CONTROL))) {
       if (item.identity[1] > 0 && !g_session.IsPetEgg(item.GetItemId())) {
         const int magnifiers =
-          LookupClientItem(g_session.m_inventoryItems, 611, 0).quantity + LookupClientItem(g_session.m_inventoryItems, 12325, 0).quantity;
+          g_session.LookupClientItem(611, 0).quantity + g_session.LookupClientItem(12325, 0).quantity;
         if (magnifiers <= 0) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_UISCRIPT_ERROR_GUIDE)), 255, 0, 0, 0);
         }
@@ -2019,7 +2019,7 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       if (!g_session.HasInventoryItem(mode->drag.id)) {
         goto invalid;
       }
-      const int owned = LookupClientItemByIdentity(g_session.m_inventoryItems, mode->drag.id).quantity;
+      const int owned = g_session.LookupClientItemByIdentity(mode->drag.id).quantity;
       if (quantity <= 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
       }
@@ -2072,7 +2072,7 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
         if (mode->drag.source != 1 || !g_session.HasInventoryItem(mode->drag.id)) {
           break;
         }
-        owned = LookupClientItemByIdentity(g_session.m_inventoryItems, mode->drag.id).quantity;
+        owned = g_session.LookupClientItemByIdentity(mode->drag.id).quantity;
       }
       if (owned == 0) {
         break;
@@ -2087,7 +2087,7 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
     case 8: {
       int owned = 0;
       if (mode->drag.source == 1) {
-        const ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, mode->drag.id);
+        const ITEM_INFO item = g_session.LookupClientItemByIdentity(mode->drag.id);
         if (item.identity[1] != 0) {
           owned = item.quantity;
         }
@@ -2173,7 +2173,7 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       if (!g_session.HasInventoryItem(mode->drag.id)) {
         goto invalid;
       }
-      const int owned = LookupClientItemByIdentity(g_session.m_inventoryItems, mode->drag.id).quantity;
+      const int owned = g_session.LookupClientItemByIdentity(mode->drag.id).quantity;
       if (quantity <= 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
       }
@@ -2575,7 +2575,7 @@ void UIItemBaseWnd::Paint() {
   const int rows = (this->geometry.height - 38) / 32;
   for (int row = 0, y = 17; row < rows; ++row, y += 32) {
     for (int column = 0, x = 40; column < columns; ++column, x += 32) {
-      DrawItemSlotBackground(*this, x, y);
+      this->DrawItemSlotFrame(x, y);
     }
   }
 
@@ -2595,7 +2595,7 @@ void UIItemBaseWnd::Paint() {
     const int x = visible % this->columns * 32 + 44;
 
     if (this->showQuantity != 0) {
-      DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+      this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     } else {
       this->DrawItemIcon(x, top + 21, *it, 0);
     }
@@ -2790,7 +2790,7 @@ void UISkillListWnd::Paint() {
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
   for (int y = 17; slots > 0; --slots, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillBlue;
@@ -4630,15 +4630,14 @@ void UIItemSellWnd2::OnCreate(int width, int height) {
 
   const std::string prefix("유저인터페이스\\");
   const char* names[2][3] = {{"btn_exchange", "btn_exchange_a", "btn_exchange_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
-  int positions[2][2] = {{this->geometry.width - 106, this->geometry.height - 24}, {this->geometry.width - 61, this->geometry.height - 24}};
   int ids[2] = {184, 185};
+  int positions[2][2] = {{this->geometry.width - 106, this->geometry.height - 24}, {this->geometry.width - 61, this->geometry.height - 24}};
   for (int index = 0; index < 2; ++index) {
     this->buttons[index] = new UIBitmapButton();
-    UIBitmapButton* button = this->buttons[index];
-    button->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
-    this->buttons[index]->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    this->buttons[index]->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
+    this->buttons[index]->SetSize(this->buttons[index]->BitmapWidth(), this->buttons[index]->BitmapHeight());
     this->buttons[index]->Move(positions[index][0], positions[index][1]);
     this->buttons[index]->SetId(ids[index]);
     this->AddChild(this->buttons[index]);
@@ -4682,15 +4681,14 @@ void UIItemSellWnd::OnCreate(int width, int height) {
 
   const std::string prefix("유저인터페이스\\");
   const char* names[2][3] = {{"btn_sell", "btn_sell_a", "btn_sell_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
-  int positions[2][2] = {{this->geometry.width - 106, this->geometry.height - 24}, {this->geometry.width - 61, this->geometry.height - 24}};
   int ids[2] = {184, 185};
+  int positions[2][2] = {{this->geometry.width - 106, this->geometry.height - 24}, {this->geometry.width - 61, this->geometry.height - 24}};
   for (int index = 0; index < 2; ++index) {
     this->buttons[index] = new UIBitmapButton();
-    UIBitmapButton* button = this->buttons[index];
-    button->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
-    this->buttons[index]->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    this->buttons[index]->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
+    this->buttons[index]->SetSize(this->buttons[index]->BitmapWidth(), this->buttons[index]->BitmapHeight());
     this->buttons[index]->Move(positions[index][0], positions[index][1]);
     this->buttons[index]->SetId(ids[index]);
     this->AddChild(this->buttons[index]);
@@ -7119,7 +7117,7 @@ void UIItemShopWnd2::OnLBtnDown(int x, int y) {
 
   if (item.identity[1] > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    const ITEM_INFO owned = LookupClientItemByIdentity(g_session.m_inventoryItems, item.identity[1]);
+    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(item.identity[1]);
     if (owned.identity[1] > 0) {
       mode->drag.BeginItem(g_windowMgr, 3, item, item.quantity, -1);
     } else {
@@ -7150,7 +7148,7 @@ void UIItemShopWnd::OnLBtnDown(int x, int y) {
 
   if (item.identity[1] > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    const ITEM_INFO owned = LookupClientItemByIdentity(g_session.m_inventoryItems, item.identity[1]);
+    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(item.identity[1]);
     if (owned.identity[1] > 0) {
       mode->BeginDragItem(3, item, item.quantity, -1);
     } else {
@@ -9005,7 +9003,7 @@ void UIItemStoreFindWnd::Paint() {
   const int rows = (this->geometry.height - 38) / 32;
   int slots = rows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 10, y);
+    this->DrawItemSlotFrame(10, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -9028,7 +9026,7 @@ void UIItemStoreFindWnd::Paint() {
     const int left = visible % this->columns * 32 + 10;
     const int width = this->geometry.width - left - 66;
     const int x = left + 4;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     this->DrawWrappedItemName(left + 40, top + 29, width, &*it, 0, 0, 12);
 
     if (0 < it->grade) {
@@ -9063,7 +9061,7 @@ void UIItemStoreSubWnd::Paint() {
   const int rows = (this->geometry.height - 38) / 32;
   int slots = rows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 10, y);
+    this->DrawItemSlotFrame(10, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -9086,7 +9084,7 @@ void UIItemStoreSubWnd::Paint() {
     const int left = visible % this->columns * 32 + 10;
     const int width = this->geometry.width - left - 66;
     const int x = left + 4;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     this->DrawWrappedItemName(left + 40, top + 29, width, &*it, 0, 0, 12);
 
     if (0 < it->grade) {
@@ -9140,7 +9138,7 @@ void UIItemPurchaseWnd::Paint() {
 
   int slots = (height - 58) / 32;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   int visible = 0;
@@ -9164,7 +9162,7 @@ void UIItemPurchaseWnd::Paint() {
     }
 
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
 
     int nameWidth = 110;
     const int amount = static_cast<int>(it->prices[0]);
@@ -9264,7 +9262,7 @@ void UIItemSellWnd::Paint() {
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -9292,7 +9290,7 @@ void UIItemSellWnd::Paint() {
     }
 
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
 
     int nameWidth = 100;
     const int amount = static_cast<int>(it->prices[0]);
@@ -9367,7 +9365,7 @@ void UIItemShopWnd::Paint() {
   int slotRows = (this->geometry.height - this->footerHeight - this->bottomPadding - 17) / 32;
   int slots = slotRows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   if (this->showFooter != 0) {
@@ -9400,7 +9398,7 @@ void UIItemShopWnd::Paint() {
     }
 
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
 
     int nameWidth = 100;
     const int amount = static_cast<int>(it->prices[0]);
@@ -9525,7 +9523,7 @@ void UIItemStoreWnd::Paint() {
   this->scrollBar->Show(1);
   int slots = slotRows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -9547,7 +9545,7 @@ void UIItemStoreWnd::Paint() {
     const int top = visible / this->columns * 32;
     const int column = visible % this->columns * 32;
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     this->DrawWrappedItemName(column + 80, top + 29, 180, &*it, 0, 0, 12);
 
     if (0 < it->grade) {
@@ -9604,7 +9602,7 @@ void UIMerchantItemPurchaseWnd::Paint() {
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -9628,7 +9626,7 @@ void UIMerchantItemPurchaseWnd::Paint() {
     }
 
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     this->DrawWrappedItemName(column + 76, top + 29, 90, &*it, 0, 0, 12);
 
     if (0 < it->grade) {
@@ -9710,7 +9708,7 @@ void UIMerchantShopMakeWnd::Paint() {
     for (int i = 0, y = 72; i < count; ++i, y += 42) {
       this->DrawTextAt(this->geometry.width - 155, y - 15, LookupMessage(MSI_BUYINGSTORE_MAKEWND_PRICE), 0, 0, 12, 0, 0, 0);
       this->DrawTextAt(this->geometry.width - 176, y - 15, LookupMessage(MSI_EA4), 0, 0, 12, 0, 0, 0);
-      DrawItemSlotBackground(*this, 3, y - 18);
+      this->DrawItemSlotFrame(3, y - 18);
       if (i >= this->slotCount) {
         continue;
       }
@@ -9732,7 +9730,7 @@ void UIMerchantShopMakeWnd::Paint() {
       const double rate = PriceCommission(price) * 0.01;
       price += static_cast<std::int64_t>(price * rate);
       FormatGroupedInteger(price, text, 24);
-      const PriceColors colors = ::PriceColor(price);
+      const PriceColors colors = PriceColor(price);
       if (colors.secondary == 0xFFFFFFFF) {
         this->DrawTextAt(width + x, y, text, 0, 0, 12, colors.primary, 0, 0);
       } else {
@@ -9773,7 +9771,7 @@ void UIMerchantShopMakeWnd::Paint() {
   } else {
     for (int i = 0, y = 72; i < this->visibleRows; ++i, y += 42) {
       this->DrawTextAt(this->geometry.width - 165, y - 15, LookupMessage(MSI_SELLPRICE), 0, 0, 12, 0, 0, 0);
-      DrawItemSlotBackground(*this, 3, y - 18);
+      this->DrawItemSlotFrame(3, y - 18);
       if (i >= this->slotCount) {
         continue;
       }
@@ -9795,7 +9793,7 @@ void UIMerchantShopMakeWnd::Paint() {
       const double rate = PriceCommission(price) * -0.01;
       price += static_cast<std::int64_t>(price * rate);
       FormatGroupedInteger(price, text, 24);
-      const PriceColors colors = ::PriceColor(price);
+      const PriceColors colors = PriceColor(price);
       if (colors.secondary == 0xFFFFFFFF) {
         this->DrawTextAt(width + x, y, text, 0, 0, 12, colors.primary, 0, 0);
       } else {
@@ -9827,7 +9825,7 @@ void UIMerchantShopMakeWnd::Paint() {
     const int top = visible / this->columns * 42;
     const int column = visible % this->columns * 42;
     const int x = column + 7;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 48, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 48, *it, 0, 0);
     this->DrawWrappedItemName(column + 39, top + 57, 100, &*it, 0, 0, 12);
 
     if (0 < it->grade) {
@@ -10370,7 +10368,7 @@ void UIEditCtrl3::DecodeLinkFields(const std::string& link, std::vector<int>& fi
 bool UIEditCtrl3::LinkDisplayName(const std::string& encoded, std::string& output) {
   const bool isTag = encoded.substr(0, 6) == "00000T";
   if (isTag) {
-    const int id = ItemLinkMessageId(encoded);
+    const int id = g_navigationLinkParser->ItemLinkMessageId(encoded);
     if (g_itemTagOwner->maxTipId >= id) {
       g_itemTagOwner->Title(id, &output, 17);
       return true;
@@ -10428,7 +10426,7 @@ void UIMerchantItemShopWnd::Paint() {
   const unsigned slotRows = static_cast<unsigned>(this->geometry.height - this->footerHeight - 17) / 32;
   unsigned slots = slotRows;
   for (int y = 17; slots != 0; --slots, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -10477,7 +10475,7 @@ void UIMerchantItemShopWnd::Paint() {
       this->DrawItemIcon(x, top + 21, *it, 0);
     } else {
       x = column + 44;
-      DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+      this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     }
 
     if (it->grade > 0) {
@@ -10664,7 +10662,7 @@ void UIItemWnd::OnLBtnDown(int x, int y) {
   if (item.identity[1] > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
     if (item.flags[2] == 0) {
-      item = LookupClientItemByIdentity(g_session.m_inventoryItems, item.identity[1]);
+      item = g_session.LookupClientItemByIdentity(item.identity[1]);
       mode->BeginDragItem(1, item, item.quantity, -1);
 
       if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
@@ -10778,7 +10776,7 @@ void UIItemSellWnd2::Paint() {
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -10806,7 +10804,7 @@ void UIItemSellWnd2::Paint() {
     }
 
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     this->DrawFittedItemName(column + 76, top + 29, &*it, 0, 0, 12, 0);
 
     if (0 < it->grade) {
@@ -10856,7 +10854,7 @@ void UIItemShopWnd2::Paint() {
   const int slotRows = (this->geometry.height - this->extraBottomHeight - this->bottomBarHeight - 17) / 32;
   int slots = slotRows;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   unsigned fillRed, fillGreen, fillBlue;
@@ -10884,7 +10882,7 @@ void UIItemShopWnd2::Paint() {
     }
 
     const int x = column + 44;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, top + 21, *it, 0, 0);
+    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
     this->DrawFittedItemName(column + 76, top + 29, &*it, 0, 0, 12, 0);
 
     if (0 < it->grade) {
@@ -11108,7 +11106,7 @@ void UIItemWnd::Paint() {
         auto* lock = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\itemwin_mid_lock.bmp")));
         this->DrawBitmap(x, y, lock, false);
       } else {
-        DrawItemSlotBackground(*this, x, y);
+        this->DrawItemSlotFrame(x, y);
       }
     }
   }
@@ -11154,7 +11152,7 @@ void UIItemWnd::Paint() {
     const int top = visible / this->columns * 32;
     const int x = visible % this->columns * 32 + 44;
     const int y = top + 21;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), x, y, *it, 0, 0);
+    this->DrawItemAndQuantity(x, y, *it, 0, 0);
 
     if (it->grade > 0) {
       this->DrawBitmap(
@@ -11284,15 +11282,14 @@ void UIItemPurchaseWnd::OnCreate(int width, int height) {
 
   const std::string prefix("유저인터페이스\\");
   const char* names[2][3] = {{"btn_buy", "btn_buy_a", "btn_buy_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
-  int positions[2][2] = {{this->geometry.width - 106, this->geometry.height - 24}, {this->geometry.width - 61, this->geometry.height - 24}};
   int ids[2] = {184, 185};
+  int positions[2][2] = {{this->geometry.width - 106, this->geometry.height - 24}, {this->geometry.width - 61, this->geometry.height - 24}};
   for (int index = 0; index < 2; ++index) {
     this->buttons[index] = new UIBitmapButton();
-    UIBitmapButton* button = this->buttons[index];
-    button->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
-    this->buttons[index]->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    this->buttons[index]->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
+    this->buttons[index]->SetSize(this->buttons[index]->BitmapWidth(), this->buttons[index]->BitmapHeight());
     this->buttons[index]->Move(positions[index][0], positions[index][1]);
     this->buttons[index]->SetId(ids[index]);
     this->AddChild(this->buttons[index]);
@@ -11570,7 +11567,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         --this->editIndex;
       }
       if (index == static_cast<int>(this->items.size())) {
-        const PriceColors colors = ::PriceColor(0);
+        const PriceColors colors = PriceColor(0);
         this->priceEdits[index]->TextColor(GetRValue(colors.primary), GetGValue(colors.primary), GetBValue(colors.primary), colors.secondary);
         this->priceEdits[index]->SetText("0");
         g_windowMgr.SetFocus(index == 0 ? this->titleEdit : this->priceEdits[index - 1]);
@@ -11588,12 +11585,12 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         UIEditCtrl* edit = this->priceEdits[index];
         std::sprintf(text, "%s ", edit->Text());
         g_session.IsNumberWithCommas(text);
-        const PriceColors colors = ::PriceColor(_atoi64(text));
+        const PriceColors colors = PriceColor(_atoi64(text));
         edit->TextColor(GetRValue(colors.primary), GetGValue(colors.primary), GetBValue(colors.primary), colors.secondary);
         UIEditCtrl* next = this->priceEdits[index + 1];
         std::sprintf(text, "%s ", next->Text());
         g_session.IsNumberWithCommas(text);
-        const PriceColors nextColors = ::PriceColor(_atoi64(text));
+        const PriceColors nextColors = PriceColor(_atoi64(text));
         next->TextColor(GetRValue(nextColors.primary), GetGValue(nextColors.primary), GetBValue(nextColors.primary), nextColors.secondary);
       }
       this->InvalidateChildren();

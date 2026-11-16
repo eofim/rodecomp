@@ -1510,7 +1510,7 @@ void UITipOfTheDayWnd::Paint() {
   const int columns = (this->geometry.width - 40) / 32;
   const int slots = (this->geometry.height - 38) / 32;
   for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    DrawItemSlotBackground(*this, 40, y);
+    this->DrawItemSlotFrame(40, y);
   }
 
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
@@ -2714,7 +2714,7 @@ int UIItemCompositionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
   case UM_SET_CARD_ITEM_INDEX:
     this->m_compositionState = static_cast<int>(a);
     if (a != 0) {
-      ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, static_cast<std::uint32_t>(a));
+      ITEM_INFO item = g_session.LookupClientItemByIdentity(static_cast<std::uint32_t>(a));
       if (item.identity[1] != 0) {
         const std::string name = item.DisplayName(0);
         this->m_title = FormatOwnedString("%s (%s)", LookupMessage(MSI_ITEM_COMPOUNDING), name.c_str());
@@ -2799,7 +2799,7 @@ int UIItemIdentifyWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     this->Invalidate();
     return 0;
   case UM_ADDITEM: {
-    ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, static_cast<std::uint32_t>(b));
+    ITEM_INFO item = g_session.LookupClientItemByIdentity(static_cast<std::uint32_t>(b));
     this->m_items.push_back(item);
     this->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
     return 0;
@@ -4060,9 +4060,9 @@ void UICardItemIllustWnd::OnCreate(int, int) {
 // OFFSET: 0x008E2590
 // FUNCTION: fn_12178
 void UIItemIdentifyWnd::OnCreate(int, int) {
-  this->m_title.assign(LookupMessage(MSI_ITEM_IDENTIFY));
-  this->m_selected = -1;
+  this->m_title = LookupMessage(MSI_ITEM_IDENTIFY);
   this->m_scroll = 0;
+  this->m_selected = -1;
   this->m_columns = 1;
   this->m_rows = 4;
   this->m_scrollable = 0;
@@ -4072,41 +4072,35 @@ void UIItemIdentifyWnd::OnCreate(int, int) {
   this->AddChild(this->m_scrollBar);
   this->UpdateScroll();
 
-  {
-    const std::string prefix("유저인터페이스\\");
-    const char* names[1][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}};
-    int positions[1][2] = {{this->geometry.width - 92, this->geometry.height - 24}};
-    int ids[1] = {184};
-    for (int i = 0; i < 1; ++i) {
-      auto* button = new UIBitmapButton();
-      button->SetBitmap((prefix + names[i][0] + ".bmp").c_str(), 0, 0);
-      button->SetBitmap((prefix + names[i][1] + ".bmp").c_str(), 1, 0);
-      button->SetBitmap((prefix + names[i][2] + ".bmp").c_str(), 2, 0);
-      button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-      button->Move(positions[i][0], positions[i][1]);
-      button->SetId(ids[i]);
-      this->AddChild(button);
-    }
+  const std::string okPrefix("유저인터페이스\\");
+  const char* okNames[1][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}};
+  int okPositions[1][2] = {{this->geometry.width - 92, this->geometry.height - 24}};
+  int okIds[1] = {184};
+  for (int i = 0; i < 1; ++i) {
+    auto* button = new UIBitmapButton();
+    button->SetBitmap((okPrefix + okNames[i][0] + ".bmp").c_str(), 0, 0);
+    button->SetBitmap((okPrefix + okNames[i][1] + ".bmp").c_str(), 1, 0);
+    button->SetBitmap((okPrefix + okNames[i][2] + ".bmp").c_str(), 2, 0);
+    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    button->Move(okPositions[i][0], okPositions[i][1]);
+    button->SetId(okIds[i]);
+    this->AddChild(button);
   }
   this->m_message0 = 184;
 
-  {
-    const std::string prefix("유저인터페이스\\");
-    const char* names[1][3] = {{"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
-    int positions[1][2] = {{this->geometry.width - 46, this->geometry.height - 24}};
-    int ids[1] = {185};
-    for (int i = 0; i < 1; ++i) {
-      auto* button = new UIBitmapButton();
-      button->SetBitmap((prefix + names[i][0] + ".bmp").c_str(), 0, 0);
-      const std::string hover = prefix + names[i][1] + ".bmp";
-      button->SetBitmap(hover.c_str(), 1, 0);
-      const std::string pressed = prefix + names[i][2] + ".bmp";
-      button->SetBitmap(pressed.c_str(), 2, 0);
-      button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-      button->Move(positions[i][0], positions[i][1]);
-      button->SetId(ids[i]);
-      this->AddChild(button);
-    }
+  const std::string cancelPrefix("유저인터페이스\\");
+  const char* cancelNames[1][3] = {{"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
+  int cancelPositions[1][2] = {{this->geometry.width - 46, this->geometry.height - 24}};
+  int cancelIds[1] = {185};
+  for (int i = 0; i < 1; ++i) {
+    auto* button = new UIBitmapButton();
+    button->SetBitmap((cancelPrefix + cancelNames[i][0] + ".bmp").c_str(), 0, 0);
+    button->SetBitmap((cancelPrefix + cancelNames[i][1] + ".bmp").c_str(), 1, 0);
+    button->SetBitmap((cancelPrefix + cancelNames[i][2] + ".bmp").c_str(), 2, 0);
+    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    button->Move(cancelPositions[i][0], cancelPositions[i][1]);
+    button->SetId(cancelIds[i]);
+    this->AddChild(button);
   }
 }
 
@@ -4369,7 +4363,7 @@ void UInCashWnd::DrawItems() {
     }
 
     const int x = row >= 4 ? 257 : 71;
-    const int y = (row >= 4 ? row - 4 : row) * this->m_rowHeight + this->m_listTop;
+    const int y = (row < 4 ? row : row - 4) * this->m_rowHeight + this->m_listTop;
     const std::string path = "유저인터페이스\\collection\\" + std::string(it->ResourcePath()) + ".bmp";
     if (!path.empty()) {
       this->DrawBitmap(x, y, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path.c_str()))), true);
@@ -6993,7 +6987,7 @@ void UIEquipWnd::OnMouseHover(int x, int y) {
 
   CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode->drag.source == 1 && x >= 0 && y >= 0 && x < this->geometry.width && y < this->geometry.height) {
-    ITEM_INFO dragged = LookupClientItemByIdentity(g_session.m_inventoryItems, mode->drag.id);
+    ITEM_INFO dragged = g_session.LookupClientItemByIdentity(mode->drag.id);
     if (dragged.identity[1] != 0 && dragged.identity[2] != 0) {
       const EquipSlots slots = g_session.GetEquipSlots(static_cast<int>(dragged.identity[2]));
       this->m_highlight[0] = slots.values[2];
@@ -8216,7 +8210,7 @@ int UISkillDescribeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
       CSkillInfo owned = g_session.LookupSkill(static_cast<std::uint32_t>(a));
       if (owned.available != 0 && owned.spCost != 0 && owned.level != 0) {
         char cost[64];
-        if (skill.UseApAmount(*g_session.m_hotkeyScript, owned.level) != 0) {
+        if (skill.UseApAmount(owned.level) != 0) {
           std::sprintf(cost, " (Sp : %d, Ap : %d)", owned.spCost, owned.apCost);
         } else {
           std::sprintf(cost, " (Sp : %d)", owned.spCost);
@@ -8239,7 +8233,8 @@ int UISkillDescribeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
         if (g_session.FindShopId("") != -1) {
           const int delay = g_session.GetShopEntry(1, this->m_skillId).first;
           if (delay != 0) {
-            const std::string line = FormatOwnedString(LookupMessage(MSI_FAIL_CALLHOMUN_OVER_100LEVEL), static_cast<int>(delay * 0.1), delay % 10);
+            const int seconds = static_cast<int>(delay * 0.1);
+            const std::string line = FormatOwnedString(LookupMessage(MSI_FAIL_CALLHOMUN_OVER_100LEVEL), seconds, delay % 10);
             this->m_text->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(line.c_str()), 0, 0, 1);
           }
         }
@@ -8248,25 +8243,28 @@ int UISkillDescribeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
         for (std::size_t index = 0; index < lines.size(); ++index) {
           buffer.resize(lines[index].size() + 4);
           StringFormat(buffer.data(), buffer.size(), static_cast<std::size_t>(-1), "%s%s", g_serverLanguage->Prefix(true), lines[index].c_str());
-          UIWindow* target = static_cast<int>(this->m_text->lines.size()) < 2 ? static_cast<UIWindow*>(this->m_text) : static_cast<UIWindow*>(this->m_viewer);
-          target->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(buffer.data()), 0, 1, 1);
+          if (static_cast<int>(this->m_text->lines.size()) < 2) {
+            this->m_text->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(buffer.data()), 0, 1, 1);
+          } else {
+            this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(buffer.data()), 0, 1, 1);
+          }
         }
       }
     } else {
       this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>("Unknown Skill"), 33, 0, 0);
     }
 
-    const int textHeight = 18 * static_cast<int>(this->m_text->lines.size());
-    this->m_text->Resize(this->m_text->geometry.width, textHeight);
+    int height = 18 * static_cast<int>(this->m_text->lines.size());
+    this->m_text->Resize(this->m_text->geometry.width, height);
     this->m_viewer->Move(this->m_viewer->geometry.x, this->m_text->geometry.height + this->m_text->geometry.y);
     int viewerHeight = 18 * static_cast<int>(this->m_viewer->lines.size()) + 4;
-    int total = viewerHeight + textHeight;
-    if (total > g_renderer->viewport.height - 50) {
-      total = g_renderer->viewport.height - 50;
-      viewerHeight = total - this->m_text->geometry.height;
+    height += viewerHeight;
+    if (height > g_renderer->viewport.height - 50) {
+      height = g_renderer->viewport.height - 50;
+      viewerHeight = height - this->m_text->geometry.height;
     }
     this->m_viewer->Resize(this->m_viewer->geometry.width, viewerHeight);
-    this->Resize(this->geometry.width, total + 6);
+    this->Resize(this->geometry.width, height + 6);
     this->Invalidate();
     g_windowMgr.Promote(this);
     break;
@@ -9307,7 +9305,7 @@ std::vector<unsigned char> UIMakingArrowListWnd::GetReplayData() {
 void UINotifyItemObtainWnd::Paint() {
   this->DrawBorder(0, 0, 0, 0);
   if (this->m_itemId.size() != 0) {
-    DrawItemIconById(*this, 13, 5, this->m_itemId.c_str(), this->m_identified);
+    this->DrawItemIconFromId(13, 5, this->m_itemId.c_str(), this->m_identified);
   }
 
   const int kind = this->m_kind;
@@ -9624,7 +9622,7 @@ void UIItemCollectionWnd::Paint() {
           }
           this->DrawBitmap(x, y, bitmap, true);
         } else {
-          DrawItemIconById(*this, x, y, FormatOwnedString("%d", card).c_str(), 0);
+          this->DrawItemIconFromId(x, y, FormatOwnedString("%d", card).c_str(), 0);
         }
       }
     }
@@ -12400,8 +12398,8 @@ void UIExchangeWnd::Paint() {
     this->DrawBitmap(buttonX[index], this->geometry.height - 23, bitmap, false);
   }
   for (int row = 0; row < 10; ++row) {
-    DrawItemSlotBackground(*this, 12, this->m_rowHeight * row + 20);
-    DrawItemSlotBackground(*this, 291, this->m_rowHeight * row + 20);
+    this->DrawItemSlotFrame(12, this->m_rowHeight * row + 20);
+    this->DrawItemSlotFrame(291, this->m_rowHeight * row + 20);
   }
   unsigned red;
   unsigned green;
@@ -12420,7 +12418,7 @@ void UIExchangeWnd::Paint() {
       continue;
     }
     const int y = this->m_rowHeight * row;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), 16, y + 21, item, 0, 0);
+    this->DrawItemAndQuantity(16, y + 21, item, 0, 0);
     this->DrawFittedItemName(48, y + 29, &item, 0, 0, 12, 1);
     if (0 < item.grade) {
       this->DrawBitmap(16, y + 33, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))), true);
@@ -12436,7 +12434,7 @@ void UIExchangeWnd::Paint() {
       continue;
     }
     const int y = this->m_rowHeight * row;
-    DrawItemWithQuantity(*this, ResourceMgr::Instance(), 295, y + 21, item, 0, 0);
+    this->DrawItemAndQuantity(295, y + 21, item, 0, 0);
     this->DrawFittedItemName(327, y + 29, &item, 0, 0, 12, 1);
     if (0 < item.grade) {
       this->DrawBitmap(295, y + 33, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()))), true);

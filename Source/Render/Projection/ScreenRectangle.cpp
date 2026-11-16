@@ -45,7 +45,7 @@ void DrawBlendedRectangle(int x, int y, int width, int height, std::uint32_t col
   primitive->quad[3].diffuse = color;
   primitive->sourceBlend = 5;
   primitive->destinationBlend = 6;
-  g_renderer->queues.Submit(primitive, 517, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
+  g_renderer->Submit(primitive, 517);
 }
 
 // OFFSET: 0x0054ED40
@@ -85,7 +85,7 @@ void DrawTexturedRectangle(int x, int y, int width, int height, std::uint32_t co
   primitive->quad[3].u = 1.0f;
   primitive->quad[3].v = 1.0f;
   primitive->quad[3].diffuse = color;
-  g_renderer->queues.Submit(primitive, 513, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
+  g_renderer->Submit(primitive, 513);
 }
 
 // OFFSET: 0x0054EFD0
@@ -96,7 +96,7 @@ void DrawTextureRegion(float x, float y, float width, float height, std::uint32_
   }
 
   RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
-  primitive->texture = texture ? texture : g_texMgr.Default();
+  primitive->texture = texture == nullptr ? g_texMgr.Default() : texture;
   primitive->quad[0].x = x;
   primitive->quad[0].y = y;
   primitive->quad[0].u = g_textureOffsetX / static_cast<float>(texture->TextureWidth());
@@ -113,10 +113,10 @@ void DrawTextureRegion(float x, float y, float width, float height, std::uint32_
   primitive->quad[3].y = y + height;
   primitive->quad[3].u = (static_cast<float>(texture->Width()) + g_textureOffsetX) / static_cast<float>(texture->TextureWidth());
   primitive->quad[3].v = (static_cast<float>(texture->Height()) + g_textureOffsetY) / static_cast<float>(texture->TextureHeight());
-  for (RenderVertex& vertex : primitive->quad) {
-    vertex.z = 0.000001f;
-    vertex.rhw = 0.999999f;
-    vertex.diffuse = color;
+  for (int index = 0; index < 4; ++index) {
+    primitive->quad[index].z = 0.000001f;
+    primitive->quad[index].rhw = 0.999999f;
+    primitive->quad[index].diffuse = color;
   }
-  g_renderer->queues.Submit(primitive, 513, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
+  g_renderer->Submit(primitive, 513);
 }

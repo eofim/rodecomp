@@ -1635,10 +1635,12 @@ void CUIGroupSound::OnEffectScroll(int position) {
 // FUNCTION: fn_16032
 void CUIGroupEmblem::Refresh() {
   const bool enabled = g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF);
-  this->m_onButton->checked = enabled;
-  this->m_onButton->Invalidate();
-  this->m_offButton->checked = !enabled;
-  this->m_offButton->Invalidate();
+  auto* const onButton = this->m_onButton;
+  onButton->checked = enabled;
+  onButton->Invalidate();
+  auto* const offButton = this->m_offButton;
+  offButton->checked = !enabled;
+  offButton->Invalidate();
 }
 
 // OFFSET: 0x00A436A0
@@ -2294,11 +2296,6 @@ void GameSettingsUI::CUIGroupSound::Apply() {
 // OFFSET: 0x00A19C60
 // FUNCTION: fn_15346
 inline CUIButton::CUIButton() : CUIControl(), state(0), disabled(0), tooltip(), onClick(), onHover() {
-}
-
-// OFFSET: 0x00A19D30
-// FUNCTION: fn_15347
-__declspec(noinline) CUIRadioButton::CUIRadioButton() : CUICheckBox(), onSelect() {
 }
 
 // OFFSET: 0x00A3C390

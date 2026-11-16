@@ -299,10 +299,10 @@ ITEM_INFO UISwapEquipmentWnd::GetSlotItem(int slot) {
   if (this->equipmentPage == 2) {
     ITEM_INFO item = g_session.GetSwapEquippedItem(slot);
     return item.identity[1] > 0 ? item : ITEM_INFO(0);
+  } else {
+    ITEM_INFO item = g_session.GetSwapCostumeItem(slot);
+    return item.identity[1] > 0 ? item : ITEM_INFO(0);
   }
-
-  ITEM_INFO item = g_session.GetSwapCostumeItem(slot);
-  return item.identity[1] > 0 ? item : ITEM_INFO(0);
 }
 
 // OFFSET: 0x00830760
@@ -485,7 +485,7 @@ void UISwapEquipmentWnd::OnMouseHover(int x, int y) {
       return;
     }
 
-    ITEM_INFO item = LookupClientItemByIdentity(g_session.m_inventoryItems, mode->drag.id);
+    ITEM_INFO item = g_session.LookupClientItemByIdentity(mode->drag.id);
     if (item.identity[1] > 0 && item.identity[2] != 0) {
       const EquipSlots slots = g_session.GetEquipSlots(item.identity[2]);
       this->hoverSlot = slots.values[2];

@@ -153,6 +153,13 @@ static vector3d RotatedForward(const float* matrix, float distance) {
 }
 
 // INLINED
+static void MatrixMult(vector3d& result, const vector3d& v, const float* m) {
+  result.x = v.x * m[0] + v.y * m[3] + v.z * m[6] + m[9];
+  result.y = v.x * m[1] + v.y * m[4] + v.z * m[7] + m[10];
+  result.z = v.x * m[2] + v.y * m[5] + v.z * m[8] + m[11];
+}
+
+// INLINED
 static void PlayEffectWave(const CRagEffect& effect, const char* name) {
   const auto* player = static_cast<const CRenderObject*>(g_modeMgr.GetGameMode()->scene->player);
   g_soundMgr->PlayWave(
@@ -754,41 +761,43 @@ void CRagEffect::Hit1() {
 
   for (int count = 0; count < 2; ++count) {
     this->state.lastPrim = this->LaunchEffectPrim(5, vector3d{0.0f, 0.0f, 0.0f});
-    this->state.lastPrim->state.longitude = static_cast<float>(std::max(rand() % 80, 0) + (facing - 40));
-    this->state.lastPrim->state.latitude = static_cast<float>(std::max(rand() % 100, 0) - 50);
+    this->state.lastPrim->state.longitude = static_cast<float>(ClampedRandom(80) + (facing - 40));
+    this->state.lastPrim->state.latitude = static_cast<float>(ClampedRandom(100) - 50);
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
     this->state.lastPrim->state.transform.AppendXRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.latitude)));
-    this->state.lastPrim->state.deltaPos3 = RotatedForward(this->state.lastPrim->state.transform.values, static_cast<float>(std::max(rand() % 4, 0) + 4));
+    vector3d& forward = this->state.lastPrim->state.deltaPos3;
+    MatrixMult(forward, {0.0f, 0.0f, static_cast<float>(ClampedRandom(4) + 4)}, this->state.lastPrim->state.transform.values);
     this->state.lastPrim->state.deltaPos2 = {this->state.lastPrim->state.deltaPos3.x + 0.0f, this->state.lastPrim->state.deltaPos3.y - 10.0f, this->state.lastPrim->state.deltaPos3.z + 0.0f};
-    this->state.lastPrim->state.speed = static_cast<float>(std::max(rand() % 90, 0) + 60) / 100.0f;
-    this->state.lastPrim->state.duration = std::max(rand() % 24, 0) + 6;
+    this->state.lastPrim->state.speed = static_cast<float>(ClampedRandom(90) + 60) / 100.0f;
+    this->state.lastPrim->state.duration = ClampedRandom(24) + 6;
     this->state.lastPrim->state.accel = -(this->state.lastPrim->state.speed / static_cast<float>(this->state.lastPrim->state.duration)) * g_depthAverageHalf;
-    this->state.lastPrim->state.size = static_cast<float>(std::max(rand() % 100, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.size = static_cast<float>(ClampedRandom(100) + 60) / 100.0f;
     this->state.lastPrim->state.fadeOutCnt = 0;
-    this->state.lastPrim->SetSpriteName(ResourceMgr::Instance(), "이팩트\\particle1.spr");
-    this->state.lastPrim->SetActionName(ResourceMgr::Instance(), "이팩트\\particle1.act");
+    this->state.lastPrim->SetSpriteName("이팩트\\particle1.spr");
+    this->state.lastPrim->SetActionName("이팩트\\particle1.act");
     this->state.lastPrim->state.numSegment = 3;
     this->state.lastPrim->InitSegment();
   }
 
   for (int count = 0; count < 2; ++count) {
     this->state.lastPrim = this->LaunchEffectPrim(6, vector3d{0.0f, 0.0f, 0.0f});
-    this->state.lastPrim->state.longitude = static_cast<float>(std::max(rand() % 80, 0) + (facing + 140));
-    this->state.lastPrim->state.latitude = static_cast<float>(std::max(rand() % 100, 0) - 50);
+    this->state.lastPrim->state.longitude = static_cast<float>(ClampedRandom(80) + (facing + 140));
+    this->state.lastPrim->state.latitude = static_cast<float>(ClampedRandom(100) - 50);
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
     this->state.lastPrim->state.transform.AppendXRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.latitude)));
-    this->state.lastPrim->state.deltaPos3 = RotatedForward(this->state.lastPrim->state.transform.values, static_cast<float>(std::max(rand() % 4, 0) + 4));
+    vector3d& forward = this->state.lastPrim->state.deltaPos3;
+    MatrixMult(forward, {0.0f, 0.0f, static_cast<float>(ClampedRandom(4) + 4)}, this->state.lastPrim->state.transform.values);
     this->state.lastPrim->state.deltaPos2 = {this->state.lastPrim->state.deltaPos3.x + 0.0f, this->state.lastPrim->state.deltaPos3.y - 10.0f, this->state.lastPrim->state.deltaPos3.z + 0.0f};
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
-    this->state.lastPrim->state.duration = std::max(rand() % 24, 0) + 6;
-    this->state.lastPrim->state.speed = static_cast<float>(std::max(rand() % 90, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.duration = ClampedRandom(24) + 6;
+    this->state.lastPrim->state.speed = static_cast<float>(ClampedRandom(90) + 60) / 100.0f;
     this->state.lastPrim->state.accel = -(this->state.lastPrim->state.speed / static_cast<float>(this->state.lastPrim->state.duration)) * g_depthAverageHalf;
-    this->state.lastPrim->state.gravSpeed = -static_cast<float>(std::max(rand() % 90, 0) + 30) / 100.0f;
+    this->state.lastPrim->state.gravSpeed = -static_cast<float>(ClampedRandom(90) + 30) / 100.0f;
     this->state.lastPrim->state.gravAccel = -(this->state.lastPrim->state.gravSpeed / static_cast<float>(this->state.lastPrim->state.duration) * 2.0f);
-    this->state.lastPrim->state.size = static_cast<float>(std::max(rand() % 100, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.size = static_cast<float>(ClampedRandom(100) + 60) / 100.0f;
     this->state.lastPrim->state.fadeOutCnt = 0;
-    this->state.lastPrim->SetSpriteName(ResourceMgr::Instance(), "이팩트\\particle1.spr");
-    this->state.lastPrim->SetActionName(ResourceMgr::Instance(), "이팩트\\particle1.act");
+    this->state.lastPrim->SetSpriteName("이팩트\\particle1.spr");
+    this->state.lastPrim->SetActionName("이팩트\\particle1.act");
     this->state.lastPrim->state.numSegment = 3;
     this->state.lastPrim->InitSegment();
   }
@@ -1709,13 +1718,6 @@ void CRagEffect::Blessing() {
     Owner(&this->state.lastPrim->state).SetSpriteName("이팩트\\particle6.spr");
     Owner(&this->state.lastPrim->state).InitSegment();
   }
-}
-
-// INLINED
-static void MatrixMult(vector3d& result, const vector3d& v, const float* m) {
-  result.x = v.x * m[0] + v.y * m[3] + v.z * m[6] + m[9];
-  result.y = v.x * m[1] + v.y * m[4] + v.z * m[7] + m[10];
-  result.z = v.x * m[2] + v.y * m[5] + v.z * m[8] + m[11];
 }
 
 // OFFSET: 0x00C0D630
@@ -4430,27 +4432,29 @@ void CRagEffect::BubbleSpiralKind(std::int16_t angle, const char*, char kind) {
     }
   }
 
-  this->state.lastPrim->state.slots[0].life = 1;
-  this->state.lastPrim->state.slots[0].process = 0;
-  this->state.lastPrim->state.slots[0].fullDisplayAngle = 360;
-  this->state.lastPrim->state.slots[0].maxHeight = 30.0f;
-  this->state.lastPrim->state.slots[0].rotStart = 180;
-  this->state.lastPrim->state.slots[0].alphaB = angle + 135;
-  this->state.lastPrim->state.slots[0].distance = 4.1f;
-  this->state.lastPrim->state.slots[0].riseAngle = 80;
-  this->state.lastPrim->state.slots[0].alphaT = kind;
-  this->state.lastPrim->state.slots[0].vecBNow.y = 0.0f;
+  int slot0 = 0;
+  this->state.lastPrim->state.slots[slot0].life = 1;
+  this->state.lastPrim->state.slots[slot0].process = 0;
+  this->state.lastPrim->state.slots[slot0].fullDisplayAngle = 360;
+  this->state.lastPrim->state.slots[slot0].maxHeight = 30.0f;
+  this->state.lastPrim->state.slots[slot0].rotStart = 180;
+  this->state.lastPrim->state.slots[slot0].alphaB = angle + 135;
+  this->state.lastPrim->state.slots[slot0].distance = 4.1f;
+  this->state.lastPrim->state.slots[slot0].riseAngle = 80;
+  this->state.lastPrim->state.slots[slot0].alphaT = kind;
+  this->state.lastPrim->state.slots[slot0].vecBNow.y = 0.0f;
 
-  this->state.lastPrim->state.slots[1].life = 1;
-  this->state.lastPrim->state.slots[1].process = 0;
-  this->state.lastPrim->state.slots[1].fullDisplayAngle = 360;
-  this->state.lastPrim->state.slots[1].maxHeight = 29.0f;
-  this->state.lastPrim->state.slots[1].rotStart = 270;
-  this->state.lastPrim->state.slots[1].alphaB = angle + 90;
-  this->state.lastPrim->state.slots[1].distance = 4.1f;
-  this->state.lastPrim->state.slots[1].riseAngle = 80;
-  this->state.lastPrim->state.slots[1].alphaT = kind;
-  this->state.lastPrim->state.slots[1].vecBNow.y = 0.0f;
+  int slot1 = 1;
+  this->state.lastPrim->state.slots[slot1].life = 1;
+  this->state.lastPrim->state.slots[slot1].process = 0;
+  this->state.lastPrim->state.slots[slot1].fullDisplayAngle = 360;
+  this->state.lastPrim->state.slots[slot1].maxHeight = 29.0f;
+  this->state.lastPrim->state.slots[slot1].rotStart = 270;
+  this->state.lastPrim->state.slots[slot1].alphaB = angle + 90;
+  this->state.lastPrim->state.slots[slot1].distance = 4.1f;
+  this->state.lastPrim->state.slots[slot1].riseAngle = 80;
+  this->state.lastPrim->state.slots[slot1].alphaT = kind;
+  this->state.lastPrim->state.slots[slot1].vecBNow.y = 0.0f;
 
   this->state.lastPrim->state.slots[2].life = 1;
   this->state.lastPrim->state.slots[2].process = 0;
@@ -9848,7 +9852,7 @@ void CRagEffect::SpawnActorHallucination() {
     }
 
     CRenderObject* hallu;
-    if (!IsPlayerJob(static_cast<CGameActor*>(this->state.parent)->GetEffectiveJob(-1))) {
+    if (!g_session.IsPlayerJob(static_cast<CGameActor*>(this->state.parent)->GetEffectiveJob(-1))) {
       hallu = new CHalluNPC(static_cast<CGameActor*>(this->state.parent));
     } else {
       hallu = new CHalluPC(static_cast<CPc*>(this->state.parent));
@@ -9870,7 +9874,7 @@ void CRagEffect::SpawnActorHallucination() {
   }
 
   CRenderObject* hallu;
-  if (!IsPlayerJob(static_cast<CGameActor*>(this->state.parent)->GetEffectiveJob(-1))) {
+  if (!g_session.IsPlayerJob(static_cast<CGameActor*>(this->state.parent)->GetEffectiveJob(-1))) {
     hallu = new CHalluNPC(static_cast<CGameActor*>(this->state.parent));
   } else {
     hallu = new CHalluPC(static_cast<CPc*>(this->state.parent));
@@ -11296,50 +11300,48 @@ void CRagEffect::RingBurstSparks() {
     return;
   }
 
-  for (int count = 4; count != 0; --count) {
+  for (int count = 0; count < 4; ++count) {
     this->state.lastPrim = this->LaunchEffectPrim(5, vector3d{0.0f, 0.0f, 0.0f});
-    this->state.lastPrim->state.longitude = static_cast<float>(std::max(rand() % 80, 0) + direction - 40);
-    this->state.lastPrim->state.latitude = static_cast<float>(std::max(rand() % 100, 0) - 50);
+    this->state.lastPrim->state.longitude = static_cast<float>(ClampedRandom(80) + direction - 40);
+    this->state.lastPrim->state.latitude = static_cast<float>(ClampedRandom(100) - 50);
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
     this->state.lastPrim->state.transform.AppendXRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.latitude)));
-    this->state.lastPrim->state.deltaPos3 = RotatedForward(this->state.lastPrim->state.transform.values, static_cast<float>(std::max(rand() % 4, 0) + 4));
-    this->state.lastPrim->state.deltaPos2.x = this->state.lastPrim->state.deltaPos3.x + 0.0f;
-    this->state.lastPrim->state.deltaPos2.y = this->state.lastPrim->state.deltaPos3.y - 10.0f;
-    this->state.lastPrim->state.deltaPos2.z = this->state.lastPrim->state.deltaPos3.z + 0.0f;
-    this->state.lastPrim->state.speed = static_cast<float>(std::max(rand() % 90, 0) + 60) / 100.0f;
-    this->state.lastPrim->state.duration = std::max(rand() % 24, 0) + 6;
+    vector3d& forward = this->state.lastPrim->state.deltaPos3;
+    MatrixMult(forward, {0.0f, 0.0f, static_cast<float>(ClampedRandom(4) + 4)}, this->state.lastPrim->state.transform.values);
+    this->state.lastPrim->state.deltaPos2 = {this->state.lastPrim->state.deltaPos3.x + 0.0f, this->state.lastPrim->state.deltaPos3.y - 10.0f, this->state.lastPrim->state.deltaPos3.z + 0.0f};
+    this->state.lastPrim->state.speed = static_cast<float>(ClampedRandom(90) + 60) / 100.0f;
+    this->state.lastPrim->state.duration = ClampedRandom(24) + 6;
     this->state.lastPrim->state.accel = -(this->state.lastPrim->state.speed / this->state.lastPrim->state.duration) * 0.5f;
-    this->state.lastPrim->state.size = static_cast<float>(std::max(rand() % 100, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.size = static_cast<float>(ClampedRandom(100) + 60) / 100.0f;
     this->state.lastPrim->state.sizeSpeed = -(this->state.lastPrim->state.size / this->state.lastPrim->state.duration);
     this->state.lastPrim->state.fadeOutCnt = 0;
-    this->state.lastPrim->SetSpriteName(ResourceMgr::Instance(), "이팩트\\particle1.spr");
-    this->state.lastPrim->SetActionName(ResourceMgr::Instance(), "이팩트\\particle1.act");
+    this->state.lastPrim->SetSpriteName("이팩트\\particle1.spr");
+    this->state.lastPrim->SetActionName("이팩트\\particle1.act");
     this->state.lastPrim->state.numSegment = 3;
     this->state.lastPrim->InitSegment();
   }
 
-  for (int count = 4; count != 0; --count) {
+  for (int count = 0; count < 4; ++count) {
     this->state.lastPrim = this->LaunchEffectPrim(6, vector3d{0.0f, 0.0f, 0.0f});
-    this->state.lastPrim->state.longitude = static_cast<float>(std::max(rand() % 80, 0) + direction + 140);
-    this->state.lastPrim->state.latitude = static_cast<float>(std::max(rand() % 100, 0) - 50);
+    this->state.lastPrim->state.longitude = static_cast<float>(ClampedRandom(80) + direction + 140);
+    this->state.lastPrim->state.latitude = static_cast<float>(ClampedRandom(100) - 50);
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
     this->state.lastPrim->state.transform.AppendXRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.latitude)));
-    this->state.lastPrim->state.deltaPos3 = RotatedForward(this->state.lastPrim->state.transform.values, static_cast<float>(std::max(rand() % 4, 0) + 4));
-    this->state.lastPrim->state.deltaPos2.x = this->state.lastPrim->state.deltaPos3.x + 0.0f;
-    this->state.lastPrim->state.deltaPos2.y = this->state.lastPrim->state.deltaPos3.y - 10.0f;
-    this->state.lastPrim->state.deltaPos2.z = this->state.lastPrim->state.deltaPos3.z + 0.0f;
+    vector3d& forward = this->state.lastPrim->state.deltaPos3;
+    MatrixMult(forward, {0.0f, 0.0f, static_cast<float>(ClampedRandom(4) + 4)}, this->state.lastPrim->state.transform.values);
+    this->state.lastPrim->state.deltaPos2 = {this->state.lastPrim->state.deltaPos3.x + 0.0f, this->state.lastPrim->state.deltaPos3.y - 10.0f, this->state.lastPrim->state.deltaPos3.z + 0.0f};
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
-    this->state.lastPrim->state.duration = std::max(rand() % 24, 0) + 6;
-    this->state.lastPrim->state.speed = static_cast<float>(std::max(rand() % 90, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.duration = ClampedRandom(24) + 6;
+    this->state.lastPrim->state.speed = static_cast<float>(ClampedRandom(90) + 60) / 100.0f;
     this->state.lastPrim->state.accel = -(this->state.lastPrim->state.speed / this->state.lastPrim->state.duration) * 0.5f;
-    this->state.lastPrim->state.gravSpeed = -static_cast<float>(std::max(rand() % 90, 0) + 30) / 100.0f;
+    this->state.lastPrim->state.gravSpeed = -static_cast<float>(ClampedRandom(90) + 30) / 100.0f;
     const float fall = this->state.lastPrim->state.gravSpeed / this->state.lastPrim->state.duration;
     this->state.lastPrim->state.gravAccel = -(fall + fall);
-    this->state.lastPrim->state.size = static_cast<float>(std::max(rand() % 100, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.size = static_cast<float>(ClampedRandom(100) + 60) / 100.0f;
     this->state.lastPrim->state.sizeSpeed = -(this->state.lastPrim->state.size / this->state.lastPrim->state.duration);
     this->state.lastPrim->state.fadeOutCnt = 0;
-    this->state.lastPrim->SetSpriteName(ResourceMgr::Instance(), "이팩트\\particle1.spr");
-    this->state.lastPrim->SetActionName(ResourceMgr::Instance(), "이팩트\\particle1.act");
+    this->state.lastPrim->SetSpriteName("이팩트\\particle1.spr");
+    this->state.lastPrim->SetActionName("이팩트\\particle1.act");
     this->state.lastPrim->state.numSegment = 3;
     this->state.lastPrim->InitSegment();
   }
@@ -12285,47 +12287,49 @@ void CRagEffect::HitDark() {
 
   for (int count = 0; count < 2; ++count) {
     this->state.lastPrim = this->LaunchEffectPrim(5, vector3d{0.0f, 0.0f, 0.0f});
-    this->state.lastPrim->state.longitude = static_cast<float>(std::max(rand() % 80, 0) + (facing - 40));
-    this->state.lastPrim->state.latitude = static_cast<float>(std::max(rand() % 100, 0) - 50);
+    this->state.lastPrim->state.longitude = static_cast<float>(ClampedRandom(80) + (facing - 40));
+    this->state.lastPrim->state.latitude = static_cast<float>(ClampedRandom(100) - 50);
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
     this->state.lastPrim->state.transform.AppendXRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.latitude)));
-    this->state.lastPrim->state.deltaPos3 = RotatedForward(this->state.lastPrim->state.transform.values, static_cast<float>(std::max(rand() % 4, 0) + 4));
+    vector3d& forward = this->state.lastPrim->state.deltaPos3;
+    MatrixMult(forward, {0.0f, 0.0f, static_cast<float>(ClampedRandom(4) + 4)}, this->state.lastPrim->state.transform.values);
     this->state.lastPrim->state.deltaPos2 = {this->state.lastPrim->state.deltaPos3.x + 0.0f, this->state.lastPrim->state.deltaPos3.y - 10.0f, this->state.lastPrim->state.deltaPos3.z + 0.0f};
-    this->state.lastPrim->state.speed = static_cast<float>(std::max(rand() % 90, 0) + 60) / 100.0f;
-    this->state.lastPrim->state.duration = std::max(rand() % 24, 0) + 6;
+    this->state.lastPrim->state.speed = static_cast<float>(ClampedRandom(90) + 60) / 100.0f;
+    this->state.lastPrim->state.duration = ClampedRandom(24) + 6;
     this->state.lastPrim->state.accel = -(this->state.lastPrim->state.speed / static_cast<float>(this->state.lastPrim->state.duration)) * g_depthAverageHalf;
-    this->state.lastPrim->state.size = static_cast<float>(std::max(rand() % 100, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.size = static_cast<float>(ClampedRandom(100) + 60) / 100.0f;
     this->state.lastPrim->state.red = 20;
     this->state.lastPrim->state.green = 20;
     this->state.lastPrim->state.blue = 20;
     this->state.lastPrim->state.fadeOutCnt = 0;
-    this->state.lastPrim->SetSpriteName(ResourceMgr::Instance(), "이팩트\\particle1.spr");
-    this->state.lastPrim->SetActionName(ResourceMgr::Instance(), "이팩트\\particle1.act");
+    this->state.lastPrim->SetSpriteName("이팩트\\particle1.spr");
+    this->state.lastPrim->SetActionName("이팩트\\particle1.act");
     this->state.lastPrim->state.numSegment = 3;
     this->state.lastPrim->InitSegment();
   }
 
   for (int count = 0; count < 2; ++count) {
     this->state.lastPrim = this->LaunchEffectPrim(6, vector3d{0.0f, 0.0f, 0.0f});
-    this->state.lastPrim->state.longitude = static_cast<float>(std::max(rand() % 80, 0) + (facing + 140));
-    this->state.lastPrim->state.latitude = static_cast<float>(std::max(rand() % 100, 0) - 50);
+    this->state.lastPrim->state.longitude = static_cast<float>(ClampedRandom(80) + (facing + 140));
+    this->state.lastPrim->state.latitude = static_cast<float>(ClampedRandom(100) - 50);
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
     this->state.lastPrim->state.transform.AppendXRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.latitude)));
-    this->state.lastPrim->state.deltaPos3 = RotatedForward(this->state.lastPrim->state.transform.values, static_cast<float>(std::max(rand() % 4, 0) + 4));
+    vector3d& forward = this->state.lastPrim->state.deltaPos3;
+    MatrixMult(forward, {0.0f, 0.0f, static_cast<float>(ClampedRandom(4) + 4)}, this->state.lastPrim->state.transform.values);
     this->state.lastPrim->state.deltaPos2 = {this->state.lastPrim->state.deltaPos3.x + 0.0f, this->state.lastPrim->state.deltaPos3.y - 10.0f, this->state.lastPrim->state.deltaPos3.z + 0.0f};
     this->state.lastPrim->state.transform.MakeYRotation(GetRadian(static_cast<int>(this->state.lastPrim->state.longitude)));
-    this->state.lastPrim->state.duration = std::max(rand() % 24, 0) + 6;
-    this->state.lastPrim->state.speed = static_cast<float>(std::max(rand() % 90, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.duration = ClampedRandom(24) + 6;
+    this->state.lastPrim->state.speed = static_cast<float>(ClampedRandom(90) + 60) / 100.0f;
     this->state.lastPrim->state.accel = -(this->state.lastPrim->state.speed / static_cast<float>(this->state.lastPrim->state.duration)) * g_depthAverageHalf;
-    this->state.lastPrim->state.gravSpeed = -static_cast<float>(std::max(rand() % 90, 0) + 30) / 100.0f;
+    this->state.lastPrim->state.gravSpeed = -static_cast<float>(ClampedRandom(90) + 30) / 100.0f;
     this->state.lastPrim->state.gravAccel = -(this->state.lastPrim->state.gravSpeed / static_cast<float>(this->state.lastPrim->state.duration) * 2.0f);
-    this->state.lastPrim->state.size = static_cast<float>(std::max(rand() % 100, 0) + 60) / 100.0f;
+    this->state.lastPrim->state.size = static_cast<float>(ClampedRandom(100) + 60) / 100.0f;
     this->state.lastPrim->state.red = 20;
     this->state.lastPrim->state.green = 20;
     this->state.lastPrim->state.blue = 20;
     this->state.lastPrim->state.fadeOutCnt = 0;
-    this->state.lastPrim->SetSpriteName(ResourceMgr::Instance(), "이팩트\\particle1.spr");
-    this->state.lastPrim->SetActionName(ResourceMgr::Instance(), "이팩트\\particle1.act");
+    this->state.lastPrim->SetSpriteName("이팩트\\particle1.spr");
+    this->state.lastPrim->SetActionName("이팩트\\particle1.act");
     this->state.lastPrim->state.numSegment = 3;
     this->state.lastPrim->InitSegment();
   }
@@ -14640,7 +14644,7 @@ void CRagEffect::RenderAniClip(EZeffectClip* clip, const EZeffectTransform* tran
   primitive->sourceBlend = transform->srcalpha;
   primitive->destinationBlend = transform->destalpha;
   primitive->textureMode = transform->mtpreset;
-  g_renderer->queues.Submit(primitive, 5, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd);
+  g_renderer->Submit(primitive, 5);
 }
 
 // OFFSET: 0x00C38AD0
@@ -16323,7 +16327,11 @@ void CRagEffect::TexturedMagicRing(const char* name, char kind) {
       this->state.lastPrim->state.slots[i].alphaB = 50;
       this->state.lastPrim->state.slots[i].height[0] = static_cast<float>(kind);
     } else if (kind == 3 || kind == 4) {
-      this->state.lastPrim->state.slots[i].life = i < 2 ? 1 : 0;
+      if (i < 2) {
+        this->state.lastPrim->state.slots[i].life = 1;
+      } else {
+        this->state.lastPrim->state.slots[i].life = 0;
+      }
       this->state.lastPrim->state.slots[i].process = 0;
       this->state.lastPrim->state.slots[i].fullDisplayAngle = static_cast<std::int16_t>(ClampedRandom(360));
       if (i < 1) {

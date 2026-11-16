@@ -107,14 +107,14 @@ bool UIItemTagOnMail::CanInsertTag(const std::string& name, int width) {
 
   std::string tag = "<";
   this->tagWidth = width;
-  tag += this->FitTextToWidth(name, width / 2);
+  tag += this->FitTextToWidth(name, this->tagWidth / 2);
   tag += ">";
 
   UIRodexEditCtrl3* contents = g_windowMgr.rodexComposeWnd->m_contents;
   const unsigned int maximum = contents->maximum;
   this->taggedText = contents->text;
-  this->taggedText += tag;
-  return this->taggedText.size() <= maximum;
+  const std::string text = this->taggedText += tag;
+  return text.size() <= maximum;
 }
 
 // OFFSET: 0x0087ABB0
@@ -126,22 +126,21 @@ bool UIItemTagCtrl::SyncTagsWithText() {
   while (text.find("<") != std::string::npos) {
     std::string token = text.substr(text.find("<"));
 
-    if (token.find(">") == std::string::npos) {
-      text = text.substr(text.find("<") + 1);
-      continue;
-    }
+    if (token.find(">") != std::string::npos) {
+      text = text.substr(text.find(">") + 1);
+      token = token.substr(0, token.find(">") + 1);
 
-    text = text.substr(text.find(">") + 1);
-    token = token.substr(0, token.find(">") + 1);
-
-    for (auto entry = this->tags.begin(); entry != this->tags.end(); ++entry) {
-      std::string fitted = this->FitTextToWidth(entry->name, this->tagWidth / 2);
-      if (token.find(fitted) != std::string::npos) {
-        entry->index = kept.size();
-        kept.push_back(*entry);
-        this->tags.erase(entry);
-        break;
+      for (auto entry = this->tags.begin(); entry != this->tags.end(); ++entry) {
+        std::string fitted = this->FitTextToWidth(entry->name, this->tagWidth / 2);
+        if (token.find(fitted) != std::string::npos) {
+          entry->index = kept.size();
+          kept.push_back(*entry);
+          this->tags.erase(entry);
+          break;
+        }
       }
+    } else {
+      text = text.substr(text.find("<") + 1);
     }
   }
 
@@ -329,9 +328,6 @@ void UIItemTagCtrl::UpdateItemTags() {
         break;
       }
 
-      if (!this->geometry.surface) {
-        this->Resize(this->tagWidth / 2, 15);
-      }
       const std::string fitted = this->FitTextToWidth(entry->name, this->tagWidth / 2);
       std::string display = "<";
       display += fitted;

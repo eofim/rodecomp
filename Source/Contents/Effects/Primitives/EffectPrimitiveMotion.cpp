@@ -1696,7 +1696,9 @@ bool CEffectPrim::PrimKouenka() {
 // OFFSET: 0x00BC27B0
 // FUNCTION: fn_19834
 bool CEffectPrim::PrimSakura() {
-  FollowMaster(*this);
+  this->render.position.x = this->state.master->render.position.x;
+  this->render.position.y = this->state.master->render.position.y;
+  this->render.position.z = this->state.master->render.position.z;
 
   EffectPrimitiveSlot& slot = this->state.slots[0];
 
@@ -1811,13 +1813,17 @@ void CEffectPrim::PrimTeiHit2() {
 // OFFSET: 0x00BC3C70
 // FUNCTION: fn_19840
 __declspec(noinline) bool CEffectPrim::PrimSuperAngel() {
-  this->render.position = this->state.master->render.position;
+  this->render.position.x = this->state.master->render.position.x;
+  this->render.position.y = this->state.master->render.position.y;
+  this->render.position.z = this->state.master->render.position.z;
 
   if (this->state.slots[0].life == 1) {
     ++this->state.slots[0].process;
     this->state.slots[0].vecBNow.y -= 0.1f;
     this->state.slots[0].vecBPre = this->state.slots[0].vecBNow;
-    this->state.deltaPos = this->state.slots[0].vecBPre;
+    this->state.deltaPos.x = this->state.slots[0].vecBPre.x;
+    this->state.deltaPos.y = this->state.slots[0].vecBPre.y;
+    this->state.deltaPos.z = this->state.slots[0].vecBPre.z;
 
     if (this->state.slots[0].process < 50) {
       if (this->state.slots[0].flag1[1] == 0) {
@@ -1940,7 +1946,9 @@ __declspec(noinline) bool CEffectPrim::PrimSuperAngel() {
     }
   }
 
-  this->render.position = this->state.deltaPos;
+  this->render.position.x = this->state.deltaPos.x;
+  this->render.position.y = this->state.deltaPos.y;
+  this->render.position.z = this->state.deltaPos.z;
   this->ShiftSegment();
   return true;
 }
@@ -7251,12 +7259,11 @@ bool CEffectPrim::PrimDriftingOrbs() {
 
   DriftSlotAngles(slot, 3);
 
-  const char kind = slot.flag1[0];
 
-  if (kind != 0 && kind < 20 && kind >= 10) {
+  if (slot.flag1[0] != 0 && slot.flag1[0] < 20 && slot.flag1[0] >= 10) {
     switch (this->state.isChangeProcessed) {
     case 0:
-      if (slot.process % (kind - 9) == 0) {
+      if (slot.process % (slot.flag1[0] - 9) == 0) {
         slot.height[6] += 1.0f;
 
         if (slot.height[6] >= 360.0f) {
@@ -7268,7 +7275,7 @@ bool CEffectPrim::PrimDriftingOrbs() {
       slot.height[7] = -15.0f;
       break;
     case 1:
-      if (slot.process % (kind - 9) == 0) {
+      if (slot.process % (slot.flag1[0] - 9) == 0) {
         slot.height[6] += 15.0f;
 
         if (slot.height[6] >= 360.0f) {
@@ -7289,7 +7296,7 @@ bool CEffectPrim::PrimDriftingOrbs() {
       }
       break;
     }
-  } else if (kind == 0 || kind >= 20 || (slot.process & 1) == 0) {
+  } else if (slot.flag1[0] == 0 || slot.flag1[0] >= 20 || (slot.process & 1) == 0) {
     slot.height[6] += 1.0f;
 
     if (slot.height[6] >= 360.0f) {
@@ -7304,7 +7311,7 @@ bool CEffectPrim::PrimDriftingOrbs() {
     slot.vecBNow.x = g_sinTable[static_cast<int>(slot.height[6])] * 5.5f + slot.vecBNow.x;
     slot.vecBNow.z = g_cosTable[static_cast<int>(slot.height[6])] * 5.5f + slot.vecBNow.z;
   } else {
-    if (kind == 0 || kind >= 20) {
+    if (slot.flag1[0] == 0 || slot.flag1[0] >= 20) {
       slot.vecBNow.x = g_sinTable[static_cast<int>(slot.height[0])];
       slot.vecBNow.z = g_sinTable[static_cast<int>(slot.height[2])];
       slot.vecBNow.y = g_sinTable[static_cast<int>(slot.height[4])];

@@ -1508,9 +1508,8 @@ void CMsgEffect::FollowOwner() {
 // FUNCTION: fn_24288
 bool CSummonActorEffect::OnProcess() {
   const bool result = this->CMsgEffect::OnProcess();
-  const SpriteColor& color = this->render.colorChannels;
   const int alpha = g_serviceOptions.Get(TT_HIDE_SUMMON_ON_OFF) != 0 ? 0x32 : 0xFF;
-  this->SetColor(alpha, color.red, color.green, color.blue);
+  this->SetColor(alpha, this->render.colorChannels.red, this->render.colorChannels.green, this->render.colorChannels.blue);
   return result;
 }
 
@@ -1663,8 +1662,8 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         case MET_NUMBER:
         case MET_NUMBER_CRITICAL:
         case MET_NUMBER_HALF:
-          this->SetSpriteName(ResourceMgr::Instance(), FormatOwnedString("%s.spr", g_session.m_damageResourceName.c_str()).c_str());
-          this->SetActionName(ResourceMgr::Instance(), FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
+          this->SetSpriteName(FormatOwnedString("%s.spr", g_session.m_damageResourceName.c_str()).c_str());
+          this->SetActionName(FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
           this->render.animation = 0;
           this->render.previousAnimation = 0;
           this->render.position.x = position->x;
@@ -1686,8 +1685,8 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
             return;
           }
 
-          this->SetSpriteName(ResourceMgr::Instance(), FormatOwnedString("%s.spr", g_session.m_damageResourceName.c_str()).c_str());
-          this->SetActionName(ResourceMgr::Instance(), FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
+          this->SetSpriteName(FormatOwnedString("%s.spr", g_session.m_damageResourceName.c_str()).c_str());
+          this->SetActionName(FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
           this->render.animation = 0;
           this->render.previousAnimation = 0;
           this->render.position.x = position->x;
@@ -1719,8 +1718,8 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       this->render.motionStartTime = timeGetTime();
       if (c != 0) {
         const std::string* names = reinterpret_cast<const std::string*>(static_cast<std::intptr_t>(c));
-        this->SetSpriteName(ResourceMgr::Instance(), names[0].c_str());
-        this->SetActionName(ResourceMgr::Instance(), names[1].c_str());
+        this->SetSpriteName(names[0].c_str());
+        this->SetActionName(names[1].c_str());
       }
 
       if (d == 1000) {

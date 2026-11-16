@@ -31,35 +31,35 @@
 
 
 // GLOBAL: gl_24754
-float g_worldLightDirection[3];
+vector3d g_worldLightDirection;
 
 // GLOBAL: gl_24755
-float g_worldDiffuse[3];
+vector3d g_worldDiffuse;
 
 // GLOBAL: gl_24756
-float g_worldAmbient[3];
+vector3d g_worldAmbient;
 
 // GLOBAL: gl_24758
 float g_worldLoadCenter[3];
 
-namespace {
-  // INLINED
-  bool Before(const DeferredWorldModel& left, const DeferredWorldModel& right) {
-    if (left.distance < right.distance) {
-      return true;
-    }
+// INLINED
+inline bool operator<(const DeferredWorldModel& left, const DeferredWorldModel& right) {
+  if (left.distance < right.distance) {
+    return true;
+  }
 
-    if (right.distance < left.distance) {
-      return false;
-    }
-
-    if (left.distance == right.distance) {
-      return reinterpret_cast<std::uintptr_t>(left.placement) < reinterpret_cast<std::uintptr_t>(right.placement);
-    }
-
+  if (right.distance < left.distance) {
     return false;
   }
 
+  if (left.distance == right.distance) {
+    return reinterpret_cast<std::uintptr_t>(left.placement) < reinterpret_cast<std::uintptr_t>(right.placement);
+  }
+
+  return false;
+}
+
+namespace {
   // INLINED
   inline C3dActor* CreateWorldModel(const WorldModelRecord& placement, C3dModelRes& resource, BinkMovies& movies) {
     resource.RegisterMovies({placement.position.x, placement.position.y, placement.position.z});
@@ -86,7 +86,7 @@ namespace {
     actor->commandMode = placement.flag;
     actor->color = static_cast<std::uint32_t>(placement.index);
     actor->Assign(resource);
-    actor->Prepare(g_worldLightDirection, g_worldDiffuse, g_worldAmbient);
+    actor->Prepare(&g_worldLightDirection.x, &g_worldDiffuse.x, &g_worldAmbient.x);
 
     return actor;
   }
@@ -97,10 +97,10 @@ namespace {
 DWORD WINAPI CWorld::LoadDeferredModels(void* parameter) {
   CWorld* world = static_cast<CWorld*>(parameter);
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
-  std::sort(g_deferredWorldModels.begin(), g_deferredWorldModels.end(), Before);
+  std::sort(g_deferredWorldModels.begin(), g_deferredWorldModels.end());
 
-  for (const DeferredWorldModel& entry : g_deferredWorldModels) {
-    const WorldModelRecord& placement = *entry.placement;
+  for (auto it = g_deferredWorldModels.begin(); it != g_deferredWorldModels.end(); ++it) {
+    const WorldModelRecord& placement = *it->placement;
     auto* resource = static_cast<C3dModelRes*>(ResourceMgr::Instance().Load(placement.model));
 
     if (!resource) {
@@ -114,7 +114,7 @@ DWORD WINAPI CWorld::LoadDeferredModels(void* parameter) {
     }
 
     world->models.push_back(model);
-    std::atomic_ref<long>(world->pending).fetch_add(1, std::memory_order_seq_cst);
+    InterlockedIncrement(&world->pending);
     Sleep(0);
   }
 
@@ -131,7 +131,7 @@ void CWorld::FinishModelLoading() {
   }
 
   g_deferredWorldModels.clear();
-  std::atomic_ref<long>(this->pending).store(0, std::memory_order_release);
+  this->pending = 0;
 }
 
 // OFFSET: 0x00AC94C0
@@ -154,18 +154,12 @@ void CWorld::InitWorld() {
   modeBounds[2] = worldRes->bounds[0];
   modeBounds[3] = worldRes->bounds[1];
 
-  g_worldLightDirection[0] = worldRes->lightDirection.x;
-  g_worldLightDirection[1] = worldRes->lightDirection.y;
-  g_worldLightDirection[2] = worldRes->lightDirection.z;
-  g_worldDiffuse[0] = worldRes->diffuse.x;
-  g_worldDiffuse[1] = worldRes->diffuse.y;
-  g_worldDiffuse[2] = worldRes->diffuse.z;
-  g_worldAmbient[0] = worldRes->ambient.x;
-  g_worldAmbient[1] = worldRes->ambient.y;
-  g_worldAmbient[2] = worldRes->ambient.z;
+  g_worldLightDirection = worldRes->lightDirection;
+  g_worldDiffuse = worldRes->diffuse;
+  g_worldAmbient = worldRes->ambient;
 
   g_renderer->twoPass = worldRes->flag;
-  g_renderer->SetLighting(g_worldLightDirection, g_worldDiffuse, g_worldAmbient);
+  g_renderer->SetLighting(&g_worldLightDirection.x, &g_worldDiffuse.x, &g_worldAmbient.x);
 
   if (worldRes->terrainName.empty()) {
     ShowErrorDialog("attr \xc6\xc4\xc0\xcf\xc0\xcc rsw \xb3\xbb\xbf\xa1 \xc1\xf6\xc1\xa4\xb5\xc7\xbe\xee \xc0\xd6\xc1\xf6 \xbe\xca\xbd\xc0\xb4\xcf\xb4\xd9", 0);
@@ -198,7 +192,7 @@ void CWorld::InitWorld() {
   }
 
   this->ground = new GroundGeometry();
-  this->ground->Build(*groundRes, g_worldLightDirection, g_worldDiffuse, g_worldAmbient);
+  this->ground->Build(*groundRes, &g_worldLightDirection.x, &g_worldDiffuse.x, &g_worldAmbient.x);
   this->ground->terrain = this->terrain;
 
   this->ground->SetWater(
@@ -214,11 +208,9 @@ void CWorld::InitWorld() {
 
   ResourceMgr::Instance().Remove(groundRes);
 
-  const std::size_t modelCount = worldRes->models.size();
+  const int modelCount = static_cast<int>(worldRes->models.size());
   this->models.clear();
-  if (this->models.capacity() < modelCount) {
-    this->models.reserve(modelCount);
-  }
+  this->models.reserve(modelCount);
 
   DWORD lastNoticeTime = 0;
   int lastPercent = -1;

@@ -1773,7 +1773,7 @@ void UIAgitMessageBox::InitializeMessageBox(const char* text, int width, int hei
   unsigned int green;
   unsigned int blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  viewer->backgroundColor = 0xFF000000 | (blue << 16) | (green << 8) | red;
+  viewer->backgroundColor = RGB(red, green, blue) | 0xFF000000;
   viewer->Invalidate();
   this->AddChild(viewer);
   viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(text), width / 6, 0, 0);
@@ -2771,7 +2771,7 @@ int UIGuildMemberManageWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
         } else {
           relation = g_session.IsGuildMemberCharacter(static_cast<std::uint32_t>(target.characterId)) == 1 ? "GuildMember" : nullptr;
         }
-        const std::string filename = ShortcutFilename(target.characterId);
+        const std::string filename = g_session.ShortcutFilename(target.characterId);
         g_windowMgr.SendNotice(UIM_MAKE_WHISPER_WINDOW, reinterpret_cast<std::intptr_t>(target.name.c_str()), reinterpret_cast<std::intptr_t>(relation),
                                reinterpret_cast<std::intptr_t>(filename.c_str()), 0, 0);
       }
