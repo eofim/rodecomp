@@ -148,7 +148,7 @@ std::uint32_t ITEM_INFO::Assign(const ModeDragState& item) {
   this->prices[0] = item.itemValue;
   this->prices[1] = item.price;
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
     std::memcpy(&this->cards[index], &item.cards[index], sizeof(item.cards[index]));
   }
 
@@ -157,7 +157,7 @@ std::uint32_t ITEM_INFO::Assign(const ModeDragState& item) {
   this->identified = item.identified;
   this->refiningLevel = item.refine;
 
-  this->optionCount = item.optionCount > 5 ? 0 : item.optionCount;
+  this->optionCount = item.optionCount < 0 || item.optionCount > ItemRandomOptionCount ? 0 : item.optionCount;
 
   for (int index = 0; index < this->optionCount; ++index) {
     this->options[index] = item.options[index];
@@ -323,7 +323,7 @@ void ITEM_INFO::SetItemId(int value) {
 // OFFSET: 0x006D90C0
 // FUNCTION: fn_06612
 std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
-  if (data.begin() == data.end()) {
+  if (data.size() < sizeof(ItemRecordHeader)) {
     return 0xFFFFFFFF;
   }
 
@@ -335,8 +335,14 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
   }
 
   while (data.size() > offset) {
+    if (data.size() - offset < sizeof(ItemRecordHeader)) {
+      return 0xFFFFFFFF;
+    }
     header.Read(data.data() + offset);
     offset += 6;
+    if (header.bytes > data.size() - offset) {
+      return 0xFFFFFFFF;
+    }
     switch (header.id) {
     case 282:
       return offset;
@@ -369,6 +375,10 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
       offset += header.bytes;
       break;
     case 290:
+      if (header.bytes > sizeof(this->cards) || header.bytes % sizeof(this->cards[0]) != 0) {
+        return 0xFFFFFFFF;
+      }
+      std::memset(this->cards, 0, sizeof(this->cards));
       std::memcpy(this->cards, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
@@ -417,10 +427,20 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
       offset += header.bytes;
       break;
     case 300:
+      if (header.bytes != sizeof(this->optionCount)) {
+        return 0xFFFFFFFF;
+      }
       std::memcpy(&this->optionCount, data.data() + offset, header.bytes);
+      if (this->optionCount < 0 || this->optionCount > ItemRandomOptionCount) {
+        return 0xFFFFFFFF;
+      }
       offset += header.bytes;
       break;
     case 301:
+      if (header.bytes > sizeof(this->options) || header.bytes % sizeof(this->options[0]) != 0) {
+        return 0xFFFFFFFF;
+      }
+      std::memset(this->options, 0, sizeof(this->options));
       std::memcpy(this->options, data.data() + offset, header.bytes);
       offset += header.bytes;
       break;
@@ -450,6 +470,11 @@ bool CSession::HasRequiredItems() const {
 // OFFSET: 0x00DFBD90
 // FUNCTION: fn_23588
 bool CSession::IsSlotItemIdentity(std::uint32_t id) const {
+  for (const ITEM_INFO& item : this->affinityItems) {
+    if (id != 0 && item.quantity == 1 && item.identity[1] == id) {
+      return true;
+    }
+  }
   if (id != 0 && id == this->equippedArrowIndex) {
     return true;
   }
@@ -478,6 +503,11 @@ bool CSession::HasInventoryItem(std::uint32_t id) const {
 // OFFSET: 0x00DFBE40
 // FUNCTION: fn_23591
 bool CSession::HasItemId(int itemId) const {
+  for (const ITEM_INFO& item : this->affinityItems) {
+    if (item.identity[1] != 0 && std::atoi(item.itemId.c_str()) == itemId) {
+      return true;
+    }
+  }
   const ITEM_INFO owned = this->LookupClientItemByIdentity(this->equippedArrowIndex);
   if (owned.identity[1] > 0 && std::atoi(owned.itemId.c_str()) == itemId) {
     return true;
@@ -495,6 +525,11 @@ bool CSession::HasItemId(int itemId) const {
 // OFFSET: 0x00DFBF70
 // FUNCTION: fn_23592
 bool CSession::HasItemCount(int itemId, int count) const {
+  for (const ITEM_INFO& item : this->affinityItems) {
+    if (item.identity[1] != 0 && std::atoi(item.itemId.c_str()) == itemId && item.refiningLevel >= count) {
+      return true;
+    }
+  }
   const ITEM_INFO owned = this->LookupClientItemByIdentity(this->equippedArrowIndex);
   if (owned.identity[1] > 0 && std::atoi(owned.itemId.c_str()) == itemId) {
     return true;
@@ -574,7 +609,7 @@ int ITEM_INFO::GetItemId() const {
 // OFFSET: 0x006D9070
 // FUNCTION: fn_06611
 void ITEM_INFO::SetOption(ItemOption option, const int& index) {
-  if (index < 5) {
+  if (index >= 0 && index < ItemRandomOptionCount) {
     this->options[index].id = option.id;
     this->options[index].parameter = option.parameter;
     this->options[index].value = option.value;
@@ -584,7 +619,7 @@ void ITEM_INFO::SetOption(ItemOption option, const int& index) {
 // OFFSET: 0x006D9590
 // FUNCTION: fn_06613
 void ITEM_INFO::SetCard(const int& card, const int& index) {
-  if (index < 4) {
+  if (index >= 0 && index < ItemCardSlotCount) {
     std::memcpy(&this->cards[index], &card, sizeof(card));
   }
 }

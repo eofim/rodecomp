@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+inline constexpr int ItemCardSlotCount = 6;
+inline constexpr int ItemRandomOptionCount = 9;
+
 struct ModeDragState;
 
 struct RawItemBasic {
@@ -89,7 +92,7 @@ struct ITEM_INFO {
   /* 0000 */ std::uint32_t identity[4];
   /* 0010 */ std::int32_t quantity;
   /* 0014 */ std::uint32_t prices[2];
-  /* 001C */ std::uint32_t cards[4];
+  /* 001C */ std::uint32_t cards[ItemCardSlotCount];
   /* 002C */ std::string itemId;
   /* 0044 */ std::string displayName;
   /* 005C */ unsigned char identified;
@@ -105,7 +108,7 @@ struct ITEM_INFO {
   /* 0088 */ std::int16_t grade;
   /* 0090 */ std::uint64_t productId;
   /* 0098 */ std::int32_t optionCount;
-  /* 009C */ ItemOptionRecord options[5];
+  /* 009C */ ItemOptionRecord options[ItemRandomOptionCount];
   /* 00B8 */ std::uint32_t recordIds[2];
   /* 00C0 */ unsigned char recordType;
   /* 00C1 */ unsigned char recordName[24];
@@ -121,14 +124,14 @@ int ReadItemArray(ITEM_INFO* items, int offset, int size, const std::vector<unsi
 
 
 #if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(ITEM_INFO) == 248);
+static_assert(sizeof(ITEM_INFO) == 272);
 static_assert(sizeof(ItemOption) == 6);
 static_assert(sizeof(ItemOptionRecord) == 5);
 static_assert(sizeof(ItemSaleData) == 0x10);
 static_assert(offsetof(ItemSaleData, startTime) == 0x04);
 static_assert(offsetof(ItemSaleData, endTime) == 0x08);
-static_assert(offsetof(ITEM_INFO, expireTime) == 0x68);
-static_assert(offsetof(ITEM_INFO, saleData) == 0x78);
+static_assert(offsetof(ITEM_INFO, expireTime) == 0x70);
+static_assert(offsetof(ITEM_INFO, saleData) == 0x80);
 #endif
 
 #endif

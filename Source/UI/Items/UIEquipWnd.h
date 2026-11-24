@@ -13,6 +13,33 @@ class UICheckBox;
 class UISwapEquipmentWnd;
 class UIScrollBar;
 
+struct AffinityVisualSettings {
+  int panelHeight = 36;
+  bool centered = true;
+  int x = 0;
+  int y = 149;
+  int stepX = 28;
+  int stepY = 0;
+  int width = 24;
+  int height = 24;
+  bool drawBackground = true;
+  int backgroundX = 1;
+  int backgroundY = 147;
+  int backgroundWidth = 0;
+  int backgroundHeight = 34;
+  unsigned int backgroundColor = 0xFFFFFF;
+  int iconX = 0;
+  int iconY = 0;
+  std::string slotImage;
+  std::string lockedImage;
+  std::string lockOverlay;
+  std::string highlightImage;
+  std::string panelImage;
+  bool customPosition[6] = {};
+  int slotX[6] = {};
+  int slotY[6] = {};
+};
+
 class UIEquipWnd : public UIFrameWnd {
 public:
   UIEquipWnd();
@@ -53,6 +80,7 @@ public:
   /* 0160 */ std::vector<std::string> m_damageSkinNames;
   /* 016C */ std::vector<std::string> m_damageSkinIcons;
   /* 0178 */ UIBitmapButton* abilityButton;
+  AffinityVisualSettings affinityVisual;
 
   void OnProcess() override;
   void OnLBtnDown(int x, int y) override;
@@ -66,6 +94,12 @@ public:
 
   void DrawDamageSkinPage();
   void DrawEquipSlots();
+  void LoadAffinityVisualSettings();
+  void AffinitySlotPosition(int slot, int& x, int& y) const;
+  int AffinityPanelHeight() const;
+  int AffinitySlotAt(int x, int y) const;
+  void RefreshAffinityLayout();
+  void DrawAffinitySlots();
   void RefreshTitleList();
   void NotifyEquipmentChanged();
   void UpdateCharacterView(int reset);

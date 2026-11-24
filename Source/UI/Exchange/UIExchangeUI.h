@@ -89,8 +89,8 @@ public:
 
 
 #if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(ExchangeUI::CItemData) == 0x100);
-static_assert(offsetof(ExchangeUI::CItemData, frozen) == 0xFC);
+static_assert(sizeof(ExchangeUI::CItemData) == 0x118);
+static_assert(offsetof(ExchangeUI::CItemData, frozen) == 0x114);
 static_assert(offsetof(ExchangeUI::CItemListBox, imageNames) == 0x90);
 static_assert(offsetof(ExchangeUI::CItemListBox, disabledName) == 0x98);
 static_assert(offsetof(ExchangeUI::CItemListBox, scrollBar) == 0xB0);

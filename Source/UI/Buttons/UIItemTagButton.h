@@ -26,8 +26,8 @@ public:
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(offsetof(UIItemTagButton, item) == 0xF8);
-static_assert(offsetof(UIItemTagButton, column) == 0x1F0);
-static_assert(offsetof(UIItemTagButton, line) == 0x1F4);
+static_assert(offsetof(UIItemTagButton, column) == 0x208);
+static_assert(offsetof(UIItemTagButton, line) == 0x20C);
 #endif
 
 #endif

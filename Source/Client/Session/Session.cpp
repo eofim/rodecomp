@@ -803,6 +803,15 @@ ITEM_INFO* CSession::GetEquippedItem(const ITEM_INFO* item) {
     return nullptr;
   }
 
+  if ((item->identity[2] & EQP_AFFINITY) != 0) {
+    for (int slot = 0; slot < 6; ++slot) {
+      if ((item->identity[2] & (EQP_AFFINITY_1 << slot)) != 0 && this->affinityItems[slot].identity[1] != 0) {
+        return &this->affinityItems[slot];
+      }
+    }
+    return nullptr;
+  }
+
   ITEM_INFO* equipped = nullptr;
   switch (item->identity[2]) {
   case EQP_HEAD_LOW:
@@ -2125,6 +2134,11 @@ void CSession::SetEquippedArrowIndex(std::uint32_t value) {
 // OFFSET: 0x00DFF9C0
 // FUNCTION: fn_23625
 void CSession::SetEquippedItem(unsigned int index, const ITEM_INFO& item) {
+  if (index >= 16 && index < 22) {
+    this->affinityItems[index - 16] = item;
+    g_windowMgr.InvalidateFrames();
+    return;
+  }
   if (index <= 9) {
     this->equippedItems[index] = item;
     EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshWearable(item.identity[3]);
@@ -2169,6 +2183,14 @@ void CSession::SetHomunSkillLevel(int skillId, int level) {
 // OFFSET: 0x00DFFBA0
 // FUNCTION: fn_23628
 void CSession::UpdateInventoryItem(const ITEM_INFO& item, unsigned char refresh) {
+  if ((item.identity[3] & EQP_AFFINITY) != 0) {
+    const EquipSlots slots = this->GetEquipSlots(item.identity[3]);
+    this->SetEquippedItem(slots.values[2], item);
+    if (refresh) {
+      RefreshItemWindows(&g_windowMgr);
+    }
+    return;
+  }
   auto it = this->m_inventoryItems.begin();
   while (it != this->m_inventoryItems.end() && it->identity[1] != item.identity[1]) {
     ++it;
@@ -2551,6 +2573,14 @@ int CSession::CountDistinctEquippedItems() const {
   std::vector<std::uint32_t> itemIds;
   for (int i = 0; i < 10; ++i) {
     const int itemId = this->equippedItems[i].identity[1];
+    if (itemId != 0 && std::find(itemIds.begin(), itemIds.end(), itemId) == itemIds.end()) {
+      itemIds.push_back(itemId);
+      ++count;
+    }
+  }
+
+  for (const ITEM_INFO& item : this->affinityItems) {
+    const int itemId = item.identity[1];
     if (itemId != 0 && std::find(itemIds.begin(), itemIds.end(), itemId) == itemIds.end()) {
       itemIds.push_back(itemId);
       ++count;
@@ -3130,6 +3160,10 @@ void CSession::Init() {
 // OFFSET: 0x00DF7C40
 // FUNCTION: fn_23508
 void CSession::ResetCharacterState() {
+  this->affinitySlotCount = 3;
+  for (ITEM_INFO& item : this->affinityItems) {
+    item.Reset();
+  }
   this->unknown_1620[1] = SquareRoot(50.0f);
 
   const int roll = std::rand() % 1024;
@@ -3249,6 +3283,9 @@ void CSession::ResetCharacterState() {
 // OFFSET: 0x00DF88B0
 // FUNCTION: fn_23511
 void CSession::ResetInventoryItems() {
+  for (ITEM_INFO& item : this->affinityItems) {
+    item.Reset();
+  }
   this->m_inventoryItems.erase(this->m_inventoryItems.begin(), this->m_inventoryItems.end());
   this->m_pingSamples.erase(this->m_pingSamples.begin(), this->m_pingSamples.end());
 
@@ -4198,6 +4235,7 @@ void CSession::LoadLuaDataFiles() {
   if (!this->m_hotkeyScript->Load("Lua Files\\HatEffectInfo\\HatEffect_F", true, false)) {
     MessageBoxA(hWnd, "Fail to load HatEffectInfo\\HatEffect_F.lua", "Error", MB_OK);
   }
+  this->m_hotkeyScript->Load("Lua Files\\DataInfo\\AffinityVisual", true, false);
 
   this->m_hotkeyScript->Load("Lua Files\\SignBoardList_F", true, false);
   {
@@ -6303,4 +6341,11 @@ void CSession::InitJobSpriteNames() {
   jobSpriteNames[403] = KarnosBodyPath3().Text();
   jobSpriteNames[404] = KarnosBodyPath4().Text();
   jobSpriteNames[405] = AliteaBodyPath2().Text();
+}
+
+ITEM_INFO CSession::GetAffinityItem(int slot) const {
+  if (slot >= 0 && slot < 6) {
+    return this->affinityItems[slot];
+  }
+  return ITEM_INFO(0);
 }

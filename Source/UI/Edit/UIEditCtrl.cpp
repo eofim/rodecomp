@@ -7750,7 +7750,7 @@ bool IsInputSuggestionAllowed() {
 // OFFSET: 0x00860080
 // FUNCTION: fn_10898
 bool UIEditCtrl::DecodeItemLink(const std::vector<int>& values, ITEM_INFO& item) {
-  if (values.empty()) {
+  if (values.size() < 6) {
     return false;
   }
 
@@ -7777,6 +7777,9 @@ bool UIEditCtrl::DecodeItemLink(const std::vector<int>& values, ITEM_INFO& item)
   item.grade = static_cast<std::int16_t>(values[5]);
   if (values.size() > 6) {
     cardCount = values[6];
+    if (cardCount < 0 || cardCount > ItemCardSlotCount || values.size() < static_cast<std::size_t>(7 + cardCount)) {
+      return false;
+    }
     for (int i = 1; i < cardCount + 1; ++i) {
       int index = i - 1;
       item.SetCard(values[6 + i], index);
@@ -7784,16 +7787,19 @@ bool UIEditCtrl::DecodeItemLink(const std::vector<int>& values, ITEM_INFO& item)
   }
 
   if (static_cast<unsigned>(cardCount + 8) < values.size()) {
-    item.optionCount = values[cardCount + 8];
-    int optionCount = item.optionCount + 1;
-    for (int i = 1; i < optionCount; ++i) {
-      const int base = cardCount + 9 + (i - 1) * 3;
+    const int optionCount = values[cardCount + 8];
+    if (optionCount < 0 || optionCount > ItemRandomOptionCount ||
+        values.size() < static_cast<std::size_t>(cardCount + 9 + optionCount * 3)) {
+      return false;
+    }
+    item.optionCount = optionCount;
+    for (int i = 0; i < optionCount; ++i) {
+      const int base = cardCount + 9 + i * 3;
       ItemOption option;
       option.id = static_cast<std::int16_t>(values[base]);
       option.value = static_cast<std::int16_t>(values[base + 2]);
       option.parameter = static_cast<unsigned char>(values[base + 1]);
-      int index = i - 1;
-      item.SetOption(option, index);
+      item.SetOption(option, i);
     }
   }
 

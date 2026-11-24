@@ -108,7 +108,15 @@ bool ITEM_INFO::HasCards() const {
     return first;
   }
 
-  return first || IsItemCard(CardId(*this, 1)) || IsItemCard(CardId(*this, 2)) || IsItemCard(CardId(*this, 3));
+  if (first) {
+    return true;
+  }
+  for (int index = 1; index < ItemCardSlotCount; ++index) {
+    if (IsItemCard(CardId(*this, index))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // OFFSET: 0x006D5780
@@ -151,11 +159,14 @@ int ITEM_INFO::Creator(char* output, int& capacity, unsigned char consume) const
 // OFFSET: 0x006D6F50
 // FUNCTION: fn_06588
 __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsigned char consume) const {
-  int ids[4] = {CardId(*this, 0), CardId(*this, 1), CardId(*this, 2), CardId(*this, 3)};
+  int ids[ItemCardSlotCount];
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
+    ids[index] = CardId(*this, index);
+  }
   int remaining = capacity;
   char* cursor = output;
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
     if (ids[index] <= 0) {
       continue;
     }
@@ -167,7 +178,7 @@ __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsign
 
     int count = 1;
 
-    for (int next = index + 1; next < 4; ++next) {
+    for (int next = index + 1; next < ItemCardSlotCount; ++next) {
       if (ids[next] == ids[index]) {
         ids[next] = 0;
         ++count;
@@ -175,6 +186,13 @@ __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsign
     }
 
     int bytes = 0;
+    if (count > 4) {
+      bytes = StringFormat(cursor, remaining, _TRUNCATE, "%s ", FormatOwnedString("%d", count).c_str());
+      if (bytes > 0) {
+        cursor += bytes;
+        remaining -= bytes;
+      }
+    }
     switch (count) {
     case 2:
       bytes = StringFormat(cursor, remaining, _TRUNCATE, "%s ", LookupMessage(MSI_DOUBLE));
@@ -217,11 +235,14 @@ __declspec(noinline) int ITEM_INFO::Prefixes(char* output, int& capacity, unsign
 // OFFSET: 0x006D6DB0
 // FUNCTION: fn_06587
 int ITEM_INFO::Suffixes(char* output, int& capacity, unsigned char consume) const {
-  int ids[4] = {CardId(*this, 0), CardId(*this, 1), CardId(*this, 2), CardId(*this, 3)};
+  int ids[ItemCardSlotCount];
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
+    ids[index] = CardId(*this, index);
+  }
   int remaining = capacity;
   char* cursor = output;
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
     if (ids[index] <= 0) {
       continue;
     }
@@ -233,7 +254,7 @@ int ITEM_INFO::Suffixes(char* output, int& capacity, unsigned char consume) cons
 
     int count = 1;
 
-    for (int next = index + 1; next < 4; ++next) {
+    for (int next = index + 1; next < ItemCardSlotCount; ++next) {
       if (ids[next] == ids[index]) {
         ids[next] = 0;
         ++count;
@@ -246,6 +267,13 @@ int ITEM_INFO::Suffixes(char* output, int& capacity, unsigned char consume) cons
       remaining -= bytes;
     }
 
+    if (count > 4) {
+      bytes = StringFormat(cursor, remaining, _TRUNCATE, " %s", FormatOwnedString("%d", count).c_str());
+      if (bytes > 0) {
+        cursor += bytes;
+        remaining -= bytes;
+      }
+    }
     switch (count) {
     case 2:
       bytes = StringFormat(cursor, remaining, _TRUNCATE, " %s", LookupMessage(MSI_DOUBLE));
@@ -433,7 +461,7 @@ std::vector<unsigned char> ITEM_INFO::Serialize() const {
   append(287, &this->quantity, 4);
   append(288, &this->prices[0], 4);
   append(289, &this->prices[1], 4);
-  append(290, this->cards, 16);
+  append(290, this->cards, sizeof(this->cards));
   const int id = std::atoi(this->itemId.c_str());
   append(291, &id, 4);
   append(292, this->displayName.c_str(), static_cast<std::uint32_t>(this->displayName.size()));
@@ -445,7 +473,7 @@ std::vector<unsigned char> ITEM_INFO::Serialize() const {
   append(298, &this->sprite, 4);
   append(299, &this->grade, 2);
   append(300, &this->optionCount, 4);
-  append(301, this->options, 25);
+  append(301, this->options, sizeof(this->options));
   append(282, nullptr, 0);
   return result;
 }
@@ -776,12 +804,12 @@ std::uint32_t __fastcall ItemCardColor(const ITEM_INFO* item) {
     int count = 0;
     const int id = std::atoi(item->itemId.c_str());
     const int slots = FindItemDescription(id, g_itemDescriptions).slots;
-    for (int index = 0; index < 4; ++index) {
+    for (int index = 0; index < ItemCardSlotCount; ++index) {
       if (index >= slots && IsItemCard(CardId(*item, index))) {
         ++count;
       }
     }
-    return colors[count];
+    return colors[count < 4 ? count : 4];
   }
 
   return 0;

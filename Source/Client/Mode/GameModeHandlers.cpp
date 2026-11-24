@@ -226,8 +226,8 @@ struct ItemRewardPacket {
   /* 000C */ unsigned char identified;
   /* 000D */ unsigned char damaged;
   /* 000E */ unsigned char refine;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ ItemRewardOption options[5];
+  /* 000F */ std::uint32_t cards[ItemCardSlotCount];
+  /* 001F */ ItemRewardOption options[ItemRandomOptionCount];
   /* 0038 */ std::uint16_t value;
   /* 003A */ unsigned char bound;
   /* 003B */ int expireTime;
@@ -242,8 +242,8 @@ struct ItemRewardPacket2 {
   /* 000B */ unsigned char type;
   /* 000C */ unsigned char identified;
   /* 000D */ unsigned char damaged;
-  /* 000E */ std::uint32_t cards[4];
-  /* 001E */ ItemRewardOption options[5];
+  /* 000E */ std::uint32_t cards[ItemCardSlotCount];
+  /* 001E */ ItemRewardOption options[ItemRandomOptionCount];
   /* 0037 */ std::uint16_t value;
   /* 0039 */ unsigned char bound;
   /* 003A */ int expireTime;
@@ -545,8 +545,8 @@ static_assert(sizeof(Item1718IndexRecord) == 0x0A);
 static_assert(sizeof(HomunculusInfoPacket) == 0x49);
 static_assert(sizeof(HomunculusInfoPacket2) == 0x49);
 static_assert(sizeof(HomunculusInfoPacket3) == 0x55);
-static_assert(sizeof(ItemRewardPacket) == 0x3F);
-static_assert(sizeof(ItemRewardPacket2) == 0x40);
+static_assert(sizeof(ItemRewardPacket) == 91);
+static_assert(sizeof(ItemRewardPacket2) == 92);
 static_assert(sizeof(ActorSkillResultPacket) == 0x1D);
 #endif
 
@@ -2514,7 +2514,7 @@ void CGameMode::ReceiveItemReward2(const unsigned char* data) {
     std::memcpy(item.cards, packet->cards, sizeof(packet->cards));
 
     int count = 0;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < ItemRandomOptionCount; ++i) {
       if (0 != packet->options[i].id) {
         ++count;
       }
@@ -3264,8 +3264,8 @@ struct SearchStoreItemPacket {
   /* 005C */ unsigned char kind;
   /* 005D */ int price;
   /* 0061 */ std::uint16_t quantity;
-  /* 0063 */ std::uint32_t cards[4];
-  /* 0073 */ ItemOptionRecord options[5];
+  /* 0063 */ std::uint32_t cards[ItemCardSlotCount];
+  /* 0073 */ ItemOptionRecord options[ItemRandomOptionCount];
   /* 008C */ unsigned char refine;
   /* 008D */ unsigned char grade;
 };
@@ -3285,13 +3285,13 @@ struct SearchStoreItemPacketOld {
   /* 005D */ int price;
   /* 0061 */ std::uint16_t quantity;
   /* 0063 */ unsigned char refine;
-  /* 0064 */ unsigned char cards[16];
-  /* 0074 */ ItemOptionRecord options[5];
+  /* 0064 */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
+  /* 0074 */ ItemOptionRecord options[ItemRandomOptionCount];
 };
 #pragma pack(pop)
 
-static_assert(sizeof(SearchStoreItemPacket) == 0x8E);
-static_assert(sizeof(SearchStoreItemPacketOld) == 0x8D);
+static_assert(sizeof(SearchStoreItemPacket) == 170);
+static_assert(sizeof(SearchStoreItemPacketOld) == 169);
 
 // OFFSET: 0x00D3FA20
 // FUNCTION: fn_21814
@@ -3321,7 +3321,7 @@ void CGameMode::ReceiveSearchStoreItems(const unsigned char* packet) {
     entry.item.identity[0] = record.kind;
     entry.item.identified = 1;
     int optionCount = 0;
-    for (int j = 0; j < 5; ++j) {
+    for (int j = 0; j < ItemRandomOptionCount; ++j) {
       if (record.options[j].id != 0) {
         ++optionCount;
       }
@@ -3330,7 +3330,7 @@ void CGameMode::ReceiveSearchStoreItems(const unsigned char* packet) {
     for (long long j = 0; j < optionCount; ++j) {
       entry.item.options[j] = record.options[j];
     }
-    for (long long j = 0; j < 4; ++j) {
+    for (long long j = 0; j < ItemCardSlotCount; ++j) {
       entry.item.cards[j] = record.cards[j];
     }
     entry.item.grade = record.grade;
@@ -3370,7 +3370,7 @@ void CGameMode::ReceiveSearchStoreItemsOld(const unsigned char* packet) {
     entry.item.identity[0] = record.kind;
     entry.item.identified = 1;
     int optionCount = 0;
-    for (int j = 0; j < 5; ++j) {
+    for (int j = 0; j < ItemRandomOptionCount; ++j) {
       if (0 != record.options[j].id) {
         ++optionCount;
       }

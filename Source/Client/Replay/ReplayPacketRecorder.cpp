@@ -247,10 +247,10 @@ namespace {
     /* 0097 */ char name[100];
     /* 00FB */ char skillName[100];
     /* 015F */ std::int32_t skillLevel;
-    /* 0163 */ unsigned char cards[16];
+    /* 0163 */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
     /* 0173 */ unsigned char skill;
     /* 0174 */ std::int32_t optionCount;
-    /* 0178 */ ItemOptionRecord options[5];
+    /* 0178 */ ItemOptionRecord options[ItemRandomOptionCount];
   };
 
   struct ValuesRecord {
@@ -270,7 +270,7 @@ namespace {
   };
 #pragma pack(pop)
 
-  static_assert(sizeof(DropRecord) == 0x191);
+  static_assert(sizeof(DropRecord) == 0x1AD);
   static_assert(sizeof(ValuesRecord) == 0x1E);
   static_assert(sizeof(TextRecord) == 0x72);
 }
@@ -309,7 +309,7 @@ void UIWindow::RecordDrop(int x, int y, const ModeDragState& drag, int target) {
   std::memcpy(packet.skillName, drag.skillName.c_str(), static_cast<int>(drag.skillName.size()) > 100 ? 100 : drag.skillName.size());
   std::memcpy(packet.cards, drag.cards, sizeof(packet.cards));
   packet.optionCount = drag.optionCount;
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < ItemRandomOptionCount; ++index) {
     packet.options[index] = drag.options[index];
   }
 

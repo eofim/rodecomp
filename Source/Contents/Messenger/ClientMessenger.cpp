@@ -5628,6 +5628,9 @@ void ClearMemberFlags(std::uint32_t* flags) {
 // OFFSET: 0x00DD85B0
 // FUNCTION: fn_23309
 void CSession::ResetEquipment() {
+  for (ITEM_INFO& item : this->affinityItems) {
+    item.Reset();
+  }
   for (int index = 0; index < 10; ++index) {
     this->equippedItems[index].Reset();
   }
@@ -6746,7 +6749,7 @@ EquipmentProperties::CEquipmentWearable::CEquipmentWearable(const ITEM_INFO* ite
   const EquipSlots slots = g_session.GetEquipSlots(this->m_type);
   this->inventoryIndex = slots.values[2];
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
     int card;
     std::memcpy(&card, &item->cards[index], sizeof(card));
     if (card != 0) {
@@ -6755,7 +6758,7 @@ EquipmentProperties::CEquipmentWearable::CEquipmentWearable(const ITEM_INFO* ite
     }
   }
 
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < ItemRandomOptionCount; ++index) {
     const ItemOptionRecord& option = item->options[index];
     const int optionId = option.id;
     EquipmentPropertyDefinition* definition = CEquipmentPropertiesMgr::GetInstance()->FindRandomOptionDefinition(optionId);

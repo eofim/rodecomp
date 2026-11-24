@@ -207,8 +207,8 @@ struct ItemSlotAddOptionsPacket {
   /* 000B */ unsigned char identified;
   /* 000C */ unsigned char damaged;
   /* 000D */ unsigned char refine;
-  /* 000E */ unsigned char cards[16];
-  /* 001E */ ItemSlotOption options[5];
+  /* 000E */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
+  /* 001E */ ItemSlotOption options[ItemRandomOptionCount];
   /* 0037 */ std::uint32_t expireTime;
   /* 003B */ std::uint16_t bindType;
 };
@@ -220,8 +220,8 @@ struct ItemSlotAddGradePacket {
   /* 0007 */ int slot;
   /* 000B */ unsigned char identified;
   /* 000C */ unsigned char damaged;
-  /* 000D */ unsigned char cards[16];
-  /* 001D */ ItemSlotOption options[5];
+  /* 000D */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
+  /* 001D */ ItemSlotOption options[ItemRandomOptionCount];
   /* 0036 */ std::uint32_t expireTime;
   /* 003A */ std::uint16_t bindType;
   /* 003C */ unsigned char refine;
@@ -232,7 +232,7 @@ struct ItemOptionsRefreshPacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ std::uint16_t index;
   /* 0004 */ std::uint16_t refine;
-  /* 0006 */ ItemSlotOption options[5];
+  /* 0006 */ ItemSlotOption options[ItemRandomOptionCount];
 };
 
 struct PacketIdOnly {
@@ -296,7 +296,7 @@ struct RouletteInfoPacket {
 // INLINED
 static int CountItemSlotOptions(const ItemSlotOption* options) {
   int count = 0;
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < ItemRandomOptionCount; ++index) {
     if (0 != options[index].id) {
       ++count;
     }
@@ -1135,7 +1135,7 @@ struct PartyItemPickupPacket {
   /* 0006 */ int itemId;
   /* 000A */ unsigned char identified;
   /* 000B */ unsigned char damaged;
-  /* 000C */ std::uint32_t cards[4];
+  /* 000C */ std::uint32_t cards[ItemCardSlotCount];
   /* 001C */ std::uint16_t location;
   /* 001E */ unsigned char type;
   /* 001F */ unsigned char refine;
@@ -1179,7 +1179,7 @@ void CGameMode::ReceivePartyItemPickup(const unsigned char* data) {
     item.identity[1] = packet->itemId;
     item.identity[3] = 0;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -1493,7 +1493,7 @@ void CGameMode::ReceiveCardCompositionResult(const unsigned char* data) {
     ITEM_INFO equip = g_session.LookupClientItemByIdentity(packet->equipIndex);
     if (equip.identity[1] != 0 && card.identity[1] != 0) {
       std::uint32_t* cards = equip.cards;
-      for (int i = 0; i < 4; ++i) {
+      for (int i = 0; i < ItemCardSlotCount; ++i) {
         if (cards[i] == 0) {
           cards[i] = std::atoi(card.itemId.c_str());
           break;
@@ -2839,7 +2839,7 @@ struct StorageEquipRecord {
   /* 000A */ std::uint16_t wearState;
   /* 000C */ unsigned char damaged;
   /* 000D */ unsigned char refine;
-  /* 000E */ std::uint32_t cards[4];
+  /* 000E */ std::uint32_t cards[ItemCardSlotCount];
   /* 001E */ int expireTime;
 };
 
@@ -2852,7 +2852,7 @@ struct StorageEquipRecord2 {
   /* 000A */ std::uint16_t wearState;
   /* 000C */ unsigned char damaged;
   /* 000D */ unsigned char refine;
-  /* 000E */ std::uint32_t cards[4];
+  /* 000E */ std::uint32_t cards[ItemCardSlotCount];
   /* 001E */ int expireTime;
   /* 0022 */ std::uint16_t bindOnEquip;
   /* 0024 */ std::uint16_t sprite;
@@ -2865,7 +2865,7 @@ struct StorageEquipRecord3 {
   /* 0007 */ std::uint16_t location;
   /* 0009 */ std::uint16_t wearState;
   /* 000B */ unsigned char refine;
-  /* 000C */ std::uint32_t cards[4];
+  /* 000C */ std::uint32_t cards[ItemCardSlotCount];
   /* 001C */ int expireTime;
   /* 0020 */ std::uint16_t bindOnEquip;
   /* 0022 */ std::uint16_t sprite;
@@ -2881,7 +2881,7 @@ struct StorageEquipRecord4 {
   /* 0007 */ int location;
   /* 000B */ int wearState;
   /* 000F */ unsigned char refine;
-  /* 0010 */ std::uint32_t cards[4];
+  /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
   /* 0020 */ int expireTime;
   /* 0024 */ std::uint16_t bindOnEquip;
   /* 0026 */ std::uint16_t sprite;
@@ -2889,7 +2889,7 @@ struct StorageEquipRecord4 {
 };
 
 struct ItemSlotOptions {
-  /* 0000 */ ItemSlotOption options[5];
+  /* 0000 */ ItemSlotOption options[ItemRandomOptionCount];
 };
 
 struct StorageEquipRecord5 {
@@ -2899,7 +2899,7 @@ struct StorageEquipRecord5 {
   /* 0007 */ int location;
   /* 000B */ int wearState;
   /* 000F */ unsigned char refine;
-  /* 0010 */ std::uint32_t cards[4];
+  /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
   /* 0020 */ int expireTime;
   /* 0024 */ std::uint16_t bindOnEquip;
   /* 0026 */ std::uint16_t sprite;
@@ -2914,7 +2914,7 @@ struct StorageNormalRecord {
   /* 0006 */ unsigned char type;
   /* 0007 */ std::int16_t amount;
   /* 0009 */ std::uint16_t wearState;
-  /* 000B */ std::uint32_t cards[4];
+  /* 000B */ std::uint32_t cards[ItemCardSlotCount];
   /* 001B */ int expireTime;
   /* 001F */ unsigned char flags;
 };
@@ -2925,13 +2925,13 @@ struct StorageNormalRecord2 {
   /* 0006 */ unsigned char type;
   /* 0007 */ std::int16_t amount;
   /* 0009 */ int wearState;
-  /* 000D */ std::uint32_t cards[4];
+  /* 000D */ std::uint32_t cards[ItemCardSlotCount];
   /* 001D */ int expireTime;
   /* 0021 */ unsigned char flags;
 };
 
 struct ItemCardSlots {
-  /* 0000 */ std::uint32_t cards[4];
+  /* 0000 */ std::uint32_t cards[ItemCardSlotCount];
 };
 
 struct LongParChangePacket {
@@ -3189,7 +3189,7 @@ struct GuildStorageLogPacketEntry {
   /* 0011 */ unsigned char uniqueId[8];
   /* 0019 */ unsigned char identified;
   /* 001A */ std::int16_t count;
-  /* 001C */ unsigned char cards[16];
+  /* 001C */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
   /* 002C */ char name[24];
   /* 0044 */ char date[24];
   /* 005C */ unsigned char highlighted;
@@ -3369,7 +3369,7 @@ void CGameMode::ReceiveStorageEquipList3(const unsigned char* data) {
 // INLINED
 static __forceinline void AddStorageEquipItem(
   unsigned char type, int location, std::int16_t index, int wearState, std::uint32_t card0, std::uint32_t card1, std::uint32_t card2,
-  std::uint32_t card3, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, int expireTime,
+  std::uint32_t card3, std::uint32_t card4, std::uint32_t card5, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, int expireTime,
   std::uint16_t bindOnEquip, std::uint16_t sprite, unsigned char etcTab, ItemSlotOptions options
 ) {
   if (location == 0x8000) {
@@ -3386,6 +3386,8 @@ static __forceinline void AddStorageEquipItem(
   cards[1] = card1;
   cards[2] = card2;
   cards[3] = card3;
+  cards[4] = card4;
+  cards[5] = card5;
   item.quantity = 1;
   item.SetItemId(itemId);
   item.identified = identified;
@@ -3419,7 +3421,7 @@ void CGameMode::ReceiveStorageEquipList4(const unsigned char* data) {
   for (int i = 0; i < count; ++i) {
     const StorageEquipRecord4* entry = &entries[i];
     AddStorageEquipItem(
-      entry->type, entry->location, entry->index, entry->wearState, entry->cards[0], entry->cards[1], entry->cards[2], entry->cards[3],
+      entry->type, entry->location, entry->index, entry->wearState, entry->cards[0], entry->cards[1], entry->cards[2], entry->cards[3], entry->cards[4], entry->cards[5],
       entry->itemId, entry->flags & 1, (entry->flags >> 1) & 1, entry->refine, entry->expireTime, entry->bindOnEquip, entry->sprite,
       (entry->flags >> 2) & 1, options
     );
@@ -3444,7 +3446,7 @@ void CGameMode::ReceiveStorageEquipList5(const unsigned char* data) {
     const StorageEquipRecord5* record = &records[i];
     AddStorageEquipItem(
       record->type, record->location, record->index, record->wearState, record->cards[0], record->cards[1], record->cards[2],
-      record->cards[3], record->itemId, record->flags & 1, (record->flags >> 1) & 1, record->refine, record->expireTime,
+      record->cards[3], record->cards[4], record->cards[5], record->itemId, record->flags & 1, (record->flags >> 1) & 1, record->refine, record->expireTime,
       record->bindOnEquip, record->sprite, (record->flags >> 2) & 1, record->options
     );
   }
@@ -3886,8 +3888,8 @@ struct VendingItemRecord2 {
   /* 000D */ unsigned char identified;
   /* 000E */ unsigned char damaged;
   /* 000F */ unsigned char refine;
-  /* 0010 */ std::uint32_t cards[4];
-  /* 0020 */ ItemSlotOption options[5];
+  /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
+  /* 0020 */ ItemSlotOption options[ItemRandomOptionCount];
   /* 0039 */ int location;
   /* 003D */ std::uint16_t sprite;
 };
@@ -5147,8 +5149,8 @@ struct ShopItemListEntry {
   /* 0009 */ int itemId;
   /* 000D */ unsigned char identified;
   /* 000E */ unsigned char damaged;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ ItemSlotOption options[5];
+  /* 000F */ std::uint32_t cards[ItemCardSlotCount];
+  /* 001F */ ItemSlotOption options[ItemRandomOptionCount];
   /* 0038 */ std::uint32_t location;
   /* 003C */ std::uint16_t sprite;
   /* 003E */ unsigned char refine;
@@ -7333,8 +7335,8 @@ struct EquipItemUpdatePacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ std::uint16_t itemId;
   /* 0004 */ unsigned char damaged;
-  /* 0005 */ std::uint32_t cards[4];
-  /* 0015 */ ItemSlotOption options[5];
+  /* 0005 */ std::uint32_t cards[ItemCardSlotCount];
+  /* 0015 */ ItemSlotOption options[ItemRandomOptionCount];
   /* 002E */ unsigned char refine;
   /* 002F */ unsigned char grade;
 };
@@ -7394,7 +7396,7 @@ void CGameMode::RefreshInventoryOrEquipItem2(const unsigned char* data) {
 
   item.damaged = packet->damaged;
   item.refiningLevel = packet->refine;
-  for (long long index = 0; index < 4; ++index) {
+  for (long long index = 0; index < ItemCardSlotCount; ++index) {
     item.cards[index] = packet->cards[index];
   }
   item.optionCount = CountItemSlotOptions(packet->options);
@@ -7537,7 +7539,7 @@ struct GuildStorageLogItemRecord {
   /* 000D */ unsigned char uniqueId[8];
   /* 0015 */ unsigned char identified;
   /* 0016 */ std::int16_t type;
-  /* 0018 */ std::uint32_t cards[4];
+  /* 0018 */ std::uint32_t cards[ItemCardSlotCount];
   /* 0028 */ char name[24];
   /* 0040 */ char characterName[24];
   /* 0058 */ unsigned char highlighted;

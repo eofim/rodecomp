@@ -47,10 +47,10 @@ public:
 static_assert(offsetof(UIRoulletteWnd, m_prizeButton) == 0xBC);
 static_assert(offsetof(UIRoulletteWnd, m_enabled) == 0xC8);
 static_assert(offsetof(UIRoulletteWnd, m_item) == 0xD0);
-static_assert(offsetof(UIRoulletteWnd, m_items) == 0x1C8);
-static_assert(offsetof(UIRoulletteWnd, m_column) == 0x1D0);
-static_assert(offsetof(UIRoulletteWnd, m_bronzeText) == 0x1E0);
-static_assert(sizeof(UIRoulletteWnd) == 0x1E8);
+static_assert(offsetof(UIRoulletteWnd, m_items) == 0x1E0);
+static_assert(offsetof(UIRoulletteWnd, m_column) == 0x1E8);
+static_assert(offsetof(UIRoulletteWnd, m_bronzeText) == 0x1F8);
+static_assert(sizeof(UIRoulletteWnd) == 0x200);
 #endif
 
 #endif

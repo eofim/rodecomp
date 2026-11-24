@@ -42,10 +42,10 @@ public:
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(offsetof(CUIGameItem, itemInfo) == 0x90);
-static_assert(offsetof(CUIGameItem, name) == 0x188);
-static_assert(offsetof(CUIGameItem, image) == 0x1A0);
-static_assert(offsetof(CUIGameItem, overlay) == 0x1A8);
-static_assert(offsetof(CUIGameItem, onClick) == 0x1B0);
+static_assert(offsetof(CUIGameItem, name) == 0x1A0);
+static_assert(offsetof(CUIGameItem, image) == 0x1B8);
+static_assert(offsetof(CUIGameItem, overlay) == 0x1C0);
+static_assert(offsetof(CUIGameItem, onClick) == 0x1C8);
 #endif
 
 #endif

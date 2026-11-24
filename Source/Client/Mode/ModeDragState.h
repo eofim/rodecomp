@@ -26,11 +26,11 @@ struct ModeDragState {
   /* 0344 */ std::string name;
   /* 035C */ std::string skillName;
   /* 0374 */ int skillLevel;
-  /* 0378 */ std::uint32_t cards[4];
+  /* 0378 */ std::uint32_t cards[ItemCardSlotCount];
   /* 0388 */ unsigned char skill;
   /* 038C */ UIWindow* sourceWindow;
   /* 0390 */ int optionCount;
-  /* 0394 */ ItemOptionRecord options[5];
+  /* 0394 */ ItemOptionRecord options[ItemRandomOptionCount];
   /* 03B0 */ int barterId;
   /* 03B4 */ std::uint16_t grade;
   /* 03B6 */ unsigned char uniqueItem;
@@ -45,7 +45,7 @@ struct ModeDragState {
 };
 
 #if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(ModeDragState) == 192);
+static_assert(sizeof(ModeDragState) == 216);
 #endif
 
 #endif

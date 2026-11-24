@@ -186,13 +186,13 @@ struct TradeItemRecord {
   /* 0009 */ int quantity;
   /* 000D */ std::uint16_t weight;
   /* 000F */ unsigned char refine;
-  /* 0010 */ std::uint32_t cards[4];
+  /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
   /* 0020 */ std::uint16_t index;
 };
 #pragma pack(pop)
 
 #if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(TradeItemRecord) == 0x22);
+static_assert(sizeof(TradeItemRecord) == 42);
 #endif
 
 // GLOBAL: gl_24992
@@ -254,7 +254,7 @@ namespace {
     /* 000A */ std::uint16_t wearState;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[ItemCardSlotCount];
     /* 001E */ std::uint32_t expireTime;
   };
 
@@ -267,7 +267,7 @@ namespace {
     /* 000A */ std::uint16_t wearState;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[ItemCardSlotCount];
     /* 001E */ std::uint32_t expireTime;
     /* 0022 */ std::uint16_t bindOnEquip;
     /* 0024 */ std::uint16_t sprite;
@@ -288,7 +288,7 @@ namespace {
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
     /* 0020 */ std::uint32_t expireTime;
     /* 0024 */ std::uint16_t bindOnEquip;
     /* 0026 */ std::uint16_t sprite;
@@ -302,12 +302,12 @@ namespace {
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
     /* 0020 */ std::uint32_t expireTime;
     /* 0024 */ std::uint16_t bindOnEquip;
     /* 0026 */ std::uint16_t sprite;
     /* 0028 */ unsigned char optionCount;
-    /* 0029 */ StoreItemOption options[5];
+    /* 0029 */ StoreItemOption options[ItemRandomOptionCount];
     /* 0042 */ unsigned char flags;
   };
 
@@ -317,7 +317,7 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::int16_t amount;
     /* 0009 */ std::uint32_t location;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[ItemCardSlotCount];
     /* 001D */ std::uint32_t expireTime;
     /* 0021 */ unsigned char flags;
   };
@@ -418,8 +418,8 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
-    /* 0020 */ StoreItemOption options[5];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
+    /* 0020 */ StoreItemOption options[ItemRandomOptionCount];
   };
 
   struct Item1718Record {
@@ -440,8 +440,8 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
-    /* 0020 */ StoreItemOption options[5];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
+    /* 0020 */ StoreItemOption options[ItemRandomOptionCount];
     /* 0039 */ std::int32_t location;
     /* 003D */ std::uint16_t sprite;
   };
@@ -454,24 +454,24 @@ namespace {
     std::uint32_t location;
     std::uint32_t wearState;
     unsigned char refine;
-    std::uint32_t cards[4];
+    std::uint32_t cards[ItemCardSlotCount];
     std::uint32_t expireTime;
     std::uint16_t bindOnEquip;
     std::uint16_t sprite;
     bool identified;
     bool damaged;
     bool placeEtcTab;
-    StoreItemOption options[5];
+    StoreItemOption options[ItemRandomOptionCount];
     unsigned char grade;
   };
 
   static_assert(sizeof(ItemStoreListHeader) == 0x1C);
-  static_assert(sizeof(StoreEquipRecord) == 0x29);
-  static_assert(sizeof(StoreEquipOptionRecord) == 0x43);
-  static_assert(sizeof(StoreNormalRecord) == 0x22);
+  static_assert(sizeof(StoreEquipRecord) == 49);
+  static_assert(sizeof(StoreEquipOptionRecord) == 95);
+  static_assert(sizeof(StoreNormalRecord) == 42);
   static_assert(sizeof(PacketLengthHeader) == 0x04);
-  static_assert(sizeof(Item1740Record) == 0x22);
-  static_assert(sizeof(Item1740EquipRecord) == 0x26);
+  static_assert(sizeof(Item1740Record) == 42);
+  static_assert(sizeof(Item1740EquipRecord) == 46);
   static_assert(sizeof(ValuePacket) == 0x06);
   static_assert(sizeof(ChatTextEntry) == 0x10);
   static_assert(sizeof(ChatEntryListPacket) == 0x16);
@@ -480,7 +480,7 @@ namespace {
   // INLINED
   int CountStoreItemOptions(const StoreItemOption* options) {
     int count = 0;
-    for (int index = 0; index < 5; ++index) {
+    for (int index = 0; index < ItemRandomOptionCount; ++index) {
       if (0 != options[index].id) {
         ++count;
       }
@@ -528,9 +528,9 @@ namespace {
   static_assert(sizeof(FormatStringMessagePacket) == 6);
   static_assert(sizeof(NotifyExpPacket) == 0xE);
   static_assert(sizeof(Item1758Record) == 0xB);
-  static_assert(sizeof(Item1758StoreRecord) == 0x39);
+  static_assert(sizeof(Item1758StoreRecord) == 85);
   static_assert(sizeof(Item1718Record) == 0x13);
-  static_assert(sizeof(Item1748Record) == 0x3F);
+  static_assert(sizeof(Item1748Record) == 91);
   static_assert(sizeof(SimulationPacketHeader) == 0x24);
   static_assert(sizeof(EnchantSimulationRecord) == 0x1C);
   static_assert(sizeof(PackageSimulationRecord) == 0x32);
@@ -903,12 +903,12 @@ void CGameMode::ReceiveDevotionList(const unsigned char* packet) {
   }
 
   if (actor != nullptr) {
-    for (int index = 0; index < 5; ++index) {
+    for (int index = 0; index < ItemRandomOptionCount; ++index) {
       actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_LINELINK, 0, 0, 0, 0, 0);
     }
   }
 
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < ItemRandomOptionCount; ++index) {
     if (list->devotees[index] == 0) {
       continue;
     }
@@ -1070,7 +1070,7 @@ void CGameMode::ReceiveItem1738EquipList(const unsigned char* data) {
 
   const int count = (packet->length - sizeof(ItemStoreListHeader)) / sizeof(StoreEquipRecord);
   const StoreEquipRecord* records = reinterpret_cast<const StoreEquipRecord*>(packet + 1);
-  StoreItemOption options[5] = {0};
+  StoreItemOption options[ItemRandomOptionCount] = {0};
   for (int i = 0; i < count; ++i) {
     const StoreEquipRecord* record = &records[i];
     StoreEquipEntry entry;
@@ -2171,7 +2171,7 @@ __declspec(noinline) void CGameMode::ReceiveItem1740EquipList(const unsigned cha
   const auto* p = reinterpret_cast<const PacketLengthHeader*>(packet);
   const int count = (p->length - 4) / sizeof(StoreEquipRecord);
   const StoreEquipRecord* records = reinterpret_cast<const StoreEquipRecord*>(p + 1);
-  StoreItemOption options[5] = {0};
+  StoreItemOption options[ItemRandomOptionCount] = {0};
   for (int i = 0; i < count; ++i) {
     const StoreEquipRecord* record = &records[i];
     StoreEquipEntry entry;
@@ -2675,7 +2675,7 @@ void __stdcall Nullsub479(int value) {
 // FUNCTION: fn_21996
 int CountItemRandomOptions(const ItemOptionRecord* options) {
   int count = 0;
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < ItemRandomOptionCount; ++index) {
     if (0 != options[index].id) {
       ++count;
     }
@@ -5130,9 +5130,20 @@ namespace {
     /* 0006 */ int value;
     /* 000A */ int bonus;
   };
+
+  struct AffinitySlotSyncPacket {
+    /* 0000 */ std::uint16_t packetType;
+    /* 0002 */ std::uint32_t type;
+    /* 0006 */ std::uint32_t guard;
+    /* 000A */ std::int32_t count;
+  };
 #pragma pack(pop)
 
   static_assert(sizeof(StatusBonusPacket) == 0xE);
+  static_assert(sizeof(AffinitySlotSyncPacket) == 14);
+  static_assert(offsetof(AffinitySlotSyncPacket, type) == 2);
+  static_assert(offsetof(AffinitySlotSyncPacket, guard) == 6);
+  static_assert(offsetof(AffinitySlotSyncPacket, count) == 10);
 }
 
 namespace EquipmentProperties {
@@ -7606,7 +7617,7 @@ struct ParaResultEntry {
   /* 0004 */ std::int16_t quantity;
   /* 0006 */ int location;
   /* 000A */ unsigned char refine;
-  /* 000B */ int cards[4];
+  /* 000B */ int cards[ItemCardSlotCount];
   /* 001B */ std::uint16_t index;
 };
 #pragma pack(pop)
@@ -8447,14 +8458,14 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[ItemCardSlotCount];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char itemType;
   };
 #pragma pack(pop)
 
 #if defined(_WIN32) && !defined(_WIN64)
-  static_assert(sizeof(PACKET_ZC_ITEM_PICKUP_PARTY) == 0x20);
+  static_assert(sizeof(PACKET_ZC_ITEM_PICKUP_PARTY) == 40);
 #endif
 }
 
@@ -8503,6 +8514,9 @@ namespace {
 // FUNCTION: fn_21995
 __declspec(noinline) void CGameMode::ReceiveEquipCardChange(const unsigned char* packet) {
   const auto* p = reinterpret_cast<const PACKET_ZC_UPDATE_CARDSLOT*>(packet);
+  if (p->cardSlot < 0 || p->cardSlot >= ItemCardSlotCount) {
+    return;
+  }
   const EquipSlots slots = g_session.GetEquipSlots(p->wearState);
   ITEM_INFO item = g_session.GetEquippedItemAt(slots.values[2]);
   if (item.identity[1] != 0) {
@@ -8551,7 +8565,7 @@ void CGameMode::ReceiveEquipWindowMicroscope2(const unsigned char* packet) {
   g_session.ResetAlternateCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 45) / 38u;
+  const int count = static_cast<unsigned>(length - 45) / sizeof(Item1740EquipRecord);
   const auto* entry = reinterpret_cast<const Item1740EquipRecord*>(p + 1);
   for (int index = 0; index < count; ++index, ++entry) {
     ITEM_INFO item;
@@ -8602,7 +8616,7 @@ void CGameMode::ReceiveEquipWindowMicroscope3(const unsigned char* packet) {
   g_session.ResetAlternateCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 45) / 41u;
+  const int count = static_cast<unsigned>(length - 45) / sizeof(StoreEquipRecord);
   const auto* entry = reinterpret_cast<const StoreEquipRecord*>(p + 1);
   for (int index = 0; index < count; ++index, ++entry) {
     ITEM_INFO item;
@@ -9209,19 +9223,19 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
-    /* 000F */ std::uint32_t cards[4];
+    /* 000F */ std::uint32_t cards[ItemCardSlotCount];
     /* 001F */ std::uint32_t expireTime;
     /* 0023 */ std::uint16_t bindOnEquip;
     /* 0025 */ std::uint16_t sprite;
     /* 0027 */ unsigned char optionCount;
-    /* 0028 */ StoreItemOption options[5];
+    /* 0028 */ StoreItemOption options[ItemRandomOptionCount];
     /* 0041 */ unsigned char refine;
     /* 0042 */ unsigned char grade;
     /* 0043 */ unsigned char flags;
   };
 #pragma pack(pop)
 
-  static_assert(sizeof(EquipWindowGradeRecord) == 0x44);
+  static_assert(sizeof(EquipWindowGradeRecord) == 96);
 
   // INLINED
   __forceinline void ReadStoreEquipEntry(StoreEquipEntry& entry, const EquipWindowGradeRecord& record) {
@@ -9329,7 +9343,7 @@ void CGameMode::ReceiveEquipWindowMicroscope4(const unsigned char* packet) {
   g_session.ResetAlternateCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 45) / 67u;
+  const int count = static_cast<unsigned>(length - 45) / sizeof(StoreEquipOptionRecord);
   const StoreEquipOptionRecord* records = reinterpret_cast<const StoreEquipOptionRecord*>(p + 1);
   for (int index = 0; index < count; ++index) {
     const StoreEquipOptionRecord* record = &records[index];
@@ -9389,7 +9403,7 @@ void CGameMode::ReceiveEquipWindowMicroscope5(const unsigned char* packet) {
   g_session.ResetAlternateCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 47) / 67u;
+  const int count = static_cast<unsigned>(length - 47) / sizeof(StoreEquipOptionRecord);
   const StoreEquipOptionRecord* records = reinterpret_cast<const StoreEquipOptionRecord*>(p + 1);
   for (int index = 0; index < count; ++index) {
     const StoreEquipOptionRecord* record = &records[index];
@@ -9426,7 +9440,7 @@ void CGameMode::ReceiveEquipWindowMicroscope6(const unsigned char* packet) {
   g_session.ResetAlternateCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 47) / 68u;
+  const int count = static_cast<unsigned>(length - 47) / sizeof(EquipWindowGradeRecord);
   const EquipWindowGradeRecord* records = reinterpret_cast<const EquipWindowGradeRecord*>(p + 1);
   for (int index = 0; index < count; ++index) {
     const EquipWindowGradeRecord* record = &records[index];
@@ -9503,9 +9517,9 @@ void CGameMode::ReceiveInventoryEquipList(const unsigned char* packet) {
   g_session.ResetCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 4) / 41u;
+  const int count = static_cast<unsigned>(length - 4) / sizeof(StoreEquipRecord);
   const StoreEquipRecord* record = reinterpret_cast<const StoreEquipRecord*>(p + 1);
-  StoreItemOption options[5] = {0};
+  StoreItemOption options[ItemRandomOptionCount] = {0};
   for (int index = 0; index < count; ++index, ++record) {
     StoreEquipEntry entry;
     ReadStoreEquipEntry(entry, *record);
@@ -9526,7 +9540,7 @@ void CGameMode::ReceiveInventoryEquipList2(const unsigned char* packet) {
   g_session.ResetCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 4) / 67u;
+  const int count = static_cast<unsigned>(length - 4) / sizeof(StoreEquipOptionRecord);
   const StoreEquipOptionRecord* records = reinterpret_cast<const StoreEquipOptionRecord*>(p + 1);
   for (int index = 0; index < count; ++index) {
     const StoreEquipOptionRecord* record = &records[index];
@@ -9549,7 +9563,7 @@ void CGameMode::ReceiveInventoryEquipList3(const unsigned char* packet) {
   g_session.ResetCostumeItems();
 
   const int length = p->length;
-  const int count = static_cast<unsigned>(length - 4) / 68u;
+  const int count = static_cast<unsigned>(length - 4) / sizeof(EquipWindowGradeRecord);
   const EquipWindowGradeRecord* records = reinterpret_cast<const EquipWindowGradeRecord*>(p + 1);
   for (int index = 0; index < count; ++index) {
     const EquipWindowGradeRecord* record = &records[index];
@@ -9564,13 +9578,13 @@ void CGameMode::ReceiveInventoryEquipList3(const unsigned char* packet) {
 }
 
 struct ItemCardSlots {
-  /* 0000 */ std::uint32_t cards[4];
+  /* 0000 */ std::uint32_t cards[ItemCardSlotCount];
 };
 
 namespace {
 #pragma pack(push, 1)
   struct PickupItemOptions {
-    /* 0000 */ StoreItemOption options[5];
+    /* 0000 */ StoreItemOption options[ItemRandomOptionCount];
   };
 
   struct ItemPickupAckPacket {
@@ -9581,7 +9595,7 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[ItemCardSlotCount];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char type;
     /* 0020 */ unsigned char result;
@@ -9595,7 +9609,7 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[ItemCardSlotCount];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char type;
     /* 0020 */ unsigned char result;
@@ -9610,7 +9624,7 @@ namespace {
     /* 000A */ unsigned char identified;
     /* 000B */ unsigned char damaged;
     /* 000C */ unsigned char refine;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[ItemCardSlotCount];
     /* 001D */ std::uint16_t location;
     /* 001F */ unsigned char type;
     /* 0020 */ unsigned char result;
@@ -9636,13 +9650,13 @@ namespace {
   };
 #pragma pack(pop)
 
-  static_assert(sizeof(PickupItemOptions) == 25);
+  static_assert(sizeof(PickupItemOptions) == 45);
   static_assert(offsetof(ItemPickupAck7Packet, cards) == 0x0D);
-  static_assert(offsetof(ItemPickupAck7Packet, options) == 0x29);
-  static_assert(sizeof(ItemPickupAckPacket) == 0x21);
-  static_assert(sizeof(ItemPickupAck2Packet) == 0x25);
-  static_assert(sizeof(ItemPickupAck3Packet) == 0x27);
-  static_assert(sizeof(ItemPickupAck7Packet) == 0x42);
+  static_assert(offsetof(ItemPickupAck7Packet, options) == 0x31);
+  static_assert(sizeof(ItemPickupAckPacket) == 41);
+  static_assert(sizeof(ItemPickupAck2Packet) == 45);
+  static_assert(sizeof(ItemPickupAck3Packet) == 47);
+  static_assert(sizeof(ItemPickupAck7Packet) == 94);
 }
 
 // OFFSET: 0x00D2DF80
@@ -9660,7 +9674,7 @@ void CGameMode::ReceiveItemPickupAck2(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -9693,7 +9707,7 @@ void CGameMode::ReceiveItemPickupAck2(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -9758,7 +9772,7 @@ void CGameMode::ReceiveItemPickupAck3(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -9796,7 +9810,7 @@ void CGameMode::ReceiveItemPickupAck3(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -9865,7 +9879,7 @@ void CGameMode::ReceiveItemPickupAck(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -9897,7 +9911,7 @@ void CGameMode::ReceiveItemPickupAck(const unsigned char* data) {
     item.identity[3] = 0;
     item.quantity = packet->amount;
     item.SetItemId(packet->itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = packet->cards[card];
     }
     item.identified = packet->identified;
@@ -9965,7 +9979,7 @@ void CGameMode::ReceiveItemPickupAck5(
   switch (result) {
   case PICKUP_SUCCEED: {
     {
-      StoreItemOption options[5] = {0};
+      StoreItemOption options[ItemRandomOptionCount] = {0};
       ITEM_INFO item;
       item.identity[0] = type;
       item.identity[2] = location;
@@ -10008,7 +10022,7 @@ void CGameMode::ReceiveItemPickupAck5(
     break;
   }
   case RECEIVE_ITEM: {
-    StoreItemOption options[5] = {0};
+    StoreItemOption options[ItemRandomOptionCount] = {0};
     ITEM_INFO item;
     item.identity[0] = type;
     item.identity[2] = location;
@@ -10090,7 +10104,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -10136,7 +10150,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -11188,8 +11202,8 @@ namespace {
   };
 #pragma pack(pop)
 
-  static_assert(sizeof(ItemPickupAckV8Packet) == 0x45);
-  static_assert(sizeof(ItemPickupAckV9Packet) == 0x46);
+  static_assert(sizeof(ItemPickupAckV8Packet) == 97);
+  static_assert(sizeof(ItemPickupAckV9Packet) == 98);
 }
 
 namespace {
@@ -11206,7 +11220,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -11256,7 +11270,7 @@ namespace {
     item.identity[3] = 0;
     item.quantity = amount;
     item.SetItemId(itemId);
-    for (int card = 0; card < 4; ++card) {
+    for (int card = 0; card < ItemCardSlotCount; ++card) {
       item.cards[card] = slots.cards[card];
     }
     item.identified = identified;
@@ -12438,7 +12452,7 @@ struct GuildStorageLogItem {
   /* 00F8 */ unsigned char logFlags;
 };
 
-static_assert(sizeof(GuildStorageLogItem) == 0x100);
+static_assert(sizeof(GuildStorageLogItem) == 0x118);
 
 // OFFSET: 0x00D3A1E0
 // FUNCTION: fn_21776
@@ -13028,7 +13042,7 @@ namespace {
     /* 0007 */ std::uint16_t location;
     /* 0009 */ std::uint16_t wearState;
     /* 000B */ unsigned char refine;
-    /* 000C */ unsigned char cards[16];
+    /* 000C */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
     /* 001C */ std::uint32_t expireTime;
     /* 0020 */ std::uint16_t bindOnEquip;
     /* 0022 */ std::uint16_t sprite;
@@ -13037,7 +13051,7 @@ namespace {
 #pragma pack(pop)
 
 #if defined(_WIN32) && !defined(_WIN64)
-  static_assert(sizeof(InventoryEquipFlagRecord) == 0x25);
+  static_assert(sizeof(InventoryEquipFlagRecord) == 45);
 #endif
 }
 
@@ -13048,7 +13062,7 @@ void CGameMode::ReceiveEquipItemListFlags(const unsigned char* packet) {
   g_session.RemoveEquipment();
   g_session.ResetEquipment();
   g_session.ResetCostumeItems();
-  const int count = static_cast<unsigned int>(p->length - 4) / 0x25;
+  const int count = static_cast<unsigned int>(p->length - 4) / sizeof(InventoryEquipFlagRecord);
   const auto* record = reinterpret_cast<const InventoryEquipFlagRecord*>(p + 1);
   for (int i = 0; i < count; ++i) {
     ITEM_INFO item;
@@ -13094,7 +13108,7 @@ __declspec(noinline) void CGameMode::ReceiveEquipItemList34(const unsigned char*
   const auto* p = reinterpret_cast<const PacketLengthHeader*>(packet);
   g_session.RemoveEquipment();
   g_session.ResetEquipment();
-  const int count = static_cast<unsigned int>(p->length - 4) / 0x22;
+  const int count = static_cast<unsigned int>(p->length - 4) / sizeof(Item1740Record);
   const auto* record = reinterpret_cast<const Item1740Record*>(p + 1);
   for (int i = 0; i < count; ++i) {
     ITEM_INFO item;
@@ -13135,7 +13149,7 @@ void CGameMode::ReceiveEquipItemList38(const unsigned char* packet) {
   g_session.RemoveEquipment();
   g_session.ResetEquipment();
   g_session.ResetCostumeItems();
-  const int count = static_cast<unsigned int>(p->length - 4) / 0x26;
+  const int count = static_cast<unsigned int>(p->length - 4) / sizeof(Item1740EquipRecord);
   const auto* record = reinterpret_cast<const Item1740EquipRecord*>(p + 1);
   for (int i = 0; i < count; ++i) {
     ITEM_INFO item;
@@ -13521,8 +13535,8 @@ struct Item1748Record2 {
   /* 0009 */ int itemId;
   /* 000D */ unsigned char identified;
   /* 000E */ unsigned char damaged;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ StoreItemOption options[5];
+  /* 000F */ std::uint32_t cards[ItemCardSlotCount];
+  /* 001F */ StoreItemOption options[ItemRandomOptionCount];
   /* 0038 */ std::int32_t location;
   /* 003C */ std::uint16_t sprite;
   /* 003E */ unsigned char refine;
@@ -13537,15 +13551,15 @@ struct Item1758StoreRecord2 {
   /* 0009 */ int itemId;
   /* 000D */ unsigned char identified;
   /* 000E */ unsigned char damaged;
-  /* 000F */ std::uint32_t cards[4];
-  /* 001F */ StoreItemOption options[5];
+  /* 000F */ std::uint32_t cards[ItemCardSlotCount];
+  /* 001F */ StoreItemOption options[ItemRandomOptionCount];
   /* 0038 */ unsigned char refine;
   /* 0039 */ unsigned char grade;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(Item1748Record2) == 0x40);
-static_assert(sizeof(Item1758StoreRecord2) == 0x3A);
+static_assert(sizeof(Item1748Record2) == 92);
+static_assert(sizeof(Item1758StoreRecord2) == 86);
 
 // OFFSET: 0x00D782F0
 // FUNCTION: fn_22161
@@ -21657,7 +21671,7 @@ struct CardItemRecord {
   /* 0007 */ unsigned char identified;
   /* 0008 */ std::int16_t amount;
   /* 000A */ std::uint16_t location;
-  /* 000C */ int cards[4];
+  /* 000C */ int cards[ItemCardSlotCount];
 };
 
 struct CardItemExpiryRecord {
@@ -21671,7 +21685,7 @@ struct FlaggedItemRecord {
   /* 0006 */ unsigned char type;
   /* 0007 */ std::int16_t amount;
   /* 0009 */ std::uint16_t location;
-  /* 000B */ int cards[4];
+  /* 000B */ int cards[ItemCardSlotCount];
   /* 001B */ std::uint32_t expireTime;
   /* 001F */ unsigned char flags;
 };
@@ -21683,7 +21697,7 @@ struct FlaggedEquipRecord {
   /* 0007 */ std::uint16_t location;
   /* 0009 */ std::uint16_t wearState;
   /* 000B */ unsigned char refine;
-  /* 000C */ int cards[4];
+  /* 000C */ int cards[ItemCardSlotCount];
   /* 001C */ std::uint32_t expireTime;
   /* 0020 */ std::uint16_t bindOnEquip;
   /* 0022 */ std::uint16_t look;
@@ -21699,7 +21713,7 @@ struct EquipItemRecord {
   /* 000A */ std::uint16_t wearState;
   /* 000C */ unsigned char damaged;
   /* 000D */ unsigned char refine;
-  /* 000E */ unsigned char cards[16];
+  /* 000E */ unsigned char cards[sizeof(std::uint32_t) * ItemCardSlotCount];
 };
 
 struct ItemUseAckPacket {
@@ -21739,7 +21753,7 @@ struct ActorMoveRoute {
 using ItemSlotOption = ItemOptionRecord;
 
 struct ItemSlotOptions {
-  /* 0000 */ ItemSlotOption options[5];
+  /* 0000 */ ItemSlotOption options[ItemRandomOptionCount];
 };
 #pragma pack(pop)
 
@@ -23254,7 +23268,7 @@ static_assert(sizeof(PACKET_ZC_USE_SKILL) == 0xF);
 static_assert(sizeof(PACKET_ZC_WARPLIST) == 0x44);
 static_assert(sizeof(PACKET_ZC_ACK_REMEMBER_WARPPOINT) == 0x3);
 static_assert(sizeof(PACKET_ZC_NOTIFY_CARTITEM_COUNTINFO) == 0xE);
-static_assert(sizeof(PACKET_ZC_ADD_ITEM_TO_CART) == 0x1F);
+static_assert(sizeof(PACKET_ZC_ADD_ITEM_TO_CART) == 39);
 static_assert(sizeof(PACKET_ZC_ACK_ADDITEM_TO_CART) == 0x3);
 static_assert(sizeof(PACKET_ZC_OPENSTORE) == 0x4);
 static_assert(sizeof(PACKET_ZC_DELETEITEM_FROM_MCSTORE) == 0x6);
@@ -23398,10 +23412,10 @@ static_assert(sizeof(PACKET_ZC_SKILLINFO_UPDATE3) == 0x11);
 static_assert(sizeof(PACKET_ZC_ITEMLIST_FROM_ASSISTANT_BUYING) == 0x19);
 static_assert(sizeof(PACKET_ZC_PROGRESSBAR_UNIT) == 0xE);
 static_assert(sizeof(PACKET_ZC_PARTY_REQ_MASTER_TO_JOIN) == 0x26);
-static_assert(sizeof(PACKET_ZC_CHANGE_ITEM_OPTION) == 0x2F);
-static_assert(sizeof(PACKET_ZC_CHANGE_ITEM_OPTION2) == 0x30);
+static_assert(sizeof(PACKET_ZC_CHANGE_ITEM_OPTION) == 75);
+static_assert(sizeof(PACKET_ZC_CHANGE_ITEM_OPTION2) == 76);
 static_assert(sizeof(PACKET_ZC_CASH_EMOTION_ACQUIRE) == 0x9);
-static_assert(sizeof(PACKET_ZC_ITEM_PICKUP_ACK_V5) == 0x29);
+static_assert(sizeof(PACKET_ZC_ITEM_PICKUP_ACK_V5) == 49);
 static_assert(sizeof(PACKET_ZC_CASH_EMOTION) == 0xA);
 static_assert(sizeof(PACKET_ZC_CASH_EMOTION_USE_RESULT) == 0x7);
 static_assert(sizeof(PACKET_ZC_CASH_EMOTION_LIST) == 0xA);
@@ -23415,7 +23429,7 @@ static_assert(sizeof(PACKET_ZC_PROPERTY_HOMUN_NO_ACCESSORY2) == 0x4D);
 static_assert(sizeof(PACKET_ZC_MAKINGITEM_LIST) == 0x6);
 static_assert(sizeof(PACKET_ZC_ACK_REQ_CHANGE_MEMBERS_sub) == 0xC);
 static_assert(sizeof(PACKET_ZC_MAKABLEITEMLIST_sub) == 0x10);
-static_assert(sizeof(PACKET_ZC_NOTIFY_WEAPONITEMLIST_sub) == 0x17);
+static_assert(sizeof(PACKET_ZC_NOTIFY_WEAPONITEMLIST_sub) == 31);
 static_assert(sizeof(PACKET_ZC_QUEST_UPDATE_sub) == 0xC);
 static_assert(sizeof(PACKET_ZC_NPC_BARTER_MARKET_ITEMINFO_sub) == 0x19);
 static_assert(sizeof(PACKET_ZC_NPC_MARKET_OPEN_sub) == 0xF);
@@ -23644,9 +23658,21 @@ void CGameMode::ProcessIncomingPackets() {
     case ID_ZC_ACTION_FAILURE:
       this->ReceiveEquipAck(g_gameModePacketBuffer);
       break;
-    case ID_ZC_COUPLESTATUS:
+    case ID_ZC_COUPLESTATUS: {
+      const auto* packet = reinterpret_cast<const AffinitySlotSyncPacket*>(g_gameModePacketBuffer);
+      if (packet->type == 0x41464653u) {
+        if (packet->guard == 0xA6060001u) {
+          g_session.affinitySlotCount = std::clamp(packet->count, 3, 6);
+          if (g_windowMgr.equipWnd) {
+            g_windowMgr.equipWnd->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
+            g_windowMgr.equipWnd->Invalidate();
+          }
+        }
+        break;
+      }
       this->ReceiveStatusBonus(g_gameModePacketBuffer);
       break;
+    }
     case ID_ZC_MYGUILD_BASIC_INFO:
       this->ReceiveGuildRelationList(g_gameModePacketBuffer);
       break;
@@ -26544,7 +26570,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -26567,7 +26593,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -26591,7 +26617,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -26909,7 +26935,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -26934,7 +26960,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -26960,7 +26986,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -28124,14 +28150,14 @@ void CGameMode::ProcessIncomingPackets() {
     case ID_ZC_SPLIT_SEND_ITEMLIST_NORMAL: {
       const auto* packet = reinterpret_cast<const PACKET_ZC_SPLIT_SEND_ITEMLIST_NORMAL*>(g_gameModePacketBuffer);
       this->ReceiveItemListPart(packet->type,
-                                static_cast<unsigned int>(packet->length - 5) / 34,
+                                static_cast<unsigned int>(packet->length - 5) / sizeof(StoreNormalRecord),
                                 reinterpret_cast<const unsigned char*>(packet + 1));
       break;
     }
     case ID_ZC_SPLIT_SEND_ITEMLIST_EQUIP: {
       const auto* packet = reinterpret_cast<const PACKET_ZC_SPLIT_SEND_ITEMLIST_NORMAL*>(g_gameModePacketBuffer);
       this->ReceiveEquipListPart(packet->type,
-                                 static_cast<unsigned int>(packet->length - 5) / 67,
+                                 static_cast<unsigned int>(packet->length - 5) / sizeof(StoreEquipOptionRecord),
                                  reinterpret_cast<const unsigned char*>(packet + 1));
       break;
     }
@@ -28636,7 +28662,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -28661,7 +28687,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -28687,7 +28713,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->location;
         item.quantity = record->amount;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -28712,7 +28738,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->wearState;
         item.quantity = 1;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);
@@ -28740,7 +28766,7 @@ void CGameMode::ProcessIncomingPackets() {
         item.identity[1] = record->index;
         item.identity[3] = record->wearState;
         item.quantity = 1;
-        for (int card = 0; card < 4; ++card) {
+        for (int card = 0; card < ItemCardSlotCount; ++card) {
           item.cards[card] = record->cards[card];
         }
         item.SetItemId(record->itemId);

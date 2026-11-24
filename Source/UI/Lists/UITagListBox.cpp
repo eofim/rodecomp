@@ -228,7 +228,7 @@ void UITagListBox::DecodeItemFields(const std::string& text, std::vector<int>& f
 // OFFSET: 0x009BA9E0
 // FUNCTION: fn_13884
 bool UITagListBox::ItemFromFields(const std::vector<int>& fields, ITEM_INFO& item) {
-  if (fields.empty()) {
+  if (fields.size() < 6) {
     return false;
   }
 
@@ -254,6 +254,9 @@ bool UITagListBox::ItemFromFields(const std::vector<int>& fields, ITEM_INFO& ite
   int cardCount = 0;
   if (fields.size() > 6) {
     cardCount = fields[6];
+    if (cardCount < 0 || cardCount > ItemCardSlotCount || fields.size() < static_cast<std::size_t>(7 + cardCount)) {
+      return false;
+    }
     for (int card = 1; card < cardCount + 1; ++card) {
       const int index = card - 1;
       item.SetCard(fields[6 + card], index);
@@ -262,6 +265,10 @@ bool UITagListBox::ItemFromFields(const std::vector<int>& fields, ITEM_INFO& ite
 
   if (static_cast<unsigned int>(cardCount + 8) < fields.size()) {
     const int optionCount = fields[cardCount + 8];
+    if (optionCount < 0 || optionCount > ItemRandomOptionCount ||
+        fields.size() < static_cast<std::size_t>(cardCount + 9 + optionCount * 3)) {
+      return false;
+    }
     item.optionCount = optionCount;
     for (int option = 1; option < optionCount + 1; ++option) {
       const int* record = &fields[cardCount + 9 + (option - 1) * 3];

@@ -155,6 +155,11 @@
 #include "UI/SkillDelayInfo/SkillDelayInfo.h"
 #include "Contents/Skills/ClientSkills.h"
 #include <algorithm>
+#include <cmath>
+
+extern "C" {
+#include <lua.h>
+}
 #include <random>
 #include <cstdint>
 #include <cstdio>
@@ -625,6 +630,8 @@ void UIEquipWnd::Paint() {
       }
     }
   }
+
+  this->DrawAffinitySlots();
 
   if (this->swapWindow) {
     this->swapWindow->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
@@ -2253,6 +2260,17 @@ void UIEquipWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     break;
   }
 
+  const int affinity = this->AffinitySlotAt(x, y);
+  if (affinity >= 0) {
+    const unsigned int location = static_cast<unsigned int>(EQP_AFFINITY_1) << affinity;
+    if (affinity < g_session.affinitySlotCount && drag->source == 1 && item.identity[1] > 0 && item.identified &&
+        item.identity[3] == 0 && (item.identity[2] & location) != 0) {
+      mode->SendMsg(MM_WEAR_EQUIP, drag->id, location, 0, 0);
+    }
+    mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    return;
+  }
+
   if (item.identity[1] > 0) {
     switch (item.identity[0]) {
     case 10:
@@ -2942,6 +2960,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
   switch (message) {
   case UM_TAB:
     this->m_page = a;
+    this->RefreshAffinityLayout();
     if (a == 2) {
       this->m_titleList->Show(1);
       this->RefreshTitleList();
@@ -3149,7 +3168,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       }
 
       const int half = this->geometry.width / 2;
-      const int bottom = this->geometry.height - this->contentOffset;
+      const int bottom = this->geometry.height - this->contentOffset - this->AffinityPanelHeight();
       this->m_viewButton->Move(half - 18, IsEquipViewHidden() * 230 + bottom - 40);
       this->m_otherButton->Move(half - 14, bottom + (g_session.replayPacketMode > 0 ? -60 : 170));
       this->Invalidate();
@@ -3216,7 +3235,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       return 0;
     }
     case 508: {
-      const int height = this->contentOffset + 167;
+      const int height = this->contentOffset + 167 + this->AffinityPanelHeight();
       this->Resize(this->geometry.width, height + 158);
       if (!this->swapWindow) {
         UISwapEquipmentWnd* created = new (std::nothrow) UISwapEquipmentWnd();
@@ -3231,7 +3250,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       }
       UIWindow* swap = this->swapWindow;
       if (swap->geometry.state == 0) {
-        swap->Move(0, 167);
+        swap->Move(0, 167 + this->AffinityPanelHeight());
         this->swapWindow->geometry.state = 1;
         if (sender == this->swapButton) {
           g_session.m_swapEquipmentMode = 1;
@@ -3248,7 +3267,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       if (this->m_page == 1) {
         packet.location = 0x3F7C00;
       } else if (this->m_page == 0) {
-        packet.location = 0x83FF;
+        packet.location = 0x83FF | EQP_AFFINITY;
       } else {
         return 0;
       }
@@ -3309,6 +3328,7 @@ int UIEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
 // OFFSET: 0x008DEC50
 // FUNCTION: fn_12171
 void UIEquipWnd::OnCreate(int width, int height) {
+  this->LoadAffinityVisualSettings();
   const int top = this->m_viewOther != 0 ? 0 : 20;
   this->contentOffset = top;
   if (height != top + this->geometry.height) {
@@ -3525,6 +3545,7 @@ void UIEquipWnd::OnCreate(int width, int height) {
   if (g_session.m_swapEquipmentMode == 1) {
     this->SendMsg(nullptr, UM_COMMAND, 508, 0, 0, 0);
   }
+  this->RefreshAffinityLayout();
 }
 
 // OFFSET: 0x008F6750
@@ -6824,12 +6845,12 @@ __declspec(noinline) int UIItemCollectionWnd::CardSlotAt(int x, int y, int* slot
   int left = 0;
   int slots = this->m_item.SlotCount();
   if (this->m_item.IsEquipment() && !this->m_item.IsApprenticeItem() && !this->m_item.HasSpecialCard()) {
-    slots = 4;
+    slots = ItemCardSlotCount;
   } else if (slots <= 0) {
     return -1;
   }
 
-  for (int index = 0; index < slots; ++index, left += 25) {
+  for (int index = 0; index < std::min(slots, ItemCardSlotCount); ++index, left += 25) {
     if (left < x && x < left + 25) {
       int cardId;
       std::memcpy(&cardId, &this->m_item.cards[index], sizeof(cardId));
@@ -6861,6 +6882,14 @@ int UINotifyLevelUpWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
 // OFFSET: 0x008D84A0
 // FUNCTION: fn_12126
 ITEM_INFO UIEquipWnd::GetSlotItem(int slot) {
+  if (slot >= 16 && slot < 22) {
+    const int affinity = slot - 16;
+    if (this->m_viewOther == 0 && this->m_page == 0 && affinity < g_session.affinitySlotCount) {
+      return g_session.GetAffinityItem(affinity);
+    }
+    return ITEM_INFO(0);
+  }
+
   if (slot == -1) {
     return ITEM_INFO(0);
   }
@@ -6885,6 +6914,11 @@ ITEM_INFO UIEquipWnd::GetSlotItem(int slot) {
 // OFFSET: 0x008D8580
 // FUNCTION: fn_12127
 __declspec(noinline) ITEM_INFO UIEquipWnd::ItemIconAt(int x, int y) {
+  const int affinity = this->AffinitySlotAt(x, y);
+  if (affinity >= 0) {
+    return this->GetSlotItem(16 + affinity);
+  }
+
   int slot = -1;
   const int top = this->m_contentTop;
   if (y < top + 17 || y > top + 145) {
@@ -6910,6 +6944,11 @@ __declspec(noinline) ITEM_INFO UIEquipWnd::ItemIconAt(int x, int y) {
 // OFFSET: 0x008D8D90
 // FUNCTION: fn_12131
 ITEM_INFO UIEquipWnd::ItemEntryAt(int x, int y) {
+  const int affinity = this->AffinitySlotAt(x, y);
+  if (affinity >= 0) {
+    return this->GetSlotItem(16 + affinity);
+  }
+
   int slot = -1;
   const int top = this->m_contentTop;
   if (y < top + 17 || y > top + 145) {
@@ -6943,6 +6982,14 @@ void UIEquipWnd::OnLBtnDblClk(int x, int y) {
     return;
   }
 
+  const int affinity = this->AffinitySlotAt(x, y);
+  if (affinity >= 0) {
+    if (affinity < g_session.affinitySlotCount) {
+      g_modeMgr.currentMode->SendMsg(MM_TAKE_OFF_EQUIP, 16 + affinity, 0, 0, 0);
+    }
+    return;
+  }
+
   ITEM_INFO item = this->ItemIconAt(x, y);
   if (item.identity[1] > 0 && item.quantity > 0) {
     const EquipSlots slots = g_session.GetEquipSlots(static_cast<int>(item.identity[3]));
@@ -6962,6 +7009,11 @@ void UIEquipWnd::OnMouseHover(int x, int y) {
       tooltipX = 175;
     } else if (x >= 106) {
       tooltipX = this->geometry.width / 2 - 20;
+    }
+    const int affinity = this->AffinitySlotAt(x, y);
+    if (affinity >= 0) {
+      this->AffinitySlotPosition(affinity, tooltipX, tooltipY);
+      tooltipY -= 3;
     }
     this->ToScreen(tooltipX, tooltipY);
 
@@ -9613,7 +9665,7 @@ void UIItemCollectionWnd::Paint() {
       this->DrawSkinBox(box, 0, top, this->geometry.width, 29, true);
       const int y = top + 2;
       int slot = 0;
-      for (int x = 4; x < 104; x += 25, ++slot) {
+      for (int x = 4; slot < ItemCardSlotCount; x += 25, ++slot) {
         const int card = static_cast<int>(this->m_item.cards[slot]);
         if (card < 1) {
           CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\empty_card_slot.bmp")));
@@ -9881,6 +9933,232 @@ UIPetEggListWnd::UIPetEggListWnd()
     : UIItemIdentifyWnd() {
 }
 
+void UIEquipWnd::LoadAffinityVisualSettings() {
+  this->affinityVisual = AffinityVisualSettings();
+  AffinityVisualSettings& settings = this->affinityVisual;
+  settings.slotImage = "유저인터페이스\\empty_card_slot.bmp";
+  settings.lockedImage = "유저인터페이스\\disable_card_slot.bmp";
+  settings.lockOverlay = "유저인터페이스\\basic_interface\\ban.bmp";
+  settings.highlightImage = "유저인터페이스\\basic_interface\\item_invert.bmp";
+  lua_State* state = g_session.m_hotkeyScript ? g_session.m_hotkeyScript->GetState() : nullptr;
+  if (state) {
+    const int stack = lua_gettop(state);
+    lua_getglobal(state, "AffinityHUD");
+    if (lua_istable(state, -1)) {
+      const auto integer = [&](const char* name, int& output, int minimum, int maximum) {
+        lua_getfield(state, -1, name);
+        if (lua_type(state, -1) == LUA_TNUMBER) {
+          const double value = lua_tonumber(state, -1);
+          if (std::isfinite(value)) {
+            output = static_cast<int>(std::clamp(value, static_cast<double>(minimum), static_cast<double>(maximum)));
+          }
+        }
+        lua_pop(state, 1);
+      };
+      const auto boolean = [&](const char* name, bool& output) {
+        lua_getfield(state, -1, name);
+        if (lua_type(state, -1) == LUA_TBOOLEAN) {
+          output = lua_toboolean(state, -1) != 0;
+        }
+        lua_pop(state, 1);
+      };
+      const auto text = [&](const char* name, std::string& output) {
+        lua_getfield(state, -1, name);
+        if (lua_type(state, -1) == LUA_TSTRING) {
+          std::size_t size;
+          const char* value = lua_tolstring(state, -1, &size);
+          if (size < 260 && std::memchr(value, 0, size) == nullptr) {
+            output.assign(value, size);
+          }
+        }
+        lua_pop(state, 1);
+      };
+      integer("panel_height", settings.panelHeight, 0, 2048);
+      boolean("center", settings.centered);
+      integer("x", settings.x, -1024, 1024);
+      integer("y", settings.y, 0, 1024);
+      integer("step_x", settings.stepX, 0, 128);
+      integer("step_y", settings.stepY, 0, 128);
+      integer("width", settings.width, 1, 128);
+      integer("height", settings.height, 1, 128);
+      boolean("draw_background", settings.drawBackground);
+      integer("background_x", settings.backgroundX, -1024, 1024);
+      integer("background_y", settings.backgroundY, 0, 1024);
+      integer("background_width", settings.backgroundWidth, 0, 2048);
+      integer("background_height", settings.backgroundHeight, 0, 1024);
+      int color = static_cast<int>(settings.backgroundColor);
+      integer("background_color", color, 0, 0xFFFFFF);
+      settings.backgroundColor = static_cast<unsigned int>(color);
+      integer("icon_x", settings.iconX, -128, 128);
+      integer("icon_y", settings.iconY, -128, 128);
+      text("slot_image", settings.slotImage);
+      text("locked_image", settings.lockedImage);
+      text("lock_overlay", settings.lockOverlay);
+      text("highlight_image", settings.highlightImage);
+      text("panel_image", settings.panelImage);
+      lua_getfield(state, -1, "slots");
+      if (lua_istable(state, -1)) {
+        for (int slot = 0; slot < 6; ++slot) {
+          lua_rawgeti(state, -1, slot + 1);
+          if (lua_istable(state, -1)) {
+            int x;
+            int y;
+            this->AffinitySlotPosition(slot, x, y);
+            settings.slotX[slot] = x;
+            settings.slotY[slot] = y - this->m_contentTop;
+            integer("x", settings.slotX[slot], -1024, 1024);
+            integer("y", settings.slotY[slot], 0, 1024);
+            settings.customPosition[slot] = true;
+          }
+          lua_pop(state, 1);
+        }
+      }
+    }
+    lua_settop(state, stack);
+  }
+  const auto imageHeight = [](const std::string& name) {
+    if (name.empty()) {
+      return 0;
+    }
+    const CBitmapRes* image = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
+    return image ? std::clamp(image->image.height, 0, 1024) : 0;
+  };
+  const int slotHeight = std::max({settings.height, settings.iconY + 24, imageHeight(settings.slotImage), imageHeight(settings.lockedImage),
+                                imageHeight(settings.lockOverlay), imageHeight(settings.highlightImage)});
+  int bottom = 0;
+  for (int slot = 0; slot < 6; ++slot) {
+    int x;
+    int y;
+    this->AffinitySlotPosition(slot, x, y);
+    bottom = std::max(bottom, y + slotHeight);
+  }
+  if (settings.drawBackground) {
+    bottom = std::max(bottom, this->m_contentTop + settings.backgroundY + settings.backgroundHeight);
+  }
+  bottom = std::max(bottom, this->m_contentTop + settings.backgroundY + imageHeight(settings.panelImage));
+  settings.panelHeight = std::max(settings.panelHeight, bottom - 165);
+}
+
+void UIEquipWnd::AffinitySlotPosition(int slot, int& x, int& y) const {
+  const AffinityVisualSettings& settings = this->affinityVisual;
+  if (settings.customPosition[slot]) {
+    x = settings.slotX[slot];
+    y = this->m_contentTop + settings.slotY[slot];
+    return;
+  }
+  const int width = settings.stepX * 5 + settings.width;
+  x = (settings.centered ? (this->geometry.width - width) / 2 : 0) + settings.x + settings.stepX * slot;
+  y = this->m_contentTop + settings.y + settings.stepY * slot;
+}
+
+int UIEquipWnd::AffinityPanelHeight() const {
+  return this->m_viewOther == 0 && this->m_page == 0 ? this->affinityVisual.panelHeight : 0;
+}
+
+int UIEquipWnd::AffinitySlotAt(int x, int y) const {
+  if (this->AffinityPanelHeight() == 0 || this->geometry.height == 17) {
+    return -1;
+  }
+  for (int slot = 0; slot < 6; ++slot) {
+    int left;
+    int top;
+    this->AffinitySlotPosition(slot, left, top);
+    if (x >= left && x < left + this->affinityVisual.width && y >= top && y < top + this->affinityVisual.height) {
+      return slot;
+    }
+  }
+  return -1;
+}
+
+void UIEquipWnd::RefreshAffinityLayout() {
+  if (this->m_viewOther != 0) {
+    return;
+  }
+  const int extra = this->AffinityPanelHeight();
+  const bool swapVisible = this->swapWindow && this->swapWindow->geometry.state != 0;
+  const int height = this->contentOffset + 167 + extra + (swapVisible ? 158 : 0);
+  if (this->geometry.height != 17 && this->geometry.height != height) {
+    this->Resize(this->geometry.width, height);
+    this->RefreshSnap();
+  }
+  this->m_show = height;
+  if (this->m_viewButton) {
+    this->m_viewButton->Move(this->geometry.width / 2 - 18, IsEquipViewHidden() * 230 + 127);
+  }
+  if (this->m_otherButton) {
+    this->m_otherButton->Move(this->geometry.width / 2 - 14, 167 + (g_session.replayPacketMode > 0 ? -60 : 170));
+  }
+  if (this->swapButton) {
+    this->swapButton->Move(193, 167 + extra);
+  }
+  if (this->unequipButton) {
+    this->unequipButton->Move(235, 167 + extra);
+  }
+  if (this->abilityButton) {
+    this->abilityButton->Move(g_equipAbilityButtonPosition[0], g_equipAbilityButtonPosition[1] + extra);
+  }
+  if (this->allowViewCheck) {
+    this->allowViewCheck->Move(10, this->contentOffset + 152 + extra);
+  }
+  if (this->swapModeCheck) {
+    this->swapModeCheck->Move(10, this->contentOffset + 152 + extra);
+  }
+  if (swapVisible) {
+    this->swapWindow->Move(0, 167 + extra);
+  }
+}
+
+void UIEquipWnd::DrawAffinitySlots() {
+  if (this->AffinityPanelHeight() == 0) {
+    return;
+  }
+  const AffinityVisualSettings& settings = this->affinityVisual;
+  if (settings.drawBackground) {
+    const int width = settings.backgroundWidth > 0 ? settings.backgroundWidth : this->geometry.width - 2;
+    this->FillRegion(settings.backgroundX, this->m_contentTop + settings.backgroundY, width, settings.backgroundHeight, settings.backgroundColor);
+  }
+  if (!settings.panelImage.empty()) {
+    CBitmapRes* panel = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(settings.panelImage.c_str())));
+    if (panel) {
+      this->DrawBitmap(settings.backgroundX, this->m_contentTop + settings.backgroundY, panel, true);
+    }
+  }
+  const CGameMode* mode = g_modeMgr.GetGameMode();
+  ITEM_INFO dragged;
+  if (mode && mode->drag.source == 1) {
+    dragged = g_session.LookupClientItemByIdentity(mode->drag.id);
+  }
+  for (int slot = 0; slot < 6; ++slot) {
+    int x;
+    int y;
+    this->AffinitySlotPosition(slot, x, y);
+    const bool unlocked = slot < g_session.affinitySlotCount;
+    const std::string& name = unlocked ? settings.slotImage : settings.lockedImage;
+    CBitmapRes* background = name.empty() ? nullptr : static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
+    if (background) {
+      this->DrawBitmap(x, y, background, true);
+    } else {
+      this->DrawRectOutline(x, y, settings.width, settings.height, unlocked ? 0x808080 : 0x404040);
+    }
+    const ITEM_INFO item = g_session.GetAffinityItem(slot);
+    if (unlocked && item.identity[1] != 0) {
+      this->DrawItemIcon(x + settings.iconX, y + settings.iconY, item, 0);
+    }
+    if (!unlocked && !settings.lockOverlay.empty()) {
+      CBitmapRes* locked = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(settings.lockOverlay.c_str())));
+      if (locked) {
+        this->DrawBitmap(x, y, locked, true);
+      }
+    } else if (unlocked && dragged.identity[1] != 0 &&
+               (dragged.identity[2] & (static_cast<unsigned int>(EQP_AFFINITY_1) << slot)) != 0 && !settings.highlightImage.empty()) {
+      CBitmapRes* highlight = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(settings.highlightImage.c_str())));
+      if (highlight) {
+        this->DrawBitmap(x, y, highlight, true);
+      }
+    }
+  }
+}
+
 // OFFSET: 0x008D1E80
 // FUNCTION: fn_12096
 void UIEquipWnd::DrawEquipSlots() {
@@ -10042,7 +10320,10 @@ void UIEquipWnd::OnLBtnDown(int x, int y) {
   if (item.quantity > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
     const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
-    if (this->m_page == 1) {
+    const int affinity = this->AffinitySlotAt(x, y);
+    if (affinity >= 0) {
+      mode->drag.BeginItem(g_windowMgr, 2, item, item.quantity, 16 + affinity);
+    } else if (this->m_page == 1) {
       mode->drag.BeginItem(g_windowMgr, 24, item, item.quantity, slots.values[2]);
     } else {
       mode->drag.BeginItem(g_windowMgr, 2, item, item.quantity, slots.values[2]);
@@ -12564,7 +12845,7 @@ int UIItemCollectionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t ar
     this->m_extraHeight = 0;
     if (this->m_item.identified == 1) {
       const ItemOptionRecord* options = this->m_item.options;
-      for (int index = 0; index < this->m_item.optionCount; ++index) {
+      for (int index = 0; index < std::min(this->m_item.optionCount, ItemRandomOptionCount); ++index) {
         const ItemOptionRecord& option = options[index];
         if (option.id == 0) {
           continue;

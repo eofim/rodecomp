@@ -4,6 +4,7 @@
 #include "UI/Shop/UIMerchantShopMakeWnd.h"
 #include "UI/Window/UIWindowMgr.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -37,12 +38,14 @@ void CMCStoreInfoBackup::ImportData(Json::Value& data) {
     item.cards[1] = (*entry).get("Slot_2", 0).asInt();
     item.cards[2] = (*entry).get("Slot_3", 0).asInt();
     item.cards[3] = (*entry).get("Slot_4", 0).asInt();
-    item.optionCount = (*entry).get("RandomOptionCount", 0).asInt();
+    item.cards[4] = (*entry).get("Slot_5", 0).asInt();
+    item.cards[5] = (*entry).get("Slot_6", 0).asInt();
+    item.optionCount = std::clamp((*entry).get("RandomOptionCount", 0).asInt(), 0, ItemRandomOptionCount);
     Json::Value options = (*entry)["RandomOptionList"];
     int index = 0;
     ItemOptionRecord* record = item.options;
 
-    for (auto option = options.begin(); option != options.end() && index <= 5; ++option, ++index, ++record) {
+    for (auto option = options.begin(); option != options.end() && index < ItemRandomOptionCount; ++option, ++index, ++record) {
       record->id = static_cast<std::int16_t>((*option).get("OptIndex", 0).asInt());
       record->value = static_cast<std::int16_t>((*option).get("Value", 0).asInt());
       record->parameter = static_cast<unsigned char>((*option).get("Parm1", 0).asInt());
@@ -78,10 +81,12 @@ void CMCStoreInfoBackup::ExportData(Json::Value& data) const {
     value["Slot_2"] = static_cast<std::int32_t>(item.cards[1]);
     value["Slot_3"] = static_cast<std::int32_t>(item.cards[2]);
     value["Slot_4"] = static_cast<std::int32_t>(item.cards[3]);
+    value["Slot_5"] = static_cast<std::int32_t>(item.cards[4]);
+    value["Slot_6"] = static_cast<std::int32_t>(item.cards[5]);
 
     value["RandomOptionCount"] = item.optionCount;
     Json::Value options;
-    const int count = item.optionCount;
+    const int count = std::clamp(item.optionCount, 0, ItemRandomOptionCount);
 
     for (int index = 0; index < count; ++index) {
       Json::Value option;

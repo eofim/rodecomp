@@ -16,18 +16,18 @@ struct RodexMailItem {
   /* 0002 */ int itemId;
   /* 0006 */ unsigned char identified;
   /* 0007 */ unsigned char damaged;
-  /* 0008 */ std::uint32_t cards[4];
+  /* 0008 */ std::uint32_t cards[ItemCardSlotCount];
   /* 0018 */ std::uint32_t expireTime;
   /* 001C */ unsigned char type;
   /* 001D */ std::uint16_t bindType;
   /* 001F */ std::uint16_t wearState;
-  /* 0021 */ ItemOptionRecord options[5];
+  /* 0021 */ ItemOptionRecord options[ItemRandomOptionCount];
   /* 003A */ unsigned char refine;
   /* 003B */ unsigned char grade;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(RodexMailItem) == 0x3C);
+static_assert(sizeof(RodexMailItem) == 0x58);
 
 struct RodexMail {
   /* 0000 */ unsigned char isRead;
@@ -93,11 +93,11 @@ public:
 };
 
 #if defined(_WIN32) && !defined(_WIN64)
-static_assert(sizeof(RodexMail) == 0x198);
+static_assert(sizeof(RodexMail) == 0x228);
 static_assert(offsetof(RodexMail, title) == 0x24);
-static_assert(offsetof(RodexMail, zeny) == 0x188);
-static_assert(offsetof(RodexMail, isReturned) == 0x190);
-static_assert(offsetof(RodexMail, isKnownSender) == 0x194);
+static_assert(offsetof(RodexMail, zeny) == 0x218);
+static_assert(offsetof(RodexMail, isReturned) == 0x220);
+static_assert(offsetof(RodexMail, isKnownSender) == 0x224);
 static_assert(sizeof(RodexMailStore) == 0x38);
 static_assert(offsetof(RodexMailStore, m_mails0) == 0x20);
 #endif

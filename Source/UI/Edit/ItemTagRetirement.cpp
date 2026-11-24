@@ -248,22 +248,22 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
   const std::uint32_t* cards = item.cards;
   int slots = item.SlotCount();
   if (slots == 0) {
-    slots = 4;
+    slots = ItemCardSlotCount;
   }
 
-  for (int index = 0; index < 4; ++index) {
+  for (int index = 0; index < ItemCardSlotCount; ++index) {
     if (cards[index] != 0) {
-      slots = 4;
+      slots = ItemCardSlotCount;
     }
   }
 
-  for (int index = 0; index < slots; ++index) {
+  for (int index = 0; index < std::min(slots, ItemCardSlotCount); ++index) {
     link += delimiters[7];
-    link += this->ItemLinkNumberText(index < 4 ? cards[index] : 0);
+    link += this->ItemLinkNumberText(index < ItemCardSlotCount ? cards[index] : 0);
   }
 
   const ItemOptionRecord* options = item.options;
-  for (int index = 0; index < item.optionCount; ++index) {
+  for (int index = 0; index < std::min(item.optionCount, ItemRandomOptionCount); ++index) {
     link += delimiters[9];
     link += this->ItemLinkNumberText(options[index].id);
     link += delimiters[10];

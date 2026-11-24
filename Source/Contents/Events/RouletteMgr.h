@@ -104,8 +104,8 @@ static_assert(offsetof(RouletteMgr, m_lastTick) == 0x25C);
 static_assert(offsetof(RouletteMgr, m_resultShown) == 0x278);
 static_assert(offsetof(RouletteMgr, m_items) == 0x27C);
 static_assert(offsetof(RouletteMgr, m_resultItem) == 0x288);
-static_assert(offsetof(RouletteMgr, m_additionItem) == 0x380);
-static_assert(sizeof(RouletteMgr) == 0x478);
+static_assert(offsetof(RouletteMgr, m_additionItem) == 0x398);
+static_assert(sizeof(RouletteMgr) == 0x4A8);
 #endif
 
 #endif

@@ -58,7 +58,7 @@ namespace {
   using ItemRandomOption = ItemOptionRecord;
 
   struct ItemRandomOptions {
-    /* 0000 */ ItemRandomOption values[5];
+    /* 0000 */ ItemRandomOption values[ItemRandomOptionCount];
   };
 
   struct ItemAddPacket {
@@ -70,7 +70,7 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
   };
 
   struct ItemAddOptionsPacket {
@@ -82,7 +82,7 @@ namespace {
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
     /* 0020 */ ItemRandomOptions options;
   };
 
@@ -94,7 +94,7 @@ namespace {
     /* 000C */ unsigned char type;
     /* 000D */ unsigned char identified;
     /* 000E */ unsigned char damaged;
-    /* 000F */ std::uint32_t cards[4];
+    /* 000F */ std::uint32_t cards[ItemCardSlotCount];
     /* 001F */ ItemRandomOptions options;
     /* 0038 */ unsigned char refine;
     /* 0039 */ unsigned char grade;
@@ -108,7 +108,7 @@ namespace {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[ItemCardSlotCount];
   };
 
   struct ItemSlotOptionsPacket {
@@ -119,8 +119,8 @@ namespace {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
-    /* 001E */ ItemRandomOption options[5];
+    /* 000E */ std::uint32_t cards[ItemCardSlotCount];
+    /* 001E */ ItemRandomOption options[ItemRandomOptionCount];
   };
 
   struct FriendNoticePacket {
@@ -137,7 +137,7 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::int16_t amount;
     /* 0009 */ int location;
-    /* 000D */ std::uint32_t cards[4];
+    /* 000D */ std::uint32_t cards[ItemCardSlotCount];
     /* 001D */ int expireTime;
     /* 0021 */ unsigned char flags;
   };
@@ -148,14 +148,14 @@ namespace {
     const auto* itemCards = item.cards;
 
     if (value.itemId != item.itemId || valueCards[0] != itemCards[0] || valueCards[1] != itemCards[1] ||
-        valueCards[2] != itemCards[2] || valueCards[3] != itemCards[3] || value.identified != item.identified ||
+        valueCards[2] != itemCards[2] || valueCards[3] != itemCards[3] || valueCards[4] != itemCards[4] || valueCards[5] != itemCards[5] || value.identified != item.identified ||
         value.refiningLevel != item.refiningLevel || value.grade != item.grade) {
       return false;
     }
 
     const int count = item.optionCount;
 
-    if (value.optionCount != count || value.optionCount >= 5) {
+    if (value.optionCount != count || value.optionCount > ItemRandomOptionCount) {
       return false;
     }
 
@@ -187,10 +187,10 @@ namespace {
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(ItemRandomOption) == 5);
-static_assert(sizeof(ItemAddPacket) == 0x20);
-static_assert(sizeof(ItemAddOptionsPacket) == 0x39);
-static_assert(sizeof(ItemAddGradePacket) == 0x3A);
-static_assert(sizeof(ItemListRecord) == 0x22);
+static_assert(sizeof(ItemAddPacket) == 40);
+static_assert(sizeof(ItemAddOptionsPacket) == 85);
+static_assert(sizeof(ItemAddGradePacket) == 86);
+static_assert(sizeof(ItemListRecord) == 42);
 #endif
 
 namespace EquipmentProperties {
@@ -255,7 +255,7 @@ void __fastcall RefreshItemWindows(UIWindowMgr* mgr) {
 // INLINED
 static int CountItemOptions(const ItemRandomOption* options) {
   int count = 0;
-  for (int index = 0; index < 5; ++index) {
+  for (int index = 0; index < ItemRandomOptionCount; ++index) {
     if (0 != options[index].id) {
       ++count;
     }
@@ -267,7 +267,7 @@ static int CountItemOptions(const ItemRandomOption* options) {
 static __forceinline void AddCartPacketItem(std::int16_t index, int amount, int itemId, unsigned char type,
                                             unsigned char identified, unsigned char damaged, unsigned char refine,
                                             std::uint32_t card1, std::uint32_t card2, std::uint32_t card3,
-                                            std::uint32_t card4, ItemRandomOptions options, int grade) {
+                                            std::uint32_t card4, std::uint32_t card5, std::uint32_t card6, ItemRandomOptions options, int grade) {
   ITEM_INFO item;
   item.identity[1] = index;
   item.quantity = amount;
@@ -281,6 +281,8 @@ static __forceinline void AddCartPacketItem(std::int16_t index, int amount, int 
   cards[1] = card2;
   cards[2] = card3;
   cards[3] = card4;
+  cards[4] = card5;
+  cards[5] = card6;
   item.optionCount = CountItemOptions(options.values);
   for (int index = 0; index < item.optionCount; ++index) {
     item.options[index] = options.values[index];
@@ -293,7 +295,7 @@ static __forceinline void AddCartPacketItem(std::int16_t index, int amount, int 
 static __forceinline void AddMerchantShopPacketItem(std::int16_t index, int amount, int itemId, unsigned char type,
                                                     unsigned char identified, unsigned char damaged,
                                                     unsigned char refine, std::uint32_t card1, std::uint32_t card2,
-                                                    std::uint32_t card3, std::uint32_t card4,
+                                                    std::uint32_t card3, std::uint32_t card4, std::uint32_t card5, std::uint32_t card6,
                                                     ItemRandomOptions options, int grade) {
   ITEM_INFO item;
   item.identity[1] = index;
@@ -308,6 +310,8 @@ static __forceinline void AddMerchantShopPacketItem(std::int16_t index, int amou
   cards[1] = card2;
   cards[2] = card3;
   cards[3] = card4;
+  cards[4] = card5;
+  cards[5] = card6;
   item.optionCount = CountItemOptions(options.values);
   for (int index = 0; index < item.optionCount; ++index) {
     item.options[index] = options.values[index];
@@ -322,7 +326,7 @@ void CGameMode::ReceiveItem1738Add(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddPacket*>(data);
   ItemRandomOptions options = {};
   AddCartPacketItem(packet->index, packet->amount, packet->itemId, packet->type, packet->identified, packet->damaged,
-                    packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3], options, 0);
+                    packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3], packet->cards[4], packet->cards[5], options, 0);
 }
 
 #pragma pack(push, 1)
@@ -334,7 +338,7 @@ void CGameMode::ReceiveItem1738Add(const unsigned char* data) {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[ItemCardSlotCount];
   };
 
   struct ItemAddSlotOptionsPacket {
@@ -345,7 +349,7 @@ void CGameMode::ReceiveItem1738Add(const unsigned char* data) {
     /* 000B */ unsigned char identified;
     /* 000C */ unsigned char damaged;
     /* 000D */ unsigned char refine;
-    /* 000E */ std::uint32_t cards[4];
+    /* 000E */ std::uint32_t cards[ItemCardSlotCount];
     /* 001E */ ItemRandomOptions options;
   };
 #pragma pack(pop)
@@ -353,7 +357,7 @@ void CGameMode::ReceiveItem1738Add(const unsigned char* data) {
 // INLINED
 static __forceinline void AddExchangePacketItem(int itemId, unsigned char type, int slot, unsigned char identified,
                                                 unsigned char damaged, unsigned char refine, std::uint32_t card1,
-                                                std::uint32_t card2, std::uint32_t card3, std::uint32_t card4,
+                                                std::uint32_t card2, std::uint32_t card3, std::uint32_t card4, std::uint32_t card5, std::uint32_t card6,
                                                 ItemRandomOptions options) {
   if (slot < 0) {
     g_modeMgr.currentMode->SendMsg(MM_CANCEL_EXCHANGE_ITEM, 0, 0, 0, 0);
@@ -375,6 +379,8 @@ static __forceinline void AddExchangePacketItem(int itemId, unsigned char type, 
   cards[1] = card2;
   cards[2] = card3;
   cards[3] = card4;
+  cards[4] = card5;
+  cards[5] = card6;
   item.identity[1] = 0xFFFFFFFF;
   item.quantity = slot;
   item.optionCount = CountItemOptions(options.values);
@@ -390,7 +396,7 @@ void CGameMode::ReceiveItemSlot(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddSlotPacket*>(data);
   ItemRandomOptions options = {};
   AddExchangePacketItem(packet->itemId, packet->type, packet->slot, packet->identified, packet->damaged,
-                        packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3],
+                        packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3], packet->cards[4], packet->cards[5],
                         options);
 }
 
@@ -399,7 +405,7 @@ void CGameMode::ReceiveItemSlot(const unsigned char* data) {
 void CGameMode::ReceiveItemSlotOptions(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddSlotOptionsPacket*>(data);
   AddExchangePacketItem(packet->itemId, packet->type, packet->slot, packet->identified, packet->damaged,
-                        packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3],
+                        packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3], packet->cards[4], packet->cards[5],
                         packet->options);
 }
 
@@ -465,7 +471,7 @@ void CGameMode::ReceiveItem1740Add(const unsigned char* data) {
   ItemRandomOptions options = {};
   AddMerchantShopPacketItem(packet->index, packet->amount, packet->itemId, packet->type, packet->identified,
                             packet->damaged, packet->refine, packet->cards[0], packet->cards[1], packet->cards[2],
-                            packet->cards[3], options, 0);
+                            packet->cards[3], packet->cards[4], packet->cards[5], options, 0);
 }
 
 // OFFSET: 0x00D1FF70
@@ -474,7 +480,7 @@ void CGameMode::ReceiveItem1740AddOptions(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddOptionsPacket*>(data);
   AddMerchantShopPacketItem(packet->index, packet->amount, packet->itemId, packet->type, packet->identified,
                             packet->damaged, packet->refine, packet->cards[0], packet->cards[1], packet->cards[2],
-                            packet->cards[3], packet->options, 0);
+                            packet->cards[3], packet->cards[4], packet->cards[5], packet->options, 0);
 }
 
 // OFFSET: 0x00D20180
@@ -483,7 +489,7 @@ void CGameMode::ReceiveItem1740AddGrade(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddGradePacket*>(data);
   AddMerchantShopPacketItem(packet->index, packet->amount, packet->itemId, packet->type, packet->identified,
                             packet->damaged, packet->refine, packet->cards[0], packet->cards[1], packet->cards[2],
-                            packet->cards[3], packet->options, packet->grade);
+                            packet->cards[3], packet->cards[4], packet->cards[5], packet->options, packet->grade);
 }
 
 // OFFSET: 0x00D204B0
@@ -491,7 +497,7 @@ void CGameMode::ReceiveItem1740AddGrade(const unsigned char* data) {
 void CGameMode::ReceiveItem1738AddOptions(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddOptionsPacket*>(data);
   AddCartPacketItem(packet->index, packet->amount, packet->itemId, packet->type, packet->identified, packet->damaged,
-                    packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3],
+                    packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3], packet->cards[4], packet->cards[5],
                     packet->options, 0);
 }
 
@@ -500,7 +506,7 @@ void CGameMode::ReceiveItem1738AddOptions(const unsigned char* data) {
 void CGameMode::ReceiveItem1738AddGrade(const unsigned char* data) {
   const auto* packet = reinterpret_cast<const ItemAddGradePacket*>(data);
   AddCartPacketItem(packet->index, packet->amount, packet->itemId, packet->type, packet->identified, packet->damaged,
-                    packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3],
+                    packet->refine, packet->cards[0], packet->cards[1], packet->cards[2], packet->cards[3], packet->cards[4], packet->cards[5],
                     packet->options, packet->grade);
 }
 
@@ -518,7 +524,7 @@ namespace {
     /* 0006 */ unsigned char type;
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
-    /* 000F */ std::uint32_t cards[4];
+    /* 000F */ std::uint32_t cards[ItemCardSlotCount];
     /* 001F */ std::uint32_t expireTime;
     /* 0023 */ std::uint16_t bindOnEquip;
     /* 0025 */ std::uint16_t sprite;
@@ -533,12 +539,12 @@ namespace {
 #pragma pack(pop)
 
   static_assert(sizeof(EquipItemListHeader) == 5);
-  static_assert(sizeof(EquipItemListRecord) == 0x44);
+  static_assert(sizeof(EquipItemListRecord) == 96);
 
   // INLINED
   __forceinline void AddStorageEquipItem(
     unsigned char type, std::uint32_t location, std::int16_t index, std::uint32_t wearState, std::uint32_t card1, std::uint32_t card2, std::uint32_t card3,
-    std::uint32_t card4, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, ItemRandomOptions options, std::uint32_t expireTime,
+    std::uint32_t card4, std::uint32_t card5, std::uint32_t card6, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, ItemRandomOptions options, std::uint32_t expireTime,
     std::uint16_t bindOnEquip, std::uint16_t sprite, unsigned char placeEtcTab, int grade
   ) {
     if (location == EQP_AMMO) {
@@ -555,6 +561,8 @@ namespace {
     cards[1] = card2;
     cards[2] = card3;
     cards[3] = card4;
+    cards[4] = card5;
+    cards[5] = card6;
     item.quantity = 1;
     item.SetItemId(itemId);
     item.identified = identified;
@@ -575,7 +583,7 @@ namespace {
   // INLINED
   __forceinline void AddInventoryEquipItem(
     unsigned char type, std::uint32_t location, std::int16_t index, std::uint32_t wearState, std::uint32_t card1, std::uint32_t card2, std::uint32_t card3,
-    std::uint32_t card4, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, ItemRandomOptions options, std::uint32_t expireTime,
+    std::uint32_t card4, std::uint32_t card5, std::uint32_t card6, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, ItemRandomOptions options, std::uint32_t expireTime,
     std::uint16_t bindOnEquip, std::uint16_t sprite, unsigned char placeEtcTab, int grade
   ) {
     ITEM_INFO item;
@@ -588,6 +596,8 @@ namespace {
     cards[1] = card2;
     cards[2] = card3;
     cards[3] = card4;
+    cards[4] = card5;
+    cards[5] = card6;
     item.quantity = 1;
     item.SetItemId(itemId);
     item.identified = identified;
@@ -640,7 +650,7 @@ namespace {
   // INLINED
   __forceinline void AddCartEquipItem(
     unsigned char type, std::uint32_t location, std::int16_t index, std::uint32_t wearState, std::uint32_t card1, std::uint32_t card2, std::uint32_t card3,
-    std::uint32_t card4, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, ItemRandomOptions options, std::uint32_t expireTime,
+    std::uint32_t card4, std::uint32_t card5, std::uint32_t card6, int itemId, unsigned char identified, unsigned char damaged, unsigned char refine, ItemRandomOptions options, std::uint32_t expireTime,
     std::uint16_t bindOnEquip, std::uint16_t sprite, unsigned char placeEtcTab, int grade
   ) {
     ITEM_INFO item;
@@ -653,6 +663,8 @@ namespace {
     cards[1] = card2;
     cards[2] = card3;
     cards[3] = card4;
+    cards[4] = card5;
+    cards[5] = card6;
     item.quantity = 1;
     item.SetItemId(itemId);
     item.identified = identified;
@@ -683,7 +695,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
     for (std::int64_t i = 0; i < count; ++i) {
       const EquipItemListRecord& record = records[i];
       AddStorageEquipItem(
-        record.type, record.location, record.index, record.wearState, record.cards[0], record.cards[1], record.cards[2], record.cards[3], record.itemId,
+        record.type, record.location, record.index, record.wearState, record.cards[0], record.cards[1], record.cards[2], record.cards[3], record.cards[4], record.cards[5], record.itemId,
         record.identified, record.damaged, record.refine, record.options, record.expireTime, record.bindOnEquip, record.sprite, record.placeEtcTab, record.grade
       );
     }
@@ -692,7 +704,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
     for (std::int64_t i = 0; i < count; ++i) {
       const EquipItemListRecord& record = records[i];
       AddInventoryEquipItem(
-        record.type, record.location, record.index, record.wearState, record.cards[0], record.cards[1], record.cards[2], record.cards[3], record.itemId,
+        record.type, record.location, record.index, record.wearState, record.cards[0], record.cards[1], record.cards[2], record.cards[3], record.cards[4], record.cards[5], record.itemId,
         record.identified, record.damaged, record.refine, record.options, record.expireTime, record.bindOnEquip, record.sprite, record.placeEtcTab, record.grade
       );
     }
@@ -701,7 +713,7 @@ void CGameMode::ReceiveEquipItemList(const unsigned char* packet) {
     for (std::int64_t i = 0; i < count; ++i) {
       const EquipItemListRecord& record = records[i];
       AddCartEquipItem(
-        record.type, record.location, record.index, record.wearState, record.cards[0], record.cards[1], record.cards[2], record.cards[3], record.itemId,
+        record.type, record.location, record.index, record.wearState, record.cards[0], record.cards[1], record.cards[2], record.cards[3], record.cards[4], record.cards[5], record.itemId,
         record.identified, record.damaged, record.refine, record.options, record.expireTime, record.bindOnEquip, record.sprite, record.placeEtcTab, record.grade
       );
     }
@@ -937,6 +949,9 @@ void CSession::AddMerchantMirrorItem(const ITEM_INFO& item) {
 // OFFSET: 0x00DD7510
 // FUNCTION: fn_23290
 bool CSession::Equip(const ITEM_INFO& item) {
+  if ((item.identity[3] & EQP_AFFINITY) != 0) {
+    return true;
+  }
   const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
   const int order[3] = {slots.values[2], slots.values[1], slots.values[0]};
 
@@ -1102,6 +1117,15 @@ __declspec(noinline) bool CSession::AddCartItem(const ITEM_INFO& item, unsigned 
 // OFFSET: 0x00DD6D70
 // FUNCTION: fn_23280
 bool CSession::EquipInventoryItem(const ITEM_INFO& item, const char* name) {
+  if ((item.identity[3] & EQP_AFFINITY) != 0) {
+    const EquipSlots slots = this->GetEquipSlots(item.identity[3]);
+    if (slots.values[2] >= 16 && slots.values[2] < 22) {
+      this->affinityItems[slots.values[2] - 16] = item;
+      this->affinityItems[slots.values[2] - 16].quantity = 1;
+    }
+    g_windowMgr.InvalidateFrames();
+    return true;
+  }
   const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
   const int order[3] = {slots.values[2], slots.values[1], slots.values[0]};
 
@@ -1129,6 +1153,14 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s%s", item.DisplayName(0).c_str(), LookupMessage(MSI_ITEM_IS_EQUIPED)).c_str()), 0xC8FF00, 7, 0, 0);
   if (item.bindOnEquip == 1) {
     item.bindOnEquip = 2;
+  }
+
+  if ((item.identity[3] & EQP_AFFINITY) != 0) {
+    char name[1] = "";
+    this->EquipInventoryItem(item, name);
+    this->RemoveInventoryItem(item.identity[1], 1);
+    RefreshItemWindows(&g_windowMgr);
+    return true;
   }
 
   if (g_session.IsCostumeLocation(item.identity[3])) {
@@ -1167,6 +1199,23 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
 // OFFSET: 0x00DFC620
 // FUNCTION: fn_23598
 bool CSession::UnequipItem(int location, std::uint32_t identity) {
+  if ((location & EQP_AFFINITY) != 0) {
+    for (int slot = 0; slot < 6; ++slot) {
+      ITEM_INFO& equipped = this->affinityItems[slot];
+      if ((location & (EQP_AFFINITY_1 << slot)) == 0 || equipped.identity[1] == 0 ||
+          (identity != 0 && identity != equipped.identity[1])) {
+        continue;
+      }
+      ITEM_INFO item = equipped;
+      item.identity[3] = 0;
+      equipped.Reset();
+      this->AddInventoryItem(item, 0);
+      this->UpdateInventoryItem(item, 0);
+    }
+    RefreshItemWindows(&g_windowMgr);
+    g_windowMgr.InvalidateFrames();
+    return true;
+  }
   if (location == EQP_AMMO) {
     const ITEM_INFO item = g_session.LookupClientItemByIdentity(identity);
     if (item.identity[1] > 0) {
@@ -1235,6 +1284,13 @@ bool CSession::UnequipItem(int location, std::uint32_t identity) {
 // OFFSET: 0x00DD7E10
 // FUNCTION: fn_23300
 EquipSlots CSession::GetEquipSlots(int location) {
+  if ((location & EQP_AFFINITY) != 0) {
+    for (int slot = 0; slot < 6; ++slot) {
+      if ((location & (EQP_AFFINITY_1 << slot)) != 0) {
+        return {-1, -1, 16 + slot};
+      }
+    }
+  }
   EquipSlots result;
   if (location == EQP_AMMO) {
     result.values[0] = -1;
@@ -1798,6 +1854,12 @@ bool CSession::EquipSwapEquipmentItem(const ITEM_INFO& item) {
 ITEM_INFO CSession::FindItemByIdentity(std::uint32_t identity, int location) {
   if (identity == 0) {
     return ITEM_INFO(0);
+  }
+
+  for (const ITEM_INFO& equipped : this->affinityItems) {
+    if (equipped.identity[1] == identity) {
+      return equipped;
+    }
   }
 
   ITEM_INFO item = this->LookupClientItemByIdentity(identity);

@@ -1,4 +1,6 @@
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/CombatTypes.h"
+#include "Contents/CombatTypes.h"
 #include "Network/Packets/NoticeEnums.h"
 #include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Effects/Core/EffectTypes.h"
@@ -3648,6 +3650,31 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_WEAR_EQUIP: {
+      if ((static_cast<unsigned int>(argument2) & EQP_AFFINITY) != 0) {
+        const ITEM_INFO affinity = g_session.LookupClientItemByIdentity(static_cast<std::uint32_t>(argument1));
+        if (affinity.identity[1] == 0 || !affinity.identified) {
+          return 0;
+        }
+        const unsigned int allowed = static_cast<unsigned int>(argument2) & affinity.identity[2] & EQP_AFFINITY;
+        unsigned int selected = 0;
+        for (int slot = 0; slot < g_session.affinitySlotCount; ++slot) {
+          const unsigned int mask = EQP_AFFINITY_1 << slot;
+          if ((allowed & mask) == 0) {
+            continue;
+          }
+          if (selected == 0) {
+            selected = mask;
+          }
+          if (g_session.GetAffinityItem(slot).identity[1] == 0) {
+            selected = mask;
+            break;
+          }
+        }
+        if (!affinity.identified || selected == 0) {
+          return 0;
+        }
+        argument2 = selected;
+      }
       if (g_windowMgr.LookupWindow(WID_EXCHANGEUI) != nullptr) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANT_USE_WHEN_OPENED_EXCHANGEWND)), 255, 0, 0, 0);
         return 0;

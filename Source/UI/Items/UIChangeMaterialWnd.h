@@ -135,10 +135,10 @@ public:
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(offsetof(UIChangeMaterialWnd, m_resultX) == 0xC4);
 static_assert(offsetof(UIChangeMaterialWnd, m_resultItem) == 0xD0);
-static_assert(offsetof(UIChangeMaterialWnd, m_materialPos) == 0x1C8);
-static_assert(offsetof(UIChangeMaterialWnd, m_materials) == 0x1F8);
-static_assert(offsetof(UIChangeMaterialWnd, m_resultAmount) == 0x204);
-static_assert(offsetof(UIChangeMaterialWnd, m_resultText) == 0x208);
+static_assert(offsetof(UIChangeMaterialWnd, m_materialPos) == 0x1E0);
+static_assert(offsetof(UIChangeMaterialWnd, m_materials) == 0x210);
+static_assert(offsetof(UIChangeMaterialWnd, m_resultAmount) == 0x21C);
+static_assert(offsetof(UIChangeMaterialWnd, m_resultText) == 0x220);
 static_assert(sizeof(UIChangeMaterialWnd_List) == 0xF8);
 static_assert(offsetof(UIChangeMaterialWnd_List, m_pageSize) == 0xBC);
 static_assert(offsetof(UIChangeMaterialWnd_List, m_selectedIndex) == 0xC0);

@@ -37,12 +37,12 @@ namespace {
     /* 0007 */ std::uint32_t location;
     /* 000B */ std::uint32_t wearState;
     /* 000F */ unsigned char refine;
-    /* 0010 */ std::uint32_t cards[4];
+    /* 0010 */ std::uint32_t cards[ItemCardSlotCount];
     /* 0020 */ std::uint32_t expireTime;
     /* 0024 */ std::uint16_t bindOnEquip;
     /* 0026 */ std::uint16_t sprite;
     /* 0028 */ unsigned char optionCount;
-    /* 0029 */ EquipListOption options[5];
+    /* 0029 */ EquipListOption options[ItemRandomOptionCount];
     /* 0042 */ unsigned char identified : 1;
     /* 0042 */ unsigned char damaged : 1;
     /* 0042 */ unsigned char etcTab : 1;
@@ -54,12 +54,12 @@ namespace {
   };
 #pragma pack(pop)
 
-  static_assert(sizeof(EquipListRecord) == 0x43);
+  static_assert(sizeof(EquipListRecord) == 95);
 
   // INLINED
   __forceinline int CountEquipListOptions(const EquipListOption* options) {
     int count = 0;
-    for (int index = 0; index < 5; ++index) {
+    for (int index = 0; index < ItemRandomOptionCount; ++index) {
       if (0 != options[index].id) {
         ++count;
       }
@@ -105,7 +105,7 @@ void CGameMode::ReceiveEquipListPart(unsigned char listType, int count, const un
         continue;
       }
 
-      EquipListOption options[5];
+      EquipListOption options[ItemRandomOptionCount];
       std::memcpy(options, records->options, sizeof(options));
       ITEM_INFO item;
       FillEquipListItem(item, record, options);
@@ -115,7 +115,7 @@ void CGameMode::ReceiveEquipListPart(unsigned char listType, int count, const un
   case INVTYPE_INVENTORY:
     for (int remaining = count; remaining > 0; --remaining, ++records) {
       const EquipListRecord record = *records;
-      EquipListOption options[5];
+      EquipListOption options[ItemRandomOptionCount];
       std::memcpy(options, records->options, sizeof(options));
       ITEM_INFO item;
       FillEquipListItem(item, record, options);
@@ -155,7 +155,7 @@ void CGameMode::ReceiveEquipListPart(unsigned char listType, int count, const un
   case INVTYPE_CART:
     for (int remaining = count; remaining > 0; --remaining, ++records) {
       const EquipListRecord record = *records;
-      EquipListOption options[5];
+      EquipListOption options[ItemRandomOptionCount];
       std::memcpy(options, records->options, sizeof(options));
       ITEM_INFO item;
       FillEquipListItem(item, record, options);

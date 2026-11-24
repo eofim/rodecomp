@@ -545,8 +545,8 @@ int UIItemReformWnd_List::SendMsg(
         }
         bool emptySocket = true;
         if (info->isEmptySocket == 1) {
-          for (unsigned int slot = std::min(item.SlotCount(), 4); slot < 4; ++slot) {
-            if (static_cast<int>(slot) < 4 && static_cast<int>(item.cards[slot]) > 0) {
+          for (unsigned int slot = std::min(item.SlotCount(), ItemCardSlotCount); slot < ItemCardSlotCount; ++slot) {
+            if (static_cast<int>(slot) < ItemCardSlotCount && static_cast<int>(item.cards[slot]) > 0) {
               emptySocket = false;
               break;
             }

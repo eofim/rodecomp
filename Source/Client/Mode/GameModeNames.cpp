@@ -25,6 +25,9 @@ __declspec(noinline) void TraceSelection(int selection) {
 // OFFSET: 0x00DDC6F0
 // FUNCTION: fn_23368
 ITEM_INFO CSession::GetEquippedItemAt(int index) const {
+  if (index >= 16 && index < 22) {
+    return this->GetAffinityItem(index - 16);
+  }
   if (index == 15) {
     return this->LookupClientItemByIdentity(this->equippedArrowIndex);
   }
