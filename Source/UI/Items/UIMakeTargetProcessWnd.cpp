@@ -47,8 +47,8 @@ void UIMakeTargetProcessWnd::DragAndDrop(int x, int y, std::intptr_t value) {
 
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
   if (drag->source == 1) {
-    bool hasElementalStone = false;
     int emptySlot = 3;
+    bool hasElementalStone = false;
     for (int index = 0; index < 3; ++index) {
       if (this->materials[index].identity[1] > 0) {
         hasElementalStone |= this->materials[index].IsElementalStone();
@@ -131,7 +131,7 @@ void UIMakeTargetProcessWnd::Paint() {
     break;
   default: {
     const ITEM_INFO* material = this->materials;
-    for (int x = 8; x < 104; x += 32, ++material) {
+    for (int x = 8; x < 104; ++material, x += 32) {
       auto* bar = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\btnbar_right2.bmp")));
       this->DrawItemSlotFrame(x - 4, this->geometry.height - bar->image.height - 32);
       if (material->identity[1] > 0) {
@@ -152,9 +152,8 @@ void UIMakeTargetProcessWnd::Paint() {
   this->DrawShadowedText(requiredWidth + 16, 22, LookupMessage(MSI_REQUIRE_FOR_MAKE_TARGET), 0, 0, 0xFFFFFF, 0, 12, 0);
 
   const std::vector<const char*>& lines = FindMetalProcessItems(this->makeType);
-  int y = 42;
-  for (unsigned int index = 0; index < lines.size(); ++index, y += 20) {
-    this->DrawTextAt(16, y, lines[index], 0, 0, 12, 0, 0, 0);
+  for (unsigned int index = 0; index < lines.size(); ++index) {
+    this->DrawTextAt(16, 42 + 20 * index, lines[index], 0, 0, 12, 0, 0, 0);
   }
 }
 
@@ -169,6 +168,23 @@ void UIMakeTargetProcessWnd::OnLBtnDown(int x, int y) {
   }
 }
 
+#pragma pack(push, 1)
+struct UIMakeTargetProcessRecordHeader {
+  /* 0000 */ std::int16_t id;
+  /* 0002 */ std::uint32_t bytes;
+
+  // INLINED
+  UIMakeTargetProcessRecordHeader() : id(0), bytes(0) {
+  }
+
+  // INLINED
+  ~UIMakeTargetProcessRecordHeader() {
+    this->id = 0;
+    this->bytes = 0;
+  }
+};
+#pragma pack(pop)
+
 // OFFSET: 0x009A48C0
 // FUNCTION: fn_13617
 int UIMakeTargetProcessWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -181,16 +197,15 @@ int UIMakeTargetProcessWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
   case UM_CLEAR_ITEM: {
     const char* name = reinterpret_cast<const char*>(a);
     for (int index = 2; index >= 0; --index) {
-      ITEM_INFO& material = this->materials[index];
-      if (material.identity[1] > 0 && material.itemId == name) {
-        g_session.AddInventoryItem(material, 1);
-        material.Reset();
+      if (this->materials[index].identity[1] > 0 && this->materials[index].itemId == name) {
+        g_session.AddInventoryItem(this->materials[index], 1);
+        this->materials[index].Reset();
         this->Invalidate();
         return 0;
       }
     }
 
-    return 0;
+    break;
   }
 
   case UM_COMMAND: {
@@ -225,55 +240,44 @@ int UIMakeTargetProcessWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
       return 0;
     }
     }
-
-    return 0;
+    break;
   }
 
   case UM_REPLAY_FRAMED_DATA: {
-#pragma pack(push, 1)
-    struct ReplayTag {
-      /* 0000 */ std::int16_t id;
-      /* 0002 */ std::uint32_t bytes;
-
-      // INLINED
-      ReplayTag() : id(0), bytes(0) {}
-
-      // INLINED
-      ~ReplayTag() {
-        this->bytes = 0;
-        this->id = 0;
-      }
-    };
-#pragma pack(pop)
-
     const auto* bytes = reinterpret_cast<const unsigned char*>(a);
-    ReplayTag tag;
-    std::memcpy(&tag, bytes, sizeof(tag));
-    unsigned offset = sizeof(tag);
+    UIMakeTargetProcessRecordHeader header;
+    header = *reinterpret_cast<const UIMakeTargetProcessRecordHeader*>(bytes);
+    unsigned offset = 6;
 
-    if (tag.id == 22000) {
-      while (static_cast<unsigned>(b) > offset) {
-        std::memcpy(&tag, bytes + offset, sizeof(tag));
-        offset += sizeof(tag);
+    if (22000 == header.id) {
+      bool scanning = true;
+      while (scanning && static_cast<unsigned>(b) > offset) {
+        header = *reinterpret_cast<const UIMakeTargetProcessRecordHeader*>(bytes + offset);
+        offset += 6;
 
-        switch (tag.id) {
+        switch (header.id) {
         case 22001:
-          return 0;
+          scanning = false;
+          break;
+
         case 22002:
-          std::memcpy(&this->makeType, bytes + offset, tag.bytes);
-          offset += tag.bytes;
+          std::memcpy(&this->makeType, bytes + offset, header.bytes);
+          offset += header.bytes;
           this->SendMsg(nullptr, UM_SETCURITEM, this->makeType, 0, 0, 0);
           break;
+
         default:
-          offset += tag.bytes;
+          offset += header.bytes;
           break;
         }
       }
     }
-
-    return 0;
-  }
+    break;
   }
 
-  return this->UIFrameWnd::SendMsg(sender, message, a, b, c, d);
+  default:
+    return this->UIFrameWnd::SendMsg(sender, message, a, b, c, d);
+  }
+
+  return 0;
 }

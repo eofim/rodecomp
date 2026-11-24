@@ -44,6 +44,12 @@ struct CheckAttendanceRequestPacket {
   /* 0000 */ std::int16_t id;
 };
 
+// OFFSET: 0x007DCF20
+// FUNCTION: fn_45756
+bool UICheckAttendanceWnd_Banner::HasEntries() const {
+  return this->m_entries.size() != 0;
+}
+
 // OFFSET: 0x007DC6B0
 // FUNCTION: fn_09631
 UICheckAttendanceWnd::UICheckAttendanceWnd()
@@ -52,8 +58,9 @@ UICheckAttendanceWnd::UICheckAttendanceWnd()
   this->m_rewardCount = static_cast<int>(g_checkAttendanceMgr->m_rewards.size());
 }
 
-// INLINED
-UICheckAttendanceWnd::~UICheckAttendanceWnd() {
+// OFFSET: 0x007DC9B0
+// FUNCTION: fn_45754
+__declspec(noinline) UICheckAttendanceWnd::~UICheckAttendanceWnd() {
 }
 
 // OFFSET: 0x007DCBD0
@@ -76,9 +83,10 @@ void UICheckAttendanceWnd::VisitChildren() {
       texture = g_texMgr.Load("유저인터페이스\\check_attendance\\bt_slot_complete.tga", 0, false, true, false);
     }
 
+    const int bannerHeight = this->BannerHeight();
     DrawTextureRegion(
       static_cast<float>(this->geometry.x + (day % 5) * 62 + 26),
-      static_cast<float>(this->BannerHeight() + 95 + (day / 5) * 64 + this->geometry.y), static_cast<float>(texture->Width()),
+      static_cast<float>(bannerHeight + 95 + (day / 5) * 64 + this->geometry.y), static_cast<float>(texture->Width()),
       static_cast<float>(texture->Height()), 0xFFFFFFFF, texture
     );
   }
@@ -88,23 +96,28 @@ void UICheckAttendanceWnd::VisitChildren() {
 // FUNCTION: fn_09638
 int UICheckAttendanceWnd::SlotAt(int x, int y) {
   const int top = this->BannerHeight() + 95;
-  const int column = x - 26;
-  if (static_cast<unsigned int>(column) <= 306 && y >= top && top + 252 >= y && column % 62 <= 58) {
-    const int row = y - top;
-    if (row % 64 <= 60) {
-      return (column / 62) % 5 + (row / 64) % 4 * 5;
-    }
+  if (x < 26 || x > 332 || y < top || top + 252 < y) {
+    return -1;
   }
-  return -1;
+
+  if ((x - 26) % 62 > 58) {
+    return -1;
+  }
+  if ((y - top) % 64 > 60) {
+    return -1;
+  }
+  return ((y - top) / 64) % 4 * 5 + ((x - 26) / 62) % 5;
 }
 
-// INLINED
+// OFFSET: 0x007DC750
+// FUNCTION: fn_45753
 UICheckAttendanceWnd_Banner::UICheckAttendanceWnd_Banner()
     : UIWindow(0), m_current(0), m_lastSwitch(timeGetTime()) {
 }
 
-// INLINED
-UICheckAttendanceWnd_Banner::~UICheckAttendanceWnd_Banner() {
+// OFFSET: 0x007DCA00
+// FUNCTION: fn_45755
+__declspec(noinline) UICheckAttendanceWnd_Banner::~UICheckAttendanceWnd_Banner() {
 }
 
 namespace {
@@ -136,12 +149,12 @@ void UICheckAttendanceWnd::OnCreate(int, int) {
   this->m_notice->SetBitmap("유저인터페이스\\check_attendance\\bt_ok_normal.bmp", 1, 0);
   this->m_notice->SetBitmap("유저인터페이스\\check_attendance\\bt_ok_press.bmp", 2, 0);
   this->m_notice->SetSize(this->m_notice->BitmapWidth(), this->m_notice->BitmapHeight());
-  SetButtonText(this->m_notice, LookupMessage(MSI_ZENY_LOTTO_BUY_10));
+  SetButtonText(this->m_notice, LookupMessage(MSI_CLOSE));
   this->m_notice->AddTextStyle(0, 14, 0x313131, 1, 1, -1000, -1000);
   this->m_notice->AddTextStyle(1, 14, 0x313131, 1, 1, -1000, -1000);
   this->m_notice->AddTextStyle(2, 14, 0x313131, 1, 1, -1000, -1000);
   this->m_notice->Move(170, 376);
-  this->m_notice->SetId(201);
+  this->m_notice->SetId(ID_CLOSE);
   this->AddChild(this->m_notice);
 
   this->m_banner = new UICheckAttendanceWnd_Banner();
@@ -150,45 +163,59 @@ void UICheckAttendanceWnd::OnCreate(int, int) {
   this->AddChild(this->m_banner);
 }
 
+namespace {
+// INLINED
+inline void DrawDayLabel(UIWindow* window, int x, int y, int day) {
+  window->DrawCenteredText(x, y, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_DATE_COUNT), day).c_str(), 58, 0, 12, 0xA44F3B, 1);
+}
+}
+
 // OFFSET: 0x007DD2E0
 // FUNCTION: fn_09640
 void UICheckAttendanceWnd::Paint() {
 
-  const char* backgroundName = this->m_banner->m_entries.size() != 0 ? "유저인터페이스\\check_attendance\\attendance_bg_ad.bmp"
+  const char* backgroundName = this->m_banner->HasEntries() ? "유저인터페이스\\check_attendance\\attendance_bg_ad.bmp"
                                                                      : "유저인터페이스\\check_attendance\\attendance_bg.bmp";
   this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(backgroundName))), false);
 
-  this->DrawCenteredText(0, 41, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_CHECK_BEFORE), g_session.m_serverName.c_str()).c_str(), this->geometry.width, 0, 13, 0x203F66, 1);
+  this->DrawCenteredText(0, 41, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_REWARD), g_session.m_serverName.c_str()).c_str(), this->geometry.width, 0, 13, 0x203F66, 1);
 
   const int start = g_checkAttendanceMgr->m_config0;
+  const int startMonth = start % 10000 / 100;
   const int end = g_checkAttendanceMgr->m_config1;
+  const int startDay = start % 100;
+  const int endMonth = end % 10000 / 100;
+  const int endDay = end % 100;
   this->DrawCenteredText(
-    0, 70, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_CHECK_AFTER), start % 10000 / 100, start % 100, end % 10000 / 100, end % 100).c_str(), this->geometry.width, 0, 12,
+    0, 70, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_DATE_INFO), startMonth, startDay, endMonth, endDay).c_str(), this->geometry.width, 0, 12,
     0x3950A4, 1
   );
 
   const int bannerHeight = this->BannerHeight();
-  this->DrawCenteredText(345, bannerHeight + 289, LookupMessage(MSI_CHECK_ATTENDANCE), 109, 0, 14, 0x595939, 1);
+  this->DrawCenteredText(345, bannerHeight + 289, LookupMessage(MSI_CHECK_ATTENDANCE_DDAY), 109, 0, 14, 0x595939, 1);
   if (this->m_daysLeft > 0) {
     this->DrawCenteredText(368, bannerHeight + 309, IntToString(this->m_daysLeft, 0).c_str(), 54, 0, 22, 0xFFFFFF, 1);
   }
-  this->DrawCenteredText(425, bannerHeight + 318, LookupMessage(MSI_CHECK_ATTENDANCE_NOT_EVENT), 0, 0, 12, 0x595939, 1);
+  this->DrawCenteredText(425, bannerHeight + 318, LookupMessage(MSI_DATE_DAY), 0, 0, 12, 0x595939, 1);
 
   {
     std::string message;
     if (this->m_blinking == 1) {
-      message = FormatOwnedString(LookupMessage(MSI_DATE_DAY), this->m_checkedDays + 1);
+      message = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_CHECK_BEFORE), this->m_checkedDays + 1));
     } else {
-      message = FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_FAIL_RESTART), this->m_checkedDays);
+      message = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_CHECK_AFTER), this->m_checkedDays));
     }
 
     if (!message.empty()) {
       std::list<std::string> lines;
-      this->WrapFormattedText(message, &lines, 112, 0, 12, 1);
+      this->WrapText(message, &lines, 112, 0, 12, 1);
       const int top = static_cast<int>((77 - lines.size() * 15) * 0.5 + 95);
-      int line = 0;
-      for (auto it = lines.begin(); it != lines.end(); ++it, ++line) {
-        this->DrawCenteredText(343, bannerHeight + top + line * 12 + std::max(line - 1, 0) * 3, it->c_str(), 112, 0, 12, 0x613CA5, 1);
+      int line = -1;
+      int offset = 0;
+      for (auto it = lines.begin(); it != lines.end(); ++it) {
+        this->DrawCenteredText(343, bannerHeight + (std::max(line, 0) + offset) * 3 + top, it->c_str(), 112, 0, 12, 0x613CA5, 1);
+        ++line;
+        offset += 4;
       }
     }
   }
@@ -209,23 +236,24 @@ void UICheckAttendanceWnd::Paint() {
     this->DrawBitmap(this->m_checkedDays % 5 * 62 + 26, this->m_checkedDays / 5 * 64 + 95 + bannerHeight, slot, true);
   }
 
-  for (int day = 1; day <= this->m_rewardCount; ++day) {
+  for (int index = 0; index < this->m_rewardCount; ++index) {
+    const int day = index + 1;
     ITEM_INFO item;
     item.SetItemId(g_checkAttendanceMgr->GetReward(day).first);
     item.quantity = g_checkAttendanceMgr->GetReward(day).second;
     g_checkAttendanceMgr->GetReward(day);
 
-    const int x = (day - 1) % 5 * 62;
-    const int y = (day - 1) / 5 * 64;
+    const int y = index / 5 * 64;
+    const int x = index % 5 * 62;
     this->DrawItemAndQuantity(x + 43, y + 109 + bannerHeight, item, 1, 0);
-    this->DrawCenteredText(x + 26, y + 140 + bannerHeight, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_DDAY), day).c_str(), 58, 0, 12, 0xA44F3B, 1);
+    this->DrawCenteredText(x + 26, y + 140 + bannerHeight, FormatOwnedString(LookupMessage(MSI_CHECK_ATTENDANCE_DATE_COUNT), day).c_str(), 58, 0, 12, 0xA44F3B, 1);
   }
 }
 
 // OFFSET: 0x007DDA90
 // FUNCTION: fn_09641
 void UICheckAttendanceWnd_Banner::Paint() {
-  if (this->m_entries.size() != 0) {
+  if (this->HasEntries()) {
     this->DrawBitmap(
       0, 0,
       static_cast<CBitmapRes*>(
@@ -297,7 +325,9 @@ void UICheckAttendanceWnd::OnMouseHover(int x, int y) {
     int tipX = 0;
     int tipY = -20;
     this->ToScreen(tipX, tipY);
-    g_modeMgr.currentMode->ShowTooltip(name, tipX + x, tipY + y, 0xFFFFFFFFu, 0, 1);
+    const int screenY = tipY + y;
+    const int screenX = tipX + x;
+    g_modeMgr.currentMode->ShowTooltip(name, screenX, screenY, 0xFFFFFFFFu, 0, 1);
   }
 }
 
@@ -336,15 +366,13 @@ void UICheckAttendanceWnd::OnRBtnDown(int x, int y) {
     return;
   }
 
-  UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
-  if (!window) {
-    return;
+  if (UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)) {
+    ITEM_INFO item;
+    CCheckAttendanceMgr* manager = g_checkAttendanceMgr;
+    item.SetItemId(manager->GetReward(slot + 1).first);
+    item.identified = 1;
+    window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
-
-  ITEM_INFO item;
-  item.SetItemId(g_checkAttendanceMgr->GetReward(slot + 1).first);
-  item.identified = 1;
-  window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
 }
 
 // OFFSET: 0x007DE0C0
@@ -375,7 +403,7 @@ int UICheckAttendanceWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     if (g_session.m_hotkeyScript->Call("set_checkAttendance_banner", "") == true) {
       this->m_banner->CreateButtons();
     }
-    if (this->m_banner->m_entries.size() != 0) {
+    if (this->m_banner->HasEntries()) {
       this->m_banner->Show(1);
       this->Resize(488, 455);
       this->m_notice->Move(170, 418);

@@ -11,6 +11,7 @@
 #include "Contents/World/World.h"
 #include "File/File.h"
 #include "Network/TextEncoding.h"
+#include "Render/Primitives/RenderQueues.h"
 #include "Resource/World/TerrainResource.h"
 #include "Resource/Json/JsonCppLoader.h"
 
@@ -20,8 +21,6 @@
 #include <new>
 #include <string>
 #include <vector>
-
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 // GLOBAL: gl_24485
 template <>
@@ -58,7 +57,7 @@ void CEffect::SetDestinationBlend(int) {
 
 // OFFSET: 0x005A2120
 // FUNCTION: fn_03084
-void CEffect::SetColor(int, int, int) {
+void CEffect::SetColor(short, short, short) {
 }
 
 // OFFSET: 0x005A2130
@@ -253,17 +252,6 @@ void EffectResourceSwitcher::SetDelay(int argument) {
 void CEffect::SetResource(int) {
 }
 
-// OFFSET: 0x005A2630
-// FUNCTION: fn_03115
-template <>
-CEZ2STREffectMgr* Singleton<CEZ2STREffectMgr>::GetInstance() {
-  if (!s_instance) {
-    s_instance = new (std::nothrow) CEZ2STREffectMgr;
-  }
-
-  return s_instance;
-}
-
 // OFFSET: 0x006FFA00
 // FUNCTION: fn_06967
 __declspec(noinline) unsigned char CEZ2STREffectEx::IsFinished() {
@@ -277,7 +265,13 @@ __declspec(noinline) unsigned char CEZ2STREffectEx::IsFinished() {
 // OFFSET: 0x006FFA20
 // FUNCTION: fn_06968
 void CEZ2STREffectEx::Open() {
-  EZ2STREffectInfo* info = CEZ2STREffectMgr::GetInstance()->FindById(this->id);
+  CEZ2STREffectMgr* manager = CEZ2STREffectMgr::s_instance;
+  if (!manager) {
+    manager = new (std::nothrow) CEZ2STREffectMgr;
+    CEZ2STREffectMgr::s_instance = manager;
+  }
+
+  EZ2STREffectInfo* info = manager->FindById(this->id);
   if (!info) {
     return;
   }
@@ -292,30 +286,29 @@ void CEZ2STREffectEx::Open() {
   particle->Load(info->name);
 
   CEZ2STRParticle* emitter = static_cast<CEZ2STRParticle*>(particle);
-  emitter->offsetX = info->offsetX;
-  emitter->offsetY = info->offsetY;
-  emitter->offsetZ = 0.0f;
+  const vector3d offset = {info->offsetX, info->offsetY, 0.0f};
+  emitter->offset = offset;
   if (info->flags & 1) {
     this->retained = 1;
     emitter->m_loop = 1;
   }
 
-  emitter->m_delay = info->delays[1];
-  this->frameStep = info->delays[1] / 16;
+  emitter->m_delay = info->interval;
+  this->frameStep = info->interval / 16;
   if (!info->soundPath.empty()) {
     this->AddEvent(0, info->soundPath.c_str(), this->frameStep + 1, 0);
   }
 
-  if (info->delays[0] >= 0) {
-    this->AddEvent(1, nullptr, info->delays[0], 0);
+  if (info->delay >= 0) {
+    this->AddEvent(1, nullptr, info->delay, 0);
   }
 
   if (info->flags & 2) {
-    particle->flags = 0xD;
+    particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
   }
 
   if (info->flags & 4) {
-    particle->flags = 0x205;
+    particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_NO_DEPTH;
   }
 
   emitter->m_repeatFrame = (info->flags >> 3) & 1;
@@ -369,16 +362,14 @@ void CEZ2STREffectEx::OnProcess() {
     const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
 
     const vector3d position = this->positionVector;
-    const float viewX = position.y * view.values[3] + position.x * view.values[0] + position.z * view.values[6] + view.values[9] + emitter->offsetX;
-    const float viewY = position.y * view.values[4] + position.x * view.values[1] + position.z * view.values[7] + view.values[10] - emitter->offsetY;
-    const float viewZ = position.y * view.values[5] + position.x * view.values[2] + position.z * view.values[8] + view.values[11];
+    const float viewZ = position.x * view.values[2] + position.y * view.values[5] + position.z * view.values[8] + view.values[11];
+    const float viewX = position.x * view.values[0] + position.y * view.values[3] + position.z * view.values[6] + view.values[9] + emitter->offsetX;
+    const float viewY = position.x * view.values[1] + position.y * view.values[4] + position.z * view.values[7] + view.values[10] - emitter->offsetY;
 
-    const float worldX = viewY * inverse.values[3] + viewX * inverse.values[0] + viewZ * inverse.values[6] + inverse.values[9];
-    const float worldY = viewY * inverse.values[4] + viewX * inverse.values[1] + viewZ * inverse.values[7] + inverse.values[10];
-    const float worldZ = viewY * inverse.values[5] + viewX * inverse.values[2] + viewZ * inverse.values[8] + inverse.values[11];
-    emitter->position.x = worldX;
-    emitter->position.y = worldY;
-    emitter->position.z = worldZ;
+    const vector3d world = {viewX * inverse.values[0] + viewY * inverse.values[3] + viewZ * inverse.values[6] + inverse.values[9],
+                            viewX * inverse.values[1] + viewY * inverse.values[4] + viewZ * inverse.values[7] + inverse.values[10],
+                            viewX * inverse.values[2] + viewY * inverse.values[5] + viewZ * inverse.values[8] + inverse.values[11]};
+    emitter->position = world;
     static_cast<CEZ2STRParticle*>(emitter)->Process(0.0f, 0.0f, 0.0f);
   }
 
@@ -493,6 +484,12 @@ void CEZ2STREffectEx::SetDelay(int argument) {
   this->SetEventFrame(0, this->frameStep + 1);
 }
 
+// INLINED
+static void SetOffset(EZ2STREffectInfo& info, float x, float y) {
+  info.offsetX = x;
+  info.offsetY = y;
+}
+
 // OFFSET: 0x00700070
 // FUNCTION: fn_06983
 void CEZ2STREffectMgr::InfoInserter::operator()(const std::pair<const std::string, EZ2STREffectRecord>& entry) const {
@@ -503,15 +500,14 @@ void CEZ2STREffectMgr::InfoInserter::operator()(const std::pair<const std::strin
   EZ2STREffectInfo info;
   info.id = static_cast<int>(this->manager->effects.size());
   info.name = static_cast<const std::string&>(FromUtf8(entry.second.name, g_textCodePage));
-  info.offsetX = static_cast<float>(entry.second.offsetX);
+  SetOffset(info, static_cast<float>(entry.second.offsetX), static_cast<float>(entry.second.offsetY));
   info.flags = entry.second.infinite ? info.flags | 1 : info.flags;
   info.flags = entry.second.floor ? info.flags | 2 : info.flags;
-  info.offsetY = static_cast<float>(entry.second.offsetY);
   info.flags = entry.second.aboveUi ? info.flags | 4 : info.flags;
   info.soundPath = static_cast<const std::string&>(FromUtf8(entry.second.soundPath, g_textCodePage));
   info.flags = entry.second.soundLoop ? info.flags | 8 : info.flags;
-  info.delays[0] = entry.second.delays[0];
-  info.delays[1] = entry.second.delays[1];
+  info.delay = entry.second.delays[0];
+  info.interval = entry.second.delays[1];
   info.flags = entry.second.toGround ? info.flags | 16 : info.flags;
 
   std::string key = FromUtf8(entry.first, g_textCodePage);
@@ -522,13 +518,13 @@ void CEZ2STREffectMgr::InfoInserter::operator()(const std::pair<const std::strin
 // OFFSET: 0x00700A10
 // FUNCTION: fn_06988
 EZ2STREffectInfo* CEZ2STREffectMgr::FindById(int id) {
-  auto it = this->effects.begin();
-  const auto end = this->effects.end();
+  auto it = this->effects.cbegin();
+  const auto end = this->effects.cend();
   while (it != end && id != it->second.id + 10000) {
     ++it;
   }
 
-  return it != end ? &it->second : nullptr;
+  return it != end ? const_cast<EZ2STREffectInfo*>(&it->second) : nullptr;
 }
 
 // OFFSET: 0x00700A90
@@ -549,7 +545,8 @@ int CEZ2STREffectMgr::EffectId(const std::string& name) {
 // FUNCTION: fn_06990
 std::vector<int> CEZ2STREffectMgr::EffectIds() {
   std::vector<int> ids;
-  for (auto it = this->effects.begin(); it != this->effects.end(); ++it) {
+  const auto end = this->effects.end();
+  for (auto it = this->effects.begin(); it != end; it++) {
     ids.push_back(it->second.id + 10000);
   }
   return ids;

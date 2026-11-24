@@ -18,6 +18,11 @@ public:
   void Close() override;
   bool IsAlive() override;
 
+private:
+  __forceinline void AddParticlePair();
+  void RenderParticle(CParticle* particle);
+
+public:
   /* 00CC */ std::list<CParticle*> particles;
 };
 

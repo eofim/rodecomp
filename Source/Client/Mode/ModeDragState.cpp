@@ -20,7 +20,7 @@ void CGameMode::ClearDrag() {
   this->drag.name = "";
   this->drag.itemValue = 0;
   this->drag.resource = "";
-  this->drag.source = 0;
+  this->drag.source = DRAG_NONE;
   this->drag.quantity = 0;
   this->drag.slot = -1;
   this->drag.skillLevel = 0;
@@ -59,7 +59,7 @@ void CGameMode::BeginDragItem(int sourceValue, const ITEM_INFO& item, int quanti
     }
 
     this->drag.grade = static_cast<std::uint16_t>(item.grade);
-    this->drag.uniqueItem = item.flags[3];
+    this->drag.uniqueItem = item.uniqueItem;
     this->drag.equipmentLocation = item.identity[2];
     this->drag.viewId = item.sprite;
   }
@@ -131,42 +131,6 @@ void ModeDragState::Clear() {
   std::memset(this->cards, 0, sizeof(this->cards));
   this->barterId = -1;
   this->grade = 0;
-}
-
-// INLINED
-void ModeDragState::BeginItem(
-  WindowManagerWindows& windows, int sourceValue, const ITEM_INFO& item, int quantityValue, int slotValue
-) {
-  windows.ShowWindowById(WID_ITEMDROPCNTWND, 0);
-
-  this->Clear();
-  if (item.identity[1] == 0) {
-    return;
-  }
-
-  this->source = sourceValue;
-  this->skill = 0;
-  this->id = item.identity[1];
-  this->quantity = quantityValue;
-  this->resource = g_session.ItemDragResource(item.itemId.c_str(), item.identified);
-  this->name = item.itemId;
-  this->itemValue = item.prices[0];
-  this->price = item.prices[1];
-  this->type = item.identity[0];
-  this->identified = item.identified;
-  this->slot = slotValue;
-  this->refine = item.refiningLevel;
-  std::memcpy(this->cards, item.cards, sizeof(this->cards));
-  this->optionCount = item.optionCount;
-
-  for (int index = 0; index < this->optionCount; ++index) {
-    this->options[index] = item.options[index];
-  }
-
-  this->grade = static_cast<std::uint16_t>(item.grade);
-  this->uniqueItem = item.flags[3];
-  this->equipmentLocation = item.identity[2];
-  this->viewId = item.sprite;
 }
 
 // INLINED

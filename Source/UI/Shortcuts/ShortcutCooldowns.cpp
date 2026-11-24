@@ -1,5 +1,6 @@
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMessage.h"
+#include "Contents/Actors/AccessoryId.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Login/UINewSelectCharWnd.h"
@@ -17,6 +18,7 @@
 #include "UI/Shop/ItemDrawing.h"
 #include "UI/Shortcuts/UIQuickSlotWnd.h"
 #include "UI/Cooldowns/CooldownOwner.h"
+#include "UI/Cooldowns/CooldownClock.h"
 #include "UI/Status/UIRebirthWnd.h"
 #include "UI/Party/UISeekPartyMBWnd.h"
 #include "UI/Party/UISeekPartyWnd.h"
@@ -62,9 +64,6 @@
 #include <cstring>
 #include <windows.h>
 #include <timeapi.h>
-
-template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
-template __declspec(noinline) std::_Tree_find_result<std::map<int, std::int64_t>::_Mybase::_Nodeptr> std::map<int, std::int64_t>::_Mybase::_Find_lower_bound<int>(const int&) const;
 
 // OFFSET: 0x00E1DCA0
 // FUNCTION: fn_23875
@@ -124,9 +123,9 @@ struct SeekPartyClosePacket {
 void CGameMode::LoadCooldownSnapshot(const void* packet) {
   g_session.m_requestTimers.clear();
   const auto* snapshot = static_cast<const CooldownSnapshotPacket*>(packet);
-  const CooldownSnapshotEntry* entry = snapshot->entries;
   const int count = (snapshot->size - 2) / 10;
 
+  const CooldownSnapshotEntry* entry = snapshot->entries;
   for (int index = 0; index < count; ++index, ++entry) {
     ShortcutCooldownRecord value;
     value.id = entry->id;
@@ -194,7 +193,8 @@ void CGameMode::ApplyCooldownStart(const void* packet) {
     }
   }
 
-  for (const ShortcutCooldownIcon& icon : g_session.m_alternateCooldownIcons) {
+  for (auto iconIt = g_session.m_alternateCooldownIcons.begin(); iconIt != g_session.m_alternateCooldownIcons.end(); ++iconIt) {
+    const ShortcutCooldownIcon& icon = *iconIt;
     if (icon.id == start->id &&
         std::find_if(g_session.m_requestTimers.begin(), g_session.m_requestTimers.end(), [&](const ShortcutCooldownRecord& record) { return record.id == icon.id; }) ==
           g_session.m_requestTimers.end()) {
@@ -205,90 +205,42 @@ void CGameMode::ApplyCooldownStart(const void* packet) {
 }
 
 void PaintCooldowns(
-  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, std::list<CooldownState> ShortcutCooldownRecord::* values, int limit, int x, int y, CooldownDrawing& drawing
+  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, std::list<CooldownState> ShortcutCooldownRecord::* values, int limit, const int& x, const int& y, CooldownOwner* const& owner
 );
 
 // INLINED
-bool RotateCooldownRows(std::list<ShortcutCooldownRecord>& records, int amount, int bank, int& rotation0, int& rotation1) {
-  const int rows = amount < 4 ? amount : amount % 4;
-  if (rows <= 0) {
-    return false;
-  }
-
-  if (bank == 0 || bank == 1) {
-    int& rotation = bank == 0 ? rotation0 : rotation1;
-    rotation += rows;
-    if (rotation >= 4) {
-      rotation -= 4;
-    }
-  }
-
-  const std::uint32_t now = CooldownNow();
-
-  for (auto entry = records.begin(); entry != records.end();) {
-    if (entry->end <= now) {
-      entry = records.erase(entry);
-      continue;
-    }
-
-    for (CooldownState& state : entry->main) {
-      state.slot -= 9 * rows;
-      state.y -= 33 * rows;
-      if (state.slot < 0) {
-        state.slot += 36;
-        state.y += 132;
-      }
-    }
-
-    ++entry;
-  }
-
-  return true;
-}
-
-// INLINED
-void PaintMainCooldowns(
-  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, int rows, int x, int y, CooldownDrawing& drawing
-) {
-  const int limit = rows * 33 + 4;
-  PaintCooldowns(records, icons, &ShortcutCooldownRecord::main, limit, x, y, drawing);
-}
-
-// INLINED
 __forceinline void PaintAlternateCooldowns(
-  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, int x, int y, CooldownDrawing& drawing
+  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, int x, int y, CooldownOwner& owner
 ) {
-  PaintCooldowns(records, icons, &ShortcutCooldownRecord::alternate, 0, x, y, drawing);
+  PaintCooldowns(records, icons, &ShortcutCooldownRecord::alternate, 0, x, y, &owner);
 }
 
 // INLINED
 __forceinline void PaintCooldowns(
-  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, std::list<CooldownState> ShortcutCooldownRecord::* values, int limit, int x, int y, CooldownDrawing& drawing
+  std::list<ShortcutCooldownRecord>& records, const std::list<ShortcutCooldownIcon>& icons, std::list<CooldownState> ShortcutCooldownRecord::* values, int limit, const int& x, const int& y, CooldownOwner* const& owner
 ) {
   const std::uint32_t now = CooldownNow();
 
   for (auto entry = records.begin(); entry != records.end();) {
     if (entry->end > now) {
-      std::list<CooldownState>& states = (*entry).*values;
-
       for (auto icon = icons.begin(); icon != icons.end(); ++icon) {
         if (entry->id == icon->id || (entry->id == 577 && !g_session.IsHomunculusSkill(icon->id))) {
-          const auto previous = std::find_if(states.begin(), states.end(), [&](const CooldownState& state) { return state.slot == icon->slot; });
-          if (previous == states.end()) {
-            states.push_back(CooldownState(icon->slot, icon->x, icon->y, entry->duration, entry->end - entry->duration, 0, 0));
+          const auto previous = std::find_if(((*entry).*values).begin(), ((*entry).*values).end(), [&](const CooldownState& state) { return state.slot == icon->slot; });
+          if (previous == ((*entry).*values).end()) {
+            ((*entry).*values).push_back(CooldownState(icon->slot, icon->x, icon->y, entry->duration, entry->end - entry->duration, 0, 0));
           }
         }
 
         if ((g_session.IsHomunculusSkill(icon->id) || g_session.IsMercenarySkill(icon->id)) && entry->id == 9999) {
-          const auto previous = std::find_if(states.begin(), states.end(), [&](const CooldownState& state) { return state.slot == icon->slot; });
-          if (previous == states.end()) {
-            states.push_back(CooldownState(icon->slot, icon->x, icon->y, entry->duration, entry->end - entry->duration, 0, 0));
+          const auto previous = std::find_if(((*entry).*values).begin(), ((*entry).*values).end(), [&](const CooldownState& state) { return state.slot == icon->slot; });
+          if (previous == ((*entry).*values).end()) {
+            ((*entry).*values).push_back(CooldownState(icon->slot, icon->x, icon->y, entry->duration, entry->end - entry->duration, 0, 0));
           }
         }
       }
 
-      for (auto state = states.begin(); state != states.end(); ++state) {
-        drawing.Draw(0, 0, 12, 12, *state, limit, x, y);
+      for (auto state = ((*entry).*values).begin(); state != ((*entry).*values).end(); ++state) {
+        owner->Draw(0, 0, 12, 12, *state, limit, x, y);
       }
 
       ++entry;
@@ -328,17 +280,19 @@ void UISeekPartyListWnd::Paint() {
     return;
   }
 
-  unsigned red;
-  unsigned green;
-  unsigned blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  {
+    unsigned red;
+    unsigned green;
+    unsigned blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  }
 
   if (g_session.m_partyBooking.m_entries.size() != 0) {
     int drawn = 0;
     int index = 0;
     int y = 124;
-    for (auto it = g_session.m_partyBooking.m_entries.begin(); it != g_session.m_partyBooking.m_entries.end(); ++it, ++index) {
+    for (auto it = g_session.m_partyBooking.m_entries.begin(), end = g_session.m_partyBooking.m_entries.end(); it != end; ++it, ++index) {
       if (index < this->m_firstRow * this->m_columnCount) {
         continue;
       }
@@ -348,12 +302,13 @@ void UISeekPartyListWnd::Paint() {
 
       const PartyBookingEntry entry = it->second;
       const int row = index + 1;
-      this->FillRegion(20, y, 510, 40, 0xCECECE);
       if (it->second.isEnd) {
+        this->FillRegion(20, y, 510, 40, 0xCECECE);
         this->FillRegion(21, y + 1, 508, (row + 1 != static_cast<int>(g_session.m_partyBooking.m_entries.size())) + 38, 0xFFFFFF);
         auto* more = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\more_info.bmp")));
-        this->DrawBitmap(22, y + 2, &more->image, false);
+        this->DrawBitmap(22, y + 2, more, false);
       } else {
+        this->FillRegion(20, y, 510, 40, 0xCECECE);
         this->FillRegion(21, y + 1, 508, (row != static_cast<int>(g_session.m_partyBooking.m_entries.size())) + 38, 0xFFFFFF);
         if (this->m_hoverIndex == index) {
           this->FillRegion(20, y, 510, 40, 0xEF9C73);
@@ -361,9 +316,7 @@ void UISeekPartyListWnd::Paint() {
 
         const int textY = y + 3;
         this->DrawTextAt(22, textY, entry.time.c_str(), 0, 0, 12, 0, 0, 0);
-        const char* charName =
-          this->ClipTextToWidth(entry.charName.c_str(), 130, 0, 12, 0);
-        this->DrawTextAt(76, textY, charName, 0, 0, 12, 0, 0, 0);
+        this->DrawTextAt(76, textY, this->ClipTextToWidth(entry.charName.c_str(), 130, 0, 12, 0), 0, 0, 12, 0, 0, 0);
         this->DrawTextAt(215, textY, entry.level.c_str(), 0, 0, 12, 0, 0, 0);
         this->DrawTextAt(280, textY, entry.location.c_str(), 0, 0, 12, 0, 0, 0);
         this->DrawTextAt(22, y + 23, entry.jobs.c_str(), 0, 0, 12, 0, 0, 0);
@@ -418,8 +371,7 @@ void UISeekPartyWnd::Paint() {
       "유저인터페이스\\basic_interface\\seekparty\\type_0%d\\seekparty_%s_0%d_%d.bmp", this->m_type, names[this->m_type], this->m_type, this->m_level
     ));
     if (ResourceMgr::Instance().Exists(name.c_str())) {
-      auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
-      this->DrawBitmap(1, 18, bitmap, false);
+      this->DrawBitmap(1, 18, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str()))), false);
     }
   }
 
@@ -444,23 +396,22 @@ void UIQuickSlotWnd::Paint() {
 
   g_session.m_alternateCooldownIcons.clear();
 
-  const QuickSlotEntry* entry = this->m_entries;
-  for (int index = 0; index < 2; ++index, ++entry) {
-    if (entry->id == 0) {
+  for (int index = 0; index < 2; ++index) {
+    if (this->m_entries[index].id == 0) {
       continue;
     }
 
     const int x = index * 29 + 5;
-    if (entry->skill) {
-      CSkillInfo skill = g_session.LookupSkill(entry->id);
+    if (this->m_entries[index].skill) {
+      CSkillInfo skill = g_session.LookupSkill(this->m_entries[index].id);
       if (skill.available) {
         char text[1024];
         g_session.ItemBitmapPath(skill.name, text);
         auto* image = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(text)));
         g_session.m_alternateCooldownIcons.push_back({skill.id, index, x, 5});
         this->DrawBitmap(x, 5, image, true);
-        if (entry->count != 0) {
-          std::sprintf(text, "%d", entry->count);
+        if (this->m_entries[index].count != 0) {
+          std::sprintf(text, "%d", this->m_entries[index].count);
           this->DrawTextAt(x + 15, 20, text, 0, 0, 11, 0xFFFFFF, 0, 0);
           this->DrawTextAt(x + 13, 20, text, 0, 0, 11, 0xFFFFFF, 0, 0);
           this->DrawTextAt(x + 14, 21, text, 0, 0, 11, 0xFFFFFF, 0, 0);
@@ -469,7 +420,7 @@ void UIQuickSlotWnd::Paint() {
         }
       }
     } else {
-      ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(entry->id), 1);
+      ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(this->m_entries[index].id), 1);
       if (item.identity[1] > 0) {
         this->DrawItemAndQuantity(x, 5, item, item.identified, 1);
         if (0 < item.grade) {
@@ -485,7 +436,7 @@ void UIQuickSlotWnd::Paint() {
     }
   }
 
-  PaintAlternateCooldowns(g_session.m_requestTimers, g_session.m_alternateCooldownIcons, this->geometry.x, this->geometry.y, g_cooldownOwner->Drawing());
+  PaintCooldowns(g_session.m_requestTimers, g_session.m_alternateCooldownIcons, &ShortcutCooldownRecord::alternate, 0, this->geometry.x, this->geometry.y, g_cooldownOwner);
 }
 
 // OFFSET: 0x00924A50
@@ -495,24 +446,19 @@ void UIQuickSlotWnd::OnCreate(int, int) {}
 // OFFSET: 0x00930610
 // FUNCTION: fn_12686
 void UIQuickSlotWnd::OnLBtnDblClk(int x, int y) {
-  if (static_cast<int>(g_session.m_options.Get(5)) > 0 || static_cast<unsigned>(y) > 23) {
+  if (static_cast<int>(g_session.m_options.Get(5)) > 0) {
     return;
   }
 
-  if (x > 58 && x < this->geometry.width) {
-    return;
-  }
-
-  const int slot = (x - 4) / 29;
-  if (x > slot * 29 + 30 || slot == -1) {
+  const int slot = this->SlotAt(x, y);
+  if (slot == -1) {
     return;
   }
 
   AutomaticSkills& automatic = g_session.m_automaticSkills;
-  const QuickSlotEntry& entry = this->m_entries[slot];
-  if (entry.skill && automatic.Contains(static_cast<std::uint16_t>(entry.id))) {
-    const int option = automatic.CancelOption(static_cast<std::uint16_t>(entry.id));
-    g_session.SetOption(option, 1, 0);
+  if (this->m_entries[slot].skill && automatic.Contains(static_cast<std::uint16_t>(this->m_entries[slot].id))) {
+    const int option = automatic.CancelOption(static_cast<std::uint16_t>(this->m_entries[slot].id));
+    g_session.SetOption(option, 1);
   } else {
     automatic.DisableAll();
   }
@@ -661,7 +607,7 @@ int g_charViewOffsetY;
 void UISelCharForUServerWnd::Paint() {
   const char* background =
     g_session.characterCount > 12 ? "유저인터페이스\\login_interface\\selCharForIntergration2.bmp" : "유저인터페이스\\login_interface\\selCharForIntergration.bmp";
-  auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background)));
+  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(background)));
   this->DrawBitmap(0, 0, bitmap, false);
 
   for (int index = 0; index < g_session.characterCount; ++index) {
@@ -669,23 +615,22 @@ void UISelCharForUServerWnd::Paint() {
       continue;
     }
 
-    CharSlotInfo& slot = this->m_slots[index];
-    this->DrawRobeSprite(slot.job, g_session.GetCurrentSex(), slot.robe, slot.x, slot.y, false, 0, 0);
+    this->DrawRobeSprite(this->m_slots[index].job, g_session.GetCurrentSex(), this->m_slots[index].robe, this->m_slots[index].x, this->m_slots[index].y, false, 0, 0);
 
     SpriteAtlasRecord record{};
     for (int layer = 0; layer < 5; ++layer) {
-      if (slot.actionNames[layer].size() == 0 || slot.spriteNames[layer].size() == 0) {
+      if (this->m_slots[index].actionNames[layer].size() == 0 || this->m_slots[index].spriteNames[layer].size() == 0) {
         continue;
       }
 
-      ResourceMgr::Instance().Load(slot.imfName.c_str());
-      auto* act = static_cast<CActRes*>(ResourceMgr::Instance().Load(slot.actionNames[layer].c_str()));
-      auto* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(slot.spriteNames[layer].c_str()));
-      const ActionFrame* frame = &act->Frame(slot.action, slot.frame);
+      ResourceMgr::Instance().Load(this->m_slots[index].imfName.c_str());
+      auto* act = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_slots[index].actionNames[layer].c_str()));
+      auto* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(this->m_slots[index].spriteNames[layer].c_str()));
+      const ActionFrame* frame = &act->Frame(this->m_slots[index].action, this->m_slots[index].frame);
 
       int offsetX = 0;
       int offsetY = 0;
-      if (g_session.IsDoramJob(slot.job) == true) {
+      if (g_session.IsDoramJob(this->m_slots[index].job) == true) {
         const auto* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
         int x = 0;
         int y = 0;
@@ -698,14 +643,14 @@ void UISelCharForUServerWnd::Paint() {
           item = info->accessory3;
         }
 
-        int turn = 0;
-        if (slot.frame == 2) {
-          turn = -1;
-        } else if (slot.frame == 1) {
-          turn = 1;
+        int direction = 0;
+        if (this->m_slots[index].frame == 2) {
+          direction = -1;
+        } else if (this->m_slots[index].frame == 1) {
+          direction = 1;
         }
 
-        int direction = turn - slot.actionBase + slot.action;
+        direction += this->m_slots[index].action - this->m_slots[index].actionBase;
         if (direction < 0) {
           direction = 7;
         }
@@ -719,11 +664,11 @@ void UISelCharForUServerWnd::Paint() {
       }
 
       if (layer == 1) {
-        const ActionFrame* body = &static_cast<CActRes*>(ResourceMgr::Instance().Load(slot.actionNames[0].c_str()))->Frame(slot.action, slot.frame);
+        const ActionFrame* body = &static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_slots[index].actionNames[0].c_str()))->Frame(this->m_slots[index].action, this->m_slots[index].frame);
         if (frame->anchorCount != 0 && body->anchorCount != 0) {
           const ActionAnchor* head = frame->anchors.data();
           const ActionAnchor* base = body->anchors.data();
-          if (head->attachmentId == base->attachmentId) {
+          if (base->attachmentId == head->attachmentId) {
             offsetX += base->x - head->x;
             g_charViewOffsetX = offsetX;
             offsetY += base->y - head->y;
@@ -731,13 +676,13 @@ void UISelCharForUServerWnd::Paint() {
           }
         }
       } else if (layer == 2 || layer == 3 || layer == 4) {
-        const ActionFrame* head = &static_cast<CActRes*>(ResourceMgr::Instance().Load(slot.actionNames[1].c_str()))->Frame(slot.action, slot.frame);
+        const ActionFrame* head = &static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_slots[index].actionNames[1].c_str()))->Frame(this->m_slots[index].action, this->m_slots[index].frame);
         int syncedFrame = 0;
         const ActionFrame* synced = g_session.GetSyncedFrame(
-          static_cast<CActRes*>(ResourceMgr::Instance().Load(slot.actionNames[1].c_str())),
-          static_cast<CActRes*>(ResourceMgr::Instance().Load(slot.actionNames[layer].c_str())), slot.action, slot.frame, this->m_startTime, &syncedFrame
+          static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_slots[index].actionNames[1].c_str())),
+          static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_slots[index].actionNames[layer].c_str())), this->m_slots[index].action, this->m_slots[index].frame, this->m_startTime, &syncedFrame
         );
-        if (synced && syncedFrame != slot.frame) {
+        if (synced && syncedFrame != this->m_slots[index].frame) {
           frame = synced;
         }
 
@@ -752,23 +697,31 @@ void UISelCharForUServerWnd::Paint() {
 
         offsetX += g_charViewOffsetX;
         offsetY += g_charViewOffsetY;
-        if (layer == 3 && (this->accessory2[index] == 0xB5 || this->accessory2[index] == 0xC5)) {
-          offsetY -= 7;
+        if (layer == 3) {
+          switch (this->accessory2[index]) {
+          case ACCESSORY_TIGER_MASK:
+          case ACCESSORY_BANANA_HAT:
+            offsetY -= 7;
+            break;
+          }
         }
       }
 
       const std::uint32_t* palette = sprite->palette;
-      if (layer == 0) {
-        if (slot.bodyPalette != 0) {
-          palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(slot.bodyPaletteName.c_str()))->palette;
+      switch (layer) {
+      case 0:
+        if (this->m_slots[index].bodyPalette != 0) {
+          palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->m_slots[index].bodyPaletteName.c_str()))->palette;
         }
-      } else if (layer == 1) {
-        if (slot.headPalette != 0) {
-          palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(slot.headPaletteName.c_str()))->palette;
+        break;
+      case 1:
+        if (this->m_slots[index].headPalette != 0) {
+          palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->m_slots[index].headPaletteName.c_str()))->palette;
         }
+        break;
       }
 
-      const SpriteFrameCell& cell = frame->Cell(layer < 2 ? layer : 0);
+      const SpriteFrameCell& cell = frame->Cell(layer <= 1 ? layer : 0);
       if (cell.image == -1) {
         continue;
       }
@@ -785,7 +738,7 @@ void UISelCharForUServerWnd::Paint() {
       }
 
       this->geometry.surface->DrawSurface(
-        cell.x + offsetX + slot.x, cell.y + offsetY + slot.y, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f),
+        this->m_slots[index].x + (cell.x + offsetX), this->m_slots[index].y + (cell.y + offsetY), texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f),
         image->width, image->height, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
       );
     }
@@ -843,14 +796,15 @@ void UISerachStoreInfoWnd::Paint() {
     return;
   }
 
+  std::vector<SearchStoreResult>::const_iterator entry = g_session.storeSearchResults.begin() + (this->m_page - 1) * 10;
   int row = 0;
-  for (std::vector<SearchStoreResult>::const_iterator entry = g_session.storeSearchResults.begin() + (this->m_page - 1) * 10; entry != end; ++entry, ++row) {
+  for (; entry != end; ++entry, ++row) {
     if (row == 10) {
       break;
     }
 
     if (this->m_hoverRow == row) {
-      this->FillRegion(5, this->m_rowHeight * row + 100, this->geometry.width - 10, this->m_rowHeight, 0xFBDFCA);
+      this->FillRegion(5, this->m_rowHeight * this->m_hoverRow + 100, this->geometry.width - 10, this->m_rowHeight, 0xFBDFCA);
     }
     this->DrawRectOutline(50, this->m_rowHeight * row + 100, 110, this->m_rowHeight + 1, 0xC0C0C0);
     this->DrawRectOutline(330, this->m_rowHeight * row + 100, 30, this->m_rowHeight + 1, 0xC0C0C0);

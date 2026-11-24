@@ -18,6 +18,10 @@ class CUITime;
 
 class CDelayItemData {
 public:
+  // INLINED
+  CDelayItemData(int levelIndex, const std::map<int, int>& delayTimes) : levelIndex(levelIndex), delayTimes(delayTimes) {
+  }
+
   /* 0000 */ int levelIndex;
   /* 0004 */ std::map<int, int> delayTimes;
 };
@@ -25,6 +29,7 @@ public:
 class CUIDelayItem : public CUIListItem {
 public:
   __declspec(noinline) CUIDelayItem();
+  CUITime* AddTime();
   void OnCreate(int width, int height) override;
   void OnInit() override;
   void Paint() override;

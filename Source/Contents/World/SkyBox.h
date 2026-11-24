@@ -9,12 +9,10 @@
 
 class C3dActor;
 class CRes;
+struct matrix;
 
 struct FlareElement {
   FlareElement();
-  FlareElement(int type, float distance, float size, float red, float green, float blue)
-    : type(type), distance(distance), size(size), red(red), green(green), blue(blue), position{0.0f, 0.0f, 0.0f} {
-  }
 
   FlareElement& operator=(const FlareElement& other) {
     this->type = other.type;
@@ -43,7 +41,8 @@ public:
   __declspec(noinline) CLensFlare();
 
   void Init();
-  void Update(const float* matrix, vector3d eye, vector3d target);
+  FlareElement MakeElement(int type, float distance, float size, float red, float green, float blue) const;
+  void Update(float unused, vector3d eye, vector3d target);
   void Render(const float* matrix, vector3d eye, vector3d target);
 
   /* 0000 */ FlareElement m_elements[12];
@@ -68,9 +67,10 @@ struct SkyCubeVertex : RenderVertex {
 class CSkyCube {
 public:
   CSkyCube();
+  void Render(const matrix& camera, const vector3d& position, float rotation, float height, vector3d eye, vector3d target);
 
   /* 0000 */ SkyCubeVertex m_vertices[10];
-  /* 0140 */ int m_loopRotationY;
+  /* 0140 */ float m_loopRotationY;
   /* 0144 */ CLensFlare m_flare;
 };
 
@@ -83,7 +83,9 @@ struct SkyBoxVertex {
 
 class CSkyBox {
 public:
+  CSkyBox();
   ~CSkyBox();
+  void Render(const matrix& camera, const vector3d& position, float rotation, float height, vector3d eye, vector3d target);
 
   /* 0000 */ CRes* m_model;
   /* 0004 */ C3dActor* m_actor;

@@ -10,9 +10,6 @@
 
 #include <new>
 
-template __declspec(noinline) std::shared_ptr<CSurface>& std::shared_ptr<CSurface>::operator=(std::shared_ptr<CSurface>&&) noexcept;
-template __declspec(noinline) std::shared_ptr<CSurface>& std::shared_ptr<CSurface>::operator=<CSurfaceDX7>(std::shared_ptr<CSurfaceDX7>&&) noexcept;
-
 // GLOBAL: gl_24503
 DeviceOwnerDX7* g_deviceOwnerDX7;
 
@@ -104,7 +101,8 @@ void CRenderSystemDX7::UpdateOption() {
 // FUNCTION: fn_02328
 CTexture* CRenderSystemDX7::BackBufferTexture() {
   if (!this->m_defaultTexture) {
-    this->m_defaultTexture = std::make_unique<CTextureDX7>(*this->m_device);
+    const auto create = [this]() { return std::unique_ptr<CTextureDX7>(new CTextureDX7(*this->m_device)); };
+    this->m_defaultTexture = create();
   }
 
   return this->m_defaultTexture.get();

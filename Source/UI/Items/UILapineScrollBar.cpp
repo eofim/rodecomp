@@ -133,8 +133,8 @@ void UILapineBox_IngredientListWnd::Paint() {
 // FUNCTION: fn_45447
 UILapineBox_IngredientListWnd::UILapineBox_IngredientListWnd(int width, int height)
     : UIScrollWnd(width, height, 0), minRefine(0), maxRefine(20) {
-  this->Resize(width, height);
-  this->OnCreate(width, height);
+  this->UIWindow::Resize(width, height);
+  static_cast<UIWindow*>(this)->OnCreate(width, height);
 }
 
 // OFFSET: 0x005FF820
@@ -142,11 +142,13 @@ UILapineBox_IngredientListWnd::UILapineBox_IngredientListWnd(int width, int heig
 void UILapineBoxWnd::DragAndDrop(int, int, std::intptr_t value) {
   CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (this->items.size() < static_cast<unsigned>(this->maxItems) && drag->source == 27) {
-    const int result = this->ingredientList->SendMsg(this, UM_DECITEM, drag->id, 0, 0, 0);
-    if (result >= 0) {
-      this->AddIngredient(drag->id, drag->quantity);
-    }
+  if (this->items.size() >= static_cast<unsigned>(this->maxItems) || drag->source != 27) {
+    mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+    return;
+  }
+
+  if (this->ingredientList->SendMsg(this, UM_DECITEM, drag->id, 0, 0, 0) >= 0) {
+    this->AddIngredient(drag->id, drag->quantity);
   }
   mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
 }
@@ -234,15 +236,13 @@ void UIIngredientInfoWnd::Paint() {
   std::string name;
   name = this->FitDisplayText(100, this->item.displayName.c_str(), 0, 12, 0).c_str();
 
-  std::uint32_t color = 0;
   if (this->insufficient == 0) {
     this->DrawItemAndQuantity(4, 3, this->item, 0, 0);
+    this->DrawShadowedText(36, 9, name.c_str(), 0, 0, 0xE0E0E0, 0, 12, 0);
   } else {
     this->DrawItemAndQuantityAuxiliary(2, 4, 3, this->item, this->item.identified, 0);
-    color = 0x969696;
+    this->DrawShadowedText(36, 9, name.c_str(), 0, 0x969696, 0xE0E0E0, 0, 12, 0);
   }
-
-  this->DrawShadowedText(36, 9, name.c_str(), 0, color, 0xE0E0E0, 0, 12, 0);
 }
 
 // OFFSET: 0x005FFF90
@@ -254,7 +254,7 @@ void UILapineBoxWnd::Paint() {
     this->DrawTitleBar(false, this->title.c_str(), 0);
   }
 
-  this->DrawCenteredText(33, 47, LookupMessage(MSI_LAPINE_FAIL_NOT_ENOUGH_REFINING_LEVEL), 160, 0, 11, 0xCD7A51, 0);
+  this->DrawCenteredText(33, 47, LookupMessage(MSI_LAPINE_INGREDIENT_TO_COMBINE), 160, 0, 11, 0xCD7A51, 0);
   this->DrawCenteredText(33, 63, this->description.c_str(), 160, 0, 11, 0x844A42, 0);
 
   this->DrawCenteredText(98, 76, FormatOwnedString("%d", static_cast<int>(this->items.size())).c_str(), 14, 0, 11, 0xFFFFFF, 0);
@@ -263,11 +263,14 @@ void UILapineBoxWnd::Paint() {
   for (unsigned index = 0; index < this->items.size(); ++index) {
     int position[2];
     this->MaterialPosition(position, index);
-    this->DrawBitmap(position[0] - 4, position[1] + 11, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\lapine\\shadow_item_off.bmp"))), true);
-    this->DrawItemAndQuantity(position[0], position[1], this->items[index], 0, 0);
+    auto* shadow = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\lapine\\shadow_item_off.bmp")));
+    const int x = position[0];
+    const int y = position[1];
+    this->DrawBitmap(x - 4, y + 11, shadow, true);
+    this->DrawItemAndQuantity(x, y, this->items[index], 0, 0);
   }
 
-  if (timeGetTime() < this->noticeTick + this->noticeDuration) {
+  if (this->noticeTick + this->noticeDuration > timeGetTime()) {
     this->DrawBitmap(6, 229, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\lapine\\icon_notify.bmp"))), true);
     this->DrawTextAt(25, 230, this->notice.c_str(), 0, 0, 12, 0xFF0000, 0, 0);
   }
@@ -275,15 +278,15 @@ void UILapineBoxWnd::Paint() {
 
 // OFFSET: 0x00601D20
 // FUNCTION: fn_04177
-int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
+bool UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
   if (this->items.size() < 10) {
     if (std::find_if(this->items.begin(), this->items.end(), [id](ITEM_INFO entry) { return id == entry.identity[1]; }) != this->items.end()) {
-      return 0;
+      return false;
     }
     ITEM_INFO item = g_session.LookupClientItemByIdentity(id);
     item.quantity = quantity;
     {
-      std::vector<char*> breaks;
+      std::vector<const char*> breaks;
       char name[260];
       std::memset(name, 0, sizeof(name));
       char* highlight = nullptr;
@@ -292,12 +295,12 @@ int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
       int highlightColor;
       this->BuildItemName(&item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
       if (item.identified == 1 && item.optionCount != 0) {
-        sprintf_s(name, sizeof(name), LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), name, item.optionCount);
+        sprintf_s(name, sizeof(name), LookupMessage(MSI_EA6), name, item.optionCount);
       }
       item.SetName(name);
     }
     this->items.push_back(item);
-    if (static_cast<int>(this->items.size()) == this->maxItems) {
+    if (this->maxItems == static_cast<int>(this->items.size())) {
       {
         auto* moveButton = this->moveButton;
         moveButton->SetDisabled(1);
@@ -305,9 +308,9 @@ int UILapineBoxWnd::AddIngredient(std::uint32_t id, int quantity) {
       }
     }
     this->Invalidate();
-    return 1;
+    return true;
   }
-  return 0;
+  return false;
 }
 
 // OFFSET: 0x00602030
@@ -328,22 +331,22 @@ unsigned char UILapineBox_IngredientListWnd::AddIngredient(std::uint32_t id) {
   }
 
   auto it = std::find_if(this->materials.begin(), this->materials.end(), [owned](ITEM_INFO mat) {
-    return std::atoi(owned.itemId.c_str()) == std::atoi(mat.itemId.c_str());
+    const int ownedId = std::atoi(owned.itemId.c_str());
+    return ownedId == std::atoi(mat.itemId.c_str());
   });
 
   if (it == this->materials.end()) {
     return 0;
   }
 
-  for (UIIngredientInfoWnd* itemWnd : this->items) {
-    if (itemWnd->item.identity[1] == id) {
-      itemWnd->item.quantity += it->quantity;
-      itemWnd->insufficient = 0;
-      itemWnd->Show(1);
-      itemWnd->Invalidate();
-      this->Invalidate();
-      return 1;
-    }
+  auto entry = std::find_if(this->items.begin(), this->items.end(), [id](UIIngredientInfoWnd* info) { return id == info->item.identity[1]; });
+  if (entry != this->items.end()) {
+    (*entry)->item.quantity += it->quantity;
+    (*entry)->insufficient = 0;
+    (*entry)->Show(1);
+    (*entry)->Invalidate();
+    this->Invalidate();
+    return 1;
   }
 
   UILapineBoxWnd* owner = static_cast<UILapineBoxWnd*>(this->parent);

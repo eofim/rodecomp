@@ -1,0 +1,7 @@
+#ifndef RAGNAROK_SOURCE_RENDER_PROJECTION_RENDERPROJECTION_H
+#define RAGNAROK_SOURCE_RENDER_PROJECTION_RENDERPROJECTION_H
+
+extern float g_projectionDepthNumerator;
+extern float g_projectionDepthOffset;
+
+#endif

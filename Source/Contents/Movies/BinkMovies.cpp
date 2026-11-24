@@ -12,8 +12,6 @@
 #include <cmath>
 #include <new>
 
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // INLINED
 NamedBinkMovie::NamedBinkMovie() : decoder(nullptr), radius(150.0f) {
 }
@@ -74,7 +72,7 @@ NamedBinkMovie* BinkMovies::Get(std::string name, int loop) {
   auto found = std::find_if(this->m_movies.begin(), this->m_movies.end(), [name](NamedBinkMovie* movie) {
     return name.compare(movie->Name()) == 0;
   });
-  if (found != this->m_movies.end()) {
+  if (this->m_movies.end() != found) {
     return *found;
   }
 

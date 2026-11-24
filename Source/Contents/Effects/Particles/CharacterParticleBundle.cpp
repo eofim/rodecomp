@@ -25,6 +25,13 @@
 
 namespace {
 
+  // INLINED
+  static __forceinline vector3d TransformPoint(const matrix& transform, const vector3d point) {
+    return vector3d{point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9],
+                    point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10],
+                    point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11]};
+  }
+
   // GLOBAL: gl_24870
   std::unordered_map<int, std::vector<RadialGridPoint>> g_clawMarkRings;
 }
@@ -43,21 +50,14 @@ __declspec(noinline) CharacterParticleBundle::~CharacterParticleBundle() {
 // FUNCTION: fn_03129
 void CChopChopClawMarks::UpdateParticlePosition(CEZ2STRParticle* particle) {
   if (particle) {
-    const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
-    const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
+    const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+    const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
     const vector3d origin = this->positionVector;
-    const float x = origin.x;
-    const float y = origin.y;
-    const float z = origin.z;
-    vector3d camera;
-    camera.x = view[0] * x + view[3] * y + view[6] * z + view[9] + this->offsetX + particle->offsetX;
-    camera.y = view[1] * x + view[4] * y + view[7] * z + view[10] - this->offsetY + particle->offsetY;
-    camera.z = view[2] * x + view[5] * y + view[8] * z + view[11] + particle->offsetZ;
-    vector3d world;
-    world.x = camera.y * inverse[3] + camera.x * inverse[0] + camera.z * inverse[6] + inverse[9];
-    world.y = camera.x * inverse[1] + camera.y * inverse[4] + camera.z * inverse[7] + inverse[10];
-    world.z = camera.x * inverse[2] + camera.y * inverse[5] + camera.z * inverse[8] + inverse[11];
-    particle->position = world;
+    vector3d camera = TransformPoint(view, origin);
+    camera.x += this->offsetX;
+    camera.y -= this->offsetY;
+    camera += particle->offset;
+    particle->position = TransformPoint(inverse, camera);
   }
 }
 
@@ -68,6 +68,7 @@ void CChopChopClawMarks::SpawnParticle() {
   if (particle) {
     const std::vector<RadialGridPoint>& ring = this->GetRing(3);
     RadialGridPoint point;
+    std::vector<RadialGridPoint>::const_iterator found;
     do {
       const int positiveX = std::ranges::max(rand() % 2, 0);
       const int x = std::max(rand() % 4, 1);
@@ -83,9 +84,10 @@ void CChopChopClawMarks::SpawnParticle() {
         signedY = y;
       }
       point.y = static_cast<float>(signedY);
-    } while (ring.end() == std::find_if(ring.begin(), ring.end(), [&point](const RadialGridPoint& candidate) {
-      return candidate.x == point.x && candidate.y == point.y;
-    }));
+      found = std::find_if(ring.begin(), ring.end(), [&point](const RadialGridPoint& candidate) {
+        return candidate.x == point.x && candidate.y == point.y;
+      });
+    } while (found == ring.end());
 
     const float x = point.x * 5.0f;
     const float y = point.y * 5.0f;
@@ -121,8 +123,9 @@ void CharacterParticleBundle::Close() {
 // OFFSET: 0x005A3A10
 // FUNCTION: fn_03134
 const std::vector<RadialGridPoint>& CChopChopClawMarks::GetRing(int radius) {
+  const auto end = g_clawMarkRings.end();
   const auto found = g_clawMarkRings.find(radius);
-  if (found != g_clawMarkRings.end()) {
+  if (found != end) {
     return found->second;
   }
 
@@ -147,8 +150,10 @@ const std::vector<RadialGridPoint>& CChopChopClawMarks::GetRing(int radius) {
 void CChopChopClawMarks::OnInit() {
   const int id = CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_ARRAY_TEXT("chop_chop", 0x59278F63D79F3DA1ULL, std::uint8_t));
   if (EZ2STREffectInfo* info = CEZ2STREffectMgr::GetInstance()->FindById(id)) {
-    this->offsetX = info->offsetX;
-    this->offsetY = info->offsetY;
+    const float offsetX = info->offsetX;
+    const float offsetY = info->offsetY;
+    this->offsetX = offsetX;
+    this->offsetY = offsetY;
   }
 }
 
@@ -184,7 +189,7 @@ bool CChopChopClawMarks::IsAlive() {
 // FUNCTION: fn_03139
 void CharacterParticleBundle::OnProcess() {
   this->EmitParticles();
-  this->particles.erase(std::remove_if(this->particles.begin(), this->particles.end(), [](CEZ2STRParticle* particle) {
+  std::erase_if(this->particles, [](CEZ2STRParticle* particle) {
     if (!particle) {
       return true;
     }
@@ -193,7 +198,7 @@ void CharacterParticleBundle::OnProcess() {
       return true;
     }
     return false;
-  }), this->particles.end());
+  });
 
   for (CEZ2STRParticle*& particle : this->particles) {
     this->UpdateParticlePosition(particle);

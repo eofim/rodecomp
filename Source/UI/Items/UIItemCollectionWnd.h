@@ -22,6 +22,7 @@ class UIItemCollectionWnd : public UIFrameWnd {
 public:
   UIItemCollectionWnd();
   ~UIItemCollectionWnd() override;
+  bool MatchesDisplayedItem(const ITEM_INFO& item) const;
   void StoreInfo() override;
   void OnCreate(int width, int height) override;
 
@@ -63,6 +64,7 @@ public:
   void Move(int x, int y) override;
   void OnProcess() override;
   void Paint() override;
+  void DrawComparisonBox(int x, int y, int width, int height);
   void OnLBtnDown(int x, int y) override;
   void OnLBtnUp(int x, int y) override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
@@ -70,6 +72,7 @@ public:
   int CardSlotAt(int x, int y, int* slotX, int* slotY);
   void OnMouseHover(int x, int y) override;
   void OnRBtnDown(int x, int y) override;
+  void ShowComparisonCardInfo(int index);
   bool WrapText(std::string text, int width, std::list<std::string>& lines);
 };
 

@@ -66,9 +66,7 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
     const float baseX = slot.vecBPre.x;
     const float baseY = slot.vecBPre.y;
     const float baseZ = slot.vecBPre.z;
-    vec1.x = baseX + vec1.x;
-    vec1.y = baseY + vec1.y;
-    vec1.z = baseZ + vec1.z;
+    vec1 = vector3d{baseX + vec1.x, baseY + vec1.y, baseZ + vec1.z};
     vec2.x = baseX + vec2.x;
     vec2.y = baseY + vec2.y;
     vec2.z = baseZ + vec2.z;
@@ -123,26 +121,26 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
 
 // OFFSET: 0x00BF5D80
 // FUNCTION: fn_19998
-__declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
+void CEffectPrim::RenderGroundSprite(matrix& wtm) {
   if (this->state.master) {
     this->render.position = this->state.master->render.position;
   }
 
   const float z = this->render.position.z;
-  CGameMode* mode = g_modeMgr.GetGameMode();
-  float position[3];
-  position[0] = this->render.position.x;
-  position[1] = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
-  position[2] = z;
-  const float depth = position[0] * wtm.values[2] + position[1] * wtm.values[5] + z * wtm.values[8] + wtm.values[11];
+  const float height = g_modeMgr.GetGameMode()->scene->terrain->Height(this->render.position.x, this->render.position.z);
+  vector3d position;
+  position.x = this->render.position.x;
+  position.y = height;
+  position.z = z;
+  const float depth = position.x * wtm.values[2] + position.y * wtm.values[5] + z * wtm.values[8] + wtm.values[11];
 
   float screenX;
   float screenY;
   float reciprocalDepth;
-  g_renderer->ProjectViewport(position, wtm.values, &screenX, &screenY, &reciprocalDepth);
+  g_renderer->ProjectViewport(&position.x, wtm.values, &screenX, &screenY, &reciprocalDepth);
   float distanceScale = g_renderer->ScaleDistance(reciprocalDepth);
 
-  if (this->state.master->state.type == 1240 && this->state.master && this->state.master->state.parent) {
+  if (this->state.master->state.type == EF_SOUL_REAPER_COLLECT && this->state.master && this->state.master->state.parent) {
     this->state.master->state.parent->ScaleByFadePulse(distanceScale);
   }
 
@@ -157,12 +155,14 @@ __declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
     }
 
     const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
+    const int cellX = cell.x;
+    const int cellY = cell.y;
     const double factor = distanceScale;
-    const float left = static_cast<float>(cell.x * factor * cell.scaleX + screenX);
-    const float right = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cell.x) * factor * cell.scaleX + screenX + 1.0);
+    const float left = static_cast<float>(cellX * factor * cell.scaleX + screenX);
+    const float right = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cellX) * factor * cell.scaleX + screenX + 1.0);
     const float lift = static_cast<float>(static_cast<double>(this->state.spriteLift));
-    const float top = static_cast<float>(cell.y * factor * cell.scaleY + screenY) - lift;
-    const float bottom = static_cast<float>(((static_cast<short>(image->doubleHeight) + 1) * image->height + cell.y) * factor * cell.scaleY + screenY + 1.0) - lift;
+    const float top = static_cast<float>(cellY * factor * cell.scaleY + screenY) - lift;
+    const float bottom = static_cast<float>(((static_cast<short>(image->doubleHeight) + 1) * image->height + cellY) * factor * cell.scaleY + screenY + 1.0) - lift;
     if (top >= static_cast<float>(g_renderer->viewport.height) || bottom <= 0.0f || left >= static_cast<float>(g_renderer->viewport.width) ||
         right <= 0.0f) {
       return;
@@ -170,6 +170,7 @@ __declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
 
     const std::uint32_t color = (((((cell.colorChannels.alpha << 8) + cell.colorChannels.red) << 8) + cell.colorChannels.green) << 8) + cell.colorChannels.blue;
     SpriteQuad quad;
+    quad.image = image;
     quad.top = top;
     quad.left = static_cast<float>(static_cast<int>(this->render.spriteOffsetX)) + left;
     quad.bottom = bottom;
@@ -179,7 +180,6 @@ __declspec(safebuffers) void CEffectPrim::RenderGroundSprite(matrix& wtm) {
     quad.angle = static_cast<float>(cell.rotation);
     const float alphaScale = static_cast<unsigned char>(static_cast<int>(this->state.alpha)) / 255.0f;
     quad.color = static_cast<std::uint32_t>(static_cast<unsigned char>(static_cast<int>(alphaScale * static_cast<float>(color >> 24)))) << 24 | (color & 0xFFFFFF);
-    quad.image = image;
     this->DrawQuad(quad, sprite->palette, this->state.renderFlag, 0.0f, 0.0f, 0);
   }
 }
@@ -207,7 +207,7 @@ static __declspec(safebuffers) __forceinline void DrawTrailSpriteQuad(
 void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
   CSprRes* sprite = this->GetSprite();
   CActRes* action = this->GetActRes();
-  const short alpha = static_cast<short>(this->state.alpha);
+  const std::uint32_t alpha = static_cast<unsigned short>(static_cast<short>(this->state.alpha));
 
   for (int ec = 0; ec < 4; ++ec) {
     if (this->state.slots[ec].life <= 0 || !(this->state.alpha > 0.0f)) {
@@ -241,24 +241,25 @@ void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
 
         float left;
         float right;
-        if ((cell.mirrored & 1) != 0) {
-          left = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cell.x) * scale * cell.scaleX * distanceScale + screenX);
-          right = static_cast<float>(cell.x * scale * cell.scaleX * distanceScale + screenX);
-          if (right >= static_cast<float>(g_renderer->viewport.width) || left <= 0.0f) {
-            continue;
-          }
-        } else {
+        if ((cell.mirrored & 1) == 0) {
           left = static_cast<float>(cell.x * scale * cell.scaleX * distanceScale + screenX);
           right = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cell.x) * scale * cell.scaleX * distanceScale + screenX);
           if (left >= static_cast<float>(g_renderer->viewport.width) || right <= 0.0f) {
             continue;
           }
+        } else {
+          left = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cell.x) * scale * cell.scaleX * distanceScale + screenX);
+          right = static_cast<float>(cell.x * scale * cell.scaleX * distanceScale + screenX);
+          if (right >= static_cast<float>(g_renderer->viewport.width) || left <= 0.0f) {
+            continue;
+          }
         }
 
-        const unsigned char red = static_cast<unsigned char>(cell.color);
-        const unsigned char green = static_cast<unsigned char>(cell.color >> 8);
-        const unsigned char blue = static_cast<unsigned char>(cell.color >> 16);
-        const std::uint32_t color = (((((alpha << 8) + red) << 8) + green) << 8) + blue;
+        const std::uint32_t red = cell.colorChannels.red;
+        const std::uint32_t green = cell.colorChannels.green;
+        const std::uint32_t blue = cell.colorChannels.blue;
+        const std::uint8_t alphaByte = static_cast<unsigned char>(alpha);
+        const std::uint32_t color = (((((alphaByte << 8) + red) << 8) + green) << 8) + blue;
         const float angle = static_cast<float>(cell.rotation) + this->state.roll;
         DrawTrailSpriteQuad(*this, this->state.slots[ec].vecBPre, top, left, bottom, right, screenY, depth, 0.0001f, angle, color, image, sprite->palette, 0x101);
 
@@ -266,20 +267,21 @@ void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
         const std::uint32_t brightGlow = (alpha << 24) + 0x0AFF0A;
         DrawTrailSpriteQuad(
           *this, this->state.slots[ec].vecBPre, top, left, bottom, right, screenY, depth, 0.0002f, angle, this->state.slots[ec].flag1[0] == 2 ? brightGlow : paleGlow, image,
-          sprite->palette, 5, 2.0f
+          sprite->palette, 5, g_effectIconOuterRadius
         );
 
-        const std::uint32_t halfColor = (((((alpha / 2 << 8) + red) << 8) + green) << 8) + blue;
+        const std::uint8_t halfAlphaByte = static_cast<unsigned char>(alpha / 2);
+        const std::uint32_t halfColor = (((((halfAlphaByte << 8) + red) << 8) + green) << 8) + blue;
         DrawTrailSpriteQuad(*this, this->state.slots[ec].vecBNow, top, left, bottom, right, screenY, depth, 0.0001f, angle, halfColor, image, sprite->palette, 0x101);
         DrawTrailSpriteQuad(
           *this, this->state.slots[ec].vecBNow, top, left, bottom, right, screenY, depth, 0.0002f, angle, this->state.slots[ec].flag1[0] == 2 ? brightGlow : paleGlow, image,
-          sprite->palette, 5, 2.0f
+          sprite->palette, 5, g_effectIconOuterRadius
         );
 
         DrawTrailSpriteQuad(*this, this->state.slots[ec].vecTPre, top, left, bottom, right, screenY, depth, 0.0001f, angle, color, image, sprite->palette, 0x101);
         DrawTrailSpriteQuad(
           *this, this->state.slots[ec].vecTPre, top, left, bottom, right, screenY, depth, 0.0002f, angle, this->state.slots[ec].flag1[0] == 2 ? brightGlow : paleGlow, image,
-          sprite->palette, 5, 2.0f
+          sprite->palette, 5, g_effectIconOuterRadius
         );
       }
     }

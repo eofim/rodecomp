@@ -17,13 +17,19 @@ namespace Gdiplus {
 #include <gdiplus.h>
 
 struct FontEntry {
+  FontEntry(int family, int height, int charset, unsigned char bold, unsigned char italic);
+  bool operator==(const FontEntry& other) const;
+  bool operator<(const FontEntry& other) const;
   void CreateSystemFont();
+  const char* FindSystemFace() const;
+  void LoadEmbeddedFont(std::int16_t familyIndex);
   bool CreatePrivateFont();
   void RemovePrivateFont() const;
+  std::string PrivateFontFamilyName(const std::string& path) const;
 
   /* 0000 */ int family;
   /* 0004 */ int height;
-  /* 0008 */ unsigned charset;
+  /* 0008 */ int charset;
   /* 000C */ unsigned char bold;
   /* 000D */ unsigned char italic;
   /* 0010 */ HFONT font;
@@ -47,7 +53,6 @@ private:
 };
 
 HFONT __stdcall CreateEmbeddedFont(int height, std::int16_t family);
-std::string __stdcall PrivateFontFamilyName(const std::string& path);
 int FallbackFontIndex(const std::string& name);
 
 struct FontCacheLayout {

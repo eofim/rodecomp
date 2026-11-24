@@ -1,6 +1,7 @@
 #ifndef RAGNAROK_SOURCE_UI_LISTS_UILISTBOXTEMPLATE_H
 #define RAGNAROK_SOURCE_UI_LISTS_UILISTBOXTEMPLATE_H
 
+#include "Contents/AdventureGuide/AdventureGuideMgr.h"
 #include "UI/Lists/UIVScrollBar.h"
 #include "UI/Window/UIControl.h"
 
@@ -27,6 +28,10 @@ public:
   virtual void SetHighlighted(bool highlighted);
   virtual void SetFrozen(bool frozen);
   __declspec(noinline) void SetImageResources(CBitmapRes* normal, CBitmapRes* hover, CBitmapRes* pressed, CBitmapRes* disabled);
+  // INLINED
+  void SetOnHover(std::function<void(CUIListItem*)> callback) { this->onHover = callback; }
+  // INLINED
+  void SetOnPress(std::function<void(CUIListItem*)> callback) { this->onPress = callback; }
 
   /* 0080 */ std::map<int, CBitmapRes*> images;
   /* 0088 */ int selected;
@@ -100,7 +105,7 @@ public:
 
 class CUIMonsterInfo : public CUIListItem {
 public:
-  CUIMonsterInfo();
+  __declspec(noinline) CUIMonsterInfo();
   void OnCreate(int width, int height) override;
   void OnInit() override;
   void Paint() override;
@@ -132,7 +137,7 @@ public:
 
 class CUITabInfo : public CUIListItem {
 public:
-  CUITabInfo();
+  __declspec(noinline) CUITabInfo();
   void OnCreate(int width, int height) override;
   void OnInit() override;
 
@@ -141,14 +146,8 @@ public:
 };
 class CItemData {
 public:
-  /* 0000 */ int id;
-  /* 0004 */ std::uint8_t first;
-  /* 0005 */ std::uint8_t second;
-  /* 0006 */ std::uint8_t third;
-  /* 0008 */ int categoryId;
-  /* 000C */ int categoryIndex;
-  /* 0010 */ std::string text;
-  /* 0028 */ std::vector<std::string> values;
+  /* 0000 */ int id = 0;
+  /* 0004 */ AdventureGuideEntry entry;
   /* 0034 */ int type;
 };
 
@@ -159,25 +158,9 @@ public:
 };
 class CQuestInfo {
 public:
-  /* 0000 */ int id;
-  /* 0004 */ std::uint8_t categoryType;
-  /* 0008 */ int categoryId;
-  /* 000C */ int categoryIndex;
-  /* 0010 */ int questId;
-  /* 0014 */ std::string title;
-  /* 002C */ std::string text;
-  /* 0044 */ std::vector<std::string> rewards;
+  /* 0000 */ int id = 0;
+  /* 0004 */ AdventureGuideContents contents;
   /* 0050 */ int type;
-};
-}
-
-namespace Guide_Intro {
-struct Contents {
-  Contents(const std::string& first, const std::string& second) : first(first), second(second) {
-  }
-
-  /* 0000 */ std::string first;
-  /* 0018 */ std::string second;
 };
 }
 
@@ -243,6 +226,7 @@ public:
   void LoadSkin(bool resolveSkin) override;
 
   void SelectItem(CUIListItem* item);
+  bool SelectFirstItem();
   T* CreateItem();
 
   // INLINED
@@ -306,6 +290,7 @@ template <class T, class D> class CUIListBoxEx : public CUIControl {
 public:
   CUIListBoxEx();
   ~CUIListBoxEx() override;
+  void SetListSize(int width, int height, int itemWidth, int rowHeight);
   void OnCreate(int width, int height) override;
   // OFFSET: 0x00A01E70
   // FUNCTION: fn_14832
@@ -350,7 +335,17 @@ public:
   }
   bool RebindIndex(int index);
   void SelectItem(CUIListItem* item);
-  bool SelectIndex(int index);
+  // INLINED
+  bool SelectIndex(int index) {
+    this->scrollBar->SetPosition(this->rowHeight * index);
+    for (T* item : this->items) {
+      if (item->index == index) {
+        this->SelectItem(item);
+        return true;
+      }
+    }
+    return false;
+  }
   void AddNewItem() {
   }
   __declspec(noinline) T* CreateItem();

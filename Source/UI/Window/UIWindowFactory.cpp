@@ -14,6 +14,11 @@
 
 #include <string>
 
+// INLINED
+static void PushRendered(UIWindowMgr* manager, UIWindow* window) {
+  manager->rendered.push_back(window);
+}
+
 // OFFSET: 0x00AA1350
 // FUNCTION: fn_17208
 UIWindow* UIWindowMgr::CreateLayoutWindow(int id) {
@@ -53,7 +58,7 @@ UIWindow* UIWindowMgr::CreateLayoutWindow(int id) {
 
     int savedX;
     int savedY;
-    auto saved = this->savedRectangles.find(id);
+    auto saved = this->savedRectangles.find(int{id});
     if (saved != this->savedRectangles.end() && saved->second != nullptr) {
       savedX = saved->second->x;
       savedY = saved->second->y;
@@ -71,7 +76,7 @@ UIWindow* UIWindowMgr::CreateLayoutWindow(int id) {
     }
 
     window->Move(x, y);
-    this->rendered.push_back(window);
+    PushRendered(this, window);
     if (id == 0x9F) {
       window->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&this->quickSlotWndInfo), 0, 0, 0);
     } else if (id == 0x9D) {

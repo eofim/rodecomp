@@ -54,7 +54,7 @@ void UIVideoWnd::OnCreate(int width, int height) {
   UIVideoSkipButton* button = new UIVideoSkipButton();
   button->SetSize(127, 43);
   button->Move(width - button->geometry.width - 33, height - button->geometry.height - 110);
-  button->SetId(521);
+  button->SetId(ID_CLOSE_VIDEO);
   this->AddChild(button);
 }
 
@@ -74,7 +74,7 @@ void UIVideoSkipButton::Paint() {
 // OFFSET: 0x00AB4600
 // FUNCTION: fn_17443
 void UIVideoWnd::Paint() {
-  this->SetSolid(g_renderer->primitives, this->geometry.width, this->geometry.height, 0xFF000000);
+  this->SetSolid(this->geometry.width, this->geometry.height, 0xFF000000);
   if (this->m_movie->State() != 1) {
     return;
   }
@@ -84,7 +84,7 @@ void UIVideoWnd::Paint() {
   const int height = this->geometry.height;
   const float scaled = (std::min)(static_cast<float>(height), static_cast<float>(static_cast<int>(handle->height)) / static_cast<float>(static_cast<int>(handle->width)) * static_cast<float>(width));
   const int videoHeight = static_cast<int>(scaled);
-  this->DrawStretched(g_renderer->primitives, 0, static_cast<int>((height - videoHeight) * 0.5), this->m_texture, 0xFFFFFFFF, width, videoHeight);
+  this->DrawStretched(0, static_cast<int>((height - videoHeight) * 0.5), this->m_texture, 0xFFFFFFFF, width, videoHeight);
 }
 
 // OFFSET: 0x00AB4680
@@ -116,7 +116,7 @@ int UIVideoWnd::SendMsg(
     }
     break;
   case UM_CLOSE:
-    if (g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_MOVE_MINI_PARTYWND), 2, true, false, 0, "Message", 280, 120, 0) == 187) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_STOP_VIDEO), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
       g_windowMgr.CloseWindow(WID_VIDEOWND);
     }
     break;

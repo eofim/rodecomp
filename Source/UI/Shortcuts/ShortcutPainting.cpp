@@ -1,4 +1,5 @@
 #include "Client/Session/Session.h"
+#include "Contents/Items/ItemId.h"
 #include "Render/Text/TextContext.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/ResourceMgr.h"
@@ -18,6 +19,7 @@
 #include "UI/Window/UIWindow.h"
 #include "Utility/Text/FormatString.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -27,36 +29,17 @@ namespace {
     return static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
   }
 
-  // INLINED
-  __forceinline void Count(UIWindow& window, int right, int y, int value) {
-    char text[16];
-    std::sprintf(text, "%d", value);
-    window.DrawRightOutlinedText(right, y, text, 0, 0, 0xFFFFFF, 0, 11, 0);
-  }
 }
 
-// OFFSET: 0x00A86200
-// FUNCTION: fn_17019
-void UIWindow::DrawRightOutlinedText(
-  int right, int y, const char* text, int bytes, std::uint32_t color, std::uint32_t outline, int family, int height,
-  unsigned char bold
-) {
-  if (bytes == 0) {
-    bytes = static_cast<int>(std::strlen(text));
+// OFFSET: 0x00918940
+// FUNCTION: fn_45758
+__forceinline void UIShortCutWnd::DrawShortcutItem(int x, int y, const ITEM_INFO& item, unsigned char identified) {
+  this->DrawItemIcon(x, y, item, identified);
+  if (item.quantity != 0) {
+    char text[16];
+    std::sprintf(text, "%d", item.quantity);
+    this->DrawRightOutlinedText(x + 27, y + 17, text, 0, 0, 0xFFFFFF, 0, 11, 0);
   }
-
-  TextContext context(*this->geometry.surface);
-  context.SetFont(family, height, bold, 0);
-  SIZE size;
-  context.Measure(text, static_cast<int>(std::strlen(text)), &size);
-  const int left = right - size.cx;
-  context.SetColor(outline);
-  context.Draw(left - 1, y, text, bytes);
-  context.Draw(left + 1, y, text, bytes);
-  context.Draw(left, y - 1, text, bytes);
-  context.Draw(left, y + 1, text, bytes);
-  context.SetColor(color);
-  context.Draw(left, y, text, bytes);
 }
 
 // OFFSET: 0x0092F8E0
@@ -76,31 +59,32 @@ void UIShortCutWnd::Paint() {
   }
 
   if (grid.row != -1 && grid.hovered != -1) {
+    const int x = ((grid.hovered * 29) + 16);
+    const int y = 5 + 33 * static_cast<unsigned>(g_session.m_hotkeyPage);
     const SkinPaletteCell cell{2, 2};
-    window.FillRegion(((grid.hovered * 29) + 16), 5 + 33 * static_cast<unsigned>(g_session.m_hotkeyPage), 24, 24,
-                      g_skinInfo.PaletteColor(cell, g_skinInfo.Selected()));
+    window.FillRegion(x, y, 24, 24, g_skinInfo.PaletteColor(cell, g_skinInfo.Selected()));
   }
 
   g_session.m_mainCooldownIcons.clear();
 
   for (int row = 0; row < grid.rows; ++row) {
-    const int y = ((row * 33) + 4);
-
     for (int column = 0; column < 9; ++column) {
       const int index = ((row * 9) + column);
       if (index >= 36) {
         continue;
       }
 
-      const NormalItemSlot& slot = *this->m_slots[index];
-      if (slot.itemId == 0) {
+      const int y = ((row * 33) + 4);
+
+      const unsigned itemId = this->m_slots[index]->itemId;
+      if (itemId == ITEMID_NONE) {
         continue;
       }
 
       const int x = 16 + 29 * column;
-      if (slot.enabled != 0) {
-        CSkillInfo skill = g_session.LookupSkill(slot.itemId);
-        if (!this->MatchesShortcut(skill, &slot)) {
+      if (this->m_slots[index]->enabled != 0) {
+        CSkillInfo skill = g_session.LookupSkill(itemId);
+        if (!this->MatchesShortcut(skill, this->m_slots[index])) {
           continue;
         }
 
@@ -114,58 +98,84 @@ void UIShortCutWnd::Paint() {
 
         g_session.m_mainCooldownIcons.push_back({skill.id, index, x, y});
         window.DrawBitmap(x, y, image, true);
-        int level = slot.value;
+        int level = this->m_slots[index]->value;
 
         if (IsIndexedSkill(skill.id) && skill.level < level) {
           level = skill.level;
         }
 
-        Count(window, x + 27, (y + 17), level);
+        std::sprintf(path, "%d", level);
+        window.DrawRightOutlinedText(x + 27, y + 17, path, 0, 0, 0xFFFFFF, 0, 11, 0);
       } else {
-        ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(slot.itemId), 1);
-        if (item.identity[1] == 0) {
-          continue;
-        }
+        ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(itemId), 1);
+        if (item.identity[1] > 0) {
+          this->DrawShortcutItem(x, y, item, item.identified);
 
-        window.DrawItemIcon(x, y, item, item.identified);
-        if (item.quantity != 0) {
-          Count(window, x + 27, (y + 17), item.quantity);
-        }
-
-        if (0 < item.grade) {
-          window.DrawBitmap(x, (y + 12), Load(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade).c_str()), true);
+          if (0 < item.grade) {
+            const std::string iconPath = FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", item.grade);
+            window.DrawBitmap(
+              x, (y + 12),
+              static_cast<CBitmapRes*>(
+                ResourceMgr::Instance().Load(Resolve(iconPath.c_str()))
+              ),
+              true
+            );
+          }
         }
       }
     }
   }
 
   if (g_session.ItemSlotActive()) {
-    const int y = ((grid.rows * 33) + 4);
-
     for (int column = 0; column < 9; ++column) {
-      const NormalItemSlot& slot = *this->m_itemSlots[column];
-      if (slot.itemId == 0) {
+      const unsigned itemId = this->m_itemSlots[column]->itemId;
+      if (itemId == ITEMID_NONE) {
         continue;
       }
 
-      ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(slot.itemId), 1);
-      if (item.identity[1] == 0) {
-        continue;
-      }
-
-      const int x = 16 + 29 * column;
-      window.DrawItemIcon(x, y, item, item.identified);
-      if (item.quantity != 0) {
-        Count(window, x + 27, (y + 17), item.quantity);
+      ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(itemId), 1);
+      if (item.identity[1] > 0) {
+        const int x = 16 + 29 * column;
+        const int y = ((grid.rows * 33) + 4);
+        this->DrawShortcutItem(x, y, item, item.identified);
       }
     }
   }
 
   for (int row = 0; row < grid.rows; ++row) {
-    char text[24];
-    std::sprintf(text, "%d", (row + 1));
-    window.DrawTextAt(6, ((row * 33) + 13), text, 0, 0, 11, 0x2F4A4A, 0, 0);
+    const std::string label = FormatOwnedString("%d", row + 1);
+    window.DrawTextAt(6, ((row * 33) + 13), label.c_str(), 0, 0, 11, 0x2F4A4A, 0, 0);
   }
 
-  PaintMainCooldowns(g_session.m_requestTimers, g_session.m_mainCooldownIcons, grid.rows, window.geometry.x, window.geometry.y, g_cooldownOwner->Drawing());
+  const std::uint32_t now = CooldownNow();
+
+  for (auto entry = g_session.m_requestTimers.begin(); entry != g_session.m_requestTimers.end();) {
+    if (entry->end > now) {
+      std::list<CooldownState>& states = entry->main;
+
+      for (auto icon = g_session.m_mainCooldownIcons.begin(); icon != g_session.m_mainCooldownIcons.end(); ++icon) {
+        if (entry->id == icon->id || (entry->id == 577 && !g_session.IsHomunculusSkill(icon->id))) {
+          const auto previous = std::find_if(states.begin(), states.end(), [&](const CooldownState& state) { return state.slot == icon->slot; });
+          if (previous == states.end()) {
+            states.push_back(CooldownState(icon->slot, icon->x, icon->y, entry->duration, entry->end - entry->duration, 0, 0));
+          }
+        }
+
+        if ((g_session.IsHomunculusSkill(icon->id) || g_session.IsMercenarySkill(icon->id)) && entry->id == 9999) {
+          const auto previous = std::find_if(states.begin(), states.end(), [&](const CooldownState& state) { return state.slot == icon->slot; });
+          if (previous == states.end()) {
+            states.push_back(CooldownState(icon->slot, icon->x, icon->y, entry->duration, entry->end - entry->duration, 0, 0));
+          }
+        }
+      }
+
+      for (auto state = states.begin(); state != states.end(); ++state) {
+        g_cooldownOwner->Draw(0, 0, 12, 12, *state, grid.rows * 33 + 4, window.geometry.x, window.geometry.y);
+      }
+
+      ++entry;
+    } else {
+      entry = g_session.m_requestTimers.erase(entry);
+    }
+  }
 }

@@ -12,6 +12,7 @@ class CParticle;
 class CCherryBlossomEffect : public CEffect {
 public:
   CCherryBlossomEffect();
+  ~CCherryBlossomEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -19,6 +20,8 @@ public:
   bool IsAlive() override {
     return this->ActorExists();
   }
+  void UpdatePetal(CParticle* particle);
+  void RenderPetal(CParticle* particle);
 
   /* 00CC */ EffectPoint offsets[16];
   /* 018C */ std::vector<CParticle*> petals;

@@ -1,5 +1,6 @@
 #include "Render/DeviceContext/DCSurface.h"
 #include "Client/Mode/ModeMessage.h"
+#include "Contents/Jobs/JobId.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "UI/Login/UINewMakeCharWnd.h"
@@ -8,6 +9,7 @@
 #include "Client/Session/Session.h"
 #include "Contents/Actors/Pc.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Sprites/SpriteRidingOffset.h"
 #include "Render/DeviceContext/DeviceContext.h"
@@ -42,6 +44,11 @@ static const std::string s_makeCharItemLinkClose = "</ITEML>";
 UIHairBitmap::UIHairBitmap() : UIBitmapButton() {
 }
 
+// OFFSET: 0x007D99C0
+// FUNCTION: fn_09608
+UIHairStyleButton::UIHairStyleButton(int style, int sex) : UIBitmapButton(), m_style(style), m_sex(sex), m_race(0), m_preview(nullptr), m_selected(false) {
+}
+
 // OFFSET: 0x007D9A50
 // FUNCTION: fn_09609
 UINewMakeCharWnd::UINewMakeCharWnd()
@@ -52,78 +59,74 @@ UINewMakeCharWnd::UINewMakeCharWnd()
   this->m_raceViews[1] = nullptr;
   this->geometry.animationFrame = 0;
 
-  const int* preset = reinterpret_cast<const int*>(g_modeMgr.currentMode->SendMsg(LMM_GET_CHAR_PARAM, 0, 0, 0, 0));
-  this->m_character.stats[0] = static_cast<unsigned char>(preset[0]);
-  this->m_character.stats[1] = static_cast<unsigned char>(preset[1]);
-  this->m_character.stats[2] = static_cast<unsigned char>(preset[2]);
-  this->m_character.stats[3] = static_cast<unsigned char>(preset[3]);
-  this->m_character.stats[4] = static_cast<unsigned char>(preset[4]);
-  this->m_character.stats[5] = static_cast<unsigned char>(preset[5]);
-  this->m_character.headPalette = static_cast<short>(preset[6]);
-  this->m_character.head = static_cast<short>(preset[7]);
+  {
+    const int* preset = reinterpret_cast<const int*>(g_modeMgr.currentMode->SendMsg(LMM_GET_CHAR_PARAM, 0, 0, 0, 0));
+    this->m_character.stats[0] = static_cast<unsigned char>(preset[0]);
+    this->m_character.stats[1] = static_cast<unsigned char>(preset[1]);
+    this->m_character.stats[2] = static_cast<unsigned char>(preset[2]);
+    this->m_character.stats[3] = static_cast<unsigned char>(preset[3]);
+    this->m_character.stats[4] = static_cast<unsigned char>(preset[4]);
+    this->m_character.stats[5] = static_cast<unsigned char>(preset[5]);
+    this->m_character.headPalette = static_cast<short>(preset[6]);
+    this->m_character.head = static_cast<short>(preset[7]);
 
-  this->m_character.name[0] = 0;
-  this->m_character.job = 0;
-  this->m_character.level = 1;
-  this->m_character.skillPoint = 1;
-  this->m_character.jobPoint = 0;
-  this->m_character.hp = 100;
-  this->m_character.maxHp = 100;
-  this->m_character.sp = 100;
-  this->m_character.maxSp = 100;
-  this->m_character.exp = 0;
-  this->m_character.slot = g_selectedSlotIndex;
-  this->m_character.headPalette = 0;
-  this->m_character.bodyStyle = 0;
-  this->m_character.shield = 0;
-  this->m_character.accessory2 = 0;
-  this->m_character.accessory3 = 0;
-  this->m_character.bodyCostume = 0;
-  this->m_character.sex = static_cast<unsigned char>(g_session.m_sex);
-  this->m_viewX = 500;
-  this->m_viewY = 228;
-  this->actionBase = 0;
-  this->m_action = 0;
-  this->m_frame = 0;
+    this->m_character.name[0] = 0;
+    this->m_character.job = 0;
+    this->m_character.level = 1;
+    this->m_character.skillPoint = 1;
+    this->m_character.jobPoint = 0;
+    this->m_character.maxHp = 100;
+    this->m_character.hp = 100;
+    this->m_character.maxSp = 100;
+    this->m_character.sp = 100;
+    this->m_character.exp = 0;
+    this->m_character.slot = g_selectedSlotIndex;
+    this->m_character.headPalette = 0;
+    this->m_character.bodyStyle = 0;
+    this->m_character.shield = 0;
+    this->m_character.accessory2 = 0;
+    this->m_character.accessory3 = 0;
+    this->m_character.bodyCostume = 0;
+    this->m_character.sex = static_cast<unsigned char>(g_session.m_sex);
+    this->m_preview.viewX = 500;
+    this->m_preview.viewY = 228;
+    this->actionBase = 0;
+    this->m_action = 0;
+    this->m_frame = 0;
 
-  this->m_raceActions[0].assign(static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_character.job, this->m_character.sex, 0, 0)));
-  this->m_raceSprites[0].assign(static_cast<const std::string&>(g_session.GetBodySprName(this->m_character.job, this->m_character.sex, 0, 0)));
+    this->m_preview.actions[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_character.job, this->m_character.sex, 0, 0));
+    this->m_preview.sprites[0] = static_cast<const std::string&>(g_session.GetBodySprName(this->m_character.job, this->m_character.sex, 0, 0));
 
-  if (!g_session.IsDoramJob(this->m_character.job) && this->m_character.sex == 1 && 13 == this->m_character.head) {
-    this->m_character.head = 14;
+    if (!g_session.IsDoramJob(this->m_character.job) && this->m_character.sex == 1 && 13 == this->m_character.head) {
+      this->m_character.head = 14;
+    }
+
+    int head = this->m_character.head;
+    this->m_preview.actions[1] = static_cast<const std::string&>(g_session.GetHeadActName(this->m_character.job, this->m_character.sex, &head));
+    this->m_preview.sprites[1] = static_cast<const std::string&>(g_session.GetHeadSprName(this->m_character.job, this->m_character.sex, &head));
+
+    const int bodyPalette = this->m_character.bodyStyle;
+    this->m_character.head = static_cast<short>(head);
+    this->m_preview.paletteEnabled[1] = bodyPalette;
+    if (bodyPalette > 0) {
+      this->m_preview.bodyPalette = static_cast<const std::string&>(g_session.GetBodyPalName(this->m_character.job, this->m_character.sex, bodyPalette, 0, 0, 0));
+    }
+
+    const int headPalette = this->m_character.headPalette;
+    this->m_preview.paletteEnabled[0] = headPalette;
+    if (headPalette > 0) {
+      this->m_preview.headPalette = static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_character.job, this->m_character.sex, headPalette));
+    }
+
+    this->m_preview.offsets = g_session.GetBodyImfName(this->m_character.job, this->m_character.sex, this->m_character.head, this->m_character.bodyCostume);
   }
-
-  int head = this->m_character.head;
-  this->m_raceActions[1].assign(static_cast<const std::string&>(g_session.GetHeadActName(this->m_character.job, this->m_character.sex, &head)));
-  this->m_raceSprites[1].assign(static_cast<const std::string&>(g_session.GetHeadSprName(this->m_character.job, this->m_character.sex, &head)));
-
-  const int bodyPalette = this->m_character.bodyStyle;
-  this->m_character.head = static_cast<short>(head);
-  this->m_racePaletteEnabled[1] = bodyPalette;
-  if (bodyPalette > 0) {
-    this->m_racePalettes[1].assign(static_cast<const std::string&>(g_session.GetBodyPalName(this->m_character.job, this->m_character.sex, bodyPalette, 0, 0, 0)));
-  }
-
-  const int headPalette = this->m_character.headPalette;
-  this->m_racePaletteEnabled[0] = headPalette;
-  if (headPalette > 0) {
-    this->m_racePalettes[0].assign(static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_character.job, this->m_character.sex, headPalette)));
-  }
-
-  this->m_raceOffsets = g_session.GetBodyImfName(this->m_character.job, this->m_character.sex, this->m_character.head, this->m_character.bodyCostume);
 
   this->previewState = 0;
   this->m_startTime = timeGetTime();
   this->previewCounter = 0;
   this->previewPhase = 0;
-  this->hairStyleButtonStorage[0] = 0;
-  this->hairStyleButtonStorage[1] = 0;
-  this->hairStyleButtonStorage[2] = 0;
-  this->hairStyleButtonStorage[3] = 0;
-  this->hairStyleButtonStorage[4] = 0;
-  this->hairStyleButtonStorage[5] = 0;
-  this->hairColorButtonStorage[0] = 0;
-  this->hairColorButtonStorage[1] = 0;
+  std::memset(this->hairStyleButtonStorage, 0, sizeof this->hairStyleButtonStorage);
+  std::memset(this->hairColorButtonStorage, 0, sizeof this->hairColorButtonStorage);
   this->hairColorButtonByte = 0;
   this->genderButtonStorage = 0;
 }
@@ -187,20 +190,18 @@ void UIHairBitmap::OnLBtnUp(int x, int y) {
 // OFFSET: 0x007DB030
 // FUNCTION: fn_09615
 void UINewMakeCharWnd::Paint() {
-  CBitmapRes* background =
-    static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\make_character_ver2\\bg_makeBg.bmp")));
-  this->DrawBitmap(0, 0, background, false);
-  this->DrawTextAt(0x2C, 0x11, LookupMessage(MSI_STOP_RECRUITING), 0, 0, 0xC, 0x5F5F5F, 1, 0);
+  this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\make_character_ver2\\bg_makeBg.bmp"))), false);
+  this->DrawTextAt(0x2C, 0x11, LookupMessage(MSI_MAKECHARWND_TITLE), 0, 0, 0xC, 0x5F5F5F, 1, 0);
 
   for (int i = 0; i < 2; ++i) {
-    CImfRes* offsets = static_cast<CImfRes*>(ResourceMgr::Instance().Load(this->m_raceOffsets.c_str()));
-    CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_raceActions[i].c_str()));
-    CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(this->m_raceSprites[i].c_str()));
+    CImfRes* offsets = static_cast<CImfRes*>(ResourceMgr::Instance().Load(this->m_preview.offsets.c_str()));
+    CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_preview.actions[i].c_str()));
+    CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(this->m_preview.sprites[i].c_str()));
     const ActionFrame& frame = action->Frame(this->m_action, this->m_frame);
     POINT offset = offsets->GetLongPoint(i, this->m_action, this->m_frame);
 
     if (i == 1) {
-      CActRes* first = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_raceActions[0].c_str()));
+      CActRes* first = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_preview.actions[0].c_str()));
       const ActionFrame& firstFrame = first->Frame(this->m_action, this->m_frame);
       if (frame.anchorCount != 0 && firstFrame.anchorCount != 0 && frame.anchors[0].attachmentId == firstFrame.anchors[0].attachmentId) {
         offset.x += firstFrame.anchors[0].x - frame.anchors[0].x;
@@ -211,13 +212,13 @@ void UINewMakeCharWnd::Paint() {
     const std::uint32_t* palette = sprite->palette;
     switch (i) {
     case 0:
-      if (this->m_racePaletteEnabled[1] > 0) {
-        palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->m_racePalettes[1].c_str()))->palette;
+      if (this->m_preview.paletteEnabled[1] > 0) {
+        palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->m_preview.bodyPalette.c_str()))->palette;
       }
       break;
     case 1:
-      if (this->m_racePaletteEnabled[0] > 0) {
-        palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->m_racePalettes[0].c_str()))->palette;
+      if (this->m_preview.paletteEnabled[0] > 0) {
+        palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->m_preview.headPalette.c_str()))->palette;
       }
       break;
     }
@@ -240,7 +241,7 @@ void UINewMakeCharWnd::Paint() {
     }
 
     this->geometry.surface->DrawSurface(
-      this->m_viewX + offset.x + cell.x, this->m_viewY + offset.y + cell.y, texture, static_cast<int>(record.u0 * 256.0f),
+      this->m_preview.viewX + offset.x + cell.x, this->m_preview.viewY + offset.y + cell.y, texture, static_cast<int>(record.u0 * 256.0f),
       static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
@@ -332,26 +333,26 @@ void UIHairStyleButton::OnCreate(int width, int height) {
 // OFFSET: 0x007DBFD0
 // FUNCTION: fn_09626
 void UINewMakeCharWnd::UpdatePreviewResources() {
-  this->m_raceActions[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_character.job, this->m_character.sex, this->m_character.job, 0));
-  this->m_raceSprites[0] = static_cast<const std::string&>(g_session.GetBodySprName(this->m_character.job, this->m_character.sex, this->m_character.job, 0));
+  this->m_preview.actions[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_character.job, this->m_character.sex, this->m_character.job, 0));
+  this->m_preview.sprites[0] = static_cast<const std::string&>(g_session.GetBodySprName(this->m_character.job, this->m_character.sex, this->m_character.job, 0));
   int head = this->m_character.head;
-  this->m_raceActions[1] = static_cast<const std::string&>(g_session.GetHeadActName(this->m_character.job, this->m_character.sex, &head));
-  this->m_raceSprites[1] = static_cast<const std::string&>(g_session.GetHeadSprName(this->m_character.job, this->m_character.sex, &head));
+  this->m_preview.actions[1] = static_cast<const std::string&>(g_session.GetHeadActName(this->m_character.job, this->m_character.sex, &head));
+  this->m_preview.sprites[1] = static_cast<const std::string&>(g_session.GetHeadSprName(this->m_character.job, this->m_character.sex, &head));
 
   const int bodyPalette = this->m_character.bodyStyle;
   this->m_character.head = static_cast<short>(head);
-  this->m_racePaletteEnabled[1] = bodyPalette;
+  this->m_preview.paletteEnabled[1] = bodyPalette;
   if (bodyPalette > 0) {
-    this->m_racePalettes[1] = static_cast<const std::string&>(g_session.GetBodyPalName(this->m_character.job, this->m_character.sex, bodyPalette, this->m_character.job, 0, 0));
+    this->m_preview.bodyPalette = static_cast<const std::string&>(g_session.GetBodyPalName(this->m_character.job, this->m_character.sex, bodyPalette, this->m_character.job, 0, 0));
   }
 
   const int headPalette = this->m_character.headPalette;
-  this->m_racePaletteEnabled[0] = headPalette;
+  this->m_preview.paletteEnabled[0] = headPalette;
   if (headPalette > 0) {
-    this->m_racePalettes[0] = static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_character.job, this->m_character.sex, headPalette));
+    this->m_preview.headPalette = static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_character.job, this->m_character.sex, headPalette));
   }
 
-  this->m_raceOffsets = g_session.GetBodyImfName(this->m_character.job, this->m_character.sex, this->m_character.head, this->m_character.bodyCostume);
+  this->m_preview.offsets = g_session.GetBodyImfName(this->m_character.job, this->m_character.sex, this->m_character.head, this->m_character.bodyCostume);
 }
 
 // OFFSET: 0x007DA340
@@ -372,11 +373,7 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
   makeButton->SetBitmap("유저인터페이스\\make_character_ver2\\bt_make_press.bmp", 2, 0);
   makeButton->SetSize(makeButton->BitmapWidth(), makeButton->BitmapHeight());
   makeButton->Move(0x268, 0x17B);
-  {
-    std::string text = LookupMessage(MSI_MAKECHARWND_DOUBLECHECK_NAME);
-    makeButton->text = text;
-    makeButton->Invalidate();
-  }
+  makeButton->SetText(LookupMessage(MSI_MAKECHARWND_CREATE));
   makeButton->AddTextStyle(0, 0xE, 0x313131, 1, 1, -1000, -1000);
   makeButton->AddTextStyle(1, 0xE, 0x313131, 1, 1, -1000, -1000);
   makeButton->AddTextStyle(2, 0xE, 0x313131, 1, 1, -1000, -1000);
@@ -389,11 +386,7 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
   cancelButton->SetBitmap("유저인터페이스\\make_character_ver2\\bt_make_press.bmp", 2, 0);
   cancelButton->SetSize(cancelButton->BitmapWidth(), cancelButton->BitmapHeight());
   cancelButton->Move(0x19, 0x17B);
-  {
-    std::string text = LookupMessage(MSI_PRIVATE_AIRPLANE_FAILED_DEAD_STATE);
-    cancelButton->text = text;
-    cancelButton->Invalidate();
-  }
+  cancelButton->SetText(LookupMessage(MSI_MAKECHARWND_CLOSE));
   cancelButton->AddTextStyle(0, 0xE, 0x313131, 1, 1, -1000, -1000);
   cancelButton->AddTextStyle(1, 0xE, 0x313131, 1, 1, -1000, -1000);
   cancelButton->AddTextStyle(2, 0xE, 0x313131, 1, 1, -1000, -1000);
@@ -465,7 +458,7 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
   leftTurn->Move(0x1AA, 0xB3);
   leftTurn->SetId(ID_LEFT);
   leftTurn->m_argument = 0;
-  leftTurn->SetTooltip(LookupMessage(MSI_VIEW_BEFORE_WORLDINFO_TITLE));
+  leftTurn->SetTooltip(LookupMessage(MSI_CHARACTER_LEFT_ROLL));
   this->AddChild(leftTurn);
 
   UIBitmapButton* rightTurn = new UIBitmapButton();
@@ -476,12 +469,12 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
   rightTurn->Move(0x227, 0xB3);
   rightTurn->SetId(ID_RIGHT);
   rightTurn->m_argument = 0;
-  rightTurn->SetTooltip(LookupMessage(MSI_VIEW_BEFORE_SERVERINFO));
+  rightTurn->SetTooltip(LookupMessage(MSI_CHARACTER_RIGHT_ROLL));
   this->AddChild(rightTurn);
 
   UIStaticText* hairStyleTitle = new UIStaticText();
   hairStyleTitle->SetSize(100, 0xF);
-  hairStyleTitle->SetText(LookupMessage(MSI_DATE_HH_MM_SS), 0);
+  hairStyleTitle->SetText(LookupMessage(MSI_MAKECHARWND_HAIR_STYLE), 0);
   hairStyleTitle->SetColor(0x40, 0x40, 0x40);
   hairStyleTitle->SetFont(0, 0xB, 1, 0);
   hairStyleTitle->Move(0x261, 0x2E);
@@ -503,7 +496,7 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
 
   UIStaticText* hairColorTitle = new UIStaticText();
   hairColorTitle->SetSize(100, 0xF);
-  hairColorTitle->SetText(LookupMessage(MSI_INPUT_TIME_EXCEEDED_SIGN_IN_AGAIN), 0);
+  hairColorTitle->SetText(LookupMessage(MSI_MAKECHARWND_HAIR_COLOR), 0);
   hairColorTitle->SetColor(0x40, 0x40, 0x40);
   hairColorTitle->SetFont(0, 0xB, 1, 0);
   hairColorTitle->Move(0x261, 0x11F);
@@ -532,7 +525,7 @@ void UINewMakeCharWnd::OnCreate(int width, int height) {
   }
 
   g_windowMgr.SetFocus(this->m_nameEdit);
-  this->m_message0 = 0xB8;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x007DB630
@@ -565,78 +558,79 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
 
     if (this->m_nameEdit->Length() < 4) {
       g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
-      return 0;
-    }
-
-    if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_makeCharItemLinkOpen.c_str())) != nullptr ||
+    } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_makeCharItemLinkOpen.c_str())) != nullptr ||
         _mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_makeCharItemLinkClose.c_str())) != nullptr) {
-      g_windowMgr.Confirm(LookupMessage(0xAFC), 0, true, false, 0, "Message", 280, 120, 0);
-      return 0;
-    }
-
-    int valid = 1;
-    if (g_serviceType == 1 && !ValidateCharacterName(this->m_nameEdit->Text())) {
-      valid = 0;
-    }
-    int allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
-    bool hasControlCharacter = g_session.HasControlCharacter(this->m_nameEdit->Text());
-    int blank = g_session.IsBlankString(this->m_nameEdit->Text());
-
-    if (!hasControlCharacter && allowed == 1 && valid == 1 && blank == 0) {
-      if (this->m_nameEdit->Length() >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
-        this->m_nameEdit->SetText("");
-        return 0;
-      }
-
-      char name[24] = {};
-      strcpy(name, this->m_nameEdit->Text());
-      memcpy(this->m_character.name, name, sizeof(this->m_character.name));
-      memcpy_s(&g_charInfo, sizeof(g_charInfo), &this->m_character, sizeof(g_charInfo));
-      if (strstr(g_charInfo.name, "\xB1\xD7\xB6\xF3\xBA\xF1\xC6\xBC") != nullptr) {
-        return 0;
-      }
-      _strlwr(name);
-      if (strstr(name, "gravity") != nullptr) {
-        return 0;
-      }
-      if ((name[0] == '[' && name[1] == 'g' && name[2] == 'm') || (name[1] == '[' && name[2] == 'g' && name[3] == 'm') ||
-          (name[2] == '[' && name[3] == 'g' && name[4] == 'm')) {
-        return 0;
-      }
-
-      g_modeMgr.currentMode->SendMsg(LMM_SENDCHARINFO, 0, 0, 0, 0);
-      g_windowMgr.Schedule(this);
+      g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
     } else {
-      if (hasControlCharacter || allowed == 0) {
-        g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+      int valid = TRUE;
+      if (g_serviceType == ServiceAmerica && !g_session.ValidateCharacterName(this->m_nameEdit->Text())) {
+        valid = FALSE;
       }
-      if (valid == 0) {
-        g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
+      int allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
+      bool hasControlCharacter = false;
+      if (g_session.HasControlCharacter(this->m_nameEdit->Text())) {
+        hasControlCharacter = true;
       }
-      if (blank == 1) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+      int blank = g_session.IsBlankString(this->m_nameEdit->Text());
+
+      if (!hasControlCharacter && allowed == TRUE && valid == TRUE && blank == FALSE) {
+        if (this->m_nameEdit->Length() >= 24) {
+          g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+          this->m_nameEdit->SetText("");
+          return 0;
+        }
+
+        char name[24] = {};
+        strcpy(name, this->m_nameEdit->Text());
+        memcpy(this->m_character.name, name, sizeof(this->m_character.name));
+        memcpy_s(&g_charInfo, sizeof(g_charInfo), &this->m_character, sizeof(g_charInfo));
+        if (strstr(g_charInfo.name, "\xB1\xD7\xB6\xF3\xBA\xF1\xC6\xBC") != nullptr) {
+          return 0;
+        }
+        _strlwr(name);
+        if (strstr(name, "gravity") != nullptr) {
+          return 0;
+        }
+        if ((name[0] == '[' && name[1] == 'g' && name[2] == 'm') || (name[1] == '[' && name[2] == 'g' && name[3] == 'm') ||
+            (name[2] == '[' && name[3] == 'g' && name[4] == 'm')) {
+          return 0;
+        }
+
+        g_modeMgr.currentMode->SendMsg(LMM_SENDCHARINFO, 0, 0, 0, 0);
+        g_windowMgr.Schedule(this);
+      } else {
+        if (hasControlCharacter || !allowed) {
+          g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        }
+        if (!valid) {
+          g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
+        }
+        if (blank == TRUE) {
+          g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        }
+      }
+
+      {
+      CMode* mode = g_modeMgr.currentMode;
+      mode->SendMsg(LMM_SET_MAKING_CHAR_NAME, reinterpret_cast<int>(this->m_nameEdit->Text()), 0, 0, 0);
+      int payload[8];
+      payload[0] = this->m_character.stats[0];
+      payload[1] = this->m_character.stats[1];
+      payload[2] = this->m_character.stats[2];
+      payload[3] = this->m_character.stats[3];
+      payload[4] = this->m_character.stats[4];
+      payload[5] = this->m_character.stats[5];
+      payload[6] = this->m_character.headPalette;
+      payload[7] = this->m_character.head;
+      mode->SendMsg(LMM_SET_CHAR_PARAM, reinterpret_cast<int>(payload), 0, 0, 0);
       }
     }
-
-    CMode* mode = g_modeMgr.currentMode;
-    mode->SendMsg(LMM_SET_MAKING_CHAR_NAME, reinterpret_cast<int>(this->m_nameEdit->Text()), 0, 0, 0);
-    int payload[8];
-    payload[0] = this->m_character.stats[0];
-    payload[1] = this->m_character.stats[1];
-    payload[2] = this->m_character.stats[2];
-    payload[3] = this->m_character.stats[3];
-    payload[4] = this->m_character.stats[4];
-    payload[5] = this->m_character.stats[5];
-    payload[6] = this->m_character.headPalette;
-    payload[7] = this->m_character.head;
-    mode->SendMsg(LMM_SET_CHAR_PARAM, reinterpret_cast<int>(payload), 0, 0, 0);
     return 0;
   }
 
   case ID_CANCEL:
     g_windowMgr.Schedule(this);
-    g_modeMgr.currentMode->SendMsg(MM_COMMAND, 0x2714, 0, 0, 0);
+    g_modeMgr.currentMode->SendMsg(MM_COMMAND, LMM_SELECTCHARACTER, 0, 0, 0);
     return 0;
 
   case ID_SLOT:
@@ -654,15 +648,22 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
       if (sender == this->m_raceViews[this->m_race]) {
         this->m_character.head = 1;
         for (int index = 0; index < 24; ++index) {
-          this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, index == 0, 0, 0, 0);
+          if (index == 0) {
+            this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+          } else {
+            this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+          }
           this->m_hairStyleButtons[index]->m_race = this->m_race;
           this->m_hairStyleButtons[index]->SendMsg(nullptr, UM_SETCURITEM, 0, 0, 0, 0);
         }
 
-        if (this->m_race == 0) {
+        switch (this->m_race) {
+        case 0:
           this->m_character.job = 0;
-        } else if (this->m_race == 1) {
-          this->m_character.job = 0x107A;
+          break;
+        case 1:
+          this->m_character.job = JT_DO_SUMMONER;
+          break;
         }
         this->UpdatePreviewResources();
       }
@@ -675,7 +676,7 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
         if (sender == this->m_hairColorButtons[index]) {
           this->m_hairColorButtons[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
           this->m_character.headPalette = static_cast<short>(index);
-          if (this->m_character.headPalette < 0) {
+          if (0 > this->m_character.headPalette) {
             this->m_character.headPalette = 8;
           }
           this->UpdatePreviewResources();
@@ -694,35 +695,7 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
       }
       this->Invalidate();
     }
-    return 0;
-
-  case ID_LEFT:
-    if (argument2 == 0) {
-      ++this->m_action;
-      if (this->m_action >= this->actionBase + 8) {
-        this->m_action = this->actionBase;
-      }
-      this->Invalidate();
-    }
-    return 0;
-
-  case MAKECHAR_BUTTON_HAIR_STYLE:
-    for (int index = 0; index < 24; ++index) {
-      if (sender == this->m_hairStyleButtons[index]) {
-        if (index >= (g_session.IsDoramJob(this->m_character.job) == true ? 6 : 0x17)) {
-          return 0;
-        }
-        this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
-        this->m_character.head = static_cast<short>(index + 1);
-        if (this->m_character.head < 0) {
-          this->m_character.head = 0;
-        }
-        this->UpdatePreviewResources();
-      } else {
-        this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
-      }
-    }
-    return 0;
+    break;
 
   case MAKECHAR_BUTTON_GENDER:
     for (int index = 0; index < 2; ++index) {
@@ -749,6 +722,38 @@ int UINewMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
       this->m_hairStyleButtons[index]->SendMsg(nullptr, UM_SETCURITEM, 0, 0, 0, 0);
     }
     this->UpdatePreviewResources();
+    return 0;
+
+  case MAKECHAR_BUTTON_HAIR_STYLE:
+    for (int index = 0; index < 24; ++index) {
+      if (sender == this->m_hairStyleButtons[index]) {
+        if (g_session.IsDoramJob(this->m_character.job) == true) {
+          if (index >= 6) {
+            return 0;
+          }
+        } else if (index >= 0x17) {
+          return 0;
+        }
+        this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+        this->m_character.head = static_cast<short>(index + 1);
+        if (this->m_character.head < 0) {
+          this->m_character.head = 0;
+        }
+        this->UpdatePreviewResources();
+      } else {
+        this->m_hairStyleButtons[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+      }
+    }
+    return 0;
+
+  case ID_LEFT:
+    if (argument2 == 0) {
+      ++this->m_action;
+      if (this->m_action >= this->actionBase + 8) {
+        this->m_action = this->actionBase;
+      }
+      this->Invalidate();
+    }
     return 0;
   }
 

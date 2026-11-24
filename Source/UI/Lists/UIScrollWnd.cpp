@@ -18,7 +18,7 @@ namespace {
 struct PrimitivePoolAccess : RenderPrimitivePool {
   // INLINED
   inline RenderPrimitive* AcquireLocal() {
-    if (this->m_current == this->m_commands.end()) {
+    if (this->m_commands.end() == this->m_current) {
       this->m_commands.emplace_back();
       this->m_current = this->m_commands.end();
       return &this->m_commands.back();
@@ -33,18 +33,25 @@ struct PrimitivePoolAccess : RenderPrimitivePool {
 };
 }
 
+// OFFSET: 0x009AC800
+// FUNCTION: fn_45752
+void UIScrollWnd::InitializeScrollWindow(int width, int height) {
+  this->UIWindow::Resize(width, height);
+  this->OnCreate(width, height);
+}
+
 // OFFSET: 0x009AC040
 // FUNCTION: fn_13770
 UIScrollWnd::UIScrollWnd(int width, int height, unsigned char cached)
     : UIWindow(cached), viewWidth(0), viewHeight(0), contentWidth(0), contentHeight(0), horizontalBar(nullptr), scrollBar(nullptr),
       scrollBarWidth(13), scrollBarHeight(13), horizontalScrollPosition(0), scrollPosition(0), horizontalScrollable(0), wheelScroll(0) {
   this->UIWindow::Resize(width, height);
-  this->OnCreate(width, height);
+  static_cast<UIWindow*>(this)->OnCreate(width, height);
 }
 
-// OFFSET: 0x009AC2B0
-// FUNCTION: fn_13772
-UIScrollWnd::~UIScrollWnd() {
+// OFFSET: 0x009AC830
+// FUNCTION: fn_45696
+void UIScrollWnd::DestroyScrollBars() {
   if (this->horizontalBar) {
     this->RemoveChild(this->horizontalBar, 0);
     delete this->horizontalBar;
@@ -55,6 +62,12 @@ UIScrollWnd::~UIScrollWnd() {
     delete this->scrollBar;
     this->scrollBar = nullptr;
   }
+}
+
+// OFFSET: 0x009AC2B0
+// FUNCTION: fn_13772
+UIScrollWnd::~UIScrollWnd() {
+  this->DestroyScrollBars();
 }
 
 // OFFSET: 0x009AC5D0
@@ -76,7 +89,8 @@ void UIScrollWnd::AddScrollChild(UIWindow* child) {
 
   for (UIWindow* window : this->m_children) {
     if (window != this->horizontalBar && window != this->scrollBar) {
-      this->childOrigins[window] = std::make_pair(window->geometry.x, window->geometry.y);
+      const POINT origin = {window->geometry.x, window->geometry.y};
+      this->childOrigins[window] = origin;
     }
   }
 
@@ -87,8 +101,8 @@ void UIScrollWnd::AddScrollChild(UIWindow* child) {
 // FUNCTION: fn_13777
 void UIScrollWnd::MoveScrollChild(UIWindow* child, int x, int y) {
   child->Move(x, y);
-  this->childOrigins[child].first = x;
-  this->childOrigins[child].second = y;
+  this->childOrigins[child].x = x;
+  this->childOrigins[child].y = y;
   this->UpdateScrollRange();
 }
 
@@ -99,30 +113,38 @@ bool UIScrollWnd::Update(int redraw) {
     return this->UpdateCached(redraw);
   }
 
-  int needRedraw = redraw;
+  return this->UpdateUncached(redraw);
+}
+
+// OFFSET: 0x009ACA00
+// FUNCTION: fn_45697
+bool UIScrollWnd::UpdateUncached(int redraw) {
   for (auto it = this->childOrigins.begin(); it != this->childOrigins.end(); ++it) {
-    it->first->Move(it->second.first - this->horizontalScrollPosition, it->second.second - this->scrollPosition);
+    it->first->Move(it->second.x - this->horizontalScrollPosition, it->second.y - this->scrollPosition);
   }
 
   if (this->m_dirty == 1) {
     this->Paint();
-    needRedraw = 1;
     this->m_dirty = 0;
+    redraw = 1;
   }
 
   bool changed = false;
   for (UIWindow* child : this->m_children) {
     if (this->horizontalBar != child && this->scrollBar != child) {
-      if (child->geometry.x + child->geometry.width > 0 && child->geometry.x < this->geometry.width && child->geometry.y + child->geometry.height > 0 &&
-          child->geometry.y < this->geometry.height && child->geometry.visible == 1) {
-        changed |= this->UpdateChild(child, needRedraw);
+      const RECT bounds = {
+        child->geometry.x, child->geometry.y, child->geometry.x + child->geometry.width, child->geometry.y + child->geometry.height
+      };
+      if (bounds.right > 0 && bounds.left < this->geometry.width && bounds.bottom > 0 && bounds.top < this->geometry.height &&
+          child->geometry.visible == 1) {
+        changed |= this->UpdateChild(child, redraw);
       }
     } else if (child->geometry.visible == 1) {
-      changed |= child->Update(needRedraw);
+      changed |= child->Update(redraw);
     }
   }
 
-  if (this->parent && this->parent->m_cached == 0 && (needRedraw == 1 || changed == 1)) {
+  if (this->parent && this->parent->m_cached == 0 && (redraw == 1 || changed == 1)) {
     this->parent->geometry.surface->BlendFrom(
       this->geometry.x, this->geometry.y, this->geometry.width, this->geometry.height, *static_cast<CDCBitmap*>(this->geometry.surface)
     );
@@ -135,7 +157,7 @@ bool UIScrollWnd::Update(int redraw) {
 // FUNCTION: fn_13779
 bool UIScrollWnd::UpdateCached(int redraw) {
   for (auto it = this->childOrigins.begin(); it != this->childOrigins.end(); ++it) {
-    it->first->Move(it->second.first, it->second.second);
+    it->first->Move(it->second.x, it->second.y);
   }
 
   if (this->m_dirty == 1) {
@@ -152,7 +174,7 @@ bool UIScrollWnd::UpdateCached(int redraw) {
   }
 
   if (redraw == 1 || changed == 1) {
-    std::list<RenderPrimitive*> primitives(this->m_primitives);
+    std::list<RenderCommand*> primitives(this->m_primitives);
     for (UIWindow* child : this->m_children) {
       if (this->horizontalBar == child || this->scrollBar == child) {
         static_cast<CDCBitmap*>(child->geometry.surface)->UploadTexture(child->m_texture);
@@ -171,7 +193,7 @@ bool UIScrollWnd::UpdateCached(int redraw) {
   }
 
   for (auto it = this->childOrigins.begin(); it != this->childOrigins.end(); ++it) {
-    it->first->Move(it->second.first - this->horizontalScrollPosition, it->second.second - this->scrollPosition);
+    it->first->Move(it->second.x - this->horizontalScrollPosition, it->second.y - this->scrollPosition);
   }
   return changed;
 }
@@ -200,33 +222,38 @@ __declspec(noinline) bool UIScrollWnd::UpdateChild(UIWindow* child, int redraw) 
   int width = child->geometry.width;
   int y = child->geometry.y;
   int height = child->geometry.height;
-  int sourceX = 0;
   int sourceY = 0;
+  int sourceX = 0;
 
   const int right = width + x;
   if (x < 0) {
     x = 0;
     if (this->geometry.width < right) {
-      sourceX = std::abs(child->geometry.x);
       width = this->geometry.width;
+      sourceX = std::abs(child->geometry.x);
     } else {
       sourceX = std::abs(child->geometry.x);
       width -= sourceX;
     }
   } else if (this->geometry.width < right) {
+    x = child->geometry.x;
+    sourceX = 0;
     width = this->geometry.width - std::abs(x);
   }
 
   const int bottom = y + height;
   if (y < 0) {
-    sourceY = std::abs(y);
     y = 0;
     if (this->geometry.height < bottom) {
       height = this->geometry.height;
+      sourceY = std::abs(child->geometry.y);
     } else {
+      sourceY = std::abs(child->geometry.y);
       height -= sourceY;
     }
   } else if (this->geometry.height < bottom) {
+    y = child->geometry.y;
+    sourceY = 0;
     height = this->geometry.height - std::abs(y);
   }
 
@@ -281,7 +308,7 @@ RenderPrimitive* UIScrollWnd::BuildPrimitive(int x, int y, int sourceX, int sour
 
 // OFFSET: 0x009AD3A0
 // FUNCTION: fn_13783
-__declspec(noinline) void UIScrollWnd::OnCreate(int width, int height) {
+void UIScrollWnd::OnCreate(int width, int height) {
   this->horizontalBar = new UIScrollBar();
   this->horizontalBar->Configure(0, height - this->scrollBarHeight, 0, width - this->scrollBarWidth);
   this->AddChild(this->horizontalBar);
@@ -314,14 +341,10 @@ void UIScrollWnd::UpdateScrollRange() {
   for (auto it = this->childOrigins.begin(); it != this->childOrigins.end(); ++it) {
     UIWindow* child = it->first;
     if (child->geometry.visible != 0) {
-      const int childRight = child->geometry.width + it->second.first;
-      if (right < childRight) {
-        right = childRight;
-      }
-      const int childBottom = it->second.second + child->geometry.height;
-      if (bottom < childBottom) {
-        bottom = childBottom;
-      }
+      const int childRight = child->geometry.width + it->second.x;
+      const int childBottom = it->second.y + child->geometry.height;
+      right = right >= childRight ? right : childRight;
+      bottom = bottom >= childBottom ? bottom : childBottom;
     }
   }
 
@@ -330,47 +353,31 @@ void UIScrollWnd::UpdateScrollRange() {
   this->viewWidth = this->geometry.width;
   this->viewHeight = this->geometry.height;
 
-  int visibleHeight;
   if (right > this->geometry.width) {
-    visibleHeight = this->geometry.height - this->scrollBarHeight;
     this->horizontalScrollable = 1;
-    this->viewHeight = visibleHeight;
-  } else {
-    visibleHeight = this->geometry.height;
+    this->viewHeight = this->geometry.height - this->scrollBarHeight;
   }
 
-  int visibleWidth;
   if (bottom > this->geometry.height) {
-    visibleWidth = this->geometry.width - this->scrollBarWidth;
     this->wheelScroll = 1;
-    this->viewWidth = visibleWidth;
-  } else {
-    visibleWidth = this->geometry.width;
+    this->viewWidth = this->geometry.width - this->scrollBarWidth;
   }
 
-  if (this->horizontalScrollable == 0 && right > visibleWidth) {
+  if (this->horizontalScrollable == 0 && right > this->viewWidth) {
     this->horizontalScrollable = 1;
-    visibleHeight = this->geometry.height - this->scrollBarHeight;
-    this->viewHeight = visibleHeight;
+    this->viewHeight = this->geometry.height - this->scrollBarHeight;
   }
 
-  if (this->wheelScroll == 0 && bottom > visibleHeight) {
-    visibleWidth = this->geometry.width - this->scrollBarWidth;
+  if (this->wheelScroll == 0 && bottom > this->viewHeight) {
     this->wheelScroll = 1;
-    this->viewWidth = visibleWidth;
+    this->viewWidth = this->geometry.width - this->scrollBarWidth;
   }
 
-  if (right < visibleWidth) {
-    right = visibleWidth;
-  }
-  this->contentWidth = right;
-  if (bottom < visibleHeight) {
-    bottom = visibleHeight;
-  }
-  this->contentHeight = bottom;
+  this->contentWidth = (std::max)(right, this->viewWidth);
+  this->contentHeight = (std::max)(bottom, this->viewHeight);
 
   if (this->horizontalScrollable == 1) {
-    this->horizontalBar->Resize(visibleWidth, this->scrollBarHeight);
+    this->horizontalBar->Resize(this->viewWidth, this->scrollBarHeight);
     this->horizontalBar->SetRange(this->contentWidth - this->viewWidth, this->viewWidth, this->contentWidth);
     const int maximum = this->contentWidth - this->viewWidth;
     int position = this->horizontalScrollPosition;
@@ -495,4 +502,26 @@ int UIScrollWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1,
   }
   }
   return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
+}
+
+// OFFSET: 0x009ADA90
+// FUNCTION: fn_45748
+void UIScrollWnd::ShowHorizontalScrollBar(int visible, bool redraw) {
+  if (this->horizontalBar && this->horizontalBar->geometry.visible != visible) {
+    this->horizontalBar->Show(visible);
+    if (redraw) {
+      this->Invalidate();
+    }
+  }
+}
+
+// OFFSET: 0x009ADAD0
+// FUNCTION: fn_45749
+void UIScrollWnd::ShowVerticalScrollBar(int visible, bool redraw) {
+  if (this->scrollBar && this->scrollBar->geometry.visible != visible) {
+    this->scrollBar->Show(visible);
+    if (redraw) {
+      this->Invalidate();
+    }
+  }
 }

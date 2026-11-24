@@ -14,20 +14,6 @@
 
 #include <algorithm>
 
-template __declspec(noinline) std::_Tree_find_result<std::map<int, ExtendedListLine>::_Mybase::_Nodeptr> std::map<int, ExtendedListLine>::_Mybase::_Find_lower_bound<int>(const int&) const;
-
-namespace {
-  // INLINED
-  unsigned Palette(int column, int row) {
-    unsigned red;
-    unsigned green;
-    unsigned blue;
-    g_skinInfo.PaletteChannels(column, row, red, green, blue);
-
-    return RGB(red, green, blue);
-  }
-}
-
 // OFFSET: 0x00872C00
 // FUNCTION: fn_11136
 UIComboBoxEx::~UIComboBoxEx() = default;
@@ -88,8 +74,8 @@ namespace {
 // INLINED
 __forceinline void SetBarRange(UIScrollBar* bar, int maximum, int visible, int total) {
   bar->maximum = maximum;
-  bar->visible = visible;
   bar->total = total;
+  bar->visible = visible;
   bar->Invalidate();
 
   if (bar->position > bar->maximum) {
@@ -149,11 +135,11 @@ int UIComboBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       g_windowMgr.CloseWindow(WID_COMBOBOXWND);
     }
 
-    return 0;
+    break;
 
   case UM_UPPUSH:
     if (this->lines.size() == 0) {
-      return 0;
+      break;
     }
 
     --this->selected;
@@ -166,13 +152,15 @@ int UIComboBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       this->topLine = this->selected;
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
 
   case UM_DOWNPUSH: {
     const unsigned count = static_cast<unsigned>(this->lines.size());
 
     if (count == 0) {
-      return 0;
+      break;
     }
 
     this->selected = (this->selected + 1);
@@ -182,28 +170,32 @@ int UIComboBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     }
 
     {
-      const int edge = ((this->bottomMargin - this->geometry.height / this->lineHeight) + this->selected);
+      const int visible = this->geometry.height / this->lineHeight;
 
-      if (this->topLine <= edge) {
-        this->topLine = (edge + 1);
+      if (this->topLine <= this->selected + this->bottomMargin - visible) {
+        this->topLine = this->selected + this->bottomMargin - visible + 1;
       }
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   }
 
   case UM_ADDITEM:
     if (b) {
       this->AddLine(reinterpret_cast<const char*>(a), static_cast<unsigned>(b));
-    } else {
-      this->AddLine(reinterpret_cast<const char*>(a), 0);
+      this->Invalidate();
+      break;
     }
+
+    this->AddLine(reinterpret_cast<const char*>(a), 0);
     this->Invalidate();
-    return 0;
+    break;
 
   case UM_SET_CALLER_WID:
     this->targetId = static_cast<int>(a);
-    return 0;
+    break;
 
   case UM_SETCURITEM:
     this->selected = static_cast<int>(a);
@@ -216,14 +208,14 @@ int UIComboBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       this->selected = static_cast<int>(this->lines.size() - 1);
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
 
   default:
     return this->UIListBoxEx::SendMsg(sender, message, a, b, c, d);
   }
 
-  this->Refresh();
-  this->Invalidate();
   return 0;
 }
 
@@ -249,8 +241,11 @@ __forceinline void UIComboBoxEx::DrawRows(bool centered) {
 // OFFSET: 0x0088A360
 // FUNCTION: fn_11354
 void UIComboBoxEx::Paint() {
-  this->ClearSurface(Palette(6, 6));
-  this->FillRegion(1, 1, (this->geometry.width - 2), (this->geometry.height - 2), Palette(2, 2));
+  unsigned red, green, blue;
+  g_skinInfo.PaletteChannels(6, 6, red, green, blue);
+  this->ClearSurface(RGB(red, green, blue));
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  this->FillRegion(1, 1, (this->geometry.width - 2), (this->geometry.height - 2), RGB(red, green, blue));
 
   auto* leftUp = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\sysboxs_lu.bmp")));
   this->DrawBitmap(0, 0, leftUp, false);
@@ -265,26 +260,23 @@ void UIComboBoxEx::Paint() {
 
   const int top = this->topLine;
   const int end = static_cast<int>(std::min(
-    static_cast<unsigned>(this->lines.size()), static_cast<unsigned>((top + (this->geometry.height / this->lineHeight - this->bottomMargin)))
+    static_cast<unsigned>((top + (this->geometry.height / this->lineHeight - this->bottomMargin))), static_cast<unsigned>(this->lines.size())
   ));
 
   for (int row = top; row < end; ++row) {
     if (row == this->selected) {
-      this->FillRegion(3, ((this->lineHeight * (row - top)) + 1), (this->geometry.width - 6), (this->lineHeight - 2), Palette(6, 2));
+      g_skinInfo.PaletteChannels(6, 2, red, green, blue);
+      this->FillRegion(3, ((this->lineHeight * (row - top)) + 1), (this->geometry.width - 6), (this->lineHeight - 2), RGB(red, green, blue));
     }
     this->DrawTextAt(3 - this->horizontalOffset, this->lineHeight * (row - top) + 2, this->lines[row].text.c_str(), 0, 0, 12, this->lines[row].color, 0, 0);
   }
 
   if (this->verticalOverflow != 0) {
-    this->FillRegion((this->geometry.width - 16), 0, 16, this->geometry.height, Palette(2, 2));
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion((this->geometry.width - 16), 0, 16, this->geometry.height, RGB(red, green, blue));
   }
 
   this->parent->Invalidate();
-}
-
-// OFFSET: 0x0086CCE0
-// FUNCTION: fn_11036
-UIComboBoxEx2::UIComboBoxEx2() : UIComboBoxEx(), alignment(0) {
 }
 
 // OFFSET: 0x008706D0

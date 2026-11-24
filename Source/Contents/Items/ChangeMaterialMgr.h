@@ -57,6 +57,9 @@ struct ChangeMaterialResult {
 
 struct MaterialKey {
   explicit __declspec(noinline) MaterialKey(const std::vector<ChangeMaterialEntry>& materials);
+  // INLINED
+  __forceinline MaterialKey(const MaterialKey& other) : itemIds(other.itemIds) {
+  }
 
   /* 0000 */ std::vector<int> itemIds;
 };
@@ -90,6 +93,8 @@ public:
   static int LuaInsertRecipe(lua_State* L);
 
   bool Load();
+  // INLINED
+  std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess> GetLibrary() const { return this->m_library; }
   ChangeMaterialResult InsertRecipe(std::vector<ChangeMaterialEntry> materials, const std::vector<ChangeMaterialProduct>& products, int type);
 
   /* 0000 */ std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess> m_library;

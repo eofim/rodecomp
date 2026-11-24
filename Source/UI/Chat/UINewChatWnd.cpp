@@ -9,6 +9,7 @@
 #include "Client/Replay/Replay.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Network/TextEncoding.h"
@@ -36,19 +37,37 @@
 #include <string>
 #include <vector>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // GLOBAL: gl_25380
-static const std::string s_chatItemLinkOpening = "<ITEML>";
+const std::string s_chatItemLinkOpening = "<ITEML>";
 
 // GLOBAL: gl_25450
 static const std::string s_itemLinkClosing = "</ITEML>";
 
+// OFFSET: 0x00940D80
+// FUNCTION: fn_45679
+void UINewChatWnd::SetStickOn(unsigned char enabled) {
+  g_windowMgr.chatWndStickOn = enabled;
+  if (enabled) {
+    this->m_currentTab = 0;
+    if (this->m_savedRowCount == 0) {
+      this->m_savedRowCount = 1;
+    }
+    this->ResizeRows(this->m_savedRowCount);
+  } else {
+    this->m_savedRowCount = this->geometry.state;
+    this->ResizeRows(0);
+  }
+  this->Invalidate();
+}
+
 // OFFSET: 0x00936360
 // FUNCTION: fn_12750
 int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
-  if (g_replayAnimationScaling != 0 && Replay::Instance().header.options.recordRestricted == 0) {
-    return 1;
+  if (g_replayAnimationScaling != 0) {
+    const unsigned char restricted = Replay::Instance().header.options.recordRestricted;
+    if (restricted == 0) {
+      return 1;
+    }
   }
 
   switch (message) {
@@ -81,14 +100,14 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
 
     this->m_tabControl->RemoveTab(this->m_currentTab);
     this->m_tabWidth = this->m_tabControl->geometry.width / names.size();
-    UISubChatHisWnd* window = static_cast<UISubChatHisWnd*>(g_windowMgr.OpenSubChatWindow(static_cast<int>(g_windowMgr.retainedWindows.size()), -1, -1, 0, 0));
+    UIWindow* window = g_windowMgr.OpenSubChatWindow(static_cast<int>(g_windowMgr.retainedWindows.size()), -1, -1, 0, 0);
     if (window == nullptr) {
       return 0;
     }
 
     std::vector<UIChatHisBox*>::iterator tab = this->m_tabs.begin() + this->m_currentTab;
     if (tab != this->m_tabs.end()) {
-      window->ChatBox()->CopyHistory(*static_cast<UIChatHisBox*>(*tab));
+      static_cast<UISubChatHisWnd*>(window)->ChatBox()->CopyHistory(*static_cast<UIChatHisBox*>(*tab));
       this->RemoveChild(*tab, 1);
       this->m_tabs.erase(tab);
     }
@@ -183,7 +202,7 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     this->ApplyHeaderLayout();
     return 0;
   }
-  case 0x74:
+  case UM_CHILD_CHANGED:
     if (this->geometry.height <= this->m_inputOffsetY + this->m_inputAreaHeight) {
       return 0;
     }
@@ -263,7 +282,11 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     case 0: {
       const int count = static_cast<int>(this->m_whisperEdit->history.size());
       if (a >= 0 && a <= count) {
-        this->m_whisperEdit->SetText(a == count ? "" : this->m_whisperEdit->history[a].c_str());
+        if (a == count) {
+          this->m_whisperEdit->SetText("");
+        } else {
+          this->m_whisperEdit->SetText(this->m_whisperEdit->history[a].c_str());
+        }
         this->m_whisperEdit->historyIndex = a;
       }
       g_windowMgr.SetFocus(this->m_whisperEdit);
@@ -300,7 +323,7 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       }
       }
 
-      if (g_serviceType == 10 && std::strlen(name) > 24) {
+      if (g_serviceType == ServiceGermany && std::strlen(name) > 24) {
         return 0;
       }
 
@@ -310,7 +333,8 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
 
       bool hasLink = false;
       std::string plain = RemoveTextColors(reinterpret_cast<const char*>(a));
-      if (g_navigationLinkParser->HasLink(plain)) {
+      NavigationLinkParser* parser = g_navigationLinkParser;
+      if (parser->HasLink(plain)) {
         hasLink = true;
         lines.push_back(plain);
       } else {
@@ -319,15 +343,16 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
         );
       }
 
-      const bool everyTab = c == 25 || (c == 0 && b == 0xFF);
+      bool everyTab = false;
+      if (c == 25 || (c == 0 && b == 0xFF)) {
+        everyTab = true;
+      }
       int index = 0;
       for (std::map<int, SubChatWndInfo>::iterator it = g_session.m_noSubChatWnds.begin(); it != g_session.m_noSubChatWnds.end(); ++it, ++index) {
         if ((it->second.options[c] || everyTab) && this->m_tabs[index] != nullptr) {
           static_cast<UIChatHisBox*>(this->m_tabs[index])->AddLinkRecord(reinterpret_cast<const char*>(a), b, name);
           for (unsigned int line = 0; line < lines.size(); ++line) {
-            UIWindow* tab = this->m_tabs[index];
-            const int width = this->TextWidth(lines[line].c_str(), 0, 0, 12, 0, 0);
-            if (width <= tab->geometry.width - 20 || hasLink) {
+            if (this->m_tabs[index]->geometry.width - 20 >= this->TextWidth(lines[line].c_str(), 0, 0, 12, 0, 0) || hasLink) {
               static_cast<UIChatHisBox*>(this->m_tabs[index])->AddText(lines[line].c_str(), b, name);
             } else {
               static_cast<UIChatHisBox*>(this->m_tabs[index])->AddTextWrapped(lines[line].c_str(), b, name);
@@ -379,13 +404,7 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       g_windowMgr.SelectWhisperName(reinterpret_cast<const char*>(b));
       return 0;
     case ID_STICK_ON:
-      g_windowMgr.chatWndStickOn = 1;
-      this->m_currentTab = 0;
-      if (this->m_savedRowCount == 0) {
-        this->m_savedRowCount = 1;
-      }
-      this->ResizeRows(this->m_savedRowCount);
-      this->Invalidate();
+      this->SetStickOn(1);
       return 0;
     case ID_STICK_OFF:
       this->SendMsg(this, UM_DETACH_CHAT_TAB, this->m_currentTab, 0, 0, 0);
@@ -399,8 +418,8 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_TO_ALL)), 0, 0, 0);
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_TO_PARTY)), 0, 0, 0);
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_TO_GUILD)), 0, 0, 0);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLAN_MANAGE_LAND)), 0, 0, 0);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_REFINING_IMPOSSIBLE)), 0, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_TO_CLAN)), 0, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_TO_ALLY)), 0, 0, 0);
       menu->SendMsg(nullptr, UM_SETCURITEM, g_session.m_chatTarget, 0, 0, 0);
       menu->Resize(0x70, 0x30);
       menu->SendMsg(nullptr, UM_SET_CALLER_WID, 1, 0, 0, 0);
@@ -453,29 +472,32 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       }
 
       UIChatEditCtrl* edit = this->m_chatEdit;
-      bool rejected = HasItemLinkTag(std::string(edit->Text()));
-      if (!rejected) {
-        UIItemTagOnChat* tags = this->m_chatEdit->itemTags;
-        if (tags != nullptr && tags->linkedText.size() != 0) {
-          text = std::string(tags->linkedText);
-          this->m_chatEdit->itemTags->linkedText.clear();
-          this->m_chatEdit->itemTags->ClearTags();
-          rejected = this->m_chatEdit->LinkedText().size() != 0;
-        }
-      }
-      if (rejected) {
+      if (edit->HasItemLinkTag(std::string(edit->Text())) == 1) {
         this->m_chatEdit->SetText("");
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLOSE)), 0xFF, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MSG_IS_ILLEGAL_MSG)), 0xFF, 0, 0, 0);
         return 0;
       }
 
+      UIItemTagOnChat* tags = this->m_chatEdit->itemTags;
+      if (tags != nullptr && tags->linkedText.size() != 0) {
+        text = std::string(tags->linkedText);
+        this->m_chatEdit->itemTags->linkedText = "";
+        this->m_chatEdit->itemTags->ClearTags();
+        if (this->m_chatEdit->LinkedText().size() != 0) {
+          this->m_chatEdit->SetText("");
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MSG_IS_ILLEGAL_MSG)), 0xFF, 0, 0, 0);
+          return 0;
+        }
+      }
+
       if (this->m_chatEdit->LinkedText().size() != 0) {
-        text = this->m_chatEdit->LinkedText();
+        const std::string& linked = this->m_chatEdit->LinkedText();
+        text = linked;
       }
       edit = this->m_chatEdit;
-      if (HasNaviLinkTag(std::string(edit->Text())) != 0) {
+      if (edit->HasNaviLinkTag(std::string(edit->Text())) == 1) {
         this->m_chatEdit->SetText("");
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLOSE)), 0xFF, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MSG_IS_ILLEGAL_MSG)), 0xFF, 0, 0, 0);
         return 0;
       }
 
@@ -483,12 +505,12 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       this->m_chatEdit->PushHistory();
       this->m_inputEdit = this->m_chatEdit;
       g_windowMgr.SetFocus(this->m_chatEdit);
-      this->m_chatEdit->linkedText.clear();
+      this->m_chatEdit->linkedText = "";
       if (std::strlen(buffer) == 0) {
         return 0;
       }
 
-      if (g_serviceType == 1 && !ValidateCharacterName(buffer)) {
+      if (g_serviceType == ServiceAmerica && !g_session.ValidateCharacterName(buffer)) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENGLISHONLY)), 0xFF, 0, 0, 0);
         return 0;
       }
@@ -509,7 +531,7 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       if (talkType == 0x37 || talkType == 0x1A || talkType == 0x12) {
         if (_mbsstr(reinterpret_cast<const unsigned char*>(buffer), reinterpret_cast<const unsigned char*>(s_chatItemLinkOpening.c_str())) != nullptr
             || _mbsstr(reinterpret_cast<const unsigned char*>(buffer), reinterpret_cast<const unsigned char*>(s_itemLinkClosing.c_str())) != nullptr) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON)), 0x64FFFF, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_NOT_USING_TAG_TO_NAME)), 0x64FFFF, 0, 0, 0);
           return 0;
         }
       }
@@ -648,7 +670,8 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     UIListBox* tab = static_cast<UIListBox*>(this->m_tabs[this->m_currentTab]);
     if (tab != nullptr && tab->verticalOverflow != 0) {
       if (HIBYTE(GetKeyState(VK_CONTROL))) {
-        tab->SendMsg(nullptr, UM_SCROLLVERT, tab->LineCount(), 0, 0, 0);
+        const int lines = tab->LineCount();
+        tab->SendMsg(nullptr, UM_SCROLLVERT, lines, 0, 0, 0);
       } else {
         tab->SendMsg(nullptr, UM_SCROLLVERTPAGEDOWN, 0, 0, 0, 0);
       }
@@ -659,7 +682,8 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     UIListBox* tab = static_cast<UIListBox*>(this->m_tabs[this->m_currentTab]);
     if (tab != nullptr && tab->verticalOverflow != 0) {
       if (HIBYTE(GetKeyState(VK_CONTROL))) {
-        tab->SendMsg(nullptr, UM_SCROLLVERT, -tab->LineCount(), 0, 0, 0);
+        const int lines = tab->LineCount();
+        tab->SendMsg(nullptr, UM_SCROLLVERT, -lines, 0, 0, 0);
       } else {
         tab->SendMsg(nullptr, UM_SCROLLVERTPAGEUP, 0, 0, 0, 0);
       }

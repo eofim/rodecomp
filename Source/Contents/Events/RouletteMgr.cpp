@@ -19,9 +19,12 @@ RouletteMgr* g_rouletteMgr = nullptr;
 // FUNCTION: fn_10070
 RouletteMgr::RouletteMgr() {
   this->m_valid = 0;
-  std::memset(&this->m_quads.current, 0, sizeof(this->m_quads.current));
-  std::memset(&this->m_quads.start, 0, sizeof(this->m_quads.start));
-  std::memset(&this->m_quads.target, 0, sizeof(this->m_quads.target));
+  RouletteVertex* current = this->m_quads.current.vertices;
+  std::memset(current, 0, sizeof(RouletteVertex) * 6);
+  RouletteVertex* start = this->m_quads.start.vertices;
+  std::memset(start, 0, sizeof(RouletteVertex) * 6);
+  RouletteVertex* target = this->m_quads.target.vertices;
+  std::memset(target, 0, sizeof(RouletteVertex) * 6);
   this->m_serial = 0;
   this->m_frame = 0;
   this->m_cycle = 0;
@@ -49,7 +52,7 @@ void RouletteMgr::AddItem(RouletteSlot slot) {
   item.SetItemId(slot.itemId);
   item.quantity = slot.count;
   item.identified = 1;
-  this->m_items.insert(std::make_pair(slot, item));
+  this->m_items.insert(std::make_pair(RouletteSlot(slot), item));
 }
 
 // OFFSET: 0x0080ABA0
@@ -96,7 +99,7 @@ void RouletteMgr::Destroy() {
 // OFFSET: 0x0080ACC0
 // FUNCTION: fn_10076
 void RouletteMgr::Draw() {
-  RenderCommand* command = g_renderer->commands.Acquire();
+  RenderCommand* command = g_renderer->AcquireCommand();
   command->texture = g_texMgr.Default();
   command->vertices = this->m_quads.current.vertices;
   command->vertexCount = 6;
@@ -130,10 +133,9 @@ void RouletteMgr::StartSpin(int x, int y, int originX, int originY) {
     this->m_quads.start.vertices[i] = this->m_quads.current.vertices[i];
   }
 
-  const float distance = (8 - this->m_stage) * 36.0f;
   for (int i = 0; i < 6; ++i) {
     this->m_quads.target.vertices[i] = this->m_quads.current.vertices[i];
-    this->m_quads.target.vertices[i].x = this->m_quads.current.vertices[i].x - distance;
+    this->m_quads.target.vertices[i].x = this->m_quads.current.vertices[i].x - (8 - this->m_stage) * 36.0f;
   }
 
   this->m_lastTick = timeGetTime();
@@ -157,22 +159,18 @@ void RouletteMgr::SetQuad(int x, int y, int originX, int originY) {
     originY += 3;
   }
 
-  const float left = x - 18.0f + originX;
-  const float right = x + 18.0f + originX;
-  const float top = y - 18.0f + originY + 17.0f;
-  const float bottom = y + 18.0f + originY + 17.0f;
-
   RenderVertex* vertices = this->m_quads.current.vertices;
-  vertices[0].x = left;
-  vertices[0].y = bottom;
-  vertices[1].x = right;
-  vertices[1].y = bottom;
-  vertices[2].x = right;
-  vertices[2].y = top;
+  const float offsetX = static_cast<float>(originX);
+  vertices[0].x = x - 18.0f + offsetX;
+  vertices[0].y = y + 18.0f + originY + 17.0f;
+  vertices[1].x = x + 18.0f + offsetX;
+  vertices[1].y = y + 18.0f + originY + 17.0f;
+  vertices[2].x = x + 18.0f + offsetX;
+  vertices[2].y = y - 18.0f + originY + 17.0f;
   vertices[3] = vertices[0];
   vertices[4] = vertices[2];
-  vertices[5].x = left;
-  vertices[5].y = top;
+  vertices[5].x = x - 18.0f + offsetX;
+  vertices[5].y = y - 18.0f + originY + 17.0f;
 
   for (int i = 0; i < 6; ++i) {
     vertices[i].z = 0.000001f;

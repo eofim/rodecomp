@@ -9,6 +9,7 @@
 #include <cstring>
 #include <deque>
 #include <string>
+#include <vector>
 #include <windows.h>
 
 // GLOBAL: gl_24512
@@ -62,9 +63,9 @@ const char* UIWindow::ParseColorCode(const char* text, std::uint32_t& color) {
   }
 
   if (*text == '^') {
-    std::uint32_t value = static_cast<unsigned char>(g_hexDigits[text[5]] * 16 + g_hexDigits[text[6]]);
-    value = (value << 8) | static_cast<unsigned char>(g_hexDigits[text[3]] * 16 + g_hexDigits[text[4]]);
-    value = (value << 8) | static_cast<unsigned char>(g_hexDigits[text[1]] * 16 + g_hexDigits[text[2]]);
+    std::uint32_t value = (static_cast<unsigned char>(g_hexDigits[text[5]] * 16 + g_hexDigits[text[6]]) << 8 |
+                           static_cast<unsigned char>(g_hexDigits[text[3]] * 16 + g_hexDigits[text[4]])) << 8 |
+                          static_cast<unsigned char>(g_hexDigits[text[1]] * 16 + g_hexDigits[text[2]]);
     color = value;
     return text + 7;
   }
@@ -121,6 +122,77 @@ void UIWindow::DrawColoredText(
 
   if (this->HasTextBackground()) {
     context.SetBackgroundMode(TRANSPARENT);
+  }
+}
+
+struct ColoredTextSegment {
+  // INLINED
+  ColoredTextSegment(const char* begin, const char* end, std::uint32_t color) : prefix(begin, end), color(color), text(begin, end) {
+  }
+
+  // INLINED
+  explicit ColoredTextSegment(std::uint32_t color) : color(color) {
+  }
+
+  std::vector<unsigned char> prefix;
+  std::uint32_t color;
+  std::vector<unsigned char> text;
+};
+
+template __declspec(noinline) void std::allocator<ColoredTextSegment>::deallocate(ColoredTextSegment* const, const std::size_t);
+
+// OFFSET: 0x00A850E0
+// FUNCTION: fn_45733
+void UIWindow::DrawRightColoredText(
+  int right, int y, const char* text, unsigned bytes, std::uint32_t& color, int family, int height
+) {
+  if (bytes == 0) {
+    bytes = static_cast<unsigned>(std::strlen(text));
+  }
+
+  const char* current = text;
+  const char* const end = text + bytes;
+  const char* next = this->SegmentEnd(current, end);
+  std::uint32_t segmentColor = color;
+  const ColoredTextSegment first(current, next, segmentColor);
+  std::vector<ColoredTextSegment> segments(1, first);
+  std::vector<unsigned char> prefix;
+
+  while (current < end) {
+    next = this->SegmentEnd(current, end);
+    prefix.insert(prefix.end(), reinterpret_cast<const unsigned char*>(current), reinterpret_cast<const unsigned char*>(next));
+    if (next >= end) {
+      break;
+    }
+
+    segmentColor = 0;
+    const char* segmentStart = this->ParseColorCode(next, segmentColor);
+    ColoredTextSegment segment(segmentColor);
+    segment.prefix.insert(segment.prefix.end(), prefix.begin(), prefix.end());
+    const char* segmentEnd = this->SegmentEnd(segmentStart, end);
+    if (segmentEnd < end) {
+      segment.text.insert(segment.text.end(), reinterpret_cast<const unsigned char*>(segmentStart), reinterpret_cast<const unsigned char*>(segmentEnd));
+      segment.prefix.insert(segment.prefix.end(), reinterpret_cast<const unsigned char*>(segmentStart), reinterpret_cast<const unsigned char*>(segmentEnd));
+    } else {
+      segment.text.insert(segment.text.end(), reinterpret_cast<const unsigned char*>(segmentStart), reinterpret_cast<const unsigned char*>(end));
+      segment.prefix.insert(segment.prefix.end(), reinterpret_cast<const unsigned char*>(segmentStart), reinterpret_cast<const unsigned char*>(end));
+    }
+    segments.push_back(segment);
+    current = segmentStart;
+  }
+
+  TextContext context(*this->geometry.surface);
+  context.SetFont(family, height, 0, 0);
+
+  for (std::vector<ColoredTextSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it) {
+    const ColoredTextSegment& segment = *it;
+    color = segment.color;
+    if (segment.text.size() != 0) {
+      SIZE size = {};
+      context.Measure(reinterpret_cast<const char*>(segment.prefix.data()), static_cast<int>(segment.prefix.size()), &size);
+      context.SetColor(color);
+      context.DrawPair(right - size.cx, y, reinterpret_cast<const char*>(segment.text.data()), static_cast<int>(segment.text.size()));
+    }
   }
 }
 
@@ -234,14 +306,13 @@ void UIWindow::DrawOutlinedColoredText(
     }
 
     if (next != current) {
-      const int length = static_cast<int>(segment.size());
       context.SetColor(outline);
-      context.Draw((x - 1), y, segment.c_str(), length);
-      context.Draw((x + 1), y, segment.c_str(), length);
-      context.Draw(x, (y - 1), segment.c_str(), length);
-      context.Draw(x, (y + 1), segment.c_str(), length);
+      context.Draw((x - 1), y, segment.c_str(), static_cast<int>(segment.size()));
+      context.Draw((x + 1), y, segment.c_str(), static_cast<int>(segment.size()));
+      context.Draw(x, (y - 1), segment.c_str(), static_cast<int>(segment.size()));
+      context.Draw(x, (y + 1), segment.c_str(), static_cast<int>(segment.size()));
       context.SetColor(color);
-      context.Draw(x, y, segment.c_str(), length);
+      context.Draw(x, y, segment.c_str(), static_cast<int>(segment.size()));
       SIZE size;
       context.Measure(current, static_cast<int>(next - current), &size);
       x = (x + size.cx);
@@ -253,7 +324,7 @@ void UIWindow::DrawOutlinedColoredText(
 
 // OFFSET: 0x00A87300
 // FUNCTION: fn_17062
-std::string StripColorCodes(const char* text, unsigned bytes) {
+std::string UIWindow::StripColorCodes(const char* text, unsigned bytes) {
   std::string result;
   const char* const end = text + bytes;
   const char* const marker = text + TextContext::Marker(text, static_cast<unsigned>(end - text));
@@ -282,36 +353,7 @@ std::string StripColorCodes(const char* text, unsigned bytes) {
 
 // OFFSET: 0x00A874B0
 // FUNCTION: fn_17063
-bool ContainsValue(const std::deque<int>& values, const int& value) {
+bool ContainsValue(const std::deque<UIWindow*>& values, UIWindow* const& value) {
   return values.end() != std::find(values.begin(), values.end(), value);
 }
 
-// INLINED
-__declspec(noinline) const char* SegmentEnd(const char* text, const char* end) {
-  if (text == nullptr) {
-    return nullptr;
-  }
-
-  const char* current = text;
-
-  while (current < end) {
-    if (*current == '^' && end - current >= 6) {
-      bool color = true;
-
-      for (int index = 1; index <= 6; ++index) {
-        if (!g_colorHexDigit[current[index]]) {
-          color = false;
-          break;
-        }
-      }
-
-      if (color) {
-        return current;
-      }
-    }
-
-    current = CharNextExA(static_cast<WORD>(g_textCodePage), current, 0);
-  }
-
-  return current;
-}

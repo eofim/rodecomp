@@ -52,7 +52,8 @@ public:
   // INLINED
   virtual void OnTargetSkillCast(CGameActor* source, CGameActor* target, int delay) {
   }
-  virtual void OnGroundSkillCast(int level, CGameActor* source, int argument3, int argument4, int argument5) {
+  // INLINED
+  virtual void OnGroundSkillCast(int level, CGameActor* source, vector3d position) {
   }
   virtual void OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
   }
@@ -80,12 +81,8 @@ public:
   }
   virtual void OnEfstUpdate(int efstId, int value, int argument3, int argument4, CRenderObject* actor) {
   }
-  virtual EfstActionMessage GetEfstBeginMessage() {
-    return {nullptr, 0xFFFF00};
-  }
-  virtual EfstActionMessage GetEfstEndMessage() {
-    return {nullptr, 0xFF};
-  }
+  virtual EfstActionMessage GetEfstBeginMessage();
+  virtual EfstActionMessage GetEfstEndMessage();
 };
 
 class CSkillObjectAction {
@@ -137,7 +134,11 @@ public:
   CSkillInfo& operator=(const CSkillInfo& other) = default;
 
   virtual ~CSkillInfo();
-  __declspec(noinline) bool IsValid() const;
+  __declspec(noinline) static bool IsValid(const CSkillInfo& skill);
+  // INLINED
+  bool IsValid() const {
+    return CSkillInfo::IsValid(*this);
+  }
   bool MatchesShortcut(const NormalItemSlot* slot) const;
   int UseApAmount(int skillLevel) const;
   // INLINED

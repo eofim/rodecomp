@@ -48,10 +48,6 @@
 #include <string>
 #include <vector>
 
-template __declspec(noinline) std::list<RenderAdapter>::~list() noexcept;
-template __declspec(noinline) std::list<DisplayMode>::~list() noexcept;
-template __declspec(noinline) std::list<RenderBackend>::~list() noexcept;
-
 namespace {
   struct RodexSpamOptionPacket {
     /* 0000 */ int id;
@@ -75,11 +71,6 @@ std::map<int, int> g_optionHotkeys;
 
 // GLOBAL: gl_25229
 bool g_restartClient;
-
-// OFFSET: 0x00A3D0A0
-// FUNCTION: fn_15905
-RenderAdapter::RenderAdapter() : backend(0), ordinal(0), drawGuid{}, renderGuid{}, deviceGuid{} {
-}
 
 // OFFSET: 0x00A2C3C0
 // FUNCTION: fn_15400
@@ -123,11 +114,6 @@ template <class T, class D> void CUIComboBox<T, D>::Paint() {
   this->DrawRectOutline(0, 0, this->geometry.width, this->geometry.height, 0xC6C6C6);
 }
 
-template void CUIComboBox<GameSettingsUI::CUIComboItem, std::string>::Paint();
-template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderBackend>::Paint();
-template void CUIComboBox<GameSettingsUI::CUIComboItem, DisplayMode>::Paint();
-template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderAdapter>::Paint();
-
 // OFFSET: 0x00A40040
 // FUNCTION: fn_15962
 // OFFSET: 0x00A40050
@@ -139,11 +125,6 @@ template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderAdapter>::Paint();
 template <class T, class D> unsigned int CUIComboBox<T, D>::Selected() const {
   return this->listBox->selected;
 }
-
-template unsigned int CUIComboBox<GameSettingsUI::CUIComboItem, RenderAdapter>::Selected() const;
-template unsigned int CUIComboBox<GameSettingsUI::CUIComboItem, DisplayMode>::Selected() const;
-template unsigned int CUIComboBox<GameSettingsUI::CUIComboItem, RenderBackend>::Selected() const;
-template unsigned int CUIComboBox<GameSettingsUI::CUIComboItem, std::string>::Selected() const;
 
 // OFFSET: 0x00A41FE0
 // FUNCTION: fn_16009
@@ -161,11 +142,6 @@ template <class T, class D> void CUIComboBox<T, D>::UpdateListHeight() {
   this->listBox->UpdateScrollBar();
 }
 
-template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderAdapter>::UpdateListHeight();
-template void CUIComboBox<GameSettingsUI::CUIComboItem, DisplayMode>::UpdateListHeight();
-template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderBackend>::UpdateListHeight();
-template void CUIComboBox<GameSettingsUI::CUIComboItem, std::string>::UpdateListHeight();
-
 // OFFSET: 0x00A3EA80
 // FUNCTION: fn_15933
 template <class T, class D> int CUIComboBox<T, D>::AddItem(const D& value, bool refresh) {
@@ -176,7 +152,17 @@ template <class T, class D> int CUIComboBox<T, D>::AddItem(const D& value, bool 
   return index;
 }
 
-template int CUIComboBox<GameSettingsUI::CUIComboItem, std::string>::AddItem(const std::string& value, bool refresh);
+// INLINED
+template <class T, class D> void SetListSize(CUIListBoxEx<T, D>* list, int width, int height, int itemWidth, int rowHeight) {
+  list->itemWidth = itemWidth;
+  list->rowHeight = rowHeight;
+  list->SetSize(width, height);
+}
+
+// INLINED
+template <class T, class D> void SetScrollStep(CUIListBoxEx<T, D>* list, int step) {
+  list->scrollBar->step = step;
+}
 
 // OFFSET: 0x00A1C1B0
 // FUNCTION: fn_15379
@@ -210,13 +196,8 @@ template <class T, class D> void CUIComboBox<T, D>::Create(int width, int itemHe
   });
   this->AddChild(this->button);
 
-  CUIListBoxEx<T, D>* listBox = new CUIListBoxEx<T, D>();
-  this->listBox = listBox;
-  const int listWidth = this->width;
-  const int listRowHeight = this->itemHeight;
-  listBox->itemWidth = listWidth;
-  listBox->rowHeight = listRowHeight;
-  listBox->SetSize(listWidth + 13, listRowHeight);
+  this->listBox = new CUIListBoxEx<T, D>();
+  SetListSize(this->listBox, this->width + 13, this->itemHeight, this->width, this->itemHeight);
   this->listBox->Move(1, 1);
   this->listBox->SetOnSelect([this](T* item, const D& value) {
     g_windowMgr.CloseDropDown();
@@ -230,7 +211,7 @@ template <class T, class D> void CUIComboBox<T, D>::Create(int width, int itemHe
 
   this->listBox->scrollBar->SetSize(13, this->itemHeight);
   this->listBox->scrollBar->Move(this->width, 0);
-  this->listBox->scrollBar->step = this->itemHeight;
+  SetScrollStep(this->listBox, this->itemHeight);
 
   this->listBox->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0up.bmp", 0xC5B1BBCD9BC9C997ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0down.bmp", 0xC1BB8111EDD183E1ULL)));
 
@@ -240,10 +221,6 @@ template <class T, class D> void CUIComboBox<T, D>::Create(int width, int itemHe
 
   this->listBox->AddNewItem();
 }
-template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderAdapter>::Create(int width, int itemHeight, int visibleItems);
-template void CUIComboBox<GameSettingsUI::CUIComboItem, DisplayMode>::Create(int width, int itemHeight, int visibleItems);
-template void CUIComboBox<GameSettingsUI::CUIComboItem, RenderBackend>::Create(int width, int itemHeight, int visibleItems);
-template void CUIComboBox<GameSettingsUI::CUIComboItem, std::string>::Create(int width, int itemHeight, int visibleItems);
 
 // INLINED
 template <class T, class D>
@@ -366,12 +343,6 @@ void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::OnWheel(int value) {
   } else if (this->parent) {
     this->parent->OnWheel(value);
   }
-}
-
-// OFFSET: 0x00A353D0
-// FUNCTION: fn_15426
-void CUICheckBox::SetOnCheck(std::function<void(bool)> callback) {
-  this->onCheck = callback;
 }
 
 // OFFSET: 0x00A354A0
@@ -512,31 +483,30 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderAdapter>::AddNewItem() {
     return;
   }
 
-  for (GameSettingsUI::CUIComboItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
 
   if (this->geometry.height >= this->rowHeight) {
-    unsigned int count = static_cast<unsigned int>(this->geometry.height / this->rowHeight) + 1;
-    if (this->geometry.height % this->rowHeight >= 2) {
-      ++count;
-    }
-    this->items.resize(count);
+    const unsigned int rows = static_cast<unsigned int>(this->geometry.height / this->rowHeight);
+    const unsigned int extra = this->geometry.height % this->rowHeight >= 2 ? 2 : 1;
+    this->items.resize(rows + extra);
     for (GameSettingsUI::CUIComboItem*& slot : this->items) {
       GameSettingsUI::CUIComboItem* item = new GameSettingsUI::CUIComboItem();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (GameSettingsUI::CUIComboItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -554,31 +524,30 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, DisplayMode>::AddNewItem() {
     return;
   }
 
-  for (GameSettingsUI::CUIComboItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
 
   if (this->geometry.height >= this->rowHeight) {
-    unsigned int count = static_cast<unsigned int>(this->geometry.height / this->rowHeight) + 1;
-    if (this->geometry.height % this->rowHeight >= 2) {
-      ++count;
-    }
-    this->items.resize(count);
+    const unsigned int rows = static_cast<unsigned int>(this->geometry.height / this->rowHeight);
+    const unsigned int extra = this->geometry.height % this->rowHeight >= 2 ? 2 : 1;
+    this->items.resize(rows + extra);
     for (GameSettingsUI::CUIComboItem*& slot : this->items) {
       GameSettingsUI::CUIComboItem* item = new GameSettingsUI::CUIComboItem();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (GameSettingsUI::CUIComboItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -596,31 +565,30 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, RenderBackend>::AddNewItem() {
     return;
   }
 
-  for (GameSettingsUI::CUIComboItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
 
   if (this->geometry.height >= this->rowHeight) {
-    unsigned int count = static_cast<unsigned int>(this->geometry.height / this->rowHeight) + 1;
-    if (this->geometry.height % this->rowHeight >= 2) {
-      ++count;
-    }
-    this->items.resize(count);
+    const unsigned int rows = static_cast<unsigned int>(this->geometry.height / this->rowHeight);
+    const unsigned int extra = this->geometry.height % this->rowHeight >= 2 ? 2 : 1;
+    this->items.resize(rows + extra);
     for (GameSettingsUI::CUIComboItem*& slot : this->items) {
       GameSettingsUI::CUIComboItem* item = new GameSettingsUI::CUIComboItem();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (GameSettingsUI::CUIComboItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -638,31 +606,30 @@ void CUIListBoxEx<GameSettingsUI::CUIComboItem, std::string>::AddNewItem() {
     return;
   }
 
-  for (GameSettingsUI::CUIComboItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
 
   if (this->geometry.height >= this->rowHeight) {
-    unsigned int count = static_cast<unsigned int>(this->geometry.height / this->rowHeight) + 1;
-    if (this->geometry.height % this->rowHeight >= 2) {
-      ++count;
-    }
-    this->items.resize(count);
+    const unsigned int rows = static_cast<unsigned int>(this->geometry.height / this->rowHeight);
+    const unsigned int extra = this->geometry.height % this->rowHeight >= 2 ? 2 : 1;
+    this->items.resize(rows + extra);
     for (GameSettingsUI::CUIComboItem*& slot : this->items) {
       GameSettingsUI::CUIComboItem* item = new GameSettingsUI::CUIComboItem();
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (GameSettingsUI::CUIComboItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -707,8 +674,9 @@ void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::AddNewItem() {
     return;
   }
 
-  for (GameSettingsUI::CUIOptionItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -724,14 +692,14 @@ void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::AddNewItem() {
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (GameSettingsUI::CUIOptionItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -1237,15 +1205,15 @@ void CUIGroup::Apply() {
 // OFFSET: 0x00A40430
 // FUNCTION: fn_15971
 void CUIGroupEmblem::Apply() {
-  g_serviceOptions.Set(0xF3, 0);
+  g_serviceOptions.Set(TT_EMBLEM_FRAME_ON_OFF, 0);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ADDSKILL_FAIL_INCLUDE_SKILL_YOU_CANNOT_LEARN)), 0x64FFFF, 0, 0, 0);
+  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_EMBLEM_FRAME_DRAW_OFF)), 0x64FFFF, 0, 0, 0);
 }
 
 // OFFSET: 0x00A40480
 // FUNCTION: fn_15972
 void CUIGroupLogInOut::Apply() {
-  g_serviceOptions.Set(0xA5, 1);
+  g_serviceOptions.Set(TT_LOGINOUT_ON_OFF, 1);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LOGINOUT_ON)), 0x64FFFF, 0, 0, 0);
 }
@@ -1456,15 +1424,12 @@ void CUIGroupGraphicsAPI::Refresh() {
 // OFFSET: 0x00A3FCD0
 // FUNCTION: fn_15960
 std::string CUIListPage::GetHotkeyText(int tab, int index) {
-  int key1 = 0;
-  int key2 = 0;
-  std::string hotkeyText;
-  std::string hotkeyDescription;
+  HotkeyInfo info(0, 0);
   const char* keyText = nullptr;
   const char* description = nullptr;
-  g_session.m_hotkeyScript->Call("GetUserHotKeyInfo", "dd>ddss", tab + 1, index, &key1, &key2, &keyText, &description);
+  g_session.m_hotkeyScript->Call("GetUserHotKeyInfo", "dd>ddss", tab + 1, index, &info.key1, &info.key2, &keyText, &description);
   if (IsNullOrEmpty(keyText)) {
-    g_session.m_hotkeyScript->Call("GetOriginalHotKeyInfo", "dd>ddss", tab + 1, index, &key1, &key2, &keyText, &description);
+    g_session.m_hotkeyScript->Call("GetOriginalHotKeyInfo", "dd>ddss", tab + 1, index, &info.key1, &info.key2, &keyText, &description);
   }
 
   if (IsNullOrEmpty(keyText)) {
@@ -1506,7 +1471,7 @@ void CUIGroupSound::SetBgmEnabled(bool enabled) {
   CUIVScrollBar* const slider = this->m_bgmSlider;
   slider->dragging = !enabled;
   slider->Invalidate();
-  g_serviceOptions.Set(7, enabled);
+  g_serviceOptions.Set(TT_MUSIC_ON_OFF, enabled);
   if (previous != enabled) {
     g_modeMgr.currentMode->SendMsg(MM_REFRESH_MUSIC, 0, 0, 0, 0);
   }
@@ -1516,8 +1481,9 @@ void CUIGroupSound::SetBgmEnabled(bool enabled) {
 // FUNCTION: fn_15943
 void CUIGroupSound::SetBgmVolume(int volume) {
   g_soundMgr->SetVolume(volume);
-  g_soundMgr->SetTargetVolume(CSoundMgr::Volume(g_soundMgr));
-  this->m_bgmSlider->SetThumbTooltip(std::to_string(CSoundMgr::Volume(g_soundMgr)));
+  CSoundMgr* soundMgr = g_soundMgr;
+  soundMgr->SetTargetVolume(soundMgr->Volume());
+  this->m_bgmSlider->SetThumbTooltip(std::to_string(g_soundMgr->Volume()));
 }
 
 // OFFSET: 0x00A3F4C0
@@ -1531,15 +1497,15 @@ void CUIGroupSound::SetEffectVolume(int volume) {
 // OFFSET: 0x00A3F560
 // FUNCTION: fn_15945
 void CUIGroupEmblem::SetEnabled(bool enabled) {
-  g_serviceOptions.Set(0xF3, enabled);
+  g_serviceOptions.Set(TT_EMBLEM_FRAME_ON_OFF, enabled);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? MSI_USESKILL_FAIL_EMPTY_SOUL_ENERGY : MSI_ADDSKILL_FAIL_INCLUDE_SKILL_YOU_CANNOT_LEARN)), 0x64FFFF, 0, 0, 0);
+  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? MSI_EMBLEM_FRAME_DRAW_ON : MSI_EMBLEM_FRAME_DRAW_OFF)), 0x64FFFF, 0, 0, 0);
 }
 
 // OFFSET: 0x00A3F5C0
 // FUNCTION: fn_15946
 void CUIGroupLogInOut::SetEnabled(bool enabled) {
-  g_serviceOptions.Set(0xA5, enabled);
+  g_serviceOptions.Set(TT_LOGINOUT_ON_OFF, enabled);
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(enabled ? MSI_LOGINOUT_ON : MSI_LOGINOUT_OFF)), 0x64FFFF, 0, 0, 0);
 }
@@ -1558,7 +1524,7 @@ void CUIGroupSound::OnEffectMute(bool muted) {
   CUIVScrollBar* const slider = this->m_effectSlider;
   slider->dragging = !enabled;
   slider->Invalidate();
-  g_serviceOptions.Set(0xB, enabled);
+  g_serviceOptions.Set(TT_EFFECT_SOUND_ON_OFF, enabled);
 }
 
 // OFFSET: 0x00A401C0
@@ -1711,8 +1677,9 @@ void CUIGroupSound::Refresh() {
   this->m_bgmSlider->SetVisible(this->m_bgmSlider->PositionFromOffset(8));
   this->m_bgmSlider->SetPosition(g_soundMgr->Volume());
   this->m_bgmSlider->SetThumbTooltip(std::to_string(g_soundMgr->Volume()));
-  const bool bgmMuted = !g_serviceOptions.Get(TT_MUSIC_ON_OFF);
-  this->m_bgmSlider->SetTransparent(bgmMuted);
+  const bool bgmOn = g_serviceOptions.Get(TT_MUSIC_ON_OFF);
+  const bool bgmMuted = !bgmOn;
+  this->m_bgmSlider->SetTransparent(!bgmOn);
   CUIVScrollBar* const bgmSlider = this->m_bgmSlider;
   bgmSlider->dragging = bgmMuted;
   bgmSlider->Invalidate();
@@ -1724,8 +1691,9 @@ void CUIGroupSound::Refresh() {
   this->m_effectSlider->SetVisible(this->m_effectSlider->PositionFromOffset(8));
   this->m_effectSlider->SetPosition(g_soundMgr->sampleVolume);
   this->m_effectSlider->SetThumbTooltip(std::to_string(g_soundMgr->sampleVolume));
-  const bool effectMuted = !g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF);
-  this->m_effectSlider->SetTransparent(effectMuted);
+  const bool effectOn = g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF);
+  const bool effectMuted = !effectOn;
+  this->m_effectSlider->SetTransparent(!effectOn);
   CUIVScrollBar* const effectSlider = this->m_effectSlider;
   effectSlider->dragging = effectMuted;
   effectSlider->Invalidate();
@@ -1808,7 +1776,7 @@ void CUIGameSettingsUI::OnTitleIconClick() {
 // FUNCTION: fn_45480
 void CUIGameSettingsUI::OnApply() {
   const bool modified = this->m_graphicsPage->IsModified();
-  if (g_windowMgr.Confirm(LookupMessage(modified ? MSI_GRAPHIC_SETTING_AURA_OFF_CHECK : MSI_GRAPHIC_SETTING_SIMPLE_AURA_CHECK), 2, true, false, 0, "Message", 280, 120, 0) != ID_NO) {
+  if (g_windowMgr.Confirm(LookupMessage(modified ? MSI_GRAPHIC_SETTING_WARNING_RESTART : MSI_GRAPHIC_SETTING_APPLY), 2, true, false, 0, "Message", 280, 120, 0) != ID_NO) {
     this->m_graphicsPage->ApplySettings();
     this->UpdateApplyButton();
   }
@@ -2019,13 +1987,16 @@ CUIFrameWnd* CreateGameSettingsUI() {
   return new CUIGameSettingsUI();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00494730
 // FUNCTION: fn_45545
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateGameSettingsUI;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10014, factory);
-  return true;
-}();
+static UIRegistration s_registration(10014, CreateGameSettingsUI);
 
 // OFFSET: 0x00A1BFD0
 // FUNCTION: fn_15374
@@ -2085,28 +2056,24 @@ void CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::ClearItems() {
 // OFFSET: 0x00A43B00
 // FUNCTION: fn_16044
 bool GameSettingsUI::CUIListPage::SetOptionChecked(int id) {
-  for (GameSettingsUI::CUIOptionItem* item : this->m_optionList->items) {
-    if (item->m_optionId == id) {
-      CUICheckBox* check = item->m_check;
-      check->checked = IsServiceOption(id) ^ g_serviceOptions.Get(id);
-      check->Invalidate();
-      return true;
-    }
+  auto& items = this->m_optionList->items;
+  auto found = std::find_if(items.begin(), items.end(), [id](GameSettingsUI::CUIOptionItem* item) { return id == item->m_optionId; });
+  if (found == items.end()) {
+    return false;
   }
-  return false;
+
+  CUICheckBox* check = (*found)->m_check;
+  check->checked = IsServiceOption(id) ^ g_serviceOptions.Get(id);
+  check->Invalidate();
+  return true;
 }
 
 // OFFSET: 0x00A43590
 // FUNCTION: fn_16031
 __declspec(noinline) void CUIGameSettingsUI::RefreshOption(int id) {
   for (GameSettingsUI::CUIListPage* page : this->m_pages) {
-    for (GameSettingsUI::CUIOptionItem* item : page->m_optionList->items) {
-      if (id == item->m_optionId) {
-        CUICheckBox* check = item->m_check;
-        check->checked = IsServiceOption(id) ^ g_serviceOptions.Get(id);
-        check->Invalidate();
-        return;
-      }
+    if (page->SetOptionChecked(id)) {
+      return;
     }
   }
   this->m_currentPage->CUIPage::Refresh();
@@ -2115,24 +2082,24 @@ __declspec(noinline) void CUIGameSettingsUI::RefreshOption(int id) {
 // OFFSET: 0x00A41120
 // FUNCTION: fn_15987
 void GameSettingsUI::CUIGroupEmblem::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_HIDE));
-  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY));
-  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_HIGH));
+  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_EMBLEM_FRAME));
+  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_SHOW));
+  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_HIDE));
 }
 
 // OFFSET: 0x00A411C0
 // FUNCTION: fn_15988
 void GameSettingsUI::CUIGroupFullscreen::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_MACRO_CHECKER_MAP_NOT_PROPER_MAP));
-  this->m_onText->SetText(LookupMessage(MSI_TAREN_TRWSDK_FILTER_SENSITIVEWORDS_ERROR));
-  this->m_offText->SetText(LookupMessage(MSI_TAREN_TRWSDK_FILTER_NO_SEND_BECAUSE_SENSITIVEWORDS_ERROR));
+  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_SCREEN_MODE));
+  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_FULLSCREEN_MODE));
+  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_WINDOW_MODE));
 }
 
 // OFFSET: 0x00A41260
 // FUNCTION: fn_15989
 void GameSettingsUI::CUIGroupGraphics::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_GRAPHIC_SETTING_MOUSE_SET));
-  this->m_modeText->SetText(LookupMessage(MSI_STORE_ASSISTANT_TRADE_FEE));
+  this->m_title->SetText(LookupMessage(MSI_GRAPHIC_SETTING_DEVICE_SET));
+  this->m_modeText->SetText(LookupMessage(MSI_GRAPHIC_SETTING_RESOLUTION_SET));
   GetRenderSystemHolder();
   this->m_adapter = this->m_pendingAdapter = SelectedRenderAdapter();
   this->m_mode = this->m_pendingMode = DisplayMode{static_cast<unsigned>(g_configuredScreenWidth), static_cast<unsigned>(g_configuredScreenHeight), static_cast<unsigned>(g_configuredBitsPerPixel)};
@@ -2141,7 +2108,7 @@ void GameSettingsUI::CUIGroupGraphics::OnInit() {
 // OFFSET: 0x00A41510
 // FUNCTION: fn_15990
 void GameSettingsUI::CUIGroupGraphicsAPI::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_ENCHANT_MARK_2));
+  this->m_title->SetText(LookupMessage(MSI_GRAPHIC_SETTING_RENDER_SYSTEM));
   const int backend = GetRenderSystemHolder()->Backend();
   this->m_pendingBackend = backend;
   this->m_backend = backend;
@@ -2150,29 +2117,29 @@ void GameSettingsUI::CUIGroupGraphicsAPI::OnInit() {
 // OFFSET: 0x00A41710
 // FUNCTION: fn_15992
 void GameSettingsUI::CUIGroupProcessPriority::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_NORMAL_TOOLTIP));
-  this->m_highText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_IDLE));
-  this->m_highText->SetTooltip(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_IDLE_TOOLTIP));
-  this->m_normalText->SetText(LookupMessage(MSI_GAME_SETTINGS_AURA));
-  this->m_normalText->SetTooltip(LookupMessage(MSI_GAME_SETTINGS_SIMPLE_AURA));
-  this->m_idleText->SetText(LookupMessage(MSI_GAME_SETTINGS_SIMPLE_AURA_OFF));
-  this->m_idleText->SetTooltip(LookupMessage(MSI_GAME_SETTINGS_SIMPLE_AURA_ON));
+  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY));
+  this->m_highText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_HIGH));
+  this->m_highText->SetTooltip(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_HIGH_TOOLTIP));
+  this->m_normalText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_NORMAL));
+  this->m_normalText->SetTooltip(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_NORMAL_TOOLTIP));
+  this->m_idleText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_IDLE));
+  this->m_idleText->SetTooltip(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_IDLE_TOOLTIP));
 }
 
 // OFFSET: 0x00A41870
 // FUNCTION: fn_15993
 void GameSettingsUI::CUIGroupRodexSpam::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_MOVE));
-  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_NORMAL));
-  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_PROCESS_PRIORITY_HIGH_TOOLTIP));
+  this->m_title->SetText(LookupMessage(MSI_MAIL));
+  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_OFF));
+  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_ON));
 }
 
 // OFFSET: 0x00A41CE0
 // FUNCTION: fn_15998
 void GameSettingsUI::CUIGroupTrilinear::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_REFUSE_SDK_AUTH_FAILED));
-  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_ON));
-  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_OFF));
+  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_TRILINEAR));
+  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_ON));
+  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_OFF));
 }
 
 // OFFSET: 0x00A193A0
@@ -2220,17 +2187,17 @@ __declspec(noinline) CUIListBoxEx<GameSettingsUI::CUIOptionItem, TALKTYPE>::CUIL
 void GameSettingsUI::CUIGroupSound::OnInit() {
   this->m_title->SetText(LookupMessage(MSI_SOUND_OPTIONWND));
   this->m_bgmText->SetText(LookupMessage(MSI_BGM));
-  this->m_bgmMuteText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_OFF));
+  this->m_bgmMuteText->SetText(LookupMessage(MSI_GAME_SETTINGS_OFF));
   this->m_effectText->SetText(LookupMessage(MSI_SOUND));
-  this->m_effectMuteText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_OFF));
+  this->m_effectMuteText->SetText(LookupMessage(MSI_GAME_SETTINGS_OFF));
 }
 
 // OFFSET: 0x00A41560
 // FUNCTION: fn_15991
 void GameSettingsUI::CUIGroupLogInOut::OnInit() {
-  this->m_title->SetText(LookupMessage(MSI_SKILL_DELAY_INFO_CAST_STAT));
-  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_ON));
-  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_RODEX_SPAM_OFF));
+  this->m_title->SetText(LookupMessage(MSI_GAME_SETTINGS_LOGINOUT));
+  this->m_onText->SetText(LookupMessage(MSI_GAME_SETTINGS_ON));
+  this->m_offText->SetText(LookupMessage(MSI_GAME_SETTINGS_OFF));
   this->m_title->SetTooltip(OBFUSCATE_SOURCE_TEXT("/loginout\x0A/li", 0x03772763F96D9DA5ULL));
 }
 
@@ -2271,7 +2238,7 @@ void GameSettingsUI::CUIGroupGraphics::OnModeSelect(CUIComboItem* item, const Di
 // FUNCTION: fn_15994
 void GameSettingsUI::CUIGroupSkin::OnInit() {
   this->m_title->SetText(LookupMessage(MSI_SKIN));
-  this->m_combo->AddItem(std::string(LookupMessage(MSI_ACHIEVEMENT_COMMAND)), false);
+  this->m_combo->AddItem(std::string(LookupMessage(MSI_BASIC_SKIN)), false);
   for (int index = 0; index < static_cast<int>(g_skinInfo.prefixes.size()); ++index) {
     this->m_combo->AddItem(std::string(g_skinInfo.Name(index)), false);
   }
@@ -2290,7 +2257,7 @@ void GameSettingsUI::CUIGroupSound::Apply() {
   CUIVScrollBar* const slider = this->m_effectSlider;
   slider->dragging = !enabled;
   slider->Invalidate();
-  g_serviceOptions.Set(0xB, enabled);
+  g_serviceOptions.Set(TT_EFFECT_SOUND_ON_OFF, enabled);
 }
 
 // OFFSET: 0x00A19C60
@@ -2331,7 +2298,7 @@ GameSettingsUI::CUIGroupFullscreen::CUIGroupFullscreen() : CUIGroup(0) {
 // OFFSET: 0x00A3C7E0
 // FUNCTION: fn_15892
 GameSettingsUI::CUIGroupGraphics::CUIGroupGraphics()
-    : CUIGroup(), m_adapterCombo(nullptr), m_modeText(nullptr), m_modeCombo(nullptr),
+    : CUIGroup(0), m_adapterCombo(nullptr), m_modeText(m_title = nullptr), m_modeCombo(nullptr),
       m_adapter(), m_pendingAdapter() {
 }
 
@@ -3023,7 +2990,10 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_title->SetText(OBFUSCATE_SOURCE_TEXT("사운드 설정", 0x6BDF334F2BFDAD51ULL));
   this->m_title->SetFitText(0);
   this->m_title->SetAlign(0, 0);
-  this->m_title->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x674D9F3975573D41ULL)));
+  {
+    std::string text1(OBFUSCATE_SOURCE_TEXT("Gulim", 0x674D9F3975573D41ULL));
+    this->m_title->SetFont(text1);
+  }
   this->m_title->SetFontHeight(12);
   this->m_title->SetBold(1);
   this->m_title->SetColor(0);
@@ -3036,7 +3006,10 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_bgmText->SetText(OBFUSCATE_SOURCE_TEXT("배경음", 0xC9712D676B5B3943ULL));
   this->m_bgmText->SetFitText(0);
   this->m_bgmText->SetAlign(0, 0);
-  this->m_bgmText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xED15938D333D2DB9ULL)));
+  {
+    std::string text1(OBFUSCATE_SOURCE_TEXT("Gulim", 0xED15938D333D2DB9ULL));
+    this->m_bgmText->SetFont(text1);
+  }
   this->m_bgmText->SetFontHeight(12);
   this->m_bgmText->SetBold(0);
   this->m_bgmText->SetColor(0);
@@ -3050,9 +3023,21 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_bgmSlider->SetTotal(128);
   this->m_bgmSlider->SetVisible(128);
   this->m_bgmSlider->step = 1;
-  this->m_bgmSlider->SetButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1left.bmp", 0xBD2BA1C11B01E73BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1right.bmp", 0x4B755DB19953E311ULL)));
-  this->m_bgmSlider->SetBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1mid.bmp", 0xFD69A9B3F311818DULL)));
-  this->m_bgmSlider->SetThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_left.bmp", 0x7F2DFFC1ABE91F2BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_mid.bmp", 0xD98F5345098D630DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_right.bmp", 0x9B0F234DEFDF7593ULL)));
+  {
+    std::string text2(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1right.bmp", 0x4B755DB19953E311ULL));
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1left.bmp", 0xBD2BA1C11B01E73BULL));
+    this->m_bgmSlider->SetButtonImages(text1, text2);
+  }
+  {
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1mid.bmp", 0xFD69A9B3F311818DULL));
+    this->m_bgmSlider->SetBackground(text1);
+  }
+  {
+    std::string text3(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_right.bmp", 0x9B0F234DEFDF7593ULL));
+    std::string text2(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_mid.bmp", 0xD98F5345098D630DULL));
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_left.bmp", 0x7F2DFFC1ABE91F2BULL));
+    this->m_bgmSlider->SetThumbImages(text1, text2, text3);
+  }
   this->AddChild(this->m_bgmSlider);
   this->m_bgmMute = new CUICheckBox();
   this->m_bgmMute->SetSize(10, 10);
@@ -3060,7 +3045,13 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_bgmMute->SetOnCheck([this](bool checked) { this->OnBgmMute(checked); });
   this->m_bgmMute->disabled = 0;
   this->m_bgmMute->Invalidate();
-  this->m_bgmMute->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xD7A749EB27D5BF6DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_1.bmp", 0xB195637DAFCB0D59ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xADADEB4DF7813B55ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xD9452D81E5CD99C1ULL)));
+  {
+    std::string text4(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xD9452D81E5CD99C1ULL));
+    std::string text3(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xADADEB4DF7813B55ULL));
+    std::string text2(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_1.bmp", 0xB195637DAFCB0D59ULL));
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xD7A749EB27D5BF6DULL));
+    this->m_bgmMute->SetImages(text1, text2, text3, text4);
+  }
   this->m_bgmMute->checked = false;
   this->m_bgmMute->Invalidate();
   this->AddChild(this->m_bgmMute);
@@ -3070,7 +3061,10 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_bgmMuteText->SetText(OBFUSCATE_SOURCE_TEXT("끄기", 0xF715514F5961B75BULL));
   this->m_bgmMuteText->SetFitText(0);
   this->m_bgmMuteText->SetAlign(0, 0);
-  this->m_bgmMuteText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x4191BB5531FD3999ULL)));
+  {
+    std::string text1(OBFUSCATE_SOURCE_TEXT("Gulim", 0x4191BB5531FD3999ULL));
+    this->m_bgmMuteText->SetFont(text1);
+  }
   this->m_bgmMuteText->SetFontHeight(12);
   this->m_bgmMuteText->SetBold(0);
   this->m_bgmMuteText->SetColor(0);
@@ -3083,7 +3077,10 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_effectText->SetText(OBFUSCATE_SOURCE_TEXT("효과음", 0xB19D1FA9116F39D3ULL));
   this->m_effectText->SetFitText(0);
   this->m_effectText->SetAlign(0, 0);
-  this->m_effectText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x9569C9C7E70909AFULL)));
+  {
+    std::string text1(OBFUSCATE_SOURCE_TEXT("Gulim", 0x9569C9C7E70909AFULL));
+    this->m_effectText->SetFont(text1);
+  }
   this->m_effectText->SetFontHeight(12);
   this->m_effectText->SetBold(0);
   this->m_effectText->SetColor(0);
@@ -3097,9 +3094,22 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_effectSlider->SetTotal(128);
   this->m_effectSlider->SetVisible(128);
   this->m_effectSlider->step = 1;
-  this->m_effectSlider->SetButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1left.bmp", 0xB7A96F8701BB4B6BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1right.bmp", 0xA31F69E7EFED01C9ULL)));
-  this->m_effectSlider->SetBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1mid.bmp", 0xB127A19D775BF751ULL)));
-  this->m_effectSlider->SetThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_left.bmp", 0x0F61499B4973EB5DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_mid.bmp", 0x85E1F5A7A5755B7FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_right.bmp", 0xAD6153019F93A527ULL)));
+  {
+    std::string text2(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1right.bmp", 0xA31F69E7EFED01C9ULL));
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1left.bmp", 0xB7A96F8701BB4B6BULL));
+    this->m_effectSlider->SetButtonImages(text1, text2);
+  }
+  {
+    std::string text1;
+    text1 = OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1mid.bmp", 0xB127A19D775BF751ULL);
+    this->m_effectSlider->SetBackground(text1);
+  }
+  {
+    std::string text3(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_right.bmp", 0xAD6153019F93A527ULL));
+    std::string text2(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_mid.bmp", 0x85E1F5A7A5755B7FULL));
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll1bar_left.bmp", 0x0F61499B4973EB5DULL));
+    this->m_effectSlider->SetThumbImages(text1, text2, text3);
+  }
   this->AddChild(this->m_effectSlider);
   this->m_effectMute = new CUICheckBox();
   this->m_effectMute->SetSize(10, 10);
@@ -3107,7 +3117,13 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_effectMute->SetOnCheck([this](bool checked) { this->OnEffectMute(checked); });
   this->m_effectMute->disabled = 0;
   this->m_effectMute->Invalidate();
-  this->m_effectMute->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xBFF5C517A1A77F59ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_1.bmp", 0x659975C121557D3DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0x41CFCB831F6B6B91ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0x5DE7712FAB613F75ULL)));
+  {
+    std::string text4(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0x5DE7712FAB613F75ULL));
+    std::string text3(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0x41CFCB831F6B6B91ULL));
+    std::string text2(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_1.bmp", 0x659975C121557D3DULL));
+    std::string text1(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xBFF5C517A1A77F59ULL));
+    this->m_effectMute->SetImages(text1, text2, text3, text4);
+  }
   this->m_effectMute->checked = false;
   this->m_effectMute->Invalidate();
   this->AddChild(this->m_effectMute);
@@ -3117,7 +3133,10 @@ void GameSettingsUI::CUIGroupSound::OnCreate(int width, int height) {
   this->m_effectMuteText->SetText(OBFUSCATE_SOURCE_TEXT("끄기", 0x81F58DED5D470D01ULL));
   this->m_effectMuteText->SetFitText(0);
   this->m_effectMuteText->SetAlign(0, 0);
-  this->m_effectMuteText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x454D31872BB3EDCBULL)));
+  {
+    std::string text1(OBFUSCATE_SOURCE_TEXT("Gulim", 0x454D31872BB3EDCBULL));
+    this->m_effectMuteText->SetFont(text1);
+  }
   this->m_effectMuteText->SetFontHeight(12);
   this->m_effectMuteText->SetBold(0);
   this->m_effectMuteText->SetColor(0);
@@ -3424,7 +3443,7 @@ void CUIGameSettingsUI::RefreshHotkeyLabels() {
 // OFFSET: 0x00A3F180
 // FUNCTION: fn_15940
 void CUIGameSettingsUI::ResetToDefaults() {
-  if (g_windowMgr.Confirm(LookupMessage(MSI_GRAPHIC_SETTING_FOG_CHECK), 2, true, false, 0, "Message", 280, 120, 0) == ID_NO) {
+  if (g_windowMgr.Confirm(LookupMessage(MSI_GRAPHIC_SETTING_WARNING_RESET), 2, true, false, 0, "Message", 280, 120, 0) == ID_NO) {
     return;
   }
 
@@ -3624,14 +3643,18 @@ void CUIGameSettingsUI::OnCreate(int width, int height) {
     this->AddChild(page);
     this->m_pages.push_back(page);
   }
-  this->m_pages[0]->Move(0, 34);
-  this->m_pages[1]->Move(0, 34);
-  this->m_pages[2]->Move(0, 34);
+  static_cast<UIWindow*>(this->m_pages[0])->Move(0, 34);
+  static_cast<UIWindow*>(this->m_pages[1])->Move(0, 34);
+  static_cast<UIWindow*>(this->m_pages[2])->Move(0, 34);
 
   this->m_tab = new CUITab();
   this->m_tab->SetSize(400, 18);
   this->m_tab->Move(0, 17);
-  this->m_tab->SetOnChange([this](CUITabButton* button) { this->OnTabChanged(button); });
+  {
+    CUITab* tab = this->m_tab;
+    const std::function<void(CUITabButton*)> handler = [this](CUITabButton* button) { this->OnTabChanged(button); };
+    tab->onChange = handler;
+  }
   this->AddChild(this->m_tab);
 
   CUITabButton* basicButton = new CUITabButton();
@@ -3647,7 +3670,9 @@ void CUIGameSettingsUI::OnCreate(int width, int height) {
   basicButton->SetFitText(0);
   basicButton->SetAlign(6, 6);
   {
-    basicButton->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x8BBF792B47E72173ULL)));
+    std::string font;
+    font = OBFUSCATE_SOURCE_TEXT("Gulim", 0x8BBF792B47E72173ULL);
+    basicButton->SetFont(font);
   }
   basicButton->SetFontHeight(12);
   basicButton->SetBold(0);
@@ -3753,8 +3778,11 @@ void CUIGameSettingsUI::OnCreate(int width, int height) {
   this->m_pageContainer->SetSize(42, 20);
   this->m_pageContainer->Move(5, 326);
   this->m_pageContainer->SetOnClick([this]() { this->ResetToDefaults(); });
-  this->m_pageContainer->disabled = 0;
-  this->m_pageContainer->Invalidate();
+  {
+    CUIImageButton* button = this->m_pageContainer;
+    button->disabled = 0;
+    button->Invalidate();
+  }
   {
     CUIImageButton* button = this->m_pageContainer;
     button->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_reset.bmp", 0x67DD5BAB1919D9D1ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_reset_b.bmp", 0x9BE3EF737387AD79ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_reset_a.bmp", 0xB96B77B7255F8569ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_reset.bmp", 0x875FCDF1E7A1795FULL)));
@@ -3765,8 +3793,11 @@ void CUIGameSettingsUI::OnCreate(int width, int height) {
   this->m_applyButton->SetSize(42, 20);
   this->m_applyButton->Move(301, 326);
   this->m_applyButton->SetOnClick([this]() { this->OnApply(); });
-  this->m_applyButton->disabled = 0;
-  this->m_applyButton->Invalidate();
+  {
+    CUIImageButton* button = this->m_applyButton;
+    button->disabled = 0;
+    button->Invalidate();
+  }
   {
     CUIImageButton* button = this->m_applyButton;
     button->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_apply.bmp", 0x072D2D872D259D5BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_apply_b.bmp", 0x9D8F2D37BFFD61B7ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_apply_a.bmp", 0x79DF094DD9616575ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_apply.bmp", 0x11CB35636377DD07ULL)));
@@ -3777,8 +3808,11 @@ void CUIGameSettingsUI::OnCreate(int width, int height) {
   this->m_closeButton->SetSize(42, 20);
   this->m_closeButton->Move(348, 326);
   this->m_closeButton->SetOnClick([this]() { this->OnCloseButton(); });
-  this->m_closeButton->disabled = 0;
-  this->m_closeButton->Invalidate();
+  {
+    CUIImageButton* button = this->m_closeButton;
+    button->disabled = 0;
+    button->Invalidate();
+  }
   {
     CUIImageButton* button = this->m_closeButton;
     button->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_close.bmp", 0x4755C1355575FD37ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_close_b.bmp", 0x6BF729E30729CF29ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_close_a.bmp", 0x3D371F5B0F7F9327ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_close.bmp", 0x1F1D51274373C1FDULL)));
@@ -3797,12 +3831,12 @@ void CUIGameSettingsUI::OnCreate(int width, int height) {
 // FUNCTION: fn_15986
 void CUIGameSettingsUI::OnInit() {
   this->Move((g_renderer->viewport.width - this->geometry.width) / 2, (g_renderer->viewport.height - this->geometry.height) / 2);
-  static_cast<CUITitleBar*>(this->m_titleBar)->SetTitle(LookupMessage(MSI_COMMAND_LIST));
-  static_cast<CUITextButton*>(this->m_tab->FindChildById(0))->SetText(LookupMessage(MSI_GAME_SETTINGS_EMBLEM_FRAME));
-  static_cast<CUITextButton*>(this->m_tab->FindChildById(1))->SetText(LookupMessage(MSI_GAME_SETTINGS_ON));
-  static_cast<CUITextButton*>(this->m_tab->FindChildById(2))->SetText(LookupMessage(MSI_GAME_SETTINGS_OFF));
-  static_cast<CUITextButton*>(this->m_tab->FindChildById(3))->SetText(LookupMessage(MSI_GAME_SETTINGS_SHOW));
-  static_cast<CUITextButton*>(this->m_tab->FindChildById(4))->SetText(LookupMessage(MSI_SKILL_DELAY_INFO_GLOBAL_POST));
+  static_cast<CUITitleBar*>(this->m_titleBar)->SetTitle(LookupMessage(MSI_GAME_SETTING));
+  static_cast<CUITextButton*>(this->m_tab->FindChildById(0))->SetText(LookupMessage(MSI_GAME_SETTINGS_TAB_BASIC));
+  static_cast<CUITextButton*>(this->m_tab->FindChildById(1))->SetText(LookupMessage(MSI_GAME_SETTINGS_TAB_EFFECT));
+  static_cast<CUITextButton*>(this->m_tab->FindChildById(2))->SetText(LookupMessage(MSI_GAME_SETTINGS_TAB_CONTROL));
+  static_cast<CUITextButton*>(this->m_tab->FindChildById(3))->SetText(LookupMessage(MSI_GAME_SETTINGS_TAB_GRAPHICS));
+  static_cast<CUITextButton*>(this->m_tab->FindChildById(4))->SetText(LookupMessage(MSI_GAME_SETTINGS_TAB_ETC));
 
   for (UIWindow* child : this->m_currentPage->m_children) {
     static_cast<GameSettingsUI::CUIGroup*>(child)->Refresh();
@@ -3822,19 +3856,28 @@ void GameSettingsUI::CUIOptionItem::OnCreate(int width, int height) {
   this->m_check->SetSize(34, 15);
   this->m_check->Move(8, 5);
   this->m_check->SetOnCheck([this](bool checked) { this->OnCheck(checked); });
-  this->m_check->disabled = 0;
-  this->m_check->Invalidate();
+  {
+    CUICheckBox* check = this->m_check;
+    check->disabled = 0;
+    check->Invalidate();
+  }
   this->m_check->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\toggle_off.bmp", 0xA597A7E7492B39D5ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\toggle_on.bmp", 0xFFABE3D5D1BBEF73ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\toggle_off.bmp", 0x0399459DAF454F0FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\toggle_off.bmp", 0xD5A78DB38D8DAFABULL)));
-  this->m_check->checked = false;
-  this->m_check->Invalidate();
+  {
+    CUICheckBox* check = this->m_check;
+    check->checked = false;
+    check->Invalidate();
+  }
   this->AddChild(this->m_check);
 
   this->m_runButton = new CUIImageButton();
   this->m_runButton->SetSize(34, 15);
   this->m_runButton->Move(7, 5);
   this->m_runButton->SetOnClick([this]() { this->RunFunction(); });
-  this->m_runButton->disabled = 0;
-  this->m_runButton->Invalidate();
+  {
+    CUIImageButton* button = this->m_runButton;
+    button->disabled = 0;
+    button->Invalidate();
+  }
   this->m_runButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\btn_optionapply_out.bmp", 0x8783C33941E15117ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\btn_optionapply_press.bmp", 0x271B45771F83DD9FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\btn_optionapply_over.bmp", 0xC70319B5EB61598FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\GameSettingsUI\\btn_optionapply_disable.bmp", 0x0B8745519B1F95D7ULL)));
   this->AddChild(this->m_runButton);
 
@@ -3848,9 +3891,12 @@ void GameSettingsUI::CUIOptionItem::OnCreate(int width, int height) {
       }
     }
   });
-  this->m_label->disabled = 0;
-  this->m_label->Invalidate();
-  this->m_label->SetText(std::string());
+  {
+    CUITextButton* label = this->m_label;
+    label->disabled = 0;
+    label->Invalidate();
+  }
+  this->m_label->SetText("");
   this->m_label->SetFitText(true);
   this->m_label->SetAlign(0, 0);
   this->m_label->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xADC51BF9C98B413DULL)));

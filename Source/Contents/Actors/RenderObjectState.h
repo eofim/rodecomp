@@ -3,6 +3,8 @@
 
 #include "Contents/InstantVar.h"
 #include "Render/Drawing/SpriteGeometry.h"
+#include "Resource/Sprites/ActionResource.h"
+#include "Resource/Sprites/SpriteResource.h"
 #include "Utility/Math/Vector3d.h"
 
 #include <cstddef>
@@ -25,7 +27,6 @@ static_assert(sizeof(ActorTintColor) == 4);
 struct RenderObjectState {
   RenderObjectState();
   ~RenderObjectState();
-  void Reset();
   RenderObjectState(const RenderObjectState&) = delete;
   RenderObjectState& operator=(const RenderObjectState&) = delete;
 
@@ -46,7 +47,7 @@ struct RenderObjectState {
   /* 0064 */ float motionSpeedScale;
   /* 0068 */ float motionSpeed;
   /* 006C */ std::uint32_t motionType;
-  /* 0070 */ std::uint32_t state;
+  /* 0070 */ int state;
   /* 0074 */ std::uint32_t previousState;
   /* 0078 */ std::uint32_t spriteOffsetX;
   /* 007C */ std::uint32_t spriteAngle;
@@ -134,7 +135,7 @@ struct RenderObjectState {
     struct {
       /* 00FC */ std::uint16_t font;
       /* 00FE */ unsigned char sequenceMode;
-      /* 00FF */ unsigned char padding_00FF;
+      /* 00FF */ unsigned char sequenceSpriteIndex;
     };
   };
   /* 0100 */ unsigned char sequenceReset;
@@ -150,6 +151,23 @@ struct RenderObjectState {
   /* 0128 */ std::int64_t hoverOffset;
   /* 0130 */ unsigned char translucentOther[8];
 };
+
+// INLINED
+inline RenderObjectState::RenderObjectState() : position() {
+  this->sprite = nullptr;
+  this->action = nullptr;
+}
+
+// INLINED
+__forceinline RenderObjectState::~RenderObjectState() {
+  if (this->sprite) {
+    this->sprite->Unlock();
+  }
+
+  if (this->action) {
+    this->action->Unlock();
+  }
+}
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(RenderObjectState) == 296);

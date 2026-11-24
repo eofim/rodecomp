@@ -33,8 +33,6 @@
 #include "Resource/MSGSTRINGID.h"
 #include <timeapi.h>
 
-template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
-
 namespace {
   constexpr char prefix[] = "유저인터페이스\\";
 
@@ -51,8 +49,8 @@ UIComboBoxDefWnd::UIComboBoxDefWnd()
       borderGreen(0), borderBlue(0), dropdownHeight(40) {
 }
 
-// OFFSET: 0x00872AE0
-// FUNCTION: fn_11134
+// OFFSET: 0x00870680
+// FUNCTION: fn_45656
 UIComboBoxDefWnd::~UIComboBoxDefWnd() = default;
 
 // OFFSET: 0x00885920
@@ -183,9 +181,11 @@ int UIComboBoxDefWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
   case UM_COMMAND:
     if (a == ID_OPEN_MEMBER_POS_COMBO) {
       this->expanded = this->expanded == 0;
-      this->Resize(
-        this->geometry.width, this->expanded ? (this->list->geometry.height + this->geometry.height) : (this->geometry.height - this->list->geometry.height)
-      );
+      if (this->expanded) {
+        this->Resize(this->geometry.width, this->list->geometry.height + this->geometry.height);
+      } else {
+        this->Resize(this->geometry.width, this->geometry.height - this->list->geometry.height);
+      }
       this->parent->Invalidate();
       this->Invalidate();
       this->list->Invalidate();
@@ -275,14 +275,18 @@ UIComboBoxDef2Wnd::UIComboBoxDef2Wnd()
     : UIComboBoxDefWnd(), skin(0), alignment(0), textOffset(0), previousTextX(0) {
 }
 
-// OFFSET: 0x00872A70
-// FUNCTION: fn_11133
+// OFFSET: 0x00870620
+// FUNCTION: fn_45655
 UIComboBoxDef2Wnd::~UIComboBoxDef2Wnd() = default;
 
 // OFFSET: 0x00885250
 // FUNCTION: fn_11318
 void UIComboBoxDef2Wnd::OnCreate(int width, int) {
-  std::string path = this->skin == 1 ? "유저인터페이스\\login_interface\\" : "유저인터페이스\\UIadventurerAgency\\";
+  std::string path = "유저인터페이스\\UIadventurerAgency\\";
+  if (this->skin == 1) {
+    path = "유저인터페이스\\login_interface\\";
+  }
+
   this->button = new UIBitmapButton();
   this->button->SetBitmap((path + "btn_dropdown_out" + ".bmp").c_str(), 0, 0);
   this->button->SetBitmap((path + "btn_dropdown_over" + ".bmp").c_str(), 1, 0);
@@ -296,9 +300,9 @@ void UIComboBoxDef2Wnd::OnCreate(int width, int) {
   auto* list = new UIComboBoxEx2();
   this->list = list;
   list->alignment = this->alignment;
-  list->SetSize(width, (this->dropdownHeight + 2));
-  list->Move(0, this->button->BitmapHeight());
-  this->AddChild(list);
+  this->list->SetSize(width, (this->dropdownHeight + 2));
+  this->list->Move(0, this->button->BitmapHeight());
+  this->AddChild(this->list);
 
   this->label = new UIStaticText();
   this->label->SetSize((this->geometry.width - this->button->BitmapWidth()), (this->button->BitmapHeight() - 6));
@@ -307,7 +311,7 @@ void UIComboBoxDef2Wnd::OnCreate(int width, int) {
   if (this->alignment == 0) {
     this->label->Move(2, (this->textOffset + 3));
   } else if (this->alignment == 1) {
-    this->label->Move(static_cast<int>(static_cast<float>(this->geometry.width) * 0.5f - static_cast<float>(this->TextWidth(std::string(this->label->text).c_str(), 0, 0, 12, 0, 0)) * 0.5f), (this->textOffset + 3));
+    this->label->Move(static_cast<int>(static_cast<float>(this->geometry.width) * 0.5f - static_cast<float>(this->TextWidth(this->label->GetText().c_str(), 0, 0, 12, 0, 0)) * 0.5f), (this->textOffset + 3));
   }
 
   this->label->shadow = 1;
@@ -323,12 +327,33 @@ void UIComboBoxDef2Wnd::Paint() {
     return;
   }
 
-  const int x = static_cast<int>(static_cast<float>(this->geometry.width) * 0.5f - static_cast<float>(this->TextWidth(std::string(this->label->text).c_str(), 0, 0, 12, 0, 0)) * 0.5f);
+  const int x = static_cast<int>(static_cast<float>(this->geometry.width) * 0.5f - static_cast<float>(this->TextWidth(this->label->GetText().c_str(), 0, 0, 12, 0, 0)) * 0.5f);
 
   if (x != this->previousTextX) {
     this->previousTextX = x;
-    this->label->Move(static_cast<int>(static_cast<float>(this->geometry.width) * 0.5f - static_cast<float>(this->TextWidth(std::string(this->label->text).c_str(), 0, 0, 12, 0, 0)) * 0.5f), (this->textOffset + 3));
+    this->label->Move(static_cast<int>(static_cast<float>(this->geometry.width) * 0.5f - static_cast<float>(this->TextWidth(this->label->GetText().c_str(), 0, 0, 12, 0, 0)) * 0.5f), (this->textOffset + 3));
     this->label->Invalidate();
+  }
+}
+
+// OFFSET: 0x00897B30
+// FUNCTION: fn_45660
+void UINewComboBoxCtrl::Select(int index) {
+  this->dropped = false;
+  if (index < 0) {
+    return;
+  }
+
+  if (static_cast<unsigned int>(index) <= this->items.size()) {
+    this->label->SetText(this->items[index].c_str(), 0);
+  }
+
+  this->selected = index;
+  this->parent->SendMsg(this, UM_COMBOBOX_SELECTED, index, 0, 0, 0);
+  this->Invalidate();
+  this->parent->Invalidate();
+  if (this->Root()) {
+    this->Root()->Invalidate();
   }
 }
 
@@ -407,13 +432,39 @@ int UINewComboBoxCtrl::SendMsg(UIWindow* sender, int message, std::intptr_t argu
 
 // OFFSET: 0x008A1640
 // FUNCTION: fn_11636
-void UITextViewEX::AddLineLinks(UITextButton* const* first, UITextButton* const* last) {
-  std::vector<UITextButton*> links;
+void UITextViewEX::AddLineLinks(std::vector<UIString*>::iterator first, std::vector<UIString*>::iterator last) {
+  std::vector<UIString*> links;
   for (; first != last; ++first) {
     links.push_back(*first);
   }
 
-  this->lineLinks.push_back(std::vector<UITextButton*>(links));
+  this->lineLinks.push_back(std::vector<UIString*>(links));
+}
+
+// OFFSET: 0x008A2480
+// FUNCTION: fn_45677
+void UITextViewEX::ArrangeLinks() {
+  auto link = this->extraLinks.begin();
+  const auto last = this->extraLinks.end();
+  auto first = link;
+  int x = 0;
+  for (; link != last; ++link) {
+    UIString* label = *link;
+    const std::string caption = label->GetText();
+    x += label->geometry.width + 5;
+    if (x + 15 > this->geometry.width || caption == "\n") {
+      this->AddLineLinks(first, link);
+      first = link;
+      if (label->GetText() == "\n") {
+        x = 0;
+      } else {
+        x = label->geometry.width + 5;
+      }
+    }
+  }
+
+  this->AddLineLinks(first, link);
+  this->Refresh();
 }
 
 // INLINED
@@ -455,7 +506,45 @@ void UIString::ParseTags(std::string text) {
     TrimLeading(key, " \t");
     TrimTrailing(key, " \t");
 
-    if (key == "image") {
+    if (key != "image") {
+      if (key == "color") {
+        const std::size_t start = tags.find_first_of(" \t", index) + 1;
+        index = tags.find_first_of(" \t", start);
+        const std::string value = tags.substr(start, index - start);
+        const std::string red = value.substr(0, 2);
+        const std::string green = value.substr(2, 2);
+        const std::string blue = value.substr(4, 2);
+        char* stop;
+        this->red = std::strtol(red.c_str(), &stop, 16);
+        this->green = std::strtol(green.c_str(), &stop, 16);
+        this->blue = std::strtol(blue.c_str(), &stop, 16);
+      } else if (key == "link") {
+        const std::size_t start = tags.find_first_of("\"", index) + 1;
+        index = tags.find_first_of("\"", start);
+        this->link = tags.substr(start, index - start);
+        TrimLeading(this->link, " \t");
+        TrimTrailing(this->link, " \t");
+        TrimLeading(this->link, "\"");
+        TrimTrailing(this->link, "\"");
+        this->red = 10;
+        this->green = 10;
+        this->blue = 255;
+      } else if (key == "font") {
+        const std::size_t start = tags.find_first_of("\"", index) + 1;
+        index = tags.find_first_of("\"", start);
+        this->fontName = tags.substr(start, index - start);
+        TrimLeading(this->fontName, " \t");
+        TrimTrailing(this->fontName, " \t");
+        TrimLeading(this->fontName, "\"");
+        TrimTrailing(this->fontName, "\"");
+      } else if (key == "bold") {
+      } else if (key == "size") {
+        const std::size_t start = tags.find_first_of(" \t", index) + 1;
+        index = tags.find_first_of(" \t", start);
+        const std::string value = tags.substr(start, index - start);
+        this->fontSize = std::atoi(value.c_str());
+      }
+    } else {
       const std::size_t start = tags.find_first_of("\"", index) + 1;
       index = tags.find_first_of("\"", start);
       this->image = tags.substr(start, index - start);
@@ -463,48 +552,13 @@ void UIString::ParseTags(std::string text) {
       TrimTrailing(this->image, " \t");
       TrimLeading(this->image, "\"");
       TrimTrailing(this->image, "\"");
-    } else if (key == "color") {
-      const std::size_t start = tags.find_first_of(" \t", index) + 1;
-      index = tags.find_first_of(" \t", start);
-      const std::string value = tags.substr(start, index - start);
-      const std::string red = value.substr(0, 2);
-      const std::string green = value.substr(2, 2);
-      const std::string blue = value.substr(4, 2);
-      char* stop;
-      this->red = std::strtol(red.c_str(), &stop, 16);
-      this->green = std::strtol(green.c_str(), &stop, 16);
-      this->blue = std::strtol(blue.c_str(), &stop, 16);
-    } else if (key == "link") {
-      const std::size_t start = tags.find_first_of("\"", index) + 1;
-      index = tags.find_first_of("\"", start);
-      this->link = tags.substr(start, index - start);
-      TrimLeading(this->link, " \t");
-      TrimTrailing(this->link, " \t");
-      TrimLeading(this->link, "\"");
-      TrimTrailing(this->link, "\"");
-      this->red = 10;
-      this->green = 10;
-      this->blue = 255;
-    } else if (key == "font") {
-      const std::size_t start = tags.find_first_of("\"", index) + 1;
-      index = tags.find_first_of("\"", start);
-      this->fontName = tags.substr(start, index - start);
-      TrimLeading(this->fontName, " \t");
-      TrimTrailing(this->fontName, " \t");
-      TrimLeading(this->fontName, "\"");
-      TrimTrailing(this->fontName, "\"");
-    } else if (key == "bold") {
-    } else if (key == "size") {
-      const std::size_t start = tags.find_first_of(" \t", index) + 1;
-      index = tags.find_first_of(" \t", start);
-      const std::string value = tags.substr(start, index - start);
-      this->fontSize = std::atoi(value.c_str());
     }
 
     position = index + 1;
   }
 
-  this->text = text.substr(end + 1, text.find_first_of("<", end + 1) - (end + 1));
+  const std::size_t start = end + 1;
+  this->text = text.substr(start, text.find_first_of("<", start) - start);
 }
 
 // OFFSET: 0x008A0B10
@@ -515,28 +569,24 @@ void UIDescriptRace::DrawRaceDescription() {
       return;
     }
 
-    this->DrawTextAt(50, 23, LookupMessage(MSI_NEWMAKECHAR_DORAMINFO), 0, 0, 12, 0x99634C, 1, 0);
-    this->DrawTextAt(49, 22, LookupMessage(MSI_NEWMAKECHAR_DORAMINFO), 0, 0, 12, 0xFFFFFF, 1, 0);
+    this->DrawTextAt(50, 23, LookupMessage(MSI_NEWMAKECHAR_DORAM), 0, 0, 12, 0x99634C, 1, 0);
+    this->DrawTextAt(49, 22, LookupMessage(MSI_NEWMAKECHAR_DORAM), 0, 0, 12, 0xFFFFFF, 1, 0);
     std::vector<std::string> lines;
-    WrapPlainText(LookupMessage(MSI_CASH_MARK2), lines, 40);
-    int y = 22;
+    WrapPlainText(LookupMessage(MSI_NEWMAKECHAR_DORAMINFO), lines, 40);
     for (unsigned index = 0; index < lines.size(); ++index) {
-      this->DrawTextAt(112, y, lines[index].c_str(), 0, 0, 12, 0, 0, 0);
-      y += 20;
+      this->DrawTextAt(112, index * 20 + 22, lines[index].c_str(), 0, 0, 12, 0, 0, 0);
     }
   } else if (this->m_race == 0) {
-    this->DrawTextAt(50, 23, LookupMessage(MSI_NEWMAKECHAR_DORAMJOB), 0, 0, 12, 0x99634C, 1, 0);
-    this->DrawTextAt(49, 22, LookupMessage(MSI_NEWMAKECHAR_DORAMJOB), 0, 0, 12, 0xFFFFFF, 1, 0);
+    this->DrawTextAt(50, 23, LookupMessage(MSI_NEWMAKECHAR_HUMAN), 0, 0, 12, 0x99634C, 1, 0);
+    this->DrawTextAt(49, 22, LookupMessage(MSI_NEWMAKECHAR_HUMAN), 0, 0, 12, 0xFFFFFF, 1, 0);
     std::vector<std::string> lines;
-    WrapPlainText(LookupMessage(MSI_CASH_MARK1), lines, 40);
-    int y = 22;
+    WrapPlainText(LookupMessage(MSI_NEWMAKECHAR_HUMANINFO), lines, 40);
     for (unsigned index = 0; index < lines.size(); ++index) {
-      this->DrawTextAt(112, y, lines[index].c_str(), 0, 0, 12, 0, 0, 0);
-      y += 20;
+      this->DrawTextAt(112, index * 20 + 22, lines[index].c_str(), 0, 0, 12, 0, 0, 0);
     }
   }
 
-  const int job = this->m_race == 1 ? 4218 : 0;
+  const int job = this->m_race != 1 ? 0 : 4218;
   const int action = this->m_noRace != 0 ? 9 : 1;
   int frame = 0;
   for (int layer = 0; layer < 2; ++layer) {
@@ -612,7 +662,7 @@ void UITextViewEX::SetText(std::string text) {
   for (;;) {
     const std::size_t tag = text.find_first_of("<", position);
     std::string segment = text.substr(position, tag - position);
-    int attached = segment.find_first_not_of(" \t") == 0;
+    int attached = segment.find_first_not_of(" \t") <= 0;
     TrimLeading(segment, " \t");
     TrimTrailing(segment, " \t");
 
@@ -680,23 +730,7 @@ void UITextViewEX::SetText(std::string text) {
     position = close + 6;
   }
 
-  int x = 0;
-  auto first = this->extraLinks.begin();
-  auto link = first;
-  const auto last = this->extraLinks.end();
-  for (; link != last; ++link) {
-    UIString* label = *link;
-    const std::string caption = label->text;
-    x += label->geometry.width + 5;
-    if (x + 15 > this->geometry.width || caption == "\n") {
-      this->AddLineLinks(reinterpret_cast<UITextButton* const*>(std::to_address(first)), reinterpret_cast<UITextButton* const*>(std::to_address(link)));
-      first = link;
-      x = label->text == "\n" ? 0 : label->geometry.width + 5;
-    }
-  }
-
-  this->AddLineLinks(reinterpret_cast<UITextButton* const*>(std::to_address(first)), reinterpret_cast<UITextButton* const*>(std::to_address(link)));
-  this->Refresh();
+  this->ArrangeLinks();
 }
 
 // OFFSET: 0x008A0480
@@ -715,7 +749,7 @@ int UITextViewEX::AddWords(std::string text, int attached, int red, int green, i
         continue;
       }
       word = "\n";
-    } else if (word.size() == 1 && word[0] == '\r') {
+    } else if (word == "\r") {
       position = space + 1;
       continue;
     }

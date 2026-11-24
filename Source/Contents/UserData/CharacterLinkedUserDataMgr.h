@@ -5,7 +5,7 @@
 #include <string>
 
 class LuaScript;
-struct AsyncDiagnostic;
+#include "Utility/Async/AsyncDiagnostic.h"
 namespace Json {
   class Value;
 }
@@ -43,6 +43,10 @@ protected:
   /* 002C */ std::uint32_t m_pendingSaves;
   /* 0030 */ std::string m_saveUrl;
   /* 0048 */ std::string m_loadUrl;
+
+private:
+  void SaveUseSkillLevel(Json::Value& data);
+  void SaveHomunSkillLevel(Json::Value& data);
 };
 
 extern CCharacterLinkedUserDataMgr* g_characterLinkedUserDataMgr;

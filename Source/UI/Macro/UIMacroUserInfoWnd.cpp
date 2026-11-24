@@ -150,21 +150,24 @@ std::string UIMacroReporterWnd::EllipsizeText(int maxWidth, const char* text, in
   std::string fitted(text);
   std::wstring wide(ATL::CA2WEX<128>(text, CP_THREAD_ACP));
 
-  while (wide.size() > 1) {
+  for (;;) {
+    if (wide.size() <= 1) {
+      fitted = std::string(ATL::CW2AEX<128>(wide.c_str(), CP_THREAD_ACP)) + "...";
+      break;
+    }
+
     if (wide.size() >= 2) {
       const std::size_t size = wide.size();
-      const std::size_t cut = (wide[size - 2] & 0x80) != 0 && (wide[size - 1] & 0x80) != 0 ? 2 : 1;
-      wide.resize(size - cut);
+      wide.resize((wide[size - 2] & 0x80) != 0 && (wide[size - 1] & 0x80) != 0 ? size - 2 : size - 1);
     }
 
     fitted = std::string(ATL::CW2AEX<128>(wide.c_str(), CP_THREAD_ACP)) + "...";
 
-    if (this->TextWidth(fitted.c_str(), 0, font, height, bold, 0) <= maxWidth) {
-      return fitted;
+    if (maxWidth >= this->TextWidth(fitted.c_str(), 0, font, height, bold, 0)) {
+      break;
     }
   }
 
-  fitted = std::string(ATL::CW2AEX<128>(wide.c_str(), CP_THREAD_ACP)) + "...";
   return fitted;
 }
 
@@ -204,7 +207,7 @@ void UIMacroReporterWnd::Paint() {
       button->Invalidate();
     }
   }
-  DrawFilledRoundedBorder(*this, 0, 0, this->geometry.width, this->geometry.height, 0xFFFFFFFF);
+  this->DrawFilledRoundedOutline(0, 0, this->geometry.width, this->geometry.height, 0xFFFFFFFF);
   this->DrawTitleBar(true, "", 0);
   this->DrawButtonBar(1, 0, 1);
 
@@ -212,10 +215,8 @@ void UIMacroReporterWnd::Paint() {
     return;
   }
 
-  int y = 56;
   for (int row = 0; row < this->m_visibleRows; ++row) {
-    this->FillRegion(14, y, 214, 18, 0xE6E6E6);
-    y += 22;
+    this->FillRegion(14, row * 22 + 56, 214, 18, 0xE6E6E6);
   }
 
   for (unsigned int index = 0; index < this->m_rows.size(); ++index) {
@@ -223,16 +224,18 @@ void UIMacroReporterWnd::Paint() {
     this->m_rows[index].second->Enable(0);
   }
 
-  y = 57;
-  for (unsigned int index = this->m_firstRow; static_cast<int>(index) < this->m_firstRow + this->m_visibleRows; ++index, y += 22) {
+  int row = 0;
+  for (unsigned int index = this->m_firstRow; static_cast<int>(index) < this->m_firstRow + this->m_visibleRows; ++index, ++row) {
     if (this->m_rows.size() <= index) {
       return;
     }
 
-    this->m_rows[index].first->Enable(1);
-    this->m_rows[index].first->Move(15, y + 2);
-    this->m_rows[index].second->Enable(1);
-    this->m_rows[index].second->Move(36, y);
+    const int y = row * 22 + 57;
+    std::pair<UIBitmapButton*, UITextButton*>& buttons = this->m_rows[index];
+    buttons.first->Enable(1);
+    buttons.first->Move(15, y + 2);
+    buttons.second->Enable(1);
+    buttons.second->Move(36, y);
   }
 }
 
@@ -355,7 +358,7 @@ bool UIMacroReporterWnd::ValidateNames(unsigned char notify) {
       if (notify == 1) {
         g_windowMgr.SendNotice(
           1,
-          reinterpret_cast<std::intptr_t>(FormatOwnedString("%d번 %s", i + 1, LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_RESULT_SUCCESS)).c_str()),
+          reinterpret_cast<std::intptr_t>(FormatOwnedString("%d번 %s", i + 1, LookupMessage(MSI_MACRO_REPORTER_UNKNWON_MAP)).c_str()),
           0xFF,
           0,
           0,
@@ -381,7 +384,7 @@ bool UIMacroReporterWnd::ValidateTarget(unsigned char notify) {
   std::string text = this->m_target;
   if (text.empty() || text.size() - 4 > 4) {
     if (notify == 1) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s", LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_RESULT_FAIL_COOLTIME)).c_str()), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s", LookupMessage(MSI_MACRO_REPORTER_WRONG_NUMBER)).c_str()), 0xFF, 0, 0, 0);
     }
     return false;
   }
@@ -394,7 +397,7 @@ bool UIMacroReporterWnd::ValidateTarget(unsigned char notify) {
 
   if (value == 0 && text.compare(buffer) != 0) {
     if (notify == 1) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s", LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_RESULT_FAIL_COOLTIME)).c_str()), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s", LookupMessage(MSI_MACRO_REPORTER_WRONG_NUMBER)).c_str()), 0xFF, 0, 0, 0);
     }
     return false;
   }
@@ -409,7 +412,7 @@ bool UIMacroReporterWnd::ValidateTarget(unsigned char notify) {
 
   if (text.compare(buffer) != 0) {
     if (notify == 1) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s", LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_RESULT_FAIL_COOLTIME)).c_str()), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s", LookupMessage(MSI_MACRO_REPORTER_WRONG_NUMBER)).c_str()), 0xFF, 0, 0, 0);
     }
     return false;
   }
@@ -489,8 +492,8 @@ void UIMacroReporterWnd::OnCreate(int, int) {
   this->m_reportButton->SetId(ID_SEND);
   this->AddChild(this->m_reportButton);
 
-  std::string labels[4] = {LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_CELL), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_RANGE), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_QUIZ), LookupMessage(MSI_MACRO_REPORTER_UNKNWON_MAP)};
-  std::string tooltips[4] = {LookupMessage(MSI_TAIWANSS_PERSONALINFO_EXPMSG), LookupMessage(MSI_TAIWANSS_PERSONALINFO_DROPMSG), LookupMessage(MSI_MACRO_REPORTER_WRONG_NUMBER), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_MAP_QUIZ_INPUT)};
+  std::string labels[4] = {LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_CHAR), LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_CELL), LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_MAP), LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_QUIZ)};
+  std::string tooltips[4] = {LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_CHAR), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_CELL), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_MAP), LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_QUIZ)};
 
   int index = 0;
   for (; index < 2; ++index) {
@@ -501,9 +504,7 @@ void UIMacroReporterWnd::OnCreate(int, int) {
     this->m_tabs[index]->SetId(ID_RADIOBTN);
     this->m_tabs[index]->value = index;
     this->m_tabs[index]->SendMsg(this, UM_SETSTATE, index == this->m_mode, 0, 0, 0);
-    if (const char* tooltip = tooltips[index].c_str()) {
-      this->m_tabs[index]->tooltip = tooltip;
-    }
+    this->m_tabs[index]->SetTooltip(tooltips[index].c_str());
     this->AddChild(this->m_tabs[index]);
   }
   for (; index < 4; ++index) {
@@ -514,29 +515,24 @@ void UIMacroReporterWnd::OnCreate(int, int) {
     this->m_tabs[index]->SetId(ID_RADIOBTN);
     this->m_tabs[index]->value = index;
     this->m_tabs[index]->SendMsg(this, UM_SETSTATE, index == this->m_mode, 0, 0, 0);
-    if (const char* tooltip = tooltips[index].c_str()) {
-      this->m_tabs[index]->tooltip = tooltip;
-    }
+    this->m_tabs[index]->SetTooltip(tooltips[index].c_str());
     this->AddChild(this->m_tabs[index]);
   }
 
-  int y = 56;
   for (int row = 0; row < this->m_visibleRows; ++row) {
     this->m_fields[row] = new UIEditCtrl();
     this->m_fields[row]->SetSize(214, 18);
-    this->m_fields[row]->Move(14, y);
+    this->m_fields[row]->Move(14, row * 22 + 56);
     this->m_fields[row]->flat = 0;
     this->m_fields[row]->Border(125, 125, 125);
     this->m_fields[row]->preserveInput = 1;
     this->m_fields[row]->invalidatesParent = 1;
-    this->m_fields[row]->disabled = 1;
-    this->m_fields[row]->Invalidate();
-    if (const char* tooltip = LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_RESULT_FAIL_MAPNAME)) {
-      this->m_fields[row]->tooltip = tooltip;
-    }
+    UIEditCtrl* field = this->m_fields[row];
+    field->disabled = 1;
+    field->Invalidate();
+    this->m_fields[row]->SetTooltip(LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_MAP_QUIZ_INPUT));
     this->AddChild(this->m_fields[row]);
     this->m_names[row] = "";
-    y += 22;
   }
   this->m_target = "";
 
@@ -549,13 +545,12 @@ void UIMacroReporterWnd::OnCreate(int, int) {
   this->m_edit->preserveInput = 1;
   this->m_edit->invalidatesParent = 1;
   this->m_edit->SetText(IntToString(this->reportCount, 0).c_str());
-  if (const char* tooltip = LookupMessage(MSI_TAIWANSS_PERSONALINFO_DEATHMSG)) {
-    this->m_edit->tooltip = tooltip;
-  }
+  this->m_edit->SetTooltip(LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_RANGE));
   this->AddChild(this->m_edit);
   if (this->m_mode != 1) {
-    this->m_edit->disabled = 1;
-    this->m_edit->Invalidate();
+    UIEditCtrl* edit = this->m_edit;
+    edit->disabled = 1;
+    edit->Invalidate();
   }
 
   this->m_entries.clear();
@@ -576,6 +571,11 @@ namespace {
     /* 0002 */ std::uint32_t accountId;
   };
 #pragma pack(pop)
+
+  struct MacroReportScratch {
+    /* 0000 */ char name[16];
+    /* 0010 */ PACKET_CZ_MACRO_REPORT_HEADER header;
+  };
 }
 
 // OFFSET: 0x007F1420
@@ -583,6 +583,7 @@ namespace {
 int UIMacroReporterWnd::SendMsg(
   UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4
 ) {
+  MacroReportScratch report;
   switch (message) {
   case UM_SETINFO: {
     this->m_state = reinterpret_cast<MacroReporterState*>(argument1);
@@ -620,10 +621,12 @@ int UIMacroReporterWnd::SendMsg(
         if (sender == it->first) {
           it->first->SetDisabled(1);
           it->first->Invalidate();
-          this->m_removedRows.push_back(it->first);
+          UIButton* first = it->first;
+          this->m_removedRows.push_back(first);
           it->second->SetDisabled(1);
           it->second->Invalidate();
-          this->m_removedRows.push_back(it->second);
+          UIButton* second = it->second;
+          this->m_removedRows.push_back(second);
           this->m_rows.erase(it);
           break;
         }
@@ -656,73 +659,69 @@ int UIMacroReporterWnd::SendMsg(
         this->m_namesValid = this->ValidateNames(1);
         this->m_targetValid = this->ValidateTarget(1);
         if (this->m_namesValid == true && this->m_targetValid == true) {
-          PACKET_CZ_MACRO_REPORT_HEADER header;
-          header.packetType = ID_CZ_MACRO_REPORT_USER;
-          strncpy_s(header.target, sizeof(header.target), this->m_target.c_str(), _TRUNCATE);
-          header.count = static_cast<std::uint8_t>(this->m_nameCount);
-          const int length = this->m_nameCount * 16 + sizeof(header);
-          header.type = 6;
+          report.header.packetType = ID_CZ_MACRO_REPORT_USER;
+          strncpy_s(report.header.target, sizeof(report.header.target), this->m_target.c_str(), _TRUNCATE);
+          report.header.count = static_cast<std::uint8_t>(this->m_nameCount);
+          const int length = this->m_nameCount * 16 + sizeof(report.header);
+          report.header.type = 6;
           char buffer[2048];
-          std::memset(buffer + sizeof(header), 0, sizeof(buffer) - sizeof(header));
+          std::memset(buffer + sizeof(report.header), 0, sizeof(buffer) - sizeof(report.header));
           if (length > sizeof(buffer)) {
             break;
           }
-          header.packetLength = static_cast<std::uint16_t>(length);
-          std::memcpy(buffer, &header, sizeof(header));
+          report.header.packetLength = static_cast<std::uint16_t>(length);
+          std::memcpy(buffer, &report.header, sizeof(report.header));
           for (int index = 0; index < this->m_nameCount; ++index) {
             if (!this->m_names[index].empty()) {
-              char name[16];
-              strncpy_s(name, sizeof(name), (this->m_names[index] + ".gat").c_str(), _TRUNCATE);
-              memcpy_s(buffer + sizeof(header) + index * 16, 16, name, sizeof(name));
+              strncpy_s(report.name, sizeof(report.name), (this->m_names[index] + ".gat").c_str(), _TRUNCATE);
+              memcpy_s(buffer + sizeof(report.header) + index * 16, 16, report.name, sizeof(report.name));
             }
           }
           GetRagConnection().Send(length, buffer);
         }
       } else {
-        std::vector<int> accounts;
+        std::vector<unsigned int> accounts;
         for (auto it = this->m_entries.begin(); it != this->m_entries.end(); ++it) {
           if (std::find(accounts.begin(), accounts.end(), it->id) == accounts.end()) {
             accounts.push_back(it->id);
           }
         }
         const int result = g_windowMgr
-                             .Confirm(FormatOwnedString(LookupMessage(MSI_MACRO_ALREADY_DETECTING), accounts.size()).c_str(), 2, false, false, 0, "Message", 280, 120, 0);
-        if (result != 188) {
-          for (auto it = accounts.begin(); it != accounts.end(); ++it) {
-            PACKET_CZ_MACRO_REPORT_ACCOUNT packet;
-            packet.packetType = ID_CZ_REQ_APPLY_MACRO_DETECTOR;
-            packet.accountId = *it;
-            GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
-          }
-          this->m_entries.clear();
-          for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
-            it->first->SetDisabled(1);
-            it->first->Invalidate();
-            this->m_removedRows.push_back(it->first);
-            it->second->SetDisabled(1);
-            it->second->Invalidate();
-            this->m_removedRows.push_back(it->second);
-          }
-          this->m_rows.clear();
+                             .Confirm(FormatOwnedString(LookupMessage(MSI_MACRO_REPORTER), accounts.size()).c_str(), 2, false, false, 0, "Message", 280, 120, 0);
+        if (result == ID_NO) {
+          break;
         }
+        for (auto it = accounts.begin(); it != accounts.end(); ++it) {
+          PACKET_CZ_MACRO_REPORT_ACCOUNT packet;
+          packet.packetType = ID_CZ_REQ_APPLY_MACRO_DETECTOR;
+          packet.accountId = *it;
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
+        }
+        this->m_entries.clear();
+        for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
+          it->first->SetDisabled(1);
+          it->first->Invalidate();
+          UIButton* first = it->first;
+          this->m_removedRows.emplace_back(first);
+          it->second->SetDisabled(1);
+          it->second->Invalidate();
+          UIButton* second = it->second;
+          this->m_removedRows.emplace_back(second);
+        }
+        this->m_rows.clear();
       }
       break;
 
     case ID_RADIOBTN: {
       if (this->activeOnly == true) {
-        switch (this->m_mode) {
-        case 0:
-        case 1:
+        if (this->m_mode == 0 || this->m_mode == 1) {
           if (argument2 == 2 || argument2 == 3) {
             this->activeCheckBox->SetChecked(0);
           }
-          break;
-        case 2:
-        case 3:
+        } else if (this->m_mode == 2 || this->m_mode == 3) {
           if (argument2 == 0 || argument2 == 1) {
             this->activeCheckBox->SetChecked(0);
           }
-          break;
         }
       }
 
@@ -738,21 +737,22 @@ int UIMacroReporterWnd::SendMsg(
       }
       sender->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
 
-      UIEditCtrl* edit = this->m_edit;
       if (sender == this->m_tabs[1]) {
+        UIEditCtrl* edit = this->m_edit;
         edit->disabled = 0;
+        edit->Invalidate();
       } else {
+        UIEditCtrl* edit = this->m_edit;
         edit->disabled = 1;
+        edit->Invalidate();
       }
-      edit->Invalidate();
 
       if (sender == this->m_tabs[0] || sender == this->m_tabs[1]) {
         g_windowMgr.SetFocus(nullptr);
         for (int index = 0; index < this->m_visibleRows; ++index) {
-          UIEditCtrl* field = this->m_fields[index];
-          field->disabled = 1;
-          field->Invalidate();
-          field->SetText("");
+          this->m_fields[index]->disabled = 1;
+          this->m_fields[index]->Invalidate();
+          this->m_fields[index]->SetText("");
         }
         for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
           it->first->SetDisabled(0);
@@ -772,16 +772,15 @@ int UIMacroReporterWnd::SendMsg(
           it->second->Enable(0);
         }
         for (int index = 0; index < this->m_visibleRows; ++index) {
-          UIEditCtrl* field = this->m_fields[index];
-          field->disabled = 0;
-          field->Invalidate();
+          this->m_fields[index]->disabled = 0;
+          this->m_fields[index]->Invalidate();
           if (sender == this->m_tabs[2]) {
-            field->SetText(this->m_names[index].c_str());
+            this->m_fields[index]->SetText(this->m_names[index].c_str());
           } else if (sender == this->m_tabs[3]) {
             if (index == 0) {
-              field->SetText(this->m_target.c_str());
+              this->m_fields[index]->SetText(this->m_target.c_str());
             } else {
-              field->SetText("");
+              this->m_fields[index]->SetText("");
             }
           }
         }
@@ -802,18 +801,17 @@ int UIMacroReporterWnd::SendMsg(
         this->m_target = this->m_fields[0]->Text();
       }
     } else if (sender == this->m_edit) {
-      UIEditCtrl* edit = this->m_edit;
-      std::string text = edit->Text();
+      std::string text = this->m_edit->Text();
       if (text.size() > 1) {
-        edit->SetText(IntToString(this->reportCount, 0).c_str());
+        this->m_edit->SetText(IntToString(this->reportCount, 0).c_str());
       } else if (text.c_str()[0] >= '0' && text.c_str()[0] <= '9') {
         this->reportCount = std::atoi(text.c_str());
         if (this->reportCount > this->maxReportCount) {
           this->reportCount = this->maxReportCount;
-          edit->SetText(IntToString(this->maxReportCount, 0).c_str());
+          this->m_edit->SetText(IntToString(this->maxReportCount, 0).c_str());
         }
       } else {
-        edit->SetText(IntToString(this->reportCount, 0).c_str());
+        this->m_edit->SetText(IntToString(this->reportCount, 0).c_str());
       }
     }
     break;

@@ -47,6 +47,10 @@ struct CharSlotInfo {
   /* 0158 */ int robe;
 };
 
+// OFFSET: 0x007D4520
+// FUNCTION: fn_09578
+inline CharSlotInfo::CharSlotInfo() noexcept = default;
+
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(CharSlotInfo) == 348);
 #endif
@@ -77,7 +81,7 @@ protected:
   /* 00C0 */ UIBmpTextButton* m_windowC0;
   /* 00C4 */ UIBmpTextButton* m_windowC4;
   /* 00C8 */ std::map<int, int> m_slotMap;
-  /* 00D0 */ std::vector<UIWindow*> m_slotButtons;
+  /* 00D0 */ std::vector<UIStaticText*> m_slotButtons;
   /* 00DC */ std::vector<UIStaticText*> m_characterWindows;
   /* 00E8 */ std::vector<UIWindow*> m_slotButtons2;
   /* 00F4 */ UIBitmapButton* m_prevPageButton;

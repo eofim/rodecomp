@@ -13,7 +13,7 @@ namespace {
 // OFFSET: 0x00AB59A0
 // FUNCTION: fn_17461
 C3dActor::C3dActor()
-    : position{0.0f, 0.0f, 0.0f}, rotation{0.0f, 0.0f, 0.0f}, scale{0.0f, 0.0f, 0.0f}, offset{0.0f, 0.0f, 0.0f}, dirty(1), oriented{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}}}, corners{}, minimum{0.0f, 0.0f, 0.0f}, maximum{0.0f, 0.0f, 0.0f}, enabled(1), renderFrame(0), occlusionEnabled(0),
+    : position{0.0f, 0.0f, 0.0f}, rotation{0.0f, 0.0f, 0.0f}, scale{0.0f, 0.0f, 0.0f}, offset{0.0f, 0.0f, 0.0f}, dirty(1), oriented{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}}}, minimum{0.0f, 0.0f, 0.0f}, maximum{0.0f, 0.0f, 0.0f}, enabled(1), renderFrame(0), occlusionEnabled(0),
       occluded(0), alpha(255), commandMode(0), color(0xFFFFFFFFu), playback(2), speed(0), shade(0) {
   this->scale.x = 1.0f;
   this->scale.y = 1.0f;
@@ -82,9 +82,7 @@ void C3dActorV2::Assign(const C3dModelRes& resource) {
   const auto& modern = static_cast<const C3dModelResV2&>(resource);
   this->shade = resource.shade;
   this->framesPerSecond = modern.framesPerSecond;
-  const float inverse = 1.0f / modern.framesPerSecond;
-  const int milliseconds = 1000 * modern.animationLength;
-  this->duration = static_cast<float>(milliseconds) * inverse;
+  this->duration = static_cast<float>(1000 * modern.animationLength) * (1.0f / modern.framesPerSecond);
 
   auto* roots = &this->roots;
   resource.ForEachRootName([&resource, roots, this](const std::string& name) {

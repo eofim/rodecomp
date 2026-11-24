@@ -8,10 +8,6 @@
 #include <new>
 #include <utility>
 
-template __forceinline
-std::_Tree_find_result<std::map<int, std::pair<int, int>>::_Mybase::_Nodeptr>
-std::map<int, std::pair<int, int>>::_Mybase::_Find_lower_bound<int>(const int&) const;
-
 // GLOBAL: gl_25106
 template <>
 CUIRegisterMgr* Singleton<CUIRegisterMgr>::s_instance = nullptr;
@@ -23,26 +19,14 @@ CUIFrameWnd::~CUIFrameWnd() {
     if (CUIRegisterMgr::s_instance == nullptr) {
       CUIRegisterMgr::s_instance = new (std::nothrow) CUIRegisterMgr;
     }
-    std::map<int, std::pair<int, int>>& positions = CUIRegisterMgr::s_instance->windowPositions;
-    std::map<int, std::pair<int, int>>::iterator position = positions.lower_bound(this->geometry.id);
-    if (position == positions.end() || this->geometry.id < position->first) {
-      position = positions.insert(position, std::map<int, std::pair<int, int>>::value_type(this->geometry.id, std::pair<int, int>()));
-    }
-    position->second.first = this->geometry.x;
-    position->second.second = this->geometry.y;
+    CUIRegisterMgr::s_instance->windowPositions[static_cast<int>(this->geometry.id)] = POINT{this->geometry.x, this->geometry.y};
   }
 
   if (this->m_ownsBorderColor) {
     if (CUIRegisterMgr::s_instance == nullptr) {
       CUIRegisterMgr::s_instance = new (std::nothrow) CUIRegisterMgr;
     }
-    std::map<int, std::pair<int, int>>& sizes = CUIRegisterMgr::s_instance->windowSizes;
-    std::map<int, std::pair<int, int>>::iterator size = sizes.lower_bound(this->geometry.id);
-    if (size == sizes.end() || this->geometry.id < size->first) {
-      size = sizes.insert(size, std::map<int, std::pair<int, int>>::value_type(this->geometry.id, std::pair<int, int>()));
-    }
-    size->second.first = this->geometry.width;
-    size->second.second = this->geometry.height;
+    CUIRegisterMgr::s_instance->windowSizes[static_cast<int>(this->geometry.id)] = SIZE{this->geometry.width, this->geometry.height};
   }
 }
 
@@ -80,11 +64,9 @@ void CUIFrameWnd::Paint() {
 // OFFSET: 0x009E6D60
 // FUNCTION: fn_14472
 void CUIFrameWnd::SetSkinColors(int backgroundColumn, int backgroundRow, int borderColumn, int borderRow) {
-  this->m_backgroundCell.column = backgroundColumn;
-  this->m_backgroundCell.row = backgroundRow;
-  this->m_borderCell.column = borderColumn;
-  this->m_borderCell.row = borderRow;
   this->m_hasSkinColors = true;
+  this->m_backgroundCell = SkinPaletteCell{backgroundColumn, backgroundRow};
+  this->m_borderCell = SkinPaletteCell{borderColumn, borderRow};
 
   this->m_backgroundColor = g_skinInfo.PaletteColor(this->m_backgroundCell, this->m_resolveSkin);
   this->m_borderColor = g_skinInfo.PaletteColor(this->m_borderCell, this->m_resolveSkin);

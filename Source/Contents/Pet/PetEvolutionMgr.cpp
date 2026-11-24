@@ -18,6 +18,12 @@ extern "C" {
 // GLOBAL: gl_24877
 CPetEvolutionMgr* g_petEvolutionMgr;
 
+// OFFSET: 0x00672360
+// FUNCTION: fn_46423
+CPetEvolutionMgr::CPetEvolutionMgr() {
+  this->m_isValid = true;
+}
+
 // OFFSET: 0x00672C20
 // FUNCTION: fn_05367
 bool CPetEvolutionMgr::Create() {
@@ -62,10 +68,12 @@ std::pair<bool, std::vector<int>> CPetEvolutionMgr::GetEvolutionTargets(int petE
   std::vector<int> targets;
   const auto found = this->m_recipes.find(petEgg);
   if (found == this->m_recipes.end()) {
-    return std::make_pair(false, std::vector<int>());
+    return std::make_pair(false, std::move(targets));
   }
 
-  for (const PetEvolutionRecipe& recipe : found->second) {
+  const auto recipeEnd = found->second.end();
+  for (auto recipeIt = found->second.begin(); recipeIt != recipeEnd; ++recipeIt) {
+    const PetEvolutionRecipe& recipe = *recipeIt;
     targets.push_back(recipe.target);
   }
   return std::make_pair(true, targets);
@@ -77,19 +85,24 @@ std::pair<bool, std::vector<std::pair<int, int>>> CPetEvolutionMgr::GetMaterials
   std::vector<std::pair<int, int>> materials;
   const auto found = this->m_recipes.find(petEgg);
   if (found == this->m_recipes.end()) {
-    return std::make_pair(false, std::vector<std::pair<int, int>>());
+    return std::make_pair(false, std::move(materials));
   }
 
-  for (auto recipe = found->second.begin(); recipe != found->second.end(); ++recipe) {
+  auto recipe = found->second.begin();
+  for (; recipe != found->second.end(); ++recipe) {
     if (recipe->target == target) {
-      for (auto material = recipe->materials.begin(); material != recipe->materials.end(); ++material) {
-        materials.push_back(*material);
-      }
-      return std::make_pair(true, materials);
+      break;
     }
   }
 
-  return std::make_pair(false, std::vector<std::pair<int, int>>());
+  if (recipe == found->second.end()) {
+    return std::make_pair(false, std::move(materials));
+  }
+
+  for (const auto material : recipe->materials) {
+    materials.push_back(material);
+  }
+  return std::make_pair(true, materials);
 }
 
 // OFFSET: 0x00673260
@@ -153,19 +166,20 @@ std::pair<bool, std::string> CPetEvolutionMgr::InsertRecipe(int petEgg, int targ
     }
   }
 
-  if (it != recipes.end()) {
-    for (auto entry = it->materials.begin(); entry != it->materials.end(); ++entry) {
-      if (entry->first == material) {
-        return std::make_pair(false, "duplicate material ITID");
-      }
-    }
-
-    it->materials.push_back(std::make_pair(material, count));
-  } else {
+  if (it == recipes.end()) {
     PetEvolutionRecipe recipe;
     recipe.target = target;
     recipe.materials.push_back(std::make_pair(material, count));
     recipes.push_back(std::move(recipe));
+  } else {
+    if (std::find_if(it->materials.begin(), it->materials.end(), [material](const std::pair<int, int>& entry) {
+          return entry.first == material;
+        }) != it->materials.end()) {
+      return std::make_pair(false, "duplicate material ITID");
+    }
+
+    it->materials.push_back(std::make_pair(material, count));
+    return std::make_pair(true, "good");
   }
 
   return std::make_pair(true, "good");

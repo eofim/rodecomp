@@ -1,4 +1,5 @@
 #include "Client/Session/Session.h"
+#include "Contents/Jobs/JobId.h"
 #include "Contents/Jobs/JobInheritance.h"
 
 #include <algorithm>
@@ -6,58 +7,20 @@
 #include <string>
 #include <vector>
 
-template __declspec(noinline) void std::vector<std::string>::resize(size_type, const std::string&);
-
 // OFFSET: 0x00DDE3D0
 // FUNCTION: fn_23395
 const char* CSession::GetHitWaveName(int job) {
-  if (!((job >= 31 && job < 1000) || job < 0 || (job > 1000 && job < 3999) || static_cast<unsigned int>(job - 20021) <= 11978)) {
+  if (!((job >= JT_MAX_BASIC && job < JT_MON_BEGIN) || job < JT_NOVICE || (job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || static_cast<unsigned int>(job - 20021) <= 11978)) {
     const std::vector<std::string>& jobWaves = this->m_jobHitWaves;
     if (job > 3950) {
-      return jobWaves.begin()[job - 3950].c_str();
+      const std::string* wave = jobWaves.data() + job - 3950;
+      return wave->c_str();
     }
-    return jobWaves.begin()[job].c_str();
+    const std::string* wave = jobWaves.data() + job;
+    return wave->c_str();
   }
 
-  const int weapon = g_session.GetRealWeaponId(-1);
-  if (weapon == -1) {
-    const int roll = std::rand() % 4;
-    switch (roll >= 0 ? roll : 0) {
-    case 0:
-      return "_enemy_hit_normal1.wav";
-    case 1:
-      return "_enemy_hit_normal2.wav";
-    case 2:
-      return "_enemy_hit_normal3.wav";
-    case 3:
-      return "_enemy_hit_normal4.wav";
-    }
-  }
-
-  const std::vector<std::string>& weaponWaves = this->m_weaponHitWaves;
-  if (weaponWaves.empty() || weaponWaves.size() <= static_cast<unsigned int>(weapon)) {
-    return nullptr;
-  }
-
-  if (this->GetDisplayJob() == 4046 || this->GetDisplayJob() == 4225) {
-    return weaponWaves[weapon].c_str();
-  }
-
-  if (weapon == 0) {
-    const int roll = std::rand() % 4;
-    switch (roll >= 0 ? roll : 0) {
-    case 0:
-      return "_hit_fist1.wav";
-    case 1:
-      return "_hit_fist2.wav";
-    case 2:
-      return "_hit_fist3.wav";
-    case 3:
-      return "_hit_fist4.wav";
-    }
-  }
-
-  return weaponWaves[weapon].c_str();
+  return this->GetWeaponHitWaveName(-1);
 }
 
 // OFFSET: 0x00DE3680
@@ -78,12 +41,16 @@ const char* CSession::GetWeaponHitWaveName(int weapon) {
     }
   }
 
-  const std::vector<std::string>& weaponWaves = this->m_weaponHitWaves;
-  if (weaponWaves.empty() || weaponWaves.size() <= static_cast<unsigned int>(realWeapon)) {
+  const std::string* weaponWaves = this->m_weaponHitWaves.data();
+  if (this->m_weaponHitWaves.empty() || this->m_weaponHitWaves.size() <= static_cast<unsigned int>(realWeapon)) {
     return nullptr;
   }
 
-  if (this->GetDisplayJob() == 4046 || this->GetDisplayJob() == 4225) {
+  if (this->GetDisplayJob() == JT_TAEKWON) {
+    return weaponWaves[realWeapon].c_str();
+  }
+
+  if (this->GetDisplayJob() == JT_TAEKWON_B) {
     return weaponWaves[realWeapon].c_str();
   }
 
@@ -101,7 +68,7 @@ const char* CSession::GetWeaponHitWaveName(int weapon) {
     }
   }
 
-  return weaponWaves[realWeapon].c_str();
+  return this->m_weaponHitWaves[realWeapon].c_str();
 }
 
 // OFFSET: 0x00DE5BD0

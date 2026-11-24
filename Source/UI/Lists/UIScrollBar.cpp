@@ -31,6 +31,7 @@
 #include "UI/Buttons/UINaviLinkButton.h"
 #include "UI/Buttons/UIItemTagButton.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Tables/TipOfTheDay.h"
 #include "Contents/Tables/MessageTable.h"
 #include <algorithm>
@@ -53,7 +54,6 @@
 #include "UI/Rodex/UIRodexComposeWnd.h"
 #include "Resource/MSGSTRINGID.h"
 
-template __declspec(noinline) std::string std::operator+(const char* const, const std::string&);
 // OFFSET: 0x0086DDA0
 // FUNCTION: fn_11059
 UIListBoxTitle::UIListBoxTitle() {
@@ -417,17 +417,14 @@ void UIScrollBar::Paint() {
     this->DrawBitmap(this->geometry.width - this->arrowLength - 1, 0, bitmap, true);
 
     const int thumb = this->arrowLength + this->ThumbOffset();
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_left.bmp")));
-    this->DrawBitmap(thumb, 0, bitmap, true);
+    this->DrawBitmap(thumb, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_left.bmp"))), true);
     const int end = thumb + this->ThumbLength() - 4;
 
     for (int offset = thumb + 4; offset < end; offset += 4) {
-      bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_mid.bmp")));
-      this->DrawBitmap(offset, 0, bitmap, true);
+      this->DrawBitmap(offset, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_mid.bmp"))), true);
     }
 
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_right.bmp")));
-    this->DrawBitmap(end, 0, bitmap, true);
+    this->DrawBitmap(end, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_right.bmp"))), true);
     break;
   }
   case 1: {
@@ -447,17 +444,14 @@ void UIScrollBar::Paint() {
     this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, bitmap, true);
 
     const int thumb = this->arrowLength + this->ThumbOffset();
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_up.bmp")));
-    this->DrawBitmap(0, thumb, bitmap, true);
+    this->DrawBitmap(0, thumb, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_up.bmp"))), true);
     const int end = thumb + this->ThumbLength() - 4;
 
     for (int offset = thumb + 4; offset < end; offset += 4) {
-      bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_mid.bmp")));
-      this->DrawBitmap(0, offset, bitmap, true);
+      this->DrawBitmap(0, offset, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_mid.bmp"))), true);
     }
 
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_down.bmp")));
-    this->DrawBitmap(0, end, bitmap, true);
+    this->DrawBitmap(0, end, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_down.bmp"))), true);
     break;
   }
   }
@@ -600,9 +594,6 @@ void UITabControl::AddTab(const char* label, const char* tooltip) {
         }
       }
 
-      if (!this->geometry.surface) {
-        this->Resize(tabWidth, 15);
-      }
       const std::string fitted = this->FitTextToWidth(this->labels[index], tabWidth);
       this->labels[index] = "";
       this->labels[index] = fitted;
@@ -614,11 +605,11 @@ void UITabControl::AddTab(const char* label, const char* tooltip) {
 
   int width;
   if (this->layout == 0 || this->layout == 2) {
-    width = this->VerticalTextHeight(label, 0, 0, this->fontSize, 0);
+    width = this->VerticalTextHeight(label, 0, 0, this->fontSize, 0) + this->tabPadding;
   } else {
-    width = this->TextWidth(label, 0, 0, this->fontSize, 0, 0);
+    width = this->TextWidth(label, 0, 0, this->fontSize, 0, 0) + this->tabPadding;
   }
-  this->widths.push_back(width + this->tabPadding);
+  this->widths.push_back(width);
 
   if (std::strlen(tooltip) != 0) {
     this->tooltips[this->labels.size() - 1] = tooltip;
@@ -759,13 +750,13 @@ void UIEditCtrl_Custom::PaintText() {
     } else if (g_serverLanguage->candidate.size() != 0) {
       this->MoveCandidateWindow(left);
       this->MoveReadingWindow(right);
-      if ((timeGetTime() / 500 & 1) == 0) {
+      if (0 == timeGetTime() / 500 % 2) {
         this->DrawSelection(x + left, std::max(right - left, 2));
       }
       this->DrawLabel(x, y, display.c_str());
     } else {
       this->DrawLabel(x, y, display.c_str());
-      if (IsInputSuggestionAllowed() == true && (timeGetTime() / 500 & 1) == 0) {
+      if (IsInputSuggestionAllowed() == true && 0 == timeGetTime() / 500 % 2) {
         this->DrawTextAt(x + left - 2, y, "|", 0, 0, 12, this->textColor, 0, 0);
       }
     }
@@ -805,22 +796,20 @@ void UIBasicItemCtrl::DrawItemIcon(int x, int y, int, bool compact) {
     this->DrawBitmap(x, y, bitmap, true);
   }
 
-  if (this->m_item.identity[1] <= 0 || this->m_item.quantity == 0) {
-    return;
-  }
-
-  const std::string count = FormatOwnedString("%d", this->m_item.quantity);
-  FontCache& fonts = g_fontCache;
-  if (compact) {
-    this->DrawTextAt(x + 16, y + 20, count.c_str(), 0, 0, 11, 0, 0, 0);
-  } else {
-    const int textY = y + 15;
-    x += this->m_item.quantity < 1000 ? 14 : 0;
-    this->DrawTextAt(x + 1, textY, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
-    this->DrawTextAt(x - 1, textY, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
-    this->DrawTextAt(x, y + 16, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
-    this->DrawTextAt(x, y + 14, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
-    this->DrawTextAt(x, textY, count.c_str(), 0, 0, 11, 0, 0, 0);
+  if (this->m_item.identity[1] > 0 && this->m_item.quantity != 0) {
+    const std::string count = FormatOwnedString("%d", this->m_item.quantity);
+    FontCache& fonts = g_fontCache;
+    if (compact) {
+      this->DrawTextAt(x + 16, y + 20, count.c_str(), 0, 0, 11, 0, 0, 0);
+    } else {
+      const int textY = y + 15;
+      const int textX = x + (this->m_item.quantity < 1000 ? 14 : 0);
+      this->DrawTextAt(textX + 1, textY, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
+      this->DrawTextAt(textX - 1, textY, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
+      this->DrawTextAt(textX, y + 16, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
+      this->DrawTextAt(textX, y + 14, count.c_str(), 0, 0, 11, 0xFFFFFF, 0, 0);
+      this->DrawTextAt(textX, textY, count.c_str(), 0, 0, 11, 0, 0, 0);
+    }
   }
 }
 
@@ -1111,7 +1100,7 @@ int UITabControl::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       const int previousWidth = this->geometry.width;
       this->RecalculateWidths();
       if (this->parent) {
-        this->parent->SendMsg(this, 116, reinterpret_cast<std::intptr_t>(text.c_str()), this->activeTabIndex, previousWidth > this->geometry.width ? previousWidth : 0, 0);
+        this->parent->SendMsg(this, UM_CHILD_CHANGED, reinterpret_cast<std::intptr_t>(text.c_str()), this->activeTabIndex, previousWidth > this->geometry.width ? previousWidth : 0, 0);
       }
     }
   }
@@ -1325,7 +1314,8 @@ int UITreeView::LayoutNodes(std::list<UITreeNode*>& nodes, int x, int y) {
                       label->m_outlined, 0
                     ) +
                     2;
-            width = label->m_border ? width + 2 : width;
+            int& bordered = width;
+            bordered = !label->m_border ? width : width + 2;
           }
           label->UIWindow::Resize(width, height);
         }
@@ -1405,7 +1395,7 @@ void UIChatHisBox::PlaceItemTags(int line) {
 void UIChatHisBox::Paint() {
   this->ClearSurface(0xFFFF00FF);
   if (this->parent && this->geometry.x >= 0 && this->geometry.y >= 0) {
-    this->parent->SendMsg(this, 116, 0, 0, 0, 0);
+    this->parent->SendMsg(this, UM_CHILD_CHANGED, 0, 0, 0, 0);
   }
 
   const unsigned int lineCount = static_cast<unsigned int>(this->lines.size());
@@ -1414,18 +1404,16 @@ void UIChatHisBox::Paint() {
   const unsigned int end = lineCount < visible ? lineCount : visible;
 
   FontCache& fonts = g_fontCache;
-  for (int row = 0; top + row < static_cast<int>(end); ++row) {
-    const int index = top + row;
-    int x;
-    if (g_serviceType == 19 && g_tipOfTheDayEnglish) {
+  for (int index = top; index < static_cast<int>(end); ++index) {
+    const int row = index - top;
+    if (g_serviceType == ServiceUae && g_tipOfTheDayEnglish) {
       const int width = this->TextWidth(this->lines[index].c_str(), 0, 0, 12, 0, 0);
       this->DrawTextAt(this->geometry.width - width - 18, this->lineHeight * row + 4, this->lines[index].c_str(), 0, 0, 12, 0, 0, 0);
-      x = this->geometry.width - width - 19;
+      this->DrawTextAt(this->geometry.width - width - 19, this->lineHeight * row + 3, this->lines[index].c_str(), 0, 0, 12, this->lineColors[index], 0, 0);
     } else {
       this->DrawTextAt(3, this->lineHeight * row + 4, this->lines[index].c_str(), 0, 0, 12, 0, 0, 0);
-      x = 2;
+      this->DrawTextAt(2, this->lineHeight * row + 3, this->lines[index].c_str(), 0, 0, 12, this->lineColors[index], 0, 0);
     }
-    this->DrawTextAt(x, this->lineHeight * row + 3, this->lines[index].c_str(), 0, 0, 12, this->lineColors[index], 0, 0);
     this->PlaceNaviLinks(index);
     this->PlaceItemTags(index);
   }
@@ -1495,15 +1483,13 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         this->HideNodes(this->root->children);
         const int x = sender->geometry.x;
         const int y = message == UM_TEXT_LBTN_UP ? sender->geometry.y - 6 : sender->geometry.y;
-        UIWindow* button;
         if (this->selectedNode->expanded == 0) {
           this->selectedNode->expanded = 1;
-          button = this->selectedNode->collapseButton;
+          this->selectedNode->collapseButton->Move(x, y);
         } else {
           this->selectedNode->expanded = 0;
-          button = this->selectedNode->expandButton;
+          this->selectedNode->expandButton->Move(x, y);
         }
-        button->Move(x, y);
         this->Invalidate();
       }
 
@@ -1552,13 +1538,15 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       }
 
       g_modeMgr.currentMode->SetCursorAction(2);
-      UITreeNode* node = this->dragNode;
-      UITVTextButton* label = node->labelButton;
-      this->RemoveChildNode(node->parent, node->id, true);
+      UITVTextButton* label = this->dragNode->labelButton;
+      this->RemoveNode(this->dragNode, true);
       UITreeNode* previousParent = this->dragNode->parent;
       this->dragNode->parent = this->dropNode;
-      UITreeNode* target = this->dropNode ? this->dropNode : this->root;
-      target->children.push_back(this->dragNode);
+      if (this->dropNode) {
+        this->dropNode->children.push_back(this->dragNode);
+      } else {
+        this->root->children.push_back(this->dragNode);
+      }
       this->dragNode->labelButton = label;
       if (this->parent) {
         this->parent->SendMsg(
@@ -1577,7 +1565,7 @@ int UITreeView::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
   case UM_CHANGE_TVITEM_TEXT:
     if (b == 0) {
       this->editNode = reinterpret_cast<UITreeNode*>(a);
-      this->edit->maximum = std::min(static_cast<int>(c), 361);
+      this->edit->maximum = std::min(c, 361);
       this->edit->SetText(this->editNode->name);
       g_windowMgr.SetFocus(this->edit);
       this->Invalidate();
@@ -1622,48 +1610,46 @@ bool UITreeView::DeleteChildNodes(UITreeNode* node) {
   }
 
   int remaining = static_cast<int>(node->children.size());
-  if (remaining <= 0) {
-    return deleted;
-  }
-
-  for (auto it = node->children.begin(); it != node->children.end(); ++it) {
-    deleted = true;
-    UITreeNode* child = *it;
-    if (child->children.size() > 0) {
-      this->DeleteChildNodes(child);
-    }
-
-    if ((*it)->collapseButton) {
-      (*it)->collapseButton->Move(-100, -100);
-      (*it)->collapseButton = nullptr;
-    }
-
-    if ((*it)->expandButton) {
-      (*it)->expandButton->Move(-100, -100);
-      (*it)->expandButton = nullptr;
-    }
-
-    (*it)->labelButton->Move(-100, -100);
-    --remaining;
-    (*it)->labelButton = nullptr;
-
-    if (node->children.size() == 0) {
-      if (node->collapseButton) {
-        node->collapseButton->Move(-100, -100);
-        node->collapseButton = nullptr;
+  if (remaining > 0) {
+    for (auto it = node->children.begin(); it != node->children.end(); ++it) {
+      deleted = true;
+      UITreeNode* child = *it;
+      if (child->children.size() > 0) {
+        this->DeleteChildNodes(child);
       }
 
-      if (node->expandButton) {
-        node->expandButton->Move(-100, -100);
-        node->expandButton = nullptr;
+      if ((*it)->collapseButton) {
+        (*it)->collapseButton->Move(-100, -100);
+        (*it)->collapseButton = nullptr;
       }
-    }
 
-    delete *it;
+      if ((*it)->expandButton) {
+        (*it)->expandButton->Move(-100, -100);
+        (*it)->expandButton = nullptr;
+      }
 
-    if (remaining == 0) {
-      node->children.clear();
-      return true;
+      (*it)->labelButton->Move(-100, -100);
+      --remaining;
+      (*it)->labelButton = nullptr;
+
+      if (node->children.size() == 0) {
+        if (node->collapseButton) {
+          node->collapseButton->Move(-100, -100);
+          node->collapseButton = nullptr;
+        }
+
+        if (node->expandButton) {
+          node->expandButton->Move(-100, -100);
+          node->expandButton = nullptr;
+        }
+      }
+
+      delete *it;
+
+      if (remaining == 0) {
+        node->children.clear();
+        return true;
+      }
     }
   }
 
@@ -1726,6 +1712,64 @@ bool UITreeView::RemoveChildNode(UITreeNode* parent, int id, bool keepButtons) {
   return false;
 }
 
+// OFFSET: 0x0089E840
+// FUNCTION: fn_45584
+bool UITreeView::RemoveNode(UITreeNode* node, bool keepButtons) {
+  return this->RemoveChildNode(node->parent, node->id, keepButtons);
+}
+
+// OFFSET: 0x0089E860
+// FUNCTION: fn_45585
+UITreeNode* UITreeView::FindChildNode(UITreeNode* parent, int id, int secondaryId) const {
+  if (!parent) {
+    parent = this->root;
+  }
+  if (static_cast<int>(parent->children.size()) > 0) {
+    for (auto child = parent->children.begin(); child != parent->children.end(); ++child) {
+      if ((*child)->id == id && (*child)->secondaryId == secondaryId) {
+        return *child;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// OFFSET: 0x0089E8C0
+// FUNCTION: fn_45586
+UITreeNode* UITreeView::AddNode(UITreeNode* node, int atFront) {
+  node->collapseButton = nullptr;
+  node->expandButton = nullptr;
+  UITreeNode* parent = node->parent;
+  if (parent) {
+    if (this->FindChildNode(parent, node->id, node->secondaryId)) {
+      return node;
+    }
+    if (!parent->expandButton && !parent->collapseButton) {
+      this->AddNodeButtons(parent, parent->id);
+    }
+    this->AddNodeLabel(node, node->id);
+    if (atFront) {
+      parent->children.push_front(node);
+      return node;
+    }
+    parent->children.push_back(node);
+    return node;
+  } else {
+    node->parent = this->root;
+    if (this->FindChildNode(this->root, node->id, node->secondaryId)) {
+      return node;
+    }
+    this->AddNodeButtons(node, node->id);
+    this->AddNodeLabel(node, node->id);
+    if (atFront) {
+      this->root->children.push_front(node);
+      return node;
+    }
+    this->root->children.push_back(node);
+    return node;
+  }
+}
+
 // OFFSET: 0x0089E470
 // FUNCTION: fn_11600
 bool UIGage::CanHitTest() {
@@ -1747,10 +1791,22 @@ void UITabControl::Configure(
   this->uniformWidths = uniformWidths;
   this->skipTabFill = skipTabFill;
   this->allowTabRename = allowTabRename;
-  this->activeFillColor = activeFillColor ? activeFillColor : 0xFFFFFF;
-  this->inactiveFillColor = inactiveFillColor ? inactiveFillColor : 0xFFFFFF;
+  if (!activeFillColor) {
+    this->activeFillColor = 0xFFFFFF;
+  } else {
+    this->activeFillColor = activeFillColor;
+  }
+  if (!inactiveFillColor) {
+    this->inactiveFillColor = 0xFFFFFF;
+  } else {
+    this->inactiveFillColor = inactiveFillColor;
+  }
   this->activeBorderColor = activeBorderColor ? activeBorderColor : 0xC3C3C3;
-  this->inactiveBorderColor = inactiveBorderColor ? inactiveBorderColor : 0xC3C3C3;
+  if (!inactiveBorderColor) {
+    this->inactiveBorderColor = 0xC3C3C3;
+  } else {
+    this->inactiveBorderColor = inactiveBorderColor;
+  }
   this->activeTextColor = activeTextColor;
   this->inactiveTextColor = inactiveTextColor;
   this->ClearTabs();
@@ -1850,9 +1906,6 @@ bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) 
 
 #include <mbstring.h>
 
-template __declspec(noinline) std::size_t std::_Traits_find<std::char_traits<char>>(
-    const char* const, std::size_t, std::size_t, const char* const, std::size_t) noexcept;
-
 // GLOBAL: gl_24662
 std::string g_itemLinkTagBegin = "<ITEML>";
 // GLOBAL: gl_24663
@@ -1893,7 +1946,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
         break;
       }
     }
-    result += prefix;
+    result.append(prefix.data(), prefix.size());
 
     if (encoded.substr(0, 6) == "00000T") {
       const int titleId = g_navigationLinkParser->ItemLinkMessageId(encoded);
@@ -1906,7 +1959,8 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
             buttons.push_back(button);
             button->line = static_cast<int>(this->lines.size());
             button->column = this->TextWidth(result.c_str(), 0, 0, 12, 0, 0) - this->horizontalOffset;
-            result += std::string(button->label);
+            const std::string buttonLabel(button->label);
+            result.append(buttonLabel.data(), buttonLabel.size());
           }
         }
         position += static_cast<unsigned>(encoded.size() + g_itemLinkTagEnd.size() + g_itemLinkTagBegin.size());
@@ -1918,7 +1972,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
     std::vector<std::int32_t> fields;
     this->DecodeItemLinkFields(encoded, fields);
     ITEM_INFO item;
-    if (ItemFromLinkFields(fields, item)) {
+    if (this->ItemFromLinkFields(fields, item)) {
       const std::string label = this->BracketName(item.DisplayName(0));
       if (label.size() + result.size() > std::strlen(lineText)) {
         previous += static_cast<unsigned>(prefix.size());
@@ -1930,10 +1984,10 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
       button->Configure(label.c_str(), 0x82F2E1, 0, 12, 0, 0);
       button->SetTooltip(item.DisplayName(0).c_str());
       button->m_hoverColor = 0x82F2E1;
-      button->SetId(0x1D0);
-      button->ResizeToTextClipped(
-          this->TextWidth(label.c_str(), 0, 0, 12, 0, 0) + 1,
-          button->geometry.height);
+      button->SetId(ID_ITEM_TAG);
+      const int buttonHeight = button->geometry.height;
+      const int buttonWidth = this->TextWidth(label.c_str(), 0, 0, 12, 0, 0) + 1;
+      button->ResizeToTextClipped(buttonWidth, buttonHeight);
 
       const std::string namelessUserName = LookupMessage(MSI_NAMELESS_USER);
       if (label.find(namelessUserName) != std::string::npos) {
@@ -1947,7 +2001,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
       buttons.push_back(button);
       button->line = static_cast<int>(this->lines.size());
       button->column = this->TextWidth(result.c_str(), 0, 0, 12, 0, 0) - this->horizontalOffset;
-      result += label;
+      result.append(label.data(), label.size());
       position += static_cast<unsigned>(encoded.size() + g_itemLinkTagEnd.size() + g_itemLinkTagBegin.size());
     }
     previous = position;
@@ -1956,7 +2010,7 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
   if (result.size() < std::strlen(lineText)) {
     const int available = static_cast<int>(std::strlen(lineText) - result.size());
     if (available > 0 && remaining.size() >= static_cast<unsigned>(available)) {
-      result += remaining.substr(0, available);
+      result.append(remaining.substr(0, available));
       previous += available;
     }
   }
@@ -2020,7 +2074,7 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
       button->SetTooltip(name.c_str());
     }
     button->m_hoverColor = 0x82F2E1;
-    button->SetId(438);
+    button->SetId(ID_NAVI_LINK);
     const int height = button->geometry.height;
     button->ResizeToTextClipped(
         this->TextWidth(label.c_str(), 0, 0, 12, 0, 0) + 1, height);
@@ -2046,13 +2100,13 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
 void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int& mode) {
   const std::string open = "<";
   const std::string close = ">";
-  std::string remaining = "";
+  std::string remaining;
   for (unsigned int line = 0; line < wrapped.size(); ++line) {
+    std::vector<std::string> split;
     if (wrapped.size() > 23) {
       break;
     }
 
-    std::vector<std::string> split;
     this->WrapLinkText(&mode, &split, wrapped[line]);
     if (split.size() > 1) {
       for (unsigned int part = 0; part < split.size(); ++part) {
@@ -2060,20 +2114,23 @@ void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int& mode)
           wrapped[line] = split[part];
         }
         if (line + part < wrapped.size() && part == split.size() - 1) {
-          wrapped[line + part].swap(split[part].append(wrapped[line + part]));
+          std::string& following = wrapped[line + part];
+          following.swap(split[part].append(following));
         } else if (part != 0) {
           std::vector<std::string> rebuilt;
           for (unsigned int index = 0; index < wrapped.size(); ++index) {
-            if (!wrapped[index].empty()) {
-              rebuilt.push_back(wrapped[index]);
+            const std::string& entry = wrapped[index];
+            if (!entry.empty()) {
+              rebuilt.push_back(entry);
             }
           }
           if (!split[part].empty()) {
             rebuilt.push_back(split[part]);
           }
           for (unsigned int next = line + 1; next < wrapped.size(); ++next) {
-            if (!wrapped[next].empty()) {
-              rebuilt.push_back(wrapped[next]);
+            const std::string& entry = wrapped[next];
+            if (!entry.empty()) {
+              rebuilt.push_back(entry);
             }
           }
           wrapped.swap(rebuilt);
@@ -2104,10 +2161,13 @@ void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int& mode)
         position = tail.find(open);
       }
 
-      if (line + 1 < wrapped.size() && wrapped[line + 1].find(close) != std::string::npos) {
-        remaining.append(wrapped[line + 1]);
-        wrapped[line + 1].swap(remaining);
-        wrapped[line] = wrapped[line].substr(0, offset);
+      if (line + 1 < wrapped.size()) {
+        std::string& next = wrapped[line + 1];
+        if (next.find(close) != std::string::npos) {
+          remaining.append(next);
+          next.swap(remaining);
+          wrapped[line] = wrapped[line].substr(0, offset);
+        }
       }
     }
   }
@@ -2153,7 +2213,7 @@ void UIChatHisBox::AddNavigationLinkLine(const char* text, std::uint32_t& color,
   std::string source = text;
   for (unsigned int line = 0; line < wrapped.size(); ++line) {
     wrapped[line] = this->RenderNavigationLinks(wrapped[line].c_str(), source);
-    if (line != 0) {
+    if (line > 0) {
       this->lineColors.push_back(color);
     }
     this->UIListBox::AddLine(wrapped[line].c_str());
@@ -2173,8 +2233,7 @@ UIListBoxID::UIListBoxID()
   background[0] = 255;
   background[1] = 255;
   background[2] = 255;
-  const SkinPaletteCell cell = {3, 2};
-  this->selectionColor = g_skinInfo.PaletteColor(cell, g_skinInfo.Selected());
+  this->selectionColor = g_skinInfo.PaletteColor({3, 2}, g_skinInfo.Selected());
 }
 
 // OFFSET: 0x0087C2A0
@@ -2183,18 +2242,20 @@ void UIString::SetText(int width, int height, std::string text) {
   this->SetSize(width, height);
   const char* chars = text.c_str();
   if (text.size() == 1 && chars[0] == '\n') {
+    std::string& label = this->text;
     this->Resize(5, 5);
-    this->text = text;
+    label = text;
     return;
   }
 
+  std::string& label = this->text;
   this->ParseTags(text);
   if (this->image.size() != 0) {
-    this->Resize(this->TextWidth(this->text.c_str(), static_cast<unsigned>(this->text.size()), 0, 12, 0, 0) + 24, 24);
+    this->Resize(this->TextWidth(label.c_str(), static_cast<unsigned>(this->text.size()), 0, 12, 0, 0) + 24, 24);
   } else {
     this->Resize(
       this->TextWidth(this->text.c_str(), static_cast<unsigned>(this->text.size()), 0, 12, 0, 0),
-      this->TextHeight(this->text.c_str(), static_cast<unsigned>(this->text.size()), 0, 12, 0, 0)
+      this->TextHeight(label.c_str(), static_cast<unsigned>(this->text.size()), 0, 12, 0, 0)
     );
   }
 }

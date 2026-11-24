@@ -19,8 +19,7 @@ namespace {
       return 0;
     }
 
-    const int value = rand() % range;
-    return value >= 0 ? value : 0;
+    return (std::ranges::max)(rand() % range, 0);
   }
 
   // INLINED
@@ -39,6 +38,18 @@ namespace {
     }
     target = goal;
   }
+
+  // INLINED
+  __forceinline vector3d Sum(const vector3d& left, const vector3d& right) {
+    return vector3d{left.x + right.x, left.y + right.y, left.z + right.z};
+  }
+
+  // INLINED
+  __forceinline void SetOffset(CParticle* particle, float x, float y, float z) {
+    particle->offsetX = x;
+    particle->offsetY = y;
+    particle->offsetZ = z;
+  }
 }
 
 // OFFSET: 0x006FB9A0
@@ -47,6 +58,11 @@ CCloud::CCloud()
     : CEffect(-1), driftX(0), driftTargetX(0), driftZ(0), driftTargetZ(0), phase(0), baseScale(0), alpha(0), fadeInEnd(0), fadeOutStart(0),
       red(255), green(255), blue(255), scaleBase(0), scaleRange(0), scaleAmplitude(0), fadeInStep(0), fadeOutStep(0), fadeInBase(0),
       fadeInRange(0), fadeOutBase(0), fadeOutRange(0), offsetRangeY(0), offsetRangeX(0), offsetRangeZ(0), renderFlag(1) {
+}
+
+// OFFSET: 0x006FBAE0
+// FUNCTION: fn_46097
+__declspec(noinline) CCloud::~CCloud() {
 }
 
 // OFFSET: 0x006FBBA0
@@ -94,20 +110,15 @@ void CCloud::ResetParticles() {
 
   this->particle->elapsedFrames = 0;
   CParticle* particle = this->particle;
-  const int rangeZ = static_cast<int>(this->offsetRangeZ);
-  const int offsetZ = Random(rangeZ);
-  const int rangeY = static_cast<int>(this->offsetRangeY);
-  const int offsetY = Random(rangeY);
-  const int rangeX = static_cast<int>(this->offsetRangeX);
-  const int offsetX = Random(rangeX);
-  particle->offsetX = static_cast<float>(offsetX);
-  particle->offsetY = static_cast<float>(offsetY);
-  particle->offsetZ = static_cast<float>(offsetZ);
+  SetOffset(particle, static_cast<float>(Random(static_cast<int>(this->offsetRangeX))), static_cast<float>(Random(static_cast<int>(this->offsetRangeY))), static_cast<float>(Random(static_cast<int>(this->offsetRangeZ))));
 
   this->particle->SetColor(this->red, this->green, this->blue);
   this->particle->alpha = 0;
   this->particle->scale = this->baseScale;
-  this->particle->SetTexture(FormatOwnedString("effect\\cloud%d.tga", Random(4) + 1).c_str());
+  CParticle* cloud = this->particle;
+  int index = Random(4);
+  ++index;
+  cloud->SetTexture(FormatOwnedString("effect\\cloud%d.tga", index).c_str());
   this->particle->SetRenderFlag(this->renderFlag);
 }
 
@@ -120,37 +131,14 @@ bool CCloud::IsAlive() {
 // OFFSET: 0x006FBED0
 // FUNCTION: fn_06920
 void CCloud::OnProcess() {
-  CParticle* particle = this->particle;
-  if (!particle) {
+  if (!this->particle) {
     return;
   }
 
-  const int frame = particle->elapsedFrames;
-  if (frame < this->fadeInEnd) {
-    this->alpha = std::min({this->alpha + this->fadeInStep, 255.0f});
-    particle->alpha = static_cast<int>(this->alpha);
-  } else if (frame > this->fadeOutStart) {
-    this->alpha -= this->fadeOutStep;
-    if (this->alpha <= 0.0f) {
-      this->ResetParticles();
-    } else {
-      particle->alpha = static_cast<int>(this->alpha);
-    }
-  } else {
-    particle->alpha = static_cast<int>(this->alpha);
-  }
-
+  this->UpdateAlpha();
   this->Drift();
-  this->phase = (this->phase + 1) % 360;
-  this->particle->scale = this->baseScale * this->scaleAmplitude * g_sinTable[this->phase] + this->baseScale;
-
-  matrix scale;
-  scale.SetScale(this->particle->scale, this->particle->scale, 1.0f);
-  matrix rotation;
-  rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
-  matrix transform;
-  transform.Compose(scale, rotation);
-  this->particle->transform = transform;
+  this->UpdateScale();
+  this->UpdateTransform();
   ++this->particle->elapsedFrames;
 }
 
@@ -160,6 +148,23 @@ void CCloud::Render() {
   if (this->particle) {
     this->particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
   }
+}
+
+// OFFSET: 0x006FC0D0
+// FUNCTION: fn_46170
+__forceinline void CCloud::UpdateAlpha() {
+  CParticle* particle = this->particle;
+  const int frame = particle->elapsedFrames;
+  if (frame < this->fadeInEnd) {
+    this->alpha = std::min(this->fadeInStep + this->alpha, 255.0f);
+  } else if (frame > this->fadeOutStart) {
+    this->alpha -= this->fadeOutStep;
+    if (this->alpha <= 0.0f) {
+      this->ResetParticles();
+      return;
+    }
+  }
+  particle->alpha = static_cast<int>(this->alpha);
 }
 
 // OFFSET: 0x006FC160
@@ -176,6 +181,24 @@ void CCloud::Drift() {
   particle->offsetY = offset.y;
   particle->offsetZ = offset.z;
 
-  const vector3d position = {offset.x + this->position[0], offset.y + this->position[1], offset.z + this->position[2]};
-  this->particle->position = position;
+  this->particle->position = Sum(this->positionVector, offset);
+}
+
+// OFFSET: 0x006FC300
+// FUNCTION: fn_46171
+__forceinline void CCloud::UpdateScale() {
+  this->phase = (this->phase + 1) % 360;
+  this->particle->scale = this->baseScale * this->scaleAmplitude * g_sinTable[this->phase] + this->baseScale;
+}
+
+// OFFSET: 0x006FC350
+// FUNCTION: fn_46172
+__forceinline void CCloud::UpdateTransform() {
+  matrix scale;
+  scale.SetScale(this->particle->scale, this->particle->scale, 1.0f);
+  matrix rotation;
+  rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
+  matrix transform;
+  transform.Compose(scale, rotation);
+  this->particle->transform = matrix(transform);
 }

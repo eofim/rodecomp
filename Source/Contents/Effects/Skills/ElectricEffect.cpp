@@ -15,10 +15,42 @@
 #include <cstdlib>
 #include <cstring>
 
+struct EmptyElectricEffectDestructor {
+  ~EmptyElectricEffectDestructor();
+};
+
+// INLINED
+static void SetParticleIndices(CParticle& particle, int group, int column, int row) {
+  particle.columnIndex = column;
+  particle.rowIndex = row;
+  particle.groupIndex = group;
+}
+
+// INLINED
+static short HeadingOf(float nx, float nz) {
+  for (short step = 0; step <= 180; ++step) {
+    if (nx >= g_cosTable[step]) {
+      return nz >= 0.0f ? step : static_cast<short>(360 - step);
+    }
+  }
+  return 180;
+}
+
+// OFFSET: 0x00B4E7A0
+// FUNCTION: fn_45993
+EmptyElectricEffectDestructor::~EmptyElectricEffectDestructor() {
+}
+
+// OFFSET: 0x00B4E7B0
+// FUNCTION: fn_45994
+__declspec(noinline) CElectricEffect::~CElectricEffect() {
+}
+
 // OFFSET: 0x00B4E890
 // FUNCTION: fn_19002
 void CElectricEffect::AddBolt(int tilt) {
-  for (int row = 0; row < 4; ++row) {
+  int phase = tilt;
+  for (int row = 0; row < 4; ++row, phase += 45) {
     const int roll = rand() % 11;
     const float spin = static_cast<float>(roll >= 0 ? roll : 0) * 0.01f;
 
@@ -30,32 +62,109 @@ void CElectricEffect::AddBolt(int tilt) {
         }
 
         particle->effectId = this->id;
-        particle->columnIndex = segment;
-        particle->rowIndex = row;
-        particle->groupIndex = strand;
+        SetParticleIndices(*particle, strand, segment, row);
         particle->SetTexture("effect\\elec1.tga");
         particle->speedParameter = 0.1f;
         particle->alpha = 0;
-        particle->phaseParameter = tilt;
+        particle->phaseParameter = phase;
         particle->scale = 0.0f;
         particle->angle = spin;
         particle->angleParameter = 0;
         particle->InitParticleQuad(particle->vertices);
         this->bolts.push_back(particle);
 
-        float* arc = &particle->animationParameter;
-        arc[20] = 9.0f;
+        particle->animationValues[20] = 9.0f;
         for (int index = 20; index > 0; --index) {
-          if (arc[index] + 9.0f > 180.0f) {
-            arc[index - 1] = 180.0f;
+          if (particle->animationValues[index] + 9.0f > 180.0f) {
+            particle->animationValues[index - 1] = 180.0f;
           } else {
-            arc[index - 1] = arc[index] + 9.0f;
+            particle->animationValues[index - 1] = particle->animationValues[index] + 9.0f;
           }
         }
       }
     }
+  }
+}
 
-    tilt += 45;
+// OFFSET: 0x00B4EDF0
+// FUNCTION: fn_46218
+void __stdcall CElectricEffect::SetHeadingFromVector(float x, float z, short* heading) {
+  const float length = SquareRoot(x * x + z * z);
+  const float nz = z / length;
+  const float nx = x / length;
+  for (short step = 0; step <= 180; ++step) {
+    if (nx >= g_cosTable[step]) {
+      if (nz >= 0.0f) {
+        *heading = step;
+      } else {
+        *heading = static_cast<short>(360 - step);
+      }
+      return;
+    }
+  }
+  *heading = 180;
+}
+
+// OFFSET: 0x00B4EA20
+// FUNCTION: fn_46217
+void CElectricEffect::UpdateParticle(CParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  const int strand = particle->groupIndex;
+  const int segment = particle->columnIndex;
+  EffectPoint points[2];
+
+  if (strand == 0) {
+    const float* arc = &particle->animationParameter;
+    for (int index = 0; index < 2; ++index) {
+      const float bend = arc[segment + index];
+      const float radius = bend / 90.0f * particle->scale;
+      this->path[index].x = radius * g_cosTable[particle->phaseParameter];
+      this->path[index].y = -particle->scale * g_sinTable[static_cast<int>(bend)] * particle->angle;
+      this->path[index].z = radius * g_sinTable[particle->phaseParameter];
+
+      const int jitterZ = rand() % 7;
+      const int jitterY = rand() % 7;
+      const int jitterX = rand() % 7;
+      this->path[index].x += static_cast<float>(jitterX >= 0 ? jitterX : 0) * 0.1f - 2.3f;
+      this->path[index].y += static_cast<float>(jitterY >= 0 ? jitterY : 0) * 0.1f - 0.3f;
+      this->path[index].z += static_cast<float>(jitterZ >= 0 ? jitterZ : 0) * 0.1f - 0.3f;
+    }
+
+    const float dz = this->path[0].z - this->path[1].z;
+    const float dx = this->path[0].x - this->path[1].x;
+    short heading;
+    this->SetHeadingFromVector(dx, dz, &heading);
+    this->angle = static_cast<short>((heading + 90) % 360);
+  }
+
+  if (segment >= 1 && segment <= 18) {
+    const float radius = particle->speedParameter;
+    const float horizontal = radius * g_cosTable[strand * 120];
+    const float offsetX = horizontal * g_cosTable[this->angle];
+    const float vertical = radius * g_sinTable[strand * 120];
+    const float offsetZ = horizontal * g_sinTable[this->angle];
+    const vector3d first = {offsetX + this->path[0].x, vertical + this->path[0].y, offsetZ + this->path[0].z};
+    const vector3d second = {offsetX + this->path[1].x, vertical + this->path[1].y, offsetZ + this->path[1].z};
+
+    particle->vertices[1].x = first.x;
+    particle->vertices[1].y = first.y;
+    particle->vertices[1].z = first.z;
+    particle->vertices[3].x = second.x;
+    particle->vertices[3].y = second.y;
+    particle->vertices[3].z = second.z;
+    if (strand != 0) {
+      particle->vertices[0].x = this->lastEdge[0].x;
+      particle->vertices[0].y = this->lastEdge[0].y;
+      particle->vertices[0].z = this->lastEdge[0].z;
+      particle->vertices[2].x = this->lastEdge[1].x;
+      particle->vertices[2].y = this->lastEdge[1].y;
+      particle->vertices[2].z = this->lastEdge[1].z;
+    }
+    this->lastEdge[0] = first;
+    this->lastEdge[1] = second;
   }
 }
 
@@ -81,6 +190,23 @@ bool CElectricEffect::IsAlive() {
   return !this->IsFinished();
 }
 
+// OFFSET: 0x00B4EE90
+// FUNCTION: fn_46219
+void CElectricEffect::UpdateTick() {
+  if (this->tick >= 20 && this->tick < 24) {
+    this->AddBolt(0);
+    this->AddBolt(180);
+  }
+
+  if (this->tick == 25) {
+    CWorld* world = g_modeMgr.GetGameMode()->scene;
+    const vector3d& player = world->player->render.position;
+    g_soundMgr->PlayWave("effect\\T_\xC0\xFC\xB1\xE2.wav", this->position[0] - player.x, 0.0f, this->position[2] - player.z, 250, 40, 1.0f, 0);
+  }
+
+  ++this->tick;
+}
+
 // OFFSET: 0x00B4EF50
 // FUNCTION: fn_19006
 void CElectricEffect::OnProcess() {
@@ -104,24 +230,28 @@ void CElectricEffect::OnProcess() {
     particlePosition.y = this->position[1];
     particlePosition.z = this->position[2];
 
-    const float scale = particle->scale + 0.4f;
-    ++particle->elapsedFrames;
-    int alpha = scale > 15.0f ? particle->alpha - 2 : particle->alpha;
-    if (particle->elapsedFrames <= 25) {
-      const int flicker = rand() % 4;
-      alpha += 5 + (flicker >= 0 ? flicker : 0);
-    }
-    particle->scale = scale;
-    particle->alpha = alpha >= 0 ? alpha : 0;
+    {
+      const float scale = particle->scale + 0.4f;
+      ++particle->elapsedFrames;
+      int alpha = scale > 15.0f ? particle->alpha - 2 : particle->alpha;
+      if (particle->elapsedFrames <= 25) {
+        const int flicker = rand() % 4;
+        alpha += 5 + (flicker >= 0 ? flicker : 0);
+      }
+      particle->scale = scale;
+      particle->alpha = alpha >= 0 ? alpha : 0;
 
-    matrix rotation;
-    std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
-    rotation.MakeYRotation(g_modeMgr.GetGameMode()->camera->camera.yaw / -180.0f * 3.141592f);
-    particle->transform = rotation;
+      matrix rotation;
+      std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
+      rotation.MakeYRotation(g_modeMgr.GetGameMode()->camera->camera.yaw / -180.0f * 3.141592f);
+      particle->transform = rotation;
+    }
 
     const int segment = particle->columnIndex;
     const int strand = particle->groupIndex;
-    EffectPoint points[2];
+    {
+      EffectPoint points[2];
+    }
 
     if (strand == 0) {
       const float* arc = &particle->animationParameter;
@@ -140,20 +270,13 @@ void CElectricEffect::OnProcess() {
         this->path[index].z += static_cast<float>(jitterZ >= 0 ? jitterZ : 0) * 0.1f - 0.3f;
       }
 
-      const float dx = this->path[0].x - this->path[1].x;
       const float dz = this->path[0].z - this->path[1].z;
+      const float dx = this->path[0].x - this->path[1].x;
       const float length = SquareRoot(dx * dx + dz * dz);
-      const float nx = dx / length;
       const float nz = dz / length;
+      const float nx = dx / length;
 
-      short heading = 180;
-      for (short step = 0; step <= 180; ++step) {
-        if (nx >= g_cosTable[step]) {
-          heading = nz < 0.0f ? static_cast<short>(360 - step) : step;
-          break;
-        }
-      }
-
+      const short heading = HeadingOf(nx, nz);
       this->angle = static_cast<short>((heading + 90) % 360);
     }
 
@@ -161,8 +284,8 @@ void CElectricEffect::OnProcess() {
       const float radius = particle->speedParameter;
       const float horizontal = radius * g_cosTable[strand * 120];
       const float vertical = radius * g_sinTable[strand * 120];
-      const float offsetX = horizontal * g_cosTable[this->angle];
       const float offsetZ = horizontal * g_sinTable[this->angle];
+      const float offsetX = horizontal * g_cosTable[this->angle];
 
       const vector3d first = {offsetX + this->path[0].x, vertical + this->path[0].y, offsetZ + this->path[0].z};
       const vector3d second = {offsetX + this->path[1].x, vertical + this->path[1].y, offsetZ + this->path[1].z};
@@ -189,6 +312,93 @@ void CElectricEffect::OnProcess() {
   }
 }
 
+// OFFSET: 0x00B4F4B0
+// FUNCTION: fn_46285
+__declspec(noinline) void CElectricEffect::UpdateParticleState(CParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  const float scale = particle->scale + 0.4f;
+  int alpha = scale > 15.0f ? particle->alpha - 2 : particle->alpha;
+  if (particle->elapsedFrames <= 25) {
+    const int flicker = rand() % 4;
+    alpha += 5 + (flicker >= 0 ? flicker : 0);
+  }
+  particle->scale = scale;
+  particle->alpha = alpha >= 0 ? alpha : 0;
+
+  {
+    matrix rotation;
+    std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
+    rotation.MakeYRotation(g_modeMgr.GetGameMode()->camera->camera.yaw / -180.0f * 3.141592f);
+    particle->transform = rotation;
+  }
+
+  const int segment = particle->columnIndex;
+  const int strand = particle->groupIndex;
+  {
+    EffectPoint points[2];
+  }
+  if (strand == 0) {
+    const float* arc = &particle->animationParameter;
+    for (int index = 0; index < 2; ++index) {
+      const float bend = arc[segment + index];
+      const float radius = bend / 90.0f * particle->scale;
+      this->path[index].x = radius * g_cosTable[particle->phaseParameter];
+      this->path[index].y = -particle->scale * g_sinTable[static_cast<int>(bend)] * particle->angle;
+      this->path[index].z = radius * g_sinTable[particle->phaseParameter];
+
+      const int jitterZ = rand() % 7;
+      const int jitterY = rand() % 7;
+      const int jitterX = rand() % 7;
+      this->path[index].x += static_cast<float>(jitterX >= 0 ? jitterX : 0) * 0.1f - 2.3f;
+      this->path[index].y += static_cast<float>(jitterY >= 0 ? jitterY : 0) * 0.1f - 0.3f;
+      this->path[index].z += static_cast<float>(jitterZ >= 0 ? jitterZ : 0) * 0.1f - 0.3f;
+    }
+
+    const float dz = this->path[0].z - this->path[1].z;
+    const float dx = this->path[0].x - this->path[1].x;
+    const float length = SquareRoot(dx * dx + dz * dz);
+    const float nz = dz / length;
+    const float nx = dx / length;
+
+    const short heading = HeadingOf(nx, nz);
+
+    this->angle = static_cast<short>((heading + 90) % 360);
+  }
+
+  if (segment >= 1 && segment <= 18) {
+    const float radius = particle->speedParameter;
+    const float horizontal = radius * g_cosTable[strand * 120];
+    const float vertical = radius * g_sinTable[strand * 120];
+    const float offsetX = horizontal * g_cosTable[this->angle];
+    const float offsetZ = horizontal * g_sinTable[this->angle];
+
+    const vector3d first = {offsetX + this->path[0].x, vertical + this->path[0].y, offsetZ + this->path[0].z};
+    const vector3d second = {offsetX + this->path[1].x, vertical + this->path[1].y, offsetZ + this->path[1].z};
+
+    particle->vertices[1].x = first.x;
+    particle->vertices[1].y = first.y;
+    particle->vertices[1].z = first.z;
+    particle->vertices[3].x = second.x;
+    particle->vertices[3].y = second.y;
+    particle->vertices[3].z = second.z;
+
+    if (strand != 0) {
+      particle->vertices[0].x = this->lastEdge[0].x;
+      particle->vertices[0].y = this->lastEdge[0].y;
+      particle->vertices[0].z = this->lastEdge[0].z;
+      particle->vertices[2].x = this->lastEdge[1].x;
+      particle->vertices[2].y = this->lastEdge[1].y;
+      particle->vertices[2].z = this->lastEdge[1].z;
+    }
+
+    this->lastEdge[0] = first;
+    this->lastEdge[1] = second;
+  }
+}
+
 // OFFSET: 0x00B4F930
 // FUNCTION: fn_19007
 void CElectricEffect::Render() {
@@ -211,5 +421,36 @@ void CElectricEffect::Render() {
       bolt->Render(quad);
       bolt->alpha = alpha;
     }
+  }
+}
+
+// OFFSET: 0x00B4FA20
+// FUNCTION: fn_46286
+__declspec(noinline) void CElectricEffect::RenderParticle(CParticle* particle) {
+  if (!particle) {
+    return;
+  }
+  const int frame = particle->columnIndex;
+  if (frame <= 0) {
+    return;
+  }
+  if (frame >= 19) {
+    return;
+  }
+  if (particle->groupIndex > 0) {
+    const int alpha = particle->alpha;
+    const int faded = alpha - frame * 5;
+    particle->alpha = faded >= 0 ? faded : 0;
+    particle->SetColor(static_cast<short>(frame * 6), static_cast<short>(frame * 6), 255);
+    ParticleQuad quad;
+    quad.billboard = false;
+    quad.unused = false;
+    quad.depth = true;
+    quad.left = 0.0f;
+    quad.right = 1.0f;
+    quad.top = static_cast<float>(particle->columnIndex - 1) / 21.0f;
+    quad.bottom = static_cast<float>(particle->columnIndex) / 21.0f;
+    particle->Render(quad);
+    particle->alpha = alpha;
   }
 }

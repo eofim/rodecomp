@@ -35,9 +35,10 @@ struct DynamicNpcCreatePacket {
 void UIMileageWnd::Paint() {
   this->ClearSurface(0xFF00FF);
 
-  std::string text;
+  std::string text("");
   text = static_cast<const std::string&>(FormatOwnedString("유저인터페이스\\basic_interface\\mileage_bg%d.bmp", this->m_bonus));
-  this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(text.c_str()))), true);
+  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(text.c_str())));
+  this->DrawBitmap(0, 0, bitmap, true);
 
   if (this->m_point >= 300) {
     text = std::string("-- : --");
@@ -46,11 +47,13 @@ void UIMileageWnd::Paint() {
   }
 
   int textWidth = this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
-  this->DrawOutlinedText((this->geometry.width - textWidth) >> 1, 15, text.c_str(), 0, 0xFFFFFF, 0, 0, 12, 0, 0);
+  const int centerX = (this->geometry.width - textWidth) >> 1;
+  this->DrawOutlinedText(centerX, 15, text.c_str(), 0, 0xFFFFFF, 0, 0, 12, 0, 0);
 
   text = FormatOwnedString("%d", this->m_point).c_str();
   textWidth = this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
-  this->DrawOutlinedText(this->geometry.width - textWidth - 9, this->geometry.height - 16, text.c_str(), 0, 0xFFFFFF, 0, 0, 12, 0, 0);
+  const int pointX = this->geometry.width - textWidth - 9;
+  this->DrawOutlinedText(pointX, this->geometry.height - 16, text.c_str(), 0, 0xFFFFFF, 0, 0, 12, 0, 0);
 }
 
 // OFFSET: 0x0094EE70
@@ -65,7 +68,8 @@ void UIMileageWnd::OnLBtnUp(int x, int y) {
     return;
   }
 
-  DynamicNpcCreatePacket packet = {ID_CZ_DYNAMICNPC_CREATE_REQUEST};
+  DynamicNpcCreatePacket packet = {};
+  packet.id = ID_CZ_DYNAMICNPC_CREATE_REQUEST;
   StringFormat(packet.name, sizeof(packet.name), static_cast<std::size_t>(-1), "GOLDPCCAFE");
   GetRagConnection().Send(sizeof(packet), &packet);
 }
@@ -115,7 +119,7 @@ void UIMileageWnd::OnProcess() {
 // OFFSET: 0x0094C230
 // FUNCTION: fn_12894
 void UIMileageWnd::OnCreate(int width, int height) {
-  this->m_tooltip = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_RESTRAINT_OF_TRADE_3), 300));
+  this->m_tooltip = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_MILEAGE_HELP), 300));
 }
 
 // OFFSET: 0x00950690

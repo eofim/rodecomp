@@ -11,12 +11,14 @@ struct CEZ2STRParticle;
 class CAcidifiedThrow : public CEffect {
 public:
   CAcidifiedThrow();
+  ~CAcidifiedThrow() override;
 
   void Open() override;
   void OnProcess() override;
   void Render() override;
   void Close() override;
   bool IsAlive() override;
+  vector3d PointOnCurve(vector3d start, vector3d control, vector3d end, float t);
 
   /* 00CC */ CEZ2STRParticle* projectileEmitter;
   /* 00D0 */ CEZ2STRParticle* impactEmitters[3];

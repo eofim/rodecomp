@@ -1,4 +1,5 @@
 #include "Contents/Skills/PlayerSkillBundle.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/Skills/SkillId.h"
@@ -11,12 +12,17 @@
 bool IsIndexedSkill(int id);
 
 // INLINED
-std::size_t SkillIdHash::operator()(int id) const {
+std::size_t SkillIdHash::operator()(const int& id) const {
   return std::hash<int>()(id);
 }
 
 // INLINED
 CPlayerSkillBundle::lcEXCInfo::lcEXCInfo() {
+}
+
+// INLINED
+CPlayerSkillBundle::lcEXCInfo::lcEXCInfo(std::int32_t previous, std::int32_t target)
+    : previous(previous), target(target) {
 }
 
 // OFFSET: 0x00770A30
@@ -45,7 +51,7 @@ void CPlayerSkillBundle::Add(const CSkillInfo& value) {
 // FUNCTION: fn_08272
 void CPlayerSkillBundle::Remove(std::uint32_t id) {
   const auto entry = std::find_if(this->skills.begin(), this->skills.end(),
-                                  [id](const CSkillInfo& value) { return value.id == id; });
+                                  [id](const CSkillInfo& value) { return id == value.id; });
   if (entry == this->skills.end()) {
     return;
   }
@@ -71,21 +77,21 @@ __declspec(noinline) std::uint32_t ResolveSkillId(std::uint32_t id);
 // OFFSET: 0x00CACF20
 // FUNCTION: fn_21049
 std::uint32_t ResolveSkillId(std::uint32_t id) {
-  if (g_session.GetPlayerSkillMode() != 1 || (id != 6578 && id != 6579)) {
+  if (g_session.GetPlayerSkillMode() != 1 || (id != AT_PRIMAL_CLAW && id != AT_FERAL_CLAW)) {
     return id;
   }
 
-  if (g_session.HasSkillEffect(1717)) {
-    const std::optional<CSkillInfo*> skill = g_session.m_skillBundle.FindIndexed(6580);
+  if (g_session.HasSkillEffect(EFST_ALPHA_CLAW_READY)) {
+    const std::optional<CSkillInfo*> skill = g_session.m_skillBundle.FindIndexed(AT_ALPHA_CLAW);
     if (skill && (*skill)->IsValid()) {
-      return 6580;
+      return AT_ALPHA_CLAW;
     }
   }
 
-  if (g_session.HasSkillEffect(1716)) {
-    const std::optional<CSkillInfo*> skill = g_session.m_skillBundle.FindIndexed(6579);
+  if (g_session.HasSkillEffect(EFST_FERAL_CLAW_READY)) {
+    const std::optional<CSkillInfo*> skill = g_session.m_skillBundle.FindIndexed(AT_FERAL_CLAW);
     if (skill && (*skill)->IsValid()) {
-      return 6579;
+      return AT_FERAL_CLAW;
     }
   }
 
@@ -99,7 +105,16 @@ CSkillInfo CPlayerSkillBundle::Lookup(std::uint32_t id) {
     return CSkillInfo(-1);
   }
 
-  const std::uint32_t key = id == 6578 || id == 6579 ? ResolveSkillId(id) : id;
+  std::uint32_t key;
+  switch (id) {
+  case AT_PRIMAL_CLAW:
+  case AT_FERAL_CLAW:
+    key = ResolveSkillId(id);
+    break;
+  default:
+    key = id;
+    break;
+  }
   const auto entry = this->index.find(key);
   if (entry != this->index.end() && entry->second->IsValid()) {
     return *entry->second;
@@ -256,7 +271,7 @@ std::list<CSkillInfo>& CPlayerSkillBundle::Group(int group) {
 
 // OFFSET: 0x00771F30
 // FUNCTION: fn_08292
-std::size_t CPlayerSkillBundle::GroupSize(int group) const {
+int CPlayerSkillBundle::GroupSize(int group) const {
   const auto entry = this->groups.find(group);
   return entry != this->groups.end() ? entry->second.size() : 0;
 }
@@ -283,14 +298,16 @@ void CPlayerSkillBundle::RecordLevelChange(const CSkillInfo& value) {
   }
 
   CSkillInfo* previous = this->FindGrouped(value.id);
-  if (!previous || previous->level >= value.level) {
+  if (!previous) {
     return;
   }
 
-  lcEXCInfo change;
-  change.previous = previous->level;
-  change.target = value.level;
-  this->levelChanges[previous->id] = change;
+  const int previousLevel = previous->level;
+  if (previousLevel >= value.level) {
+    return;
+  }
+
+  this->levelChanges[previous->id] = lcEXCInfo(previousLevel, value.level);
   this->changed[previous->id] = true;
 }
 
@@ -317,11 +334,13 @@ void CPlayerSkillBundle::ApplyLevelChange(CSkillInfo& value) {
     }
   }
 
-  for (int removed : this->removals) {
-    const auto change = this->levelChanges.find(removed);
+  const auto removedEnd = this->removals.end();
+  for (auto removedIt = this->removals.begin(); removedIt != removedEnd; ++removedIt) {
+    const int removed = *removedIt;
+    const auto change = this->levelChanges.find(static_cast<int>(*removedIt));
     if (change != this->levelChanges.end()) {
       this->levelChanges.erase(change);
-      const auto flag = this->changed.find(removed);
+      const auto flag = this->changed.find(static_cast<int>(*removedIt));
       if (flag != this->changed.end()) {
         this->changed.erase(flag);
       }
@@ -366,10 +385,11 @@ void CPlayerSkillBundle::SetSkillValue(int id, int value) {
 
 // OFFSET: 0x00771B40
 // FUNCTION: fn_08287
-void CPlayerSkillBundle::ForEachGrouped(std::function<bool(CSkillInfo*)> callback) {
+void CPlayerSkillBundle::ForEachGrouped(std::function<bool(CSkillInfo&)> callback) {
   for (auto group = this->groups.begin(); group != this->groups.end(); ++group) {
-    for (CSkillInfo& value : group->second) {
-      if (!callback(&value)) {
+    auto& skills = group->second;
+    for (auto skill = skills.begin(); skill != skills.end(); ++skill) {
+      if (!callback(*skill)) {
         return;
       }
     }
@@ -403,7 +423,8 @@ void CPlayerSkillBundle::RevertLevelChange(const CSkillInfo& current, CSkillInfo
 // OFFSET: 0x00771A50
 // FUNCTION: fn_45559
 void CPlayerSkillBundle::TakePreviousLevel(int& level, int id, int key) {
-  if (this->levelChanges.find(key) == this->levelChanges.end()) {
+  const auto entry = this->levelChanges.find(key);
+  if (entry == this->levelChanges.end()) {
     return;
   }
 

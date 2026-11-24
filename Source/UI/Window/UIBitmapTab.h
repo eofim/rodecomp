@@ -7,6 +7,10 @@
 #include <vector>
 
 struct BitmapTabEntry {
+  BitmapTabEntry(int height, const char* name)
+      : height(height), name(name) {
+  }
+
   /* 0000 */ int height;
   /* 0004 */ std::string name;
 };
@@ -16,6 +20,7 @@ public:
   void DragAndDrop(int argument1, int argument2, std::intptr_t argument3) override;
   void Paint() override;
   void OnLBtnDown(int x, int y) override;
+  int TabAt(int x, int y);
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
 
   /* 007C */ std::vector<BitmapTabEntry> tabs;

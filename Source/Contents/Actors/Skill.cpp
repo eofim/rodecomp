@@ -76,7 +76,7 @@ CGraffiSkill::CGraffiSkill() : CSkill(0) {
 // FUNCTION: fn_24256
 CSkill::CSkill(std::uint32_t aid) {
   this->skillAid = aid;
-  this->SetActorJob(0x7E);
+  this->SetActorJob(JT_SAFETYWALL);
   this->m_effectTimer = 0x8CA0;
   this->render.trackBounds = 0;
   this->render.enabled = 0;
@@ -238,7 +238,7 @@ __declspec(safebuffers) void CSkill::LaunchGroundEffects(int effectId, int, int 
       const float x = static_cast<float>(column * 6) + this->render.position.x + static_cast<float>(rand() % 11) * 0.2f - 1.0f;
       const float z = static_cast<float>(row * 6) + this->render.position.z + static_cast<float>(rand() % 11) * 0.2f - 1.0f;
       float y = g_modeMgr.GetGameMode()->scene->terrain->Height(x, z);
-      if (effectId == 0x3BF || effectId == 0x3CF) {
+      if (effectId == EF_POISON_MIST || effectId == EF_VOLCANIC_ASH) {
         y += 20.0f;
       }
       y -= static_cast<float>(rand() % 11) * 0.4f;
@@ -259,29 +259,29 @@ void CSkill::SetRenderInfo(const float* box, float x, float y) {
     // GLOBAL: gl_25171
     static int minimum = static_cast<int>(g_renderer->UiScaleX() * 34.0f);
     ActorPickInfo* info = new ActorPickInfo;
-    info->left = box[0] < box[2] ? box[0] : box[2];
-    info->top = box[1];
-    info->depth = box[4] + 350.0f;
-    info->right = box[0] > box[2] ? box[0] : box[2];
-    info->bottom = box[3];
-    info->depthOffset = box[4] + 350.0f;
+    info->corners[0].x = box[0] < box[2] ? box[0] : box[2];
+    info->corners[0].y = box[1];
+    info->corners[0].z = box[4] + 350.0f;
+    info->corners[1].x = box[0] > box[2] ? box[0] : box[2];
+    info->corners[1].y = box[3];
+    info->corners[1].z = box[4] + 350.0f;
     info->accountId = this->skillAid;
     info->job = this->GetEffectiveJob(-1);
     info->healthState = 0;
     info->kind = 2;
 
-    const int width = static_cast<int>(info->right - info->left);
+    const int width = static_cast<int>(info->corners[1].x - info->corners[0].x);
     if (width < minimum) {
       const float pad = static_cast<float>((minimum - width) / 2);
-      info->right += pad;
-      info->left -= pad;
+      info->corners[1].x += pad;
+      info->corners[0].x -= pad;
     }
 
-    const int height = static_cast<int>(info->bottom - info->top);
+    const int height = static_cast<int>(info->corners[1].y - info->corners[0].y);
     if (height < minimum) {
       const float pad = static_cast<float>((minimum - height) / 2);
-      info->bottom += pad;
-      info->top -= pad;
+      info->corners[1].y += pad;
+      info->corners[0].y -= pad;
     }
 
     g_actorPickNode.AddPickInfo(info);
@@ -290,65 +290,48 @@ void CSkill::SetRenderInfo(const float* box, float x, float y) {
   this->SetTlvert(x, y);
 }
 
-// OFFSET: 0x00E55320
-// FUNCTION: fn_24304
-__declspec(safebuffers) void CSkill::ShowModel(const char* modelName) {
-  if (modelName == nullptr || this->render.enabled == 0) {
+// INLINED
+static __forceinline void ShowModelImpl(CSkill* skill, const char* modelName) {
+  if (modelName == nullptr || skill->render.enabled == 0) {
     return;
   }
 
-  this->ReleaseModel();
-  const float diffuse[3] = {0.5f, 0.7f, 0.5f};
-  const float white[3] = {1.0f, 1.0f, 1.0f};
-  const float ambient[3] = {0.5f, 0.5f, 0.5f};
+  skill->ReleaseModel();
+  const vector3d diffuse{0.5f, 0.7f, 0.5f};
+  const vector3d white{1.0f, 1.0f, 1.0f};
+  const vector3d ambient{0.5f, 0.5f, 0.5f};
   auto* resource = static_cast<C3dModelRes*>(ResourceMgr::Instance().Load(modelName));
   if (resource->major == 1) {
-    this->m_model = new C3dActorV1;
+    skill->m_model = new C3dActorV1;
   } else if (resource->major == 2) {
-    this->m_model = new C3dActorV2;
+    skill->m_model = new C3dActorV2;
   }
 
-  this->m_model->CopyVolumes(resource->volumes);
-  this->m_model->SetSpeed(1.0f);
-  const vector3d position = this->render.position;
-  this->m_model->SetPosition(position);
-  this->m_model->Assign(*resource);
-  this->m_model->Animate(3.0);
-  this->m_model->occlusionEnabled = 0;
-  this->m_model->playback = 0;
-  this->m_model->Prepare(diffuse, white, ambient);
-  g_modeMgr.GetGameMode()->scene->spatial.InsertModel(*this->m_model, 0);
+  skill->m_model->CopyVolumes(resource->volumes);
+  skill->m_model->SetSpeed(1.0f);
+  const vector3d position = skill->render.position;
+  skill->m_model->SetPosition(position);
+  skill->m_model->Assign(*resource);
+  skill->m_model->Animate(3.0);
+  skill->m_model->occlusionEnabled = 0;
+  skill->m_model->playback = 0;
+  skill->m_model->Prepare(&diffuse.x, &white.x, &ambient.x);
+  g_modeMgr.GetGameMode()->scene->spatial.InsertModelAfter(skill->m_model, 0);
+}
+
+// OFFSET: 0x00E55320
+// FUNCTION: fn_24304
+void CSkill::ShowModel(const char* modelName) {
+  ShowModelImpl(this, modelName);
 }
 
 // OFFSET: 0x00E51BD0
 // FUNCTION: fn_24302
 void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) {
   CGameMode* mode = g_modeMgr.GetGameMode();
+  ActorDamageMessage damageMessage;
 
   switch (message) {
-  case AM_CHAT: {
-    const char* text = reinterpret_cast<const char*>(static_cast<std::intptr_t>(b));
-    if (std::strlen(text) == 0) {
-      return;
-    }
-
-    this->chatTick = timeGetTime();
-    if (this->actorWindows[0] == 0) {
-      UITransBalloonText* balloon =
-        new UITransBalloonText();
-      this->actorWindows[0] = balloon;
-      balloon->SetSize(8, 8);
-      g_windowMgr.AddRenderedFront(this->actorWindows[0]);
-    }
-
-    UITransBalloonText* balloon = static_cast<UITransBalloonText*>(this->actorWindows[0]);
-    balloon->SetText(text, 35);
-    balloon->SetColors(0xFF8080, 0);
-    this->chatWidth = balloon->geometry.width;
-    this->chatHeight = balloon->geometry.height;
-    balloon->Move(this->render.screenX - this->chatWidth / 2, this->render.screenY - g_renderer->viewport.height * 110 / 480);
-    return;
-  }
   case AM_SKILL: {
     const SkillHitMessage* hit = reinterpret_cast<const SkillHitMessage*>(static_cast<std::intptr_t>(b));
     const int skillId = hit->skillId;
@@ -361,61 +344,61 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       hitCount = 1;
     }
     const int damage = hit->damage / hitCount;
+    const std::uint32_t targetAid = hit->targetAid;
 
     CRenderObject* target = nullptr;
-    if (g_session.m_aid == hit->targetAid) {
+    if (g_session.m_aid == targetAid) {
       target = mode->scene->player;
       g_session.GetDisplayJob();
     } else {
-      CRenderObject* actor = mode->scene->GetGameActorByAID(hit->targetAid);
-      CRenderObject* skill = mode->scene->GetSkillByAID(hit->targetAid);
+      CRenderObject* actor = mode->scene->GetGameActorByAID(targetAid);
+      CRenderObject* skill = mode->scene->GetSkillByAID(targetAid);
       if (actor != nullptr) {
         target = actor;
+        static_cast<CGameActor*>(target)->GetEffectiveJob(-1);
       } else if (skill != nullptr) {
         target = skill;
-      }
-      if (target != nullptr) {
         static_cast<CGameActor*>(target)->GetEffectiveJob(-1);
       }
     }
 
-    int effectId = skillId < 493 ? 0 : -1;
+    int effectId = skillId < TK_MISSION ? 0 : -1;
     switch (skillId) {
     case MG_FIREWALL:
-      effectId = 0x31;
+      effectId = EF_FIREHIT;
       break;
     case PR_MAGNUS:
-      effectId = 0x98;
+      effectId = EF_HOLYHIT;
       break;
     case WZ_VERMILION:
     case SJ_BOOKOFCREATINGSTAR:
-      effectId = 0x34;
+      effectId = EF_WINDHIT;
       break;
     case WZ_STORMGUST:
     case NPC_STORMGUST2:
-      effectId = 0x33;
+      effectId = EF_COLDHIT;
       break;
     case SG_SUN_WARM:
     case SG_MOON_WARM:
     case SG_STAR_WARM:
-      effectId = 0x247;
+      effectId = EF_M01;
       break;
     case AG_MYSTERY_ILLUSION:
-      effectId = 0x6EF;
+      effectId = EF_MYSTERY_ILLUSION_HIT;
       break;
     case AG_VIOLENT_QUAKE_ATK:
     case AG_STRANTUM_TREMOR:
-      effectId = 0x764;
+      effectId = EF_STRATUM_TREMOR_HIT;
       break;
     case AG_ALL_BLOOM_ATK:
     case AG_ALL_BLOOM_ATK2:
-      effectId = 0x707;
+      effectId = EF_ALL_BLOOM_HIT;
       break;
     case AG_TORNADO_STORM:
-      effectId = 0x6F4;
+      effectId = EF_TORNADO_STORM_HIT;
       break;
     case AG_FLORAL_FLARE_ROAD:
-      effectId = 0x70F;
+      effectId = EF_FLORAL_FLARE_ROAD_HIT;
       break;
     case ABC_ABYSS_SQUARE:
     case EM_LIGHTNING_LAND:
@@ -425,31 +408,32 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       effectId = g_session.FindSkillFollowEffect(skillId);
       break;
     case WH_DEEPBLINDTRAP:
-      effectId = 0x753;
+      effectId = EF_DEEP_BLIND_TRAP_HIT;
       break;
     case WH_SOLIDTRAP:
-      effectId = 0x75B;
+      effectId = EF_SOLID_TRAP_HIT;
       break;
     case WH_SWIFTTRAP:
-      effectId = 0x757;
+      effectId = EF_SWIFT_TRAP_HIT;
       break;
     case WH_FLAMETRAP:
-      effectId = 0x782;
+      effectId = EF_FLAME_TRAP_HIT;
       break;
     }
 
     if (target != nullptr) {
-      ActorDamageMessage damageMessage;
-      damageMessage.targetAid = this->hitTargetAid;
+      const std::uint32_t attackerAid = this->skillAid;
+      const std::uint32_t targetAidValue = this->hitTargetAid;
+      damageMessage.targetAid = targetAidValue;
       damageMessage.action = 26;
       damageMessage.damage = damage;
       damageMessage.time = timeGetTime();
-      damageMessage.attackerAid = this->skillAid;
+      damageMessage.attackerAid = attackerAid;
+      damageMessage.monsterValue = monsterValue;
       damageMessage.cellX = cellX;
       damageMessage.cellY = cellY;
-      damageMessage.hitEffect = effectId;
       damageMessage.effectId = -1;
-      damageMessage.monsterValue = monsterValue;
+      damageMessage.hitEffect = effectId;
       damageMessage.motionSpeed = static_cast<float>(motionSpeed) / 288.0f;
       damageMessage.blueDamage = 0;
       damageMessage.skillId = skillId;
@@ -472,6 +456,33 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
     }
     return;
   }
+  case AM_SETJOB:
+    this->SetActorJob(static_cast<int>(b));
+    switch (this->GetEffectiveJob(-1)) {
+    case UNT_WARP_WAITING: {
+      const vector3d& player = g_modeMgr.GetGameMode()->scene->player->render.position;
+      g_soundMgr->PlayWave(
+        "effect\\EF_Portal.wav", this->render.position.x - player.x, 0.0f, this->render.position.z - player.z, 250, 40, 1.0f, 0
+      );
+      break;
+    }
+    case UNT_USED_TRAPS:
+      if (this->m_effectId != -1 &&
+          !g_effectMgr->Spawn(0, this->m_effectId, this->render.position, 0, -1, 0, 0)) {
+        CRagEffect* effect = this->LaunchEffect(this->m_effectId, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+        if (effect != nullptr) {
+          effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&this->render.position), 0, 0, 0, 0);
+        }
+      }
+      break;
+    }
+
+    this->m_effectTimer = 36000;
+    this->ShowModel(this->GetTrapModelName());
+    if (this->m_model != nullptr) {
+      this->m_model->playback = 1;
+    }
+    return;
   case AM_SKILLSTANDENTRY: {
     const SkillUnitMessage* unit = reinterpret_cast<const SkillUnitMessage*>(static_cast<std::intptr_t>(b));
     this->range = unit->range;
@@ -489,8 +500,9 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
     }
 
     mode->CellCenter(unit->x, unit->y, this->render.position.x, this->render.position.z);
-    this->render.position.y = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
+    const float height = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
     this->m_effectId = -1;
+    this->render.position.y = height;
 
     const vector3d& position = this->render.position;
     switch (this->GetEffectiveJob(-1)) {
@@ -499,7 +511,7 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       return;
     case UNT_FIREWALL:
     case UNT_FIRE_MANTLE: {
-      const vector3d& player = mode->scene->player->render.position;
+      const vector3d& player = g_modeMgr.GetGameMode()->scene->player->render.position;
       g_soundMgr->PlayWave("effect\\EF_FireWall.wav", position.x - player.x, 0.0f, position.z - player.z, 250, 40, 1.0f, 0);
       this->render.trackBounds = 0;
       return;
@@ -511,78 +523,78 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       this->render.trackBounds = 0;
       return;
     case UNT_GROUNDDRIFT_WIND:
-      this->m_effectId = 0x6B;
+      this->m_effectId = EF_CLAYMORE;
       this->render.trackBounds = 0;
       return;
     case UNT_WALLOFTHORN:
-      this->m_effectId = 0x6A;
+      this->m_effectId = EF_BLASTMINEBOMB;
       this->render.trackBounds = 1;
       return;
     case UNT_WARMER:
-      this->m_effectId = 0x6A;
+      this->m_effectId = EF_BLASTMINEBOMB;
       this->render.trackBounds = 0;
       return;
     case UNT_GROUNDDRIFT_DARK:
     case UNT_GROUNDDRIFT_FIRE:
     case UNT_GROUNDDRIFT_NEUTRAL:
-      this->m_effectId = 0x63;
+      this->m_effectId = EF_FLASHER;
       this->render.trackBounds = 0;
       return;
     case UNT_GROUNDDRIFT_POISON:
-      this->m_effectId = 0x8B;
+      this->m_effectId = EF_SANDMAN;
       this->render.trackBounds = 0;
       return;
     case UNT_MAGENTATRAP:
     case UNT_COBALTTRAP:
     case UNT_MAIZETRAP:
     case UNT_VERDURETRAP:
-      this->m_effectId = 0x8B;
+      this->m_effectId = EF_SANDMAN;
       this->render.trackBounds = 0;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_ELECTRICSHOCKER:
-      this->m_effectId = 0x6B;
+      this->m_effectId = EF_CLAYMORE;
       this->render.trackBounds = 0;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       if (!this->HasId(EF_SHOCKWAVE)) {
         this->LaunchEffect(EF_SHOCKWAVE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
       return;
     case UNT_FIRINGTRAP:
     case UNT_CLUSTERBOMB:
-      this->m_effectId = 0x6B;
+      this->m_effectId = EF_CLAYMORE;
       this->render.trackBounds = 0;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_ICEBOUNDTRAP:
-      this->m_effectId = 0x6C;
+      this->m_effectId = EF_FREEZING;
       this->render.trackBounds = 0;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_GROUNDDRIFT_WATER:
-      this->m_effectId = 0x6C;
+      this->m_effectId = EF_FREEZING;
       this->render.trackBounds = 0;
       return;
     case UNT_KAEN:
       if (rand() % 8 == 0) {
-        const vector3d& player = mode->scene->player->render.position;
+        const vector3d& player = g_modeMgr.GetGameMode()->scene->player->render.position;
         g_soundMgr->PlayWave("effect\\화염진.wav", position.x - player.x, 0.0f, position.z - player.z, 250, 40, 1.0f, 0);
       }
       this->render.trackBounds = 0;
       return;
     case UNT_TRAP:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_BLASTMINE:
       this->render.trackBounds = 1;
-      this->m_effectId = 0x6A;
-      this->ShowModel(this->GetTrapModelName());
+      this->m_effectId = EF_BLASTMINEBOMB;
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_REVERBERATION:
     case UNT_NETHERWORLD:
       this->render.trackBounds = 1;
-      this->m_effectId = 0x1D0;
+      this->m_effectId = EF_STORMKICK6;
       return;
     case UNT_SKIDTRAP:
     case UNT_ANKLESNARE:
@@ -590,31 +602,31 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
     case UNT_TALKIEBOX:
     case UNT_THORNS_TRAP:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_SANDMAN:
       this->render.trackBounds = 1;
-      this->m_effectId = 0x8B;
-      this->ShowModel(this->GetTrapModelName());
+      this->m_effectId = EF_SANDMAN;
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_FLASHER:
       this->render.trackBounds = 1;
-      this->m_effectId = 0x63;
-      this->ShowModel(this->GetTrapModelName());
+      this->m_effectId = EF_FLASHER;
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_FREEZINGTRAP:
       this->render.trackBounds = 1;
-      this->m_effectId = 0x6C;
-      this->ShowModel(this->GetTrapModelName());
+      this->m_effectId = EF_FREEZING;
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_CLAYMORETRAP:
       this->render.trackBounds = 1;
-      this->m_effectId = 0x6B;
-      this->ShowModel(this->GetTrapModelName());
+      this->m_effectId = EF_CLAYMORE;
+      ShowModelImpl(this, this->GetTrapModelName());
       return;
     case UNT_SHOCKWAVE:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       if (this->render.enabled && !this->HasId(EF_SHOCKWAVE)) {
         this->LaunchEffect(EF_SHOCKWAVE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
@@ -635,13 +647,13 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       return;
     }
     case UNT_KINGS_GRACE: {
-      const vector3d& player = mode->scene->player->render.position;
+      const vector3d& player = g_modeMgr.GetGameMode()->scene->player->render.position;
       g_soundMgr->PlayWave("effect\\lg_kings_grace.wav", position.x - player.x, 0.0f, position.z - player.z, 250, 40, 1.0f, 0);
       this->render.trackBounds = 0;
       return;
     }
     case UNT_MAGMA_ERUPTION: {
-      const vector3d& player = mode->scene->player->render.position;
+      const vector3d& player = g_modeMgr.GetGameMode()->scene->player->render.position;
       g_soundMgr->PlayWave("effect\\NC_MAGMA_ERUPTION.wav", position.x - player.x, 0.0f, position.z - player.z, 250, 40, 1.0f, 0);
       this->render.trackBounds = 0;
       return;
@@ -682,19 +694,19 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
     case UNT_SEEDTRAP:
       switch (unit->level) {
       case 1:
-        this->m_effectId = 0x642;
+        this->m_effectId = EF_BIO5_PLANT_GREEN;
         break;
       case 2:
-        this->m_effectId = 0x643;
+        this->m_effectId = EF_BIO5_PLANT_BLUE;
         break;
       case 3:
-        this->m_effectId = 0x644;
+        this->m_effectId = EF_BIO5_PLANT_YELLOW;
         break;
       case 4:
-        this->m_effectId = 0x645;
+        this->m_effectId = EF_BIO5_PLANT_WHITE;
         break;
       case 5:
-        this->m_effectId = 0x646;
+        this->m_effectId = EF_BIO5_PLANT_RED;
         break;
       }
       return;
@@ -702,33 +714,33 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       g_effectMgr->Spawn(this->render.accountId, EF_PNEUMATICUS_PROCELLA, position, 0, unit->level, 0, 0);
       return;
     case UNT_RAIN_OF_CRYSTAL:
-      if (!g_effectMgr->Has(this->render.accountId, 0x6D8)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_UNK_1752)) {
         g_effectMgr->Retire(this->render.accountId, 0x6D8);
       }
-      g_effectMgr->Spawn(this->render.accountId, 0x6D8, position, 0, unit->level, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_UNK_1752, position, 0, unit->level, 0, 0);
       return;
     case UNT_VIOLENT_QUAKE:
       g_effectMgr->Retire(this->render.accountId, 0x701);
       g_effectMgr->Spawn(this->render.accountId, EF_VIOLENT_QUAKE_BOTTOM, position, 0, unit->level, 0, 0);
       return;
     case UNT_ASTRAL_STRIKE:
-      if (!g_effectMgr->Has(this->render.accountId, 0x6E8)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_ASTRAL_STRIKE)) {
         g_effectMgr->Retire(this->render.accountId, 0x6E8);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_ASTRAL_STRIKE, position, 0, unit->level, 0, 0);
       return;
     case UNT_MYSTERY_ILLUSION:
-      if (!g_effectMgr->Has(this->render.accountId, 0x6EC)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_MYSTERY_ILLUSION_BOTTOM)) {
         g_effectMgr->Retire(this->render.accountId, 0x6EC);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_MYSTERY_ILLUSION_BOTTOM, position, 0, unit->level, 0, 0);
       return;
     case UNT_TORNADO_STORM:
-      if (!g_effectMgr->Has(this->render.accountId, 0x6F0)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_TORNADO_STORM)) {
         g_effectMgr->Retire(this->render.accountId, 0x6F0);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_TORNADO_STORM, position, 0, unit->level, 0, 0);
-      if (!g_effectMgr->Has(this->render.accountId, 0x6F1)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_TORNADO_STORM_BOTTOM)) {
         g_effectMgr->Retire(this->render.accountId, 0x6F1);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_TORNADO_STORM_BOTTOM, position, 0, unit->level, 0, 0);
@@ -744,7 +756,7 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       g_effectMgr->Spawn(this->render.accountId, EF_FLORAL_FLARE_ROAD, position, 0, unit->level, 0, 0);
       return;
     case UNT_STRANTUM_TREMOR:
-      for (std::int64_t effectId = 0x765; effectId <= 0x766; ++effectId) {
+      for (std::int64_t effectId = EF_STRATUM_TREMOR; effectId <= EF_STRATUM_TREMOR_BOTTOM; ++effectId) {
         if (!g_effectMgr->Has(this->render.accountId, static_cast<int>(effectId))) {
           g_effectMgr->Retire(this->render.accountId, static_cast<int>(effectId));
         }
@@ -756,27 +768,27 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       }
       return;
     case UNT_VENOM_SWAMP:
-      if (!g_effectMgr->Has(this->render.accountId, 0x7EF)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_VENOM_SWAMP_BOTTOM)) {
         g_effectMgr->Retire(this->render.accountId, 0x7EF);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_VENOM_SWAMP_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_LIGHTNING_LAND:
-      if (!g_effectMgr->Has(this->render.accountId, 0x7FA)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_LIGHTNING_LAND_BOTTOM)) {
         g_effectMgr->Retire(this->render.accountId, 0x7FA);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_LIGHTNING_LAND_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      if (!g_effectMgr->Has(this->render.accountId, 0x7F9)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_LIGHTNING_LAND)) {
         g_effectMgr->Retire(this->render.accountId, 0x7F9);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_LIGHTNING_LAND, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_CONFLAGRATION:
-      if (!g_effectMgr->Has(this->render.accountId, 0x808)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_CONFLAGRATION_BOTTOM)) {
         g_effectMgr->Retire(this->render.accountId, 0x808);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_CONFLAGRATION_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      if (!g_effectMgr->Has(this->render.accountId, 0x807)) {
+      if (!g_effectMgr->Has(this->render.accountId, EF_CONFLAGRATION)) {
         g_effectMgr->Retire(this->render.accountId, 0x807);
       }
       g_effectMgr->Spawn(this->render.accountId, EF_CONFLAGRATION, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
@@ -838,32 +850,32 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       return;
     }
     case UNT_CANE_OF_EVIL_EYE:
-      g_effectMgr->Spawn(this->render.accountId, 0x903, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      g_effectMgr->Spawn(this->render.accountId, EF_UNK_2307, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
     case UNT_DEEPBLINDTRAP:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       if (this->render.enabled) {
         g_effectMgr->Spawn(this->render.accountId, EF_DEEP_BLIND_TRAP, position, 0, -1, 0, 0);
       }
       return;
     case UNT_SWIFTTRAP:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       if (this->render.enabled) {
         g_effectMgr->Spawn(this->render.accountId, EF_SWIFT_TRAP, position, 0, -1, 0, 0);
       }
       return;
     case UNT_SOLIDTRAP:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       if (this->render.enabled) {
         g_effectMgr->Spawn(this->render.accountId, EF_SOLID_TRAP, position, 0, -1, 0, 0);
       }
       return;
     case UNT_FLAMETRAP:
       this->render.trackBounds = 1;
-      this->ShowModel(this->GetTrapModelName());
+      ShowModelImpl(this, this->GetTrapModelName());
       if (this->render.enabled) {
         g_effectMgr->Spawn(this->render.accountId, EF_FLAME_TRAP, position, 0, -1, 0, 0);
       }
@@ -879,44 +891,6 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
       return;
     }
   }
-  case AM_SETJOB:
-    this->SetActorJob(static_cast<int>(b));
-    switch (this->GetEffectiveJob(-1)) {
-    case UNT_WARP_WAITING: {
-      const vector3d& player = g_modeMgr.GetGameMode()->scene->player->render.position;
-      g_soundMgr->PlayWave(
-        "effect\\EF_Portal.wav", this->render.position.x - player.x, 0.0f, this->render.position.z - player.z, 250, 40, 1.0f, 0
-      );
-      break;
-    }
-    case UNT_USED_TRAPS:
-      if (this->m_effectId != -1 &&
-          !g_effectMgr->Spawn(0, this->m_effectId, this->render.position, 0, -1, 0, 0)) {
-        CRagEffect* effect = this->LaunchEffect(this->m_effectId, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-        if (effect != nullptr) {
-          effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&this->render.position), 0, 0, 0, 0);
-        }
-      }
-      break;
-    }
-
-    this->m_effectTimer = 36000;
-    this->ShowModel(this->GetTrapModelName());
-    if (this->m_model != nullptr) {
-      this->m_model->playback = 1;
-    }
-    return;
-  case AM_DISAPPEAR:
-    if (this->GetEffectiveJob(-1) == UNT_CANE_OF_EVIL_EYE) {
-      CEffect* effect = g_effectMgr->Find(this->render.accountId, 0x903);
-      if (effect != nullptr) {
-        static_cast<CCaneOfEvilEyeEffect*>(effect)->Finish();
-      }
-    } else {
-      CSkillActionMgr* actions = CSkillActionMgr::GetInstance();
-      actions->OnSkillObjectRemove(this->GetEffectiveJob(-1), this);
-    }
-    return;
   case AM_SKILL_UPDATE:
     if (this->render.enabled) {
       return;
@@ -941,6 +915,40 @@ void CSkill::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, 
     case UNT_FLAMETRAP:
       g_effectMgr->Spawn(this->render.accountId, EF_FLAME_TRAP, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       return;
+    }
+    return;
+  case AM_CHAT: {
+    const char* text = reinterpret_cast<const char*>(static_cast<std::intptr_t>(b));
+    if (std::strlen(text) == 0) {
+      return;
+    }
+
+    this->chatTick = timeGetTime();
+    if (this->actorWindows[0] == 0) {
+      UITransBalloonText* balloon =
+        new UITransBalloonText();
+      this->actorWindows[0] = balloon;
+      balloon->SetSize(8, 8);
+      g_windowMgr.AddRenderedFront(this->actorWindows[0]);
+    }
+
+    UITransBalloonText* balloon = static_cast<UITransBalloonText*>(this->actorWindows[0]);
+    balloon->SetText(text, 35);
+    balloon->SetColors(0xFF8080, 0);
+    this->chatWidth = balloon->geometry.width;
+    this->chatHeight = balloon->geometry.height;
+    balloon->Move(this->render.screenX - this->chatWidth / 2, this->render.screenY - g_renderer->viewport.height * 110 / 480);
+    return;
+  }
+  case AM_DISAPPEAR:
+    if (this->GetEffectiveJob(-1) == UNT_CANE_OF_EVIL_EYE) {
+      CEffect* effect = g_effectMgr->Find(this->render.accountId, EF_UNK_2307);
+      if (effect != nullptr) {
+        static_cast<CCaneOfEvilEyeEffect*>(effect)->Finish();
+      }
+    } else {
+      CSkillActionMgr* actions = CSkillActionMgr::GetInstance();
+      actions->OnSkillObjectRemove(this->GetEffectiveJob(-1), this);
     }
     return;
   default:

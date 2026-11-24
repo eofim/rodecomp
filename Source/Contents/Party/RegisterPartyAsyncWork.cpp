@@ -30,7 +30,8 @@ CRegisterPartyAsyncWork::CRegisterPartyAsyncWork()
       m_diagnostic(false, std::string(OBFUSCATE_BYTES_TEXT("unknwon", 0x2D33791F67AD47DFULL)), sourceFile, 26) {
 }
 
-// INLINED
+// OFFSET: 0x005D3960
+// FUNCTION: fn_46412
 CRegisterPartyAsyncWork::~CRegisterPartyAsyncWork() = default;
 
 // OFFSET: 0x005D3E80
@@ -113,5 +114,3 @@ void CRegisterPartyAsyncWork::Complete() {
   CAdventurerAgencyMgr* manager = g_adventurerAgencyMgr;
   manager->CompleteRegistration(this->m_diagnostic, this->m_response);
 }
-
-template void std::deque<CRegisterPartyAsyncWork*>::push_back(CRegisterPartyAsyncWork*&&);

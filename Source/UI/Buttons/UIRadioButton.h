@@ -12,6 +12,7 @@ public:
   /* 0128 */ std::function<void(bool)> onCheck;
 
   CUICheckBox();
+  ~CUICheckBox() override;
 
   void SetOnCheck(std::function<void(bool)> callback);
   void Paint() override;
@@ -24,6 +25,7 @@ public:
   /* 0150 */ std::function<void(CUIRadioButton*)> onSelect;
 
   CUIRadioButton();
+  __declspec(noinline) ~CUIRadioButton() override;
   void SetOnSelect(std::function<void(CUIRadioButton*)> callback);
   void OnLBtnDown(int x, int y) override;
 };
@@ -35,6 +37,7 @@ public:
 
   void OnCreate(int width, int height) override;
   bool IsChecked();
+  void SetChecked(bool checked, bool notify);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)
@@ -53,6 +56,18 @@ inline CUICheckBox::CUICheckBox() : CUIImageButton(), checked(false), onCheck() 
 // OFFSET: 0x00A19D30
 // FUNCTION: fn_15347
 inline CUIRadioButton::CUIRadioButton() : CUICheckBox(), onSelect() {
+}
+
+// OFFSET: 0x00A353D0
+// FUNCTION: fn_15426
+inline void CUICheckBox::SetOnCheck(std::function<void(bool)> callback) {
+  this->onCheck = callback;
+}
+
+// OFFSET: 0x00A021D0
+// FUNCTION: fn_14838
+inline void CUIRadioButton::SetOnSelect(std::function<void(CUIRadioButton*)> callback) {
+  this->onSelect = callback;
 }
 
 #endif

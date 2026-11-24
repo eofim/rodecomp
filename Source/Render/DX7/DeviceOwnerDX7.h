@@ -20,6 +20,9 @@ public:
   void DestroyRenderer(CRenderer* renderer);
   HRESULT Clear(DWORD color);
   HRESULT ClearDepth();
+  HRESULT RestoreSurfaces();
+  HRESULT BlitBackBuffer();
+  HRESULT CreateDepthBuffer();
   HRESULT Present(bool wait);
   int RestoreLostSurfaces();
   void MarkSurfacesLost();
@@ -41,6 +44,9 @@ public:
 
   CRenderer* CreateRenderer();
   std::uint16_t PackColor(int red, int green, int blue);
+  DWORD UnpackBlue(std::uint16_t pixel) const;
+  DWORD UnpackGreen(std::uint16_t pixel) const;
+  DWORD UnpackRed(std::uint16_t pixel) const;
   DWORD BlueMask();
   DWORD BlueExpansion();
   DWORD BlueShift();
@@ -53,6 +59,7 @@ public:
   DWORD RedExpansion();
   DWORD RedShift();
   IDirectDrawSurface7* RenderTarget();
+  D3DDEVICEDESC7 Capabilities() const;
 
   /* 0000 */ HWND window;
   /* 0004 */ DWORD width;

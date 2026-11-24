@@ -1,4 +1,5 @@
 #include "Client/Session/Session.h"
+#include "Contents/CombatTypes.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/AdventureGuide/AdventureGuideMgr.h"
@@ -32,13 +33,6 @@
 #include <regex>
 #include <utility>
 
-template __declspec(noinline) std::string std::sub_match<std::string::const_iterator>::str() const;
-template __declspec(noinline) void CUIListBox<AdventureGuide::CUISubTab>::UpdateScrollBar();
-template __declspec(noinline) void CUIListBoxEx<AdventureGuide::CUIMonsterInfo, AdventureGuide::CMonsterData>::UpdateScrollBar();
-
-template void CUIListBoxEx<AdventureGuide::CUIMonsterInfo, AdventureGuide::CMonsterData>::UpdateScrollBar();
-template void CUIListBox<AdventureGuide::CUITab>::UpdateScrollBar();
-template void CUIListBox<AdventureGuide::CUISubTab>::UpdateScrollBar();
 template <> __declspec(noinline) void CUIListBox<AdventureGuide::CUISubTab>::SelectItem(CUIListItem* item);
 template <> AdventureGuide::CUISubTab* CUIListBox<AdventureGuide::CUISubTab>::CreateItem();
 template <> AdventureGuide::CUITab* CUIListBox<AdventureGuide::CUITab>::CreateItem();
@@ -69,9 +63,6 @@ template <class T> void CUIListBox<T>::OnCreate(int width, int height) {
   this->AddChild(this->scrollBar);
 }
 
-template void CUIListBox<AdventureGuide::CUISubTab>::OnCreate(int, int);
-template void CUIListBox<AdventureGuide::CUITab>::OnCreate(int, int);
-
 // OFFSET: 0x009C2A50
 // FUNCTION: fn_13995
 // OFFSET: 0x009C2B20
@@ -86,11 +77,6 @@ template <class T, class D> void CUIListBoxEx<T, D>::OnCreate(int width, int hei
   this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
-
-template void CUIListBoxEx<AdventureGuide::CUIItemInfo, AdventureGuide::CItemData>::OnCreate(int, int);
-template void CUIListBoxEx<AdventureGuide::CUIMonsterInfo, AdventureGuide::CMonsterData>::OnCreate(int, int);
-template void CUIListBoxEx<AdventureGuide::CUIQuestInfo, AdventureGuide::CQuestInfo>::OnCreate(int, int);
-template void CUIListBoxEx<AdventureGuide::CUITabInfo, Guide_Intro::Contents>::OnCreate(int, int);
 
 // OFFSET: 0x009C12B0
 // FUNCTION: fn_13987
@@ -248,7 +234,7 @@ void CUIAdventureGuide::OnCreate(int width, int height) {
   this->tabs->SetOnSelect([this](AdventureGuide::CUITab* tab) { this->OnSelectTab(tab); });
   {
     CUIListBox<AdventureGuide::CUITab>* tabs = this->tabs;
-    tabs->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_normal.bmp", 0x79DF094DD9616575ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_press.bmp", 0x11CB35636377DD07ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_over.bmp", 0x4755C1355575FD37ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_normal.bmp", 0x9BE3EF737387AD79ULL)));
+    tabs->SetImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_normal.bmp", 0x79DF094DD9616575ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_press.bmp", 0x11CB35636377DD07ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_over.bmp", 0x4755C1355575FD37ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_normal.bmp", 0x9BE3EF737387AD79ULL));
   }
 
   this->tabs->itemWidth = 98;
@@ -260,15 +246,15 @@ void CUIAdventureGuide::OnCreate(int width, int height) {
   this->tabs->scrollBar->step = 20;
   {
     CUIListBox<AdventureGuide::CUITab>* tabs = this->tabs;
-    tabs->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xB96B77B7255F8569ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x875FCDF1E7A1795FULL)));
+    tabs->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xB96B77B7255F8569ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x875FCDF1E7A1795FULL));
   }
   {
     CUIListBox<AdventureGuide::CUITab>* tabs = this->tabs;
-    tabs->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x072D2D872D259D5BULL)));
+    tabs->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x072D2D872D259D5BULL));
   }
   {
     CUIListBox<AdventureGuide::CUITab>* tabs = this->tabs;
-    tabs->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xF535E561137F138DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD3E5516F89F161D1ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x5FFD7FABB5D1EF57ULL)));
+    tabs->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xF535E561137F138DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD3E5516F89F161D1ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x5FFD7FABB5D1EF57ULL));
   }
   this->AddChild(this->tabs);
 }
@@ -297,8 +283,8 @@ void CUIAdventureGuide::OnButtonClick() {
 
 // OFFSET: 0x009DBFD0
 // FUNCTION: fn_14313
-void CRenewQuestMgr::AddStatusRequest(unsigned int id) {
-  this->m_statusRequests.insert(id);
+inline void CRenewQuestMgr::AddStatusRequest(unsigned int id) {
+  this->m_statusRequests.insert(static_cast<unsigned int>(id));
 }
 
 namespace AdventureGuide {
@@ -357,15 +343,18 @@ void CUIItem::BindItem(CUIItemInfo* item, const CItemData& data) {
   item->itemId = data.id;
   const ITEM_DESC& desc = FindItemDescription(std::atoi(info.itemId.c_str()));
   const std::string image = "유저인터페이스\\collection\\" + std::string(desc.identifiedResource) + ".bmp";
-  item->nameText->SetText(std::string(desc.identifiedName));
+  {
+    const std::string name = desc.identifiedName;
+    item->nameText->SetText(name);
+  }
   item->image->SetImage(image);
-  item->SetStatusLines(data.first, data.second, data.third);
+  item->SetStatusLines(data.entry.firstFlag, data.entry.secondFlag, data.entry.thirdFlag);
   item->SetDescription(data.type, info.Description());
   item->sourcesViewer->Clear();
-  for (const std::string& value : data.values) {
+  for (const std::string& value : data.entry.values) {
     item->sourcesViewer->AddLine(value);
   }
-  item->description = data.text;
+  item->description = data.entry.text;
 }
 
 // OFFSET: 0x009DC770
@@ -374,30 +363,30 @@ void __stdcall BindQuestInfo(CUIQuestInfo* owner, const CQuestInfo& data) {
   switch (data.type) {
   case 1:
     owner->SetTitle(data.id);
-    owner->SetViewerLines(data.rewards);
-    owner->title = data.title;
+    owner->SetViewerLines(data.contents.values);
+    owner->title = data.contents.first;
     owner->statusViewer->Clear();
-    owner->statusViewer->AddLine(data.text);
-    owner->questId = data.questId;
+    owner->statusViewer->AddLine(data.contents.second);
+    owner->questId = data.contents.questId;
     {
-      const bool isNew = g_renewQuestMgr->IsNewQuest(data.questId);
+      const bool isNew = g_renewQuestMgr->IsNewQuest(data.contents.questId);
       owner->stampImage->Show(isNew);
     }
     break;
   case 3:
     owner->SetTitle(data.id);
-    owner->SetViewerLines(data.rewards);
-    owner->title = data.title;
+    owner->SetViewerLines(data.contents.values);
+    owner->title = data.contents.first;
     owner->statusViewer->Clear();
-    owner->statusViewer->AddLine(data.text);
+    owner->statusViewer->AddLine(data.contents.second);
     owner->stampImage->Show(0);
     return;
   case 4:
     owner->SetTip(data.id);
-    owner->SetViewerLines(data.rewards);
-    owner->title = data.title;
+    owner->SetViewerLines(data.contents.values);
+    owner->title = data.contents.first;
     owner->statusViewer->Clear();
-    owner->statusViewer->AddLine(data.text);
+    owner->statusViewer->AddLine(data.contents.second);
     owner->stampImage->Show(0);
     return;
   }
@@ -435,8 +424,8 @@ void CUIIntro::OnInit() {
     return;
   }
 
-  for (const auto& [id, text] : intro.texts) {
-    this->contents->data.emplace_back(text.first, text.second);
+  for (const auto& entry : intro.texts) {
+    this->contents->data.push_back(entry.second);
   }
 
   this->contents->UpdateScrollBar();
@@ -479,7 +468,8 @@ void CUIItemInfo::SetDescription(int type, const std::vector<const char*>& descr
       break;
     }
 
-    std::string text(value);
+    std::string text;
+    text = value;
     constexpr char highlight[] = {'^', '7', '7', '7', '7', '7', '7'};
     if (text.find(highlight, 0, sizeof(highlight)) == std::string::npos) {
       continue;
@@ -489,10 +479,10 @@ void CUIItemInfo::SetDescription(int type, const std::vector<const char*>& descr
     std::regex pattern("\\^000000");
     std::regex_search(text, match, pattern);
     while (!match.empty()) {
-      std::string line = match.prefix().str() + match[0].str();
+      std::string line = std::string(match.prefix().first, match.prefix().second) + match.str();
       this->descriptionViewer->AddLine(line);
       ++lines;
-      text = match.suffix().str();
+      text = match.suffix();
       text.erase(0, text.find_first_not_of(" \r\n\t\v\f"));
       std::regex_search(text, match, pattern);
     }
@@ -507,7 +497,7 @@ void CUIMonster::OnInit() {
   for (const AdventureGuideEpisode& episode : episodes) {
     CMonsterData data;
     data.name = episode.name;
-    data.values = episode.values;
+    data.values = episode.info.values;
     this->monsterList->data.push_back(data);
   }
   this->monsterList->UpdateScrollBar();
@@ -568,11 +558,11 @@ void CUIQuestInfo::SetTitle(int id) {
   }
 
   std::string text = entry.title;
-  std::cmatch match;
-  std::regex_search(text.c_str(), text.c_str() + text.size(), match, std::regex("Q(.+)\\("));
+  std::smatch match;
+  std::regex_search(text, match, std::regex("Q(.+)\\("));
   const std::string whitespace(" \r\n\t\v\f");
   if (match.size() > 1) {
-    text = match[1].str();
+    text = match[1];
   }
 
   text.erase(0, text.find_first_not_of(whitespace));
@@ -581,9 +571,9 @@ void CUIQuestInfo::SetTitle(int id) {
   this->titleViewer->AddLine(text);
 
   text = entry.paragraphs[0];
-  std::regex_search(text.c_str(), text.c_str() + text.size(), match, std::regex("\n"));
+  std::regex_search(text, match, std::regex("\n"));
   if (match.size() > 0) {
-    text = match.prefix().str();
+    text = match.prefix();
   }
 
   text.erase(0, text.find_first_not_of(whitespace));
@@ -598,24 +588,24 @@ void CUIItemInfo::SetStatusLines(unsigned char first, unsigned char second, unsi
   this->optionsViewer->Clear();
   if (first == 1) {
     this->optionsViewer->SetTextColor(0xC86464u);
-    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_ENCHANT_IMPOSSIBLE)));
+    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_REFINING_POSSIBLE)));
   } else {
     this->optionsViewer->SetTextColor(0x6464C8u);
-    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_GRADE_ENCHANT_POSSIBLE)));
+    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_REFINING_IMPOSSIBLE)));
   }
   if (second == 1) {
     this->optionsViewer->SetTextColor(0xC86464u);
-    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_GRADE_ENCHANT_IMPOSSIBLE)));
+    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_ENCHANT_POSSIBLE)));
   } else {
     this->optionsViewer->SetTextColor(0x6464C8u);
-    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_RUNESYSTEM_EQUIP_OUT)));
+    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_ENCHANT_IMPOSSIBLE)));
   }
   if (third == 1) {
     this->optionsViewer->SetTextColor(0xC86464u);
-    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_RUNESYSTEM_EQUIP_NOTPUT)));
+    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_GRADE_ENCHANT_POSSIBLE)));
   } else {
     this->optionsViewer->SetTextColor(0x6464C8u);
-    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_RUNESYSTEM_RUNESET_TITLE)));
+    this->optionsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_GRADE_ENCHANT_IMPOSSIBLE)));
   }
 }
 
@@ -643,13 +633,7 @@ void CUIItem::LoadPage(int type, int id) {
   for (const auto& [key, entry] : entries) {
     CItemData data;
     data.id = key;
-    data.first = entry.firstFlag;
-    data.second = entry.secondFlag;
-    data.third = entry.thirdFlag;
-    data.categoryId = entry.minLevel;
-    data.categoryIndex = entry.maxLevel;
-    data.text = entry.text;
-    data.values = entry.values;
+    data.entry = entry;
     data.type = type;
     this->itemList->data.push_back(data);
   }
@@ -673,13 +657,7 @@ void CUIQuest::LoadPage(int type, int id) {
   for (const auto& [key, content] : contents) {
     CQuestInfo data;
     data.id = key;
-    data.categoryType = content.flag;
-    data.categoryId = content.minLevel;
-    data.categoryIndex = content.maxLevel;
-    data.questId = content.questId;
-    data.title = content.first;
-    data.text = content.second;
-    data.rewards = content.values;
+    data.contents = content;
     data.type = type;
     this->questList->data.push_back(data);
     if (type == 1 && !g_renewQuestMgr->IsNewQuest(content.questId)) {
@@ -762,10 +740,35 @@ void CUIListBox<AdventureGuide::CUITab>::SelectItem(CUIListItem* item) {
   }
 }
 
+// INLINED
+template <class T> static __forceinline bool SelectListItem(CUIListBox<T>* list, T* item) {
+  if (item) {
+    list->SelectItem(item);
+    if (item != list->selected) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// OFFSET: 0x009DE640
+// FUNCTION: fn_45710
+// OFFSET: 0x009DE600
+// FUNCTION: fn_45709
+template <class T> __forceinline bool CUIListBox<T>::SelectFirstItem() {
+  if (this->items.empty()) {
+    return false;
+  }
+  return SelectListItem(this, this->items.front());
+}
+
+template bool CUIListBox<AdventureGuide::CUISubTab>::SelectFirstItem();
+template bool CUIListBox<AdventureGuide::CUITab>::SelectFirstItem();
+
 // OFFSET: 0x009DC950
 // FUNCTION: fn_14329
 void CUIAdventureGuide::OnInit() {
-  this->titleBar->SetTitle(LookupMessage(MSI_RUNESYSTEM_CLOSE_RODEX));
+  this->titleBar->SetTitle(LookupMessage(MSI_ADVENTURE_GUIDE));
 
   CAdventureGuideMgr* mgr = g_adventureGuideMgr;
   if (mgr->m_intros.empty()) {
@@ -823,12 +826,7 @@ void CUIAdventureGuide::OnInit() {
     }
   }
 
-  if (!this->tabs->items.empty()) {
-    AdventureGuide::CUITab* first = this->tabs->items.front();
-    if (first) {
-      this->tabs->SelectItem(first);
-    }
-  }
+  this->tabs->SelectFirstItem();
   g_renewQuestMgr->SendQuestStatusRequest();
 }
 
@@ -844,11 +842,11 @@ void AdventureGuide::CUIQuestInfo::SetTip(int id) {
   }
 
   std::string title = tip.title;
-  std::match_results<const char*> match;
-  std::regex_search(title.c_str(), title.c_str() + title.size(), match, std::regex("\\#"));
+  std::smatch match;
+  std::regex_search(title, match, std::regex("\\#"));
   const std::string whitespace(" \r\n\t\v\f");
   if (!match.empty()) {
-    title = match.prefix().str();
+    title = match.prefix();
   }
 
   title.erase(0, title.find_first_not_of(whitespace));
@@ -857,14 +855,26 @@ void AdventureGuide::CUIQuestInfo::SetTip(int id) {
   this->titleViewer->AddLine(title);
 
   title = tip.paragraphs.front();
-  std::regex_search(title.c_str(), title.c_str() + title.size(), match, std::regex("\n"));
+  std::regex_search(title, match, std::regex("\n"));
   if (!match.empty()) {
-    title = match.prefix().str();
+    title = match.prefix();
   }
   title.erase(0, title.find_first_not_of(whitespace));
   title.erase(title.find_last_not_of(whitespace) + 1);
   this->titleViewer->SetBold(false);
   this->titleViewer->AddLine(title);
+}
+
+// OFFSET: 0x009DE680
+// FUNCTION: fn_45711
+void AdventureGuide::CUIQuest::MarkQuest(int questId) {
+  std::vector<CUIQuestInfo*> items = this->questList->items;
+  auto found = std::find_if(items.begin(), items.end(), [questId](CUIQuestInfo* item) {
+    return item->questId == questId;
+  });
+  if (found != items.end()) {
+    (*found)->stampImage->Show(1);
+  }
 }
 
 // OFFSET: 0x009DEBF0
@@ -887,13 +897,7 @@ void CUIAdventureGuide::MarkQuest(int questId) {
 
     AdventureGuide::CUIQuest* quest = dynamic_cast<AdventureGuide::CUIQuest*>(tab->page);
     if (quest) {
-      std::vector<AdventureGuide::CUIQuestInfo*> items = quest->questList->items;
-      auto found = std::find_if(items.begin(), items.end(), [questId](AdventureGuide::CUIQuestInfo* item) {
-        return item->questId == questId;
-      });
-      if (found != items.end()) {
-        (*found)->stampImage->Show(1);
-      }
+      quest->MarkQuest(questId);
     }
   }
 }
@@ -910,14 +914,8 @@ void CUIAdventureGuide::OnSelectTab(AdventureGuide::CUITab* tab) {
   const int type = tab->type;
   CUIListBox<AdventureGuide::CUISubTab>* subTabs = tab->subTabs;
   if (subTabs) {
-    if (!subTabs->items.empty()) {
-      AdventureGuide::CUISubTab* first = subTabs->items.front();
-      if (first) {
-        subTabs->SelectItem(first);
-        if (first != subTabs->selected) {
-          return;
-        }
-      }
+    if (subTabs->SelectFirstItem()) {
+      return;
     }
 
     if (subTabs->selected) {
@@ -1023,89 +1021,98 @@ void CUIItemInfo::OnCreate(int width, int height) {
   this->nameText->SetOutline(0, 0xFFFFFF);
   this->AddChild(this->nameText);
 
-  CUITextViewer* description = new CUITextViewer();
-  this->descriptionViewer = description;
-  description->SetSize(173, 97);
-  description->Move(165, 26);
-  description->SetTextOffset(0, 6);
+  this->descriptionViewer = new CUITextViewer();
+  this->descriptionViewer->SetSize(173, 97);
+  this->descriptionViewer->Move(165, 26);
+  this->descriptionViewer->SetTextOffset(0, 6);
   {
+    CUITextViewer* description = this->descriptionViewer;
     description->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xB3E307A5F753D5E3ULL)));
   }
-  description->SetFontHeight(12);
-  description->SetBold(0);
-  description->SetTextColor(0);
-  description->SetOutline(0, 0xFFFF00FF);
-  description->SetLineSpacing(6);
-  description->SetBackgroundColor(0xFFFF00FF);
-  description->SetPadding(0, 0, 0, 0);
-  description->SetScrollBarSize(8, 97);
-  description->SetScrollStep(20);
+  this->descriptionViewer->SetFontHeight(12);
+  this->descriptionViewer->SetBold(0);
+  this->descriptionViewer->SetTextColor(0);
+  this->descriptionViewer->SetOutline(0, 0xFFFF00FF);
+  this->descriptionViewer->SetLineSpacing(6);
+  this->descriptionViewer->SetBackgroundColor(0xFFFF00FF);
+  this->descriptionViewer->SetPadding(0, 0, 0, 0);
+  this->descriptionViewer->SetScrollBarSize(8, 97);
+  this->descriptionViewer->SetScrollStep(20);
   {
-    description->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xDB27CB557D038759ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x3FA3AFA7035DE3FFULL)));
+    CUITextViewer* description = this->descriptionViewer;
+    description->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xDB27CB557D038759ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x3FA3AFA7035DE3FFULL));
   }
   {
-    description->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x87E3D1C50D572DEFULL)));
+    CUITextViewer* description = this->descriptionViewer;
+    description->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x87E3D1C50D572DEFULL));
   }
   {
-    description->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x51BB39B763BBBD8DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xADC51BF9C98B413DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xDF8117FF49CFF551ULL)));
+    CUITextViewer* description = this->descriptionViewer;
+    description->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x51BB39B763BBBD8DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xADC51BF9C98B413DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xDF8117FF49CFF551ULL));
   }
-  this->AddChild(description);
+  this->AddChild(this->descriptionViewer);
 
-  CUITextViewer* options = new CUITextViewer();
-  this->optionsViewer = options;
-  options->SetSize(115, 90);
-  options->Move(338, 26);
-  options->SetTextOffset(0, 8);
+  this->optionsViewer = new CUITextViewer();
+  this->optionsViewer->SetSize(115, 90);
+  this->optionsViewer->Move(338, 26);
+  this->optionsViewer->SetTextOffset(0, 8);
   {
+    CUITextViewer* options = this->optionsViewer;
     options->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x114901C7E37F6D49ULL)));
   }
-  options->SetFontHeight(12);
-  options->SetBold(0);
-  options->SetTextColor(0);
-  options->SetOutline(0, 0xFFFF00FF);
-  options->SetLineSpacing(6);
-  options->SetBackgroundColor(0xFFFF00FF);
-  options->SetPadding(0, 0, 0, 0);
-  options->SetScrollBarSize(8, 90);
-  options->SetScrollStep(20);
+  this->optionsViewer->SetFontHeight(12);
+  this->optionsViewer->SetBold(0);
+  this->optionsViewer->SetTextColor(0);
+  this->optionsViewer->SetOutline(0, 0xFFFF00FF);
+  this->optionsViewer->SetLineSpacing(6);
+  this->optionsViewer->SetBackgroundColor(0xFFFF00FF);
+  this->optionsViewer->SetPadding(0, 0, 0, 0);
+  this->optionsViewer->SetScrollBarSize(8, 90);
+  this->optionsViewer->SetScrollStep(20);
   {
-    options->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x7D5D0F110B6B8371ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xF715514F5961B75BULL)));
+    CUITextViewer* options = this->optionsViewer;
+    options->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x7D5D0F110B6B8371ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xF715514F5961B75BULL));
   }
   {
-    options->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x4191BB5531FD3999ULL)));
+    CUITextViewer* options = this->optionsViewer;
+    options->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x4191BB5531FD3999ULL));
   }
   {
-    options->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xB19D1FA9116F39D3ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x9569C9C7E70909AFULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xD7A749EB27D5BF6DULL)));
+    CUITextViewer* options = this->optionsViewer;
+    options->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xB19D1FA9116F39D3ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x9569C9C7E70909AFULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xD7A749EB27D5BF6DULL));
   }
-  this->AddChild(options);
+  this->AddChild(this->optionsViewer);
 
-  CUITextViewer* sources = new CUITextViewer();
-  this->sourcesViewer = sources;
-  sources->SetSize(108, 118);
-  sources->Move(480, 5);
-  sources->SetTextOffset(0, 6);
+  this->sourcesViewer = new CUITextViewer();
+  this->sourcesViewer->SetSize(108, 118);
+  this->sourcesViewer->Move(480, 5);
+  this->sourcesViewer->SetTextOffset(0, 6);
   {
+    CUITextViewer* sources = this->sourcesViewer;
     sources->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xB195637DAFCB0D59ULL)));
   }
-  sources->SetFontHeight(12);
-  sources->SetBold(0);
-  sources->SetTextColor(0);
-  sources->SetOutline(0, 0xFFFF00FF);
-  sources->SetLineSpacing(6);
-  sources->SetBackgroundColor(0xFFFF00FF);
-  sources->SetPadding(0, 0, 0, 0);
-  sources->SetScrollBarSize(8, 118);
-  sources->SetScrollStep(20);
+  this->sourcesViewer->SetFontHeight(12);
+  this->sourcesViewer->SetBold(0);
+  this->sourcesViewer->SetTextColor(0);
+  this->sourcesViewer->SetOutline(0, 0xFFFF00FF);
+  this->sourcesViewer->SetLineSpacing(6);
+  this->sourcesViewer->SetBackgroundColor(0xFFFF00FF);
+  this->sourcesViewer->SetPadding(0, 0, 0, 0);
+  this->sourcesViewer->SetScrollBarSize(8, 118);
+  this->sourcesViewer->SetScrollStep(20);
   {
-    sources->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xADADEB4DF7813B55ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xD9452D81E5CD99C1ULL)));
+    CUITextViewer* sources = this->sourcesViewer;
+    sources->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xADADEB4DF7813B55ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xD9452D81E5CD99C1ULL));
   }
   {
-    sources->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xFD69A9B3F311818DULL)));
+    CUITextViewer* sources = this->sourcesViewer;
+    sources->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xFD69A9B3F311818DULL));
   }
   {
-    sources->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x7F2DFFC1ABE91F2BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD98F5345098D630DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x9B0F234DEFDF7593ULL)));
+    CUITextViewer* sources = this->sourcesViewer;
+    sources->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x7F2DFFC1ABE91F2BULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD98F5345098D630DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x9B0F234DEFDF7593ULL));
   }
-  this->AddChild(sources);
+  this->AddChild(this->sourcesViewer);
 }
 
 // OFFSET: 0x009CC580
@@ -1291,11 +1298,10 @@ void CUIQuestInfo::OnCreate(int width, int height) {
 // OFFSET: 0x009DCE10
 // FUNCTION: fn_14330
 void CUICharacterInfo::OnInit() {
-  this->jobIcon->SetImage(std::format("유저인터페이스\\renewalparty\\icon_jobs_{}.bmp", g_session.m_job));
+  this->jobIcon->SetImage(std::format("유저인터페이스\\renewalparty\\icon_jobs_{}.bmp", static_cast<int>(g_session.m_job)));
   const int level = g_session.m_level;
   this->level->SetText(std::format("Lv. {}", level));
-  const int jobLevel = g_session.m_jobLevel;
-  this->jobLevel->SetText(std::format("Jv. {}", jobLevel));
+  this->jobLevel->SetText(std::format("Jv. {}", static_cast<int>(g_session.m_jobLevel)));
   this->name->SetText(g_session.DecodePlayerName());
 }
 
@@ -1304,42 +1310,42 @@ void CUICharacterInfo::OnInit() {
 void CUIItemInfo::OnRBtnDown(int, int) {
   ITEM_INFO info;
   info.SetItemId(this->itemId);
-  info.identity[0] = this->type;
   info.identified = 1;
+  info.identity[0] = this->type;
   int location;
   if (this->type == 5) {
     location = this->location <= 9 ? 2 : 0x22;
   } else if (this->type == 4) {
     switch (this->location) {
     case 0:
-      location = 0x100;
+      location = EQP_HEAD_TOP;
       break;
     case 1:
-      location = 0x200;
+      location = EQP_HEAD_MID;
       break;
     case 2:
-      location = 1;
+      location = EQP_HEAD_LOW;
       break;
     case 3:
-      location = 0x10;
+      location = EQP_ARMOR;
       break;
     case 4:
-      location = 4;
+      location = EQP_GARMENT;
       break;
     case 5:
-      location = 0x20;
+      location = EQP_HAND_L;
       break;
     case 6:
-      location = 0x40;
+      location = EQP_SHOES;
       break;
     case 7:
-      location = 0x88;
+      location = EQP_ACC_RL;
       break;
     case 8:
-      location = 8;
+      location = EQP_ACC_R;
       break;
     case 9:
-      location = 0x80;
+      location = EQP_ACC_L;
       break;
     default:
       location = 0;
@@ -1389,60 +1395,60 @@ void CUIMonsterInfo::SetMonster(const std::string& title) {
   this->action = static_cast<CActRes*>(ResourceMgr::Instance().Load(spriteName + ".act"));
 
   if (element == 1) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY4), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY1), elementLevel));
   } else if (element == 2) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY5), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY2), elementLevel));
   } else if (element == 3) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY6), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY3), elementLevel));
   } else if (element == 4) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY7), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY4), elementLevel));
   } else if (element == 5) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY8), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY5), elementLevel));
   } else if (element == 6) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY9), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY6), elementLevel));
   } else if (element == 7) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY0), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY7), elementLevel));
   } else if (element == 8) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_SCALE1), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY8), elementLevel));
   } else if (element == 9) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_SCALE2), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY9), elementLevel));
   } else {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_SCALE0), elementLevel));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_PROPERTY0), elementLevel));
   }
 
   if (race == 1) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE4)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE1)));
   } else if (race == 2) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE5)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE2)));
   } else if (race == 3) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE6)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE3)));
   } else if (race == 4) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE7)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE4)));
   } else if (race == 5) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE8)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE5)));
   } else if (race == 6) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE9)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE6)));
   } else if (race == 7) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE0)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE7)));
   } else if (race == 8) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_MOVECLICK)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE8)));
   } else if (race == 9) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_NPCMOVE)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE9)));
   } else {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_NPCCLICK)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE0)));
   }
 
   if (size == 1) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE1)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_SCALE1)));
   } else if (size == 2) {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE2)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_SCALE2)));
   } else {
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_RACE3)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_SCALE0)));
   }
 
   if (type == 0x12D) {
     this->detailsViewer->SetTextColor(0x6464FFu);
-    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_TARGET_D_D)));
+    this->detailsViewer->AddLine(FormatOwnedString(LookupMessage(MSI_NAVIGATION_BOSS)));
   }
 }
 
@@ -1505,13 +1511,16 @@ CUIAdventureGuide* CreateAdventureGuide() {
   return new CUIAdventureGuide();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00487B10
 // FUNCTION: fn_45546
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateAdventureGuide;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10002, factory);
-  return true;
-}();
+static UIRegistration s_adventureGuideRegistered(10002, CreateAdventureGuide);
 
 namespace AdventureGuide {
 
@@ -1536,14 +1545,14 @@ AdventureGuide::CUISubTab* CUIListBox<AdventureGuide::CUISubTab>::CreateItem() {
   item->SetSize(this->itemWidth, this->rowHeight);
   item->Show(0);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-  item->onHover = [this](CUIListItem* listItem) {
+  item->SetOnHover([this](CUIListItem* listItem) {
     for (AdventureGuide::CUISubTab* other : this->items) {
       other->SetHighlighted(other == listItem);
     }
-  };
-  item->onPress = [this](CUIListItem* listItem) {
+  });
+  item->SetOnPress([this](CUIListItem* listItem) {
     this->SelectItem(listItem);
-  };
+  });
   this->AddChild(item);
   this->items.push_back(item);
   this->UpdateScrollBar();
@@ -1559,14 +1568,14 @@ AdventureGuide::CUITab* CUIListBox<AdventureGuide::CUITab>::CreateItem() {
   item->SetSize(this->itemWidth, this->rowHeight);
   item->Show(0);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-  item->onHover = [this](CUIListItem* listItem) {
+  item->SetOnHover([this](CUIListItem* listItem) {
     for (AdventureGuide::CUITab* other : this->items) {
       other->SetHighlighted(other == listItem);
     }
-  };
-  item->onPress = [this](CUIListItem* listItem) {
+  });
+  item->SetOnPress([this](CUIListItem* listItem) {
     this->SelectItem(listItem);
-  };
+  });
   this->AddChild(item);
   this->items.push_back(item);
   this->UpdateScrollBar();
@@ -1653,7 +1662,7 @@ void CUIQuest::SearchNavigation() {
   g_navigationManager.selectedPathNode = 0;
   if (!g_navigationManager.SelectNodeState()) {
     this->RequestNavigation();
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(4241)), 0, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_MOVE_INDOOR_MAP)), 0, 0, 0, 0);
     return;
   }
 

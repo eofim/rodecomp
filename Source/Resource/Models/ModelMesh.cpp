@@ -1,18 +1,18 @@
 #include "Resource/Models/ModelMesh.h"
 #include "Utility/Math/AffineMatrix.h"
 
-#include <cmath>
+#include <algorithm>
 #include <map>
 
 namespace {
   // INLINED
-  void Normalize(float* vector) {
-    const float squared = (vector[0] * vector[0] + vector[1] * vector[1]) + vector[2] * vector[2];
+  void Normalize(ShadeVector& vector) {
+    const float squared = (vector.x * vector.x + vector.y * vector.y) + vector.z * vector.z;
     const float inverse = 1.0f / SquareRoot(squared);
 
-    vector[0] = inverse * vector[0];
-    vector[1] = inverse * vector[1];
-    vector[2] = inverse * vector[2];
+    vector.x = inverse * vector.x;
+    vector.y = inverse * vector.y;
+    vector.z = inverse * vector.z;
   }
 }
 
@@ -67,22 +67,22 @@ void ModelMesh::CalculateNormals() {
   }
 
   for (int index = 0; index < this->faceCount; ++index) {
+    auto& normal = this->faceNormals[index];
     const ModelFace& face = this->faces[index];
     const auto& first = this->vertices[face.vertices[0]];
-    const auto& second = this->vertices[face.vertices[1]];
     const auto& third = this->vertices[face.vertices[2]];
+    const auto& second = this->vertices[face.vertices[1]];
     const float x1 = first[0] - third[0];
     const float y1 = first[1] - third[1];
     const float z1 = first[2] - third[2];
     const float x2 = second[0] - third[0];
     const float y2 = second[1] - third[1];
     const float z2 = second[2] - third[2];
-    auto& normal = this->faceNormals[index];
 
     normal.x = y2 * z1 - z2 * y1;
     normal.y = z2 * x1 - x2 * z1;
     normal.z = x2 * y1 - y2 * x1;
-    Normalize(&this->faceNormals[index].x);
+    Normalize(this->faceNormals[index]);
   }
 
   std::map<int, std::vector<int>> adjacent;
@@ -101,23 +101,16 @@ void ModelMesh::CalculateNormals() {
     const ModelFace& face = this->faces[index];
 
     for (int corner = 0; corner < 3; ++corner) {
-      for (int neighbor : adjacent[face.vertices[corner]]) {
-        const ModelFace& other = this->faces[neighbor];
-
-        for (std::uint32_t group : face.smoothing) {
-          bool matches = false;
-
-          for (std::uint32_t candidate : other.smoothing) {
-            if (candidate == group) {
-              matches = true;
-              break;
-            }
-          }
-
-          if (matches) {
-            this->vertexNormals[index * 3 + corner].x = this->vertexNormals[index * 3 + corner].x + this->faceNormals[neighbor].x;
-            this->vertexNormals[index * 3 + corner].y = this->faceNormals[neighbor].y + this->vertexNormals[index * 3 + corner].y;
-            this->vertexNormals[index * 3 + corner].z = this->faceNormals[neighbor].z + this->vertexNormals[index * 3 + corner].z;
+      auto& neighbors = adjacent[face.vertices[corner]];
+      for (auto it = neighbors.begin(); it != neighbors.end(); ++it) {
+        const ModelFace& other = this->faces[*it];
+        for (auto group = face.smoothing.begin(); group != face.smoothing.end(); ++group) {
+          if (std::find(other.smoothing.begin(), other.smoothing.end(), *group) != other.smoothing.end()) {
+            const ShadeVector& faceNormal = this->faceNormals[*it];
+            ShadeVector& normal = this->vertexNormals[index * 3 + corner];
+            normal.x = normal.x + faceNormal.x;
+            normal.y = faceNormal.y + normal.y;
+            normal.z = faceNormal.z + normal.z;
           }
         }
       }
@@ -125,6 +118,6 @@ void ModelMesh::CalculateNormals() {
   }
 
   for (int index = 0; index < this->faceCount * 3; ++index) {
-    Normalize(&this->vertexNormals[index].x);
+    Normalize(this->vertexNormals[index]);
   }
 }

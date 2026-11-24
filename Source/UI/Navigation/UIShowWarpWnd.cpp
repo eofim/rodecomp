@@ -43,9 +43,9 @@ void UIShowWarpWnd::OnCreate(int width, int height) {
   close->SetBitmap((prefix + "btn_close_b" + ".bmp").c_str(), 2, 0);
   close->SetSize(close->BitmapWidth(), close->BitmapHeight());
   close->Move(closeX, closeY);
-  close->SetId(0xc9);
+  close->SetId(ID_CLOSE);
   this->AddChild(close);
-  this->m_message0 = 0xb8;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x0094ECE0

@@ -102,7 +102,7 @@ class CUITabButton;
 
 class CUITab : public CUIControl {
 public:
-  __declspec(noinline) CUITab();
+  CUITab();
 
   void Paint() override;
 
@@ -118,6 +118,17 @@ public:
   /* 00B0 */ std::function<bool(CUITabButton*, CUITabButton*)> onChanging;
 };
 
+// OFFSET: 0x009F7380
+// FUNCTION: fn_14771
+inline CUITab::CUITab() : CUIControl(), current(nullptr) {
+}
+
+// OFFSET: 0x00A63C00
+// FUNCTION: fn_16441
+inline void CUITab::SetOnChange(std::function<void(CUITabButton*)> handler) {
+  this->onChange = handler;
+}
+
 class CUIButton : public CUIControl {
 public:
   CUIButton();
@@ -130,7 +141,16 @@ public:
   void OnMouseEnter() override;
   void OnMouseLeave() override;
 
-  void SetState(int value);
+  __declspec(noinline) void SetState(int value);
+  // INLINED
+  __forceinline void SetStateInline(int value) {
+    if (this->state != value) {
+      this->state = value;
+      if (!this->disabled) {
+        this->Invalidate();
+      }
+    }
+  }
   void SetOnClick(std::function<void()> handler);
 
   /* 0080 */ int state;
@@ -297,7 +317,9 @@ public:
   void LoadSkin(bool resolveSkin) override;
 
   void SetImages(const std::string& left, const std::string& middle, const std::string& right);
+  void SetImage(const std::string& name);
   void SetSecondButton(CUIButton* button);
+  void ToggleParentHeight();
   void SetTitle(std::string_view title);
   // INLINED
   void SetTitle(const char* title, std::size_t length) {
@@ -336,6 +358,7 @@ public:
   void SetBorderWidth(int width);
   void SetMaximum(int value);
   void SetEditBounds(int left, int top, int right, int bottom);
+  void SetMask(char value);
   void SetText(const std::string& text);
   void SetTextColor(std::uint32_t color);
 

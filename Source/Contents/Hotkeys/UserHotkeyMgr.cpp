@@ -54,9 +54,9 @@ namespace {
 // OFFSET: 0x00E12E50
 // FUNCTION: fn_23820
 int CSession::HotkeyIndex(int tab, int index) const {
-  if (tab == 1 && index >= HK_FIRST_HIDDEN) {
+  if (tab == 1) {
     for (int candidate = HK_FIRST_HIDDEN; candidate <= index; ++candidate) {
-      if (HiddenInterfaceIndex(candidate)) {
+      if (HiddenInterfaceIndex(candidate) == true) {
         ++index;
       }
     }
@@ -67,21 +67,28 @@ int CSession::HotkeyIndex(int tab, int index) const {
   return index >= count ? -1 : index;
 }
 
+// INLINED
+static int HiddenHotkeyCount(int tab, int count) {
+  if (tab != 1) {
+    return 0;
+  }
+
+  int hidden = 0;
+  for (int index = HK_FIRST_HIDDEN; index < count; ++index) {
+    if (HiddenInterfaceIndex(index) == true) {
+      ++hidden;
+    }
+  }
+
+  return hidden;
+}
+
 // OFFSET: 0x00E0A4C0
 // FUNCTION: fn_23797
 int CSession::HotkeyCount(int tab) const {
   int count = 0;
   if (g_session.m_hotkeyScript->Call("GetOriginalHotKeyListSize", "d>d", tab + 1, &count)) {
-    int hidden = 0;
-    if (tab == 1) {
-      for (int index = HK_FIRST_HIDDEN; index < count; ++index) {
-        if (HiddenInterfaceIndex(index)) {
-          ++hidden;
-        }
-      }
-    }
-
-    return count - hidden;
+    return count - HiddenHotkeyCount(tab, count);
   }
 
   return count;
@@ -200,7 +207,7 @@ void CUserHotkeyMgr::Capture() {
       if (g_session.m_hotkeyScript->Call("GetUserHotKeyInfo", "dd>ddss", tab + 1, index, &hotkey.key1, &hotkey.key2, &keyText, &description)) {
         hotkey.description = description;
         if (!hotkey.description.empty()) {
-          this->m_original.emplace_back(hotkey.tab, hotkey.index, hotkey.key1, hotkey.key2, hotkey.description);
+          this->m_original.push_back(hotkey);
         }
       }
     }
@@ -220,17 +227,14 @@ bool CUserHotkeyMgr::HasUserAssignments() const {
         continue;
       }
 
-      std::string keyName;
-      int key1 = 0;
-      int key2 = 0;
-      std::string userDescription;
+      HotkeyInfo hotkey(0, 0);
       const char* keyText = nullptr;
       const char* description = nullptr;
 
-      if (g_session.m_hotkeyScript->Call("GetUserHotKeyInfo", "dd>ddss", tab + 1, index, &key1, &key2, &keyText, &description)) {
-        userDescription = description;
-        if (!userDescription.empty() &&
-            g_session.m_hotkeyScript->Call("GetOriginalHotKeyInfo", "dd>ddss", tab + 1, index, &key1, &key2, &keyText, &description)) {
+      if (g_session.m_hotkeyScript->Call("GetUserHotKeyInfo", "dd>ddss", tab + 1, index, &hotkey.key1, &hotkey.key2, &keyText, &description)) {
+        hotkey.description = description;
+        if (!hotkey.description.empty() &&
+            g_session.m_hotkeyScript->Call("GetOriginalHotKeyInfo", "dd>ddss", tab + 1, index, &hotkey.key1, &hotkey.key2, &keyText, &description)) {
           std::string originalDescription = description;
           if (!originalDescription.empty()) {
             return true;
@@ -261,12 +265,14 @@ void CAccountLinkedUserDataMgr::ExportUserHotkey(Json::Value& data) {
   g_userHotkeyMgr->Capture();
   Json::Value version2;
   const std::list<CUserHotkeyMgr::Hotkey> snapshot = g_userHotkeyMgr->m_original;
+  auto it = snapshot.begin();
   Json::Value skillBar1;
   Json::Value skillBar2;
   Json::Value interfaceTab;
   Json::Value emotionTab;
 
-  for (const CUserHotkeyMgr::Hotkey& hotkey : snapshot) {
+  while (it != snapshot.end()) {
+    const CUserHotkeyMgr::Hotkey& hotkey = *it;
     Json::Value value;
     value["index"] = hotkey.index;
     value["key1"] = hotkey.key1;
@@ -287,6 +293,8 @@ void CAccountLinkedUserDataMgr::ExportUserHotkey(Json::Value& data) {
       emotionTab.append(value);
       break;
     }
+
+    ++it;
   }
 
   version2["SkillBar_1Tab"] = skillBar1;
@@ -294,7 +302,8 @@ void CAccountLinkedUserDataMgr::ExportUserHotkey(Json::Value& data) {
   version2["InterfaceTab"] = interfaceTab;
   version2["EmotionTab"] = emotionTab;
   data["UserHotkey_V2"] = version2;
-  data["UserHotkey"] = Json::Value();
+  Json::Value empty;
+  data["UserHotkey"] = empty;
 }
 
 // INLINED

@@ -73,25 +73,25 @@ UINT* DeviceOwnerDX9::AdjustTextureDimensions(UINT* output, UINT width, UINT hei
     return value + (value == 0);
   };
 
-  UINT adjustedWidth = roundUp(width);
-  UINT adjustedHeight = roundUp(height);
+  width = roundUp(width);
+  height = roundUp(height);
   const DWORD ratio = this->caps.MaxTextureAspectRatio;
 
-  adjustedWidth = std::min<UINT>(adjustedWidth, this->caps.MaxTextureWidth);
-  adjustedHeight = std::min<UINT>(adjustedHeight, this->caps.MaxTextureHeight);
+  width = std::min<UINT>(width, this->caps.MaxTextureWidth);
+  height = std::min<UINT>(height, this->caps.MaxTextureHeight);
 
   if (ratio != 0) {
-    if (adjustedWidth / adjustedHeight > ratio) {
-      adjustedHeight = adjustedWidth / ratio;
+    if (width / height > ratio) {
+      height = width / ratio;
     }
 
-    if (adjustedHeight / adjustedWidth > ratio) {
-      adjustedWidth = adjustedHeight / ratio;
+    if (height / width > ratio) {
+      width = height / ratio;
     }
   }
 
-  output[0] = adjustedWidth;
-  output[1] = adjustedHeight;
+  output[0] = width;
+  output[1] = height;
   return output;
 }
 
@@ -130,18 +130,8 @@ HRESULT DeviceOwnerDX9::CreateDevice(UINT selectedAdapter) {
   this->presentation.Flags = D3DPRESENTFLAG_LOCKABLE_BACKBUFFER | D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL;
 
   if (!this->presentation.Windowed) {
-    const DWORD adapter = selectedAdapter;
-    const D3DFORMAT format = D3DFMT_X8R8G8B8;
-    DisplayModeSelectorDX9 selectMode{format, this, adapter, width, height};
-    if (!selectMode.Select(D3DSCANLINEORDERING_PROGRESSIVE) && !selectMode.Select(D3DSCANLINEORDERING_INTERLACED)) {
-      D3DDISPLAYMODEEX mode = {sizeof(D3DDISPLAYMODEEX)};
-      D3DDISPLAYROTATION rotation = D3DDISPLAYROTATION_IDENTITY;
-
-      if (FAILED(this->direct3D->GetAdapterDisplayModeEx(adapter, &mode, &rotation))) {
-        return deviceError;
-      }
-
-      this->displayMode = mode;
+    if (!this->SelectFullscreenMode(selectedAdapter, width, height, D3DFMT_X8R8G8B8)) {
+      return deviceError;
     }
 
     this->presentation.BackBufferWidth = this->displayMode.Width;
@@ -255,18 +245,21 @@ void DeviceOwnerDX9::SetInitialStates() {
   this->state.SetSamplerState(1, D3DSAMP_BORDERCOLOR, 0xFF000000u);
 }
 
+// INLINED
+template <typename T>
+static void SafeRelease(T*& object) {
+  if (object) {
+    object->Release();
+    object = nullptr;
+  }
+}
+
 // OFFSET: 0x0054BFA0
 // FUNCTION: fn_01915
 HRESULT DeviceOwnerDX9::Close() {
-  if (this->backBuffer) {
-    this->backBuffer->Release();
-    this->backBuffer = nullptr;
-  }
+  SafeRelease(this->backBuffer);
 
-  if (this->capturedBackBuffer) {
-    this->capturedBackBuffer->Release();
-    this->capturedBackBuffer = nullptr;
-  }
+  SafeRelease(this->capturedBackBuffer);
 
   ULONG references = 0;
 
@@ -275,10 +268,7 @@ HRESULT DeviceOwnerDX9::Close() {
     this->device = nullptr;
   }
 
-  if (this->direct3D) {
-    this->direct3D->Release();
-    this->direct3D = nullptr;
-  }
+  SafeRelease(this->direct3D);
 
   return references > 0 ? static_cast<HRESULT>(0x8200000Bu) : D3D_OK;
 }
@@ -298,16 +288,37 @@ void DeviceOwnerDX9::UpdateMipmapFiltering() {
 void DeviceOwnerDX9::RestoreDisplayMode() {
 }
 
+// OFFSET: 0x0054C080
+// FUNCTION: fn_45930
+bool DeviceOwnerDX9::SelectFullscreenMode(DWORD adapter, UINT width, UINT height, D3DFORMAT format) {
+  DisplayModeSelectorDX9 selectMode{format, this, adapter, width, height};
+  if (!selectMode.Select(D3DSCANLINEORDERING_PROGRESSIVE) && !selectMode.Select(D3DSCANLINEORDERING_INTERLACED)) {
+    D3DDISPLAYMODEEX mode = {sizeof(mode)};
+    D3DDISPLAYROTATION rotation = D3DDISPLAYROTATION_IDENTITY;
+    if (SUCCEEDED(this->direct3D->GetAdapterDisplayModeEx(adapter, &mode, &rotation))) {
+      this->displayMode = mode;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
 // OFFSET: 0x0054C490
 // FUNCTION: fn_01920
 HRESULT DeviceOwnerDX9::ClipFullscreenCursor() {
+  this->ConfineFullscreenCursor();
+  return D3D_OK;
+}
+
+// OFFSET: 0x0054C4D0
+// FUNCTION: fn_45931
+void DeviceOwnerDX9::ConfineFullscreenCursor() {
   if (!this->presentation.Windowed) {
     RECT rectangle;
     GetWindowRect(this->window, &rectangle);
     ClipCursor(&rectangle);
   }
-
-  return D3D_OK;
 }
 
 // OFFSET: 0x0054C510

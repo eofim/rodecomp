@@ -59,10 +59,22 @@ UIMiniMapWnd::UIMiniMapWnd()
   this->townCheckBox = nullptr;
 }
 
+// OFFSET: 0x0099DD10
+// FUNCTION: fn_45721
+__forceinline int UIMiniMapWnd::MapToWindowX(float x, int halfWidth) const {
+  return static_cast<int>(x * this->scale - halfWidth + this->originX);
+}
+
+// OFFSET: 0x0099DD40
+// FUNCTION: fn_45722
+__forceinline int UIMiniMapWnd::MapToWindowY(float y, int halfHeight) const {
+  return static_cast<int>(this->originY - (y * this->scale + halfHeight));
+}
+
 // OFFSET: 0x0099B540
 // FUNCTION: fn_13554
 void UIMiniMapWnd::AddTownMarks() {
-  std::string mapName = g_modeMgr.GetGameMode()->mapName;
+  std::string mapName = g_modeMgr.GetGameMode()->MapName();
   this->marks[2].clear();
 
   for (int index = 0;; ++index) {
@@ -73,10 +85,9 @@ void UIMiniMapWnd::AddTownMarks() {
     }
 
     if (info.type == 8) {
-      MiniMapMark mark;
-      mark.y = static_cast<int>(this->originY - (static_cast<float>(info.y) * this->scale + 6.0f));
-      mark.x = static_cast<int>(static_cast<float>(info.x) * this->scale - 6.0f + this->originX);
-      this->marks[2].push_back(mark);
+      const int y = this->MapToWindowY(static_cast<float>(info.y), 6);
+      const int x = this->MapToWindowX(static_cast<float>(info.x), 6);
+      this->marks[2].push_back(MiniMapMark{x, y});
     } else {
       UIBitmapButton* button = new UIBitmapButton();
       button->SetBitmap(info.image.c_str(), 0, 0);
@@ -85,12 +96,9 @@ void UIMiniMapWnd::AddTownMarks() {
       button->SetSize(button->BitmapWidth(), button->BitmapHeight());
       button->SetId(index + 1000);
       button->SetTooltip(info.name.c_str());
-      button->Move(
-        static_cast<int>(static_cast<float>(info.x) * this->scale - 6.0f + this->originX),
-        static_cast<int>(this->originY - (static_cast<float>(info.y) * this->scale + 6.0f))
-      );
+      button->Move(this->MapToWindowX(static_cast<float>(info.x), 6), this->MapToWindowY(static_cast<float>(info.y), 6));
       this->AddChild(button);
-      this->townButtons.emplace(index, button);
+      this->townButtons.insert(std::make_pair(index, button));
     }
   }
 }
@@ -142,7 +150,7 @@ int UIMiniMapWnd::LoadMemos() {
         text += tokens[index];
       }
 
-      tokens.clear();
+      tokens.erase(tokens.begin(), tokens.end());
       this->memoButtons[count]->Move(x, y);
       this->memoButtons[count]->SetTooltip(text.c_str());
       ++count;
@@ -158,8 +166,8 @@ int UIMiniMapWnd::LoadMemos() {
 // OFFSET: 0x0099C090
 // FUNCTION: fn_13556
 void UIEditctrlWnd::OnCreate(int, int) {
-  this->AddCloseButton(LookupMessage(MSI_MINIMAP_MSG_04), 0);
-  this->AddNumberedButton(184, 205, 19, "minimap\\memo_ok", LookupMessage(MSI_EA8), true);
+  this->AddCloseButton(LookupMessage(MSI_MINIMAP_MSG_01), 0);
+  this->AddNumberedButton(184, 205, 19, "minimap\\memo_ok", LookupMessage(MSI_MINIMAP_MSG_14), true);
 
   this->edit = new UIEditCtrl();
   this->edit->SetSize(200, 18);
@@ -169,7 +177,7 @@ void UIEditctrlWnd::OnCreate(int, int) {
   this->edit->Border(200, 100, 100);
   this->edit->flat = 0;
   UIEditCtrl* edit = this->edit;
-  const char* tooltip = LookupMessage(MSI_EA7);
+  const char* tooltip = LookupMessage(MSI_MINIMAP_MSG_13);
   if (tooltip) {
     edit->tooltip = tooltip;
   }
@@ -181,25 +189,15 @@ void UIEditctrlWnd::OnCreate(int, int) {
 // FUNCTION: fn_13557
 void UIMiniMapWnd::OnCreate(int width, int height) {
   const int bottom = this->geometry.height;
-  const float terrainWidth = static_cast<float>(g_modeMgr.GetGameMode()->TerrainWidth());
-  const float terrainHeight = static_cast<float>(g_modeMgr.GetGameMode()->TerrainHeight());
-  this->originX = 2.0f;
-  this->originY = 531.0f;
-  this->scale = 512.0f / std::max(terrainWidth, terrainHeight);
-  const float margin = std::fabs(terrainWidth - terrainHeight) * 0.5f * this->scale;
-  if (terrainHeight > terrainWidth) {
-    this->originX = margin + 2.0f;
-  } else if (terrainWidth > terrainHeight) {
-    this->originY = 531.0f - margin;
-  }
+  this->FitMapToWindow();
 
-  this->questCheckBox = this->AddCheckBox(361, 100, 12, LookupMessage(MSI_MINIMAP_MSG_05), 20, bottom - 19, 1, LookupMessage(MSI_MINIMAP_MSG_06));
-  this->townCheckBox = this->AddCheckBox(194, 100, 12, LookupMessage(MSI_MINIMAP_MSG_07), 120, bottom - 19, 1, LookupMessage(MSI_MINIMAP_MSG_08));
-  this->guildCheckBox = this->AddCheckBox(373, 100, 12, LookupMessage(MSI_MINIMAP_MSG_09), 220, bottom - 19, 1, LookupMessage(MSI_MINIMAP_MSG_10));
-  this->AddCloseButton(LookupMessage(MSI_MINIMAP_MSG_04), 0);
-  this->AddNumberedButton(356, this->geometry.width - 120, bottom - 23, "minimap\\memo_ready", LookupMessage(MSI_MINIMAP_MSG_11), true);
+  this->questCheckBox = this->AddCheckBox(361, 100, 12, LookupMessage(MSI_MINIMAP_MSG_02), 20, bottom - 19, 1, LookupMessage(MSI_MINIMAP_MSG_03));
+  this->townCheckBox = this->AddCheckBox(194, 100, 12, LookupMessage(MSI_MINIMAP_MSG_04), 120, bottom - 19, 1, LookupMessage(MSI_MINIMAP_MSG_05));
+  this->guildCheckBox = this->AddCheckBox(373, 100, 12, LookupMessage(MSI_MINIMAP_MSG_06), 220, bottom - 19, 1, LookupMessage(MSI_MINIMAP_MSG_07));
+  this->AddCloseButton(LookupMessage(MSI_MINIMAP_MSG_01), 0);
+  this->AddNumberedButton(356, this->geometry.width - 120, bottom - 23, "minimap\\memo_ready", LookupMessage(MSI_MINIMAP_MSG_08), true);
   this->AddTownMarks();
-  this->bossButton = this->AddNumberedButton(205, -100, -100, "minimap\\boss", LookupMessage(MSI_MINIMAP_MSG_12), true);
+  this->bossButton = this->AddNumberedButton(205, -100, -100, "minimap\\boss", LookupMessage(MSI_MINIMAP_MSG_09), true);
   g_modeMgr.GetGameMode()->ResendMinimapMarkers();
   for (int index = 0; index < 20; ++index) {
     this->memoButtons[index] = this->AddNumberedButton(index + 601, -100, -100, "minimap\\memopoint", nullptr, true);
@@ -212,16 +210,32 @@ void UIMiniMapWnd::OnCreate(int width, int height) {
   this->m_playerHead->animationIndex = 0;
   this->m_playerHead->frameIndex = 0;
   this->m_playerHead->animate = 0;
-  this->m_playerHead->SetTooltip(LookupMessage(MSI_MINIMAP_MSG_13));
+  this->m_playerHead->SetTooltip(LookupMessage(MSI_MINIMAP_MSG_10));
   this->m_playerHead->SetId(200);
   this->AddChild(this->m_playerHead);
+}
+
+// OFFSET: 0x0099DA40
+// FUNCTION: fn_45725
+__forceinline void UIMiniMapWnd::FitMapToWindow() {
+  const float terrainWidth = static_cast<float>(g_modeMgr.GetGameMode()->TerrainWidth());
+  const float terrainHeight = static_cast<float>(g_modeMgr.GetGameMode()->TerrainHeight());
+  this->originX = 2.0f;
+  this->originY = 531.0f;
+  this->scale = 512.0f / std::max(terrainWidth, terrainHeight);
+  const float margin = std::fabs(terrainWidth - terrainHeight) * 0.5f * this->scale;
+  if (terrainHeight > terrainWidth) {
+    this->originX = margin + 2.0f;
+  } else if (terrainWidth > terrainHeight) {
+    this->originY = 531.0f - margin;
+  }
 }
 
 // OFFSET: 0x0099C530
 // FUNCTION: fn_13558
 void UIEditctrlWnd::Paint() {
   this->ClearSurface(0xFFFFFFFF);
-  this->DrawTitleBar(true, LookupMessage(MSI_EA9), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_MINIMAP_MSG_15), 0);
 }
 
 // OFFSET: 0x0099C820
@@ -254,6 +268,12 @@ void UIMiniMapWnd::ResetCursor(int, int) {
 // FUNCTION: fn_13562
 int UIEditctrlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
   switch (message) {
+  case UM_DEFPUSH:
+    if (this->edit == sender && this->edit->Length() > 0) {
+      this->SendMsg(this->edit, UM_COMMAND, ID_OK, 0, 0, 0);
+      return 0;
+    }
+    break;
   case UM_COMMAND:
     switch (argument1) {
     case ID_OK: {
@@ -261,7 +281,7 @@ int UIEditctrlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       FILE* file = std::fopen(text.c_str(), "ab");
       if (file) {
         std::fseek(file, 0, SEEK_END);
-        text = FormatOwnedString(g_miniMapMemoLineFormat, g_windowMgr.miniMapWndInfo.x, g_windowMgr.miniMapWndInfo.y, this->edit->Text());
+        text = static_cast<const std::string&>(FormatOwnedString(g_miniMapMemoLineFormat, g_windowMgr.miniMapWndInfo.x, g_windowMgr.miniMapWndInfo.y, this->edit->Text()));
         std::fwrite(text.c_str(), text.size(), 1, file);
         std::fclose(file);
         if (g_windowMgr.miniMapWnd) {
@@ -276,11 +296,6 @@ int UIEditctrlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       return 0;
     }
     return 0;
-  case UM_DEFPUSH:
-    if (this->edit == sender && this->edit->Length() > 0) {
-      this->SendMsg(this->edit, UM_COMMAND, ID_OK, 0, 0, 0);
-      return 0;
-    }
   }
 
   return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
@@ -375,20 +390,40 @@ void UIMiniMapWnd::Paint() {
   }
 }
 
+// OFFSET: 0x0099C8D0
+// FUNCTION: fn_45723
+__declspec(noinline) int UIMiniMapWnd::SaveMemos() {
+  int count = 0;
+  std::string text = FormatOwnedString(g_miniMapMemoPath, g_applicationDirectory, g_session.m_navigationPlayerMap);
+  FILE* file = std::fopen(text.c_str(), "wb");
+  if (file) {
+    const auto tooltipOf = [](const UIBitmapButton* button) -> std::string { return button->m_tooltip; };
+    for (int index = 0; index < 20; ++index) {
+      if (this->memoButtons[index]->geometry.x > 0 && this->memoButtons[index]->geometry.y > 0) {
+        text = static_cast<const std::string&>(FormatOwnedString(g_miniMapMemoLineFormat, this->memoButtons[index]->geometry.x, this->memoButtons[index]->geometry.y, tooltipOf(this->memoButtons[index]).c_str()));
+        std::fwrite(text.c_str(), text.size(), 1, file);
+        ++count;
+      }
+    }
+    std::fclose(file);
+  }
+  return count;
+}
+
+// INLINED
+static const std::string FormatMemoLine(int x, int y, const std::string& tooltip) {
+  return FormatOwnedString(g_miniMapMemoLineFormat, x, y, tooltip.c_str());
+}
+
 // OFFSET: 0x0099CC20
 // FUNCTION: fn_13563
 int UIMiniMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
   switch (message) {
   case UM_COMMAND:
     switch (argument1) {
-    case ID_ITEMS: {
-      const bool enabled = this->townCheckBox->geometry.state != 0;
-      for (auto it = this->townButtons.begin(); it != this->townButtons.end(); ++it) {
-        it->second->Enable(enabled);
-      }
-      this->Invalidate();
+    case ID_ITEMS:
+      this->UpdateTownButtons();
       return 0;
-    }
     case ID_BASE:
       return 0;
     case ID_CLOSE:
@@ -397,20 +432,14 @@ int UIMiniMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     case ID_BOOKMARK:
       this->dragging = 1;
       return 0;
-    case 361: {
-      const bool enabled = this->questCheckBox->geometry.state != 0;
-      for (auto it = this->questButtons.begin(); it != this->questButtons.end(); ++it) {
-        it->second->Enable(enabled);
-      }
-      this->Invalidate();
+    case 361:
+      this->UpdateQuestButtons();
       return 0;
-    }
     case 373:
-      this->Invalidate();
-      return 0;
+      break;
     default:
       if (argument1 >= 601 && argument1 < 621) {
-        if (g_windowMgr.Confirm(LookupMessage(MSI_MINIMAP_MSG_14), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_MINIMAP_MSG_11), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
           this->memoButtons[argument1 - 601]->SetTooltip("");
           this->memoButtons[argument1 - 601]->Move(-100, -100);
 
@@ -420,7 +449,7 @@ int UIMiniMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
             for (int index = 0; index < 20; ++index) {
               UIBitmapButton* memo = this->memoButtons[index];
               if (memo->geometry.x > 0 && memo->geometry.y > 0) {
-                text = FormatOwnedString(g_miniMapMemoLineFormat, memo->geometry.x, memo->geometry.y, std::string(memo->m_tooltip).c_str());
+                text = FormatMemoLine(memo->geometry.x, memo->geometry.y, std::string(memo->m_tooltip));
                 std::fwrite(text.c_str(), text.size(), 1, file);
               }
             }
@@ -457,6 +486,7 @@ int UIMiniMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       }
       return 0;
     }
+    break;
 
   case UM_SETINFO:
     this->m_saved = reinterpret_cast<MiniMapWndInfo*>(argument1);
@@ -514,12 +544,12 @@ int UIMiniMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     button->SetBitmap(name.c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->SetId(id);
-    button->SetTooltip(LookupMessage(MSI_MINIMAP_MSG_15));
+    button->SetTooltip(LookupMessage(MSI_MINIMAP_MSG_12));
     button->Move(static_cast<int>(static_cast<float>(argument3) * this->scale - 6.0f + this->originX),
       static_cast<int>(this->originY - (static_cast<float>(argument4) * this->scale + 6.0f)));
     this->AddChild(button);
-    this->questButtons.insert(std::make_pair(id, button));
-    this->questMarks.insert(std::make_pair(id, MiniMapMark{argument3, argument4}));
+    this->questButtons.try_emplace(id, button);
+    this->questMarks.try_emplace(id, MiniMapMark{argument3, argument4});
     this->Invalidate();
     return 0;
   }
@@ -530,9 +560,32 @@ int UIMiniMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     }
     this->questButtons.clear();
     this->questMarks.clear();
-    this->Invalidate();
-    return 0;
+    break;
+
+  default:
+    return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 
-  return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
+  this->Invalidate();
+  return 0;
+}
+
+// OFFSET: 0x0099D920
+// FUNCTION: fn_45726
+void UIMiniMapWnd::UpdateTownButtons() {
+  const bool enabled = this->townCheckBox->geometry.state != 0;
+  for (auto it = this->townButtons.begin(); it != this->townButtons.end(); ++it) {
+    it->second->Enable(enabled);
+  }
+  this->Invalidate();
+}
+
+// OFFSET: 0x0099D9B0
+// FUNCTION: fn_45724
+void UIMiniMapWnd::UpdateQuestButtons() {
+  const bool enabled = this->questCheckBox->geometry.state != 0;
+  for (auto it = this->questButtons.begin(); it != this->questButtons.end(); ++it) {
+    it->second->Enable(enabled);
+  }
+  this->Invalidate();
 }

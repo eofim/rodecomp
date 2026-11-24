@@ -17,8 +17,6 @@
 
 #include <cstring>
 
-template __declspec(noinline) std::_Tree_find_result<std::map<int, std::int64_t>::_Mybase::_Nodeptr> std::map<int, std::int64_t>::_Mybase::_Find_lower_bound<int>(const int&) const;
-
 namespace {
   struct CRollingCutterRagEffect : CRagEffect {
     __declspec(noinline) CRollingCutterRagEffect();
@@ -41,10 +39,12 @@ namespace {
   };
 
   void RecordLaunch(int effectId) {
-    std::uint32_t recent[8];
+    std::uint32_t previous[8];
+    std::memcpy(previous, g_launchInfo, sizeof(previous));
+    std::uint32_t recent[32];
     recent[0] = effectId;
-    std::memcpy(recent + 1, g_launchInfo, sizeof(recent) - sizeof(recent[0]));
-    std::memcpy(g_launchInfo, recent, sizeof(recent));
+    std::memcpy(recent + 1, previous, 7 * sizeof(recent[0]));
+    std::memcpy(g_launchInfo, recent, 8 * sizeof(recent[0]));
   }
 }
 
@@ -112,9 +112,11 @@ bool CRollingCutterRagEffect::OnProcess() {
 CRagEffect* EffectActor::LaunchEffect(int effectId, vector3d deltaPos, float rotation) {
   CRagEffect* effect;
 
-  if (effectId == 127) {
+  if (effectId == EF_POISONREACT2) {
     this->effectLaunched = 1;
-  } else if (effectId < 0 || effectId > 60000) {
+  } else if (effectId < 0) {
+    return nullptr;
+  } else if (effectId > 60000) {
     return nullptr;
   }
 
@@ -148,7 +150,7 @@ CRagEffect* EffectActor::LaunchEffect(int effectId, vector3d deltaPos, float rot
   deltaPos.x = x;
   deltaPos.z = z;
 
-  if (effectId == 166 && this->render.isCharacter == 0) {
+  if (effectId == EF_MAKEBLUR && this->render.isCharacter == 0) {
     return nullptr;
   }
 
@@ -157,7 +159,8 @@ CRagEffect* EffectActor::LaunchEffect(int effectId, vector3d deltaPos, float rot
   }
 
   effect->Init(this, effectId, deltaPos);
-  g_modeMgr.GetGameMode()->scene->objects.push_back(effect);
+  CGameMode* mode = g_modeMgr.GetGameMode();
+  mode->scene->objects.push_back(effect);
   this->effectList.push_back(effect);
   return effect;
 }

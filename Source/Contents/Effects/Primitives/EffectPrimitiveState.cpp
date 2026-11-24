@@ -1,3 +1,4 @@
+#include "Contents/Actors/ActorEnums.h"
 #include "Contents/Effects/Primitives/EffectPrimitiveState.h"
 #include "Contents/Effects/Primitives/EffectPrim.h"
 #include "Contents/Effects/Core/RagEffect.h"
@@ -7,30 +8,15 @@
 #include <cstdlib>
 #include <cstring>
 
-// OFFSET: 0x00BAE170
-// FUNCTION: fn_19762
-EffectPrimitiveSlot::EffectPrimitiveSlot() {
-  for (int i = 0; i < 4; ++i) {
-    this->vectors[i].x = 0.0f;
-    this->vectors[i].y = 0.0f;
-    this->vectors[i].z = 0.0f;
-  }
-}
-
 // INLINED
-EffectPrimitiveState::~EffectPrimitiveState() {
-  if (this->master) {
-    auto& related = this->master->state.primList;
-
-    for (auto entry = related.begin(); entry != related.end(); ++entry) {
-      if (*entry == this) {
-        related.erase(entry);
-        break;
-      }
-    }
+CEffectPrim::~CEffectPrim() {
+  if (this->state.master) {
+    this->state.master->SendMsg(this, AM_CHILD_DEAD, 0, 0, 0, 0, 0, 0);
   }
 
-  std::free(this->textures);
+  if (this->state.textures) {
+    delete[] this->state.textures;
+  }
 }
 
 // OFFSET: 0x00BAE460
@@ -51,14 +37,18 @@ void CEffectPrim::GetColorOverride(unsigned char* red, unsigned char* green, uns
 
 // OFFSET: 0x00BAE4B0
 // FUNCTION: fn_19766
-void __stdcall Get_Angle(float x, float y, std::int16_t* angle) {
+void CEffectPrim::Get_Angle(float x, float y, std::int16_t* angle) {
   const float length = SquareRoot(x * x + y * y);
   const float normalY = y / length;
   const float normalX = x / length;
 
   for (std::int16_t index = 0; index <= 180; ++index) {
     if (normalX >= g_cosTable[index]) {
-      *angle = normalY < 0.0f ? 360 - index : index;
+      if (normalY >= 0.0f) {
+        *angle = index;
+      } else {
+        *angle = 360 - index;
+      }
       return;
     }
   }
@@ -68,12 +58,12 @@ void __stdcall Get_Angle(float x, float y, std::int16_t* angle) {
 
 // OFFSET: 0x00BAE5D0
 // FUNCTION: fn_19767
-void CEffectPrim::Initialize(CRagEffect& master, int type, float x, float y, float z) {
+void CEffectPrim::Initialize(CRagEffect& master, int type, vector3d deltaPos) {
   this->state.master = &master;
   this->state.count = type;
-  this->state.deltaPos.x = x + this->state.deltaPos.x;
-  this->state.deltaPos.y = y + this->state.deltaPos.y;
-  this->state.deltaPos.z = z + this->state.deltaPos.z;
+  this->state.deltaPos.x = deltaPos.x + this->state.deltaPos.x;
+  this->state.deltaPos.y = deltaPos.y + this->state.deltaPos.y;
+  this->state.deltaPos.z = deltaPos.z + this->state.deltaPos.z;
   this->state.orgPos = master.render.position;
   this->render.position = this->state.orgPos;
   this->state.isChangeProcessed = 0;

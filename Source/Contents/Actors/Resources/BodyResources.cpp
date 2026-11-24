@@ -4049,20 +4049,41 @@ bool CSession::IsSecondJob(int job) {
 
 // OFFSET: 0x00E0A3A0
 // FUNCTION: fn_23795
-std::string CSession::GetBodyJobName(int job) {
+__declspec(noinline) std::string CSession::GetBodyJobName(int job) {
   return this->m_bodyJobNames[job];
+}
+
+// INLINED
+static std::string SexNameOf(int sex) {
+  return g_session.GetSexName(sex);
+}
+
+// INLINED
+static std::string ImfNameOf(int job) {
+  return g_session.GetImfName(job);
+}
+
+// INLINED
+static std::string BodyJobNameOf(int job) {
+  return g_session.GetBodyJobName(job);
 }
 
 // OFFSET: 0x00BAB5D0
 // FUNCTION: fn_19752
 std::string EquipmentResourceMgr::GetBodyImfName(int job, int sex, int, int costumeJob) {
   const int spriteJob = g_session.GetSpriteJob(job, costumeJob, true);
-  std::string sexName;
-  std::string jobName;
-  std::string result;
+  std::string sexName("");
+  std::string jobName("");
+  std::string result("");
 
-  sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
-  jobName = static_cast<const std::string&>(g_session.GetImfName(spriteJob));
+  {
+    const std::string& name = SexNameOf(sex);
+    sexName = name;
+  }
+  {
+    const std::string& name = ImfNameOf(spriteJob);
+    jobName = name;
+  }
   result = static_cast<const std::string&>(FormatOwnedString("%s_%s.imf", jobName.c_str(), sexName.c_str()));
 
   return result;
@@ -4071,14 +4092,20 @@ std::string EquipmentResourceMgr::GetBodyImfName(int job, int sex, int, int cost
 // OFFSET: 0x00BAB850
 // FUNCTION: fn_19753
 std::string EquipmentResourceMgr::GetBodyResourceName(int type, int job, int sex, int costumeJob, int costume) {
-  std::string result;
-  std::string sexName;
-  std::string jobName;
+  std::string result("");
+  std::string sexName("");
+  std::string jobName("");
 
   const bool secondJob = g_session.IsSecondJob(costumeJob);
   const int spriteJob = g_session.GetSpriteJob(job, costumeJob, true);
-  sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
-  jobName = static_cast<const std::string&>(g_session.GetBodyJobName(spriteJob));
+  {
+    const std::string& name = SexNameOf(sex);
+    sexName = name;
+  }
+  {
+    const std::string& name = BodyJobNameOf(spriteJob);
+    jobName = name;
+  }
 
   if (secondJob == true) {
     result = static_cast<const std::string&>(this->GetBodyRacePrefix(spriteJob + 3950)) +

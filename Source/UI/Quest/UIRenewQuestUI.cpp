@@ -839,7 +839,7 @@ void RenewQuestUI::CUIQuestItem::OnSimpleView(bool simpleView) {
 // FUNCTION: fn_16622
 void RenewQuestUI::CUIQuestItem::OnInit() {
   CUIButton* button = this->simpleViewCheckBox;
-  std::string tooltip = LookupMessage(MSI_PASSWORD);
+  std::string tooltip = LookupMessage(MSI_RENEW_QUEST_CHECK_TOOTIP3_ITEM);
   button->tooltip = tooltip;
 }
 
@@ -881,8 +881,6 @@ void CUIRenewQuestUI::OnTabButton(CUITabButton* button) {
 // FUNCTION: fn_16635
 void CUIRenewQuestUI::OnPanelButton() {
 }
-
-template void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::ClearData();
 
 // OFFSET: 0x00A661F0
 // FUNCTION: fn_16612
@@ -936,27 +934,22 @@ void CUIRenewQuestUI::OnCallback56() {
 // OFFSET: 0x00A66FF0
 // FUNCTION: fn_16628
 void CUIRenewQuestUI::SelectQuest(unsigned int questId) {
-  for (RenewQuestUI::CUIQuestList* list : this->questLists) {
-    CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>* listBox = list->list;
-    auto node = std::find(listBox->data.begin(), listBox->data.end(), questId);
-    if (node != listBox->data.end()) {
-      this->tab->SelectPage(list);
-      CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>* pageListBox = list->list;
+  for (auto* page : this->questLists) {
+    const auto& data = page->list->data;
+    const auto node = std::find(data.begin(), data.end(), questId);
+    if (node != data.end()) {
+      this->tab->SelectPage(page);
+      auto* listBox = page->list;
+      const int index = static_cast<int>(std::distance(data.begin(), node));
 
-      int index = 0;
-      for (auto it = listBox->data.begin(); it != node; ++it) {
-        ++index;
+      listBox->scrollBar->SetPosition(listBox->rowHeight * index);
+
+      const auto found = std::find_if(listBox->items.begin(), listBox->items.end(), [index](RenewQuestUI::CUIQuestItem* item) {
+        return index == item->index;
+      });
+      if (found != listBox->items.end()) {
+        listBox->SelectItem(*found);
       }
-
-      pageListBox->scrollBar->SetPosition(pageListBox->rowHeight * index);
-
-      for (RenewQuestUI::CUIQuestItem* item : pageListBox->items) {
-        if (index == item->index) {
-          pageListBox->SelectItem(item);
-          return;
-        }
-      }
-
       return;
     }
   }
@@ -997,13 +990,6 @@ template <>
 CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::~CUIListBoxEx() {
 }
 
-// OFFSET: 0x00A59BB0
-// FUNCTION: fn_16367
-CUIEditBoxEx::CUIEditBoxEx()
-    : CUIControl(), backgroundColor(0xF7F7F7), borderColor(0xC6C6C6), borderWidth(1), editLeft(0), editTop(0), editRight(0), editBottom(0),
-      edit(nullptr), onSubmit() {
-}
-
 // OFFSET: 0x00A67CA0
 // FUNCTION: fn_16630
 void RenewQuestUI::CUIQuestItem::SetSelected(bool selected) {
@@ -1041,11 +1027,7 @@ template <>
 void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
   this->scrollBar->Show(0);
-  {
-    CUIVScrollBar* bar = this->scrollBar;
-    const std::function<void(int)> onChange = [this](int position) { this->OnScroll(position); };
-    bar->onChange = onChange;
-  }
+  this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
 
@@ -1053,12 +1035,6 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::OnCreate(int width
 // FUNCTION: fn_16440
 void CUIEditBoxEx::SetOnSubmit(std::function<void()> handler) {
   this->onSubmit = handler;
-}
-
-// OFFSET: 0x00A63C00
-// FUNCTION: fn_16441
-void CUITab::SetOnChange(std::function<void(CUITabButton*)> handler) {
-  this->onChange = handler;
 }
 
 // OFFSET: 0x00A664C0
@@ -1109,7 +1085,7 @@ void RenewQuestUI::CUIQuestList::BindItem(CUIQuestItem* item, const unsigned lon
     CUICheckBox* activeCheckBox = item->activeCheckBox;
     activeCheckBox->checked = info.m_active;
     activeCheckBox->Invalidate();
-    std::string tooltip = LookupMessage(MSI_SAVE_ID);
+    std::string tooltip = LookupMessage(MSI_RENEW_QUEST_CHECK_TOOTIP2_ITEM);
     item->activeCheckBox->tooltip = tooltip;
   } else {
     auto& quests = g_renewQuestMgr->m_ongoingQuests;
@@ -1131,8 +1107,18 @@ void RenewQuestUI::CUIQuestList::BindItem(CUIQuestItem* item, const unsigned lon
     CUICheckBox* activeCheckBox = item->activeCheckBox;
     activeCheckBox->checked = info.m_active;
     activeCheckBox->Invalidate();
-    std::string tooltip = LookupMessage(MSI_OTP_INPUT_TIME);
+    std::string tooltip = LookupMessage(MSI_RENEW_QUEST_CHECK_TOOTIP1_ITEM);
     item->activeCheckBox->tooltip = tooltip;
+  }
+}
+
+// INLINED
+static void AddProgressingQuest(
+  CUIRenewQuestUI* window, CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>* listBox, const std::pair<const unsigned int, RenewQuestOngoingInfo>& quest
+) {
+  const std::pair<const unsigned long, RenewQuestOngoingInfo> entry = quest;
+  if (window->MatchesFilter(entry.second) && entry.second.questType != 1 && entry.second.m_state != 0) {
+    listBox->AddData(entry.first, false);
   }
 }
 
@@ -1148,10 +1134,8 @@ void CUIRenewQuestUI::UpdateQuestLists(unsigned int flags) {
       if (CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>* listBox = list->list) {
         const int position = listBox->data.size() == 0 ? -1 : listBox->scrollBar->position;
         listBox->ClearData();
-        for (std::pair<const unsigned long, RenewQuestOngoingInfo> entry : g_renewQuestMgr->m_ongoingQuests) {
-          if (this->MatchesFilter(entry.second) && entry.second.questType != 1 && entry.second.m_state != 0) {
-            listBox->AddData(entry.first, false);
-          }
+        for (const auto& quest : g_renewQuestMgr->m_ongoingQuests) {
+          AddProgressingQuest(this, listBox, quest);
         }
         listBox->UpdateScrollBar();
         if (position == -1) {
@@ -1206,7 +1190,10 @@ void CUIRenewQuestUI::UpdateQuestLists(unsigned int flags) {
         const int position = listBox->data.size() == 0 ? -1 : listBox->scrollBar->position;
         listBox->ClearData();
         for (std::pair<const unsigned long, RenewQuestOngoingInfo> entry : g_renewQuestMgr->m_ongoingQuests) {
-          if (this->MatchesFilter(entry.second) && entry.second.questType != 1 && entry.second.m_state == 0) {
+          if (!this->MatchesFilter(entry.second)) {
+            continue;
+          }
+          if (entry.second.questType != 1 && entry.second.m_state == 0) {
             listBox->AddData(entry.first, false);
           }
         }
@@ -1229,7 +1216,10 @@ void CUIRenewQuestUI::UpdateQuestLists(unsigned int flags) {
         const int position = listBox->data.size() == 0 ? -1 : listBox->scrollBar->position;
         listBox->ClearData();
         for (std::pair<const unsigned long, RenewQuestOngoingInfo> entry : g_renewQuestMgr->m_ongoingQuests) {
-          if (this->MatchesFilter(entry.second) && entry.second.questType == 1) {
+          if (!this->MatchesFilter(entry.second)) {
+            continue;
+          }
+          if (entry.second.questType == 1) {
             listBox->AddData(entry.first, false);
           }
         }
@@ -1249,13 +1239,16 @@ CUIFrameWnd* CreateRenewQuestUI() {
   return new CUIRenewQuestUI();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00499210
 // FUNCTION: fn_45554
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateRenewQuestUI;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10008, factory);
-  return true;
-}();
+static UIRegistration s_renewQuestUIRegistered(10008, CreateRenewQuestUI);
 
 // OFFSET: 0x00A5C590
 // FUNCTION: fn_16434
@@ -1777,8 +1770,9 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::AddNewItem() {
     return;
   }
 
-  for (RenewQuestUI::CUIQuestItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -1794,14 +1788,14 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::AddNewItem() {
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (RenewQuestUI::CUIQuestItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -1937,13 +1931,18 @@ CUIRenewQuestUI::CUIRenewQuestUI()
       titleBar(nullptr), background(nullptr) {
 }
 
+// INLINED
+static void SetTabTooltip(CUITabButton* button, const std::string& text) {
+  button->tooltipText = text;
+}
+
 // OFFSET: 0x00A66DA0
 // FUNCTION: fn_16624
 void CUIRenewQuestUI::OnInit() {
   g_windowMgr.RecordWindowPacket(0x2718);
   g_windowMgr.CloseWindow(WID_NOTIFYQUESTWND);
 
-  this->titleBar->SetTitle(LookupMessage(MSI_RENEW_QUEST_DETAIL_REWARD));
+  this->titleBar->SetTitle(LookupMessage(MSI_RENEW_QUEST_TITLE));
   this->filterLabel->SetText(LookupMessage(MSI_QUEST_DISPLAY_ONOFF));
 
   bool visible = false;
@@ -1961,7 +1960,6 @@ void CUIRenewQuestUI::OnInit() {
   this->UpdateQuestLists(0xF);
 
   for (UIWindow* child : this->filterPanel->m_children) {
-    const std::string& name = g_renewQuestMgr->GetFilterName(child->geometry.id);
-    static_cast<CUITabButton*>(child)->tooltipText = name;
+    SetTabTooltip(static_cast<CUITabButton*>(child), g_renewQuestMgr->GetFilterName(child->geometry.id));
   }
 }

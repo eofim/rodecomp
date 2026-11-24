@@ -28,7 +28,7 @@ bool PakRegistry::Add(const char* filename) {
 
 // OFFSET: 0x00AE9BF0
 // FUNCTION: fn_18112
-void* PakRegistry::Read(const char* filename, std::uint32_t* size, int) {
+void* PakRegistry::Read(const char* filename, std::uint32_t* size, bool) {
   void* result = this->ReadArchive(filename, size);
   if (result) {
     return result;
@@ -42,9 +42,10 @@ void* PakRegistry::Read(const char* filename, std::uint32_t* size, int) {
 void* PakRegistry::ReadArchive(const char* filename, std::uint32_t* size) {
   for (const auto& archive : this->m_archives) {
     myGPack::PakEntry entry;
+    CGPak* pak = archive.second;
     myGPack::PakName name(filename);
 
-    if (archive.second->Find(name, &entry)) {
+    if (pak->Find(name, &entry)) {
       *size = entry.originalSize;
 
       void* buffer = VirtualAlloc(nullptr, entry.originalSize + 8, MEM_COMMIT, PAGE_READWRITE);
@@ -65,20 +66,24 @@ void* PakRegistry::ReadArchive(const char* filename, std::uint32_t* size) {
 bool PakRegistry::Exists(const char* filename, bool looseOnly) const {
   if (!looseOnly) {
     for (const auto& archive : this->m_archives) {
-      if (archive.second->Find(myGPack::PakName(filename), nullptr)) {
+      CGPak* pak = archive.second;
+      myGPack::PakName name(filename);
+      if (pak->Find(name, nullptr)) {
         return true;
       }
     }
   }
 
-  WIN32_FIND_DATAA information;
-  HANDLE search = FindFirstFileA(filename, &information);
-  if (search == INVALID_HANDLE_VALUE) {
-    return false;
-  }
+  {
+    WIN32_FIND_DATAA information;
+    HANDLE search = FindFirstFileA(filename, &information);
+    if (search == INVALID_HANDLE_VALUE) {
+      return false;
+    }
 
-  FindClose(search);
-  return true;
+    FindClose(search);
+    return true;
+  }
 }
 
 // OFFSET: 0x00AEA1F0

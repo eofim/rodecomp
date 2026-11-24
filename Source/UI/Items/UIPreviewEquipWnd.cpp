@@ -34,6 +34,17 @@ UIPreviewEquipWnd::~UIPreviewEquipWnd() {
   delete this->m_render;
 }
 
+// INLINED
+static void DrawPreviewCharacter(
+  UIWindow* window, int x, int y, unsigned char sex, short job, int hairColor, short body, short head, short bottomAccessory, short topAccessory,
+  short midAccessory, int robe, unsigned char flags, int shield, int bodyStyle, int headPalette, int action, int motion, int time
+) {
+  FuncDrawWNDChar(
+    window, x, y, sex, job, hairColor, body, head, bottomAccessory, topAccessory, midAccessory, robe, flags, shield, bodyStyle, headPalette, action,
+    motion, time
+  ).Draw(1);
+}
+
 // OFFSET: 0x007F3590
 // FUNCTION: fn_09881
 void UIPreviewEquipWnd::DrawCharacter() {
@@ -45,16 +56,13 @@ void UIPreviewEquipWnd::DrawCharacter() {
   offset.x = 0.0f;
   offset.y = 0.0f;
   offset.z = -this->m_render->cameraDistance;
-  float eye[3];
-  eye[0] = offset.x * view.values[0] + offset.y * view.values[3] + offset.z * view.values[6] + view.values[9];
-  eye[1] = offset.x * view.values[1] + offset.y * view.values[4] + offset.z * view.values[7] + view.values[10];
-  eye[2] = offset.x * view.values[2] + offset.y * view.values[5] + offset.z * view.values[8] + view.values[11];
+  vector3d eye;
+  eye.x = offset.x * view.values[0] + offset.y * view.values[3] + offset.z * view.values[6] + view.values[9];
+  eye.y = offset.x * view.values[1] + offset.y * view.values[4] + offset.z * view.values[7] + view.values[10];
+  eye.z = offset.x * view.values[2] + offset.y * view.values[5] + offset.z * view.values[8] + view.values[11];
 
-  float up[3];
-  up[0] = this->m_render->cameraUpX;
-  up[1] = this->m_render->cameraUpY;
-  up[2] = this->m_render->cameraUpZ;
-  view.LookAt(eye, &this->m_render->position.x, up);
+  vector3d up = this->m_render->cameraUp;
+  view.LookAt(&eye.x, &this->m_render->position.x, &up.x);
 
   float screenX = 0.0f;
   float screenY = 0.0f;
@@ -65,13 +73,13 @@ void UIPreviewEquipWnd::DrawCharacter() {
     static_cast<float>(this->geometry.height) + this->m_render->viewportOffsetY
   );
 
-  FuncDrawWNDChar(
+  DrawPreviewCharacter(
     this, static_cast<int>(screenX), static_cast<int>(screenY), static_cast<unsigned char>(this->m_render->appearance[0]),
     static_cast<short>(this->m_render->job), this->m_render->headJob, static_cast<short>(this->m_render->bodyCostume),
     static_cast<short>(this->m_render->appearance[1]), static_cast<short>(this->m_render->lowerHeadgear), static_cast<short>(this->m_render->upperHeadgear),
     static_cast<short>(this->m_render->middleHeadgear), this->m_render->robe, this->m_render->riding, this->m_render->madogearType, this->m_render->appearance[2],
     this->m_render->appearance[3], this->m_render->actionIndex, this->m_render->frameIndex, 0
-  ).Draw(1);
+  );
 }
 
 // OFFSET: 0x007F38A0
@@ -83,20 +91,20 @@ void UIPreviewEquipWnd::OnCreate(int width, int height) {
 
   UIStaticText* shadow = new UIStaticText();
   shadow->SetSize(
-    this->TextWidth(LookupMessage(MSI_IMPOSSIBLE_CHANGE_GUILD_MASTER_IN_SIEGE_TIME), 0, 0, 12, 0, 0),
-    this->TextHeight(LookupMessage(MSI_IMPOSSIBLE_CHANGE_GUILD_MASTER_IN_SIEGE_TIME), 0, 0, 12, 0, 0)
+    this->TextWidth(LookupMessage(MSI_EQUIPMENT), 0, 0, 12, 0, 0),
+    this->TextHeight(LookupMessage(MSI_EQUIPMENT), 0, 0, 12, 0, 0)
   );
-  shadow->SetText(LookupMessage(MSI_IMPOSSIBLE_CHANGE_GUILD_MASTER_IN_SIEGE_TIME), 0);
+  shadow->SetText(LookupMessage(MSI_EQUIPMENT), 0);
   shadow->SetColor(255, 255, 255);
   shadow->Move(19, 4);
   this->AddChild(shadow);
 
   UIStaticText* title = new UIStaticText();
   title->SetSize(
-    this->TextWidth(LookupMessage(MSI_IMPOSSIBLE_CHANGE_GUILD_MASTER_IN_SIEGE_TIME), 0, 0, 12, 0, 0),
-    this->TextHeight(LookupMessage(MSI_IMPOSSIBLE_CHANGE_GUILD_MASTER_IN_SIEGE_TIME), 0, 0, 12, 0, 0)
+    this->TextWidth(LookupMessage(MSI_EQUIPMENT), 0, 0, 12, 0, 0),
+    this->TextHeight(LookupMessage(MSI_EQUIPMENT), 0, 0, 12, 0, 0)
   );
-  title->SetText(LookupMessage(MSI_IMPOSSIBLE_CHANGE_GUILD_MASTER_IN_SIEGE_TIME), 0);
+  title->SetText(LookupMessage(MSI_EQUIPMENT), 0);
   title->Move(18, 3);
   this->AddChild(title);
 
@@ -126,7 +134,7 @@ void UIPreviewEquipWnd::OnCreate(int width, int height) {
   this->AddChild(this->m_rightButton);
 
   this->m_actionButton = new UIBasicButton();
-  this->m_actionButton->Configure(80, LookupMessage(MSI_BLOCK_CALL_PERMIT));
+  this->m_actionButton->Configure(80, LookupMessage(MSI_RESET));
   this->m_actionButton->Move(static_cast<int>((this->geometry.width - this->m_actionButton->geometry.width) * 0.5), this->geometry.height - 30);
   this->m_actionButton->SetId(ID_RESET);
   this->m_actionButton->invalidateParent = 1;
@@ -136,8 +144,8 @@ void UIPreviewEquipWnd::OnCreate(int width, int height) {
 // OFFSET: 0x007F3CD0
 // FUNCTION: fn_09883
 void UIPreviewEquipWnd::Paint() {
-  this->SetSolid(g_renderer->primitives, this->geometry.width, this->geometry.height, 0);
-  this->DrawNamed(g_renderer->primitives, 0, 0, "유저인터페이스\\equip_preview\\bg_mounting2.bmp", 0xffffffff, 0, 0);
+  this->SetSolid(this->geometry.width, this->geometry.height, 0);
+  this->DrawNamed(0, 0, "유저인터페이스\\equip_preview\\bg_mounting2.bmp", 0xffffffff, 0, 0);
   void (UIPreviewEquipWnd::*draw)() = &UIPreviewEquipWnd::DrawCharacter;
   (this->*draw)();
 }
@@ -276,11 +284,11 @@ int UIPreviewEquipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       case EQP_COSTUME_HEAD_LOW:
         this->m_render->lowerHeadgear = item->sprite;
         this->m_render->lowerHeadgearLocation = 1;
-        if ((this->m_render->upperHeadgearLocation & 1) != 0) {
+        if (0 != (this->m_render->upperHeadgearLocation & 1)) {
           this->m_render->upperHeadgearLocation = 0;
           this->m_render->upperHeadgear = 0;
         }
-        if ((this->m_render->middleHeadgearLocation & 1) != 0) {
+        if (0 != (this->m_render->middleHeadgearLocation & 1)) {
           this->m_render->middleHeadgearLocation = 0;
           this->m_render->middleHeadgear = 0;
         }

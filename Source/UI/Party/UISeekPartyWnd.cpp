@@ -5,15 +5,13 @@
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Text/UIStaticText.h"
 #include "UI/Status/UIJobListWnd.h"
+#include "UI/Window/UIEnums.h"
 
 #include "Resource/MSGSTRINGID.h"
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <utility>
-
-template __declspec(noinline) std::_Tree_find_result<std::map<int, bool>::_Mybase::_Nodeptr> std::map<int, bool>::_Mybase::_Find_lower_bound<int>(const int&) const;
-
 
 // OFFSET: 0x00912010
 // FUNCTION: fn_12525
@@ -29,6 +27,11 @@ UISeekPartyWnd::UISeekPartyWnd() : UIFrameWnd(0) {
   this->expandedHeight = 0;
   this->m_minimized = 0;
   this->m_elapsed = GetTickCount() - g_session.m_partyBooking.registeredTick;
+}
+
+// OFFSET: 0x00914770
+// FUNCTION: fn_45687
+__declspec(noinline) UISeekPartyWnd::~UISeekPartyWnd() {
 }
 
 // OFFSET: 0x009281A0
@@ -60,7 +63,7 @@ void UISeekPartyWnd::OnCreate(int, int) {
     this->m_cancelButton->SetBitmap((path + "btn_cancel_b" + ".bmp").c_str(), 2, 0);
     this->m_cancelButton->SetSize(this->m_cancelButton->BitmapWidth(), this->m_cancelButton->BitmapHeight());
     this->m_cancelButton->Move(this->geometry.width - 0x2E, this->geometry.height - 0x18);
-    this->m_cancelButton->SetId(0xC9);
+    this->m_cancelButton->SetId(ID_CLOSE);
     this->AddChild(this->m_cancelButton);
   }
 
@@ -72,7 +75,7 @@ void UISeekPartyWnd::OnCreate(int, int) {
     this->m_rewriteButton->SetBitmap((path + "btn_rewrite_b" + ".bmp").c_str(), 2, 0);
     this->m_rewriteButton->SetSize(this->m_rewriteButton->BitmapWidth(), this->m_rewriteButton->BitmapHeight());
     this->m_rewriteButton->Move(this->geometry.width - 0x5C, this->geometry.height - 0x18);
-    this->m_rewriteButton->SetId(0x11C);
+    this->m_rewriteButton->SetId(ID_CHARGE);
     this->AddChild(this->m_rewriteButton);
   }
 

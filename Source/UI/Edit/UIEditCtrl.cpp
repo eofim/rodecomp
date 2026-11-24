@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/GameSettings/TalkType.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMessage.h"
@@ -136,9 +137,9 @@ char g_skillListCount;
 int g_skillUpgradeId;
 
 // GLOBAL: gl_24651
-static const std::string g_itemLinkOpen = "<ITEML>";
+const std::string g_itemLinkOpen = "<ITEML>";
 // GLOBAL: gl_24652
-static const std::string g_itemLinkClose = "</ITEML>";
+const std::string g_itemLinkClose = "</ITEML>";
 // GLOBAL: gl_24647
 static const std::string g_editNaviTagBegin = "<NAVIL>";
 // GLOBAL: gl_24648
@@ -358,77 +359,6 @@ void UIEditCtrl::OnMouseHover(int x, int y) {
   }
 }
 
-// INLINED
-__forceinline void UIEditCtrl::InsertLink(const char* value) {
-  const std::string name = g_navigationLinkParser->FormatNavigationLink(value, false);
-  this->FitTextToWidth(name, this->geometry.width / 2);
-  std::string display = "<";
-  display += name;
-  display += ">";
-  std::string before;
-  bool removed = false;
-  std::size_t position = 0;
-  std::size_t oldBytes = 0;
-
-  for (auto entry = this->links.begin(); entry != this->links.end();) {
-    UIWindow* window = *entry;
-
-    if (window->geometry.id == 438) {
-      removed = true;
-      UINaviLinkButton* button = static_cast<UINaviLinkButton*>(window);
-      const std::string linkName = g_navigationLinkParser->FormatNavigationLink(button->Link(), false);
-      this->FitTextToWidth(linkName, this->geometry.width / 2);
-      std::string old = "<";
-      old += linkName;
-      old += ">";
-
-      oldBytes = std::strlen(old.c_str());
-      position = this->text.find(old);
-
-      if (position != std::string::npos) {
-        before = this->text.substr(0, position);
-      }
-
-      this->RemoveChild(window, 1);
-      entry = this->links.erase(entry);
-    } else {
-      ++entry;
-    }
-  }
-
-  if (!_mbsstr(reinterpret_cast<const unsigned char*>(value), reinterpret_cast<const unsigned char*>(g_editNaviTagBegin.c_str())) &&
-      !_mbsstr(reinterpret_cast<const unsigned char*>(value), reinterpret_cast<const unsigned char*>(g_editNaviTagEnd.c_str()))) {
-    this->SetText(value);
-    return;
-  }
-
-  const std::string prospective = this->text + g_navigationLinkParser->DisplayNavigationLink(value);
-
-  if (static_cast<unsigned>(this->maximum) < prospective.size()) {
-    return;
-  }
-
-  if (!removed) {
-    this->text += g_navigationLinkParser->DisplayNavigationLink(value);
-  } else if (position != std::string::npos) {
-    before += display;
-    before += this->text.substr(position + oldBytes);
-    this->text = before;
-  }
-
-  this->SetText(this->text.c_str());
-  this->anchor = this->cursor = static_cast<int>(this->text.size());
-  g_serverLanguage->Select(this->cursor, this->cursor);
-
-  auto* button = new UINaviLinkButton();
-
-  button->Configure(display.c_str(), 0x009E68F0, 0, 12, 0, 0);
-  button->SetId(438);
-  button->link = GetNavigationLinkParser()->ExtractNavigationLink(value);
-  this->AddChild(button);
-  this->links.push_back(button);
-}
-
 // OFFSET: 0x008641C0
 // FUNCTION: fn_10914
 int UIEditCtrl::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -448,9 +378,74 @@ int UIEditCtrl::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       }
     }
     break;
-  case UM_INSERT_ITEM_LINK:
-    this->InsertLink(reinterpret_cast<const char*>(a));
+  case UM_INSERT_ITEM_LINK: {
+    const char* value = reinterpret_cast<const char*>(a);
+    const std::string name = GetNavigationLinkParser()->FormatNavigationLink(value, false);
+    this->FitTextToWidth(name, this->geometry.width / 2);
+    std::string display = "<";
+    display += name;
+    display += ">";
+    bool removed = false;
+    std::string before;
+    std::size_t position = 0;
+    std::size_t oldBytes = 0;
+
+    for (auto entry = this->links.begin(); entry != this->links.end();) {
+      if ((*entry)->geometry.id == 438) {
+        removed = true;
+        const std::string linkName = GetNavigationLinkParser()->FormatNavigationLink(static_cast<UINaviLinkButton*>(*entry)->Link(), false);
+        this->FitTextToWidth(linkName, this->geometry.width / 2);
+        std::string old = "<";
+        old += linkName;
+        old += ">";
+
+        oldBytes = std::strlen(old.c_str());
+        position = this->text.find(old);
+
+        if (position != std::string::npos) {
+          before = this->text.substr(0, position);
+        }
+
+        this->RemoveChild(*entry, 1);
+        entry = this->links.erase(entry);
+      } else {
+        ++entry;
+      }
+    }
+
+    if (!_mbsstr(reinterpret_cast<const unsigned char*>(value), reinterpret_cast<const unsigned char*>(g_editNaviTagBegin.c_str())) &&
+        !_mbsstr(reinterpret_cast<const unsigned char*>(value), reinterpret_cast<const unsigned char*>(g_editNaviTagEnd.c_str()))) {
+      this->SetText(value);
+      break;
+    }
+
+    const std::string prospective = this->text + GetNavigationLinkParser()->DisplayNavigationLink(value);
+
+    if (static_cast<unsigned>(this->maximum) < prospective.size()) {
+      break;
+    }
+
+    if (!removed) {
+      this->text += GetNavigationLinkParser()->DisplayNavigationLink(value);
+    } else if (position != std::string::npos) {
+      before += display;
+      before += this->text.substr(position + oldBytes);
+      this->text = before;
+    }
+
+    this->SetText(this->text.c_str());
+    this->anchor = this->cursor = static_cast<int>(this->text.size());
+    g_serverLanguage->Select(this->cursor, this->cursor);
+
+    auto* button = new UINaviLinkButton();
+
+    button->Configure(display.c_str(), 0x009E68F0, 0, 12, 0, 0);
+    button->SetId(ID_NAVI_LINK);
+    button->link = GetNavigationLinkParser()->ExtractNavigationLink(value);
+    this->AddChild(button);
+    this->links.push_back(button);
     break;
+  }
   }
 
   UIWindow::SendMsg(sender, message, a, b, c, d);
@@ -522,13 +517,13 @@ std::string UIEditCtrl3::TakePendingText() {
 
 // OFFSET: 0x008590E0
 // FUNCTION: fn_10772
-bool HasItemLinkTag(const std::string& text) {
+int UIEditCtrl::HasItemLinkTag(const std::string& text) {
   return text.find(g_itemLinkOpen) != std::string::npos || text.find(g_itemLinkClose) != std::string::npos;
 }
 
 // OFFSET: 0x00859170
 // FUNCTION: fn_10773
-int __stdcall HasNaviLinkTag(const std::string& text) {
+int UIEditCtrl::HasNaviLinkTag(const std::string& text) {
   return text.find(g_editNaviTagBegin) != std::string::npos || text.find(g_editNaviTagEnd) != std::string::npos;
 }
 
@@ -559,6 +554,20 @@ void UIEditCtrl3::SetTagColor(std::uint32_t color) {
       (*it)[index]->m_hoverColor = color;
     }
   }
+}
+
+// OFFSET: 0x008542B0
+// FUNCTION: fn_45635
+__declspec(noinline) void UIEditCtrl3::ClearTags() {
+  for (auto entry = this->entries.begin(); entry != this->entries.end();) {
+    for (unsigned index = 0; index < entry->size(); ++index) {
+      this->RemoveChild((*entry)[index], 1);
+    }
+    std::vector<UIItemTagButton*> buttons;
+    buttons.swap(*entry);
+    entry = this->entries.erase(entry);
+  }
+  this->entries.clear();
 }
 
 // INLINED
@@ -609,9 +618,12 @@ void UIEditCtrl3::PlaceTags(const int& x, const int& y, const int& firstLine, co
 // OFFSET: 0x00856FB0
 // FUNCTION: fn_10758
 void UIEditCtrl::DrawSelectionAt(int x, int y, int width) {
-  const int extent = x < 3 ? x - 3 + width : width;
-  const int left = x >= 3 ? x : 3;
   const int right = this->geometry.width;
+  if (x < 3) {
+    width += x - 3;
+  }
+  const int extent = width;
+  const int left = x >= 3 ? x : 3;
 
   if (left < right && extent > 0) {
     unsigned red, green, blue;
@@ -623,7 +635,10 @@ void UIEditCtrl::DrawSelectionAt(int x, int y, int width) {
 // OFFSET: 0x00857040
 // FUNCTION: fn_10759
 void UIEditCtrl::DrawSelection(int x, int width) {
-  const int extent = x < 3 ? x - 3 + width : width;
+  if (x < 3) {
+    width += x - 3;
+  }
+  const int extent = width;
   const int left = x >= 3 ? x : 3;
   const int right = this->geometry.width;
 
@@ -881,12 +896,6 @@ void UITextureButton::VisitChildren() {
   );
 }
 
-// OFFSET: 0x00858B80
-// FUNCTION: fn_10764
-std::string UINaviLinkButton::Link() {
-  return this->link;
-}
-
 // OFFSET: 0x00858BE0
 // FUNCTION: fn_10765
 int UISpriteButton::FrameHeight(int action, int frame) {
@@ -912,7 +921,7 @@ void UINoticeMessageBox_LockSellItem::OnCreate(int, int) {
   button->SetBitmap("유저인터페이스\\inventory\\bt_close.bmp", 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(229, 4);
-  button->SetId(201);
+  button->SetId(ID_CLOSE);
   this->AddChild(button);
 }
 
@@ -1030,14 +1039,14 @@ void UIItemStoreWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   if (g_session.m_buyingStoreMode) {
     if (g_session.m_buyingStoreNoPermission == 1) {
       std::memset(text, 0, 250);
-      std::sprintf(text, LookupMessage(MSI_GUILD_STORAGE_PERMISSON_WARNING_MSG));
+      std::sprintf(text, LookupMessage(MSI_GUILD_STORAGE_WARNING_USING_ANOTHER_MEMBER));
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFF, 0, 0, 0);
       return;
     }
 
     if (!g_session.m_buyingStoreDbNumber && !g_session.m_buyingStoreNoPermission) {
       std::memset(text, 0, 250);
-      std::sprintf(text, LookupMessage(MSI_BARGAINSALE_TOOLWND_DB_NUMBER));
+      std::sprintf(text, LookupMessage(MSI_GUILD_STORAGE_PERMISSON_WARNING_MSG));
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFF, 0, 0, 0);
       return;
     }
@@ -1142,22 +1151,22 @@ void UIItemWnd::DragAndDrop(int x, int y, std::intptr_t value) {
 void UIItemStoreFindWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.itemWnd) {
         if (mode->inventoryChanged) {
           mode->inventoryChanged = 0;
-          mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_BODY, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+          mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_BODY, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
         }
       } else if (g_windowMgr.merchantItemWnd && mode->inventoryChanged) {
         mode->inventoryChanged = 0;
-        mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       if (g_windowMgr.itemWnd) {
-        mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
@@ -1170,22 +1179,22 @@ void UIItemStoreFindWnd::OnRBtnDown(int x, int y) {
 void UIItemStoreSubWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.itemWnd) {
         if (mode->inventoryChanged) {
           mode->inventoryChanged = 0;
-          mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_BODY, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+          mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_BODY, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
         }
       } else if (g_windowMgr.merchantItemWnd && mode->inventoryChanged) {
         mode->inventoryChanged = 0;
-        mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       if (g_windowMgr.itemWnd) {
-        mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
@@ -1198,21 +1207,21 @@ void UIItemStoreSubWnd::OnRBtnDown(int x, int y) {
 void UIItemStoreWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.itemWnd) {
         if (mode->inventoryChanged) {
           mode->inventoryChanged = 0;
-          mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_BODY, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+          mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_BODY, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
         }
       } else if (g_windowMgr.merchantItemWnd && mode->inventoryChanged) {
         mode->inventoryChanged = 0;
-        mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
-      mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+      mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
     } else {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
     }
@@ -1224,7 +1233,7 @@ void UIItemStoreWnd::OnRBtnDown(int x, int y) {
 void UIItemWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
@@ -1232,8 +1241,8 @@ void UIItemWnd::OnRBtnDown(int x, int y) {
         return;
       }
 
-      item = g_session.LookupClientItemByIdentity(item.identity[1]);
-      mode->drag.BeginItem(g_windowMgr, 1, item, item.quantity, -1);
+      item = g_session.LookupClientItemByIdentity(item.itemIndex);
+      mode->BeginDragItem(DRAG_ITEM_INVENTORY, item, item.quantity, -1);
       if (mode->ConfirmDraggedItemUse()) {
         return;
       }
@@ -1241,27 +1250,27 @@ void UIItemWnd::OnRBtnDown(int x, int y) {
       if (g_windowMgr.itemStoreWnd) {
         if (mode->inventoryChanged) {
           mode->inventoryChanged = 0;
-          mode->SendMsg(MM_ADD_ITEM_TO_STORE, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+          mode->SendMsg(MM_ADD_ITEM_TO_STORE, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
         }
       } else if (g_windowMgr.LookupWindow(WID_EXCHANGEUI)) {
         if (mode->inventoryChanged) {
           mode->inventoryChanged = 0;
-          mode->SendMsg(MM_ADD_EXCHANGE_ITEM, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+          mode->SendMsg(MM_ADD_EXCHANGE_ITEM, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
         }
       } else if (g_windowMgr.merchantItemWnd && mode->inventoryChanged) {
         mode->inventoryChanged = 0;
-        mode->SendMsg(MM_MOVE_ITEM_FROM_BODY_TO_CART, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_FROM_BODY_TO_CART, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       if (this->tabs) {
-        mode->SendMsg(MM_INVENTORY_TAB, static_cast<int>(item.identity[1]), this->tabs->activeTabIndex == 3, 0, 0);
+        mode->SendMsg(MM_INVENTORY_TAB, static_cast<int>(item.itemIndex), this->tabs->activeTabIndex == 3, 0, 0);
       }
     } else if (HIBYTE(GetAsyncKeyState(VK_CONTROL))) {
-      if (item.identity[1] > 0 && !g_session.IsPetEgg(item.GetItemId())) {
+      if (item.itemIndex > 0 && !g_session.IsPetEgg(item.GetItemId())) {
         const int magnifiers =
           g_session.LookupClientItem(611, 0).quantity + g_session.LookupClientItem(12325, 0).quantity;
         if (magnifiers <= 0) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_UISCRIPT_ERROR_GUIDE)), 255, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILIED_ONECLICK_ITEMIDENTIFY_NO_MAGNIFIER)), 255, 0, 0, 0);
         }
 
         if (this->categoryFilter == 1 && !item.identified) {
@@ -1270,8 +1279,8 @@ void UIItemWnd::OnRBtnDown(int x, int y) {
             unsigned short index;
           } packet;
           packet.packetType = ID_CZ_REQ_ONECLICK_ITEMIDENTIFY;
-          packet.index = static_cast<unsigned short>(item.identity[1]);
-          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
+          packet.index = static_cast<unsigned short>(item.itemIndex);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(ID_CZ_REQ_ONECLICK_ITEMIDENTIFY), &packet);
         }
       }
     } else {
@@ -1292,13 +1301,13 @@ void UIMerchantItemPurchaseWnd::OnRBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.merchantItemShopWnd) {
         item = g_session.GetMerchantHopeToSellItemInfoByItemId(item.itemId.c_str());
-        mode->BeginDragItem(13, item, item.quantity, -1);
+        mode->BeginDragItem(DRAG_VENDING_ITEM_PURCHASE, item, item.quantity, -1);
         static_cast<UIWindow*>(g_windowMgr.merchantItemShopWnd)->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
       }
     } else {
@@ -1319,12 +1328,12 @@ void UIMerchantItemShopWnd::OnRBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.merchantItemPurchaseWnd) {
-        mode->BeginDragItem(12, item, item.quantity, -1);
+        mode->BeginDragItem(DRAG_VENDING_ITEM_SHOP, item, item.quantity, -1);
         static_cast<UIWindow*>(g_windowMgr.merchantItemPurchaseWnd)->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
       }
     } else {
@@ -1338,7 +1347,7 @@ void UIMerchantItemShopWnd::OnRBtnDown(int x, int y) {
 void UIMerchantItemWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
@@ -1346,16 +1355,16 @@ void UIMerchantItemWnd::OnRBtnDown(int x, int y) {
         if (g_windowMgr.itemStoreWnd) {
           if (mode->inventoryChanged) {
             mode->inventoryChanged = 0;
-            mode->SendMsg(MM_MOVE_ITEM_FROM_CART_TO_STORE, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+            mode->SendMsg(MM_MOVE_ITEM_FROM_CART_TO_STORE, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
           }
         } else if (g_windowMgr.itemWnd && mode->inventoryChanged) {
           mode->inventoryChanged = 0;
-          mode->SendMsg(MM_MOVE_ITEM_FROM_CART_TO_BODY, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+          mode->SendMsg(MM_MOVE_ITEM_FROM_CART_TO_BODY, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
         }
       }
     } else if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       if (g_windowMgr.itemWnd) {
-        mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL_FROM_STORAGE, static_cast<int>(item.identity[1]), item.quantity, 0, 0);
+        mode->SendMsg(MM_MOVE_ITEM_TO_PERSONAL_FROM_STORAGE, static_cast<int>(item.itemIndex), item.quantity, 0, 0);
       }
     } else {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
@@ -1368,17 +1377,17 @@ void UIMerchantItemWnd::OnRBtnDown(int x, int y) {
 void UIMerchantMirrorItemWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.merchantShopMakeWnd) {
-        item = g_session.FindMerchantMyShopItem(item.identity[1]);
-        mode->BeginDragItem(11, item, item.quantity, -1);
+        item = g_session.FindMerchantMyShopItem(item.itemIndex);
+        mode->BeginDragItem(DRAG_VENDING_SHOP_LIST, item, item.quantity, -1);
         static_cast<UIWindow*>(g_windowMgr.merchantShopMakeWnd)->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
       } else if (g_windowMgr.buyingShopMakeWnd) {
-        item = g_session.FindMerchantMyShopItem(item.identity[1]);
-        mode->BeginDragItem(20, item, item.quantity, -1);
+        item = g_session.FindMerchantMyShopItem(item.itemIndex);
+        mode->BeginDragItem(DRAG_BUYINGSTORE_SHOP_LIST, item, item.quantity, -1);
         static_cast<UIWindow*>(g_windowMgr.buyingShopMakeWnd)->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
       }
     } else {
@@ -1417,8 +1426,12 @@ UIMerchantShopMakeWnd::UIMerchantShopMakeWnd(int mode) : UIFrameWnd(0), mode(mod
 int UIMerchantItemMyShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
   case UM_SETTITLE: {
-    char text[40];
-    std::sprintf(text, "%s : %s", LookupMessage(this->buyingShop != 0 ? MSI_BUYINGSTORE_MYSHOPWND_TITLE : MSI_ITEM_MY_STORE), g_session.storeTitle.c_str());
+    char text[200];
+    int titleId = MSI_BUYINGSTORE_MYSHOPWND_TITLE;
+    if (this->buyingShop == 0) {
+      titleId = MSI_ITEM_MY_STORE;
+    }
+    std::sprintf(text, "%s : %s", LookupMessage(titleId), g_session.storeTitle.c_str());
     this->title->SetTextFitted(text);
     return 0;
   }
@@ -1451,7 +1464,7 @@ int UIMerchantItemMyShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_
         this->resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
         this->scrollBar->Move(this->geometry.width - 15, 14);
         this->scrollBar->Resize(this->scrollBar->geometry.width, this->geometry.height - this->footerHeight - 17);
-        this->saleAlarm->Move(12, this->buyingShop != 0 ? this->geometry.height - 12 : this->geometry.height - 18);
+        this->saleAlarm->Move(12, this->geometry.height + (this->buyingShop != 0 ? -12 : -18));
         this->buttons[0]->Move(this->geometry.width - 61, this->geometry.height - 24);
         if (this->actionButton) {
           this->actionButton->Move(this->geometry.width - this->actionButton->geometry.width - 66, this->geometry.height - 24);
@@ -1516,14 +1529,15 @@ int UIMerchantItemMyShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_
       g_session.m_muteSellSound = !g_session.m_muteSellSound;
       return 0;
     case ID_CLOSE_OFFLINE_STORE:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_LIMIT_USER_MSG), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_SHOP_WITHDRAWAL), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
         mode->SendMsg(MM_CLOSE_OFFLINE_STORE, this->offlineStoreId, 0, 0, 0);
         mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
         if (this->buyingShop == 1) {
           g_windowMgr.CloseWindow(WID_MERCHANTITEMMYSHOPWND_MODE_1);
-        } else {
-          g_windowMgr.CloseWindow(WID_MERCHANTITEMMYSHOPWND);
+          return 0;
         }
+
+        g_windowMgr.CloseWindow(WID_MERCHANTITEMMYSHOPWND);
         return 0;
       }
       break;
@@ -1535,7 +1549,7 @@ int UIMerchantItemMyShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_
     const int size = g_session.GetNumMerchantPurchaseItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetMerchantPurchaseItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -1604,17 +1618,19 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     }
 
     const char* format;
-    if (!this->cashShopMode) {
-      format = "Total : %d Zeny";
-    } else if (g_serviceType == 6) {
-      format = "Total : %d Koin";
-    } else if (g_serviceType == 0) {
-      format = g_session.m_channelCopId == 1 ? "Total : %d 한코인" : "Total : %d Cash";
+    if (this->cashShopMode) {
+      if (g_serviceType == 6) {
+        format = "Total : %d Koin";
+      } else if (g_serviceType == 0) {
+        format = g_session.m_channelCopId == 1 ? "Total : %d 한코인" : "Total : %d Cash";
+      } else {
+        format = "Total : %d Point";
+      }
     } else {
-      format = "Total : %d Point";
+      format = "Total : %d Zeny";
     }
 
-    char text[80];
+    char text[16];
     std::sprintf(text, format, 0);
     this->title->SetTextAutoWidth(text);
     return 0;
@@ -1696,12 +1712,13 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   case UM_COMMAND: {
     this->RecordResponse(static_cast<int>(a), b, c, d);
     CMode* mode = g_modeMgr.currentMode;
-    if (a == ID_OK) {
+    switch (a) {
+    case ID_OK:
       if (!this->cashShopMode) {
         mode->SendMsg(MM_REQ_PURCHASE, 0, 0, 0, 0);
       } else {
         if (!g_session.GetNumPurchaseItems()) {
-          break;
+          return 0;
         }
 
         int amount = std::atoi(this->quantityEdit->Text());
@@ -1715,7 +1732,7 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
           amount = g_session.GetPurchaseItemTotalPrice();
         }
 
-        char text[16];
+        char text[12];
         _itoa(amount, text, 10);
         g_windowMgr.SetFocus(this->quantityEdit);
         this->quantityEdit->SetText(text);
@@ -1724,21 +1741,21 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
         const int total = g_session.GetPurchaseItemTotalPrice();
         if (g_session.m_pendingGid + g_session.m_pendingAid < total) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BUY_CASH_FAIL_MONEY)), 0xFF, 0, 0, 0);
-          break;
+          return 0;
         }
 
         if (amount == 0 && g_session.m_pendingAid < total) {
           if (g_windowMgr.Confirm(LookupMessage(MSI_BUY_TO_FREE_POINT), 0, true, false, 0, "Message", 280, 120, 0)) {
-            break;
+            return 0;
           }
         }
 
         std::string confirm;
         const int price = g_session.GetPurchaseItemTotalPrice();
         if (amount > 0) {
-          confirm = FormatOwnedString(LookupMessage(MSI_CHANGE_MATERIAL_INVSORT), price - amount, amount);
+          confirm = FormatOwnedString(LookupMessage(MSI_BUY_RECONFIRM2_2019), price - amount, amount);
         } else {
-          confirm = FormatOwnedString(LookupMessage(MSI_BILLING_INFO_URL), price);
+          confirm = FormatOwnedString(LookupMessage(MSI_BUY_RECONFIRM1_2019), price);
         }
 
         if (g_windowMgr.Confirm(confirm.c_str(), 2, true, true, 0, "Message", 280, 120, 0) == ID_YES) {
@@ -1749,11 +1766,13 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
         }
         return 0;
       }
-    } else if (a == ID_CANCEL) {
+      break;
+    case ID_CANCEL:
       g_windowMgr.CloseWindow(WID_ITEMSHOPWND);
       g_windowMgr.CloseWindow(WID_ITEMPURCHASEWND);
-    } else {
-      if (a == ID_APPLY && this->cashShopMode) {
+      break;
+    case ID_APPLY:
+      if (this->cashShopMode) {
         int amount = std::atoi(this->quantityEdit->Text());
         if (amount < 0) {
           amount = 0;
@@ -1762,13 +1781,14 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
           amount = g_session.m_pendingGid;
         }
 
-        char text[12];
+        char text[4];
         _itoa(amount, text, 10);
         this->quantityEdit->SetText(text);
         g_windowMgr.SetFocus(nullptr);
-        return 0;
       }
-      break;
+      return 0;
+    default:
+      return 0;
     }
 
     mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
@@ -1823,21 +1843,23 @@ int UIItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     const int size = g_session.GetNumPurchaseItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         total += item.quantity * item.prices[1];
         this->items.push_back(item);
       }
     }
 
     const char* format;
-    if (!this->cashShopMode) {
-      format = "Total : %s Zeny";
-    } else if (g_serviceType == 6) {
-      format = "Total : %s Koin";
-    } else if (g_serviceType == 0) {
-      format = g_session.m_channelCopId == 1 ? "Total : %s 한코인" : "Total : %s 캐시";
+    if (this->cashShopMode) {
+      if (g_serviceType == 6) {
+        format = "Total : %s Koin";
+      } else if (g_serviceType == 0) {
+        format = g_session.m_channelCopId == 1 ? "Total : %s 한코인" : "Total : %s 캐시";
+      } else {
+        format = "Total : %s Point";
+      }
     } else {
-      format = "Total : %s Point";
+      format = "Total : %s Zeny";
     }
 
     char grouped[64];
@@ -1888,31 +1910,28 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
   case UM_DEFPUSH:
     if (this->m_message0 != 0 && this->geometry.visible != 0) {
       this->SendMsg(this, UM_COMMAND, this->m_message0, 0, 0, 0);
-      return 0;
     }
-    return 0;
+    break;
   case UM_SETSTATE:
     this->geometry.state = static_cast<std::uint32_t>(a);
     if (a == 20) {
       char text[24];
       std::sprintf(text, "%d", b);
       this->m_edit->SetText(text);
-      if (this->geometry.state == 20) {
-        this->m_edit->SetText(IntToString(static_cast<int>(b), 0).c_str());
-        return 0;
-      }
     }
-    return 0;
+    if (this->geometry.state == 20) {
+      this->m_edit->SetText(IntToString(static_cast<int>(b), 0).c_str());
+    }
+    break;
   case UM_SETTEXT:
     if (b != 0) {
       this->itemTitle->SetText(reinterpret_cast<const char*>(b), 0);
       this->Invalidate();
-      return 0;
     }
-    return 0;
+    break;
   case UM_COMMAND: {
     if (a != ID_OK || this->m_edit->Length() == 0) {
-      return 0;
+      break;
     }
 
     CGameMode* mode = g_modeMgr.GetGameMode();
@@ -1925,36 +1944,215 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
     }
 
     UIWindow* window;
-    int windowId;
     switch (this->geometry.state) {
-    case 0:
-      if (quantity <= 0 || quantity > mode->drag.quantity) {
-        goto invalid;
-      }
-      mode->SendMsg(MM_ITEMTHROW_THROUGH_DROPCNTWND, quantity, 0, 0, 0);
-      break;
     case 1:
       if (quantity <= 0) {
-        goto invalid;
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
       }
       if (quantity > 30000) {
         mode->drag.quantity = 30000;
       } else {
         mode->drag.quantity = quantity;
       }
-      if (quantity >= 30000) {
+      if (mode->drag.quantity == 30000) {
         char text[200];
         std::sprintf(text, LookupMessage(MSI_LIMIT_BUY_ITEM2), 30000);
         g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFF, 0, 0, 0);
       }
       window = g_windowMgr.itemPurchaseWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
+    case 21: {
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity > 30000) {
+        mode->drag.quantity = 30000;
+      } else {
+        mode->drag.quantity = quantity;
+      }
+      if (mode->drag.quantity == 30000) {
+        char text[200] = {};
+        sprintf_s(text, sizeof(text), LookupMessage(MSI_LIMIT_BUY_ITEM2), 30000);
+        g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFF, 0, 0, 0);
+      }
+      UIParaItemPurchaseWnd* purchase = dynamic_cast<UIParaItemPurchaseWnd*>(g_windowMgr.LookupWindow(WID_PARAITEMPURCHASEWND));
+      if (purchase) {
+        purchase->SendMsg(nullptr, UM_DROP, quantity, 0, 0, 0);
+      }
+      break;
+    }
+    case 22: {
+      const int owned = g_session.GetPurchaseItemNumByItemId(mode->drag.name.c_str());
+      if (owned == 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+      }
+      if (quantity > owned) {
+        quantity = owned;
+      }
+      mode->drag.quantity = quantity;
+      UIParaItemShopWnd* shop = dynamic_cast<UIParaItemShopWnd*>(g_windowMgr.LookupWindow(WID_PARAITEMSHOPWND));
+      if (shop) {
+        shop->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
+    }
+    case 24: {
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity > 30000) {
+        g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LIMIT_BUY_ITEM)), 0xFF, 0, 0, 0);
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      int limit = g_barterMarketItemMgr->GetValueById(mode->drag.barterId);
+      if (limit == -1) {
+        limit = 30000;
+      }
+      if (limit != 0) {
+        mode->drag.quantity = quantity <= limit ? quantity : limit;
+      }
+      window = g_windowMgr.LookupWindow(WID_BARTERITEMPURCHASEWND);
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, quantity, 0, 0, 0);
+      } else {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+      }
+      break;
+    }
+    case 23: {
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      const int owned = g_barterMarketItemMgr->GetAllItemValueById(mode->drag.barterId);
+      if (owned <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity > owned) {
+        quantity = owned;
+      }
+      mode->drag.quantity = quantity;
+      window = g_windowMgr.LookupWindow(WID_BARTERMARKETWND);
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
+    }
+    case 26: {
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity > 30000) {
+        g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LIMIT_BUY_ITEM)), 0xFF, 0, 0, 0);
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      int limit = g_expandedBarterMarketItemMgr->GetItemValueById(mode->drag.barterId);
+      if (limit == -1) {
+        limit = 30000;
+      }
+      if (limit != 0) {
+        mode->drag.quantity = quantity <= limit ? quantity : limit;
+      }
+      window = g_windowMgr.LookupWindow(WID_EXPANDEDBARTERITEMPURCHASEWND);
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, quantity, 0, 0, 0);
+      } else {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+      }
+      break;
+    }
+    case 25: {
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      const int owned = g_expandedBarterMarketItemMgr->GetValueById(mode->drag.barterId);
+      if (owned <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity > owned) {
+        quantity = owned;
+      }
+      mode->drag.quantity = quantity;
+      window = g_windowMgr.LookupWindow(WID_EXPANDEDBARTERMARKETWND);
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
+    }
+    case 19:
+      if (quantity <= 0) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      if (quantity > 100) {
+        mode->drag.quantity = 100;
+      } else {
+        mode->drag.quantity = quantity;
+        if (quantity < 100) {
+          window = g_windowMgr.LookupWindow(WID_CASHSHOP_WND);
+          if (window) {
+            window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+          }
+          break;
+        }
+      }
+      g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_LIMIT_BUY_ITEM2), 100).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+      break;
+    case 20: {
+      const int current = mode->drag.quantity;
+      if (current <= 0) {
+        if (quantity <= 0) {
+          mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+          break;
+        }
+        if (current == 0) {
+          window = g_windowMgr.LookupWindow(WID_CASHSHOP_WND);
+          if (window) {
+            window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+          }
+          break;
+        }
+      }
+      mode->drag.quantity = quantity <= current ? quantity : current;
+      window = g_windowMgr.LookupWindow(WID_CASHSHOP_WND);
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
+    }
+    case 0:
+      if (quantity <= 0 || quantity > mode->drag.quantity) {
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
+      }
+      mode->SendMsg(MM_ITEMTHROW_THROUGH_DROPCNTWND, quantity, 0, 0, 0);
+      break;
     case 2:
     case 16: {
       const int owned = g_session.GetShopItemNum(mode->drag.id);
       if (owned == 0) {
-        goto invalid;
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
       }
       if (quantity <= 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -1970,12 +2168,16 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       } else {
         break;
       }
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 3: {
       const int owned = g_session.GetPurchaseItemNumByItemId(mode->drag.name.c_str());
       if (owned == 0) {
-        goto invalid;
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
       }
       if (quantity <= 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -1985,13 +2187,17 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity;
       window = g_windowMgr.itemShopWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 4:
     case 15: {
       const int owned = g_session.GetStorageItemNum(mode->drag.id);
       if (owned == 0) {
-        goto invalid;
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
       }
       if (quantity <= 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -2014,7 +2220,8 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
     }
     case 5: {
       if (!g_session.HasInventoryItem(mode->drag.id)) {
-        goto invalid;
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
       }
       const int owned = g_session.LookupClientItemByIdentity(mode->drag.id).quantity;
       if (quantity <= 0) {
@@ -2029,44 +2236,43 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       break;
     }
-    case 6:
+    case 6: {
+      int owned = 0;
       if (quantity <= 0) {
         mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
       }
-      if (mode->drag.source == 6) {
+      if (mode->drag.source == DRAG_ITEM_STORAGE) {
         if (g_session.GetCartItemNum(mode->drag.id) != 0) {
-          const int owned = g_session.FindCartItem(mode->drag.id).quantity;
-          if (owned != 0) {
-            mode->drag.quantity = quantity <= owned ? quantity : owned;
-          }
+          owned = g_session.FindCartItem(mode->drag.id).quantity;
         }
-      } else if (mode->drag.source == 9) {
+      } else if (mode->drag.source == DRAG_ITEM_MERCHANT_INVENTORY) {
         if (g_windowMgr.merchantShopMakeWnd) {
           break;
         }
         if (g_session.GetMerchantShopItemNum(mode->drag.id) != 0) {
-          const int owned = g_session.FindMerchantShopItem(mode->drag.id).quantity;
-          if (owned != 0) {
-            mode->drag.quantity = quantity <= owned ? quantity : owned;
-          }
+          owned = g_session.FindMerchantShopItem(mode->drag.id).quantity;
         }
-      } else if (mode->drag.source == 15) {
-        const int owned = mode->drag.quantity;
-        if (owned != 0) {
-          mode->drag.quantity = quantity <= owned ? quantity : owned;
-        }
+      } else if (mode->drag.source == DRAG_RODEX_COMPOSE) {
+        owned = mode->drag.quantity;
+      }
+      if (owned != 0) {
+        mode->drag.quantity = quantity <= owned ? quantity : owned;
       }
       window = g_windowMgr.itemWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
+    }
     case 7: {
       int owned = 0;
-      if (mode->drag.source == 9) {
+      if (mode->drag.source == DRAG_ITEM_MERCHANT_INVENTORY) {
         const ITEM_INFO item = g_session.FindMerchantShopItem(mode->drag.id);
-        if (item.identity[1] != 0) {
+        if (item.itemIndex > 0) {
           owned = item.quantity;
         }
       } else {
-        if (mode->drag.source != 1 || !g_session.HasInventoryItem(mode->drag.id)) {
+        if (mode->drag.source != DRAG_ITEM_INVENTORY || !g_session.HasInventoryItem(mode->drag.id)) {
           break;
         }
         owned = g_session.LookupClientItemByIdentity(mode->drag.id).quantity;
@@ -2079,22 +2285,28 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.itemStoreWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 8: {
       int owned = 0;
-      if (mode->drag.source == 1) {
+      switch (mode->drag.source) {
+      case 1: {
         const ITEM_INFO item = g_session.LookupClientItemByIdentity(mode->drag.id);
-        if (item.identity[1] != 0) {
+        if (item.itemIndex > 0) {
           owned = item.quantity;
         }
-      } else if (mode->drag.source == 6) {
-        const ITEM_INFO item = g_session.FindCartItem(mode->drag.id);
-        if (item.identity[1] != 0) {
-          owned = item.quantity;
-        }
-      } else {
         break;
+      }
+      case 6: {
+        const ITEM_INFO item = g_session.FindCartItem(mode->drag.id);
+        if (item.itemIndex > 0) {
+          owned = item.quantity;
+        }
+        break;
+      }
       }
       if (owned == 0) {
         break;
@@ -2104,13 +2316,16 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.merchantItemWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 9: {
       int owned = 0;
-      if (mode->drag.source == 11) {
+      if (mode->drag.source == DRAG_VENDING_SHOP_LIST) {
         const ITEM_INFO item = g_session.FindMerchantMyShopItem(mode->drag.id);
-        if (item.identity[1] != 0) {
+        if (item.itemIndex > 0) {
           owned = item.quantity;
         }
       }
@@ -2122,13 +2337,16 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.merchantShopMakeWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 10: {
       int owned = 0;
-      if (mode->drag.source == 10) {
+      if (mode->drag.source == DRAG_VENDING_PURCHASE_LIST) {
         const ITEM_INFO item = g_session.FindMerchantPurchaseSavedItem(mode->drag.id);
-        if (item.identity[1] != 0) {
+        if (item.itemIndex > 0) {
           owned = item.quantity;
         }
       }
@@ -2140,10 +2358,13 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.merchantMirrorItemWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 11: {
-      if (mode->drag.source != 13) {
+      if (mode->drag.source != DRAG_VENDING_ITEM_PURCHASE) {
         break;
       }
       const int owned = g_session.GetMerchantHopeToSellItemNumByItemId(mode->drag.name.c_str());
@@ -2155,7 +2376,10 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.merchantItemShopWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 12:
       if (quantity <= 0) {
@@ -2163,10 +2387,14 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity;
       window = g_windowMgr.merchantItemPurchaseWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     case 13: {
       if (!g_session.HasInventoryItem(mode->drag.id)) {
-        goto invalid;
+        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+        break;
       }
       const int owned = g_session.LookupClientItemByIdentity(mode->drag.id).quantity;
       if (quantity <= 0) {
@@ -2176,13 +2404,16 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
         mode->drag.quantity = quantity <= owned ? quantity : owned;
       }
       window = g_windowMgr.rodexComposeWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 17: {
       int owned = 0;
-      if (mode->drag.source == 22) {
+      if (mode->drag.source == DRAG_PURCHASE_MIRROR_LIST) {
         const ITEM_INFO item = g_session.FindMerchantMyShopItem(mode->drag.id);
-        if (item.identity[1] != 0) {
+        if (item.itemIndex > 0) {
           owned = item.quantity;
         }
       }
@@ -2194,13 +2425,16 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.buyingShopPurchaseWnd;
-      goto notify;
+      if (window) {
+        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
+      }
+      break;
     }
     case 18: {
       int owned = 0;
-      if (mode->drag.source == 21) {
+      if (mode->drag.source == DRAG_BUYINGSTORE_ITEM_PURCHASE) {
         const ITEM_INFO item = g_session.FindMerchantHopeToSellItem(mode->drag.id);
-        if (item.identity[1] != 0) {
+        if (item.itemIndex > 0) {
           owned = item.quantity;
         }
       }
@@ -2212,178 +2446,22 @@ int UIItemDropCntWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
       mode->drag.quantity = quantity <= owned ? quantity : owned;
       window = g_windowMgr.purchaseMirrorItemWnd;
-      goto notify;
-    }
-    case 19:
-      if (quantity <= 0) {
-        goto invalid;
-      }
-      if (quantity > 100) {
-        mode->drag.quantity = 100;
-      } else {
-        mode->drag.quantity = quantity;
-        if (quantity < 100) {
-          goto stall;
-        }
-      }
-      g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_LIMIT_BUY_ITEM2), 100).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
-      break;
-    case 20: {
-      const int current = mode->drag.quantity;
-      if (current <= 0) {
-        if (quantity <= 0) {
-          goto invalid;
-        }
-        if (current == 0) {
-          goto stall;
-        }
-      }
-      mode->drag.quantity = quantity <= current ? quantity : current;
-      goto stall;
-    }
-    case 21: {
-      if (quantity <= 0) {
-        goto invalid;
-      }
-      if (quantity > 30000) {
-        mode->drag.quantity = 30000;
-      } else {
-        mode->drag.quantity = quantity;
-      }
-      if (quantity >= 30000) {
-        char text[200] = {};
-        sprintf_s(text, sizeof(text), LookupMessage(MSI_LIMIT_BUY_ITEM2), 30000);
-        g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFF, 0, 0, 0);
-      }
-      UIParaItemPurchaseWnd* purchase = dynamic_cast<UIParaItemPurchaseWnd*>(g_windowMgr.LookupWindow(WID_PARAITEMPURCHASEWND));
-      if (purchase) {
-        purchase->SendMsg(nullptr, UM_DROP, quantity, 0, 0, 0);
-      }
-      break;
-    }
-    case 22: {
-      const int owned = g_session.GetPurchaseItemNumByItemId(mode->drag.name.c_str());
-      if (owned == 0) {
-        goto invalid;
-      }
-      if (quantity <= 0) {
-        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-      }
-      if (quantity > owned) {
-        quantity = owned;
-      }
-      mode->drag.quantity = quantity;
-      UIParaItemShopWnd* shop = dynamic_cast<UIParaItemShopWnd*>(g_windowMgr.LookupWindow(WID_PARAITEMSHOPWND));
-      if (shop) {
-        shop->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
-      }
-      break;
-    }
-    case 23: {
-      if (quantity <= 0) {
-        goto invalid;
-      }
-      const int owned = g_barterMarketItemMgr->GetAllItemValueById(mode->drag.barterId);
-      if (owned <= 0) {
-        goto invalid;
-      }
-      if (quantity > owned) {
-        quantity = owned;
-      }
-      mode->drag.quantity = quantity;
-      window = g_windowMgr.LookupWindow(WID_BARTERMARKETWND);
       if (window) {
         window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
       }
       break;
     }
-    case 24: {
-      if (quantity <= 0) {
-        goto invalid;
-      }
-      if (quantity > 30000) {
-        goto tooMany;
-      }
-      int limit = g_barterMarketItemMgr->GetValueById(mode->drag.barterId);
-      if (limit == -1) {
-        limit = 30000;
-      }
-      if (limit != 0) {
-        mode->drag.quantity = quantity <= limit ? quantity : limit;
-      }
-      windowId = 335;
-      goto lookup;
-    }
-    case 25: {
-      if (quantity <= 0) {
-        goto invalid;
-      }
-      const int owned = g_expandedBarterMarketItemMgr->GetValueById(mode->drag.barterId);
-      if (owned <= 0) {
-        goto invalid;
-      }
-      if (quantity > owned) {
-        quantity = owned;
-      }
-      mode->drag.quantity = quantity;
-      window = g_windowMgr.LookupWindow(WID_EXPANDEDBARTERMARKETWND);
-      if (window) {
-        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
-      }
-      break;
-    }
-    case 26: {
-      if (quantity <= 0) {
-        goto invalid;
-      }
-      if (quantity > 30000) {
-        goto tooMany;
-      }
-      int limit = g_expandedBarterMarketItemMgr->GetItemValueById(mode->drag.barterId);
-      if (limit == -1) {
-        limit = 30000;
-      }
-      if (limit != 0) {
-        mode->drag.quantity = quantity <= limit ? quantity : limit;
-      }
-      windowId = 342;
-      goto lookup;
-    }
-    lookup:
-      window = g_windowMgr.LookupWindow(static_cast<WindowId>(windowId));
-      if (window) {
-        window->SendMsg(nullptr, UM_DROP, quantity, 0, 0, 0);
-      } else {
-        mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-      }
-      break;
-    stall:
-      window = g_windowMgr.LookupWindow(WID_CASHSHOP_WND);
-      if (window) {
-        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
-      }
-      break;
-    tooMany:
-      g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LIMIT_BUY_ITEM)), 0xFF, 0, 0, 0);
-    invalid:
-      mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-      break;
-    notify:
-      if (window) {
-        window->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
-      }
-      break;
     }
 
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     g_windowMgr.ShowWindowById(WID_ITEMDROPCNTWND, 0);
-    return 0;
+    break;
   }
   default:
     return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
+
+  return 0;
 }
 
 // OFFSET: 0x0097C230
@@ -2443,8 +2521,7 @@ void UIMerchantShopMakeWnd::OnCreate(int width, int height) {
     if (this->mode != 0) {
       this->priceEdits[index]->Background(232, 232, 232);
     } else {
-      this->priceEdits[index]->disabled = 1;
-      this->priceEdits[index]->Invalidate();
+      SetEditDisabled(*this->priceEdits[index], 1);
       this->priceEdits[index]->Background(182, 182, 182);
     }
     this->AddChild(this->priceEdits[index]);
@@ -2479,20 +2556,19 @@ void UIMerchantShopMakeWnd::OnCreate(int width, int height) {
     }
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
   if (Replay::Instance().state != 6) {
     g_session.ClearMerchantPurchaseSavedItems();
   }
 
   if (this->mode == 0) {
-    UICheckBox* notice = new UICheckBox();
-    this->notice = notice;
-    notice->SetSize(140, 12);
-    notice->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", LookupMessage(MSI_QUEST_INFO_01));
-    notice->FitToText();
-    notice->Move(12, this->geometry.height - 20);
-    notice->SetChecked(g_session.m_skipPriceWarning);
-    this->AddChild(notice);
+    this->notice = new UICheckBox();
+    this->notice->SetSize(140, 12);
+    this->notice->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", LookupMessage(MSI_WARNING_PRICE7));
+    this->notice->FitToText();
+    this->notice->Move(12, this->geometry.height - 20);
+    this->notice->SetChecked(g_session.m_skipPriceWarning);
+    this->AddChild(this->notice);
   }
 
   this->initialHeight = this->geometry.height;
@@ -2504,7 +2580,7 @@ void UIMerchantShopMakeWnd::OnCreate(int width, int height) {
   info->SetBitmap("유저인터페이스\\basic_interface\\bt_shopinfo.bmp", 2, 0);
   info->SetSize(info->BitmapWidth(), info->BitmapHeight());
   info->Move(this->geometry.width - 23, 20);
-  info->SetId(343);
+  info->SetId(ID_HELP);
   this->AddChild(info);
 }
 
@@ -2513,18 +2589,18 @@ void UIMerchantShopMakeWnd::OnCreate(int width, int height) {
 void UIMerchantShopMakeWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* gameMode = g_modeMgr.GetGameMode();
 
     if (HIBYTE(GetAsyncKeyState(VK_MENU))) {
       if (g_windowMgr.merchantMirrorItemWnd) {
-        item = g_session.FindMerchantPurchaseSavedItem(item.identity[1]);
-        gameMode->BeginDragItem(10, item, item.quantity, -1);
+        item = g_session.FindMerchantPurchaseSavedItem(item.itemIndex);
+        gameMode->BeginDragItem(DRAG_VENDING_PURCHASE_LIST, item, item.quantity, -1);
         g_windowMgr.merchantMirrorItemWnd->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
         g_windowMgr.SetFocus(nullptr);
       } else if (g_windowMgr.buyingShopMirrorItemWnd) {
-        item = g_session.FindMerchantPurchaseSavedItem(item.identity[1]);
-        gameMode->BeginDragItem(19, item, item.quantity, -1);
+        item = g_session.FindMerchantPurchaseSavedItem(item.itemIndex);
+        gameMode->BeginDragItem(DRAG_BUYINGSTORE_PURCHASE_LIST, item, item.quantity, -1);
         g_windowMgr.buyingShopMirrorItemWnd->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
       }
     } else {
@@ -2549,31 +2625,33 @@ void UIItemBaseWnd::Paint() {
   }
 
   const int leftTiles = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int tile = 0, y = 17; tile < leftTiles; ++tile, y += 8) {
+  for (int tile = 0; tile < leftTiles; ++tile) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, tile * 8 + 17, left, false);
   }
 
   const int rightTiles = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int tile = 0, y = 17; tile < rightTiles; ++tile, y += 8) {
+  for (int tile = 0; tile < rightTiles; ++tile) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, tile * 8 + 17, right, false);
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - 38) % 32;
-  const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - 38) % 32;
+    const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  }
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int rows = (this->geometry.height - 38) / 32;
-  for (int row = 0, y = 17; row < rows; ++row, y += 32) {
-    for (int column = 0, x = 40; column < columns; ++column, x += 32) {
-      this->DrawItemSlotFrame(x, y);
+  for (int row = 0; row < rows; ++row) {
+    for (int column = 0; column < columns; ++column) {
+      this->DrawItemSlotFrame(column * 32 + 40, row * 32 + 17);
     }
   }
 
@@ -2589,18 +2667,18 @@ void UIItemBaseWnd::Paint() {
       continue;
     }
 
-    const int top = visible / this->columns * 32;
-    const int x = visible % this->columns * 32 + 44;
+    const int itemX = visible % this->columns * 32 + 40;
+    const int itemY = visible / this->columns * 32 + 17;
 
     if (this->showQuantity != 0) {
-      this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
+      this->DrawItemAndQuantity(itemX + 4, itemY + 4, *it, 0, 0);
     } else {
-      this->DrawItemIcon(x, top + 21, *it, 0);
+      this->DrawItemIcon(itemX + 4, itemY + 4, *it, 0);
     }
 
     if (0 < it->grade) {
       this->DrawBitmap(
-        x, top + 33,
+        itemX + 4, itemY + 16,
         static_cast<CBitmapRes*>(
           ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", it->grade).c_str()))
         ),
@@ -2634,20 +2712,20 @@ void UIMerchantItemMyShopWnd::Paint() {
 
       if (this->buyingShop == 1) {
         if (remaining <= 60000) {
-          this->DrawTextAt(12, this->geometry.height - 42, FormatOwnedString(LookupMessage(MSI_SELECT_SHOP_POSITION), days, hours, minutes, seconds).c_str(), 0,
+          this->DrawTextAt(12, this->geometry.height - 42, FormatOwnedString(LookupMessage(MSI_REMAIN_TIME), days, hours, minutes, seconds).c_str(), 0,
             0, 11, 0xFF, 1, 0
           );
         } else {
-          this->DrawTextAt(12, this->geometry.height - 42, FormatOwnedString(LookupMessage(MSI_SELECT_SHOP_POSITION), days, hours, minutes, seconds).c_str(), 0,
+          this->DrawTextAt(12, this->geometry.height - 42, FormatOwnedString(LookupMessage(MSI_REMAIN_TIME), days, hours, minutes, seconds).c_str(), 0,
             0, 11, 0, 1, 0
           );
         }
       } else if (remaining <= 60000) {
-        this->DrawTextAt(20, this->geometry.height - 50, FormatOwnedString(LookupMessage(MSI_SELECT_SHOP_POSITION), days, hours, minutes, seconds).c_str(), 0, 0,
+        this->DrawTextAt(20, this->geometry.height - 50, FormatOwnedString(LookupMessage(MSI_REMAIN_TIME), days, hours, minutes, seconds).c_str(), 0, 0,
           12, 0xFF, 1, 0
         );
       } else {
-        this->DrawTextAt(20, this->geometry.height - 50, FormatOwnedString(LookupMessage(MSI_SELECT_SHOP_POSITION), days, hours, minutes, seconds).c_str(), 0, 0,
+        this->DrawTextAt(20, this->geometry.height - 50, FormatOwnedString(LookupMessage(MSI_REMAIN_TIME), days, hours, minutes, seconds).c_str(), 0, 0,
           12, 0, 1, 0
         );
       }
@@ -2660,7 +2738,7 @@ void UIMerchantItemMyShopWnd::Paint() {
 void UIMerchantItemPurchaseMSGWnd::OnCreate(int, int) {
   this->title = new UIStaticText();
   this->title->SetSize(100, 15);
-  this->title->SetTextFitted(LookupMessage(MSI_SHOP_ITEM_BAY_MAG3));
+  this->title->SetTextFitted(LookupMessage(MSI_SHOP_ITEM_BAY_TITLE));
   this->title->Move(16, 2);
   this->title->shadow = 1;
   this->AddChild(this->title);
@@ -2671,7 +2749,7 @@ void UIMerchantItemPurchaseMSGWnd::OnCreate(int, int) {
   this->buyButton->SetBitmap("유저인터페이스\\btn_buy_b.bmp", 2, 0);
   this->buyButton->SetSize(this->buyButton->BitmapWidth(), this->buyButton->BitmapHeight());
   this->buyButton->Move(this->geometry.width - 106, this->geometry.height - 24);
-  this->buyButton->SetId(184);
+  this->buyButton->SetId(ID_OK);
   this->AddChild(this->buyButton);
 
   this->cancelButton = new UIBitmapButton();
@@ -2680,12 +2758,12 @@ void UIMerchantItemPurchaseMSGWnd::OnCreate(int, int) {
   this->cancelButton->SetBitmap("유저인터페이스\\btn_cancel_b.bmp", 2, 0);
   this->cancelButton->SetSize(this->cancelButton->BitmapWidth(), this->cancelButton->BitmapHeight());
   this->cancelButton->Move(this->geometry.width - 61, this->geometry.height - 24);
-  this->cancelButton->SetId(185);
+  this->cancelButton->SetId(ID_CANCEL);
   this->AddChild(this->cancelButton);
 
   this->firstLine = new UIStaticText();
   this->firstLine->SetSize(200, 15);
-  this->firstLine->SetText(LookupMessage(MSI_BASIC_EXP_MSG2), 0);
+  this->firstLine->SetText(LookupMessage(MSI_SHOP_ITEM_BAY_MAG1), 0);
   this->firstLine->Move(10, 20);
   this->AddChild(this->firstLine);
 
@@ -2696,7 +2774,7 @@ void UIMerchantItemPurchaseMSGWnd::OnCreate(int, int) {
 
   this->thirdLine = new UIStaticText();
   this->thirdLine->SetSize(200, 15);
-  this->thirdLine->SetText(LookupMessage(MSI_PERSONAL_INFORMATION_MSG_CHN), 0);
+  this->thirdLine->SetText(LookupMessage(MSI_SHOP_ITEM_BAY_MAG3), 0);
   this->thirdLine->Move(10, 60);
   this->AddChild(this->thirdLine);
 }
@@ -2737,7 +2815,7 @@ void UIMerchantItemWnd::Paint() {
 // FUNCTION: fn_13345
 void UINoticeMessageBox_LockSellItem::Paint() {
   this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\popup_itemDeal_lock.bmp"))), false);
-  this->DrawCenteredText(0, 5, LookupMessage(MSI_CONNECT_SNS_WHOLE_SCREEN_SHOT), this->geometry.width, 0, 12, 0xFFFFFF, 0);
+  this->DrawCenteredText(0, 5, LookupMessage(MSI_CANNOT_SELL_IN_PRIVATE_TAB), this->geometry.width, 0, 12, 0xFFFFFF, 0);
 }
 
 // OFFSET: 0x00983550
@@ -2790,17 +2868,20 @@ void UISkillListWnd::Paint() {
   {
     unsigned red, green, blue;
     g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-    this->FillRegion(20, 17, (this->geometry.width - 60) % 32, this->geometry.height - 38, RGB(red, green, blue));
-    this->FillRegion(20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, (this->geometry.height - 38) % 32, RGB(red, green, blue));
+    const int gap = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, gap, this->geometry.height - 38, RGB(red, green, blue));
+    const int height = this->geometry.height - 38;
+    const int remainder = height % 32;
+    const int bottom = height / 32 * 32 + 17;
+    this->FillRegion(20, bottom, this->geometry.width - 24, remainder, RGB(red, green, blue));
   }
   this->DrawButtonBar(2, 0, 1);
 
   {
     const int slotColumns = (this->geometry.width - 40) / 32;
     const int slotRows = (this->geometry.height - 38) / 32;
-    int slots = slotRows;
-    for (int y = 17; slots > 0; --slots, y += 32) {
-      this->DrawItemSlotFrame(40, y);
+    for (int i = 0; i < slotRows; ++i) {
+      this->DrawItemSlotFrame(40, i * 32 + 17);
     }
 
     unsigned red, green, blue;
@@ -2884,12 +2965,12 @@ void UISkillListWnd::Paint() {
           } else if (this->skillTab == 1) {
             spLevel = g_session.MercSkillLevel(static_cast<int>(it->id));
           }
-          const int amount = it->UseSpAmount(*g_session.m_hotkeyScript, spLevel);
+          const int amount = it->UseSpAmount(spLevel);
           if (amount != 0 && spLevel <= it->level) {
             sp = amount;
           }
         }
-        const int ap = it->UseApAmount(*g_session.m_hotkeyScript, it->level);
+        const int ap = it->UseApAmount(it->level);
         if (ap != 0) {
           std::sprintf(text, "Sp : %d , Ap : %d", sp, ap);
         } else {
@@ -2923,9 +3004,9 @@ void UIItemSellWnd2::OnLBtnDblClk(int x, int y) {
 
   if (target) {
     this->OnLBtnDown(x, y);
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    this->RecordDrop(x, y, mode->drag, 160);
-    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&mode->drag));
+    auto& drag = g_modeMgr.GetGameMode()->drag;
+    this->RecordDrop(x, y, drag, 160);
+    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&drag));
   }
 }
 
@@ -2940,9 +3021,9 @@ void UIItemSellWnd::OnLBtnDblClk(int x, int y) {
 
   if (target) {
     this->OnLBtnDown(x, y);
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    this->RecordDrop(x, y, mode->drag, 22);
-    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&mode->drag));
+    auto& drag = g_modeMgr.GetGameMode()->drag;
+    this->RecordDrop(x, y, drag, 22);
+    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&drag));
   }
 }
 
@@ -2971,26 +3052,26 @@ void UIItemWnd::OnLBtnDblClk(int x, int y) {
   }
 
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] <= 0) {
+  if (item.itemIndex <= 0) {
     return;
   }
 
   CGameMode* mode = g_modeMgr.GetGameMode();
-  switch (item.identity[0]) {
-  case 0:
-  case 1:
-  case 2:
-    if (item.GetItemId() == 12802 &&
-        g_windowMgr.Confirm(LookupMessage(MSI_COMMAND_SETTING), 2, false, false, 0, "Message", 280, 120, 0) == ID_NO) {
+  switch (item.itemType) {
+  case TYPE_HEAL:
+  case TYPE_SCHANGE:
+  case TYPE_SPECIAL:
+    if (item.GetItemId() == ITEMID_TIME_GUARDIAN_BOX &&
+        g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_TO_OPEN_EVENT_ITEM), 2, false, false, 0, "Message", 280, 120, 0) == ID_NO) {
       break;
     }
-    mode->SendMsg(MM_USEITEM, static_cast<int>(item.identity[1]), 0, 0, 0);
+    mode->SendMsg(MM_USEITEM, static_cast<int>(item.itemIndex), 0, 0, 0);
     break;
-  case 18:
+  case TYPE_CASH_POINT_ITEM:
     if (g_session.m_manner >= 0) {
       if (g_windowMgr
               .Confirm(FormatOwnedString(LookupMessage(MSI_CONFIRM_TO_OPEN_CASH_ITEM), item.DisplayName(0).c_str()).c_str(), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
-        mode->SendMsg(MM_USEITEM, static_cast<int>(item.identity[1]), 0, 0, 0);
+        mode->SendMsg(MM_USEITEM, static_cast<int>(item.itemIndex), 0, 0, 0);
       }
     }
     break;
@@ -3006,36 +3087,36 @@ void UIItemWnd::OnLBtnDblClk(int x, int y) {
     if (!item.identified) {
       break;
     }
-    if (item.identity[1] <= 0 || item.identity[2] == 0 || item.identity[3] != 0) {
+    if (item.itemIndex <= 0 || item.location == 0 || item.wearLocation != 0) {
       if (!g_session.IsPetAccessory(item.GetItemId())) {
         break;
       }
     }
     if (GetAsyncKeyState(VK_CONTROL) && g_session.m_swapEquipmentMode) {
-      mode->SendMsg(MM_WEAR_SWAP_EQUIP, static_cast<int>(item.identity[1]), static_cast<int>(item.identity[2]), 0, 0);
+      mode->SendMsg(MM_WEAR_SWAP_EQUIP, static_cast<int>(item.itemIndex), static_cast<int>(item.location), 0, 0);
     } else if (g_windowMgr.LookupWindow(WID_REFININGWND)) {
-      g_windowMgr.LookupWindow(WID_REFININGWND)->SendMsg(this, UM_REFRESHITEM, item.identity[1], 0, 0, 0);
+      g_windowMgr.LookupWindow(WID_REFININGWND)->SendMsg(this, UM_REFRESHITEM, item.itemIndex, 0, 0, 0);
     } else if (g_windowMgr.LookupWindow(WID_GRADEENCHANTWND)) {
-      g_windowMgr.LookupWindow(WID_GRADEENCHANTWND)->SendMsg(this, UM_REFRESHITEM, item.identity[1], 0, 0, 0);
+      g_windowMgr.LookupWindow(WID_GRADEENCHANTWND)->SendMsg(this, UM_REFRESHITEM, item.itemIndex, 0, 0, 0);
     } else {
-      mode->SendMsg(MM_WEAR_EQUIP, static_cast<int>(item.identity[1]), static_cast<int>(item.identity[2]), 0, 0);
+      mode->SendMsg(MM_WEAR_EQUIP, static_cast<int>(item.itemIndex), static_cast<int>(item.location), 0, 0);
     }
     break;
-  case 10:
-  case 16:
-  case 17:
-  case 19:
-    if (item.identity[1] <= 0 || item.identity[3] != 0) {
+  case TYPE_ARROW:
+  case TYPE_AMMO:
+  case TYPE_THROWWEAPON:
+  case TYPE_CANNONBALL:
+    if (item.itemIndex <= 0 || item.wearLocation != 0) {
       break;
     }
     if (GetAsyncKeyState(VK_CONTROL) && g_session.m_swapEquipmentMode) {
-      mode->SendMsg(MM_WEAR_SWAP_EQUIP, static_cast<int>(item.identity[1]), static_cast<int>(item.identity[2]), 0, 0);
+      mode->SendMsg(MM_WEAR_SWAP_EQUIP, static_cast<int>(item.itemIndex), static_cast<int>(item.location), 0, 0);
     } else {
-      mode->SendMsg(MM_WEAR_EQUIP_ARROW, static_cast<int>(item.identity[1]), static_cast<int>(item.identity[2]), 0, 0);
+      mode->SendMsg(MM_WEAR_EQUIP_ARROW, static_cast<int>(item.itemIndex), static_cast<int>(item.location), 0, 0);
     }
     break;
-  case 6:
-    mode->SendMsg(MM_REQ_ITEMCOMPOSITION_LIST, static_cast<int>(item.identity[1]), 0, 0, 0);
+  case TYPE_CARD:
+    mode->SendMsg(MM_REQ_ITEMCOMPOSITION_LIST, static_cast<int>(item.itemIndex), 0, 0, 0);
     break;
   }
 }
@@ -3140,7 +3221,7 @@ void UIMerchantShopMakeWnd::OnProcess() {
     if (price < 0) {
       price = 0;
     } else if (price > 1000000000) {
-      const int result = g_windowMgr.Confirm(LookupMessage(MSI_BASIC_EXP_MSG_INDONESIA), 2, true, false, 0, "Message", 280, 120, 0);
+      const int result = g_windowMgr.Confirm(LookupMessage(MSI_OVERPRICE_MAX), 2, true, false, 0, "Message", 280, 120, 0);
       price = 1000000000;
       if (result == ID_YES) {
         edit->SetText(_itoa(1000000000, text, 10));
@@ -3152,7 +3233,8 @@ void UIMerchantShopMakeWnd::OnProcess() {
 
     const PriceColors colors = PriceColor(price);
     edit->TextColor(GetRValue(colors.primary), GetGValue(colors.primary), GetBValue(colors.primary), colors.secondary);
-    edit->SetText(FormatGroupedInteger(price, text, sizeof(text)));
+    FormatGroupedInteger(price, text, sizeof(text));
+    edit->SetText(text);
     this->previousPriceText = this->priceEdits[index]->Text();
     this->previousPriceLength = this->priceEdits[index]->Length();
     edit->SetCursor(edit->Length());
@@ -3178,7 +3260,7 @@ void UINoticeMessageBox_LockSellItem::OnProcess() {
 void UIItemSellWnd2::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
 }
@@ -3188,7 +3270,7 @@ void UIItemSellWnd2::OnRBtnDown(int x, int y) {
 void UIItemSellWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
 }
@@ -3198,7 +3280,7 @@ void UIItemSellWnd::OnRBtnDown(int x, int y) {
 void UIItemShopWnd2::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     g_modeMgr.GetGameMode();
     g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
@@ -3209,7 +3291,7 @@ void UIItemShopWnd2::OnRBtnDown(int x, int y) {
 void UIMerchantItemMyShopWnd::OnRBtnDown(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     g_modeMgr.GetGameMode();
     g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
@@ -3520,8 +3602,6 @@ bool UIMerchantShopMakeWnd::HasSelection() const {
   return true;
 }
 
-#pragma inline_depth(0)
-
 // OFFSET: 0x00974590
 // FUNCTION: fn_13304
 void UIMerchantShopMakeWnd::SendShopRequest() {
@@ -3533,16 +3613,14 @@ void UIMerchantShopMakeWnd::SendShopRequest() {
   g_modeMgr.GetGameMode()->SendMsg(MM_OFFLINE_STORE_CREATE, reinterpret_cast<int>(this->titleEdit->Text()), 0, 0, 0);
 }
 
-#pragma inline_depth()
-
 // OFFSET: 0x00974820
 // FUNCTION: fn_13306
 void UIMerchantShopMakeWnd::AddActionButton() {
   this->actionButton = new UIBasicButton();
-  this->actionButton->Configure(60, LookupMessage(MSI_GUILD_AGIT_AGIT_MESSAGE));
+  this->actionButton->Configure(60, LookupMessage(MSI_MCSTORE_BACKUP));
   this->actionButton->Move(this->geometry.width - 156, this->geometry.height - 24);
-  this->actionButton->SetTooltip(LookupMessage(MSI_WARNING_UNDER_AGE_MSG1));
-  this->actionButton->SetId(560);
+  this->actionButton->SetTooltip(LookupMessage(MSI_MCSTORE_BACKUP_TOOLTIP));
+  this->actionButton->SetId(ID_RESTORE_STORE_INFO);
   this->AddChild(this->actionButton);
 }
 
@@ -3751,7 +3829,7 @@ void UIMerchantShopMakeWnd::SetSuspended(unsigned char suspend) {
     this->suspended = 1;
     this->Show(0);
     window->Show(0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STORE_ASSISTANT_TRADE_ITEM)), 0xFFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SELECT_SHOP_POSITION)), 0xFFFF, 0, 0, 0);
     return;
   }
 
@@ -3786,9 +3864,9 @@ void UIMerchantItemMyShopWnd::OpenShop() {
   this->shopOpen = 1;
   if (!this->actionButton) {
     this->actionButton = new UIBasicButton();
-    this->actionButton->Configure(42, LookupMessage(MSI_LIMIT_USER));
+    this->actionButton->Configure(42, LookupMessage(MSI_WITHDRAWAL));
     this->actionButton->Move(this->geometry.width - this->actionButton->geometry.width - 66, this->geometry.height - 24);
-    this->actionButton->SetId(506);
+    this->actionButton->SetId(ID_CLOSE_OFFLINE_STORE);
     this->AddChild(this->actionButton);
   }
 
@@ -3811,7 +3889,7 @@ void UIItemWnd::ReleaseSelection(unsigned char keep) {
 
   for (auto it = this->items.begin(); it != this->items.end(); ++it) {
     g_session.ClearItemSelection();
-    it->flags[1] = 0;
+    it->selected = 0;
   }
 
   if (UIWindow* window = g_windowMgr.LookupWindow(WID_MENUICONWND)) {
@@ -3819,15 +3897,211 @@ void UIItemWnd::ReleaseSelection(unsigned char keep) {
   }
 }
 
+// OFFSET: 0x00994D90
+// FUNCTION: fn_45727
+bool UIItemStoreSubWnd::FilterItem(ITEM_INFO& item) {
+  CItemInfoMgr* itemInfoMgr = g_itemInfoMgr;
+  item.saleData.costume = itemInfoMgr->IsCostume(std::stoi(item.itemId));
+  if (item.saleData.costume != 0) {
+    if (this->tabIndex == 4) {
+      return true;
+    }
+  } else {
+    const int type = static_cast<int>(item.itemType);
+    switch (this->tabIndex) {
+    case 0:
+      if (type == TYPE_HEAL || type == TYPE_SCHANGE || type == TYPE_SPECIAL) {
+        return true;
+      }
+      break;
+    case 1:
+      if (type == TYPE_CASH_POINT_ITEM) {
+        return true;
+      }
+      break;
+    case 2:
+      switch (type) {
+      case TYPE_ARMOR:
+      case TYPE_ARMORTM:
+      case TYPE_ARMORTB:
+      case TYPE_ARMORMB:
+      case TYPE_ARMORTMB:
+        return true;
+      }
+      break;
+    case 3:
+      switch (type) {
+      case TYPE_WEAPON:
+      case TYPE_BOW:
+      case TYPE_BOTHHAND:
+      case TYPE_GUN:
+        return true;
+      }
+      break;
+    case 5:
+      if (type == TYPE_ARROW || type == TYPE_AMMO || type == TYPE_THROWWEAPON || type == TYPE_CANNONBALL) {
+        return true;
+      }
+      break;
+    case 6:
+      if (type == TYPE_CARD) {
+        return true;
+      }
+      break;
+    case 7:
+      if (type == TYPE_EVENT || type == TYPE_PETEGG) {
+        return true;
+      }
+      break;
+    }
+  }
+  return false;
+}
+
+// OFFSET: 0x00994EF0
+// FUNCTION: fn_45728
+bool UIItemStoreWnd::FilterItem(ITEM_INFO& item) {
+  CItemInfoMgr* itemInfoMgr = g_itemInfoMgr;
+  item.saleData.costume = itemInfoMgr->IsCostume(std::stoi(item.itemId));
+  if (item.saleData.costume != 0) {
+    if (this->m_sortMode == 4) {
+      return true;
+    }
+  } else {
+    const int type = static_cast<int>(item.itemType);
+    switch (this->m_sortMode) {
+    case 0:
+      if (type == TYPE_HEAL || type == TYPE_SCHANGE || type == TYPE_SPECIAL) {
+        return true;
+      }
+      break;
+    case 1:
+      if (type == TYPE_CASH_POINT_ITEM) {
+        return true;
+      }
+      break;
+    case 2:
+      switch (type) {
+      case TYPE_ARMOR:
+      case TYPE_ARMORTM:
+      case TYPE_ARMORTB:
+      case TYPE_ARMORMB:
+      case TYPE_ARMORTMB:
+        return true;
+      }
+      break;
+    case 3:
+      switch (type) {
+      case TYPE_WEAPON:
+      case TYPE_BOW:
+      case TYPE_BOTHHAND:
+      case TYPE_GUN:
+        return true;
+      }
+      break;
+    case 5:
+      if (type == TYPE_ARROW || type == TYPE_AMMO || type == TYPE_THROWWEAPON || type == TYPE_CANNONBALL) {
+        return true;
+      }
+      break;
+    case 6:
+      if (type == TYPE_CARD) {
+        return true;
+      }
+      break;
+    case 7:
+      if (type == TYPE_EVENT || type == TYPE_PETEGG) {
+        return true;
+      }
+      break;
+    }
+  }
+  return false;
+}
+
+// OFFSET: 0x00995050
+// FUNCTION: fn_45729
+bool UIItemWnd::FilterItem(ITEM_INFO& item) {
+  if (item.placeEtcTab != 0) {
+    if (this->categoryFilter == 3) {
+      return true;
+    }
+  } else {
+    const int type = static_cast<int>(item.itemType);
+    switch (this->categoryFilter) {
+    case 0:
+      if (type == TYPE_HEAL || type == TYPE_SCHANGE || type == TYPE_SPECIAL || type == TYPE_CASH_POINT_ITEM) {
+        switch (this->usableFilter) {
+        case 0:
+          if (type == TYPE_HEAL) {
+            return true;
+          }
+          break;
+        case 2:
+          if (type == TYPE_SCHANGE || type == TYPE_SPECIAL) {
+            return true;
+          }
+          break;
+        case 3:
+          return true;
+        }
+      }
+      break;
+    case 1:
+      switch (type) {
+      case TYPE_ARMOR:
+      case TYPE_ARMORTM:
+      case TYPE_ARMORTB:
+      case TYPE_ARMORMB:
+      case TYPE_ARMORTMB:
+      case TYPE_WEAPON:
+      case TYPE_BOW:
+      case TYPE_BOTHHAND:
+      case TYPE_GUN:
+        switch (this->equipmentFilter) {
+        case 0:
+          if (type == TYPE_WEAPON || type == TYPE_BOTHHAND || type == TYPE_BOW) {
+            return true;
+          }
+          break;
+        case 1:
+          switch (type) {
+          case TYPE_ARMOR:
+          case TYPE_ARMORTM:
+          case TYPE_ARMORTB:
+          case TYPE_ARMORMB:
+          case TYPE_ARMORTMB:
+            return true;
+          }
+          break;
+        case 3:
+          return true;
+        }
+        break;
+      }
+      break;
+    case 2:
+      if (type == TYPE_CARD || type == TYPE_EVENT || type == TYPE_PETEGG || type == TYPE_ARROW || type == TYPE_AMMO ||
+          type == TYPE_THROWWEAPON || type == TYPE_CANNONBALL) {
+        if (this->miscFilter == 4) {
+          return true;
+        }
+      }
+      break;
+    }
+  }
+  return false;
+}
+
 // OFFSET: 0x009967F0
 // FUNCTION: fn_13469
 int ItemTypeSortRank(int type) {
   switch (type) {
-  case 0:
-  case 1:
-  case 2:
+  case TYPE_HEAL:
+  case TYPE_SCHANGE:
+  case TYPE_SPECIAL:
     return 0;
-  case 18:
+  case TYPE_CASH_POINT_ITEM:
     return 1;
   case TYPE_ARMOR:
   case TYPE_ARMORTM:
@@ -3840,15 +4114,15 @@ int ItemTypeSortRank(int type) {
   case TYPE_BOTHHAND:
   case TYPE_GUN:
     return 3;
-  case 10:
-  case 16:
-  case 17:
-  case 19:
+  case TYPE_ARROW:
+  case TYPE_AMMO:
+  case TYPE_THROWWEAPON:
+  case TYPE_CANNONBALL:
     return 4;
-  case 6:
+  case TYPE_CARD:
     return 5;
-  case 3:
-  case 7:
+  case TYPE_EVENT:
+  case TYPE_PETEGG:
     return 6;
   default:
     return 10;
@@ -3862,8 +4136,8 @@ struct ItemTypeNameLess {
 // OFFSET: 0x009700C0
 // FUNCTION: fn_13240
 bool ItemTypeNameLess::operator()(const ITEM_INFO& left, const ITEM_INFO& right) const {
-  const int leftRank = ItemTypeSortRank(left.identity[0]);
-  const int rightRank = ItemTypeSortRank(right.identity[0]);
+  const int leftRank = ItemTypeSortRank(left.itemType);
+  const int rightRank = ItemTypeSortRank(right.itemType);
   if (leftRank == rightRank) {
     return left.DisplayName(0) < right.DisplayName(0);
   }
@@ -4003,39 +4277,39 @@ int UIMerchantShopMakeWnd::CommitPrice(int next) {
   }
 
   std::int64_t price = _atoi64(text);
-  if (price <= 0x7FFFFFFF && price < 0) {
+  if (0x7FFFFFFF >= price && price < 0) {
     price = 0;
   } else if (price > 0x7FFFFFFF || price > 1000000000) {
-    if (g_windowMgr.Confirm(LookupMessage(MSI_BASIC_EXP_MSG_INDONESIA), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_OVERPRICE_MAX), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      price = 1000000000;
+      edit->SetText(_itoa(1000000000, text, 10));
+      this->Invalidate();
+    } else {
       edit->SetText("0");
       g_windowMgr.SetFocus(edit);
       edit->SelectAll();
       return 0;
     }
-
-    price = 1000000000;
-    edit->SetText(_itoa(1000000000, text, 10));
-    this->Invalidate();
   }
 
-  if (price >= std::atoi(LookupMessage(MSI_WARNING_PRICE7))) {
+  if (price >= std::atoi(LookupMessage(MSI_WARNING_PRICE4))) {
     ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(this->editIndex);
     char name[128];
     int capacity = 128;
     item.GetIdDisplayName(name, capacity, 0);
-    std::string message = FormatOwnedString(LookupMessage(MSI_WARNING_PRICE4), name);
+    std::string message = FormatOwnedString(LookupMessage(MSI_WARNING_PRICE1), name);
 
-    const int high = static_cast<int>(price / std::atoi(LookupMessage(MSI_WARNING_PRICE5)));
+    const int high = static_cast<int>(price / std::atoi(LookupMessage(MSI_WARNING_PRICE2)));
     if (high > 0) {
-      message += FormatOwnedString(LookupMessage(MSI_WARNING_PRICE6), high);
+      message += FormatOwnedString(LookupMessage(MSI_WARNING_PRICE3), high);
     }
 
-    const int low = static_cast<int>(price % std::atoi(LookupMessage(MSI_WARNING_PRICE5))) / std::atoi(LookupMessage(MSI_WARNING_PRICE7));
+    const int low = static_cast<int>(price % std::atoi(LookupMessage(MSI_WARNING_PRICE2))) / std::atoi(LookupMessage(MSI_WARNING_PRICE4));
     if (low > 0) {
-      message += FormatOwnedString(LookupMessage(MSI_AMERICA_CASHSHOP_URL), low);
+      message += FormatOwnedString(LookupMessage(MSI_WARNING_PRICE5), low);
     }
 
-    message += std::string(LookupMessage(MSI_AMERICA_CASHSHOP_URL_STEAM));
+    message += std::string(LookupMessage(MSI_WARNING_PRICE6));
     if (g_windowMgr.Confirm(message.c_str(), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
       edit->SetText("0");
       g_windowMgr.SetFocus(edit);
@@ -4359,20 +4633,20 @@ std::string UIEditCtrl3::ResolveItemLinks(const std::string& source) {
   }
 
   std::string remaining = source;
-  std::string result;
+  std::string result("");
   int position = 0;
   int previous = 0;
   for (;;) {
-    std::string link;
+    std::string link("");
     if (!this->ExtractItemLink(remaining, link, position, source.c_str())) {
       break;
     }
 
     result += source.substr(previous, position - previous);
 
-    std::string name;
+    std::string name("");
     if (this->LinkDisplayName(link, name)) {
-      name = this->BracketFittedText(name);
+      name = static_cast<const std::string&>(this->BracketFittedText(name));
       result += name;
       position += static_cast<int>(link.size() + g_itemLinkClose.size() + g_itemLinkOpen.size());
     }
@@ -4392,17 +4666,17 @@ std::string UIEditCtrl3::ResolveItemLinks(const std::string& source) {
 // FUNCTION: fn_10777
 std::string UIEditCtrl3::PlaceLineLinks(const char* line, std::string& text, const int* lineIndex) {
   if (text.find(g_itemLinkOpen) == std::string::npos) {
-    return std::string(line, std::strlen(line));
+    return std::string(line);
   }
 
   std::string remaining(text);
-  std::string result;
+  std::string result = "";
   std::vector<UIItemTagButton*> buttons;
   int position = 0;
   int start;
 
   for (;;) {
-    std::string link;
+    std::string link = "";
     const int previous = position;
     start = previous;
     if (!this->ExtractItemLink(remaining, link, position, text.c_str())) {
@@ -4463,9 +4737,10 @@ std::string UIEditCtrl3::PlaceLineLinks(const char* line, std::string& text, con
       UIItemTagButton* button = new (std::nothrow) UIItemTagButton();
       button->item = item;
       button->Configure(name.c_str(), 0x82F2E1, 0, 12, 0, 0);
-      button->SetTooltip(item.DisplayName(0).c_str());
+      const std::string tooltipText = item.DisplayName(0);
+      button->SetTooltip(tooltipText.c_str());
       button->m_hoverColor = 0x82F2E1;
-      button->SetId(0x1D0);
+      button->SetId(ID_ITEM_TAG);
       button->ResizeToTextClipped(this->TextWidth(name.c_str(), 0, 0, 12, 0, 0) + 1, button->geometry.height);
       this->AddChild(button);
       buttons.push_back(button);
@@ -4489,17 +4764,23 @@ std::string UIEditCtrl3::PlaceLineLinks(const char* line, std::string& text, con
   return result;
 }
 
+// OFFSET: 0x00860030
+// FUNCTION: fn_45654
+void UIEditCtrl3::WrapText(std::vector<std::string>& lines, const std::string& text) {
+  int width = this->geometry.width - 6;
+  if (this->scrollEnabled != 0) {
+    width += 3 - this->scrollBar->geometry.width;
+  }
+  this->WrapTextWithBreaks(text.c_str(), &lines, &this->lineBreaks, width);
+}
+
 // OFFSET: 0x00869810
 // FUNCTION: fn_10973
 void UIEditCtrl3::SetLinkedText(const char* value) {
   std::string resolved = this->ResolveItemLinks(std::string(value));
 
   std::vector<std::string> lines;
-  int width = this->geometry.width - 6;
-  if (this->scrollEnabled != 0) {
-    width += 3 - this->scrollBar->geometry.width;
-  }
-  this->WrapTextWithBreaks(resolved.c_str(), &lines, &this->lineBreaks, width);
+  this->WrapText(lines, resolved);
   this->WrapLines(lines);
 
   this->lineCount = static_cast<int>(lines.size());
@@ -4511,11 +4792,7 @@ void UIEditCtrl3::SetLinkedText(const char* value) {
   if (this->scrollEnabled != 0) {
     lines.clear();
     resolved = this->ResolveItemLinks(std::string(value));
-    width = this->geometry.width - 6;
-    if (this->scrollEnabled != 0) {
-      width += 3 - this->scrollBar->geometry.width;
-    }
-    this->WrapTextWithBreaks(resolved.c_str(), &lines, &this->lineBreaks, width);
+    this->WrapText(lines, resolved);
     this->WrapLines(lines);
   }
 
@@ -4533,7 +4810,7 @@ void UIEditCtrl3::SetLinkedText(const char* value) {
 void UIEditCtrl3::WrapLines(std::vector<std::string>& lines) {
   const std::string open = "<";
   const std::string close = ">";
-  std::string remaining;
+  std::string remaining("");
 
   for (std::size_t index = 0; index < lines.size(); ++index) {
     std::vector<std::string> pieces;
@@ -4878,11 +5155,11 @@ void UIMerchantMirrorItemWnd::OnCreate(int width, int height) {
   title->SetSize(150, 15);
   int messageId;
   if (this->mode == 1) {
-    messageId = 1733;
+    messageId = MSI_BUYINGSTORE_MIRRORBUYITEMLIST;
   } else if (this->mode == 2) {
-    messageId = 1738;
+    messageId = MSI_BUYINGSTORE_MIRRORSELLWND_TITLE;
   } else {
-    messageId = 232;
+    messageId = MSI_MERCHANTMIRRORITEM;
   }
   const char* text = LookupMessage(messageId);
   title->SetText(text, 0);
@@ -5221,9 +5498,9 @@ std::vector<unsigned char> UIItemStoreWnd::GetReplayData() {
 
 // OFFSET: 0x00973260
 // FUNCTION: fn_13285
-std::vector<unsigned char> UIItemShopWnd::BuildReplayRecords() {
+std::vector<unsigned char> UIMerchantItemMyShopWnd::GetReplayData() {
   std::vector<unsigned char> records;
-  if (this->hovered != 0) {
+  if (this->buyingShop != 0) {
     AppendReplayRecord(records, BuildReplayTaggedRecord(21050, nullptr, 0));
     AppendReplayRecord(records, BuildReplayTaggedRecord(21051, nullptr, 0));
   } else {
@@ -5235,9 +5512,9 @@ std::vector<unsigned char> UIItemShopWnd::BuildReplayRecords() {
 
 // OFFSET: 0x009733A0
 // FUNCTION: fn_13286
-std::vector<unsigned char> UIParaItemShopWnd::BuildReplayRecords() {
+std::vector<unsigned char> UIMerchantItemPurchaseWnd::GetReplayData() {
   std::vector<unsigned char> records;
-  if (this->footerHeight != 0) {
+  if (this->buyingStore != 0) {
     AppendReplayRecord(records, BuildReplayTaggedRecord(21100, nullptr, 0));
     AppendReplayRecord(records, BuildReplayTaggedRecord(21101, nullptr, 0));
   } else {
@@ -5328,9 +5605,9 @@ void UIItemShopWnd2::OnLBtnDblClk(int x, int y) {
 
   if (target) {
     this->OnLBtnDown(x, y);
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    this->RecordDrop(x, y, mode->drag, 161);
-    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&mode->drag));
+    auto& drag = g_modeMgr.GetGameMode()->drag;
+    this->RecordDrop(x, y, drag, 161);
+    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&drag));
   }
 }
 
@@ -5345,9 +5622,9 @@ void UIItemShopWnd::OnLBtnDblClk(int x, int y) {
 
   if (target) {
     this->OnLBtnDown(x, y);
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    this->RecordDrop(x, y, mode->drag, 24);
-    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&mode->drag));
+    auto& drag = g_modeMgr.GetGameMode()->drag;
+    this->RecordDrop(x, y, drag, 24);
+    target->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(&drag));
   }
 }
 
@@ -5372,7 +5649,7 @@ void UISkillListWnd::OnLBtnDown(int x, int y) {
     CGameMode* mode = g_modeMgr.GetGameMode();
 
     if (mode) {
-      mode->BeginDragSkill(8, skill.id, skill.name, g_session.SkillLevel(skill.id), -1);
+      mode->BeginDragSkill(DRAG_SKILL, skill.id, skill.name, g_session.SkillLevel(skill.id), -1);
     }
   }
 }
@@ -5411,8 +5688,8 @@ void UIMerchantItemShopWnd::OnLBtnDown(int x, int y) {
 
     ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-    if (item.identity[1] > 0) {
-      g_modeMgr.GetGameMode()->BeginDragItem(12, item, 1, -1);
+    if (item.itemIndex > 0) {
+      g_modeMgr.GetGameMode()->BeginDragItem(DRAG_VENDING_ITEM_SHOP, item, 1, -1);
     }
   }
 }
@@ -5429,7 +5706,7 @@ void UIItemPurchaseWnd::OnRBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     g_modeMgr.GetGameMode();
     g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
@@ -5447,7 +5724,7 @@ void UIItemShopWnd::OnRBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     g_modeMgr.GetGameMode();
     g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
   }
@@ -5509,11 +5786,8 @@ int UISkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
         this->scrollBar->Resize(this->scrollBar->geometry.width, this->geometry.height - 38);
         int row = 0;
         for (int y = 17; y < 241; y += 32, ++row) {
-          if (row < this->visibleRows && static_cast<unsigned>(this->scroll + row) < this->skills.size()) {
-            this->upgradeButtons[row]->Move(53, y);
-          } else {
-            this->upgradeButtons[row]->Move(-200, y);
-          }
+          const bool visible = row < this->visibleRows && static_cast<unsigned>(this->scroll + row) < this->skills.size();
+          this->upgradeButtons[row]->Move(visible ? 53 : -200, y);
         }
         this->UpdateScrollBar();
         this->UpdateRowButtons();
@@ -5526,7 +5800,7 @@ int UISkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     const CSkillInfo* skill = reinterpret_cast<const CSkillInfo*>(a);
     if (skill->level != 0) {
       CMode* mode = g_modeMgr.currentMode;
-      int level = 0;
+      int level;
       if (this->skillTab == 0) {
         level = g_session.HomunSkillLevel(skill->id);
       } else if (this->skillTab == 1) {
@@ -5613,7 +5887,7 @@ int UISkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
           level = skill.level;
         }
         if (this->skillTab == 0) {
-          g_session.SetOption(8, 1, 0);
+          g_session.SetOption(8, 1);
           g_session.SetHomunSkillLevel(id, level);
         } else if (this->skillTab == 1) {
           g_session.SetMercSkillLevel(id, level);
@@ -5646,7 +5920,7 @@ int UISkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
           level = skill.level;
         }
         if (this->skillTab == 0) {
-          g_session.SetOption(8, 1, 0);
+          g_session.SetOption(8, 1);
           g_session.SetHomunSkillLevel(id, level);
         } else if (this->skillTab == 1) {
           g_session.SetMercSkillLevel(id, level);
@@ -5700,7 +5974,7 @@ int UISkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
           this->skills.push_back(skill);
           ++upgradable;
         }
-        if (CSkillInfo::UsesLevel(*g_session.m_hotkeyScript, skill.id) && skill.level != 0) {
+        if (CSkillInfo::UsesLevel(skill.id) && skill.level != 0) {
           int current = 0;
           if (this->skillTab == 0) {
             current = g_session.HomunSkillLevel(skill.id);
@@ -5752,10 +6026,11 @@ int UISkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
         menu->SendMsg(nullptr, UM_SET_CALLER_WID, 0x7E, 0, 0, 0);
       }
       menu->SendMsg(nullptr, UM_ADJUSTSIZE, 0, 0, 0, 0);
-      menu->Move(
-        std::min(std::max(g_mouse.x + 1, 1), g_renderer->viewport.width - menu->geometry.width),
-        std::min(std::max(g_mouse.y + 1, 1), g_renderer->viewport.height - menu->geometry.height)
-      );
+      int x = g_mouse.x + 1;
+      int y = g_mouse.y + 1;
+      x = std::min(std::max(x, 1), g_renderer->viewport.width - menu->geometry.width);
+      y = std::min(std::max(y, 1), g_renderer->viewport.height - menu->geometry.height);
+      menu->Move(x, y);
       return 0;
     }
     break;
@@ -5822,15 +6097,14 @@ void UISkillListWnd::OnCreate(int width, int height) {
     std::string pressed("유저인터페이스\\basic_interface\\skill_up_c.bmp");
     int row = 0;
     for (int y = 21; y < 245; y += 32, ++row) {
-      UIBitmapButton* button = new UIBitmapButton();
-      this->upgradeButtons[row] = button;
-      button->SetBitmap(normal.c_str(), 0, 0);
-      button->SetBitmap(over.c_str(), 1, 0);
-      button->SetBitmap(pressed.c_str(), 2, 0);
-      button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-      button->Move(78, y);
-      button->SetId(upgradeIds[row]);
-      this->AddChild(button);
+      this->upgradeButtons[row] = new UIBitmapButton();
+      this->upgradeButtons[row]->SetBitmap(normal.c_str(), 0, 0);
+      this->upgradeButtons[row]->SetBitmap(over.c_str(), 1, 0);
+      this->upgradeButtons[row]->SetBitmap(pressed.c_str(), 2, 0);
+      this->upgradeButtons[row]->SetSize(this->upgradeButtons[row]->BitmapWidth(), this->upgradeButtons[row]->BitmapHeight());
+      this->upgradeButtons[row]->Move(78, y);
+      this->upgradeButtons[row]->SetId(upgradeIds[row]);
+      this->AddChild(this->upgradeButtons[row]);
     }
   }
 
@@ -5839,15 +6113,14 @@ void UISkillListWnd::OnCreate(int width, int height) {
     std::string left("유저인터페이스\\basic_interface\\arw_left.bmp");
     int row = 0;
     for (int y = 34; y < 258; y += 32, ++row) {
-      UIBitmapButton* button = new UIBitmapButton();
-      this->levelButtons[row] = button;
-      button->SetBitmap(left.c_str(), 0, 0);
-      button->SetBitmap(left.c_str(), 1, 0);
-      button->SetBitmap(left.c_str(), 2, 0);
-      button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-      button->Move(112, y);
-      button->SetId(levelDownIds[row]);
-      this->AddChild(button);
+      this->levelButtons[row] = new UIBitmapButton();
+      this->levelButtons[row]->SetBitmap(left.c_str(), 0, 0);
+      this->levelButtons[row]->SetBitmap(left.c_str(), 1, 0);
+      this->levelButtons[row]->SetBitmap(left.c_str(), 2, 0);
+      this->levelButtons[row]->SetSize(this->levelButtons[row]->BitmapWidth(), this->levelButtons[row]->BitmapHeight());
+      this->levelButtons[row]->Move(112, y);
+      this->levelButtons[row]->SetId(levelDownIds[row]);
+      this->AddChild(this->levelButtons[row]);
     }
   }
 
@@ -5856,15 +6129,14 @@ void UISkillListWnd::OnCreate(int width, int height) {
     std::string right("유저인터페이스\\basic_interface\\arw_right.bmp");
     int row = 0;
     for (int y = 34; y < 258; y += 32, ++row) {
-      UIBitmapButton* button = new UIBitmapButton();
-      this->levelLabels[row] = button;
-      button->SetBitmap(right.c_str(), 0, 0);
-      button->SetBitmap(right.c_str(), 1, 0);
-      button->SetBitmap(right.c_str(), 2, 0);
-      button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-      button->Move(192, y);
-      button->SetId(levelUpIds[row]);
-      this->AddChild(button);
+      this->levelLabels[row] = new UIBitmapButton();
+      this->levelLabels[row]->SetBitmap(right.c_str(), 0, 0);
+      this->levelLabels[row]->SetBitmap(right.c_str(), 1, 0);
+      this->levelLabels[row]->SetBitmap(right.c_str(), 2, 0);
+      this->levelLabels[row]->SetSize(this->levelLabels[row]->BitmapWidth(), this->levelLabels[row]->BitmapHeight());
+      this->levelLabels[row]->Move(192, y);
+      this->levelLabels[row]->SetId(levelUpIds[row]);
+      this->AddChild(this->levelLabels[row]);
     }
   }
 
@@ -6156,10 +6428,13 @@ int UIMerchantItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     break;
   case UM_DROP: {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    if (mode->drag.source == 1) {
+    switch (mode->drag.source) {
+    case 1:
       mode->SendMsg(MM_MOVE_ITEM_FROM_BODY_TO_CART, mode->drag.id, mode->drag.quantity, 0, 0);
-    } else if (mode->drag.source == 6) {
+      break;
+    case 6:
       mode->SendMsg(MM_MOVE_ITEM_FROM_STORE_TO_CART, mode->drag.id, mode->drag.quantity, 0, 0);
+      break;
     }
 
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -6199,7 +6474,7 @@ int UIMerchantItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     const int size = g_session.GetNumMerchantShopItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetMerchantShopItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -6298,7 +6573,7 @@ int UIMerchantMirrorItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_
     const int size = g_session.GetNumMerchantMyShopItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetMerchantMyShopItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -6312,7 +6587,7 @@ int UIMerchantMirrorItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_
     ItemListChunkHeader header;
     header = *reinterpret_cast<const ItemListChunkHeader*>(bytes);
     unsigned offset = 6;
-    if (header.type == 21400) {
+    if (21400 == header.type) {
       while (static_cast<unsigned>(b) > offset) {
         header = *reinterpret_cast<const ItemListChunkHeader*>(bytes + offset);
         offset += 6;
@@ -6436,7 +6711,7 @@ int UIItemSellWnd2::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     const int size = g_session.GetNumStorageItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetStorageItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -6511,7 +6786,7 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
     int owned = 0;
     for (int i = 0; i < ownedCount; ++i) {
       found = g_session.GetMerchantHopeToSellItemInfoBySequence(i);
-      if (found.identity[1] == item.identity[1]) {
+      if (found.itemIndex == item.itemIndex) {
         owned = found.quantity;
         break;
       }
@@ -6522,30 +6797,34 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
     int limit = 0;
     for (int i = 0; i < stockCount; ++i) {
       stock = g_session.GetMerchantMirrorItemInfoBySequence(i);
-      bool same;
       if (this->buyingStore) {
-        same = std::atoi(stock.itemId.c_str()) == std::atoi(item.itemId.c_str());
-      } else {
-        same = stock.identity[1] == item.identity[1];
-      }
-      if (same) {
+        const int stockId = std::atoi(stock.itemId.c_str());
+        const int itemId = std::atoi(item.itemId.c_str());
+        if (stockId == itemId) {
+          limit = stock.quantity;
+          break;
+        }
+      } else if (stock.itemIndex == item.itemIndex) {
         limit = stock.quantity;
         break;
       }
     }
 
-    char text[256];
     int total = owned + item.quantity;
     if (limit < total) {
+      char text[200];
       total = limit;
       item.quantity = limit - owned;
-      std::sprintf(text, LookupMessage(this->buyingStore ? MSI_BUYINGSTORE_SELLWND_LIMITNUM : MSI_CAN_BUY_ITEM_NUM), limit);
+      const char* format = LookupMessage(!this->buyingStore ? MSI_CAN_BUY_ITEM_NUM : MSI_BUYINGSTORE_SELLWND_LIMITNUM);
+      std::sprintf(text, format, limit);
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 255, 0, 0, 0);
     }
     if (total > 30000) {
+      char text[200];
       item.quantity = 30000 - owned;
-      std::sprintf(text, LookupMessage((this->buyingStore != 0) + 1704), 30000);
+      const char* format = LookupMessage((this->buyingStore != 0) + 1704);
+      std::sprintf(text, format, 30000);
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 255, 0, 0, 0);
     }
@@ -6554,16 +6833,16 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
       const long long pending = g_session.GetMerchantHopeToSellItemTotalPrice();
       const int price = static_cast<int>(drag.price);
       if (this->buyingStore) {
-        if (static_cast<long long>(price * item.quantity) + g_session.m_zeny + pending > 0x7FFFFFFF) {
-          g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_OVER_OR_LOW_MONEY)), 255, 0, 0, 0);
-        } else {
+        if (static_cast<long long>(price * item.quantity) + g_session.m_zeny + pending <= 0x7FFFFFFF) {
           g_session.AddMerchantHopeToSellItem(item);
           g_session.RemoveMerchantMyShopItem(item, 2, 1);
           this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
           if (g_windowMgr.purchaseMirrorItemWnd) {
             g_windowMgr.purchaseMirrorItemWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
           }
+        } else {
+          g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_OVER_OR_LOW_MONEY)), 255, 0, 0, 0);
         }
       } else if (g_session.m_zeny >= static_cast<long long>(price) * item.quantity + pending) {
         g_session.AddMerchantHopeToSellItem(item);
@@ -6580,11 +6859,12 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
   case UM_COMMAND: {
     this->RecordResponse(static_cast<int>(a), b, c, d);
     CMode* mode = g_modeMgr.currentMode;
-    if (a == ID_OK) {
+    switch (a) {
+    case ID_OK:
       if (this->buyingStore) {
         int sum = 0;
         for (std::list<ITEM_INFO>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
-          if (it->identity[1] != 0) {
+          if (it->itemIndex > 0) {
             sum += static_cast<int>(it->prices[1]) * it->quantity;
           }
         }
@@ -6602,13 +6882,13 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
         g_windowMgr.CloseWindow(WID_MERCHANTITEMSHOPWND_MODE_1);
         g_windowMgr.CloseWindow(WID_MERCHANTITEMPURCHASEWND_MODE_1);
         g_windowMgr.CloseWindow(WID_MERCHANTMIRRORITEMWND_MODE_2);
-      } else {
-        g_windowMgr.CloseWindow(WID_MERCHANTITEMSHOPWND);
-        g_windowMgr.CloseWindow(WID_MERCHANTITEMPURCHASEWND);
+        return 0;
       }
+
+      g_windowMgr.CloseWindow(WID_MERCHANTITEMSHOPWND);
+      g_windowMgr.CloseWindow(WID_MERCHANTITEMPURCHASEWND);
       return 0;
-    }
-    if (a == ID_CANCEL) {
+    case ID_CANCEL: {
       int first;
       int second;
       if (this->buyingStore) {
@@ -6623,6 +6903,8 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
       g_windowMgr.CloseWindow(second);
       mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
       g_session.ClearItems1760And1748();
+      break;
+    }
     }
     return 0;
   }
@@ -6658,7 +6940,7 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
     const int count = g_session.GetNumMerchantHopeToSellItems();
     for (int i = 0; i < count; ++i) {
       ITEM_INFO item = g_session.GetMerchantHopeToSellItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         sum += item.quantity * static_cast<int>(item.prices[1]);
         this->items.push_back(item);
       }
@@ -6682,7 +6964,7 @@ int UIMerchantItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intpt
     ItemListChunkHeader header;
     header = *reinterpret_cast<const ItemListChunkHeader*>(bytes);
     unsigned offset = 6;
-    if (header.type == 21150 || header.type == 21100) {
+    if (21150 == header.type || 21100 == header.type) {
       while (static_cast<unsigned>(b) > offset) {
         header = *reinterpret_cast<const ItemListChunkHeader*>(bytes + offset);
         offset += 6;
@@ -6728,8 +7010,9 @@ int UIMerchantItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
   case UM_DROP: {
     CGameMode* mode = g_modeMgr.GetGameMode();
     if (this->buyingShop == 0) {
+      ModeDragState& drag = mode->drag;
       ITEM_INFO item;
-      item.Assign(mode->drag);
+      item.Assign(drag);
       g_session.RemoveMerchantHopeToSellItem(item);
       if (g_windowMgr.merchantItemPurchaseWnd) {
         static_cast<UIWindow*>(g_windowMgr.merchantItemPurchaseWnd)->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
@@ -6743,11 +7026,11 @@ int UIMerchantItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
   }
   case UM_RESIZE:
     if (a == 3) {
-      int width;
+      int width = b;
       if (this->buyingShop) {
-        width = b <= 426 ? b : 426;
-      } else {
-        width = b <= 320 ? b : 320;
+        width = width <= 426 ? width : 426;
+      } else if (width > 320) {
+        width = 320;
       }
       int height = c <= 336 ? c : 336;
       if (width < 232) {
@@ -6773,7 +7056,7 @@ int UIMerchantItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     const int size = g_session.GetNumMerchantMirrorItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetMerchantMirrorItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -6901,7 +7184,7 @@ void UIMerchantItemMyShopWnd::OnCreate(int width, int height) {
 
   this->title = new UIStaticText();
   this->title->SetSize(240, 15);
-  this->title->SetText(LookupMessage(this->buyingShop ? MSI_BUYINGSTORE_MYSHOPWND_TITLE : MSI_CONNECT_SNS_SUCCESS_SEND), 0);
+  this->title->SetText(LookupMessage(this->buyingShop == 0 ? MSI_SALESTORE_MYSHOPWND_TITLE : MSI_BUYINGSTORE_MYSHOPWND_TITLE), 0);
   this->title->Move(16, 2);
   this->title->shadow = 1;
   this->AddChild(this->title);
@@ -6921,23 +7204,26 @@ void UIMerchantItemMyShopWnd::OnCreate(int width, int height) {
 
   this->saleAlarm = new UICheckBox();
   this->saleAlarm->SetSize(240, 12);
-  this->saleAlarm->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", LookupMessage(this->buyingShop ? MSI_RODEX_FOWARD : MSI_DELETE_DUE_DATE));
+  this->saleAlarm->SetImages("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp", LookupMessage(this->buyingShop == 0 ? MSI_SOUNDEFFECT_ITEMSELLWND : MSI_SOUNDEFFECT_ITEMBUYWND));
   this->saleAlarm->FitToText();
-  this->saleAlarm->Move(12, this->geometry.height - (this->buyingShop ? 12 : 18));
+  if (this->buyingShop) {
+    this->saleAlarm->Move(12, this->geometry.height - 12);
+  } else {
+    this->saleAlarm->Move(12, this->geometry.height - 18);
+  }
   this->saleAlarm->SetChecked(g_session.m_muteSellSound);
   this->AddChild(this->saleAlarm);
 
   const std::string prefix("유저인터페이스\\");
-  int ids[1] = {201};
   const char* names[1][3] = {{"btn_close", "btn_close_a", "btn_close_b"}};
+  int ids[1] = {201};
   int positions[1][2] = {{this->geometry.width - 61, this->geometry.height - 24}};
   for (int index = 0; index < 1; ++index) {
     this->buttons[index] = new UIBitmapButton();
-    UIBitmapButton* button = this->buttons[index];
-    button->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
-    this->buttons[index]->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    this->buttons[index]->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
+    this->buttons[index]->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
+    this->buttons[index]->SetSize(this->buttons[index]->BitmapWidth(), this->buttons[index]->BitmapHeight());
     this->buttons[index]->Move(positions[index][0], positions[index][1]);
     this->buttons[index]->SetId(ids[index]);
     this->AddChild(this->buttons[index]);
@@ -7021,10 +7307,10 @@ void UIItemPurchaseWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
     item = g_session.GetPurchaseItemInfoByItemId(item.itemId.c_str());
-    mode->BeginDragItem(4, item, item.quantity, -1);
+    mode->BeginDragItem(DRAG_ITEM_PURCHASE_CART, item, item.quantity, -1);
   }
 }
 
@@ -7048,18 +7334,18 @@ void UIItemSellWnd2::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] == 0) {
+  if (item.itemIndex <= 0) {
     item = this->GetItemByIndex(this->hovered);
 
-    if (item.identity[1] > 0) {
+    if (item.itemIndex > 0) {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 1, 0, 0);
     }
   }
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindStorageItem(item.identity[1]);
-    mode->BeginDragItem(5, item, item.quantity, -1);
+    item = g_session.FindStorageItem(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_SELL, item, item.quantity, -1);
   }
 }
 
@@ -7083,18 +7369,18 @@ void UIItemSellWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] == 0) {
+  if (item.itemIndex <= 0) {
     item = this->GetItemByIndex(this->hovered);
 
-    if (item.identity[1] > 0) {
+    if (item.itemIndex > 0) {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 1, 0, 0);
     }
   }
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindStorageItem(item.identity[1]);
-    mode->BeginDragItem(5, item, item.quantity, -1);
+    item = g_session.FindStorageItem(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_SELL, item, item.quantity, -1);
   }
 }
 
@@ -7118,22 +7404,18 @@ void UIItemShopWnd2::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] == 0) {
+  if (item.itemIndex <= 0) {
     item = this->GetItemByIndex(this->hovered);
 
-    if (item.identity[1] > 0) {
+    if (item.itemIndex > 0) {
       g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 1, 0, 0);
     }
   }
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(item.identity[1]);
-    if (owned.identity[1] > 0) {
-      mode->drag.BeginItem(g_windowMgr, 3, item, item.quantity, -1);
-    } else {
-      mode->drag.BeginItem(g_windowMgr, 3, item, 1, -1);
-    }
+    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_NPC_SHOP, item, owned.itemIndex > 0 ? item.quantity : 1, -1);
   }
 }
 
@@ -7157,13 +7439,13 @@ void UIItemShopWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(item.identity[1]);
-    if (owned.identity[1] > 0) {
-      mode->BeginDragItem(3, item, item.quantity, -1);
+    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(item.itemIndex);
+    if (owned.itemIndex > 0) {
+      mode->BeginDragItem(DRAG_ITEM_NPC_SHOP, item, item.quantity, -1);
     } else {
-      mode->BeginDragItem(3, item, 1, -1);
+      mode->BeginDragItem(DRAG_ITEM_NPC_SHOP, item, 1, -1);
     }
   }
 }
@@ -7177,10 +7459,10 @@ void UIItemStoreFindWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0 && item.flags[2] == 0) {
+  if (item.itemIndex > 0 && item.flagged == 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindCartItem(item.identity[1]);
-    mode->BeginDragItem(6, item, item.quantity, -1);
+    item = g_session.FindCartItem(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_STORAGE, item, item.quantity, -1);
   }
 }
 
@@ -7193,10 +7475,10 @@ void UIItemStoreSubWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0 && item.flags[2] == 0) {
+  if (item.itemIndex > 0 && item.flagged == 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindCartItem(item.identity[1]);
-    mode->BeginDragItem(6, item, item.quantity, -1);
+    item = g_session.FindCartItem(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_STORAGE, item, item.quantity, -1);
   }
 }
 
@@ -7213,10 +7495,10 @@ void UIItemStoreWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0 && item.flags[2] == 0) {
+  if (item.itemIndex > 0 && item.flagged == 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindCartItem(item.identity[1]);
-    mode->BeginDragItem(6, item, item.quantity, -1);
+    item = g_session.FindCartItem(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_STORAGE, item, item.quantity, -1);
   }
 }
 
@@ -7240,13 +7522,13 @@ void UIMerchantItemPurchaseWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemByIndex(this->hovered);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
     item = g_session.GetMerchantHopeToSellItemInfoByItemId(item.itemId.c_str());
     if (this->buyingStore != 0) {
-      mode->BeginDragItem(21, item, item.quantity, -1);
+      mode->BeginDragItem(DRAG_BUYINGSTORE_ITEM_PURCHASE, item, item.quantity, -1);
     } else {
-      mode->BeginDragItem(13, item, item.quantity, -1);
+      mode->BeginDragItem(DRAG_VENDING_ITEM_PURCHASE, item, item.quantity, -1);
     }
   }
 }
@@ -7264,15 +7546,15 @@ void UIMerchantMirrorItemWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindMerchantMyShopItem(item.identity[1]);
+    item = g_session.FindMerchantMyShopItem(item.itemIndex);
     if (this->mode == 1) {
-      mode->BeginDragItem(20, item, item.quantity, -1);
+      mode->BeginDragItem(DRAG_BUYINGSTORE_SHOP_LIST, item, item.quantity, -1);
     } else if (this->mode == 2) {
-      mode->BeginDragItem(22, item, item.quantity, -1);
+      mode->BeginDragItem(DRAG_PURCHASE_MIRROR_LIST, item, item.quantity, -1);
     } else {
-      mode->BeginDragItem(11, item, item.quantity, -1);
+      mode->BeginDragItem(DRAG_VENDING_SHOP_LIST, item, item.quantity, -1);
     }
   }
 }
@@ -7291,13 +7573,13 @@ void UIMerchantShopMakeWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* gameMode = g_modeMgr.GetGameMode();
-    item = g_session.FindMerchantPurchaseSavedItem(item.identity[1]);
+    item = g_session.FindMerchantPurchaseSavedItem(item.itemIndex);
     if (this->mode != 0) {
-      gameMode->BeginDragItem(19, item, item.quantity, -1);
+      gameMode->BeginDragItem(DRAG_BUYINGSTORE_PURCHASE_LIST, item, item.quantity, -1);
     } else {
-      gameMode->BeginDragItem(10, item, item.quantity, -1);
+      gameMode->BeginDragItem(DRAG_VENDING_PURCHASE_LIST, item, item.quantity, -1);
     }
   }
 }
@@ -7306,9 +7588,11 @@ void UIMerchantShopMakeWnd::OnLBtnDown(int x, int y) {
 // FUNCTION: fn_13371
 void UIItemPurchaseWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     std::string text;
@@ -7337,7 +7621,8 @@ void UIItemPurchaseWnd::OnMouseHover(int x, int y) {
                                FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), currency));
     }
 
-    g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+    CMode* mode = g_modeMgr.currentMode;
+    mode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
   }
 }
 
@@ -7345,9 +7630,11 @@ void UIItemPurchaseWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13372
 void UIItemSellWnd2::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     std::string text;
@@ -7360,7 +7647,8 @@ void UIItemSellWnd2::OnMouseHover(int x, int y) {
                                FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64)));
     }
 
-    g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+    CMode* mode = g_modeMgr.currentMode;
+    mode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
   }
 }
 
@@ -7368,19 +7656,21 @@ void UIItemSellWnd2::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13373
 void UIItemSellWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] == 0) {
+  if (item.itemIndex <= 0) {
     return;
   }
 
-  int tooltipX = (x - 40) / 32 * 32 + 40;
-  int tooltipY = (y - 17) / 32 * 32 + 1;
+  const int column = (x - 40) / 32;
+  const int row = (y - 17) / 32;
+  int tooltipX = column * 32 + 40;
+  int tooltipY = row * 32 + 1;
   this->ToScreen(tooltipX, tooltipY);
 
   std::string text;
   char price[64];
   if (item.prices[0] != item.prices[1]) {
     if (item.identified == 1 && item.optionCount != 0) {
-      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA12), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA9), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
                                item.prices[0], FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), "Zeny"));
     } else {
       text = static_cast<const std::string&>(FormatOwnedString("%s %d %s %d -> %s Zeny", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4), item.prices[0],
@@ -7388,7 +7678,7 @@ void UIItemSellWnd::OnMouseHover(int x, int y) {
     }
   } else {
     if (item.identified == 1 && item.optionCount != 0) {
-      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_TAIWAN_CASH_LEMITEMIN), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA10), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
                                FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), "Zeny"));
     } else {
       text = static_cast<const std::string&>(FormatOwnedString("%s %d %s %s Zeny", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4),
@@ -7396,14 +7686,15 @@ void UIItemSellWnd::OnMouseHover(int x, int y) {
     }
   }
 
-  g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+  CMode* mode = g_modeMgr.currentMode;
+  mode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
 }
 
 // OFFSET: 0x009865C0
 // FUNCTION: fn_13374
 void UIItemShopWnd2::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] == 0) {
+  if (item.itemIndex <= 0) {
     return;
   }
 
@@ -7430,16 +7721,19 @@ void UIItemShopWnd2::OnMouseHover(int x, int y) {
     }
   }
 
-  g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+  CMode* mode = g_modeMgr.currentMode;
+  mode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
 }
 
 // OFFSET: 0x00986970
 // FUNCTION: fn_13375
 void UIItemShopWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     std::string text;
@@ -7463,7 +7757,7 @@ void UIItemShopWnd::OnMouseHover(int x, int y) {
     if (this->sellMode) {
       if (item.prices[0] != item.prices[1]) {
         if (item.identified == 1 && item.optionCount != 0) {
-          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA12), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
+          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA9), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
                                    item.prices[0], FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), currency));
         } else {
           text = static_cast<const std::string&>(FormatOwnedString("%s %d %s %d -> %s %s", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4), item.prices[0],
@@ -7471,7 +7765,7 @@ void UIItemShopWnd::OnMouseHover(int x, int y) {
         }
       } else {
         if (item.identified == 1 && item.optionCount != 0) {
-          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_TAIWAN_CASH_LEMITEMIN), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
+          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA10), item.DisplayName(0).c_str(), item.optionCount, item.quantity, LookupMessage(MSI_EA4),
                                    FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), currency));
         } else {
           text = static_cast<const std::string&>(FormatOwnedString("%s %d %s %s %s", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4),
@@ -7481,7 +7775,7 @@ void UIItemShopWnd::OnMouseHover(int x, int y) {
     } else {
       if (item.prices[0] != item.prices[1]) {
         if (item.identified == 1 && item.optionCount != 0) {
-          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_DRESSROOM_HEARCOLOR), item.DisplayName(0).c_str(), item.optionCount, item.prices[0],
+          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA11), item.DisplayName(0).c_str(), item.optionCount, item.prices[0],
                                    FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), currency));
         } else {
           text = static_cast<const std::string&>(FormatOwnedString("%s %d -> %s %s", item.DisplayName(0).c_str(), item.prices[0],
@@ -7489,7 +7783,7 @@ void UIItemShopWnd::OnMouseHover(int x, int y) {
         }
       } else {
         if (item.identified == 1 && item.optionCount != 0) {
-          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_DRESSROOM_HEARSTYLE), item.DisplayName(0).c_str(), item.optionCount,
+          text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA12), item.DisplayName(0).c_str(), item.optionCount,
                                    FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64), currency));
         } else {
           text = static_cast<const std::string&>(FormatOwnedString("%s %s %s", item.DisplayName(0).c_str(), FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64),
@@ -7506,14 +7800,16 @@ void UIItemShopWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13376
 void UIItemStoreFindWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     if (item.identified == 1 && item.optionCount != 0) {
       CMode* mode = g_modeMgr.currentMode;
-      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
+      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA6), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
                         g_session.GetItemNameColor(item), 0, 1);
     } else {
       CMode* mode = g_modeMgr.currentMode;
@@ -7526,14 +7822,16 @@ void UIItemStoreFindWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13377
 void UIItemStoreSubWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     if (item.identified == 1 && item.optionCount != 0) {
       CMode* mode = g_modeMgr.currentMode;
-      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
+      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA6), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
                         g_session.GetItemNameColor(item), 0, 1);
     } else {
       CMode* mode = g_modeMgr.currentMode;
@@ -7546,14 +7844,16 @@ void UIItemStoreSubWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13378
 void UIItemStoreWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     if (item.identified == 1 && item.optionCount != 0) {
       CMode* mode = g_modeMgr.currentMode;
-      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
+      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA6), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
                         g_session.GetItemNameColor(item), 0, 1);
     } else {
       CMode* mode = g_modeMgr.currentMode;
@@ -7566,22 +7866,24 @@ void UIItemStoreWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13379
 void UIItemWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     CMode* gameMode = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
-      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
+      int screenX = tooltipX;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA5), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
                  color, 0, 1);
     } else {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
+      int screenX = tooltipX;
       gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity).c_str(), screenX, screenY,
                  color, 0, 1);
     }
@@ -7592,9 +7894,11 @@ void UIItemWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13380
 void UIMerchantItemMyShopWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     std::string text;
@@ -7604,14 +7908,15 @@ void UIMerchantItemMyShopWnd::OnMouseHover(int x, int y) {
                                item.quantity));
     } else {
       if (item.identified == 1 && item.optionCount != 0) {
-        text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA11), item.DisplayName(0).c_str(), item.optionCount,
+        text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA8), item.DisplayName(0).c_str(), item.optionCount,
                                  FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64)));
       } else {
         text = static_cast<const std::string&>(FormatOwnedString("%s %s Zeny", item.DisplayName(0).c_str(), FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64)));
       }
     }
 
-    g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+    CMode* mode = g_modeMgr.currentMode;
+    mode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
   }
 }
 
@@ -7619,15 +7924,17 @@ void UIMerchantItemMyShopWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13381
 void UIMerchantItemPurchaseWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     CMode* mode = g_modeMgr.currentMode;
     std::uint32_t color = g_session.GetItemNameColor(item);
-    int screenX = tooltipX;
     int screenY = tooltipY;
+    int screenX = tooltipX;
     char price[64];
     mode->ShowTooltip(FormatOwnedString("%s %d %s %s Zeny", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4),
                                  FormatGroupedInteger(static_cast<int>(item.prices[1]), price, 64))
@@ -7640,48 +7947,49 @@ void UIMerchantItemPurchaseWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13382
 void UIMerchantItemShopWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
+    this->ToScreen(tooltipX, tooltipY);
+
+    if (item.identified == 1 && item.optionCount != 0) {
+      CMode* mode = g_modeMgr.currentMode;
+      std::uint32_t color = g_session.GetItemNameColor(item);
+      int screenY = tooltipY;
+      int screenX = tooltipX;
+      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA6), item.DisplayName(0).c_str(), item.optionCount).c_str(), screenX, screenY, color, 0, 1);
+    } else {
+      CMode* mode = g_modeMgr.currentMode;
+      std::uint32_t color = g_session.GetItemNameColor(item);
+      int screenY = tooltipY;
+      int screenX = tooltipX;
+      mode->ShowTooltip(item.DisplayName(0).c_str(), screenX, screenY, color, 0, 1);
+    }
+  } else {
+    item = this->GetItemByIndex(this->GetItemIndexAt(x, y));
+    if (item.itemIndex <= 0) {
+      return;
+    }
+
+    int tooltipX = 72;
     int tooltipY = (y - 17) / 32 * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     if (item.identified == 1 && item.optionCount != 0) {
       CMode* mode = g_modeMgr.currentMode;
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
-      int screenY = tooltipY;
-      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), screenX, screenY, color, 0, 1);
+      int screenY = tooltipY + 24;
+      int screenX = tooltipX - 2;
+      mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA6), item.DisplayName(0).c_str(), item.optionCount).c_str(), screenX, screenY, color, 0, 1);
     } else {
       CMode* mode = g_modeMgr.currentMode;
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
-      int screenY = tooltipY;
+      int screenY = tooltipY + 24;
+      int screenX = tooltipX - 2;
       mode->ShowTooltip(item.DisplayName(0).c_str(), screenX, screenY, color, 0, 1);
     }
-    return;
-  }
-
-  item = this->GetItemByIndex(this->GetItemIndexAt(x, y));
-  if (item.identity[1] == 0) {
-    return;
-  }
-
-  int tooltipX = 72;
-  int tooltipY = (y - 17) / 32 * 32 + 1;
-  this->ToScreen(tooltipX, tooltipY);
-
-  if (item.identified == 1 && item.optionCount != 0) {
-    CMode* mode = g_modeMgr.currentMode;
-    std::uint32_t color = g_session.GetItemNameColor(item);
-    int screenX = tooltipX - 2;
-    int screenY = tooltipY + 24;
-    mode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), screenX, screenY, color, 0, 1);
-  } else {
-    CMode* mode = g_modeMgr.currentMode;
-    std::uint32_t color = g_session.GetItemNameColor(item);
-    int screenX = tooltipX - 2;
-    int screenY = tooltipY + 24;
-    mode->ShowTooltip(item.DisplayName(0).c_str(), screenX, screenY, color, 0, 1);
   }
 }
 
@@ -7689,22 +7997,24 @@ void UIMerchantItemShopWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13383
 void UIMerchantItemWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     CMode* gameMode = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
-      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
+      int screenX = tooltipX;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA5), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
                  color, 0, 1);
     } else {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
+      int screenX = tooltipX;
       gameMode->ShowTooltip(FormatOwnedString("%s %d %s", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4)).c_str(), screenX, screenY,
                  color, 0, 1);
     }
@@ -7715,22 +8025,24 @@ void UIMerchantItemWnd::OnMouseHover(int x, int y) {
 // FUNCTION: fn_13384
 void UIMerchantMirrorItemWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.itemIndex > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
     CMode* gameMode = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
-      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA10), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
+      int screenX = tooltipX;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA7), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
                  color, 0, 1);
     } else {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
+      int screenX = tooltipX;
       gameMode->ShowTooltip(FormatOwnedString("%s %d %s", item.DisplayName(0).c_str(), item.quantity, LookupMessage(MSI_EA4)).c_str(), screenX, screenY,
                  color, 0, 1);
     }
@@ -7762,10 +8074,10 @@ bool UIEditCtrl::DecodeItemLink(const std::vector<int>& values, ITEM_INFO& item)
     return false;
   }
 
-  item.identity[2] = values[0];
+  item.location = values[0];
   item.SetItemId(values[2]);
   if (values[1] != 0) {
-    item.identity[0] = 4;
+    item.itemType = 4;
   }
 
   if (values.size() > 3) {
@@ -7790,8 +8102,8 @@ bool UIEditCtrl::DecodeItemLink(const std::vector<int>& values, ITEM_INFO& item)
       const int base = cardCount + 9 + (i - 1) * 3;
       ItemOption option;
       option.id = static_cast<std::int16_t>(values[base]);
-      option.value = static_cast<std::int16_t>(values[base + 2]);
       option.parameter = static_cast<unsigned char>(values[base + 1]);
+      option.value = static_cast<std::int16_t>(values[base + 2]);
       int index = i - 1;
       item.SetOption(option, index);
     }
@@ -7928,7 +8240,7 @@ UIItemStoreWnd::UIItemStoreWnd() : UIItemBaseWnd() {
 void UIItemStoreWnd::OnCreate(int width, int height) {
   this->title = new UIStaticText();
   this->title->SetSize(70, 15);
-  this->title->SetText(LookupMessage(g_session.m_buyingStoreMode ? MSI_BARGAINSALE_TOOLWND_DB_NAME : MSI_ITEMS_THAT_IS_STORED), 0);
+  this->title->SetText(LookupMessage(g_session.m_buyingStoreMode ? MSI_GUILD_STORAGE_TITLE : MSI_ITEMS_THAT_IS_STORED), 0);
   this->title->Move(16, 2);
   this->title->shadow = 1;
   this->AddChild(this->title);
@@ -7992,7 +8304,7 @@ void UIItemStoreWnd::OnCreate(int width, int height) {
     if (index < 4) {
       this->tabs[index]->SetTooltip(LookupMessage(index + 1465));
     } else if (index == 4) {
-      this->tabs[index]->SetTooltip(LookupMessage(3151));
+      this->tabs[index]->SetTooltip(LookupMessage(MSI_STORE_TABNAME_7));
     } else {
       this->tabs[index]->SetTooltip(LookupMessage(index + 1464));
     }
@@ -8010,11 +8322,11 @@ void UIItemStoreWnd::OnCreate(int width, int height) {
   this->sortCombo->SetSize(62, 18);
   this->sortCombo->Move(214, this->geometry.height - 52);
   this->AddChild(this->sortCombo);
-  this->sortCombo->AddOption(LookupMessage(MSI_HOMUN_SELF_FEEDING), 0);
-  this->sortCombo->AddOption(LookupMessage(MSI_CHEATDEFENDER_FILE_CHECK_FAIL), 0);
-  this->sortCombo->AddOption(LookupMessage(MSI_ITEMMOVERESTRICT_WHITELIST), 0);
+  this->sortCombo->AddOption(LookupMessage(MSI_DEFAULT), 0);
+  this->sortCombo->AddOption(LookupMessage(MSI_ASCENDING_ORDER), 0);
+  this->sortCombo->AddOption(LookupMessage(MSI_DESENDING_ORDER), 0);
 
-  const bool sortModes[3] = {g_session.m_itemDefaultSort, g_session.m_itemAscendingOrder, g_session.m_itemDescendingOrder};
+  const bool* sortModes = &g_session.m_itemDefaultSort;
   for (int index = 0; index < 3; ++index) {
     if (sortModes[index] == true) {
       this->sortCombo->Select(index);
@@ -8046,9 +8358,9 @@ void UIItemWnd::OnCreate(int width, int height) {
   scrollBar->Configure(this->geometry.width - 15, 17, 1, this->geometry.height - 38);
   this->AddChild(this->scrollBar);
 
-  this->baseButton = this->AddBaseButton();
-  this->minimizeButton = this->AddMinimizeButton("Ctrl+E", 0);
-  this->closeButton = this->AddCloseButton("Alt+E", 0);
+  this->titleButtons[0] = this->AddBaseButton();
+  this->titleButtons[1] = this->AddMinimizeButton("Ctrl+E", 0);
+  this->titleButtons[2] = this->AddCloseButton("Alt+E", 0);
   this->expandedHeight = this->geometry.height;
   this->columns = (width - 40) / 32;
   this->visibleRows = (height - 38) / 32;
@@ -8062,25 +8374,26 @@ void UIItemWnd::OnCreate(int width, int height) {
   for (int index = 0; index < 4; ++index) {
     this->tabs->AddTab(labels[index], "");
   }
-  this->tabs->colors[3] = g_skinInfo.PaletteColor(SkinPaletteCell{5, 2}, g_skinInfo.Selected());
-  this->tabs->Invalidate();
+  UITabControl* tabControl = this->tabs;
+  tabControl->colors[3] = g_skinInfo.PaletteColor(SkinPaletteCell{5, 2}, g_skinInfo.Selected());
+  tabControl->Invalidate();
 
   this->lockDropBox = new (std::nothrow) UICheckBox();
   this->lockDropBox->SetSize(14, 11);
   this->lockDropBox->SetBitmaps("유저인터페이스\\inventory\\item_drop_lock_on.bmp", "유저인터페이스\\inventory\\item_drop_lock_off.bmp");
   this->lockDropBox->Move(79, height - 16);
   this->lockDropBox->SetChecked(g_session.m_lockItemDrop);
-  this->lockDropBox->SetTooltip(LookupMessage(MSI_RODEX_GENERAL));
+  this->lockDropBox->SetTooltip(LookupMessage(MSI_INVENTORY_ITEM_DROP_LOCK));
   this->AddChild(this->lockDropBox);
 
   UICheckBox* compare = new (std::nothrow) UICheckBox();
   this->optionBox = compare;
   compare->SetSize(12, 12);
   this->optionBox->SetBitmaps("유저인터페이스\\inventory\\item_compare_on.bmp", "유저인터페이스\\inventory\\item_compare_off.bmp");
-  this->optionBox->SetId(456);
+  this->optionBox->SetId(ID_ITEM_COMPARE);
   this->optionBox->Move(103, height - 17);
   this->optionBox->SetChecked(g_serviceOptions.Get(TT_ITEM_COMPARE_ON_OFF));
-  this->optionBox->SetTooltip(LookupMessage(MSI_CONNECT_SNS_WND));
+  this->optionBox->SetTooltip(LookupMessage(MSI_INVENTORY_ITEM_COMPARE));
   this->AddChild(this->optionBox);
 
   this->countButton = new (std::nothrow) UIBitmapButton();
@@ -8089,26 +8402,26 @@ void UIItemWnd::OnCreate(int width, int height) {
   this->countButton->SetBitmap("유저인터페이스\\inventory\\icon_num.bmp", 2, 0);
   this->countButton->SetSize(this->countButton->BitmapWidth(), this->countButton->BitmapHeight());
   this->countButton->Move(23, height - 17);
-  this->countButton->SetId(545);
-  this->countButton->SetTooltip(LookupMessage(MSI_INVENTORY_EXTEND_FAILED_ANOTHER_WORK));
+  this->countButton->SetId(ID_EXTEND_INVENTORY);
+  this->countButton->SetTooltip(LookupMessage(MSI_INVENTORY_EXTEND_OF_BODYITEM));
   this->AddChild(this->countButton);
 
   UIBitmapButton* lockDeal = new UIBitmapButton();
   this->dealLockButton = lockDeal;
-  lockDeal->SetBitmap(g_session.m_blockPrivateTab != 1 ? "유저인터페이스\\inventory\\bt_itemDeal_lock_off.bmp" : "유저인터페이스\\inventory\\bt_itemdeal_lock_on.bmp", 0, 0);
+  lockDeal->SetBitmap(g_session.m_blockPrivateTab == 1 ? "유저인터페이스\\inventory\\bt_itemdeal_lock_on.bmp" : "유저인터페이스\\inventory\\bt_itemDeal_lock_off.bmp", 0, 0);
   this->dealLockButton->SetBitmap("유저인터페이스\\inventory\\bt_itemDeal_lock_over.bmp", 1, 0);
   this->dealLockButton->SetBitmap("유저인터페이스\\inventory\\bt_itemDeal_lock_press.bmp", 2, 0);
   this->dealLockButton->SetSize(this->dealLockButton->BitmapWidth(), this->dealLockButton->BitmapHeight());
   this->dealLockButton->Move(124, this->geometry.height - 19);
-  this->dealLockButton->SetTooltip(LookupMessage(MSI_CONNECT_SNS_PART_SCREEN_SHOT));
-  this->dealLockButton->SetId(507);
+  this->dealLockButton->SetTooltip(LookupMessage(MSI_LOCK_SELL_IN_PRIVATE_TAB));
+  this->dealLockButton->SetId(ID_TOGGLE_ITEM_TRADE_LOCK);
   this->AddChild(this->dealLockButton);
 
   this->filterButton = new UIBitmapButton();
   this->RefreshSortButton();
   this->filterButton->SetSize(this->filterButton->BitmapWidth(), this->filterButton->BitmapHeight());
   this->filterButton->Move(157, this->geometry.height - 19);
-  this->filterButton->SetId(364);
+  this->filterButton->SetId(ID_SORT_ITEMS);
   this->AddChild(this->filterButton);
 }
 
@@ -8205,6 +8518,14 @@ UINoticeMessageBox_LockSellItem::UINoticeMessageBox_LockSellItem() : UIFrameWnd(
   this->duration = 2000;
 }
 
+// OFFSET: 0x0096F790
+// FUNCTION: fn_13236
+UIItemPurchaseWnd::~UIItemPurchaseWnd() = default;
+
+// OFFSET: 0x0096F990
+// FUNCTION: fn_13237
+UIItemShopWnd::~UIItemShopWnd() = default;
+
 // OFFSET: 0x0096FB70
 // FUNCTION: fn_13238
 UIItemStoreWnd::~UIItemStoreWnd() {
@@ -8238,8 +8559,9 @@ int UIItemShopWnd2::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     switch (a) {
     case 0: {
       CGameMode* mode = g_modeMgr.GetGameMode();
+      ModeDragState& drag = mode->drag;
       ITEM_INFO item;
-      item.Assign(mode->drag);
+      item.Assign(drag);
       g_session.RemoveItem1720ByName(item);
       if (g_windowMgr.itemPurchaseWnd) {
         g_windowMgr.itemPurchaseWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
@@ -8251,8 +8573,9 @@ int UIItemShopWnd2::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     }
     case 1: {
       CGameMode* mode = g_modeMgr.GetGameMode();
+      ModeDragState& drag = mode->drag;
       ITEM_INFO item;
-      item.Assign(mode->drag);
+      item.Assign(drag);
       CSession* lists = &g_session;
       lists->MergeShopItem(item);
       lists->RemoveStorageItem(item);
@@ -8305,7 +8628,7 @@ int UIItemShopWnd2::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     const int size = g_session.GetNumShopItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetShopItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -8396,7 +8719,11 @@ int UIItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->checkBox->m_disabled = 1;
     }
 
-    this->footerHeight = this->showFooter != 0 ? 20 : 0;
+    if (this->showFooter != 0) {
+      this->footerHeight = 20;
+    } else {
+      this->footerHeight = 0;
+    }
     {
       const int height = this->geometry.height - this->bottomPadding - this->footerHeight - 17;
       this->visibleRows = height / 32;
@@ -8437,7 +8764,7 @@ int UIItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     const int size = g_session.GetNumShopItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetShopItemInfoBySequence(i);
-      if (item.identity[1] > 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -8468,10 +8795,13 @@ int UIItemStoreSubWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     return 0;
   case UM_DROP: {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    if (mode->drag.source == 1) {
+    switch (mode->drag.source) {
+    case DRAG_ITEM_INVENTORY:
       mode->SendMsg(MM_ADD_ITEM_TO_STORE, mode->drag.id, mode->drag.quantity, 0, 0);
-    } else if (mode->drag.source == 9) {
+      break;
+    case DRAG_ITEM_MERCHANT_INVENTORY:
       mode->SendMsg(MM_MOVE_ITEM_FROM_CART_TO_STORE, mode->drag.id, mode->drag.quantity, 0, 0);
+      break;
     }
 
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -8482,57 +8812,7 @@ int UIItemStoreSubWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     const int size = g_session.GetNumCartItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetCartItemInfoBySequence(i);
-      if (item.identity[1] == 0) {
-        continue;
-      }
-
-      item.saleData.costume = g_itemInfoMgr->IsCostume(std::stoi(item.itemId));
-      const int type = static_cast<int>(item.identity[0]);
-      bool matches = false;
-      if (item.saleData.costume != 0) {
-        matches = this->tabIndex == 4;
-      } else {
-        switch (this->tabIndex) {
-        case 0:
-          matches = type == 0 || type == 1 || type == 2;
-          break;
-        case 1:
-          matches = type == 18;
-          break;
-        case 2:
-          switch (type) {
-          case TYPE_ARMOR:
-          case TYPE_ARMORTM:
-          case TYPE_ARMORTB:
-          case TYPE_ARMORMB:
-          case TYPE_ARMORTMB:
-            matches = true;
-            break;
-          }
-          break;
-        case 3:
-          switch (type) {
-          case TYPE_WEAPON:
-          case TYPE_BOW:
-          case TYPE_BOTHHAND:
-          case TYPE_GUN:
-            matches = true;
-            break;
-          }
-          break;
-        case 5:
-          matches = type == 10 || type == 16 || type == 17 || type == 19;
-          break;
-        case 6:
-          matches = type == 6;
-          break;
-        case 7:
-          matches = type == 3 || type == 7;
-          break;
-        }
-      }
-
-      if (matches) {
+      if (item.itemIndex > 0 && this->FilterItem(item)) {
         this->items.push_back(item);
       }
     }
@@ -8543,7 +8823,7 @@ int UIItemStoreSubWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       this->SortReversed2();
     }
 
-    if (!this->nameFilter.empty() && !this->FilterByName2(std::string(this->nameFilter.c_str(), this->nameFilter.size()))) {
+    if (!this->nameFilter.empty() && !this->FilterByName2(this->nameFilter)) {
       return 0;
     }
 
@@ -8585,7 +8865,7 @@ int UIItemStoreSubWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     return 0;
   }
   case UM_SEARCH_ITEMS:
-    if (!this->nameFilter.empty() && this->FilterByName2(std::string(this->nameFilter.c_str(), this->nameFilter.size()))) {
+    if (!this->nameFilter.empty() && this->FilterByName2(this->nameFilter)) {
       this->Invalidate();
       this->UpdateScrollBar();
     }
@@ -8612,6 +8892,30 @@ int UIItemStoreSubWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     return 0;
   default:
     return UIItemBaseWnd::SendMsg(sender, message, a, b, c, d);
+  }
+}
+
+// INLINED
+static __forceinline void ToggleItemStoreTab(UIItemStoreWnd& wnd, int index, int windowId) {
+  UICheckBox* tab = wnd.tabs[index];
+  if (!tab) {
+    return;
+  }
+
+  if (tab->geometry.state != 0) {
+    wnd.m_tabWindows[index] = nullptr;
+    wnd.m_tabWindows[index] = g_windowMgr.EnsureWindow(windowId);
+    if (wnd.m_tabWindows[index]) {
+      wnd.m_tabWindows[index]->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+    }
+    wnd.saved->openTabs |= 1 << index;
+    return;
+  }
+
+  g_windowMgr.CloseWindow(windowId);
+  if (wnd.m_tabWindows[index]) {
+    wnd.saved->openTabs ^= 1 << index;
+    wnd.m_tabWindows[index] = nullptr;
   }
 }
 
@@ -8669,9 +8973,9 @@ int UIItemStoreWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       this->buttons[1]->Enable(0);
       this->buttons[3]->Enable(1);
       this->buttons[3]->Move(this->geometry.width - 48, this->geometry.height - 52);
-      for (int id = 146; id < 153; ++id) {
-        if (g_windowMgr.LookupWindow(static_cast<WindowId>(id))) {
-          g_windowMgr.LookupWindow(static_cast<WindowId>(id))->SendMsg(nullptr, UM_SORT_ITEMS, 0, 0, 0, 0);
+      for (int index = 0; index < 7; ++index) {
+        if (g_windowMgr.LookupWindow(static_cast<WindowId>(index + WID_ITEMSTORESUBWND_TAB_0))) {
+          g_windowMgr.LookupWindow(static_cast<WindowId>(index + WID_ITEMSTORESUBWND_TAB_0))->SendMsg(nullptr, UM_SORT_ITEMS, 0, 0, 0, 0);
         }
       }
       if (g_windowMgr.LookupWindow(WID_ITEMSTORESUBWND_TAB_7)) {
@@ -8699,7 +9003,7 @@ int UIItemStoreWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       if (!text.empty()) {
         UIItemStoreFindWnd* window = static_cast<UIItemStoreFindWnd*>(g_windowMgr.EnsureWindow(WID_ITEMSTOREFINDWND));
         this->m_searchWindow = window;
-        window->SetSearchText(std::string(text.c_str(), text.size()));
+        window->SetSearchText(text);
         this->m_searchWindow->SendMsg(nullptr, UM_REFRESHITEM, 365, 0, 0, 0);
         this->m_searchWindow->SendMsg(nullptr, UM_SEARCH_ITEMS, 0, 0, 0, 0);
         this->searchEdit->SetText("");
@@ -8712,57 +9016,18 @@ int UIItemStoreWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     case WID_ITEMSTORESUBWND_TAB_3:
     case WID_ITEMSTORESUBWND_TAB_4:
     case WID_ITEMSTORESUBWND_TAB_5:
-    case WID_ITEMSTORESUBWND_TAB_6: {
-      UICheckBox* tab = this->tabs[a - WID_ITEMSTORESUBWND_TAB_0];
-      const int index = a - WID_ITEMSTORESUBWND_TAB_0;
-      if (!tab) {
-        break;
-      }
-
-      if (tab->geometry.state != 0) {
-        this->m_tabWindows[index] = nullptr;
-        this->m_tabWindows[index] = g_windowMgr.EnsureWindow(a);
-        if (this->m_tabWindows[index]) {
-          this->m_tabWindows[index]->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-        }
-        this->saved->openTabs |= 1 << index;
-        break;
-      }
-
-      g_windowMgr.CloseWindow(a);
-      if (this->m_tabWindows[index]) {
-        this->saved->openTabs ^= 1 << index;
-        this->m_tabWindows[index] = nullptr;
-      }
+    case WID_ITEMSTORESUBWND_TAB_6:
+      ToggleItemStoreTab(*this, a - WID_ITEMSTORESUBWND_TAB_0, a);
       break;
-    }
     case WID_ITEMSTORESUBWND_TAB_7:
-      if (!this->tabs[7]) {
-        break;
-      }
-
-      if (this->tabs[7]->geometry.state != 0) {
-        this->m_tabWindows[7] = nullptr;
-        this->m_tabWindows[7] = g_windowMgr.EnsureWindow(WID_ITEMSTORESUBWND_TAB_7);
-        if (this->m_tabWindows[7]) {
-          this->m_tabWindows[7]->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-        }
-        this->saved->openTabs |= 0x80;
-        break;
-      }
-
-      g_windowMgr.CloseWindow(WID_ITEMSTORESUBWND_TAB_7);
-      if (this->m_tabWindows[7]) {
-        this->saved->openTabs ^= 0x80;
-        this->m_tabWindows[7] = nullptr;
-      }
+      ToggleItemStoreTab(*this, 7, a);
       break;
     case 133:
       if (!this->m_searchWindow) {
         this->m_searchWindow = g_windowMgr.EnsureWindow(WID_ITEMSTOREFINDWND);
         std::string text(this->searchEdit->Text());
-        if (!text.empty() && this->FilterByName(std::string(text.c_str(), text.size()))) {
-          static_cast<UIItemStoreFindWnd*>(this->m_searchWindow)->SetSearchText(std::string(text.c_str(), text.size()));
+        if (!text.empty() && this->FilterByName(text)) {
+          static_cast<UIItemStoreFindWnd*>(this->m_searchWindow)->SetSearchText(text);
           this->m_searchWindow->SendMsg(nullptr, UM_SEARCH_ITEMS, 0, 0, 0, 0);
         }
       }
@@ -8771,10 +9036,13 @@ int UIItemStoreWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     return 0;
   case UM_DROP: {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    if (mode->drag.source == 1) {
+    switch (mode->drag.source) {
+    case DRAG_ITEM_INVENTORY:
       mode->SendMsg(MM_ADD_ITEM_TO_STORE, mode->drag.id, mode->drag.quantity, 0, 0);
-    } else if (mode->drag.source == 9) {
+      break;
+    case DRAG_ITEM_MERCHANT_INVENTORY:
       mode->SendMsg(MM_MOVE_ITEM_FROM_CART_TO_STORE, mode->drag.id, mode->drag.quantity, 0, 0);
+      break;
     }
 
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -8817,57 +9085,7 @@ int UIItemStoreWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     const int size = g_session.GetNumCartItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetCartItemInfoBySequence(i);
-      if (item.identity[1] == 0) {
-        continue;
-      }
-
-      item.saleData.costume = g_itemInfoMgr->IsCostume(std::stoi(item.itemId));
-      const int type = static_cast<int>(item.identity[0]);
-      bool matches = false;
-      if (item.saleData.costume != 0) {
-        matches = this->m_sortMode == 4;
-      } else {
-        switch (this->m_sortMode) {
-        case 0:
-          matches = type == 0 || type == 1 || type == 2;
-          break;
-        case 1:
-          matches = type == 18;
-          break;
-        case 2:
-          switch (type) {
-          case TYPE_ARMOR:
-          case TYPE_ARMORTM:
-          case TYPE_ARMORTB:
-          case TYPE_ARMORMB:
-          case TYPE_ARMORTMB:
-            matches = true;
-            break;
-          }
-          break;
-        case 3:
-          switch (type) {
-          case TYPE_WEAPON:
-          case TYPE_BOW:
-          case TYPE_BOTHHAND:
-          case TYPE_GUN:
-            matches = true;
-            break;
-          }
-          break;
-        case 5:
-          matches = type == 10 || type == 16 || type == 17 || type == 19;
-          break;
-        case 6:
-          matches = type == 6;
-          break;
-        case 7:
-          matches = type == 3 || type == 7;
-          break;
-        }
-      }
-
-      if (matches) {
+      if (item.itemIndex > 0 && this->FilterItem(item)) {
         this->items.push_back(item);
       }
     }
@@ -8880,7 +9098,7 @@ int UIItemStoreWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
 
     std::string text = this->searchEdit->Text();
     if (!text.empty() && a == 365) {
-      if (this->FilterByName(std::string(text.c_str(), text.size()))) {
+      if (this->FilterByName(text)) {
         this->Invalidate();
         this->UpdateScrollBar();
         for (int index = 0; index < 7; ++index) {
@@ -9007,21 +9225,25 @@ void UIChatEditCtrl::InsertItemLink(const ITEM_INFO& item) {
 void UIItemStoreFindWnd::Paint() {
   this->DrawTitleBar(true, "", 0);
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  }
   this->DrawButtonBar(0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int rows = (this->geometry.height - 38) / 32;
   int slots = rows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(10, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(10, i * 32 + 17);
   }
 
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, rows * 32, RGB(fillRed, fillGreen, fillBlue));
+  {
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(72, 17, columns * 32 - 32, rows * 32, RGB(fillRed, fillGreen, fillBlue));
+  }
 
   int visible = 0;
   int index = 0;
@@ -9065,21 +9287,25 @@ void UIItemStoreFindWnd::Paint() {
 void UIItemStoreSubWnd::Paint() {
   this->DrawTitleBar(true, "", 0);
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  }
   this->DrawButtonBar(0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int rows = (this->geometry.height - 38) / 32;
   int slots = rows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(10, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(10, i * 32 + 17);
   }
 
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, rows * 32, RGB(fillRed, fillGreen, fillBlue));
+  {
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(72, 17, columns * 32 - 32, rows * 32, RGB(fillRed, fillGreen, fillBlue));
+  }
 
   int visible = 0;
   int index = 0;
@@ -9128,33 +9354,38 @@ void UIItemPurchaseWnd::Paint() {
   }
 
   int rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, i * 8 + 17, left, false);
   }
 
   rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, false);
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - 38) % 32;
-  const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - 38) % 32;
+    const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  }
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int height = this->geometry.height;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(40, 17, this->geometry.width - 50, (height - 38) / 32 * 32, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(40, 17, this->geometry.width - 50, (height - 38) / 32 * 32, RGB(red, green, blue));
+  }
 
   int slots = (height - 58) / 32;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
   int visible = 0;
@@ -9257,36 +9488,40 @@ void UIItemSellWnd::Paint() {
   }
 
   int rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, i * 8 + 17, left, false);
   }
 
   rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, false);
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - 38) % 32;
-  const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - 38) % 32;
+    const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  }
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  {
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  }
 
   int visible = 0;
   int index = 0;
@@ -9337,10 +9572,10 @@ void UIItemSellWnd::Paint() {
     }
 
     int length;
-    if (it->prices[0] == it->prices[1]) {
-      length = sprintf(text, " %s Zeny", FormatGroupedInteger(static_cast<int>(it->prices[0]), price, 64));
-    } else {
+    if (it->prices[0] != it->prices[1]) {
       length = sprintf(text, " %d -> %s Zeny", it->prices[0], FormatGroupedInteger(static_cast<int>(it->prices[1]), price, 64));
+    } else {
+      length = sprintf(text, " %s Zeny", FormatGroupedInteger(static_cast<int>(it->prices[0]), price, 64));
     }
     this->DrawRightAlignedText(this->geometry.width - 18, top + 29, text, length, 0, 12, 0, 0);
 
@@ -9360,40 +9595,45 @@ void UIItemShopWnd::Paint() {
   }
 
   int rows = (this->geometry.height - this->bottomPadding - 17) / 8 + ((this->geometry.height - this->bottomPadding - 17) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, i * 8 + 17, left, false);
   }
 
   rows = (this->geometry.height - this->bottomPadding - 17) / 8 + ((this->geometry.height - this->bottomPadding - 17) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, false);
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - this->bottomPadding - 17, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - this->bottomPadding - 17) % 32;
-  const int fillY = (this->geometry.height - this->bottomPadding - 17) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - this->bottomPadding - 17, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - this->bottomPadding - 17) % 32;
+    const int fillY = (this->geometry.height - this->bottomPadding - 17) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  }
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   int slotRows = (this->geometry.height - this->footerHeight - this->bottomPadding - 17) / 32;
   int slots = slotRows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
   if (this->showFooter != 0) {
     slotRows = (this->geometry.height - this->bottomPadding - 17) / 32;
   }
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(red, green, blue));
-  if (this->showFooter != 0) {
-    this->FillRegion(40, slotRows * 32 - 15, 32, 32, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(red, green, blue));
+    if (this->showFooter != 0) {
+      this->FillRegion(40, slotRows * 32 - 15, 32, 32, RGB(red, green, blue));
+    }
   }
 
   int visible = 0;
@@ -9447,15 +9687,13 @@ void UIItemShopWnd::Paint() {
     char currency[8];
     sprintf(currency, "Z");
     if (this->showFooter != 0) {
-      const char* name;
       if (g_serviceType == 6) {
-        name = "K";
+        sprintf(currency, "K");
       } else if (g_serviceType == 0) {
-        name = g_session.m_channelCopId != 1 ? "C" : "H";
+        sprintf(currency, g_session.m_channelCopId == 1 ? "H" : "C");
       } else {
-        name = "P";
+        sprintf(currency, "P");
       }
-      sprintf(currency, name);
     }
 
     char price[64];
@@ -9476,9 +9714,9 @@ void UIItemShopWnd::Paint() {
   if (this->showFooter != 0) {
     int message;
     if (g_serviceType == 0 && g_session.m_channelCopId == 1) {
-      message = 1290;
+      message = MSI_POINT_SHOP_NHN;
     } else {
-      message = 1210;
+      message = MSI_POINT_SHOP;
     }
 
     char text[352];
@@ -9497,6 +9735,92 @@ void UIItemShopWnd::Paint() {
 // OFFSET: 0x009808E0
 // FUNCTION: fn_13337
 void UIItemStoreWnd::Paint() {
+  this->DrawTitleBar(0, "", 0);
+
+  if (this->geometry.height == 17) {
+    return;
+  }
+
+  int rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
+  for (int i = 0; i < rows; ++i) {
+    auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
+    this->DrawBitmap(0, i * 8 + 17, left, 0);
+  }
+
+  rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
+  for (int i = 0; i < rows; ++i) {
+    auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, 0);
+  }
+
+  unsigned red, green, blue;
+  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+  this->FillRegion(20, 17, (this->geometry.width - 60) % 32, this->geometry.height - 38, RGB(red, green, blue));
+  this->FillRegion(20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, (this->geometry.height - 38) % 32, RGB(red, green, blue));
+  this->DrawButtonBar(this->alternateButtonBar != 0 ? 3 : 0, 0, 1);
+
+  const int columns = (this->geometry.width - 40) / 32;
+  const int visibleRows = (this->geometry.height - 74) / 32;
+  if (this->m_hideCapacity == 0) {
+    this->scrollBar->Show(0);
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(40, 17, columns * 32, visibleRows * 32, RGB(fillRed, fillGreen, fillBlue));
+    this->DrawRoundedOutline(55, 131, 187, 139, 0xCE9484);
+    this->DrawFilledRoundedOutline(56, 132, 185, 137, 0xFFE7DE);
+    this->DrawFilledRoundedOutline(61, 137, 175, 127, 0xFFFFFF);
+    this->DrawBitmap(116, 151, (static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\notice_poring.bmp")))), 1);
+    this->DrawCenteredText(20, 210, LookupMessage(MSI_ITEMSTORE_DOWNLOADING), 257, 0, 12, 0, 0);
+    this->DrawCenteredText(20, 236, LookupMessage(MSI_RODEX_NOW_LOADING), 257, 0, 15, 0xC89482, 1);
+    this->DrawCenteredText(20, 272, LookupMessage(MSI_WARNINGMSG_LOADING), 257, 0, 12, 0x6464DC, 1);
+    return;
+  }
+
+  this->scrollBar->Show(1);
+  for (int i = 0; i < visibleRows; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
+  }
+
+  unsigned fillRed, fillGreen, fillBlue;
+  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+  this->FillRegion(72, 17, columns * 32 - 32, visibleRows * 32, RGB(fillRed, fillGreen, fillBlue));
+
+  int visible = 0;
+  int index = 0;
+  for (auto it = this->items.begin(); it != this->items.end(); ++it, ++index) {
+    if (index < this->scroll * this->columns) {
+      continue;
+    }
+    if (g_session.IsPetEgg(std::atoi(it->itemId.c_str())) && it->damaged) {
+      continue;
+    }
+
+    const int row = visible / this->columns;
+    const int column = visible % this->columns;
+    const int x = column * 32 + 44;
+    this->DrawItemAndQuantity(x, row * 32 + 21, *it, 0, 0);
+    this->DrawWrappedItemName(column * 32 + 80, row * 32 + 29, 180, &*it, 0, 0, 12);
+
+    if (it->grade > 0) {
+      const std::string icon = FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", it->grade);
+      this->DrawBitmap(x, row * 32 + 33, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(icon.c_str()))), 1);
+    }
+
+    if (++visible == this->visibleRows * this->columns) {
+      break;
+    }
+  }
+
+  this->DrawBitmap(6, this->geometry.height - 21, (static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\icon_num.bmp")))), 1);
+  const std::uint32_t color = this->m_itemCount >= this->m_capacity ? 0xFF : 0x232323;
+  this->DrawTextAt(22, this->geometry.height - 19, FormatOwnedString("%d", this->m_itemCount).c_str(), 0, 0, 11, color, 0, 0);
+  const int width = this->TextWidth(FormatOwnedString("%d", this->m_itemCount).c_str(), 0, 0, 11, 0, 0);
+  this->DrawTextAt(width + 23, this->geometry.height - 19, FormatOwnedString("/%d", this->m_capacity).c_str(), 0, 0, 11, 0, 0, 0);
+}
+
+// OFFSET: 0x009819C0
+// FUNCTION: fn_13341
+void UIMerchantItemPurchaseWnd::Paint() {
   this->DrawTitleBar(false, "", 0);
 
   if (this->geometry.height == 17) {
@@ -9518,120 +9842,26 @@ void UIItemStoreWnd::Paint() {
   {
     unsigned red, green, blue;
     g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-    this->FillRegion(20, 17, (this->geometry.width - 60) % 32, this->geometry.height - 38, RGB(red, green, blue));
-    this->FillRegion(20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, (this->geometry.height - 38) % 32, RGB(red, green, blue));
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - 38) % 32;
+    const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
   }
-  this->DrawButtonBar(this->alternateButtonBar != 0 ? 3 : 0, 0, 1);
-
-  const int columns = (this->geometry.width - 40) / 32;
-  const int slotRows = (this->geometry.height - 74) / 32;
-  if (!this->m_hideCapacity) {
-    this->scrollBar->Show(0);
-    unsigned fillRed, fillGreen, fillBlue;
-    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-    this->FillRegion(40, 17, columns * 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
-    this->DrawRoundedOutline(55, 131, 187, 139, 0xCE9484);
-    this->DrawFilledRoundedOutline(56, 132, 185, 137, 0xFFE7DE);
-    this->DrawFilledRoundedOutline(61, 137, 175, 127, 0xFFFFFF);
-    auto* poring = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\notice_poring.bmp")));
-    this->DrawBitmap(116, 151, poring, true);
-    this->DrawCenteredText(20, 210, LookupMessage(MSI_RODEX_BUTTON_ANSWER), 257, 0, 12, 0, 0);
-    this->DrawCenteredText(20, 236, LookupMessage(MSI_CLOSE_SETUP), 257, 0, 15, 0xC89482, 1);
-    this->DrawCenteredText(20, 272, LookupMessage(MSI_USE_WORLDMAP_WITH_PERIOD_MSG2), 257, 0, 12, 0x6464DC, 1);
-    return;
-  }
-
-  this->scrollBar->Show(1);
-  int slots = slotRows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
-  }
-
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
-
-  int visible = 0;
-  int index = 0;
-
-  for (auto it = this->items.begin(); it != this->items.end(); ++it, ++index) {
-    if (index < this->scroll * this->columns) {
-      continue;
-    }
-
-    if (g_session.IsPetEgg(std::atoi(it->itemId.c_str())) && it->damaged) {
-      continue;
-    }
-
-    const int top = visible / this->columns * 32;
-    const int column = visible % this->columns * 32;
-    const int x = column + 44;
-    this->DrawItemAndQuantity(x, top + 21, *it, 0, 0);
-    this->DrawWrappedItemName(column + 80, top + 29, 180, &*it, 0, 0, 12);
-
-    if (0 < it->grade) {
-      this->DrawBitmap(
-        x, top + 33,
-        static_cast<CBitmapRes*>(
-          ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\grade_icon%d.bmp", it->grade).c_str()))
-        ),
-        true
-      );
-    }
-
-    if (++visible == this->visibleRows * this->columns) {
-      break;
-    }
-  }
-
-  auto* icon = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\icon_num.bmp")));
-  this->DrawBitmap(6, this->geometry.height - 21, icon, true);
-  const std::uint32_t color = this->m_itemCount >= this->m_capacity ? 0xFF : 0x232323;
-  this->DrawTextAt(22, this->geometry.height - 19, FormatOwnedString("%d", this->m_itemCount).c_str(), 0, 0, 11, color, 0, 0);
-  const int width = this->TextWidth(FormatOwnedString("%d", this->m_itemCount).c_str(), 0, 0, 11, 0, 0);
-  this->DrawTextAt(width + 23, this->geometry.height - 19, FormatOwnedString("/%d", this->m_capacity).c_str(), 0, 0, 11, 0, 0, 0);
-}
-
-// OFFSET: 0x009819C0
-// FUNCTION: fn_13341
-void UIMerchantItemPurchaseWnd::Paint() {
-  this->DrawTitleBar(false, "", 0);
-
-  if (this->geometry.height == 17) {
-    return;
-  }
-
-  int rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
-    auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
-  }
-
-  rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
-    auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
-  }
-
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - 38) % 32;
-  const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  {
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  }
 
   int visible = 0;
   int index = 0;
@@ -9666,10 +9896,10 @@ void UIMerchantItemPurchaseWnd::Paint() {
     char price[64];
     char text[64];
     int length;
-    if (it->prices[0] == it->prices[1]) {
-      length = sprintf(text, " %s Zeny", FormatGroupedInteger(static_cast<int>(it->prices[0]), price, 64));
-    } else {
+    if (it->prices[0] != it->prices[1]) {
       length = sprintf(text, " %d -> %s Zeny", it->prices[0], FormatGroupedInteger(static_cast<int>(it->prices[1]), price, 64));
+    } else {
+      length = sprintf(text, " %s Zeny", FormatGroupedInteger(static_cast<int>(it->prices[0]), price, 64));
     }
     this->DrawRightAlignedText(this->geometry.width - 18, top + 29, text, length, 0, 12, 0, 0);
     ++visible;
@@ -9751,8 +9981,8 @@ void UIMerchantShopMakeWnd::Paint() {
       }
 
       const int x = this->geometry.width - 155;
-      this->DrawTextAt(x, y, LookupMessage(MSI_MAKE_CHAT_ROOM), 0, 0, 12, 0, 0, 0);
-      const int width = this->TextWidth(LookupMessage(MSI_MAKE_CHAT_ROOM), 0, 0, 12, 0, 0);
+      this->DrawTextAt(x, y, LookupMessage(MSI_METCHANT_SHOP_PRICE_INCLUDED_CHARGE_FEE), 0, 0, 12, 0, 0, 0);
+      const int width = this->TextWidth(LookupMessage(MSI_METCHANT_SHOP_PRICE_INCLUDED_CHARGE_FEE), 0, 0, 12, 0, 0);
       const double rate = PriceCommission(price) * 0.01;
       price += static_cast<std::int64_t>(price * rate);
       FormatGroupedInteger(price, text, 24);
@@ -9792,7 +10022,7 @@ void UIMerchantShopMakeWnd::Paint() {
     }
     this->DrawRightAlignedText(this->geometry.width - 20, this->geometry.height - barHeight * 2 + 5, text, 0, 0, 12, color, 0);
 
-    message = LookupMessage(MSI_NOTIFY_JOBEXP_INT64);
+    message = LookupMessage(MSI_WARNING_METCHANT_SHOP_BUY);
     messageY = this->geometry.height - 72;
   } else {
     for (int i = 0, y = 72; i < this->visibleRows; ++i, y += 42) {
@@ -9814,8 +10044,8 @@ void UIMerchantShopMakeWnd::Paint() {
       }
 
       const int x = this->geometry.width - 165;
-      this->DrawTextAt(x, y, LookupMessage(MSI_MAKE_CHAT_ROOM), 0, 0, 12, 0, 0, 0);
-      const int width = this->TextWidth(LookupMessage(MSI_MAKE_CHAT_ROOM), 0, 0, 12, 0, 0);
+      this->DrawTextAt(x, y, LookupMessage(MSI_METCHANT_SHOP_PRICE_INCLUDED_CHARGE_FEE), 0, 0, 12, 0, 0, 0);
+      const int width = this->TextWidth(LookupMessage(MSI_METCHANT_SHOP_PRICE_INCLUDED_CHARGE_FEE), 0, 0, 12, 0, 0);
       const double rate = PriceCommission(price) * -0.01;
       price += static_cast<std::int64_t>(price * rate);
       FormatGroupedInteger(price, text, 24);
@@ -9831,7 +10061,7 @@ void UIMerchantShopMakeWnd::Paint() {
     this->DrawTextAt(16, 3, LookupMessage(MSI_MERCHANTSHOPMAKER), 0, 0, 12, 0, 0, 0);
     this->DrawTextAt(2, 25, LookupMessage(MSI_STALL_NAME), 0, 0, 12, 0, 0, 0);
 
-    message = LookupMessage(MSI_CANNOT_JOIN_CHARACTER_HAVING_LOW_SKILL);
+    message = LookupMessage(MSI_WARNING_METCHANT_SHOP_SELL);
     messageY = this->geometry.height - 43;
   }
   this->DrawTextAt(5, messageY, message, 0, 0, 12, 0xFF, 0, 0);
@@ -9874,10 +10104,28 @@ void UIMerchantShopMakeWnd::Paint() {
 // FUNCTION: fn_13426
 int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
+  case UM_SETINFO:
+    this->saved = reinterpret_cast<ItemWndInfo*>(a);
+    if (this->saved->IsValid() == 0) {
+      this->saved->Reset();
+    }
+    this->SendMsg(nullptr, UM_RESIZE, 7, this->saved->width, this->saved->expandedHeight, 0);
+    this->categoryFilter = this->saved->selectedTab;
+    this->usableFilter = 3;
+    this->equipmentFilter = 3;
+    this->miscFilter = 4;
+    this->tabs->activeTabIndex = this->saved->selectedTab;
+    this->Invalidate();
+    this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+    if (this->saved->height != this->saved->expandedHeight) {
+      this->SendMsg(nullptr, UM_COMMAND, ID_MINI, 0, 0, 0);
+    }
+    this->Move(this->saved->x, this->saved->y);
+    return 0;
   case UM_COMMAND:
     switch (a) {
-    case 456:
-      Singleton<CGameSettingsMgr>::GetInstance()->ToggleOption(264);
+    case ID_ITEM_COMPARE:
+      Singleton<CGameSettingsMgr>::GetInstance()->ToggleOption(TT_ITEM_COMPARE_ON_OFF);
       return 0;
     case ID_TOGGLE_ITEM_TRADE_LOCK: {
       const char* normal;
@@ -9903,10 +10151,9 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
         over = "유저인터페이스\\inventory\\bt_itemDeal_lock_on_over.bmp";
         normal = "유저인터페이스\\inventory\\bt_itemDeal_lock_on.bmp";
       }
-      UIBitmapButton* button = this->dealLockButton;
-      button->SetBitmap(normal, 0, 0);
-      button->SetBitmap(over, 1, 0);
-      button->SetBitmap(press, 2, 0);
+      this->dealLockButton->SetBitmap(normal, 0, 0);
+      this->dealLockButton->SetBitmap(over, 1, 0);
+      this->dealLockButton->SetBitmap(press, 2, 0);
       this->dealLockButton->Invalidate();
       this->Invalidate();
       return 0;
@@ -9955,6 +10202,10 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
     default:
       return 0;
     }
+  case UM_TAB:
+    this->categoryFilter = static_cast<int>(a);
+    this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+    return 0;
   case UM_RESIZE: {
     if (a != 7) {
       return 0;
@@ -9983,9 +10234,8 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
       this->UpdateScrollBar();
       this->Invalidate();
       const int positions[3] = {3, this->geometry.width - 28, this->geometry.width - 14};
-      UIBitmapButton* buttons[3] = {this->baseButton, this->minimizeButton, this->closeButton};
       for (int index = 0; index < 3; ++index) {
-        buttons[index]->Move(positions[index], 3);
+        this->titleButtons[index]->Move(positions[index], 3);
       }
     }
     this->expandedHeight = this->geometry.height;
@@ -10000,31 +10250,28 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
     this->filterButton->Move(157, this->geometry.height - 19);
     return 0;
   }
-  case UM_TAB:
-    this->categoryFilter = static_cast<int>(a);
-    this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-    return 0;
-  case UM_REFRESHITEM:
+  case UM_REFRESHITEM: {
     if (this->categoryFilter == 3) {
       this->RefreshItems();
       return 0;
     }
     this->items.erase(this->items.begin(), this->items.end());
-    for (int i = 0; i < g_session.GetNumInventoryItems(); ++i) {
+    const int count = g_session.GetNumInventoryItems();
+    for (int i = 0; i < count; ++i) {
       ITEM_INFO item = g_session.GetInventoryItemAt(i);
-      if (item.identity[1] == 0) {
+      if (item.itemIndex <= 0) {
         continue;
       }
-      const unsigned type = item.identity[0];
+      const unsigned type = item.itemType;
       bool include = false;
-      if (item.flags[0] != 0) {
+      if (item.placeEtcTab != 0) {
         include = this->categoryFilter == 3;
       } else if (this->categoryFilter == 0) {
-        if (type <= 2 || type == 18) {
+        if (type <= TYPE_SPECIAL || type == TYPE_CASH_POINT_ITEM) {
           if (this->usableFilter == 0) {
-            include = type == 0;
+            include = type == TYPE_HEAL;
           } else if (this->usableFilter == 2) {
-            include = type == 1 || type == 2;
+            include = type == TYPE_SCHANGE || type == TYPE_SPECIAL;
           } else if (this->usableFilter == 3) {
             include = true;
           }
@@ -10041,9 +10288,9 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
         case TYPE_ARMORTMB:
         case TYPE_GUN:
           if (this->equipmentFilter == 0) {
-            include = type == 5 || type == 9 || type == 8;
+            include = type == TYPE_WEAPON || type == TYPE_BOTHHAND || type == TYPE_BOW;
           } else if (this->equipmentFilter == 1) {
-            include = type == 4 || type == 11 || type == 12 || type == 13 || type == 14;
+            include = type == TYPE_ARMOR || type == TYPE_ARMORTM || type == TYPE_ARMORTB || type == TYPE_ARMORMB || type == TYPE_ARMORTMB;
           } else if (this->equipmentFilter == 3) {
             include = true;
           }
@@ -10052,7 +10299,7 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
           break;
         }
       } else if (this->categoryFilter == 2) {
-        if (type == 6 || type == 3 || type == 7 || type == 10 || type == 16 || type == 17 || type == 19) {
+        if (type == TYPE_CARD || type == TYPE_EVENT || type == TYPE_PETEGG || type == TYPE_ARROW || type == TYPE_AMMO || type == TYPE_THROWWEAPON || type == TYPE_CANNONBALL) {
           include = this->miscFilter == 4;
         }
       }
@@ -10063,24 +10310,7 @@ int UIItemWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intp
     this->Invalidate();
     this->UpdateScrollBar();
     return 0;
-  case UM_SETINFO:
-    this->saved = reinterpret_cast<ItemWndInfo*>(a);
-    if (this->saved->IsValid() == 0) {
-      this->saved->Reset();
-    }
-    this->SendMsg(nullptr, UM_RESIZE, 7, this->saved->width, this->saved->expandedHeight, 0);
-    this->categoryFilter = this->saved->selectedTab;
-    this->usableFilter = 3;
-    this->equipmentFilter = 3;
-    this->miscFilter = 4;
-    this->tabs->activeTabIndex = this->saved->selectedTab;
-    this->Invalidate();
-    this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-    if (this->saved->height != this->saved->expandedHeight) {
-      this->SendMsg(nullptr, UM_COMMAND, ID_MINI, 0, 0, 0);
-    }
-    this->Move(this->saved->x, this->saved->y);
-    return 0;
+  }
   case UM_DROP: {
     CGameMode* mode = g_modeMgr.GetGameMode();
     ModeDragState& drag = static_cast<CGameMode*>(mode)->drag;
@@ -10130,7 +10360,7 @@ void UIItemWnd::RefreshSortButton() {
   this->filterButton->SetBitmap(std::format("{}.bmp", name).c_str(), 0, 0);
   this->filterButton->SetBitmap(std::format("{}_over.bmp", name).c_str(), 1, 0);
   this->filterButton->SetBitmap(std::format("{}_press.bmp", name).c_str(), 2, 0);
-  this->filterButton->SetTooltip(std::format("{} {}", LookupMessage(MSI_BABY_INDEPENDENCE_RODEX_ERASED), g_session.m_sortPrivateTab ? "ON" : "OFF").c_str());
+  this->filterButton->SetTooltip(std::format("{} {}", LookupMessage(MSI_SORT_ITEM), g_session.m_sortPrivateTab ? "ON" : "OFF").c_str());
   this->Invalidate();
 }
 
@@ -10158,7 +10388,7 @@ void UIItemWnd::RefreshItems() {
   this->items.clear();
   for (int i = 0; i < g_session.GetNumInventoryItems(); ++i) {
     ITEM_INFO item = g_session.GetInventoryItemAt(i);
-    if (item.flags[0] == 1) {
+    if (item.placeEtcTab == 1) {
       this->items.push_back(item);
     }
   }
@@ -10180,11 +10410,11 @@ bool UIItemStoreFindWnd::FilterByName(std::string query) {
   for (auto it = this->items.begin(); it != this->items.end();) {
     ITEM_INFO item = *it;
     const std::string name = item.displayName;
-    auto next = std::next(it);
     if (!_mbsstr(reinterpret_cast<const unsigned char*>(name.c_str()), reinterpret_cast<const unsigned char*>(query.c_str()))) {
-      this->items.erase(it);
+      it = this->items.erase(it);
+    } else {
+      ++it;
     }
-    it = next;
   }
   return true;
 }
@@ -10238,7 +10468,7 @@ bool UIItemStoreFindWnd::UpdateItemNames() {
     char text[256];
     char* highlight = nullptr;
     char* cursor = text;
-    std::vector<char*> breaks;
+    std::vector<const char*> breaks;
     ITEM_INFO item = *it;
     int remaining = 0x100;
     int highlightColor;
@@ -10259,7 +10489,7 @@ bool UIItemStoreSubWnd::UpdateItemNames2() {
     char text[256];
     char* highlight = nullptr;
     char* cursor = text;
-    std::vector<char*> breaks;
+    std::vector<const char*> breaks;
     ITEM_INFO item = *it;
     int remaining = 0x100;
     int highlightColor;
@@ -10280,7 +10510,7 @@ bool UIItemStoreWnd::UpdateItemNames() {
     char text[256];
     char* highlight = nullptr;
     char* cursor = text;
-    std::vector<char*> breaks;
+    std::vector<const char*> breaks;
     ITEM_INFO item = *it;
     int remaining = 0x100;
     int highlightColor;
@@ -10296,17 +10526,17 @@ void UIMerchantItemPurchaseMSGWnd::SetPurchase(int value, int amount) {
   this->purchaseIndex = value;
   this->purchaseAmount = amount;
 
-  int total = 0;
   const int count = g_session.GetNumMerchantHopeToSellItems();
+  int total = 0;
   for (int i = 0; i < count; ++i) {
     ITEM_INFO item;
     item = g_session.GetMerchantHopeToSellItemInfoBySequence(i);
-    if (item.identity[1] > 0) {
+    if (item.itemIndex > 0) {
       total += item.quantity * item.prices[0];
     }
   }
 
-  const std::string text = IntToSignedString(total, true, false) + std::string(LookupMessage(MSI_CARDWIN));
+  const std::string text = IntToSignedString(total, true, false) + std::string(LookupMessage(MSI_SHOP_ITEM_BAY_MAG2));
   this->secondLine->SetText(text.c_str(), 0);
   this->Invalidate();
 }
@@ -10323,7 +10553,7 @@ void UIEditCtrl3::DecodeLinkFields(const std::string& link, std::vector<int>& fi
   char* text = new char[length];
   strcpy_s(text, length, link.c_str());
 
-  std::string value;
+  std::string value = "";
   int optionCount = 0;
   std::vector<int> options;
   int cardCount = 0;
@@ -10336,9 +10566,9 @@ void UIEditCtrl3::DecodeLinkFields(const std::string& link, std::vector<int>& fi
   fields[6] = -1;
   value.assign(text, 5);
   fields[0] = this->DecodeLinkNumber(std::move(value));
-  value.clear();
+  value = "";
   value += text[5];
-  fields[1] = this->DecodeLinkNumber(std::move(value));
+  fields[1] = this->DecodeLinkNumber(value);
   value.clear();
 
   int field = 2;
@@ -10354,23 +10584,31 @@ void UIEditCtrl3::DecodeLinkFields(const std::string& link, std::vector<int>& fi
         continue;
       }
 
-      if (kind == 7) {
+      switch (kind) {
+      case 7: {
         if (!value.empty()) {
-          fields[field] = this->DecodeLinkNumber(std::move(value));
+          fields[field] = this->DecodeLinkNumber(value);
         }
 
         const int size = static_cast<int>(link.size());
         cardCount = this->DecodeLinkCards(fields, text, position, delimiters[7], size, 6);
-      } else if (kind == 9) {
+        break;
+      }
+      case 9: {
         ++optionCount;
         if (!value.empty()) {
-          fields[field] = this->DecodeLinkNumber(std::move(value));
+          fields[field] = this->DecodeLinkNumber(value);
         }
 
         const int size = static_cast<int>(link.size());
         this->DecodeLinkOptions(options, text, position, size, delimiters[10], delimiters[11]);
-      } else if (!value.empty()) {
-        fields[field] = this->DecodeLinkNumber(std::move(value));
+        break;
+      }
+      default:
+        if (!value.empty()) {
+          fields[field] = this->DecodeLinkNumber(value);
+        }
+        break;
       }
 
       value.clear();
@@ -10550,11 +10788,11 @@ void UIMerchantItemShopWnd::Paint() {
       const int seconds = remaining / 1000 % 60;
       if (remaining <= 60000) {
         this->DrawTextAt(20, this->geometry.height - 50,
-          FormatOwnedString(LookupMessage(MSI_SELECT_SHOP_POSITION), days, hours, minutes, seconds).c_str(), 0, 0, 12, 0xFF, 1, 0
+          FormatOwnedString(LookupMessage(MSI_REMAIN_TIME), days, hours, minutes, seconds).c_str(), 0, 0, 12, 0xFF, 1, 0
         );
       } else {
         this->DrawTextAt(20, this->geometry.height - 50,
-          FormatOwnedString(LookupMessage(MSI_SELECT_SHOP_POSITION), days, hours, minutes, seconds).c_str(), 0, 0, 12, 0, 1, 0
+          FormatOwnedString(LookupMessage(MSI_REMAIN_TIME), days, hours, minutes, seconds).c_str(), 0, 0, 12, 0, 1, 0
         );
       }
 
@@ -10573,10 +10811,10 @@ bool UIEditCtrl3::ExtractItemLink(std::string& text, std::string& link, int& pos
     return false;
   }
 
-  do {
+  while (close != std::string::npos) {
     text = text.substr(0, close);
     std::size_t open = text.find(g_itemLinkOpen);
-    if (open == std::string::npos) {
+    if (open == std::string::npos && close != std::string::npos) {
       position += g_itemLinkClose.size();
       text = source;
       text = text.substr(position);
@@ -10585,30 +10823,28 @@ bool UIEditCtrl3::ExtractItemLink(std::string& text, std::string& link, int& pos
 
     close = text.find(g_itemLinkClose);
     if (open != std::string::npos) {
-      for (;;) {
+      do {
         position += open;
         text = text.substr(open + g_itemLinkOpen.size());
         open = text.find(g_itemLinkOpen);
         close = text.find(g_itemLinkClose);
-        if (open == std::string::npos) {
-          break;
+        if (open != std::string::npos) {
+          position += g_itemLinkOpen.size();
         }
-
-        position += g_itemLinkOpen.size();
-      }
+      } while (open != std::string::npos);
 
       link = text;
       text = source;
-      std::string name = "";
+      std::string name("");
       if (!this->LinkDisplayName(link, name)) {
-        position += link.size() + g_itemLinkOpen.size() + g_itemLinkClose.size();
+        position += link.size() + g_itemLinkClose.size() + g_itemLinkOpen.size();
         text = text.substr(position);
         return true;
       }
 
-      text = text.substr(position + link.size() + g_itemLinkOpen.size() + g_itemLinkClose.size());
+      text = text.substr(position + link.size() + g_itemLinkClose.size() + g_itemLinkOpen.size());
     }
-  } while (close != std::string::npos);
+  }
 
   return true;
 }
@@ -10688,11 +10924,11 @@ void UIItemWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0) {
+  if (item.itemIndex > 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    if (item.flags[2] == 0) {
-      item = g_session.LookupClientItemByIdentity(item.identity[1]);
-      mode->BeginDragItem(1, item, item.quantity, -1);
+    if (item.flagged == 0) {
+      item = g_session.LookupClientItemByIdentity(item.itemIndex);
+      mode->BeginDragItem(DRAG_ITEM_INVENTORY, item, item.quantity, -1);
 
       if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
         if (g_windowMgr.GetHoverWindow() && item.identified != 0) {
@@ -10726,10 +10962,10 @@ void UIMerchantItemWnd::OnLBtnDown(int x, int y) {
 
   ITEM_INFO item = this->GetItemAt(x, y);
 
-  if (item.identity[1] > 0 && !g_windowMgr.merchantShopMakeWnd && item.flags[2] == 0) {
+  if (item.itemIndex > 0 && !g_windowMgr.merchantShopMakeWnd && item.flagged == 0) {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    item = g_session.FindMerchantShopItem(item.identity[1]);
-    mode->BeginDragItem(9, item, item.quantity, -1);
+    item = g_session.FindMerchantShopItem(item.itemIndex);
+    mode->BeginDragItem(DRAG_ITEM_MERCHANT_INVENTORY, item, item.quantity, -1);
 
     if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       if (g_windowMgr.GetHoverWindow() && item.identified != 0) {
@@ -10767,7 +11003,8 @@ void UISkillListWnd::OnMouseHover(int x, int y) {
   if (std::strlen(name) != 0) {
     int tooltipY = (index - this->scroll) * 32 + 17;
     int tooltipX = 112;
-    if (this->TextWidth(name, 0, 0, 12, 0, 0) > this->geometry.width - 132 && x > tooltipX) {
+    const int maxWidth = this->geometry.width - 132;
+    if (this->TextWidth(name, 0, 0, 12, 0, 0) > maxWidth && x > tooltipX) {
       this->ToScreen(tooltipX, tooltipY);
       g_modeMgr.currentMode->ShowTooltip(name, tooltipX - 8, tooltipY, 0xFFFFFFFF, 0, 1);
     }
@@ -10784,36 +11021,40 @@ void UIItemSellWnd2::Paint() {
   }
 
   int rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, i * 8 + 17, left, false);
   }
 
   rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, false);
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - 38) % 32;
-  const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - 38, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - 38) % 32;
+    const int fillY = (this->geometry.height - 38) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  }
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int slotRows = (this->geometry.height - 38) / 32;
   int slots = slotRows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  {
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  }
 
   int visible = 0;
   int index = 0;
@@ -10865,36 +11106,40 @@ void UIItemShopWnd2::Paint() {
   }
 
   int rows = (this->geometry.height - this->bottomBarHeight - 17) / 8 + ((this->geometry.height - this->bottomBarHeight - 17) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, i * 8 + 17, left, false);
   }
 
   rows = (this->geometry.height - this->bottomBarHeight - 17) / 8 + ((this->geometry.height - this->bottomBarHeight - 17) % 8 != 0);
-  for (int i = 0, y = 17; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, false);
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const int fillWidth = (this->geometry.width - 60) % 32;
-  this->FillRegion(20, 17, fillWidth, this->geometry.height - this->bottomBarHeight - 17, RGB(red, green, blue));
-  const int fillHeight = (this->geometry.height - this->bottomBarHeight - 17) % 32;
-  const int fillY = (this->geometry.height - this->bottomBarHeight - 17) / 32 * 32 + 17;
-  this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    const int fillWidth = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, fillWidth, this->geometry.height - this->bottomBarHeight - 17, RGB(red, green, blue));
+    const int fillHeight = (this->geometry.height - this->bottomBarHeight - 17) % 32;
+    const int fillY = (this->geometry.height - this->bottomBarHeight - 17) / 32 * 32 + 17;
+    this->FillRegion(20, fillY, this->geometry.width - 24, fillHeight, RGB(red, green, blue));
+  }
   this->DrawButtonBar(this->alternateButtonBar != 0 ? 2 : 0, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int slotRows = (this->geometry.height - this->extraBottomHeight - this->bottomBarHeight - 17) / 32;
   int slots = slotRows;
-  for (int i = 0, y = 17; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
-  unsigned fillRed, fillGreen, fillBlue;
-  g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
-  this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  {
+    unsigned fillRed, fillGreen, fillBlue;
+    g_skinInfo.PaletteChannels(2, 2, fillRed, fillGreen, fillBlue);
+    this->FillRegion(72, 17, columns * 32 - 32, slotRows * 32, RGB(fillRed, fillGreen, fillBlue));
+  }
 
   int visible = 0;
   int index = 0;
@@ -10971,19 +11216,20 @@ int UIItemSellWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   case UM_COMMAND: {
     this->RecordResponse(static_cast<int>(a), b, c, d);
     CMode* mode = g_modeMgr.currentMode;
-    if (a == ID_OK) {
+    switch (a) {
+    case ID_OK:
       if (g_session.HasRequiredItems()) {
         mode->SendMsg(MM_REQ_SELL, 0, 0, 0, 0);
       }
-    } else if (a != ID_CANCEL) {
-      break;
+      [[fallthrough]];
+    case ID_CANCEL:
+      g_windowMgr.CloseWindow(WID_ITEMSHOPWND);
+      g_windowMgr.CloseWindow(WID_ITEMSELLWND);
+      mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
+      g_session.ClearTradeItems();
+      return 0;
     }
-
-    g_windowMgr.CloseWindow(WID_ITEMSHOPWND);
-    g_windowMgr.CloseWindow(WID_ITEMSELLWND);
-    mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
-    g_session.ClearTradeItems();
-    return 0;
+    break;
   }
   case UM_RESIZE:
     if (a == 3) {
@@ -11022,12 +11268,12 @@ int UIItemSellWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     }
     break;
   case UM_REFRESHITEM: {
-    this->items.erase(this->items.begin(), this->items.end());
     int totalPrice = 0;
+    this->items.erase(this->items.begin(), this->items.end());
     const int size = g_session.GetNumStorageItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetStorageItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         totalPrice += item.quantity * item.prices[1];
         this->items.push_back(item);
       }
@@ -11046,7 +11292,7 @@ int UIItemSellWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     ItemListChunkHeader header;
     header = *reinterpret_cast<const ItemListChunkHeader*>(bytes);
     unsigned offset = 6;
-    if (header.type == 20750) {
+    if (20750 == header.type) {
       while (static_cast<unsigned>(b) > offset) {
         header = *reinterpret_cast<const ItemListChunkHeader*>(bytes + offset);
         offset += 6;
@@ -11105,8 +11351,11 @@ void UIItemWnd::Paint() {
     unsigned red, green, blue;
     g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     const int height = this->geometry.height - 38;
-    this->FillRegion(20, 17, (this->geometry.width - 60) % 32, height, RGB(red, green, blue));
-    this->FillRegion(20, height / 32 * 32 + 17, this->geometry.width - 24, height % 32, RGB(red, green, blue));
+    const int bottom = height / 32 * 32 + 17;
+    const int gap = (this->geometry.width - 60) % 32;
+    const int remainder = height % 32;
+    this->FillRegion(20, 17, gap, height, RGB(red, green, blue));
+    this->FillRegion(20, bottom, this->geometry.width - 24, remainder, RGB(red, green, blue));
   }
 
   if (this->filterWindow) {
@@ -11137,13 +11386,12 @@ void UIItemWnd::Paint() {
 
   const int slotColumns = (this->geometry.width - 40) / 32;
   int slotRows = (this->geometry.height - 38) / 32;
-  for (int i = 0, y = 17; i < slotRows; ++i, y += 32) {
-    for (int j = 0, x = 40; j < slotColumns; ++j, x += 32) {
+  for (int i = 0; i < slotRows; ++i) {
+    for (int j = 0; j < slotColumns; ++j) {
       if (this->categoryFilter == 3 && g_session.m_blockPrivateTab == 1) {
-        auto* lock = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\itemwin_mid_lock.bmp")));
-        this->DrawBitmap(x, y, lock, false);
+        this->DrawBitmap(j * 32 + 40, i * 32 + 17, (static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\itemwin_mid_lock.bmp")))), false);
       } else {
-        this->DrawItemSlotFrame(x, y);
+        this->DrawItemSlotFrame(j * 32 + 40, i * 32 + 17);
       }
     }
   }
@@ -11161,10 +11409,9 @@ void UIItemWnd::Paint() {
 
     const int y = visible / this->columns * 32 + 17;
     const int x = visible % this->columns * 32 + 40;
-    if (it->flags[1]) {
+    if (it->selected) {
       if (this->categoryFilter == 3 && g_session.m_blockPrivateTab == 1) {
-        auto* mark = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\itemwin_new_lock.bmp")));
-        this->DrawBitmap(x, y, mark, false);
+        this->DrawBitmap(x, y, (static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\inventory\\itemwin_new_lock.bmp")))), false);
       } else {
         this->DrawNewItemMark(x, y);
       }
@@ -11201,7 +11448,7 @@ void UIItemWnd::Paint() {
       );
     }
 
-    if (g_session.HasSwapEquipmentItem(it->identity[1])) {
+    if (g_session.HasSwapEquipmentItem(it->itemIndex)) {
       CTexture* background = g_texMgr.Load("유저인터페이스\\swap_equipment\\bg_change.bmp", 0, false, true, false);
       if (background) {
         this->geometry.surface->DrawScaledSurface(
@@ -11252,30 +11499,31 @@ void UIItemDropCntWnd::OnCreate(int, int) {
   if (dragName) {
     ITEM_INFO item;
     item.itemId = dragName;
-    item.refiningLevel = 0;
     item.identified = gameMode->drag.identified;
+    item.refiningLevel = 0;
     name = item.DisplayName(0);
   }
 
-  auto* title = new UIStaticText();
-  this->itemTitle = title;
-  title->SetSize(100, 15);
-  title->Move(15, 6);
-  title->SetText(name.c_str(), 0);
-  this->AddChild(title);
+  this->itemTitle = new UIStaticText();
+  this->itemTitle->SetSize(100, 15);
+  this->itemTitle->Move(15, 6);
+  this->itemTitle->SetText(name.c_str(), 0);
+  this->AddChild(this->itemTitle);
 
-  const std::string prefix("유저인터페이스\\");
-  const int x = this->geometry.width - 55;
-  const int y = this->geometry.height - 32;
-  auto* button = new UIBitmapButton();
-  button->SetBitmap((prefix + "btn_ok" + ".bmp").c_str(), 0, 0);
-  button->SetBitmap((prefix + "btn_ok_a" + ".bmp").c_str(), 1, 0);
-  button->SetBitmap((prefix + "btn_ok_b" + ".bmp").c_str(), 2, 0);
-  button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-  button->Move(x, y);
-  button->SetId(184);
-  this->AddChild(button);
-  this->m_message0 = 184;
+  {
+    const std::string prefix("유저인터페이스\\");
+    const int x = this->geometry.width - 55;
+    const int y = this->geometry.height - 32;
+    auto* button = new UIBitmapButton();
+    button->SetBitmap((prefix + "btn_ok" + ".bmp").c_str(), 0, 0);
+    button->SetBitmap((prefix + "btn_ok_a" + ".bmp").c_str(), 1, 0);
+    button->SetBitmap((prefix + "btn_ok_b" + ".bmp").c_str(), 2, 0);
+    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    button->Move(x, y);
+    button->SetId(ID_OK);
+    this->AddChild(button);
+  }
+  this->m_message0 = ID_OK;
   this->geometry.state = 0;
 }
 
@@ -11355,7 +11603,7 @@ int UIItemStoreFindWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
     const int size = g_session.GetNumCartItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetCartItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
@@ -11367,7 +11615,7 @@ int UIItemStoreFindWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
       this->SortReversed();
     }
     if (!this->searchText.empty()) {
-      this->FilterByName(std::string(this->searchText.c_str(), this->searchText.size()));
+      this->FilterByName(this->searchText);
     }
 
     this->Invalidate();
@@ -11449,7 +11697,7 @@ int UIItemStoreFindWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
     if (this->searchText.empty()) {
       return 0;
     }
-    if (!this->FilterByName(std::string(this->searchText.c_str(), this->searchText.size()))) {
+    if (!this->FilterByName(this->searchText)) {
       return 0;
     }
     break;
@@ -11495,6 +11743,45 @@ void UIItemDropCntWnd::Show(int visible) {
   }
 }
 
+// OFFSET: 0x0098A650
+// FUNCTION: fn_45772
+void UIMerchantShopMakeWnd::UpdateScrollBar() {
+  UIScrollBar* bar = this->scrollBar;
+  if (!bar) {
+    return;
+  }
+
+  const int visible = this->maxVisibleRows;
+  const int count = static_cast<int>(this->items.size());
+  int maximum = count - visible;
+  if (maximum < 0) {
+    maximum = 0;
+  }
+
+  this->scrollable = maximum != 0;
+  if (maximum != 0) {
+    bar->SetRange(maximum, visible, count);
+    int position = this->scroll;
+    if (position < 0) {
+      this->scroll = 0;
+      position = 0;
+    }
+
+    const int last = count - this->maxVisibleRows;
+    if (position > last) {
+      this->scroll = last;
+      position = last;
+    }
+
+    this->scrollBar->SetPosition(position);
+  } else {
+    this->scroll = 0;
+    bar->SetRange(0, visible, count);
+  }
+
+  this->scrollBar->Invalidate();
+}
+
 // OFFSET: 0x00992130
 // FUNCTION: fn_13433
 int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -11509,9 +11796,11 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     break;
   case UM_DROP: {
     CGameMode* mode = g_modeMgr.GetGameMode();
+    ModeDragState& drag = mode->drag;
     ITEM_INFO item;
-    item.Assign(mode->drag);
-    if (mode->drag.source == 20) {
+    item.Assign(drag);
+    switch (drag.source) {
+    case 20: {
       if (this->slotCount > g_session.GetNumMerchantPurchaseSavedItems()) {
         if (!g_session.AddMerchantPurchaseSavedItem(item, 1, 1)) {
           g_windowMgr.Confirm(LookupMessage(MSI_BUYINGSTORE_MAKEWND_DUPLICATEITEM), 0, true, false, 0, "Message", 280, 120, 0);
@@ -11519,7 +11808,13 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
           g_session.RemoveMerchantMyShopItem(item, 1, 1);
         }
       }
-      int index = std::min(std::max(g_session.GetNumMerchantPurchaseSavedItems() - 1, 0), 4);
+      int index = g_session.GetNumMerchantPurchaseSavedItems() - 1;
+      if (index < 0) {
+        index = 0;
+      }
+      if (index >= 5) {
+        index = 4;
+      }
       if (this->priceEdits[index]) {
         if (this->priceEdits[index]->Length() == 0) {
           this->priceEdits[index]->SetText("0");
@@ -11531,34 +11826,35 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
           this->quantityEdits[index]->SelectAll();
         }
       }
-    } else if (mode->drag.source == 11) {
-      if (item.quantity + g_session.GetMerchantPurchaseSavedItemNum(mode->drag.id) > 30000) {
-        item.quantity = 30000 - g_session.GetMerchantPurchaseSavedItemNum(mode->drag.id);
-        char text[200];
+      break;
+    }
+    case 11: {
+      char text[200];
+      if (item.quantity + g_session.GetMerchantPurchaseSavedItemNum(drag.id) > 30000) {
+        item.quantity = 30000 - g_session.GetMerchantPurchaseSavedItemNum(drag.id);
         std::sprintf(text, LookupMessage(MSI_LIMIT_SELL_ITEM), 30000);
         g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFF, 0, 0, 0);
       }
       if (item.quantity != 0) {
         const bool full = this->slotCount <= g_session.GetNumMerchantPurchaseSavedItems();
-        bool movable;
         if (!full) {
-          movable = g_session.GetMerchantMyShopItemNum(mode->drag.id) != 0;
-        } else {
-          movable = g_session.GetMerchantMyShopItemNum(mode->drag.id) != 0 && g_session.GetMerchantPurchaseSavedItemNum(mode->drag.id) != 0;
-        }
-        if (movable) {
+          if (g_session.GetMerchantMyShopItemNum(drag.id) != 0) {
+            g_session.AddMerchantPurchaseSavedItem(item, 0, 1);
+            g_session.RemoveMerchantMyShopItem(item, 0, 1);
+          }
+        } else if (g_session.GetMerchantMyShopItemNum(drag.id) != 0 && g_session.GetMerchantPurchaseSavedItemNum(drag.id) != 0) {
           g_session.AddMerchantPurchaseSavedItem(item, 0, 1);
           g_session.RemoveMerchantMyShopItem(item, 0, 1);
         }
         int index = g_session.GetNumMerchantPurchaseSavedItems() - 1;
+        std::string price("");
         bool fresh = true;
-        std::string price;
-        ITEM_INFO owned = g_session.FindMerchantPurchaseSavedItem(mode->drag.id);
-        if (owned.identity[1] != 0) {
+        ITEM_INFO owned = g_session.FindMerchantPurchaseSavedItem(drag.id);
+        if (owned.itemIndex != 0) {
           index = 0;
           for (const ITEM_INFO& old : this->items) {
-            if (old.identity[1] == owned.identity[1]) {
+            if (owned.itemIndex == old.itemIndex) {
               fresh = false;
               price = this->priceEdits[index]->Text();
               break;
@@ -11566,25 +11862,37 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
             ++index;
           }
         }
-        index = std::min(std::max(index, 0), 12);
-        UIEditCtrl* edit = this->priceEdits[index];
-        if (edit) {
+        if (index < 0) {
+          index = 0;
+        }
+        if (index >= 13) {
+          index = 12;
+        }
+        if (this->priceEdits[index]) {
           if (this->mode != 0) {
-            if (edit->Length() == 0) {
-              edit->SetText("0");
-              g_windowMgr.SetFocus(edit);
-              edit->SelectAll();
+            if (this->priceEdits[index]->Length() == 0) {
+              this->priceEdits[index]->SetText("0");
+              g_windowMgr.SetFocus(this->priceEdits[index]);
+              this->priceEdits[index]->SelectAll();
             }
-          } else if (!full) {
-            edit->Background(232, 232, 232);
-            edit->disabled = 0;
-            edit->Invalidate();
-            edit->SetText(fresh ? "0" : price.c_str());
-            g_windowMgr.SetFocus(edit);
-            edit->SelectAll();
+          } else {
+            if (full == true) {
+              break;
+            }
+            this->priceEdits[index]->Background(232, 232, 232);
+            SetEditDisabled(*this->priceEdits[index], 0);
+            if (fresh == true) {
+              this->priceEdits[index]->SetText("0");
+            } else {
+              this->priceEdits[index]->SetText(price.c_str());
+            }
+            g_windowMgr.SetFocus(this->priceEdits[index]);
+            this->priceEdits[index]->SelectAll();
           }
         }
       }
+      break;
+    }
     }
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     break;
@@ -11594,13 +11902,13 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     const int count = g_session.GetNumMerchantPurchaseSavedItems();
     for (int i = 0; i < count; ++i) {
       ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(i);
-      if (item.identity[1] > 0) {
+      if (item.itemIndex > 0) {
         this->items.push_back(item);
       }
     }
     if (a > 0 && this->mode == 0) {
       int index = static_cast<int>(a) - 1;
-      if (index <= this->editIndex) {
+      if (this->editIndex >= index) {
         --this->editIndex;
       }
       if (index == static_cast<int>(this->items.size())) {
@@ -11611,10 +11919,8 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       } else {
         g_windowMgr.SetFocus(this->priceEdits[index]);
       }
-      UIEditCtrl* edit = this->priceEdits[this->items.size()];
-      edit->Background(182, 182, 182);
-      edit->disabled = 1;
-      edit->Invalidate();
+      this->priceEdits[this->items.size()]->Background(182, 182, 182);
+      SetEditDisabled(*this->priceEdits[this->items.size()], 1);
       char text[24] = {};
       for (; index < this->slotCount - 1; ++index) {
         this->priceEdits[index]->SetText(this->priceEdits[index + 1]->Text());
@@ -11729,7 +12035,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     case ID_OK: {
       CGameMode* mode = g_modeMgr.GetGameMode();
       if (g_windowMgr.HasTitleAtActorCell(g_session.m_aid)) {
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SWAP_EQUIPITEM_EQUIPMENTSET)), 0xFF, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RESULT_FAILED_ASSISTANT_POS)), 0xFF, 0, 0, 0);
         break;
       }
       if (g_windowMgr.chatRoomWnd || g_windowMgr.chatRoomMakeWnd) {
@@ -11751,7 +12057,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       BOOL freeItem = FALSE;
       BOOL highPrice = FALSE;
       if (this->mode != 0 && this->items.empty()) {
-        error = 1724;
+        error = MSI_BUYINGSTORE_MAKEWND_ADDITEM;
         goto showError;
       }
       auto current = this->items.begin();
@@ -11759,32 +12065,11 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         char text[24];
         std::sprintf(text, "%s ", this->priceEdits[i]->Text());
         if (!g_session.IsNumberWithCommas(text)) {
-          error = 602;
+          error = MSI_CAN_INPUT_NUMBER_ONLY;
           goto showError;
         }
         const std::int64_t price = std::max(std::min(_atoi64(text), static_cast<std::int64_t>(0x7FFFFFFF)), static_cast<std::int64_t>(0));
-        if (this->mode == 0) {
-          if (this->items.empty()) {
-            error = 2494;
-            goto showError;
-          }
-          ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(i);
-          if (static_cast<unsigned>(i) < this->items.size()) {
-            if (item.identity[1] == 0) {
-              return 0;
-            }
-            if (item.identified == 0) {
-              error = 603;
-              goto showError;
-            }
-            if (price == 0) {
-              freeItem = TRUE;
-            }
-          }
-          if (!g_session.m_skipPriceWarning && static_cast<unsigned>(i) < this->items.size() && price > 1000000000) {
-            highPrice = TRUE;
-          }
-        } else {
+        if (this->mode != 0) {
           if (static_cast<unsigned>(i) >= this->items.size()) {
             break;
           }
@@ -11801,6 +12086,27 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
             return 0;
           }
           ++current;
+        } else {
+          if (this->items.empty()) {
+            error = MSI_BUYINGSTORE_MAKEWND_ADD_GOODS;
+            goto showError;
+          }
+          ITEM_INFO item = g_session.GetMerchantPurchaseSavedItemInfoBySequence(i);
+          if (static_cast<unsigned>(i) < this->items.size()) {
+            if (item.itemIndex == 0) {
+              return 0;
+            }
+            if (item.identified == 0) {
+              error = MSI_CANT_SELL_UNIDENTIFIED_ITEM;
+              goto showError;
+            }
+            if (price == 0) {
+              freeItem = TRUE;
+            }
+          }
+          if (!g_session.m_skipPriceWarning && static_cast<unsigned>(i) < this->items.size() && price > 1000000000) {
+            highPrice = TRUE;
+          }
         }
       }
       if (this->mode == 0) {
@@ -11808,7 +12114,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
           break;
         }
         if (!g_session.m_skipPriceWarning && highPrice &&
-            g_windowMgr.Confirm(LookupMessage(MSI_BASIC_EXP_MSG_INDONESIA), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
+            g_windowMgr.Confirm(LookupMessage(MSI_OVERPRICE_MAX), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
           break;
         }
       }
@@ -11818,7 +12124,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
           char text[24];
           std::sprintf(text, "%s ", this->quantityEdits[i]->Text());
           if (!g_session.IsNumberWithCommas(text)) {
-            error = 602;
+            error = MSI_CAN_INPUT_NUMBER_ONLY;
             goto showError;
           }
           if (static_cast<unsigned>(i) >= this->items.size()) {
@@ -11841,7 +12147,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         }
         const std::int64_t budget = _atoi64(this->zenyLimitEdit->Text());
         if (budget > g_session.m_zeny) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SAVE_BUY_STORE_ITEMLIST)), 0x6464FF, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BUYINGSTORE_MAKEWND_LIMITZENY_NOT_OVER_MYMONEY)), 0x6464FF, 0, 0, 0);
           break;
         }
         if (budget > 0x7FFFFFFF) {
@@ -11850,7 +12156,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         }
       }
       if (this->titleEdit->Length() == 0) {
-        error = 225;
+        error = MSI_ENTER_SHOP_TITLE;
         goto showError;
       }
       if (!g_forbiddenWords.Allows(this->titleEdit->Text())) {
@@ -11866,7 +12172,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
           price = std::atoi(text);
         }
         if (g_serviceType == 2 && this->priceEdits[i]->Length() == 0 && this->priceEdits[i]->Text() != nullptr) {
-          error = 602;
+          error = MSI_CAN_INPUT_NUMBER_ONLY;
           goto showError;
         }
         g_session.SetMerchantPurchaseSavedPrice(i, price);
@@ -11881,7 +12187,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
             quantity = std::atoi(text);
           }
           if (g_serviceType == 2 && this->quantityEdits[i]->Length() == 0 && this->quantityEdits[i]->Text() != nullptr) {
-            error = 602;
+            error = MSI_CAN_INPUT_NUMBER_ONLY;
             goto showError;
           }
           g_session.SetItem1768Quantity(i, quantity);
@@ -11901,7 +12207,7 @@ int UIMerchantShopMakeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
           total += price * quantity;
         }
         if (total > 0x7FFFFFFF) {
-          error = 3826;
+          error = MSI_MERCHANTSHOP_TOTA_LOVER_ZENY_ERR;
           goto showError;
         }
         if (this->itemsSet == 1) {

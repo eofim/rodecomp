@@ -45,11 +45,22 @@ namespace {
     return std::find_if(records.begin(), records.end(), [&](const ShortcutCooldownRecord& entry) { return entry.id == group; });
   }
 
+  struct SlotMatches {
+    const int& slot;
+
+    bool operator()(const CooldownState& state) const {
+      return state.slot == slot;
+    }
+  };
+
   // INLINED
   __forceinline std::list<CooldownState>::iterator FindCooldownState(std::list<CooldownState>& states, const int& slot) {
-    return std::find_if(states.begin(), states.end(), [&](const CooldownState& state) { return state.slot == slot; });
+    return std::find_if(states.begin(), states.end(), SlotMatches{slot});
   }
 }
+
+template __declspec(noinline) std::list<CooldownState>::iterator std::find_if<std::list<CooldownState>::iterator, SlotMatches>(std::list<CooldownState>::iterator, std::list<CooldownState>::iterator, SlotMatches);
+template __declspec(noinline) std::list<CooldownState>::iterator std::list<CooldownState>::erase(std::list<CooldownState>::const_iterator) noexcept;
 
 // OFFSET: 0x0091C4D0
 // FUNCTION: fn_12614
@@ -63,28 +74,13 @@ int UIQuickSlotWnd::SlotX(int slot) {
   return -1;
 }
 
-// OFFSET: 0x0091C500
-// FUNCTION: fn_12615
-int UIQuickSlotWnd::SlotAt(int x, int y) {
-  if (y < 0 || y >= 24 || (x > 58 && x < this->geometry.width)) {
-    return -1;
-  }
-
-  const int index = (x - 4) / 29;
-  if (x > index * 29 + 30) {
-    return -1;
-  }
-
-  return index;
-}
-
 // OFFSET: 0x00917640
 // FUNCTION: fn_12589
 void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
   UIWindow& window = *this;
   ShortcutGrid& grid = this->m_grid;
   const ModeDragState& value = *reinterpret_cast<const ModeDragState*>(argument);
-  const int bank = static_cast<int>(g_session.m_options.Get(10));
+  const std::int64_t bank = g_session.m_options.Get(10);
 
   if (value.skill != 0) {
     const std::string copiedName = value.skillName;
@@ -112,7 +108,7 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
         return;
       }
 
-      g_session.AssignShortcut(1, skill.id, value.skillLevel, index, bank);
+      g_session.AssignShortcut(1, skill.id, value.skillLevel, index, static_cast<int>(bank));
 
       if (value.slot != index) {
         RemoveFirst(g_session.m_requestTimers, index);
@@ -148,7 +144,7 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
         }
       }
 
-      g_session.AssignShortcut(1, 0, 0, value.slot, bank);
+      g_session.AssignShortcut(1, 0, 0, value.slot, static_cast<int>(bank));
       Refresh(window);
     }
 
@@ -156,80 +152,77 @@ void UIShortCutWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
     return;
   }
 
-  if (value.source == 6 || value.source == 9) {
-    g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-    return;
-  }
-
-  ITEM_INFO item = g_session.LookupClientItemByIdentity(value.id);
-  if (item.identity[1] <= 0 || item.identified == 0) {
-    g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-    return;
-  }
-
-  switch (item.identity[0]) {
-  case TYPE_EVENT:
-  case TYPE_ARROW:
-  case TYPE_AMMO:
-  case TYPE_THROWWEAPON:
-  case TYPE_CANNONBALL: {
-    const int column = this->HitTestSlot(x, y);
-    if (column != -1 && 9 * grid.rows <= 9 * g_session.m_hotkeyPage + column) {
-      if (g_session.ItemSlotActive()) {
-        g_session.AssignItemShortcut(static_cast<std::uint32_t>(item.GetItemId()), column);
-        Refresh(window);
-      }
-
-      if (g_modeMgr.currentMode) {
-        g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-      }
-
+  if (value.source != 6 && value.source != 9) {
+    ITEM_INFO item = g_session.LookupClientItemByIdentity(value.id);
+    if (item.identity[1] <= 0 || item.identified == 0) {
+      g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
       return;
     }
-  }
-  }
 
-  switch (item.identity[0]) {
-  case TYPE_ARMOR:
-  case TYPE_WEAPON:
-  case TYPE_BOW:
-  case TYPE_BOTHHAND:
-  case TYPE_ARMORTM:
-  case TYPE_ARMORTB:
-  case TYPE_ARMORMB:
-  case TYPE_ARMORTMB:
-  case TYPE_GUN:
-    if (item.identity[2] == 0) {
-      break;
-    }
-  case TYPE_HEAL:
-  case TYPE_SCHANGE:
-  case TYPE_SPECIAL:
-  case TYPE_ARROW:
-  case TYPE_AMMO:
-  case TYPE_THROWWEAPON:
-  case TYPE_CANNONBALL: {
-    const int column = this->HitTestSlot(x, y);
-    if (column != -1) {
-      const int index = 9 * g_session.m_hotkeyPage + column;
-      if (grid.rows <= g_session.m_hotkeyPage) {
+    switch (item.identity[0]) {
+    case TYPE_EVENT:
+    case TYPE_ARROW:
+    case TYPE_AMMO:
+    case TYPE_THROWWEAPON:
+    case TYPE_CANNONBALL: {
+      const int column = this->HitTestSlot(x, y);
+      if (column != -1 && 9 * grid.rows <= 9 * g_session.m_hotkeyPage + column) {
+        if (g_session.ItemSlotActive()) {
+          g_session.AssignItemShortcut(static_cast<std::uint32_t>(item.GetItemId()), column);
+          Refresh(window);
+        }
+
         if (g_modeMgr.currentMode) {
           g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         }
 
         return;
       }
-
-      g_session.AssignShortcut(0, static_cast<std::uint32_t>(item.GetItemId()), 0, index, bank);
-      if (value.slot != index) {
-        RemoveFirst(g_session.m_requestTimers, index);
-      }
-
-      Refresh(window);
+    }
     }
 
-    break;
-  }
+    switch (item.identity[0]) {
+    case TYPE_ARMOR:
+    case TYPE_WEAPON:
+    case TYPE_BOW:
+    case TYPE_BOTHHAND:
+    case TYPE_ARMORTM:
+    case TYPE_ARMORTB:
+    case TYPE_ARMORMB:
+    case TYPE_ARMORTMB:
+    case TYPE_GUN:
+      if (item.identity[2] == 0) {
+        break;
+      }
+    case TYPE_HEAL:
+    case TYPE_SCHANGE:
+    case TYPE_SPECIAL:
+    case TYPE_ARROW:
+    case TYPE_AMMO:
+    case TYPE_THROWWEAPON:
+    case TYPE_CANNONBALL: {
+      const int column = this->HitTestSlot(x, y);
+      if (column != -1) {
+        const int index = 9 * g_session.m_hotkeyPage + column;
+        if (grid.rows <= g_session.m_hotkeyPage) {
+          if (g_modeMgr.currentMode) {
+            g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
+          }
+
+          return;
+        }
+
+        g_session.AssignShortcut(0, static_cast<std::uint32_t>(item.GetItemId()), 0, index, static_cast<int>(bank));
+        if (value.slot != index) {
+          RemoveFirst(g_session.m_requestTimers, index);
+        }
+
+        Refresh(window);
+      }
+
+      break;
+    }
+    }
   }
 
   g_modeMgr.currentMode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -270,15 +263,14 @@ void UIQuickSlotWnd::DragAndDrop(int x, int y, std::intptr_t argument) {
 
         const std::list<ShortcutCooldownRecord>::iterator record = FindCooldownRecord(records, skill.id);
         if (record != records.end() && timeGetTime() < record->end) {
-          std::list<CooldownState>& states = record->alternate;
-          const std::list<CooldownState>::iterator previous = FindCooldownState(states, value.slot);
-          if (previous != states.end()) {
+          const std::list<CooldownState>::iterator previous = FindCooldownState(record->alternate, value.slot);
+          if (previous != record->alternate.end()) {
             previous->slot = slot;
             previous->x = this->SlotX(slot);
           } else {
-            for (std::list<CooldownState>::iterator state = states.begin(); state != states.end(); ++state) {
+            for (std::list<CooldownState>::iterator state = record->alternate.begin(); state != record->alternate.end(); ++state) {
               if (state->x == this->SlotX(slot)) {
-                states.erase(state);
+                record->alternate.erase(state);
                 break;
               }
             }

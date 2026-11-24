@@ -4,13 +4,12 @@
 #include "Contents/Configuration/ServiceOptions.h"
 #include "UI/Window/UIWindowMgr.h"
 
-template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<UIWindow* const, SnapRectangle>>>, std::_Iterator_base0>& std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<UIWindow* const, SnapRectangle>>>, std::_Iterator_base0>::operator++() noexcept;
-template __declspec(noinline) std::_Tree_find_result<std::map<UIWindow*, SnapRectangle>::_Mybase::_Nodeptr> std::map<UIWindow*, SnapRectangle>::_Mybase::_Find_lower_bound<UIWindow*>(UIWindow* const&) const;
-
 // OFFSET: 0x00AAB0D0
 // FUNCTION: fn_17280
 void UIWindowMgr::StoreSnapRectangle(UIWindow* window) {
-  for (UIWindow* entry : this->snapExcluded) {
+  const auto entryEnd = this->snapExcluded.end();
+  for (auto entryIt = this->snapExcluded.begin(); entryIt != entryEnd; ++entryIt) {
+    UIWindow* entry = *entryIt;
     if (entry == window) {
       return;
     }
@@ -56,19 +55,16 @@ void UIWindowMgr::ConstrainSnap(UIWindow* window, int& dx, int& dy, int groupMem
   const bool root = g_snapMgr.IsRoot(window);
 
   for (auto it = this->snapRectangles.begin(); it != this->snapRectangles.end(); ++it) {
-    auto& [other, rectangle] = *it;
-    const bool connected = g_snapMgr.Connected(window, other);
-    const bool otherRoot = g_snapMgr.IsRoot(other);
+    SnapRectangle& rectangle = it->second;
+    const bool connected = g_snapMgr.Connected(window, it->first);
+    const bool otherRoot = g_snapMgr.IsRoot(it->first);
+    UIWindow* const other = it->first;
     const bool otherConnected = g_snapMgr.ConnectedToRoot(other);
 
-    if (groupMember != 0) {
-      if (window == other || otherRoot || connected || otherConnected) {
-        continue;
-      }
-    } else {
-      if (window == other || (root && (otherConnected || connected))) {
-        continue;
-      }
+    const bool skip = groupMember != 0 ? window == other || otherRoot || connected || otherConnected
+                                       : window == other || (root && (otherConnected || connected));
+    if (skip) {
+      continue;
     }
 
     rectangle.Snap(moving, snapX, snapY);

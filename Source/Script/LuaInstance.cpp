@@ -86,8 +86,7 @@ bool CLuaInstance::LoadFile(const std::string& path) {
     return true;
   }
 
-  const char* error = lua_tostring(this->m_state, -1);
-  MessageBoxA(nullptr, error, path.c_str(), MB_OK);
+  MessageBoxA(nullptr, lua_tostring(this->m_state, -1), path.c_str(), MB_OK);
   lua_pop(this->m_state, 1);
   delete[] buffer;
 
@@ -115,6 +114,17 @@ void CLuaInstance::SetGlobal(const std::string& name, double value) {
   lua_setglobal(this->m_state, name.c_str());
 }
 
+// INLINED
+static int ReadText(const CLuaInstance* script, std::string& value) {
+  const int type = lua_type(script->GetState(), -1);
+  if (type != LUA_TSTRING) {
+    return (type != LUA_TNIL) + 1;
+  }
+
+  value = lua_tostring(script->GetState(), -1);
+  return 0;
+}
+
 // OFFSET: 0x00E27850
 // FUNCTION: fn_23942
 int CLuaInstance::ReadStrings(std::vector<std::string>& values, const char* global) {
@@ -128,17 +138,15 @@ int CLuaInstance::ReadStrings(std::vector<std::string>& values, const char* glob
   values.resize(lua_objlen(this->m_state, -1));
   std::size_t index = 0;
 
-  for (lua_pushnil(this->m_state); lua_next(this->m_state, -2); lua_pop(this->m_state, 1)) {
+  for (lua_pushnil(this->m_state); lua_next(this->m_state, -2); lua_pop(this->m_state, 1), ++index) {
     std::string value;
-    const int valueType = lua_type(this->m_state, -1);
-    if (valueType != LUA_TSTRING) {
-      const int result = (valueType != LUA_TNIL) + 1;
+    const int result = ReadText(this, value);
+    if (result != 0) {
       lua_pop(this->m_state, 3);
       return result;
     }
 
-    value = lua_tostring(this->m_state, -1);
-    values[index++] = value;
+    values[index] = value;
   }
 
   lua_pop(this->m_state, 1);

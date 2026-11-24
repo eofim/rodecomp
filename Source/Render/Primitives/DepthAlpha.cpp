@@ -5,6 +5,12 @@
 
 __declspec(noinline) std::uint32_t DepthAlpha(float reciprocalDepth);
 
+// OFFSET: 0x0055D120
+// FUNCTION: fn_45881
+float DepthToRhw(float depth) {
+  return (1500.0f - depth * 1490.0f) / 15000.0f;
+}
+
 // OFFSET: 0x0055D190
 // FUNCTION: fn_02100
 std::uint32_t DepthAlpha(float reciprocalDepth) {
@@ -22,20 +28,8 @@ std::uint32_t DepthAlpha(float reciprocalDepth) {
   return static_cast<std::uint32_t>(alpha) << 24;
 }
 
-// OFFSET: 0x005694A0
-// FUNCTION: fn_02260
-void RenderCommand::ApplyDepthAlpha() {
-  for (int index = 0; index < this->vertexCount; ++index) {
-    RenderVertex& vertex = this->vertices[index];
-    vertex.specular = DepthAlpha(vertex.rhw);
-  }
-}
-
-// OFFSET: 0x005694E0
-// FUNCTION: fn_02261
-void LightmappedPrimitive::ApplyDepthAlpha() {
-  for (int index = 0; index < this->vertexCount; ++index) {
-    auto& vertex = this->vertices[index];
-    vertex.specular = DepthAlpha(vertex.rhw);
-  }
+// OFFSET: 0x0055D310
+// FUNCTION: fn_02101
+__declspec(noinline) float RhwToDepth(float rhw) {
+  return ((1.0f / rhw - 10.0f) * 1.0067114f) * rhw;
 }

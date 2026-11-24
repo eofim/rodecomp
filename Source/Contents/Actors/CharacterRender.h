@@ -36,7 +36,7 @@ public:
   bool SetRobe(int robe);
   bool ProjectCell(
     int unused, int layer, float scale, const SpriteFrameCell& cell, float x, float y, const float* position, float shift, float& bottomDepth,
-    float& topDepth, const SpriteRleImage& image, SpriteQuad& quad, tagRECT& bounds, SpriteColor& color, int offsetX, int offsetY, int flags
+    float& topDepth, const SpriteRleImage& image, SpriteQuad& quad, tagRECT& bounds, SpriteColor& color, int offsetX, int offsetY, bool flags
   ) const;
   void OffsetLayerDepth(int layer, SpriteQuad& quad, float bottomDepth, float topDepth) const;
   void OffsetAccessoryLayerDepth(int layer, SpriteQuad& quad, float bottomDepth, float topDepth) const;
@@ -71,9 +71,7 @@ public:
   /* 007C */ float unknown_007C;
   /* 0080 */ float unknown_0080;
   /* 0084 */ float unknown_0084;
-  /* 0088 */ float cameraUpX;
-  /* 008C */ float cameraUpY;
-  /* 0090 */ float cameraUpZ;
+  /* 0088 */ vector3d cameraUp;
   /* 0094 */ RenderBounds renderBounds;
   /* 00A8 */ float screenX;
   /* 00AC */ float screenY;
@@ -85,7 +83,7 @@ public:
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(offsetof(CCharacterRender, viewportWidth) == 0x68);
-static_assert(offsetof(CCharacterRender, cameraUpY) == 0x8C);
+static_assert(offsetof(CCharacterRender, cameraUp) == 0x88);
 static_assert(offsetof(CCharacterRender, layerViews) == 0xB4);
 static_assert(sizeof(CCharacterRender) == 0xC4);
 #endif

@@ -12,6 +12,7 @@ class CParticle;
 class CCommonFloorEffect : public CEffect {
 public:
   CCommonFloorEffect();
+  ~CCommonFloorEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -19,10 +20,16 @@ public:
   void Close() override;
   bool IsAlive() override;
   void ResetParticles() override;
-  void SetColor(int red, int green, int blue) override;
+  void SetColor(short red, short green, short blue) override;
   void SetParticleTexture(std::string name) override;
 
   /* 00CC */ std::vector<CParticle*> particles;
+
+private:
+  void SpawnParticles();
+  void ResetParticle(CParticle* particle);
+  void UpdateParticle(CParticle* particle);
+  __declspec(noinline) void RenderParticle(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

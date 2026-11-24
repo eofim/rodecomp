@@ -23,9 +23,9 @@ int MovementRouteInterpolation::Sample(std::uint32_t tick, float* x, float* y, i
       float deltaX;
       float deltaY;
       if (index == 0) {
-        deltaY = static_cast<float>(this->points[index + 1].y) - this->startY;
+        deltaY = static_cast<float>(this->points[1].y) - this->startY;
         originX = this->startX;
-        deltaX = static_cast<float>(this->points[index + 1].x) - originX;
+        deltaX = static_cast<float>(this->points[1].x) - originX;
       } else {
         deltaY = static_cast<float>(this->points[index + 1].y - this->points[index].y);
         originX = static_cast<float>(this->points[index].x);
@@ -56,4 +56,40 @@ int MovementRouteInterpolation::Sample(std::uint32_t tick, float* x, float* y, i
 // FUNCTION: fn_17877
 std::uint32_t MovementRouteInterpolation::Segment() const {
   return this->segment;
+}
+
+// OFFSET: 0x00AD9510
+// FUNCTION: fn_45898
+float MovementRouteInterpolation::StartX() const {
+  return this->startX;
+}
+
+// OFFSET: 0x00AD9520
+// FUNCTION: fn_45899
+float MovementRouteInterpolation::StartY() const {
+  return this->startY;
+}
+
+// OFFSET: 0x00AD9910
+// FUNCTION: fn_17887
+void MovementRouteInterpolation::ResetSegment() {
+  this->segment = 0;
+}
+
+// OFFSET: 0x00AD9930
+// FUNCTION: fn_45900
+void MovementRouteInterpolation::SetSegment(std::uint32_t segment) {
+  this->segment = segment;
+}
+
+// OFFSET: 0x00AD9940
+// FUNCTION: fn_45901
+void MovementRouteInterpolation::SetStartX(float startX) {
+  this->startX = startX;
+}
+
+// OFFSET: 0x00AD9960
+// FUNCTION: fn_45902
+void MovementRouteInterpolation::SetStartY(float startY) {
+  this->startY = startY;
 }

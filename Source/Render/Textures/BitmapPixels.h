@@ -20,9 +20,10 @@ struct BitmapPixels {
   /* 0014 */ std::uint32_t* pixels;
   /* 0018 */ bool dirty;
 
+  // INLINED
+  BitmapPixels() : bitmap(nullptr), previous(nullptr), pixels(nullptr) {
+  }
   BitmapPixels(int width, int height);
-  ~BitmapPixels();
-  void Dim(int x, int y, int width, int height, int percent);
   void CopyRegion(
     int x, int y, int sourceLeft, int sourceTop, int sourceRight, int sourceBottom, const std::uint32_t* source, int sourceWidth, int sourceHeight,
     bool transparent, bool alpha

@@ -1,6 +1,7 @@
 #include "Render/Primitives/RenderPrimitivePool.h"
 #include <new>
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Client/Mode/CMode.h"
 #include "Render/Renderer.h"
 #include "Render/Primitives/TextureQuad.h"
@@ -52,11 +53,11 @@ void CMode::DrawActionSprite(
     const float scaleY = cell.scaleY;
     const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
     const float left = static_cast<float>(cell.x) * scale;
-    const float scaledLeft = left * scaleX;
     const float top = static_cast<float>(cell.y) * scale * scaleY;
+    const float scaledLeft = left * scaleX;
+    const float bottom = static_cast<float>(image->height * (image->doubleHeight + 1) - 1 + cell.y) * scale * scaleY;
     const float right = static_cast<float>(image->width * (image->doubleWidth + 1) - 1 + cell.x) * scale;
     const float scaledRight = right * scaleX;
-    const float bottom = static_cast<float>(image->height * (image->doubleHeight + 1) - 1 + cell.y) * scale * scaleY;
 
     CTexture* texture;
     if (cell.imageType == 0) {
@@ -112,14 +113,14 @@ void CMode::DrawActionSprite(
     }
 
     RenderVertex* vertices = primitive->quad;
-    vertices[0].x = x0 + 0.5f;
-    vertices[0].y = y0 + 0.5f;
-    vertices[1].x = x1 + 0.5f;
-    vertices[1].y = y1 + 0.5f;
-    vertices[2].x = x2 + 0.5f;
-    vertices[2].y = y2 + 0.5f;
-    vertices[3].x = x3 + 0.5f;
-    vertices[3].y = y3 + 0.5f;
+    vertices[0].x = x0 + g_depthAverageHalf;
+    vertices[0].y = y0 + g_depthAverageHalf;
+    vertices[1].x = x1 + g_depthAverageHalf;
+    vertices[1].y = y1 + g_depthAverageHalf;
+    vertices[2].x = x2 + g_depthAverageHalf;
+    vertices[2].y = y2 + g_depthAverageHalf;
+    vertices[3].x = x3 + g_depthAverageHalf;
+    vertices[3].y = y3 + g_depthAverageHalf;
 
     vertices[0].z = 0.000001f;
     vertices[0].rhw = 0.999999f;

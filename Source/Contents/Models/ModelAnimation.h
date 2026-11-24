@@ -9,6 +9,7 @@
 class LegacyPositionTrack : public std::vector<ModelPositionKey> {
 public:
   using std::vector<ModelPositionKey>::operator=;
+  void Add(int frame, float x, float y, float z);
   void Sample(int frame, matrix& output) const;
 };
 
@@ -43,6 +44,5 @@ public:
   using std::vector<ModelRotationKey>::operator=;
   void Sample(float frame, const matrix& base, matrix& output) const;
 };
-void QuaternionMatrix(const ModelRotationKey& key, matrix& output);
 
 #endif

@@ -12,10 +12,6 @@ CGndRes::CGndRes() {
   this->loaded = 0;
 }
 
-// OFFSET: 0x0074E390
-// FUNCTION: fn_07908
-CGndRes::~CGndRes() = default;
-
 // OFFSET: 0x0074DB10
 // FUNCTION: fn_07899
 CGndRes* CGndRes::Create() {
@@ -140,23 +136,49 @@ void CGndRes::Unload() {
   this->cells = nullptr;
 }
 
+// OFFSET: 0x0074E440
+// FUNCTION: fn_45816
+unsigned char GroundLegacyLightmap::GetSample(int index) const {
+  const int bit = index * 5;
+  const int shift = bit % 8;
+  const unsigned char* packed = this->bits + bit / 8;
+
+  if (shift < 4) {
+    return static_cast<unsigned char>((packed[0] & (0xF8 >> shift)) << shift);
+  }
+
+  return static_cast<unsigned char>(((packed[0] & (0xF8 >> shift)) << shift) + ((packed[1] & (0xF8 << (8 - shift))) >> (8 - shift)));
+}
+
 // OFFSET: 0x0074E4B0
 // FUNCTION: fn_07909
 void GroundLegacyLightmap::Decode(unsigned char* output) const {
   for (int index = 0; index < 64; ++index) {
-    const int bit = index * 5;
-    const int shift = bit % 8;
-    const unsigned char* packed = this->bits + bit / 8;
-    const int mask = 248 >> shift;
-    unsigned char value;
+    const int value = this->GetSample(index);
+    output[index] = static_cast<unsigned char>(value);
+  }
+}
 
-    if (shift < 4) {
-      value = static_cast<unsigned char>((packed[0] & mask) << shift);
-    } else {
-      value = static_cast<unsigned char>(((packed[0] & mask) << shift) + (((248 << (8 - shift)) & packed[1]) >> (8 - shift)));
-    }
+// OFFSET: 0x0074EB60
+// FUNCTION: fn_45817
+void GroundLegacyLightmap::SetSample(int index, unsigned char value) {
+  const int bit = index * 5;
+  const int shift = bit % 8;
+  unsigned char* packed = this->bits + bit / 8;
+  value &= 0xF8;
+  packed[0] = static_cast<unsigned char>((packed[0] & (~0xF8u >> shift)) | (value >> shift));
 
-    output[index] = value;
+  if (shift >= 4) {
+    const int remaining = 8 - shift;
+    packed[1] = static_cast<unsigned char>((packed[1] & (0x07 << remaining)) | (value << remaining));
+  }
+}
+
+// OFFSET: 0x0074EBD0
+// FUNCTION: fn_45818
+void GroundLegacyLightmap::Encode(const unsigned char* input) {
+  for (int index = 0; index < 64; ++index) {
+    this->SetSample(index, input[index]);
   }
 }
 
@@ -164,26 +186,28 @@ void GroundLegacyLightmap::Decode(unsigned char* output) const {
 // FUNCTION: fn_07910
 void CGndRes::Lightmap(int index, unsigned char* output) const {
   if (this->minor >= 7) {
-    std::memcpy(output, this->lightmaps + (static_cast<std::uint32_t>(index) << 8), 256);
+    std::memcpy(output, this->lightmaps + index * 256, 256);
     return;
   }
 
+  const GroundLegacyLightmap* lightmaps = this->legacyLightmaps;
   const std::uint32_t* indices = this->legacyLightmapIndices + 4 * index;
   unsigned char brightness[64];
   unsigned char red[64];
   unsigned char green[64];
   unsigned char blue[64];
-  this->legacyLightmaps[indices[0]].Decode(brightness);
-  this->legacyLightmaps[indices[1]].Decode(red);
-  this->legacyLightmaps[indices[2]].Decode(green);
-  this->legacyLightmaps[indices[3]].Decode(blue);
+  lightmaps[indices[0]].Decode(brightness);
+  lightmaps[indices[1]].Decode(red);
+  lightmaps[indices[2]].Decode(green);
+  lightmaps[indices[3]].Decode(blue);
 
   for (int pixel = 0; pixel < 64; ++pixel) {
     const unsigned transposed = static_cast<unsigned>(pixel) / 8 + 8 * (pixel & 7);
     output[transposed] = brightness[pixel];
-    output[64 + 3 * transposed] = red[pixel];
-    output[65 + 3 * transposed] = green[pixel];
-    output[66 + 3 * transposed] = blue[pixel];
+    unsigned char* color = output + 3 * transposed;
+    color[64] = red[pixel];
+    color[65] = green[pixel];
+    color[66] = blue[pixel];
   }
 }
 

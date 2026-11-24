@@ -1,4 +1,6 @@
 #include "Client/Mode/CGameMode.h"
+#include "Contents/Actors/ActorEnums.h"
+#include "Contents/Jobs/JobId.h"
 #include "Contents/Skills/SkillId.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
@@ -10,16 +12,9 @@
 #include <cstdint>
 #include <map>
 
-template __declspec(noinline) SessionRecord6178Entry* std::allocator<SessionRecord6178Entry>::allocate(std::size_t);
-template __declspec(noinline) std::vector<SessionRecord6178Entry>::~vector() noexcept;
-
-template __declspec(noinline)
-std::_Tree_find_result<std::map<std::int64_t, std::int64_t>::_Mybase::_Nodeptr>
-std::map<std::int64_t, std::int64_t>::_Mybase::_Find_lower_bound<std::int64_t>(const std::int64_t&) const;
-
 // OFFSET: 0x00E1D6B0
 // FUNCTION: fn_23850
-int CSession::IsState291To303(int state) const {
+int CSession::IsAbracadabraSpecialSkill(int state) const {
   switch (state) {
   case SA_MONOCELL:
   case SA_CLASSCHANGE:
@@ -45,7 +40,7 @@ bool CSession::HasTrackedAchievement(int id) const {
   const auto it = std::find_if(this->trackedAchievements.begin(), this->trackedAchievements.end(), [id](SessionRecord6178 record) {
     return id == record.id;
   });
-  return it != this->trackedAchievements.end();
+  return this->trackedAchievements.end() != it;
 }
 
 // OFFSET: 0x00E1D850
@@ -65,11 +60,11 @@ int CSession::IsMonsterActor(CGameActor* actor) const {
   }
 
   const int job = actor->GetEffectiveJob(-1);
-  if ((job > 1000 && job < 3999) || (job >= 20021 && job <= 31999)) {
+  if ((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || (job >= JT_EXTENDED_JOB_NAME_START && job <= 31999)) {
     return 1;
   }
 
-  if (actor->GetEffectiveJob(-1) >= 2114) {
+  if (actor->GetEffectiveJob(-1) >= JT_EL_AGNI_S) {
     actor->GetEffectiveJob(-1);
   }
   return 0;
@@ -92,7 +87,7 @@ int CSession::IsLocalPlayerAid(std::uint32_t aid) const {
 // OFFSET: 0x00E1DDF0
 // FUNCTION: fn_23881
 int CSession::IsHomunAid(std::uint32_t aid) const {
-  if (aid == 0xFFFFFFFF) {
+  if (aid == INVALID_AID) {
     return false;
   }
   return aid == this->m_homunAid;
@@ -101,7 +96,7 @@ int CSession::IsHomunAid(std::uint32_t aid) const {
 // OFFSET: 0x00E1DE10
 // FUNCTION: fn_23882
 int CSession::IsMercenaryAid(std::uint32_t aid) const {
-  if (aid == 0xFFFFFFFF) {
+  if (aid == INVALID_AID) {
     return false;
   }
   return aid == this->m_mercenaryAid;
@@ -110,7 +105,7 @@ int CSession::IsMercenaryAid(std::uint32_t aid) const {
 // OFFSET: 0x00E1DE30
 // FUNCTION: fn_23883
 int CSession::IsCompanionAid(std::uint32_t aid) const {
-  if (aid == 0xFFFFFFFF) {
+  if (aid == INVALID_AID) {
     return 0;
   }
   if (aid == this->m_homunAid ||
@@ -119,7 +114,7 @@ int CSession::IsCompanionAid(std::uint32_t aid) const {
     return 1;
   }
   auto it = this->summonHp.find(aid);
-  if (it == this->summonHp.end() || it->second == -1) {
+  if (this->summonHp.end() == it || -1 == it->second) {
     return 0;
   }
   return 1;
@@ -128,7 +123,7 @@ int CSession::IsCompanionAid(std::uint32_t aid) const {
 // OFFSET: 0x00E1DF00
 // FUNCTION: fn_23885
 int CSession::IsPetAid(std::uint32_t aid) const {
-  if (aid == 0xFFFFFFFF) {
+  if (aid == INVALID_AID) {
     return false;
   }
   return aid == this->petGid;

@@ -13,8 +13,6 @@ struct CooldownEdge {
   /* 000C */ unsigned char increasing;
 };
 
-std::uint32_t CooldownNow();
-
 struct CooldownState {
   /* 0000 */ std::map<unsigned, CooldownEdge> edges;
   /* 0008 */ unsigned segment;
@@ -36,6 +34,8 @@ struct CooldownState {
   ~CooldownState();
   void ClearEdges() noexcept;
   void AddEdge(unsigned segment, float origin, int radius, unsigned char increasing);
+  float EdgePosition(float origin, int radius, unsigned char increasing) const;
+  void UpdateSegment(std::uint32_t progress);
   float Update();
 };
 

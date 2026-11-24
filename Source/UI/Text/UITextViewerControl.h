@@ -14,7 +14,13 @@ class CUIVScrollBar;
 
 class CUITextViewer : public CUIControl {
 public:
-  CUITextViewer();
+  // OFFSET: 0x009BE300
+  // FUNCTION: fn_13947
+  CUITextViewer()
+      : CUIControl(), textX(0), textY(0), font(0), fontHeight(12), bold(false), textColor(0), shadow(false), shadowColor(0xFFFFFF), outline(false),
+        outlineColor(0xFFFFFF), lineSpacing(6), backgroundColor(0xFFFFFF), paddingLeft(3), paddingTop(3), paddingRight(3), paddingBottom(3), scrollBar(nullptr),
+        padding(nullptr), lines(), contentHeight(0), childPositions() {
+  }
   void OnCreate(int width, int height) override;
   void Resize(int width, int height) override;
   void OnProcess() override;
@@ -39,6 +45,7 @@ public:
   void SetScrollBarBackground(const std::string& name);
   void Clear();
   void AddLine(const std::string& text);
+  void AddLineChild(UIWindow* child);
   void Relayout();
 
   /* 0080 */ int textX;
@@ -61,7 +68,7 @@ public:
   /* 00C4 */ CUIPadding* padding;
   /* 00C8 */ std::vector<std::string> lines;
   /* 00D4 */ int contentHeight;
-  /* 00D8 */ std::map<UIWindow*, std::pair<int, int>> childPositions;
+  /* 00D8 */ std::map<UIWindow*, POINT> childPositions;
 };
 
 #endif

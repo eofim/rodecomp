@@ -13,6 +13,7 @@ public:
   DeviceOwnerDX9& operator=(const DeviceOwnerDX9&) = delete;
   HRESULT Initialize(HWND window, UINT adapter);
   HRESULT CreateDevice(UINT adapter);
+  bool SelectFullscreenMode(DWORD adapter, UINT width, UINT height, D3DFORMAT format);
   __declspec(noinline) HRESULT AcquireBackBuffer();
   void SetInitialStates();
 
@@ -23,12 +24,37 @@ public:
   void RestoreDisplayMode();
   HRESULT Present(unsigned char unused);
   HRESULT ClipFullscreenCursor();
+  void ConfineFullscreenCursor();
   HRESULT CheckState();
   bool Begin();
   void End();
   bool CaptureBackBuffer();
   bool RestoreBackBuffer();
   ScopedDeviceStateDX9 SaveState();
+  // INLINED
+  ScopedDeviceStateDX9 CaptureState() {
+    return ScopedDeviceStateDX9(this->state);
+  }
+
+  // INLINED
+  HRESULT SetRenderState(D3DRENDERSTATETYPE type, DWORD value) {
+    return this->state.SetRenderState(type, value);
+  }
+
+  // INLINED
+  HRESULT SetTexture(UINT stage, IDirect3DBaseTexture9* texture) {
+    return this->state.SetTexture(stage, texture);
+  }
+
+  // INLINED
+  HRESULT SetSamplerState(UINT stage, D3DSAMPLERSTATETYPE type, DWORD value) {
+    return this->state.SetSamplerState(stage, type, value);
+  }
+
+  // INLINED
+  HRESULT SetTextureStageState(UINT stage, D3DTEXTURESTAGESTATETYPE type, DWORD value) {
+    return this->state.SetTextureStageState(stage, type, value);
+  }
 
   /* 0000 */ HWND window;
   /* 0004 */ IDirect3D9Ex* direct3D;
@@ -45,6 +71,12 @@ public:
   /* 0689 */ unsigned char padding_0689[3];
   /* 068C */ HRESULT lastPresent;
 };
+
+// OFFSET: 0x005650F0
+// FUNCTION: fn_02213
+__declspec(noinline) inline ScopedDeviceStateDX9 DeviceOwnerDX9::SaveState() {
+  return ScopedDeviceStateDX9(this->state);
+}
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(DeviceOwnerDX9) == 0x690);

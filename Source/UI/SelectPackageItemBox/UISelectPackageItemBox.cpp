@@ -29,11 +29,6 @@
 #include <iterator>
 #include <new>
 
-template __declspec(noinline) std::string::basic_string(const std::string&);
-
-template __declspec(noinline) std::list<ITEM_INFO>::~list() noexcept;
-template __declspec(noinline) std::list<SelectPackageItemBox::CTabInfoData>::~list() noexcept;
-
 // OFFSET: 0x00A684E0
 // FUNCTION: fn_16646
 template <>
@@ -217,8 +212,9 @@ void CUIListBoxEx<SelectPackageItemBox::CUIItemInfo, ITEM_INFO>::AddNewItem() {
     return;
   }
 
-  for (SelectPackageItemBox::CUIItemInfo* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -234,14 +230,14 @@ void CUIListBoxEx<SelectPackageItemBox::CUIItemInfo, ITEM_INFO>::AddNewItem() {
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (SelectPackageItemBox::CUIItemInfo* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -259,8 +255,9 @@ void CUIListBoxEx<SelectPackageItemBox::CUITabInfo, SelectPackageItemBox::CTabIn
     return;
   }
 
-  for (SelectPackageItemBox::CUITabInfo* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -276,14 +273,14 @@ void CUIListBoxEx<SelectPackageItemBox::CUITabInfo, SelectPackageItemBox::CTabIn
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (SelectPackageItemBox::CUITabInfo* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -609,7 +606,7 @@ void CUISelectPackageItemBox::OnOk() {
     } while (count > 0);
   }
   const int result = g_windowMgr
-                       .Confirm(FormatOwnedString(LookupMessage(MSI_JOB_ABYSS_CHASER), it->name.c_str()).c_str(), 2, true, false, 0, "Message", 280, 120, 0);
+                       .Confirm(FormatOwnedString(LookupMessage(MSI_PACKAGEITEM_SELECT), it->name.c_str()).c_str(), 2, true, false, 0, "Message", 280, 120, 0);
   if (result == 187) {
     g_modeMgr.GetGameMode()->SendMsg(MM_USE_PACKAGEITEM, this->sourceIndex, this->packageId, index, 0);
   }
@@ -686,7 +683,7 @@ void SelectPackageItemBox::CUIItemInfo::OnCreate(int width, int height) {
   this->image->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\selectpackage\\item_list.bmp", 0xD97D5DBDBB2F2709ULL)));
   this->AddChild(this->image);
 
-  this->gameItem = new CUIGameItem();
+  this->gameItem = new CUIGameItemWithNum;
   this->gameItem->SetMode(0);
   this->gameItem->SetScale(100);
   this->gameItem->Move(6, 5);
@@ -1077,8 +1074,13 @@ void CUISelectPackageItemBox::OnInit() {
   auto* const ok = this->okButton;
   ok->disabled = 1;
   ok->Invalidate();
-  this->okButton->SetText(LookupMessage(MSI_PRIVATE_AIRPLANE_WARNNING_SELECT_NPC));
-  this->cancelButton->SetText(LookupMessage(MSI_ZENY_LOTTO_BUY_10));
+  this->okButton->SetText(LookupMessage(MSI_OK));
+  this->cancelButton->SetText(LookupMessage(MSI_CLOSE));
+}
+
+// INLINED
+static std::map<int, std::map<int, SelectPackageTab>>::iterator FindPackage(CSelectPackageItemMgr& manager, int packageId) {
+  return manager.m_packages.find(packageId);
 }
 
 // OFFSET: 0x00A705F0
@@ -1088,19 +1090,18 @@ void CUISelectPackageItemBox::Open(int sourceIndex) {
   this->itemList->ClearData();
   this->title->SetTitle("");
   this->sourceIndex = sourceIndex;
-  const ITEM_INFO item = g_session.LookupClientItemByIdentity(sourceIndex);
+  const ITEM_INFO item = g_session.LookupClientItemByIdentity(this->sourceIndex);
   if (item.identity[1] <= 0) {
     return;
   }
 
   this->packageId = std::atoi(item.itemId.c_str());
-  const char* name = FindItemDescription(this->packageId).identifiedName;
-  this->title->SetTitle(name);
+  this->title->SetTitle(FindItemDescription(this->packageId).identifiedName);
   if (!Singleton<CSelectPackageItemMgr>::s_instance) {
     Singleton<CSelectPackageItemMgr>::s_instance = new (std::nothrow) CSelectPackageItemMgr;
   }
 
-  auto package = Singleton<CSelectPackageItemMgr>::s_instance->m_packages.find(this->packageId);
+  auto package = FindPackage(*Singleton<CSelectPackageItemMgr>::s_instance, this->packageId);
   if (package != Singleton<CSelectPackageItemMgr>::s_instance->m_packages.end()) {
     for (const auto& tab : package->second) {
       this->tabList->data.push_back(SelectPackageItemBox::CTabInfoData{this->packageId, tab.first, tab.second.name});
@@ -1127,13 +1128,16 @@ CUIFrameWnd* CreateSelectPackageItemBox() {
   return new CUISelectPackageItemBox();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x0049B670
 // FUNCTION: fn_45555
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateSelectPackageItemBox;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10033, factory);
-  return true;
-}();
+static UIRegistration s_registered(10033, CreateSelectPackageItemBox);
 
 // OFFSET: 0x00A6F470
 // FUNCTION: fn_16772

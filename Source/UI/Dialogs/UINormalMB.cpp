@@ -37,7 +37,7 @@ int UINormalMB::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       action->second();
     } else {
       if (this->m_owner) {
-        this->m_owner->SendMsg(this, UM_COMMAND, 488, a, 0, 0);
+        this->m_owner->SendMsg(this, UM_COMMAND, ID_MESSAGEBOX_RESULT, a, 0, 0);
       }
 
       if (this->m_keepOpen) {
@@ -78,7 +78,7 @@ void UINormalMB::Create(UIWindow* owner, const char* text, int type, bool defaul
   this->m_owner = owner;
   this->m_message = text;
   if (!title) {
-    this->m_title = LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL);
+    this->m_title = LookupMessage(MSI_NORMAL_MESSAGEBOX_CAPTION);
   } else {
     this->m_title = title;
   }
@@ -111,12 +111,12 @@ void UINormalMB::Create(UIWindow* owner, const char* text, int type, bool defaul
   switch (type) {
   case 4:
     this->AddButton("유저인터페이스\\btn_cancel.bmp", "유저인터페이스\\btn_cancel_a.bmp", "유저인터페이스\\btn_cancel_b.bmp", width - 46, height - 24, 185);
-    this->m_message0 = 185;
+    this->m_message0 = ID_CANCEL;
     break;
 
   case 0:
     this->AddButton("유저인터페이스\\btn_ok.bmp", "유저인터페이스\\btn_ok_a.bmp", "유저인터페이스\\btn_ok_b.bmp", width - 46, height - 24, 184);
-    this->m_message0 = 184;
+    this->m_message0 = ID_OK;
     break;
 
   case 2:
@@ -129,10 +129,4 @@ void UINormalMB::Create(UIWindow* owner, const char* text, int type, bool defaul
   default:
     break;
   }
-}
-
-// OFFSET: 0x00CFE370
-// FUNCTION: fn_21431
-void UINormalMB::SetAction(int id, void (*action)()) {
-  this->m_actions[id] = action;
 }

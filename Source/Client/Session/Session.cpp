@@ -1,4 +1,5 @@
 #include "Client/Session/Session.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Effects/Core/EffectTypes.h"
@@ -24,6 +25,7 @@
 #include "Contents/Skills/ClientSkills.h"
 #include "UI/Login/UINewSelectCharWnd.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "File/File.h"
 #include "Network/Connection/Connection.h"
 #include "Network/Packets/PacketId.h"
@@ -89,11 +91,12 @@
 #include "UI/Status/UIHomunInfoWnd.h"
 #include "UI/Status/UIMerInfoWnd.h"
 
-template __declspec(noinline) void std::vector<SearchStoreResult>::_Destroy(SearchStoreResult*, SearchStoreResult*);
-
 // STATIC: 0x01732638
 // GLOBAL: gl_24474
 CSession g_session;
+
+// GLOBAL: gl_24723
+int g_resetMessengerRandomStats = 1;
 
 // GLOBAL: gl_25140
 static std::string s_messageEndTag = "</MSG>";
@@ -101,10 +104,17 @@ static std::string s_messageEndTag = "</MSG>";
 class CTokenizer {
 public:
   std::string& operator[](int index);
+  __declspec(noinline) int TokenCount() const;
   void Parse(const std::string& text);
 
   /* 0000 */ std::vector<std::string> tokens;
 };
+
+// OFFSET: 0x00DFCD80
+// FUNCTION: fn_23601
+int CTokenizer::TokenCount() const {
+  return static_cast<int>(this->tokens.size());
+}
 
 class CUserHotkeyMgr {
 public:
@@ -113,14 +123,6 @@ public:
 
 // GLOBAL: gl_25445
 int g_sessionTableLoadCount;
-
-namespace EquipmentProperties {
-class CEquipmentPropertiesMgr {
-public:
-  static CEquipmentPropertiesMgr* GetInstance();
-  void RefreshWearable(const std::uint32_t& key);
-};
-}
 
 // OFFSET: 0x00DDE860
 // FUNCTION: fn_23401
@@ -153,8 +155,8 @@ int CSession::IsExchangeItemListFull() {
 // FUNCTION: fn_23633
 void CSession::ClearItemSelection() {
   for (auto it = this->m_inventoryItems.begin(); it != this->m_inventoryItems.end(); ++it) {
-    if (it->flags[1] == 1) {
-      it->flags[1] = 0;
+    if (it->selected == 1) {
+      it->selected = 0;
     }
   }
 }
@@ -433,7 +435,8 @@ int CSession::GetMerchantMyShopItemNum(std::uint32_t id) const {
 // OFFSET: 0x00DDECB0
 // FUNCTION: fn_23411
 ITEM_INFO CSession::FindMerchantPurchaseItem(std::uint32_t id) const {
-  for (const ITEM_INFO& item : this->m_merchantPurchaseItems) {
+  for (auto itemIt = this->m_merchantPurchaseItems.begin(); itemIt != this->m_merchantPurchaseItems.end(); ++itemIt) {
+    const ITEM_INFO& item = *itemIt;
     if (item.identity[1] == id) {
       return item;
     }
@@ -611,7 +614,8 @@ ITEM_INFO CSession::GetMerchantHopeToSellItemInfoByItemId(const char* itemId) co
 // OFFSET: 0x00DDF090
 // FUNCTION: fn_23417
 int CSession::GetMerchantHopeToSellItemNumByItemId(const char* itemId) const {
-  for (const ITEM_INFO& item : this->m_merchantHopeToSellItems) {
+  for (auto it = this->m_merchantHopeToSellItems.begin(); it != this->m_merchantHopeToSellItems.end(); ++it) {
+    const ITEM_INFO& item = *it;
     if (item.itemId == itemId) {
       return item.quantity;
     }
@@ -790,7 +794,7 @@ ITEM_INFO* CSession::GetEquippedItem(const ITEM_INFO* item) {
   }
 
   if (item->identity[3] != 0) {
-    if (item->identity[3] != 0x8000 || this->equippedArrowIndex == item->identity[1]) {
+    if (item->identity[3] != EQP_AMMO || this->equippedArrowIndex == item->identity[1]) {
       return nullptr;
     }
 
@@ -961,14 +965,13 @@ ITEM_INFO CSession::GetInventoryItemAt(int index) const {
   return ITEM_INFO(0);
 }
 
-// OFFSET: 0x00DDD7B0
-// FUNCTION: fn_23389
-ITEM_INFO* CSession::FindInventoryItemByItemId(int itemId, bool identifiedOnly) {
-  if (this->m_inventoryItems.size() == 0) {
+// INLINED
+static __forceinline ITEM_INFO* FindItemInListByItemId(std::list<ITEM_INFO>& items, int itemId, bool identifiedOnly) {
+  if (items.size() == 0) {
     return nullptr;
   }
 
-  for (ITEM_INFO& item : this->m_inventoryItems) {
+  for (ITEM_INFO& item : items) {
     if (std::atoi(item.itemId.c_str()) == itemId && (!identifiedOnly || item.identified != 0)) {
       return &item;
     }
@@ -977,15 +980,21 @@ ITEM_INFO* CSession::FindInventoryItemByItemId(int itemId, bool identifiedOnly) 
   return nullptr;
 }
 
+// OFFSET: 0x00DDD7B0
+// FUNCTION: fn_23389
+ITEM_INFO* CSession::FindInventoryItemByItemId(int itemId, bool identifiedOnly) {
+  return FindItemInListByItemId(this->m_inventoryItems, itemId, identifiedOnly);
+}
+
 // OFFSET: 0x00DDD9A0
 // FUNCTION: fn_23390
 int CSession::GetInventoryItemCount(int itemId) const {
   int count = 0;
-  for (const ITEM_INFO& item : this->m_inventoryItems) {
+  std::for_each(this->m_inventoryItems.begin(), this->m_inventoryItems.end(), [&](const ITEM_INFO& item) {
     if (std::atoi(item.itemId.c_str()) == itemId) {
       count += item.quantity;
     }
-  }
+  });
 
   return count;
 }
@@ -1035,62 +1044,62 @@ static bool IsTalkCommand(const std::string& token, const char (&command)[Length
 int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
   int offset = 0;
   if (text == nullptr) {
-    *talkType = 3;
+    *talkType = TT_UNKNOWN;
     return -1;
   }
 
   CTokenizer tokenizer;
   tokenizer.Parse(std::string(text));
   if (tokenizer.tokens.size() == 0) {
-    *talkType = 3;
+    *talkType = TT_UNKNOWN;
     return -1;
   }
 
   LowercaseText(tokenizer[0]);
   if (text[0] != '/') {
-    *talkType = 0;
+    *talkType = TT_NORMAL;
   } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xD0'})) {
-    *talkType = 0x1;
+    *talkType = TT_BROADCAST;
     offset = 3;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'b'})) {
-    *talkType = 0x1;
+    *talkType = TT_BROADCAST;
     offset = 2;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'l', 'b'})) {
-    *talkType = 0x57;
+    *talkType = TT_LOCALBROADCAST;
     offset = 3;
   } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xD3', '\xA4', '\xD0'})) {
-    *talkType = 0x57;
+    *talkType = TT_LOCALBROADCAST;
     offset = 5;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'n', 'b'})) {
-    *talkType = 0x5A;
+    *talkType = TT_NAMELESS_BROADCAST;
     offset = 3;
   } else if (IsTalkCommand(tokenizer[0], {'/', '\xC6', '\xC4', '\xB6', '\xF5', '\xB8', '\xBB'})) {
-    *talkType = 0x66;
+    *talkType = TT_NAMELESS_BLUEBROADCAST;
     offset = 7;
   } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xCC', '\xA4', '\xD0'})) {
-    *talkType = 0x5A;
+    *talkType = TT_NAMELESS_BROADCAST;
     offset = 5;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'n', 'l', 'b'})) {
-    *talkType = 0x5B;
+    *talkType = TT_NAMELESS_LOCALBROADCAST;
     offset = 4;
   } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xCF', '\xA4', '\xD0'})) {
-    *talkType = 0x5B;
+    *talkType = TT_NAMELESS_LOCALBROADCAST;
     offset = 5;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'b', 'b'})) {
-    *talkType = 0x66;
+    *talkType = TT_NAMELESS_BLUEBROADCAST;
     offset = 3;
   } else if (tokenizer[0] == "/지역파란말") {
-    *talkType = 0x67;
+    *talkType = TT_NAMELESS_BLUELOCALBROADCAST;
     offset = 11;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'm', 'b'})) {
-    *talkType = 0x67;
+    *talkType = TT_NAMELESS_BLUELOCALBROADCAST;
     offset = 3;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'k', 'i', 'l', 'l'})) {
-    *talkType = 0x4;
+    *talkType = TT_DISCONNECT_CHARACTER;
     offset = 5;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'v'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xBD'})) {
-    *talkType = 0xC;
-    if (static_cast<int>(tokenizer.tokens.size()) >= 2) {
+    *talkType = TT_VOLUME;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
       return -1;
     }
@@ -1099,58 +1108,58 @@ int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
     parts[0].assign(volume, std::strlen(volume));
     return -1;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'b', 'v'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xD0', '\xA4', '\xBD'})) {
-    *talkType = 0xD;
-    if (static_cast<int>(tokenizer.tokens.size()) >= 2) {
+    *talkType = TT_BVOLUME;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
       return -1;
     }
     char volume[20];
-    _itoa(CSoundMgr::Volume(g_soundMgr), volume, 10);
+    _itoa(g_soundMgr->Volume(), volume, 10);
     parts[0].assign(volume, std::strlen(volume));
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', 'g', 'c'}) || IsTalkCommand(tokenizer[0], {'/', 'g', 'u', 'i', 'l', 'd', 'c', 'h', 'a', 't'})) && static_cast<int>(tokenizer.tokens.size()) >= 2) {
-    *talkType = 0x39;
+  } else if ((IsTalkCommand(tokenizer[0], {'/', 'g', 'c'}) || IsTalkCommand(tokenizer[0], {'/', 'g', 'u', 'i', 'l', 'd', 'c', 'h', 'a', 't'})) && tokenizer.TokenCount() >= 2) {
+    *talkType = TT_GUILD_CHAT;
     parts[0] = text + (IsTalkCommand(tokenizer[0], {'/', 'g', 'c'}) ? 4 : 11);
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', 'e', 'x'}) || IsTalkCommand(tokenizer[0], {'/', '\xC2', '\xF7', '\xB4', '\xDC'})) && static_cast<int>(tokenizer.tokens.size()) >= 2) {
-    *talkType = 0x12;
+  } else if ((IsTalkCommand(tokenizer[0], {'/', 'e', 'x'}) || IsTalkCommand(tokenizer[0], {'/', '\xC2', '\xF7', '\xB4', '\xDC'})) && tokenizer.TokenCount() >= 2) {
+    *talkType = TT_REQ_WHISPER_PC_EX;
     parts[0] = text + (IsTalkCommand(tokenizer[0], {'/', 'e', 'x'}) ? 4 : 6);
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', 'i', 'n'}) || IsTalkCommand(tokenizer[0], {'/', '\xC7', '\xD8', '\xC1', '\xA6'})) && static_cast<int>(tokenizer.tokens.size()) >= 2) {
-    *talkType = 0x13;
+  } else if ((IsTalkCommand(tokenizer[0], {'/', 'i', 'n'}) || IsTalkCommand(tokenizer[0], {'/', '\xC7', '\xD8', '\xC1', '\xA6'})) && tokenizer.TokenCount() >= 2) {
+    *talkType = TT_REQ_WHISPER_PC_IN;
     parts[0] = text + (IsTalkCommand(tokenizer[0], {'/', 'i', 'n'}) ? 4 : 6);
     return -1;
   } else if (IsTalkCommand(tokenizer[0], {'/', 'r', 'e', 'd'})) {
-    *talkType = 0x14;
-    for (int index = 1; index < static_cast<int>(tokenizer.tokens.size()); ++index) {
+    *talkType = TT_IS_REDCELL;
+    for (int index = 1; index < tokenizer.TokenCount(); ++index) {
       const std::string& token = tokenizer[index];
       parts[0].append(token.c_str(), token.size());
       parts[0].append(" ");
     }
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xB0', '\xC5', '\xB7', '\xA1'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'j', 'f', 'o'}) || IsTalkCommand(tokenizer[0], {'/', '\xB1', '\xB3', '\xC8', '\xAF'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'y', 'g', 'h', 'k', 's'}) || IsTalkCommand(tokenizer[0], {'/', 'd', 'e', 'a', 'l'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xB7', '\xA4', '\xA7', '\xB9', '\xCC'})) && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x19;
+  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xB0', '\xC5', '\xB7', '\xA1'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'j', 'f', 'o'}) || IsTalkCommand(tokenizer[0], {'/', '\xB1', '\xB3', '\xC8', '\xAF'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'y', 'g', 'h', 'k', 's'}) || IsTalkCommand(tokenizer[0], {'/', 'd', 'e', 'a', 'l'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xB7', '\xA4', '\xA7', '\xB9', '\xCC'})) && tokenizer.TokenCount() == 2) {
+    *talkType = TT_REQ_EXCHANGE_ITEM;
     parts[0] = tokenizer[1];
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xB1', '\xE6', '\xB5', '\xE5'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'l', 'f', 'e', 'm'}) || IsTalkCommand(tokenizer[0], {'/', 'g', 'u', 'i', 'l', 'd'})) && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x37;
+  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xB1', '\xE6', '\xB5', '\xE5'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'l', 'f', 'e', 'm'}) || IsTalkCommand(tokenizer[0], {'/', 'g', 'u', 'i', 'l', 'd'})) && tokenizer.TokenCount() == 2) {
+    *talkType = TT_REQ_MAKE_GUILD;
     parts[0] = tokenizer[1];
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xC7', '\xD8', '\xC3', '\xBC'}) || tokenizer[0] == "/gocp" || tokenizer[0] == "/breakguild") && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x38;
+  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xC7', '\xD8', '\xC3', '\xBC'}) || tokenizer[0] == "/gocp" || tokenizer[0] == "/breakguild") && tokenizer.TokenCount() == 2) {
+    *talkType = TT_REQ_BREAK_GUILD;
     parts[0] = tokenizer[1];
     return -1;
-  } else if ((tokenizer[0] == "/결성" || tokenizer[0] == "/ruftjd" || tokenizer[0] == "/organize") && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x1A;
+  } else if ((tokenizer[0] == "/결성" || tokenizer[0] == "/ruftjd" || tokenizer[0] == "/organize") && tokenizer.TokenCount() == 2) {
+    *talkType = TT_REQ_MAKE_GROUP;
     parts[0] = tokenizer[1];
     return -1;
-  } else if ((tokenizer[0] == "/몬스터" || tokenizer[0] == "/아이템" || tokenizer[0] == "/item" || tokenizer[0] == "/monster") && static_cast<int>(tokenizer.tokens.size()) >= 2) {
-    *talkType = 0x30;
+  } else if ((tokenizer[0] == "/몬스터" || tokenizer[0] == "/아이템" || tokenizer[0] == "/item" || tokenizer[0] == "/monster") && tokenizer.TokenCount() >= 2) {
+    *talkType = TT_REQ_ITEM_CREATE;
     parts[0] = tokenizer[1];
-    if (static_cast<int>(tokenizer.tokens.size()) > 2) {
+    if (tokenizer.TokenCount() > 2) {
       std::string joined;
-      for (int index = 1; index < static_cast<int>(tokenizer.tokens.size()); ++index) {
-        if (index + 1 != static_cast<int>(tokenizer.tokens.size())) {
+      for (int index = 1; index < tokenizer.TokenCount(); ++index) {
+        if (index + 1 != tokenizer.TokenCount()) {
           joined.append(tokenizer[index] + " ");
         } else {
           joined.append(tokenizer[index]);
@@ -1159,127 +1168,127 @@ int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
       parts[0] = joined;
     }
     return -1;
-  } else if ((tokenizer[0] == "/맵이동" || tokenizer[0] == "/mapmove" || tokenizer[0] == "/mm") && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x31;
+  } else if ((tokenizer[0] == "/맵이동" || tokenizer[0] == "/mapmove" || tokenizer[0] == "/mm") && tokenizer.TokenCount() > 1) {
+    *talkType = TT_REQ_MOVETO_MAP;
     parts[0] = tokenizer[1];
-    if (tokenizer.tokens.size() == 4) {
+    if (tokenizer.TokenCount() == 4) {
       parts[1] = tokenizer[2];
       parts[2] = tokenizer[3];
     } else {
       parts[1] = parts[2].assign("0");
     }
     return -1;
-  } else if ((tokenizer[0] == "/제명" || tokenizer[0] == "/wpaud" || tokenizer[0] == "/expel") && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x1C;
+  } else if ((tokenizer[0] == "/제명" || tokenizer[0] == "/wpaud" || tokenizer[0] == "/expel") && tokenizer.TokenCount() == 2) {
+    *talkType = TT_REQ_EXPEL_GROUP_MEMBER;
     parts[0] = tokenizer[1];
     return -1;
-  } else if (tokenizer[0] == "/sm" && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x3A;
+  } else if (tokenizer[0] == "/sm" && tokenizer.TokenCount() == 2) {
+    *talkType = TT_TEST_SHOW_IMAGE;
     parts[0] = tokenizer[1];
     return -1;
   } else if (tokenizer[0] == "/resetstate") {
-    *talkType = 0x3D;
+    *talkType = TT_REQ_RESETSTATE;
     return -1;
   } else if (tokenizer[0] == "/resetskill") {
-    *talkType = 0x3E;
-    if (tokenizer.tokens.size() >= 2) {
+    *talkType = TT_REQ_RESETSKILL;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
     } else {
       parts[0].assign("1");
     }
     return -1;
-  } else if ((tokenizer[0] == "/changemaptype" || tokenizer[0] == "/cmt") && static_cast<int>(tokenizer.tokens.size()) == 4) {
-    *talkType = 0x3F;
+  } else if ((tokenizer[0] == "/changemaptype" || tokenizer[0] == "/cmt") && tokenizer.TokenCount() == 4) {
+    *talkType = TT_CHANGE_MAPTYPE;
     parts[0] = tokenizer[1];
     parts[1] = tokenizer[2];
     parts[2] = tokenizer[3];
     return -1;
   } else if (tokenizer[0] == "/emblem" || tokenizer[0] == "/엠블렘" || tokenizer[0] == "/앰블렘" || tokenizer[0] == "/dpaqmffpa" || tokenizer[0] == "/doaqmffpa") {
-    *talkType = 0x40;
+    *talkType = TT_SHOW_EMBLEM_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/hide") {
-    *talkType = 0x58;
+    *talkType = TT_HIDE;
     return -1;
   } else if (tokenizer[0] == "/폰트" || tokenizer[0] == "/font") {
-    *talkType = 0x5C;
+    *talkType = TT_NAME_ABOVE_HEAD_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/mineffect" || tokenizer[0] == LookupMessage(MSI_MINEFFECT)) {
-    *talkType = 0xE5;
+    *talkType = TT_MIN_EFFECT_ON_OFF;
     return -1;
-  } else if (tokenizer[0] == "/remove" && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x5F;
+  } else if (tokenizer[0] == "/remove" && tokenizer.TokenCount() == 2) {
+    *talkType = TT_REMOVE;
     parts[0] = tokenizer[1];
     return -1;
-  } else if (tokenizer[0] == "/summon" && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x62;
+  } else if (tokenizer[0] == "/summon" && tokenizer.TokenCount() == 2) {
+    *talkType = TT_RECALL_GID;
     parts[0] = tokenizer[1];
     return -1;
   } else if (tokenizer[0] == "/shift") {
-    *talkType = 0x60;
-    for (int index = 0; index < static_cast<int>(tokenizer.tokens.size()) - 1; ++index) {
+    *talkType = TT_SHIFT;
+    for (int index = 0; index < tokenizer.TokenCount() - 1; ++index) {
       parts[index] = tokenizer[index + 1];
     }
     return -1;
-  } else if (tokenizer[0] == "/recall" && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x61;
+  } else if (tokenizer[0] == "/recall" && tokenizer.TokenCount() == 2) {
+    *talkType = TT_RECALL_AID;
     parts[0] = tokenizer[1];
     return -1;
-  } else if (tokenizer[0] == "/check" && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x8F;
+  } else if (tokenizer[0] == "/check" && tokenizer.TokenCount() == 2) {
+    *talkType = TT_CHECK_ID;
     parts[0] = tokenizer[1];
     return -1;
-  } else if (tokenizer[0] == "/rc" && static_cast<int>(tokenizer.tokens.size()) == 2) {
-    *talkType = 0x90;
+  } else if (tokenizer[0] == "/rc" && tokenizer.TokenCount() == 2) {
+    *talkType = TT_RC_ID;
     parts[0] = tokenizer[1];
     return -1;
   } else if (tokenizer[0] == "/요금") {
-    *talkType = 0x65;
+    *talkType = TT_BILLING_INFO;
     return -1;
   } else if (tokenizer[0] == "/이름표시" || tokenizer[0] == "/showname") {
-    *talkType = 0x6C;
+    *talkType = TT_BOLD_NAME_TYPE_ON_OFF;
     offset = 0;
-  } else if (tokenizer[0] == "/str+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/str+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_STATUS_CHANGE, 0xD, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/agi+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/agi+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_STATUS_CHANGE, 0xE, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/luk+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/luk+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_STATUS_CHANGE, 0x12, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/int+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/int+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_STATUS_CHANGE, 0x10, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/vit+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/vit+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_STATUS_CHANGE, 0xF, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/dex+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/dex+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_STATUS_CHANGE, 0x11, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/pow+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/pow+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_ADVANCED_STATUS_CHANGE, 0xDB, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/sta+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/sta+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_ADVANCED_STATUS_CHANGE, 0xDC, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/wis+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/wis+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_ADVANCED_STATUS_CHANGE, 0xDD, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/spl+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/spl+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_ADVANCED_STATUS_CHANGE, 0xDE, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/con+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/con+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_ADVANCED_STATUS_CHANGE, 0xDF, std::atoi(tokenizer[1].c_str()), 0, 0);
-  } else if (tokenizer[0] == "/crt+" && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x89;
+  } else if (tokenizer[0] == "/crt+" && tokenizer.TokenCount() > 1) {
+    *talkType = TT_SIYEON_STATUS;
     g_modeMgr.GetGameMode()->SendMsg(MM_ADVANCED_STATUS_CHANGE, 0xE0, std::atoi(tokenizer[1].c_str()), 0, 0);
   } else if (tokenizer[0] == "/hi") {
     std::string message("");
-    *talkType = 0x97;
-    if (static_cast<int>(tokenizer.tokens.size()) > 1) {
+    *talkType = TT_EX_HI;
+    if (tokenizer.TokenCount() > 1) {
       parts[0] = tokenizer[1];
-      for (int index = 1; index < static_cast<int>(tokenizer.tokens.size()); ++index) {
+      for (int index = 1; index < tokenizer.TokenCount(); ++index) {
         message.append(tokenizer[index]);
         message.append(" ");
       }
@@ -1287,133 +1296,125 @@ int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
     }
     return -1;
   } else if (tokenizer[0] == "/초대" || tokenizer[0] == "/cheo" || tokenizer[0] == "/invite") {
-    *talkType = 0xB8;
+    *talkType = TT_REQ_INVITE_PARTY;
     std::string command(text);
     const std::size_t space = command.find(" ", 0);
     if (space != std::string::npos) {
       parts[0] = command.erase(0, space + 1);
     } else {
-      g_windowMgr.SetChatInputText(LookupMessage(MSI_NOWARPSKILL2));
+      g_windowMgr.SetChatInputText(LookupMessage(MSI_PARTY_INVITE));
     }
     return -1;
   } else if (tokenizer[0] == "/길드초대" || tokenizer[0] == "/rlfemcheo" || tokenizer[0] == "/guildinvite") {
-    *talkType = 0xD3;
+    *talkType = TT_REQ_INVITE_GUILD;
     std::string command(text);
     const std::size_t space = command.find(" ", 0);
     if (space != std::string::npos) {
       parts[0] = command.erase(0, space + 1);
     } else {
-      g_windowMgr.SetChatInputText(LookupMessage(MSI_PARA_PURCHASE_ITEM_WEIGHT));
+      g_windowMgr.SetChatInputText(LookupMessage(MSI_GUILD_INVITE));
     }
     return -1;
-  } else if (tokenizer[0] == "/web" && static_cast<int>(tokenizer.tokens.size()) >= 2) {
-    *talkType = 0xD0;
+  } else if (tokenizer[0] == "/web" && tokenizer.TokenCount() >= 2) {
+    *talkType = TT_WEB_BROWSER;
     parts[0] = tokenizer[1];
-  } else if ((tokenizer[0] == "/navi" || tokenizer[0] == "/navigation") && static_cast<int>(tokenizer.tokens.size()) >= 3) {
-    *talkType = 0xD1;
+  } else if ((tokenizer[0] == "/navi" || tokenizer[0] == "/navigation") && tokenizer.TokenCount() >= 3) {
+    *talkType = TT_NAVIGATION;
     parts[0] = tokenizer[1];
     parts[1] = tokenizer[2];
     return -1;
-  } else if ((tokenizer[0] == "/navi2" || tokenizer[0] == "/navigation2") && static_cast<int>(tokenizer.tokens.size()) >= 4) {
-    *talkType = 0xD2;
+  } else if ((tokenizer[0] == "/navi2" || tokenizer[0] == "/navigation2") && tokenizer.TokenCount() >= 4) {
+    *talkType = TT_NAVIGATION2;
     parts[0] = tokenizer[1];
     parts[1] = tokenizer[2];
     parts[2] = tokenizer[3];
     return -1;
   } else if (tokenizer[0] == "/naviopen") {
-    *talkType = 0xD9;
+    *talkType = TT_NAVIGATION3;
     return -1;
-  } else if ((tokenizer[0] == "/cl" || tokenizer[0] == "/clanchat") && static_cast<int>(tokenizer.tokens.size()) >= 2) {
-    *talkType = 0xD6;
+  } else if ((tokenizer[0] == "/cl" || tokenizer[0] == "/clanchat") && tokenizer.TokenCount() >= 2) {
+    *talkType = TT_CLAN_CHAT;
     parts[0] = text + (tokenizer[0] == "/cl" ? 4 : 10);
     return -1;
-  } else if (tokenizer[0] == LookupMessage(MSI_PARA_RESULT_TITLE)) {
-    *talkType = 0xD8;
+  } else if (tokenizer[0] == LookupMessage(MSI_BARGAINSALE_TOOLWND_CALL)) {
+    *talkType = TT_REQ_BARGAINSALE;
     return -1;
   } else if (tokenizer[0] == "/cashshop") {
-    *talkType = 0xDA;
+    *talkType = TT_SHOW_CASHSHOP_BTN_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/goldpc") {
-    *talkType = 0xDB;
+    *talkType = TT_SHOW_GOLDPCCAFE_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/roulette") {
-    *talkType = 0xDC;
+    *talkType = TT_SHOW_ROULETTE_BTN_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/quake") {
-    *talkType = 0xDD;
+    *talkType = TT_QUAKE_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/매크로등록" || tokenizer[0] == "/macro_register" || tokenizer[0] == "/mr") {
-    *talkType = 0xE0;
+    *talkType = TT_MACRO_REGISTER;
     return -1;
   } else if (tokenizer[0] == "/매크로확인" || tokenizer[0] == "/macro_preview" || tokenizer[0] == "/mp") {
-    *talkType = 0xE1;
-    if (static_cast<int>(tokenizer.tokens.size()) >= 2) {
+    *talkType = TT_MACRO_PREVIEW;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
     }
     return -1;
   } else if (tokenizer[0] == "/매크로신고" || tokenizer[0] == "/macro_detector" || tokenizer[0] == "/md") {
-    *talkType = 0xE2;
-    if (static_cast<int>(tokenizer.tokens.size()) >= 2) {
+    *talkType = TT_MACRO_DETECTOR;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
     }
     return -1;
-  } else if (tokenizer[0] == "/setcamera" && static_cast<int>(tokenizer.tokens.size()) > 2) {
-    *talkType = 0xE4;
+  } else if (tokenizer[0] == "/setcamera" && tokenizer.TokenCount() > 2) {
+    *talkType = TT_SET_CAMERA;
     parts[0] = tokenizer[1];
     parts[1] = tokenizer[2];
-    if (tokenizer.tokens.size() == 4) {
+    if (tokenizer.TokenCount() == 4) {
       parts[2] = tokenizer[3];
     }
     return -1;
   } else if (tokenizer[0] == "/resetcooltime" || tokenizer[0] == "/rct") {
-    *talkType = 0xE6;
+    *talkType = TT_RESET_COOLTIME;
     return -1;
   } else if (tokenizer[0] == "/call" || tokenizer[0] == "/호출") {
-    *talkType = 0xE7;
+    *talkType = TT_BLOCK_CALL_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/환복" || tokenizer[0] == "/changedress" || tokenizer[0] == "/nocosplay") {
-    *talkType = 0xEF;
+    *talkType = TT_EX_NO_COS_PLAY;
     return -1;
   } else if (tokenizer[0] == "/노점보기" || tokenizer[0] == "/showshop") {
-    *talkType = 0xFA;
+    *talkType = TT_SHOW_MERCHANT_SHOP_ON_OFF;
     return -1;
   } else if (tokenizer[0] == "/prison") {
-    *talkType = 0xFB;
-    if (static_cast<int>(tokenizer.tokens.size()) >= 2) {
+    *talkType = TT_PRISON_USER;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
     }
     return -1;
   } else if (tokenizer[0] == "/계정한정" || tokenizer[0] == "/accountlimitedtool") {
-    *talkType = 0xFC;
+    *talkType = TT_OPEN_ACCOUNT_LIMITED_TOOL;
     return -1;
   } else if (tokenizer[0] == "/모험가중개소" || tokenizer[0] == "/중개소" || tokenizer[0] == "/agency") {
-    *talkType = 0xED;
+    *talkType = TT_ADVEN_PARTY_BOARD;
     return -1;
   } else if (tokenizer[0] == "/removeon") {
-    *talkType = 0xFE;
-    if (tokenizer.tokens.size() >= 2) {
-      parts[0] = tokenizer[1];
-    } else {
-      parts[0] = "0";
-    }
-    if (tokenizer.tokens.size() >= 3) {
-      parts[1] = tokenizer[2];
-    } else {
-      parts[1] = "0";
-    }
+    *talkType = TT_REMOVE_ON;
+    parts[0] = tokenizer.TokenCount() >= 2 ? tokenizer[1] : std::string("0");
+    parts[1] = tokenizer.TokenCount() >= 3 ? tokenizer[2] : std::string("0");
     return -1;
   } else if (tokenizer[0] == "/removeoff") {
-    *talkType = 0xFF;
-    if (static_cast<int>(tokenizer.tokens.size()) >= 2) {
+    *talkType = TT_REMOVE_OFF;
+    if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
     }
     return -1;
-  } else if ((tokenizer[0] == "/MacroChecker" || tokenizer[0] == "/macrochecker") && static_cast<int>(tokenizer.tokens.size()) > 1) {
-    *talkType = 0x104;
+  } else if ((tokenizer[0] == "/MacroChecker" || tokenizer[0] == "/macrochecker") && tokenizer.TokenCount() > 1) {
+    *talkType = TT_MACRO_CHECKER_MAP;
     parts[0] = tokenizer[1];
     return -1;
   } else if (tokenizer[0] == "/ProbabilityTest" || tokenizer[0] == "/확률테스트") {
-    *talkType = 0x117;
+    *talkType = TT_PROBABILITY_TEST;
     return -1;
   } else {
     *talkType = this->GetCommandId(tokenizer[0].c_str());
@@ -1558,7 +1559,8 @@ ITEM_INFO CSession::GetPurchaseItemInfoBySequence(int index) const {
 // OFFSET: 0x00DE0770
 // FUNCTION: fn_23458
 int CSession::GetPurchaseItemNumByItemId(const char* itemId) const {
-  for (const ITEM_INFO& item : this->m_purchaseItems) {
+  for (auto it = this->m_purchaseItems.begin(); it != this->m_purchaseItems.end(); ++it) {
+    const ITEM_INFO& item = *it;
     if (item.itemId == itemId) {
       return item.quantity;
     }
@@ -1678,6 +1680,12 @@ const char* CSession::GetHotkeyDescription(int index) const {
   return this->m_hotkeyDescriptions[index].c_str();
 }
 
+// OFFSET: 0x00DE0E20
+// FUNCTION: fn_23473
+void CSession::ItemBitmapPath(const char* name, char* output) {
+  std::sprintf(output, "유저인터페이스\\item\\%s.bmp", name);
+}
+
 // OFFSET: 0x00DE0EB0
 // FUNCTION: fn_23475
 ITEM_INFO CSession::FindCartItem(std::uint32_t id) const {
@@ -1773,16 +1781,20 @@ bool CSession::IsGuildMemberCharacter(int characterId, char* name) const {
 
 // OFFSET: 0x00DF9D90
 // FUNCTION: fn_23567
-bool CSession::IsGuildMemberName(const char* name) const {
+int CSession::IsGuildMemberName(const char* name) const {
   std::list<GuildInfo::Member> members;
   members = g_guildInfo.m_members;
   for (const GuildInfo::Member& member : members) {
     if (member.name == name) {
-      return true;
+      return 1;
     }
   }
 
-  return std::strcmp(g_guildInfo.masterName.c_str(), name) == 0;
+  if (std::strcmp(g_guildInfo.masterName.c_str(), name) == 0) {
+    return 1;
+  }
+
+  return 0;
 }
 
 // OFFSET: 0x00DFA160
@@ -1802,7 +1814,8 @@ bool CSession::IsIndoorMapName(const char* name) const {
 // OFFSET: 0x00DDB580
 // FUNCTION: fn_23354
 void CSession::RemovePartyMemberByName(const char* name) {
-  for (std::list<MessengerMember>::iterator it = this->m_partyMembers.begin(); it != this->m_partyMembers.end(); ++it) {
+  using PartyList = std::list<MessengerMember>;
+  for (PartyList::iterator it = this->m_partyMembers.begin(); it != this->m_partyMembers.end(); ++it) {
     if (it->name != name) {
       continue;
     }
@@ -1817,7 +1830,8 @@ void CSession::RemovePartyMemberByName(const char* name) {
       actor->SendMsg(nullptr, AM_DELETE_EFFECT, EF_PARTY, 0, 0, 0, 0, 0);
     }
 
-    this->m_partyMembers.erase(it);
+    PartyList::iterator (PartyList::*erase)(PartyList::const_iterator) = &PartyList::erase;
+    (this->m_partyMembers.*erase)(it);
     return;
   }
 }
@@ -1838,7 +1852,7 @@ static_assert(sizeof(PACKET_CZ_USE_SKILL_END) == 4);
 // OFFSET: 0x00E2ED90
 // FUNCTION: fn_24151
 void CSession::AddPendingActorName(std::uint32_t id) {
-  this->pendingActorNames.insert(id);
+  this->pendingActorNames.insert(static_cast<std::uint32_t>(id));
 }
 
 // OFFSET: 0x00E2F3B0
@@ -1916,14 +1930,18 @@ int CSession::GetBodyStyle(int job, int style, int renderJob) {
   return static_cast<unsigned>(g_session.GetBodyStyleJob(job) - JT_NOVICE_H) < 7;
 }
 
+// INLINED
+static void AppendSerialized(std::vector<unsigned char>& records, const std::vector<unsigned char>& record) {
+  records.insert(records.end(), record.begin(), record.end());
+}
+
 // OFFSET: 0x00E2F920
 // FUNCTION: fn_24160
 std::vector<unsigned char> SerializeItems(const std::list<ITEM_INFO>& items) {
   std::vector<unsigned char> result;
 
   for (std::list<ITEM_INFO>::const_iterator it = items.begin(); it != items.end(); ++it) {
-    const std::vector<unsigned char> bytes = it->Serialize();
-    result.insert(result.end(), bytes.begin(), bytes.end());
+    AppendSerialized(result, it->Serialize());
   }
 
   return result;
@@ -2105,7 +2123,7 @@ void CSession::SetEquippedArrowIndex(std::uint32_t value) {
 
   std::vector<ActiveSkillEffect>::iterator it = std::find_if(
       g_activeSkillEffects.begin(), g_activeSkillEffects.end(),
-      [](const ActiveSkillEffect& effect) { return effect.id == 0x2B7; });
+      [](const ActiveSkillEffect& effect) { return effect.id == EFST_CLIENT_ONLY_EQUIP_ARROW; });
 
   if (it == g_activeSkillEffects.end()) {
     if (value) {
@@ -2285,6 +2303,27 @@ ITEM_INFO CSession::GetSwapCostumeItem(int index) const {
   return ITEM_INFO(0);
 }
 
+// OFFSET: 0x00E31C60
+// FUNCTION: fn_45612
+int CSession::GetWeightPercent() const {
+  if (this->m_weight > 0 && this->m_maxWeight > 0) {
+    return this->m_weight * 100 / this->m_maxWeight;
+  }
+  return 0;
+}
+
+// OFFSET: 0x00E31C80
+// FUNCTION: fn_45613
+ITEM_INFO CSession::GetCardItemAt(std::size_t index) const {
+  if (this->m_cardItems.empty()) {
+    return ITEM_INFO(0);
+  }
+  if (this->m_cardItems.size() <= index) {
+    return ITEM_INFO(0);
+  }
+  return this->m_cardItems[index];
+}
+
 // OFFSET: 0x00E31DE0
 // FUNCTION: fn_24177
 bool CSession::IsRequestReady(int requestId) {
@@ -2315,6 +2354,61 @@ void CSession::RefreshHpSpWindows() {
   }
 
   g_modeMgr.GetGameMode()->NotifyItemBounds();
+}
+
+// OFFSET: 0x00DD80A0
+// FUNCTION: fn_23304
+__declspec(noinline) void CSession::UpdateRandomStats() {
+  int statCount = 12;
+  if (g_resetMessengerRandomStats != 0) {
+    g_resetMessengerRandomStats = 0;
+    int roll = std::rand() % statCount;
+    this->randomStatIndexC = roll >= 0 ? roll : 0;
+    roll = std::rand() % statCount;
+    this->randomStatIndexB = roll >= 0 ? roll : 0;
+    roll = std::rand() % statCount;
+    this->randomStatIndexE = roll >= 0 ? roll : 0;
+    roll = std::rand() % statCount;
+    this->randomStatIndexA = roll >= 0 ? roll : 0;
+    roll = std::rand() % statCount;
+    this->randomStatIndexD = roll >= 0 ? roll : 0;
+  }
+
+  const int bound70 = this->m_sp;
+  const int bound74 = this->m_maxSp;
+  const int bound68 = this->hp;
+  const int bound6C = this->maxHp;
+  int roll = std::rand() % statCount;
+  this->randomStatIndexC = roll >= 0 ? roll : 0;
+  roll = std::rand() % statCount;
+  this->randomStatIndexA = roll >= 0 ? roll : 0;
+  roll = std::rand() % statCount;
+  this->randomStatIndexD = roll >= 0 ? roll : 0;
+  roll = std::rand() % statCount;
+  this->randomStatIndexB = roll >= 0 ? roll : 0;
+  roll = std::rand() % statCount;
+  this->randomStatIndexE = roll >= 0 ? roll : 0;
+  for (int index = 0; index < 12; ++index) {
+    const int value = std::abs(std::rand()) % 1;
+    this->randomStatValues[index] = value >= 0 ? value : 0;
+  }
+
+  if (this->hp != bound68) {
+    this->hp = bound68;
+    this->RefreshHpSpWindows();
+  }
+  if (this->maxHp != bound6C) {
+    this->maxHp = bound6C;
+    this->RefreshHpSpWindows();
+  }
+  if (this->m_sp != bound70) {
+    this->m_sp = bound70;
+    this->RefreshHpSpWindows();
+  }
+  if (this->m_maxSp != bound74) {
+    this->m_maxSp = bound74;
+    this->RefreshHpSpWindows();
+  }
 }
 
 // OFFSET: 0x00DF9460
@@ -2422,7 +2516,7 @@ bool CSession::IsKnownName(std::string name) const {
 void CSession::FlagInventoryItem(std::uint32_t id) {
   for (ITEM_INFO& item : this->m_inventoryItems) {
     if (item.identity[1] == id) {
-      item.flags[2] = 1;
+      item.flagged = 1;
       RefreshItemWindows(&g_windowMgr);
       return;
     }
@@ -2434,7 +2528,7 @@ void CSession::FlagInventoryItem(std::uint32_t id) {
 void CSession::FlagMerchantShopItem(std::uint32_t id) {
   for (ITEM_INFO& item : this->m_merchantShopItems) {
     if (item.identity[1] == id) {
-      item.flags[2] = 1;
+      item.flagged = 1;
       RefreshItemWindows(&g_windowMgr);
       return;
     }
@@ -2446,7 +2540,7 @@ void CSession::FlagMerchantShopItem(std::uint32_t id) {
 void CSession::FlagCartItem(std::uint32_t id) {
   for (ITEM_INFO& item : this->m_cartItems) {
     if (item.identity[1] == id) {
-      item.flags[2] = 1;
+      item.flagged = 1;
       RefreshItemWindows(&g_windowMgr);
       return;
     }
@@ -2495,7 +2589,7 @@ void CSession::RefreshMerchantMyShopItems() {
       }
     }
 
-    if (match == this->m_merchantMirrorItems.end()) {
+    if (this->m_merchantMirrorItems.end() == match) {
       it = this->m_merchantMyShopItems.erase(it);
       continue;
     }
@@ -2535,7 +2629,7 @@ int CSession::CountDistinctCostumeItems() const {
   std::vector<std::uint32_t> itemIds;
   for (int i = 0; i < 10; ++i) {
     const int itemId = this->costumeItems[i].identity[1];
-    if (itemId != 0 && std::find(itemIds.begin(), itemIds.end(), itemId) == itemIds.end()) {
+    if (itemId != ITEMID_NONE && std::find(itemIds.begin(), itemIds.end(), itemId) == itemIds.end()) {
       itemIds.push_back(itemId);
       ++count;
     }
@@ -2551,7 +2645,7 @@ int CSession::CountDistinctEquippedItems() const {
   std::vector<std::uint32_t> itemIds;
   for (int i = 0; i < 10; ++i) {
     const int itemId = this->equippedItems[i].identity[1];
-    if (itemId != 0 && std::find(itemIds.begin(), itemIds.end(), itemId) == itemIds.end()) {
+    if (itemId != ITEMID_NONE && std::find(itemIds.begin(), itemIds.end(), itemId) == itemIds.end()) {
       itemIds.push_back(itemId);
       ++count;
     }
@@ -2606,7 +2700,7 @@ std::pair<int, int> CSession::GetShopEntry(unsigned int index, int key) {
     if (shop != this->m_shops.end() && shop->second.items.size() > index) {
       std::map<int, std::pair<int, int>>& entries = shop->second.items[index];
       auto entry = entries.find(key);
-      if (entry != entries.end()) {
+      if (entries.end() != entry) {
         return entry->second;
       }
     }
@@ -2615,6 +2709,17 @@ std::pair<int, int> CSession::GetShopEntry(unsigned int index, int key) {
   return std::pair<int, int>(0, 0);
 }
 
+enum ControlCharacter : unsigned char {
+  CHAR_LAST_C0_CONTROL = 0x1F,
+  CHAR_DELETE = 0x7F,
+  CP1252_UNDEFINED_81 = 0x81,
+  CP1252_UNDEFINED_8D = 0x8D,
+  CP1252_UNDEFINED_8F = 0x8F,
+  CP1252_UNDEFINED_90 = 0x90,
+  CP1252_UNDEFINED_9D = 0x9D,
+  CHAR_SOFT_HYPHEN = 0xAD,
+};
+
 // OFFSET: 0x00DE3CE0
 // FUNCTION: fn_23487
 bool CSession::HasControlCharacter(std::string text) {
@@ -2622,8 +2727,8 @@ bool CSession::HasControlCharacter(std::string text) {
     const char c = *it;
     if (c >= 0) {
       const unsigned char value = static_cast<unsigned char>(c);
-      if (value <= 0x1F || value == 0x7F || value == 0x81 || value == 0x8D || value == 0x8F || value == 0x90 ||
-          value == 0x9D || value == 0xAD) {
+      if (value <= CHAR_LAST_C0_CONTROL || value == CHAR_DELETE || value == CP1252_UNDEFINED_81 || value == CP1252_UNDEFINED_8D ||
+          value == CP1252_UNDEFINED_8F || value == CP1252_UNDEFINED_90 || value == CP1252_UNDEFINED_9D || value == CHAR_SOFT_HYPHEN) {
         return true;
       }
     }
@@ -2667,7 +2772,6 @@ void CSession::LoadMiniPartyInfo() {
 
   int state = 1;
   char name[24] = {0};
-  char token[24];
   SessionRecord0734 record;
   for (int i = 0; i < size; ++i) {
     record.active = 1;
@@ -2693,7 +2797,7 @@ void CSession::LoadMiniPartyInfo() {
     case '{': {
       ++i;
       std::memset(name, 0, sizeof(name) - 1);
-      std::memset(token, 0, sizeof(token));
+      char token[24] = {0};
       int position = 0;
       while (data[i] != ',') {
         token[position] += data[i];
@@ -2714,7 +2818,9 @@ void CSession::LoadMiniPartyInfo() {
     }
   }
 
-  delete[] data;
+  if (data) {
+    delete[] data;
+  }
 }
 
 // OFFSET: 0x00DFD060
@@ -2942,8 +3048,8 @@ void CSession::Init() {
   std::memset(modulePath, 0, sizeof(modulePath));
   std::memset(directory, 0, sizeof(directory));
   GetModuleFileNameA(nullptr, modulePath, MAX_PATH);
-  const char* fileName = std::strrchr(modulePath, '\\');
-  std::strncpy(directory, modulePath, std::strlen(modulePath) - std::strlen(fileName + 1));
+  const char* fileName = std::strrchr(modulePath, '\\') + 1;
+  std::strncpy(directory, modulePath, std::strlen(modulePath) - std::strlen(fileName));
 
   HKEY key;
   if (RegCreateKeyExA(HKEY_CURRENT_USER, OBFUSCATE_ARRAY_TEXT("Software\\Gravity\\RagnarokOnline", 0x2FE993D1DDE1F197ULL, char), 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, nullptr) == ERROR_SUCCESS) {
@@ -3076,7 +3182,7 @@ void CSession::Init() {
   this->storeSearchPageFlags = 0;
   this->storeSearchX = -1;
   this->storeSearchY = -1;
-  this->storeSearchOwnerAid = 0xFFFFFFFF;
+  this->storeSearchOwnerAid = INVALID_AID;
   this->ClearPairValues(1, 1, 1);
 
   this->m_lockItemDrop = false;
@@ -3109,9 +3215,9 @@ void CSession::Init() {
 
   this->automaticSkillHotkey = 0;
   this->m_currentHotkey = 0;
-  this->petGid = 0xFFFFFFFF;
-  this->m_homunAid = -1;
-  this->m_mercenaryAid = -1;
+  this->petGid = INVALID_AID;
+  this->m_homunAid = INVALID_AID;
+  this->m_mercenaryAid = INVALID_AID;
   this->m_guildMemberListSort = true;
   this->m_blockPrivateTab = false;
   this->m_sortPrivateTab = false;
@@ -3215,8 +3321,8 @@ void CSession::ResetCharacterState() {
   this->quitAllowed = 0;
   this->sessionFlag = 0;
   g_session.m_mapTransitionFlag = 0;
-  this->m_playerMessage82Arg = 0;
   this->adoptionSkillAvailable = 0;
+  this->m_playerMessage82Arg = 0;
   this->m_randomLoadingScreen = 1;
   this->guildLeader = 0;
   this->showTimer = 0;
@@ -3292,8 +3398,8 @@ void CSession::ClearItemContainers() {
   }
 
   this->m_partyMembers.clear();
-  this->partyName = "";
   this->partyLeader = 0;
+  this->partyName = "";
   this->ClearItemQuantities();
 }
 
@@ -3305,7 +3411,7 @@ void CSession::ClearStoreSearchResults() {
   this->storeSearchPageFlags = 0;
   this->storeSearchX = -1;
   this->storeSearchY = -1;
-  this->storeSearchOwnerAid = 0xFFFFFFFF;
+  this->storeSearchOwnerAid = INVALID_AID;
 }
 
 // OFFSET: 0x00D8D9E0
@@ -3409,7 +3515,7 @@ bool CSession::LoadMapViewParameters() {
       values.push_back(std::string(start, cursor));
     } else {
       values.push_back(std::string(start, cursor));
-      this->m_mapViewParameters.push_back(std::make_pair(name, values));
+      this->m_mapViewParameters.push_back(std::pair<std::string, std::vector<std::string>>(name, values));
       name.clear();
       values.clear();
     }
@@ -3611,8 +3717,7 @@ void CSession::InitJobKeyNames() {
 std::vector<unsigned char> SerializeMessengerMembers(const std::list<MessengerMember>& members) {
   std::vector<unsigned char> records;
   for (std::list<MessengerMember>::const_iterator it = members.begin(); it != members.end(); ++it) {
-    const std::vector<unsigned char> record = it->Serialize();
-    records.insert(records.end(), record.begin(), record.end());
+    AppendSerialized(records, it->Serialize());
   }
   return records;
 }
@@ -3916,11 +4021,11 @@ void CSession::InitCommandTables() {
   this->m_commandIds.push_back(std::pair<const char*, int>("/eqopen", 185));
   this->m_commandIds.push_back(std::pair<const char*, int>("/show_addressbar", 205));
   this->m_commandIds.push_back(std::pair<const char*, int>("/buildinfo", 207));
-  this->m_commandIds.push_back(std::pair<const char*, int>(LookupMessage(MSI_GUILD_MEMBERLIST_SORT), 223));
+  this->m_commandIds.push_back(std::pair<const char*, int>(LookupMessage(MSI_MINIMAP_BUTTON_ONOFF), 223));
   this->m_commandIds.push_back(std::pair<const char*, int>("/viewpointvalue", 227));
   this->m_commandIds.push_back(std::pair<const char*, int>("/mable", 240));
-  this->m_commandIds.push_back(std::pair<const char*, int>(LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), 241));
-  this->m_commandIds.push_back(std::pair<const char*, int>(LookupMessage(MSI_RUSSIA_PERSONALINFO_EXP), 243));
+  this->m_commandIds.push_back(std::pair<const char*, int>(LookupMessage(MSI_EXPAND_SIGHT), 241));
+  this->m_commandIds.push_back(std::pair<const char*, int>(LookupMessage(MSI_DRAW_EMBLEM_FRAME_ONOFF), 243));
   std::stable_sort(this->m_commandIds.begin(), this->m_commandIds.end(),
                    [](const std::pair<const char*, int>& left, const std::pair<const char*, int>& right) {
                      return std::strcmp(left.first, right.first) < 0;
@@ -4007,11 +4112,10 @@ SessionTraits::SessionTraits() {
 
 // OFFSET: 0x00DC2B20
 // FUNCTION: fn_22763
-CSession::CSession() {
-  this->m_priorityClass = 32;
-  this->m_genderChangeBlocked = false;
-  this->m_itemSlotActive = true;
-  this->sessionIndex = -1;
+CSession::CSession()
+  : m_launchPassCommandLine(false), m_channelCopId(0), showCameraInfo(0), m_priorityClass(32), m_pingLiveSchedule(0),
+    m_lastReceiveTick(0), m_lastSendTick(0), m_gameOptionFlag(false), m_genderChangeBlocked(false), m_itemSlotActive(true),
+    playerSkillMode(0), m_startTimeTicks(0), m_loginTimeTicks(0), sessionIndex(-1) {
   this->skyMapNames.clear();
 
   CItemInfoMgr::Create();
@@ -4083,14 +4187,13 @@ void CSession::LoadLuaDataFiles() {
   }
 
   this->m_hotkeyScript->Load("SaveData\\UserKeys", false, true);
-  ResetHotkeySlots();
+  this->ResetHotkeySlots();
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\NPCIdentity", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\jobName_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\jobName", true, false);
   {
     const std::array<char, 27> source = OBFUSCATE_SOURCE_CHARS(27, "Lua Files\\DataInfo\\PetInfo", 0x35E5656B5DEDCD75ULL);
-    thread_local EncryptedName<sizeof(source), 0x35E5656B5DEDCD75ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
+    this->m_hotkeyScript->Load(OBFUSCATE_DECRYPT(0x35E5656B5DEDCD75ULL, source), true, false);
   }
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\AccessoryId", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\accName_F", true, false);
@@ -5902,12 +6005,11 @@ void CSession::LoadSessionTables() {
   ++g_sessionTableLoadCount;
   session->InitJobHitWaveNames();
 
-  CCommonObject& storage = session->m_tableLoader;
   {
     std::vector<char*> tokens;
     session->m_bgmFileNames.clear();
     session->m_bgmFileNames.reserve(512);
-    storage.LoadTokens(tokens, "mp3NameTable.txt", 0);
+    session->m_tableLoader.LoadTokens(tokens, "mp3NameTable.txt", 0);
     for (auto token = tokens.begin(); token != tokens.end(); token += 2) {
       session->m_bgmFileNames.push_back(std::make_pair(token[0], token[1]));
     }
@@ -5917,7 +6019,7 @@ void CSession::LoadSessionTables() {
               });
   }
 
-  storage.LoadTokens(session->m_indoorRswNames, "indoorRswTable.txt", 0);
+  session->m_tableLoader.LoadTokens(session->m_indoorRswNames, "indoorRswTable.txt", 0);
   std::sort(session->m_indoorRswNames.begin(), session->m_indoorRswNames.end(),
             [](const char* left, const char* right) { return std::strcmp(left, right) < 0; });
 
@@ -5934,7 +6036,7 @@ void CSession::LoadSessionTables() {
   constexpr std::array<char, 15> source = OBFUSCATE_SOURCE("Ragnarok Setup", 0x9171997D6963C9F7ULL);
   thread_local EncryptedName<sizeof(source), 0x9171997D6963C9F7ULL> setupName(source);
   if (HWND window = FindWindowA(nullptr, setupName.Text())) {
-    ShowErrorDialog(LookupMessage(MSI_TAREN_LOGINREFUSE_FAIL_PASSWORD), 0);
+    ShowErrorDialog(LookupMessage(MSI_CLOSE_SETUP), 0);
     SendMessageA(window, WM_CLOSE, 0, 0);
   }
 
@@ -5958,9 +6060,9 @@ void CSession::LoadSessionTables() {
     std::vector<char*> buyingStoreItems;
     session->inventoryFilterIds.clear();
     session->inventoryFilterIds.reserve(512);
-    storage.LoadTokens(buyingStoreItems, "BuyingStoreItemList.txt", 0);
-    for (char* token : buyingStoreItems) {
-      session->inventoryFilterIds.push_back(std::atoi(token));
+    session->m_tableLoader.LoadTokens(buyingStoreItems, "BuyingStoreItemList.txt", 0);
+    for (auto it = buyingStoreItems.begin(); it != buyingStoreItems.end(); ++it) {
+      session->inventoryFilterIds.push_back(std::atoi(*it));
     }
   }
 

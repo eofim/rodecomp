@@ -14,6 +14,7 @@
 #include "UI/Navigation/NavigationLink.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Tables/ForbiddenWords.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Contents/Tables/MessageTable.h"
@@ -25,8 +26,6 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
-
-template __declspec(noinline) std::string::size_type std::string::find(const char, const std::string::size_type) const noexcept;
 
 #pragma pack(push, 1)
 struct CharacterRenamePacket {
@@ -55,7 +54,7 @@ void UIChangeNameWnd::OnCreate(int, int) {
     this->m_okButton->SetBitmap((prefix + "btn_ok_b" + ".bmp").c_str(), 2, 0);
     this->m_okButton->SetSize(this->m_okButton->BitmapWidth(), this->m_okButton->BitmapHeight());
     this->m_okButton->Move(this->geometry.width - 93, this->geometry.height - 24);
-    this->m_okButton->SetId(184);
+    this->m_okButton->SetId(ID_OK);
     this->AddChild(this->m_okButton);
   }
   {
@@ -66,7 +65,7 @@ void UIChangeNameWnd::OnCreate(int, int) {
     this->m_cancelButton->SetBitmap((prefix + "btn_cancel_b" + ".bmp").c_str(), 2, 0);
     this->m_cancelButton->SetSize(this->m_cancelButton->BitmapWidth(), this->m_cancelButton->BitmapHeight());
     this->m_cancelButton->Move(this->geometry.width - 46, this->geometry.height - 24);
-    this->m_cancelButton->SetId(185);
+    this->m_cancelButton->SetId(ID_CANCEL);
     this->AddChild(this->m_cancelButton);
   }
 
@@ -76,10 +75,10 @@ void UIChangeNameWnd::OnCreate(int, int) {
   this->m_edit->SetSize(this->m_edit->geometry.width, this->m_edit->geometry.height);
   this->m_edit->Move(60, 44);
   this->m_edit->maximum = 24;
-  this->m_edit->SetId(184);
+  this->m_edit->SetId(ID_OK);
   this->AddChild(this->m_edit);
   g_windowMgr.SetFocus(this->m_edit);
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x00911190
@@ -99,76 +98,87 @@ int UIChangeNameWnd::SendMsg(UIWindow*, int message, std::intptr_t a, std::intpt
     switch (a) {
     case ID_OK: {
       if (GetNavigationLinkParser()->HasLink(this->m_edit->Text()) == true) {
-        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
         this->m_edit->SetText("");
         return 0;
       }
 
       std::string name(this->m_edit->Text());
       if (name.find('\n', 0) != std::string::npos) {
-        g_windowMgr.Confirm(LookupMessage(MSI_TOKENAGENCY_SERVER_CONNECTION_FAILED), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_ONE_LINE_WITHOUT_LINE_BREAKS), 0, true, false, 0, "Message", 280, 120, 0);
         this->m_edit->SetText("");
         break;
       }
 
-      if (g_serviceType == 1 && !ValidateCharacterName(this->m_edit->Text())) {
+      if (g_serviceType == ServiceAmerica && !g_session.ValidateCharacterName(this->m_edit->Text())) {
         g_windowMgr.Confirm(LookupMessage(MSI_CHARACTERNAME_ERROR), 0, true, false, 0, "Message", 280, 120, 0);
         this->m_edit->SetText("");
-        return 0;
+        break;
       }
 
-      if (this->m_edit->Length() < 4) {
+      if (this->m_edit->Length() >= 4) {
+        const int allowed = g_forbiddenWords.Allows(this->m_edit->Text());
+        const int blank = g_session.IsBlankString(this->m_edit->Text());
+        if (allowed && !blank) {
+          if (this->m_edit->Length() >= 24) {
+            g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+            this->m_edit->SetText("");
+            break;
+          }
+
+          if (!this->IsNameWithinLimit(this->m_edit->Text(), 24)) {
+            g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+            this->m_edit->SetText("");
+            break;
+          }
+
+          char newName[24] = {};
+          std::strcpy(newName, this->m_edit->Text());
+          memcpy_s(&this->m_info, sizeof(this->m_info), this->m_character, sizeof(CharacterInfo));
+          std::memcpy(this->m_info.name, newName, sizeof(newName));
+          if (std::strstr(this->m_info.name, "그라비티") != nullptr) {
+            return 0;
+          }
+
+          _strlwr(newName);
+          if (std::strstr(newName, "gravity") != nullptr) {
+            return 0;
+          }
+
+          if (newName[0] == '[' && newName[1] == 'g' && newName[2] == 'm') {
+            break;
+          }
+
+          if (newName[1] == '[' && newName[2] == 'g' && newName[3] == 'm') {
+            return 0;
+          }
+
+          if (newName[2] == '[' && newName[3] == 'g' && newName[4] == 'm') {
+            return 0;
+          }
+
+          char text[300];
+          std::sprintf(text, LookupMessage(MSI_CONFIRM_TO_CHANGE_NAME), this->m_info.name);
+          if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
+            CharacterRenamePacket packet;
+            packet.id = ID_CH_REQ_CHANGE_CHARACTERNAME;
+            packet.gid = this->m_character->gid;
+            g_session.m_renameGid = packet.gid;
+            std::memcpy(packet.name, this->m_info.name, sizeof(packet.name));
+            std::memcpy(g_session.m_renameName, this->m_info.name, sizeof(g_session.m_renameName));
+            GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+            g_windowMgr.Schedule(this);
+          }
+        } else {
+          if (!allowed) {
+            g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+          }
+          if (blank) {
+            g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+          }
+        }
+      } else {
         g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
-        break;
-      }
-
-      const int allowed = g_forbiddenWords.Allows(this->m_edit->Text());
-      const int blank = g_session.IsBlankString(this->m_edit->Text());
-      if (!allowed || blank) {
-        if (!allowed) {
-          g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
-        }
-        if (blank) {
-          g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
-        }
-        break;
-      }
-
-      if (this->m_edit->Length() >= 24 || !this->IsNameWithinLimit(this->m_edit->Text(), 24)) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
-        this->m_edit->SetText("");
-        break;
-      }
-
-      char newName[24] = {};
-      std::strcpy(newName, this->m_edit->Text());
-      memcpy_s(&this->m_info, sizeof(this->m_info), this->m_character, sizeof(CharacterInfo));
-      std::memcpy(this->m_info.name, newName, sizeof(newName));
-      if (std::strstr(this->m_info.name, "그라비티") != nullptr) {
-        return 0;
-      }
-
-      _strlwr(newName);
-      if (std::strstr(newName, "gravity") != nullptr) {
-        return 0;
-      }
-
-      if ((newName[0] == '[' && newName[1] == 'g' && newName[2] == 'm') || (newName[1] == '[' && newName[2] == 'g' && newName[3] == 'm') ||
-          (newName[2] == '[' && newName[3] == 'g' && newName[4] == 'm')) {
-        return 0;
-      }
-
-      char text[300];
-      std::sprintf(text, LookupMessage(MSI_CONFIRM_TO_CHANGE_NAME), this->m_info.name);
-      if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) == 187) {
-        CharacterRenamePacket packet;
-        packet.id = ID_CH_REQ_CHANGE_CHARACTERNAME;
-        packet.gid = this->m_character->gid;
-        g_session.m_renameGid = packet.gid;
-        std::memcpy(packet.name, this->m_info.name, sizeof(packet.name));
-        std::memcpy(g_session.m_renameName, this->m_info.name, sizeof(g_session.m_renameName));
-        GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
-        g_windowMgr.Schedule(this);
       }
       break;
     }

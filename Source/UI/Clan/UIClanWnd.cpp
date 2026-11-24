@@ -35,7 +35,7 @@ int UIClanInfoManageWnd::Tab() {
 // FUNCTION: fn_10629
 void UIClanInfoManageWnd::OnCreate(int width, int height) {
   if (!this->m_title) {
-    const char* title = LookupMessage(MSI_CLAN_MARK);
+    const char* title = LookupMessage(MSI_CLAN_INFOMANAGE);
     this->m_title = new UIStaticText();
     this->m_title->SetSize(62, 15);
     this->m_title->SetTextFitted(title);
@@ -59,13 +59,13 @@ void UIClanInfoManageWnd::Paint() {
   UIClanWnd::Paint();
   char text[1024];
   std::memset(text, 0, sizeof(text));
-  std::sprintf(text, "%s : %s", LookupMessage(MSI_HOSTILITY_CLAN), g_clanInfo->m_clanName.c_str());
+  std::sprintf(text, "%s : %s", LookupMessage(MSI_CLAN_NAME), g_clanInfo->m_clanName.c_str());
   this->DrawTextAt(8, 49, text, 0, 0, 12, 0, 0, 0);
-  std::sprintf(text, "%s : %d", LookupMessage(MSI_ALLY_CLAN), g_clanInfo->allyClanCount);
+  std::sprintf(text, "%s : %d", LookupMessage(MSI_CLAN_LEVEL), g_clanInfo->allyClanCount);
   this->DrawTextAt(8, 65, text, 0, 0, 12, 0, 0, 0);
-  std::sprintf(text, "%s : %s", LookupMessage(MSI_VIEW_CLAN_MSG), g_clanInfo->m_masterName.c_str());
+  std::sprintf(text, "%s : %s", LookupMessage(MSI_CLAN_MASTER_NAME), g_clanInfo->m_masterName.c_str());
   this->DrawTextAt(8, 81, text, 0, 0, 12, 0, 0, 0);
-  std::sprintf(text, "%s : ", LookupMessage(MSI_TWWEB_WARRING));
+  std::sprintf(text, "%s : ", LookupMessage(MSI_CLAN_NUM_MEMBER));
   this->DrawTextAt(8, 97, text, 0, 0, 12, 0, 0, 0);
   std::sprintf(text, "%s", "유저인터페이스\\basic_interface\\grp_online.bmp");
   CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(text)));
@@ -79,7 +79,7 @@ void UIClanInfoManageWnd::Paint() {
       map.replace(map.find(".gat"), std::string(".rsw").size(), ".rsw");
     }
     map = g_session.GetMapDisplayName(map.c_str());
-    std::sprintf(text, "%s : %s", LookupMessage(MSI_TWWEB_URL), map.c_str());
+    std::sprintf(text, "%s : %s", LookupMessage(MSI_CLAN_MANAGE_LAND), map.c_str());
     this->DrawTextAt(8, 113, text, 0, 0, 12, 0, 0, 0);
   }
 
@@ -97,54 +97,57 @@ void UIClanInfoManageWnd::Paint() {
     this->DrawBitmap(50, 145, bitmap, true);
   }
 
-  std::sprintf(text, "%s", LookupMessage(MSI_SEND_TO_CLAN));
+  std::sprintf(text, "%s", LookupMessage(MSI_CLAN_MARK));
   this->DrawTextAt(200, 65, text, 0, 0, 12, 0, 0, 0);
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(6, 2, red, green, blue);
-  this->FillRegion(279, 64, 26, 26, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(6, 2, red, green, blue);
+    this->FillRegion(279, 64, 26, 26, RGB(red, green, blue));
+  }
   if (g_clanInfo->m_clanId != 0) {
     this->DrawBitmap(280, 65, this->m_emblem, true);
   }
-  std::sprintf(text, "%s", LookupMessage(MSI_CLAN_MASTER_NAME));
+  std::sprintf(text, "%s", LookupMessage(MSI_ALLY_CLAN));
   this->DrawTextAt(200, 139, text, 0, 0, 12, 0, 0, 0);
-  std::sprintf(text, "%s", LookupMessage(MSI_CLAN_NUM_MEMBER));
+  std::sprintf(text, "%s", LookupMessage(MSI_HOSTILITY_CLAN));
   this->DrawTextAt(200, 213, text, 0, 0, 12, 0, 0, 0);
 
+  unsigned red, green, blue;
   g_skinInfo.PaletteChannels(14, 6, red, green, blue);
   this->FillRegion(200, 155, 168, 48, RGB(red, green, blue));
   int row = 0;
-  int y = 157;
   for (auto relation = g_clanInfo->m_relations.begin(); relation != g_clanInfo->m_relations.end(); ++relation) {
+    const int y = 157 + row * 16;
     if (y >= 205) {
       break;
     }
     if (relation->first == 0) {
       if (row == this->allyRow) {
-        g_skinInfo.PaletteChannels(6, 2, red, green, blue);
-        this->FillRegion(204, y, 80, 16, RGB(red, green, blue));
+        unsigned rowRed, rowGreen, rowBlue;
+        g_skinInfo.PaletteChannels(6, 2, rowRed, rowGreen, rowBlue);
+        this->FillRegion(204, y, 80, 16, RGB(rowRed, rowGreen, rowBlue));
       }
       this->DrawTextAt(204, y, relation->second.c_str(), 0, 0, 12, 0, 0, 0);
       ++row;
-      y += 16;
     }
   }
 
   g_skinInfo.PaletteChannels(14, 6, red, green, blue);
   this->FillRegion(200, 229, 168, 48, RGB(red, green, blue));
   row = 0;
-  y = 231;
   for (auto relation = g_clanInfo->m_relations.begin(); relation != g_clanInfo->m_relations.end(); ++relation) {
+    const int y = 231 + row * 16;
     if (y >= 279) {
       break;
     }
     if (relation->first == 1) {
       if (row == this->hostileRow) {
-        g_skinInfo.PaletteChannels(6, 2, red, green, blue);
-        this->FillRegion(204, y, 80, 16, RGB(red, green, blue));
+        unsigned rowRed, rowGreen, rowBlue;
+        g_skinInfo.PaletteChannels(6, 2, rowRed, rowGreen, rowBlue);
+        this->FillRegion(204, y, 80, 16, RGB(rowRed, rowGreen, rowBlue));
       }
       this->DrawTextAt(204, y, relation->second.c_str(), 0, 0, 12, 0, 0, 0);
       ++row;
-      y += 16;
     }
   }
 }

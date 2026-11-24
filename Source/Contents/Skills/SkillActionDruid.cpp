@@ -1,5 +1,6 @@
 #include "Contents/Actors/ActorEnums.h"
 #include "Contents/Effects/Core/EffectTypes.h"
+#include "Resource/MSGSTRINGID.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/GameActor.h"
@@ -12,6 +13,7 @@
 #include "Contents/Effects/Core/EffectActor.h"
 #include "Contents/Effects/Core/EffectLists.h"
 #include "Contents/Effects/Core/RagEffect.h"
+#include "Contents/Skills/SkillId.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Utility/Cipher/XorBytes.h"
@@ -351,13 +353,13 @@ void CSkillAction_DR_WERERAPTOR::OnSkillEffect(int level, CGameActor* source, CG
 // OFFSET: 0x00620190
 // FUNCTION: fn_04460
 EfstActionMessage CEfstAction_WERERAPTOR::GetEfstBeginMessage() {
-  return {LookupMessage(4648), 0xFFFF00};
+  return {LookupMessage(MSI_DR_WERERAPTOR_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x006201C0
 // FUNCTION: fn_04461
 EfstActionMessage CEfstAction_WERERAPTOR::GetEfstEndMessage() {
-  return {LookupMessage(4649), 0xFF};
+  return {LookupMessage(MSI_DR_WERERAPTOR_OFF), 0xFF};
 }
 
 // OFFSET: 0x00620220
@@ -383,13 +385,13 @@ void CSkillAction_DR_ENRAGE_WOLF::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x00620480
 // FUNCTION: fn_04467
 EfstActionMessage CEfstAction_ENRAGE_WOLF::GetEfstBeginMessage() {
-  return {LookupMessage(4644), 0xFFFF00};
+  return {LookupMessage(MSI_DR_ENRAGE_WOLF_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x006204B0
 // FUNCTION: fn_04468
 EfstActionMessage CEfstAction_ENRAGE_WOLF::GetEfstEndMessage() {
-  return {LookupMessage(4645), 0xFF};
+  return {LookupMessage(MSI_DR_ENRAGE_WOLF_OFF), 0xFF};
 }
 
 // OFFSET: 0x006204E0
@@ -415,13 +417,13 @@ void CSkillAction_DR_BLOOD_HOWLING::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x00620740
 // FUNCTION: fn_04473
 EfstActionMessage CEfstAction_BLOOD_HOWLING::GetEfstBeginMessage() {
-  return {LookupMessage(4646), 0xFFFF00};
+  return {LookupMessage(MSI_DR_BLOOD_HOWLING_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00620770
 // FUNCTION: fn_04474
 EfstActionMessage CEfstAction_BLOOD_HOWLING::GetEfstEndMessage() {
-  return {LookupMessage(4647), 0xFF};
+  return {LookupMessage(MSI_DR_BLOOD_HOWLING_OFF), 0xFF};
 }
 
 // OFFSET: 0x006207A0
@@ -487,13 +489,13 @@ void CSkillAction_DR_ENRAGE_RAPTOR::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x006212C0
 // FUNCTION: fn_04486
 EfstActionMessage CEfstAction_ENRAGE_RAPTOR::GetEfstBeginMessage() {
-  return {LookupMessage(4650), 0xFFFF00};
+  return {LookupMessage(MSI_DR_ENRAGE_RAPTOR_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x006212F0
 // FUNCTION: fn_04487
 EfstActionMessage CEfstAction_ENRAGE_RAPTOR::GetEfstEndMessage() {
-  return {LookupMessage(4651), 0xFF};
+  return {LookupMessage(MSI_DR_ENRAGE_RAPTOR_OFF), 0xFF};
 }
 
 // OFFSET: 0x00621320
@@ -519,13 +521,13 @@ void CSkillAction_DR_PREENING::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x00621570
 // FUNCTION: fn_04492
 EfstActionMessage CEfstAction_PREENING::GetEfstBeginMessage() {
-  return {LookupMessage(4652), 0xFFFF00};
+  return {LookupMessage(MSI_DR_PREENING_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x006215A0
 // FUNCTION: fn_04493
 EfstActionMessage CEfstAction_PREENING::GetEfstEndMessage() {
-  return {LookupMessage(4653), 0xFF};
+  return {LookupMessage(MSI_DR_PREENING_OFF), 0xFF};
 }
 
 // OFFSET: 0x006215D0
@@ -577,16 +579,17 @@ void CSkillAction_DR_LOW_FLIGHT::OnSkillEffect(int level, CGameActor* source, CG
 
   const float scale = source->attackMotion * source->render.speed * 16.0f;
   const bool flag = direction != 1 && direction != 2;
+  const bool horizontal = (direction & 1) != 0;
 
   const std::string effectName(
-    (direction & 1) != 0 ? std::string(OBFUSCATE_TEXT_NAMED("low_flight_horizon", 0x8B65CD61012B5931ULL, horizonName)) : std::string(OBFUSCATE_TEXT_NAMED("low_flight_vertical", 0xF7530137154D8FE5ULL, verticalName))
+    horizontal ? std::string(OBFUSCATE_TEXT_NAMED("low_flight_horizon", 0x8B65CD61012B5931ULL, horizonName)) : std::string(OBFUSCATE_TEXT_NAMED("low_flight_vertical", 0xF7530137154D8FE5ULL, verticalName))
   );
 
+  float angleOffset = 0.0f;
   EffectLists* effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(effectName), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     effect->SetDelay(static_cast<int>(scale));
-    float angleOffset = 0.0f;
-    if ((direction & 1) != 0) {
+    if (horizontal) {
       effect->SetFlipX(flag);
       if (!flag) {
         angleOffset = -180.0f;
@@ -638,13 +641,13 @@ void CSkillAction_DR_NATURE_SHIELD::OnSkillEffect(int level, CGameActor* source,
 // OFFSET: 0x00622440
 // FUNCTION: fn_04505
 EfstActionMessage CEfstAction_NATURE_SHIELD::GetEfstBeginMessage() {
-  return {LookupMessage(4660), 0xFFFF00};
+  return {LookupMessage(MSI_DR_NATURE_SHIELD_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00622470
 // FUNCTION: fn_04506
 EfstActionMessage CEfstAction_NATURE_SHIELD::GetEfstEndMessage() {
-  return {LookupMessage(4661), 0xFF};
+  return {LookupMessage(MSI_DR_NATURE_SHIELD_OFF), 0xFF};
 }
 
 // OFFSET: 0x006224A0
@@ -675,13 +678,13 @@ int CEfstAction_GROUND_GROW::GetEffectId(int efstId, int argument4) {
 // OFFSET: 0x00622920
 // FUNCTION: fn_04509
 EfstActionMessage CEfstAction_NATURE_PROTECTION::GetEfstBeginMessage() {
-  return {LookupMessage(4666), 0xFFFF00};
+  return {LookupMessage(MSI_KR_NATURE_PROTECTION_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00622950
 // FUNCTION: fn_04510
 EfstActionMessage CEfstAction_NATURE_PROTECTION::GetEfstEndMessage() {
-  return {LookupMessage(4667), 0xFF};
+  return {LookupMessage(MSI_KR_NATURE_PROTECTION_OFF), 0xFF};
 }
 
 // OFFSET: 0x00622980
@@ -721,7 +724,7 @@ void CEfstAction_THUNDERING_ROD::OnEfstEnd(int efstId, int argument2, int argume
 // FUNCTION: fn_04515
 int CEfstAction_THUNDERING_ROD::GetEffectId(int efstId, int argument4) {
   const int step = argument4 - 1;
-  if (static_cast<unsigned int>(step) <= 5) {
+  if (step >= 0 && step < 6) {
     std::string suffix = std::format("{:02}", step);
     return CEZ2STREffectMgr::GetInstance()->EffectId(std::string(OBFUSCATE_TEXT_NAMED("thundering_rod_", 0x0BEB63A5C905B3A7ULL, prefixName)) + suffix);
   }
@@ -732,13 +735,13 @@ int CEfstAction_THUNDERING_ROD::GetEffectId(int efstId, int argument4) {
 // OFFSET: 0x00622DD0
 // FUNCTION: fn_04516
 EfstActionMessage CEfstAction_THUNDERING_ROD_MAX::GetEfstBeginMessage() {
-  return {LookupMessage(4688), 0xFFFF00};
+  return {LookupMessage(MSI_THUNDERING_ROD_MAX_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00622E00
 // FUNCTION: fn_04517
 EfstActionMessage CEfstAction_THUNDERING_ROD_MAX::GetEfstEndMessage() {
-  return {LookupMessage(4689), 0xFF};
+  return {LookupMessage(MSI_THUNDERING_ROD_MAX_OFF), 0xFF};
 }
 
 // OFFSET: 0x00622E30
@@ -784,13 +787,13 @@ void CSkillAction_DR_TRUTH_OF_EARTH::OnSkillEffect(int level, CGameActor* source
 // OFFSET: 0x006233D0
 // FUNCTION: fn_04523
 EfstActionMessage CEfstAction_TRUTH_OF_EARTH::GetEfstBeginMessage() {
-  return {LookupMessage(4654), 0xFFFF00};
+  return {LookupMessage(MSI_DR_TRUTH_OF_EARTH_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00623400
 // FUNCTION: fn_04524
 EfstActionMessage CEfstAction_TRUTH_OF_EARTH::GetEfstEndMessage() {
-  return {LookupMessage(4655), 0xFF};
+  return {LookupMessage(MSI_DR_TRUTH_OF_EARTH_OFF), 0xFF};
 }
 
 // OFFSET: 0x00623430
@@ -830,13 +833,13 @@ void CSkillAction_DR_TRUTH_OF_ICE::OnSkillEffect(int level, CGameActor* source, 
 // OFFSET: 0x00623820
 // FUNCTION: fn_04529
 EfstActionMessage CEfstAction_TRUTH_OF_ICE::GetEfstBeginMessage() {
-  return {LookupMessage(4658), 0xFFFF00};
+  return {LookupMessage(MSI_DR_TRUTH_OF_ICE_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00623850
 // FUNCTION: fn_04530
 EfstActionMessage CEfstAction_TRUTH_OF_ICE::GetEfstEndMessage() {
-  return {LookupMessage(4659), 0xFF};
+  return {LookupMessage(MSI_DR_TRUTH_OF_ICE_OFF), 0xFF};
 }
 
 // OFFSET: 0x00623880
@@ -876,13 +879,13 @@ void CSkillAction_DR_TRUTH_OF_WIND::OnSkillEffect(int level, CGameActor* source,
 // OFFSET: 0x00623C70
 // FUNCTION: fn_04535
 EfstActionMessage CEfstAction_TRUTH_OF_WIND::GetEfstBeginMessage() {
-  return {LookupMessage(4656), 0xFFFF00};
+  return {LookupMessage(MSI_DR_TRUTH_OF_WIND_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00623CA0
 // FUNCTION: fn_04536
 EfstActionMessage CEfstAction_TRUTH_OF_WIND::GetEfstEndMessage() {
-  return {LookupMessage(4657), 0xFF};
+  return {LookupMessage(MSI_DR_TRUTH_OF_WIND_OFF), 0xFF};
 }
 
 // OFFSET: 0x00623CD0
@@ -914,7 +917,8 @@ void CSkillAction_DR_CUTTING_WIND::OnSkillEffect(int level, CGameActor* source, 
 
   EffectLists* effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("cutting_wind", 0x4F1791FB1503C713ULL, name)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
-    effect->SetAngle(ScreenAngle(&target->render.position.x, &source->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values));
+    const float angle = ScreenAngle(&target->render.position.x, &source->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
+    effect->SetAngle(angle);
   }
 }
 
@@ -956,11 +960,12 @@ void CSkillAction_DR_WIND_BOMB::OnSkillEffect(int level, CGameActor* source, CGa
     return;
   }
 
-  if (CEffect* effect = g_effectMgr->Spawn(source->render.accountId, 0x9A4, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
+  EffectLists* effects = g_effectMgr;
+  if (CEffect* effect = effects->Spawn(source->render.accountId, EF_UNK_2468, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     static_cast<CBezierArcThrowEffect*>(effect)->SetTarget(target->render.position);
   }
 
-  EffectLists* effects = g_effectMgr;
+  effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("wind_bomb_main", 0xD1538513DF975701ULL, effectName)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     effect->SetDelay(300);
   }
@@ -1050,13 +1055,13 @@ void CSkillAction_DR_WEREWOLF::OnSkillEffect(int level, CGameActor* source, CGam
 // OFFSET: 0x006253A0
 // FUNCTION: fn_04553
 EfstActionMessage CEfstAction_WEREWOLF::GetEfstBeginMessage() {
-  return {LookupMessage(4642), 0xFFFF00};
+  return {LookupMessage(MSI_DR_WEREWOLF_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x006253D0
 // FUNCTION: fn_04554
 EfstActionMessage CEfstAction_WEREWOLF::GetEfstEndMessage() {
-  return {LookupMessage(4643), 0xFF};
+  return {LookupMessage(MSI_DR_WEREWOLF_OFF), 0xFF};
 }
 
 // OFFSET: 0x00620270
@@ -1138,7 +1143,8 @@ void CSkillAction_DR_SHOOTING_FEATHER::OnSkillEffect(int level, CGameActor* sour
 
   EffectLists* effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("shooting_feather", 0x93E7A3A1F587CDC5ULL, name)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
-    effect->SetAngle(ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values));
+    const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
+    effect->SetAngle(angle);
   }
 }
 
@@ -1167,74 +1173,74 @@ void CEfstAction_WERERAPTOR::OnEfstBegin(int efstId, int value, int argument3, i
 }
 
 // GLOBAL: gl_25684
-static EfstActionRegistrar s_efstAction1678(1678, NewAction<CEfstAction_BLOOD_HOWLING, CEfstAction>);
+static EfstActionRegistrar s_efstActionBloodHowling{EFST_BLOOD_HOWLING, NewAction<CEfstAction_BLOOD_HOWLING, CEfstAction>};
 // GLOBAL: gl_25685
-static EfstActionRegistrar s_efstAction1681(1681, NewAction<CEfstAction_ENRAGE_RAPTOR, CEfstAction>);
+static EfstActionRegistrar s_efstActionEnrageRaptor{EFST_ENRAGE_RAPTOR, NewAction<CEfstAction_ENRAGE_RAPTOR, CEfstAction>};
 // GLOBAL: gl_25686
-static EfstActionRegistrar s_efstAction1676(1676, NewAction<CEfstAction_ENRAGE_WOLF, CEfstAction>);
+static EfstActionRegistrar s_efstActionEnrageWolf{EFST_ENRAGE_WOLF, NewAction<CEfstAction_ENRAGE_WOLF, CEfstAction>};
 // GLOBAL: gl_25687
-static EfstActionRegistrar s_efstAction1697(1697, NewAction<CEfstAction_GROUND_GROW, CEfstAction>);
+static EfstActionRegistrar s_efstActionGroundGrow{EFST_GROUND_GROW, NewAction<CEfstAction_GROUND_GROW, CEfstAction>};
 // GLOBAL: gl_25688
-static EfstActionRegistrar s_efstAction1698(1698, NewAction<CEfstAction_NATURE_PROTECTION, CEfstAction>);
+static EfstActionRegistrar s_efstActionNatureProtection{EFST_NATURE_PROTECTION, NewAction<CEfstAction_NATURE_PROTECTION, CEfstAction>};
 // GLOBAL: gl_25689
-static EfstActionRegistrar s_efstAction1687(1687, NewAction<CEfstAction_NATURE_SHIELD, CEfstAction>);
+static EfstActionRegistrar s_efstActionNatureShield{EFST_NATURE_SHIELD, NewAction<CEfstAction_NATURE_SHIELD, CEfstAction>};
 // GLOBAL: gl_25690
-static EfstActionRegistrar s_efstAction1682(1682, NewAction<CEfstAction_PREENING, CEfstAction>);
+static EfstActionRegistrar s_efstActionPreening{EFST_PREENING, NewAction<CEfstAction_PREENING, CEfstAction>};
 // GLOBAL: gl_25691
-static EfstActionRegistrar s_efstAction1695(1695, NewAction<CEfstAction_THUNDERING_ROD, CEfstAction>);
+static EfstActionRegistrar s_efstActionThunderingRod{EFST_THUNDERING_ROD, NewAction<CEfstAction_THUNDERING_ROD, CEfstAction>};
 // GLOBAL: gl_25692
-static EfstActionRegistrar s_efstAction1696(1696, NewAction<CEfstAction_THUNDERING_ROD_MAX, CEfstAction>);
+static EfstActionRegistrar s_efstActionThunderingRodMax{EFST_THUNDERING_ROD_MAX, NewAction<CEfstAction_THUNDERING_ROD_MAX, CEfstAction>};
 // GLOBAL: gl_25693
-static EfstActionRegistrar s_efstAction1686(1686, NewAction<CEfstAction_TRUTH_OF_EARTH, CEfstAction>);
+static EfstActionRegistrar s_efstActionTruthOfEarth{EFST_TRUTH_OF_EARTH, NewAction<CEfstAction_TRUTH_OF_EARTH, CEfstAction>};
 // GLOBAL: gl_25694
-static EfstActionRegistrar s_efstAction1684(1684, NewAction<CEfstAction_TRUTH_OF_ICE, CEfstAction>);
+static EfstActionRegistrar s_efstActionTruthOfIce{EFST_TRUTH_OF_ICE, NewAction<CEfstAction_TRUTH_OF_ICE, CEfstAction>};
 // GLOBAL: gl_25695
-static EfstActionRegistrar s_efstAction1685(1685, NewAction<CEfstAction_TRUTH_OF_WIND, CEfstAction>);
+static EfstActionRegistrar s_efstActionTruthOfWind{EFST_TRUTH_OF_WIND, NewAction<CEfstAction_TRUTH_OF_WIND, CEfstAction>};
 // GLOBAL: gl_25696
-static EfstActionRegistrar s_efstAction1680(1680, NewAction<CEfstAction_WERERAPTOR, CEfstAction>);
+static EfstActionRegistrar s_efstActionWereraptor{EFST_WERERAPTOR, NewAction<CEfstAction_WERERAPTOR, CEfstAction>};
 // GLOBAL: gl_25697
-static EfstActionRegistrar s_efstAction1675(1675, NewAction<CEfstAction_WEREWOLF, CEfstAction>);
+static EfstActionRegistrar s_efstActionWerewolf{EFST_WEREWOLF, NewAction<CEfstAction_WEREWOLF, CEfstAction>};
 // GLOBAL: gl_25698
-static SkillActionRegistrar s_skillAction6546(6546, NewAction<CSkillAction_DR_AROUND_FLOWER, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrAroundFlower{DR_AROUND_FLOWER, NewAction<CSkillAction_DR_AROUND_FLOWER, CSkillAction>};
 // GLOBAL: gl_25699
-static SkillActionRegistrar s_skillAction6529(6529, NewAction<CSkillAction_DR_BLOOD_HOWLING, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrBloodHowling{DR_BLOOD_HOWLING, NewAction<CSkillAction_DR_BLOOD_HOWLING, CSkillAction>};
 // GLOBAL: gl_25700
-static SkillActionRegistrar s_skillAction6527(6527, NewAction<CSkillAction_DR_CRUEL_BITE, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrCruelBite{DR_CRUEL_BITE, NewAction<CSkillAction_DR_CRUEL_BITE, CSkillAction>};
 // GLOBAL: gl_25701
-static SkillActionRegistrar s_skillAction6542(6542, NewAction<CSkillAction_DR_CUTTING_WIND, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrCuttingWind{DR_CUTTING_WIND, NewAction<CSkillAction_DR_CUTTING_WIND, CSkillAction>};
 // GLOBAL: gl_25702
-static SkillActionRegistrar s_skillAction6545(6545, NewAction<CSkillAction_DR_EARTH_FLOWER, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrEarthFlower{DR_EARTH_FLOWER, NewAction<CSkillAction_DR_EARTH_FLOWER, CSkillAction>};
 // GLOBAL: gl_25703
-static SkillActionRegistrar s_skillAction6532(6532, NewAction<CSkillAction_DR_ENRAGE_RAPTOR, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrEnrageRaptor{DR_ENRAGE_RAPTOR, NewAction<CSkillAction_DR_ENRAGE_RAPTOR, CSkillAction>};
 // GLOBAL: gl_25704
-static SkillActionRegistrar s_skillAction6525(6525, NewAction<CSkillAction_DR_ENRAGE_WOLF, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrEnrageWolf{DR_ENRAGE_WOLF, NewAction<CSkillAction_DR_ENRAGE_WOLF, CSkillAction>};
 // GLOBAL: gl_25705
-static SkillActionRegistrar s_skillAction6534(6534, NewAction<CSkillAction_DR_FLICKING_TONADO, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrFlickingTonado{DR_FLICKING_TONADO, NewAction<CSkillAction_DR_FLICKING_TONADO, CSkillAction>};
 // GLOBAL: gl_25706
-static SkillActionRegistrar s_skillAction6528(6528, NewAction<CSkillAction_DR_HUNGER, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrHunger{DR_HUNGER, NewAction<CSkillAction_DR_HUNGER, CSkillAction>};
 // GLOBAL: gl_25707
-static SkillActionRegistrar s_skillAction6540(6540, NewAction<CSkillAction_DR_ICE_CLOUD, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrIceCloud{DR_ICE_CLOUD, NewAction<CSkillAction_DR_ICE_CLOUD, CSkillAction>};
 // GLOBAL: gl_25708
-static SkillActionRegistrar s_skillAction6539(6539, NewAction<CSkillAction_DR_ICE_TOTEM, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrIceTotem{DR_ICE_TOTEM, NewAction<CSkillAction_DR_ICE_TOTEM, CSkillAction>};
 // GLOBAL: gl_25709
-static SkillActionRegistrar s_skillAction6535(6535, NewAction<CSkillAction_DR_LOW_FLIGHT, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrLowFlight{DR_LOW_FLIGHT, NewAction<CSkillAction_DR_LOW_FLIGHT, CSkillAction>};
 // GLOBAL: gl_25710
-static SkillActionRegistrar s_skillAction6547(6547, NewAction<CSkillAction_DR_NATURE_SHIELD, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrNatureShield{DR_NATURE_SHIELD, NewAction<CSkillAction_DR_NATURE_SHIELD, CSkillAction>};
 // GLOBAL: gl_25711
-static SkillActionRegistrar s_skillAction6526(6526, NewAction<CSkillAction_DR_NOMERCY_CLAW, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrNomercyClaw{DR_NOMERCY_CLAW, NewAction<CSkillAction_DR_NOMERCY_CLAW, CSkillAction>};
 // GLOBAL: gl_25712
-static SkillActionRegistrar s_skillAction6536(6536, NewAction<CSkillAction_DR_PREENING, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrPreening{DR_PREENING, NewAction<CSkillAction_DR_PREENING, CSkillAction>};
 // GLOBAL: gl_25713
-static SkillActionRegistrar s_skillAction6533(6533, NewAction<CSkillAction_DR_SHOOTING_FEATHER, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrShootingFeather{DR_SHOOTING_FEATHER, NewAction<CSkillAction_DR_SHOOTING_FEATHER, CSkillAction>};
 // GLOBAL: gl_25714
-static SkillActionRegistrar s_skillAction6544(6544, NewAction<CSkillAction_DR_TRUTH_OF_EARTH, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrTruthOfEarth{DR_TRUTH_OF_EARTH, NewAction<CSkillAction_DR_TRUTH_OF_EARTH, CSkillAction>};
 // GLOBAL: gl_25715
-static SkillActionRegistrar s_skillAction6538(6538, NewAction<CSkillAction_DR_TRUTH_OF_ICE, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrTruthOfIce{DR_TRUTH_OF_ICE, NewAction<CSkillAction_DR_TRUTH_OF_ICE, CSkillAction>};
 // GLOBAL: gl_25716
-static SkillActionRegistrar s_skillAction6541(6541, NewAction<CSkillAction_DR_TRUTH_OF_WIND, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrTruthOfWind{DR_TRUTH_OF_WIND, NewAction<CSkillAction_DR_TRUTH_OF_WIND, CSkillAction>};
 // GLOBAL: gl_25717
-static SkillActionRegistrar s_skillAction6531(6531, NewAction<CSkillAction_DR_WERERAPTOR, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrWereraptor{DR_WERERAPTOR, NewAction<CSkillAction_DR_WERERAPTOR, CSkillAction>};
 // GLOBAL: gl_25718
-static SkillActionRegistrar s_skillAction6524(6524, NewAction<CSkillAction_DR_WEREWOLF, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrWerewolf{DR_WEREWOLF, NewAction<CSkillAction_DR_WEREWOLF, CSkillAction>};
 // GLOBAL: gl_25719
-static SkillActionRegistrar s_skillAction6543(6543, NewAction<CSkillAction_DR_WIND_BOMB, CSkillAction>);
+static SkillActionRegistrar s_skillActionDrWindBomb{DR_WIND_BOMB, NewAction<CSkillAction_DR_WIND_BOMB, CSkillAction>};

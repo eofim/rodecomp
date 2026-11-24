@@ -13,6 +13,7 @@ public:
   /* 00CC */ std::vector<CEZ2STRParticle*> particles;
 
   CTalismanMarkEffect();
+  ~CTalismanMarkEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -21,6 +22,9 @@ public:
 
   void PlayEnd();
   __declspec(noinline) void UpdateParticle(CEZ2STRParticle* particle);
+
+private:
+  static void __stdcall RenderParticle(CEZ2STRParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

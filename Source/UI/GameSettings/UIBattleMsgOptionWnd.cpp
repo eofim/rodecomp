@@ -49,7 +49,7 @@ UIBattleMsgOptionWnd::UIBattleMsgOptionWnd() : UIFrameWnd(0) {
   this->messages.push_back(LookupMessage(MSI_VIEW_WHISPER_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_PARTY_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_GUILD_MSG));
-  this->messages.push_back(LookupMessage(MSI_REFINING_POSSIBLE));
+  this->messages.push_back(LookupMessage(MSI_ALLY_CHAT_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_GET_ITEM_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_EQUIP_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_CHANGE_STATUS_MSG));
@@ -65,10 +65,10 @@ UIBattleMsgOptionWnd::UIBattleMsgOptionWnd() : UIFrameWnd(0) {
   this->messages.push_back(LookupMessage(MSI_VIEW_GETTING_EXP_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_QUEST_INFO_MSG));
   this->messages.push_back(LookupMessage(MSI_VIEW_BATTLEFIELD_INFO_MSG));
-  this->messages.push_back(LookupMessage(MSI_STR_MAKECHARACTER));
-  this->messages.push_back(LookupMessage(MSI_RESULT_FAILED_ASSISTANT_POS));
-  this->messages.push_back(LookupMessage(MSI_ALLY_CHAT_MSG));
-  this->messages.push_back(LookupMessage(MSI_PAY_CONFIRM_BY_NYANGVINE_FRUIT));
+  this->messages.push_back(LookupMessage(MSI_VIEW_CLAN_MSG));
+  this->messages.push_back(LookupMessage(MSI_BLOCK_CALL_NOTIFY));
+  this->messages.push_back(LookupMessage(MSI_GUILD_EXP_TRIBUTE));
+  this->messages.push_back(LookupMessage(MSI_VIEW_CHANGE_EQUIPMENT_PROPERTIES_MSG));
 
   this->text = LookupMessage(MSI_BATTLE_CHAT_WND_OPTION);
 }
@@ -136,11 +136,12 @@ void UIBattleMsgOptionWnd::OnLBtnDown(int x, int y) {
 
   if (this->hoveredOption != -1) {
     this->optionStates[this->hoveredOption] = this->optionStates[this->hoveredOption] == 0;
+    const int& window = this->chatWindowIndex;
     const bool state = this->optionStates[this->hoveredOption];
     if (this->useMainChatOptions) {
-      g_session.m_noSubChatWnds[this->chatWindowIndex].options[this->hoveredOption] = state;
+      g_session.m_noSubChatWnds[window].options[this->hoveredOption] = state;
     } else {
-      g_session.m_subChatWnds[this->chatWindowIndex].options[this->hoveredOption] = state;
+      g_session.m_subChatWnds[window].options[this->hoveredOption] = state;
     }
     this->allChecked = 1;
     for (int i = 0; i < 25; ++i) {
@@ -173,8 +174,8 @@ void UIBattleMsgOptionWnd::UpdateScrollBar() {
     return;
   }
 
-  const int total = static_cast<int>(this->messages.size()) + (this->messages.empty() ? -1 : 0);
   const int visible = this->m_visibleRows;
+  const int total = static_cast<int>(this->messages.size()) + (this->messages.empty() ? -1 : 0);
   const int range = total - visible < 0 ? 0 : total - visible;
   this->m_scrollable = range != 0;
   if (range != 0) {
@@ -220,9 +221,14 @@ void UIBattleMsgOptionWnd::Paint() {
   this->DrawButtonBar(0, 0, 1);
 
   int index = 0;
+  std::vector<const char*>::iterator it = this->messages.begin();
+  if (it == this->messages.end()) {
+    return;
+  }
+
   int row = 1;
   int y = 22;
-  for (std::vector<const char*>::iterator it = this->messages.begin(); it != this->messages.end(); ++it, ++index) {
+  for (; it != this->messages.end(); ++it, ++index) {
     if (std::strcmp(LookupMessage(MSI_VIEW_SEEK_PARTY), *it) == 0 || index < this->scrollPosition) {
       continue;
     }
@@ -256,20 +262,20 @@ int UIBattleMsgOptionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
   case UM_COMMAND:
     switch (a) {
     case ID_OPTION: {
-      if (this->chatWindowIndex == b && this->useMainChatOptions == (c != 0)) {
+      if (this->chatWindowIndex == b && this->useMainChatOptions == static_cast<unsigned char>(c != 0)) {
         if (d != 2) {
           g_windowMgr.CloseWindow(WID_BATTLEMSGOPTIONWND);
           return 0;
         }
       } else if (d == 1) {
-        return 0;
+        break;
       }
 
       this->chatWindowIndex = b;
       this->useMainChatOptions = c != 0;
       SubChatWndInfo info;
-      info = (this->useMainChatOptions ? g_session.m_noSubChatWnds : g_session.m_subChatWnds)[this->chatWindowIndex];
-      if (!info.name.empty()) {
+      info = (!this->useMainChatOptions ? g_session.m_subChatWnds : g_session.m_noSubChatWnds)[this->chatWindowIndex];
+      if (info.name.size() > 0) {
         this->allChecked = 1;
         for (int i = 0; i < 25; ++i) {
           this->optionStates[i] = info.options[i];
@@ -277,17 +283,15 @@ int UIBattleMsgOptionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
             this->allChecked = 0;
           }
         }
-        {
-          auto* allCheckBox = this->m_allCheckBox;
-          allCheckBox->geometry.state = this->allChecked;
-          allCheckBox->Invalidate();
-        }
+        UICheckBox* allCheckBox = this->m_allCheckBox;
+        allCheckBox->geometry.state = this->allChecked;
+        allCheckBox->Invalidate();
         this->text = info.name;
         this->text += LookupMessage(MSI_SET_CHATINFO);
         this->Invalidate();
       }
       this->UpdateScrollBar();
-      return 0;
+      break;
     }
     case ID_CLOSE:
       g_windowMgr.CloseWindow(WID_BATTLEMSGOPTIONWND);
@@ -295,12 +299,16 @@ int UIBattleMsgOptionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     case ID_CHECK:
       this->allChecked = b;
       for (int i = 0; i < 25; ++i) {
-        const bool checked = this->allChecked != 0;
-        this->optionStates[i] = checked;
-        (this->useMainChatOptions ? g_session.m_noSubChatWnds : g_session.m_subChatWnds)[this->chatWindowIndex].options[i] = checked;
+        if (this->useMainChatOptions) {
+          g_session.m_noSubChatWnds[this->chatWindowIndex].options[i] = this->optionStates[i] = this->allChecked != 0;
+        } else {
+          g_session.m_subChatWnds[this->chatWindowIndex].options[i] = this->optionStates[i] = this->allChecked != 0;
+        }
       }
       this->Invalidate();
       return 0;
+    default:
+      break;
     }
     return 0;
 
@@ -311,7 +319,7 @@ int UIBattleMsgOptionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     if (message == UM_SCROLLVERTPAGEUP) {
       this->scrollPosition = previous - this->m_visibleRows + 1;
     } else if (message == UM_SCROLLVERTPAGEDOWN) {
-      this->scrollPosition = previous + this->m_visibleRows - 1;
+      this->scrollPosition = previous + (this->m_visibleRows - 1);
     } else {
       this->scrollPosition = previous + static_cast<int>(a);
     }
@@ -321,7 +329,7 @@ int UIBattleMsgOptionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     }
     return this->scrollPosition - previous;
   }
+  default:
+    return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
-
-  return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
 }

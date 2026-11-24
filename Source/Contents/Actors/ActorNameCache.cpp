@@ -22,9 +22,6 @@ static_assert(sizeof(ActorNameCacheHeader) == 4);
 static_assert(sizeof(ActorNameCardRecord) == 8);
 static_assert(sizeof(ActorNameStringRecord) == 4);
 
-template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const std::uint32_t, CActorNameCard>>>, std::_Iterator_base0>&
-std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const std::uint32_t, CActorNameCard>>>, std::_Iterator_base0>::operator++() noexcept;
-
 // OFFSET: 0x005BFA60
 // FUNCTION: fn_03499
 std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
@@ -32,7 +29,7 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
     return 0;
   }
 
-  std::vector<char> buffer(0x400);
+  std::vector<char> buffer(0x400, 0);
   std::size_t offset = 4;
   reinterpret_cast<ActorNameCacheHeader*>(buffer.data())->count = this->cards.size();
 
@@ -40,7 +37,8 @@ std::size_t CActorNameCardHolder::Save(std::vector<char>& output) {
     const CActorNameCard& card = it->second;
     const std::size_t needed = card.name.size() + card.partyName.size() + card.guildName.size() + card.clanName.size() + 0x14 + offset;
     if (buffer.size() < needed) {
-      buffer.resize(needed + 1, 0);
+      const std::size_t size = needed + 1;
+      buffer.resize(size, 0);
     }
 
     reinterpret_cast<ActorNameCardRecord*>(&buffer[offset])->id = it->first;

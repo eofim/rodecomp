@@ -8,9 +8,19 @@ struct OrientedBounds;
 struct WorldSpatialTree;
 class GroundGeometry;
 
+struct PlaneNormal {
+  // INLINED
+  PlaneNormal() : x(0.0f), y(0.0f), z(0.0f) {
+  }
+
+  /* 0000 */ float x;
+  /* 0004 */ float y;
+  /* 0008 */ float z;
+};
+
 struct ModelViewPlanes {
   /* 0010 */ float planes[6][4];
-  /* 0070 */ float normals[6][3];
+  /* 0070 */ PlaneNormal normals[6];
 };
 
 struct WorldViewSpatial {
@@ -25,6 +35,7 @@ struct WorldViewSpatial {
   int ClassifyOriented(const OrientedBounds& bounds) const;
   void Collect(float horizontal, float vertical, const float* matrix, WorldSpatialTree& root);
   void CollectNode(WorldSpatialTree* node, int depth, bool fullyInside);
+  void ClearVisibility();
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

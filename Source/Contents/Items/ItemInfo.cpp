@@ -16,10 +16,6 @@
 #include <list>
 #include <vector>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 namespace {
 #pragma pack(push, 1)
   struct ItemRecordHeader {
@@ -63,8 +59,6 @@ unsigned char g_digitCharacters[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-template std::list<ITEM_INFO>::iterator std::list<ITEM_INFO>::erase(std::list<ITEM_INFO>::const_iterator) noexcept;
-
 // OFFSET: 0x006D47E0
 // FUNCTION: fn_06562
 __declspec(noinline) ITEM_INFO::ITEM_INFO() {
@@ -79,30 +73,7 @@ __declspec(noinline) ITEM_INFO::ITEM_INFO(int) {
 
 // OFFSET: 0x005D8F90
 // FUNCTION: fn_03753
-ITEM_INFO::ITEM_INFO(const ITEM_INFO& other) : itemId(other.itemId), displayName(other.displayName) {
-  std::memcpy(this->identity, other.identity, sizeof(this->identity));
-  this->quantity = other.quantity;
-  std::memcpy(this->prices, other.prices, sizeof(this->prices));
-  std::memcpy(this->cards, other.cards, sizeof(this->cards));
-  this->identified = other.identified;
-  this->damaged = other.damaged;
-  this->refiningLevel = other.refiningLevel;
-  this->bindOnEquip = other.bindOnEquip;
-  this->durationInHours = other.durationInHours;
-  this->expireTime = other.expireTime;
-  this->priceFactor = other.priceFactor;
-  this->sprite = other.sprite;
-  std::memcpy(this->flags, other.flags, sizeof(this->flags));
-  this->saleData = other.saleData;
-  this->grade = other.grade;
-  this->productId = other.productId;
-  this->optionCount = other.optionCount;
-  std::memcpy(this->options, other.options, sizeof(this->options));
-  std::memcpy(this->recordIds, other.recordIds, sizeof(this->recordIds));
-  this->recordType = other.recordType;
-  std::memcpy(this->recordName, other.recordName, sizeof(this->recordName));
-  std::memcpy(this->recordDate, other.recordDate, sizeof(this->recordDate));
-}
+ITEM_INFO::ITEM_INFO(const ITEM_INFO& other) = default;
 
 // OFFSET: 0x006D52B0
 // FUNCTION: fn_06569
@@ -124,12 +95,12 @@ __declspec(noinline) ITEM_INFO& ITEM_INFO::operator=(const ITEM_INFO& other) {
   this->expireTime = other.expireTime;
   this->priceFactor = other.priceFactor;
   this->sprite = other.sprite;
-  this->flags[0] = other.flags[0];
-  this->flags[1] = other.flags[1];
-  this->flags[2] = other.flags[2];
+  this->placeEtcTab = other.placeEtcTab;
+  this->selected = other.selected;
+  this->flagged = other.flagged;
   this->optionCount = other.optionCount;
   memcpy_s(this->options, sizeof(this->options), other.options, sizeof(other.options));
-  this->flags[3] = other.flags[3];
+  this->uniqueItem = other.uniqueItem;
   this->saleData.costume = other.saleData.costume;
   this->saleData.purchaseCount = other.saleData.purchaseCount;
   this->saleData.startTime = other.saleData.startTime;
@@ -164,7 +135,7 @@ std::uint32_t ITEM_INFO::Assign(const ModeDragState& item) {
   }
 
   this->grade = item.grade;
-  this->flags[3] = item.uniqueItem;
+  this->uniqueItem = item.uniqueItem;
   this->identity[2] = item.equipmentLocation;
   this->sprite = static_cast<std::uint32_t>(item.viewId);
 
@@ -191,11 +162,12 @@ void ITEM_INFO::Reset() {
   this->expireTime = 0;
   this->priceFactor = 0;
   this->sprite = 0;
+  this->placeEtcTab = 0;
+  this->selected = 0;
+  this->flagged = 0;
   this->optionCount = 0;
   SecureZeroMemory(this->options, sizeof(this->options));
-  for (int index = 0; index < 4; ++index) {
-    this->flags[index] = 0;
-  }
+  this->uniqueItem = 0;
   this->saleData.costume = 0;
   this->saleData.startTime = 0;
   this->saleData.endTime = 0;
@@ -250,7 +222,7 @@ ITEM_INFO& ITEM_INFO::AssignBasic(const RawItemBasic& item) {
   this->itemId = item.itemId;
   this->sprite = item.sprite;
   this->identity[2] = item.location;
-  this->flags[3] = item.id != -1;
+  this->uniqueItem = item.id != -1;
   return *this;
 }
 
@@ -260,25 +232,30 @@ bool ITEM_INFO::operator<(const ITEM_INFO& other) const {
   return this->displayName < other.displayName;
 }
 
+// INLINED
+static bool HasItemCardName(int id) {
+  return g_itemCardNames.find(id) != g_itemCardNames.end();
+}
+
 // OFFSET: 0x006D8B60
 // FUNCTION: fn_06607
 std::list<int> SearchItemIds(std::string query, unsigned char cardsOnly, unsigned char partial) {
   std::list<int> result;
-  for (const auto& entry : g_itemDescriptions) {
-    if (cardsOnly == 1 && g_itemCardNames.find(entry.first) == g_itemCardNames.end()) {
+  for (auto entryIt = g_itemDescriptions.begin(); entryIt != g_itemDescriptions.end(); ++entryIt) {
+    const auto& entry = *entryIt;
+    if (cardsOnly == 1 && !HasItemCardName(entry.first)) {
       continue;
     }
 
-    const char* name = entry.second.identifiedName;
-    if (name == nullptr || *name == '\0') {
+    if (entry.second.identifiedName == nullptr || *entry.second.identifiedName == '\0') {
       continue;
     }
 
-    if (MatchItemName(name, query, partial, &result, entry.first)) {
+    if (MatchItemName(entry.second.identifiedName, query, partial, &result, entry.first)) {
       continue;
     }
 
-    if (g_itemCardNames.find(entry.first) == g_itemCardNames.end()) {
+    if (!HasItemCardName(entry.first)) {
       continue;
     }
 
@@ -327,9 +304,9 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
     return 0xFFFFFFFF;
   }
 
-  std::uint32_t offset = 6;
   ItemRecordHeader header;
   header.Read(data.data());
+  std::uint32_t offset = 6;
   if (281 != header.id) {
     return 0xFFFFFFFF;
   }
@@ -435,16 +412,18 @@ std::uint32_t ITEM_INFO::Deserialize(const std::vector<unsigned char>& data) {
 
 // OFFSET: 0x00DFB9D0
 // FUNCTION: fn_23584
-bool CSession::HasRequiredItems() const {
-  for (auto it = this->m_storageItems.begin(); it != this->m_storageItems.end(); ++it) {
+int CSession::HasRequiredItems() const {
+  auto it = this->m_storageItems.begin();
+  while (it != this->m_storageItems.end()) {
     const ITEM_INFO& required = *it;
     const ITEM_INFO owned = this->LookupClientItemByIdentity(required.identity[1]);
     if (owned.identity[1] <= 0 || owned.quantity < required.quantity) {
-      return false;
+      return 0;
     }
+    ++it;
   }
 
-  return true;
+  return 1;
 }
 
 // OFFSET: 0x00DFBD90
@@ -483,8 +462,10 @@ bool CSession::HasItemId(int itemId) const {
     return true;
   }
 
+  const ITEM_INFO* const equipped = this->equippedItems;
+  const ITEM_INFO* const costume = this->costumeItems;
   for (int index = 0; index < 10; ++index) {
-    if (std::atoi(this->equippedItems[index].itemId.c_str()) == itemId || std::atoi(this->costumeItems[index].itemId.c_str()) == itemId) {
+    if (std::atoi(equipped[index].itemId.c_str()) == itemId || std::atoi(costume[index].itemId.c_str()) == itemId) {
       return true;
     }
   }
@@ -530,7 +511,7 @@ bool ITEM_INFO::IsApprenticeItem() const {
 // OFFSET: 0x006D8920
 // FUNCTION: fn_06601
 bool ITEM_INFO::IsForgeMaterial() const {
-  return std::atoi(this->itemId.c_str()) == 1000 || this->IsElementalStone();
+  return std::atoi(this->itemId.c_str()) == ITEMID_STAR_CRUMB || this->IsElementalStone();
 }
 
 // OFFSET: 0x006D8980
@@ -640,6 +621,12 @@ bool LoadItemIntegerTable(std::vector<int>& values, const char* name) {
   return true;
 }
 
+// INLINED
+static void ReadBytes(std::vector<unsigned char>& buffer, const std::vector<unsigned char>& data, int& offset, int size) {
+  std::memcpy(buffer.data(), data.data() + offset, size);
+  offset += size;
+}
+
 // OFFSET: 0x00E48E90
 // FUNCTION: fn_24229
 int ReadItemList(std::list<ITEM_INFO>& items, int offset, int size, const std::vector<unsigned char>& data) {
@@ -648,8 +635,7 @@ int ReadItemList(std::list<ITEM_INFO>& items, int offset, int size, const std::v
   }
 
   std::vector<unsigned char> buffer(size, 0);
-  std::memcpy(buffer.data(), data.data() + offset, size);
-  int end = offset + size;
+  ReadBytes(buffer, data, offset, size);
   std::uint32_t consumed = 0;
   std::vector<unsigned char> remaining(buffer);
   while (consumed < buffer.size()) {
@@ -662,7 +648,7 @@ int ReadItemList(std::list<ITEM_INFO>& items, int offset, int size, const std::v
     }
   }
 
-  return end;
+  return offset;
 }
 
 // OFFSET: 0x00E49090
@@ -673,8 +659,7 @@ int ReadItemArray(ITEM_INFO* items, int offset, int size, const std::vector<unsi
   }
 
   std::vector<unsigned char> buffer(size, 0);
-  std::memcpy(buffer.data(), data.data() + offset, size);
-  int end = offset + size;
+  ReadBytes(buffer, data, offset, size);
   std::uint32_t consumed = 0;
   ITEM_INFO item;
   std::vector<unsigned char> remaining(buffer);
@@ -688,7 +673,7 @@ int ReadItemArray(ITEM_INFO* items, int offset, int size, const std::vector<unsi
     std::memcpy(remaining.data(), buffer.data() + consumed, buffer.size() - consumed);
   }
 
-  return end;
+  return offset;
 }
 
 // OFFSET: 0x00DDA740
@@ -739,12 +724,15 @@ bool CSession::RemoveMerchantMyShopItem(const ITEM_INFO& item, int type, unsigne
 // OFFSET: 0x00DDAB30
 // FUNCTION: fn_23348
 void CSession::RemovePurchaseItem(const ITEM_INFO& item) {
-  const bool hasFlag = item.flags[3] != 0;
   for (auto it = this->m_purchaseItems.begin(); it != this->m_purchaseItems.end(); ++it) {
-    const bool same = hasFlag ? it->identity[1] == item.identity[1] : it->itemId == item.itemId;
-    if (same) {
-      it->quantity -= item.quantity;
-      if (it->quantity <= 0) {
+    ITEM_INFO& owned = *it;
+    bool same = owned.identity[1] == item.identity[1];
+    if (item.uniqueItem == 0) {
+      same = owned.itemId == item.itemId;
+    }
+    if (same == true) {
+      owned.quantity -= item.quantity;
+      if (owned.quantity <= 0) {
         this->m_purchaseItems.erase(it);
       }
       return;

@@ -32,7 +32,20 @@ AnimatedModelFrame::~AnimatedModelFrame() {
   }
 }
 
-// INLINED
+// OFFSET: 0x00759270
+// FUNCTION: fn_45852
+void AnimatedModelFrame::AllocateVertices(int count) {
+  this->vertices = new AnimatedModelVertex[count];
+}
+
+// OFFSET: 0x00759200
+// FUNCTION: fn_45851
+void AnimatedModelFrame::AllocateTextureVertices(int count) {
+  this->textureVertices = new ModelTextureVertex[count];
+}
+
+// OFFSET: 0x00755230
+// FUNCTION: fn_45861
 AnimatedModelNode::AnimatedModelNode() {
   this->textures = nullptr;
   this->parent = nullptr;
@@ -44,8 +57,9 @@ AnimatedModelNode::AnimatedModelNode() {
   this->faces = nullptr;
 }
 
-// INLINED
-AnimatedModelNode::~AnimatedModelNode() {
+// OFFSET: 0x0075C920
+// FUNCTION: fn_45848
+void AnimatedModelNode::ReleaseGeometry() {
   if (this->frames) {
     delete[] this->frames;
     this->frames = nullptr;
@@ -70,6 +84,12 @@ AnimatedModelNode::~AnimatedModelNode() {
     delete[] this->textures;
     this->textures = nullptr;
   }
+}
+
+// OFFSET: 0x00756540
+// FUNCTION: fn_45847
+AnimatedModelNode::~AnimatedModelNode() {
+  this->ReleaseGeometry();
 }
 
 // OFFSET: 0x007550E0
@@ -193,7 +213,8 @@ bool C3dAnimModelRes::Load(const char* name) {
     file.Read(&node->vertexCount, 4);
 
     for (int frameIndex = 0; frameIndex < this->frameCount; ++frameIndex) {
-      node->frames[frameIndex].vertices = new std::array<float, 3>[node->vertexCount]{};
+      AnimatedModelFrame& frame = node->frames[frameIndex];
+      frame.AllocateVertices(node->vertexCount);
       file.Read(node->frames[frameIndex].vertices, node->vertexCount * 12);
     }
 
@@ -201,11 +222,13 @@ bool C3dAnimModelRes::Load(const char* name) {
     file.Read(&node->sharedTextureVertices, 4);
 
     if (node->sharedTextureVertices) {
-      node->frames[0].textureVertices = new ModelTextureVertex[node->textureVertexCount];
+      AnimatedModelFrame& frame = node->frames[0];
+      frame.AllocateTextureVertices(node->textureVertexCount);
       file.Read(node->frames[0].textureVertices, node->textureVertexCount * 12);
     } else {
       for (int frameIndex = 0; frameIndex < this->frameCount; ++frameIndex) {
-        node->frames[frameIndex].textureVertices = new ModelTextureVertex[node->textureVertexCount];
+        AnimatedModelFrame& frame = node->frames[frameIndex];
+        frame.AllocateTextureVertices(node->textureVertexCount);
         file.Read(node->frames[frameIndex].textureVertices, node->textureVertexCount * 12);
       }
     }
@@ -229,16 +252,15 @@ bool C3dAnimModelRes::Load(const char* name) {
 
   for (AnimatedModelNode* node : this->nodes) {
     if (!node->parentName.empty()) {
-      const char* parentName = node->parentName.c_str();
-      AnimatedModelNode* parent = nullptr;
-
-      for (AnimatedModelNode* candidate : this->nodes) {
-        if (candidate->name == parentName) {
-          parent = candidate;
-          break;
+      const auto findNode = [this](const char* name) -> AnimatedModelNode* {
+        for (AnimatedModelNode* candidate : this->nodes) {
+          if (candidate->name == name) {
+            return candidate;
+          }
         }
-      }
-
+        return nullptr;
+      };
+      AnimatedModelNode* parent = findNode(node->parentName.c_str());
       node->parent = parent;
       parent->children.push_back(node);
     }
@@ -248,21 +270,29 @@ bool C3dAnimModelRes::Load(const char* name) {
   return true;
 }
 
-// INLINED
-GrannyAnimationLibrary::~GrannyAnimationLibrary() {
-  if (this->instance) {
-    this->FreeInstance();
+// OFFSET: 0x0075C9D0
+// FUNCTION: fn_45856
+void GrannyAnimationLibrary::Release() {
+  this->FreeInstance();
 
-    for (auto& job : this->animations) {
-      for (granny_animation*& animation : job) {
-        if (animation) {
-          animation = nullptr;
-        }
+  for (int job = 0; job < 100; ++job) {
+    for (int action = 0; action < 20; ++action) {
+      granny_animation*& animation = this->animations[job][action];
+      if (animation) {
+        animation = nullptr;
       }
     }
+  }
 
-    GrannyFreeLocalPose(this->localPose);
-    GrannyFreeFile(this->file);
+  GrannyFreeLocalPose(this->localPose);
+  GrannyFreeFile(this->file);
+}
+
+// OFFSET: 0x007566B0
+// FUNCTION: fn_45849
+GrannyAnimationLibrary::~GrannyAnimationLibrary() {
+  if (this->instance) {
+    this->Release();
   }
 }
 
@@ -278,6 +308,14 @@ C3dGrannyModelRes::C3dGrannyModelRes() {
   this->hairPivot = 0;
 }
 
+// OFFSET: 0x00756740
+// FUNCTION: fn_45857
+__declspec(noinline) C3dGrannyModelRes::~C3dGrannyModelRes() {
+  if (this->instance) {
+    this->Release();
+  }
+}
+
 // OFFSET: 0x00753540
 // FUNCTION: fn_07961
 C3dGrannyModelRes* C3dGrannyModelRes::Create() {
@@ -288,6 +326,17 @@ C3dGrannyModelRes* C3dGrannyModelRes::Create() {
 // FUNCTION: fn_07962
 void C3dGrannyModelRes::Unload() {
   this->Release();
+}
+
+// OFFSET: 0x00759230
+// FUNCTION: fn_45853
+void C3dGrannyModelRes::InitializeTexture(GrannyTextureEntry& entry, const granny_texture* texture) {
+  entry.name = texture->fromFileName;
+  if (texture->textureType == 0 && texture->imageCount == 1) {
+    entry.texture = this->CreateTexture(texture, 0);
+  } else {
+    ShowErrorDialog("This sample only works with single-image : ColorMapTextureType textures", 0);
+  }
 }
 
 // OFFSET: 0x00753620
@@ -346,15 +395,7 @@ bool C3dGrannyModelRes::Load(const char* name) {
 
       for (int index = 0; index < this->textureCount; ++index) {
         this->textures[index].texture = nullptr;
-        const granny_texture* texture = info->textures[index];
-        GrannyTextureEntry& entry = this->textures[index];
-        entry.name = texture->fromFileName;
-
-        if (texture->textureType == 0 && texture->imageCount == 1) {
-          entry.texture = this->CreateTexture(texture, 0);
-        } else {
-          ShowErrorDialog("This sample only works with single-image : ColorMapTextureType textures", 0);
-        }
+        this->InitializeTexture(this->textures[index], info->textures[index]);
       }
 
       this->modelCount = info->modelCount;

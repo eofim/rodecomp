@@ -32,7 +32,8 @@ bool CSession::HasEmotionHotkeyChanges() const {
     const std::string* current = this->m_emotionHotkeys.current.data();
     const std::string* saved = this->m_emotionHotkeys.saved.data();
     for (int i = 0; i < 10; ++i) {
-      if (saved[i] != current[i]) {
+      const std::string& entry = saved[i];
+      if (entry != current[i]) {
         return true;
       }
     }
@@ -88,17 +89,8 @@ bool CSession::LoadEmotionHotkeyDefaults() {
   this->m_emotionHotkeys.current.emplace_back(LookupMessage(MSI_EMOTION_THINK));
 
   CLuaInstance script;
-  const bool loaded = script.LoadFile(std::format("savedata\\shortcutlist\\{}.lua", this->ShortcutFilename(this->m_aid)), false);
-  return loaded && script.ReadStrings(this->m_emotionHotkeys.current, "tbl") == 0 && this->m_emotionHotkeys.current.size() == 10;
-}
-
-// INLINED
-void EmotionHotkeys::Export(Json::Value& data) const {
-  Json::Value values;
-
-  for (unsigned index = 0; index < 10; ++index) {
-    values.append(ToUtf8(this->current[index], g_textCodePage));
+  if (!script.LoadFile(std::format("savedata\\shortcutlist\\{}.lua", this->ShortcutFilename(this->m_aid)), false)) {
+    return false;
   }
-
-  data["EmotionHotkey"] = values;
+  return script.ReadStrings(this->m_emotionHotkeys.current, "tbl") == 0 && this->m_emotionHotkeys.current.size() == 10;
 }

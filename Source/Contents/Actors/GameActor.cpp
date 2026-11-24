@@ -44,12 +44,12 @@ void CGameActor::ProcessDamageMessages() {
   for (auto it = this->willBeAttackedList.begin(); it != this->willBeAttackedList.end();) {
     if (timeGetTime() >= it->time) {
       if (it->damage > 0) {
-        const std::uint32_t targetAid = it->targetAid;
-        const std::uint32_t attackerAid = it->attackerAid;
         char partyNotice[500];
         char notice[500];
         notice[0] = '\0';
         partyNotice[0] = '\0';
+        const std::uint32_t targetAid = it->targetAid;
+        const std::uint32_t attackerAid = it->attackerAid;
 
         std::string targetName = g_modeMgr.GetGameMode()->ActorName(targetAid);
         std::string attackerName = g_modeMgr.GetGameMode()->ActorName(attackerAid);
@@ -98,7 +98,7 @@ void CGameActor::ProcessDamageMessages() {
       }
 
       ActorDamageMessage& message = *it;
-      this->SendMsg(nullptr, message.action, reinterpret_cast<std::uint32_t>(&message.targetAid), 0, 0, 0, 0, 0);
+      this->SendMsg(nullptr, message.action, reinterpret_cast<int>(&message.targetAid), 0, 0, 0, 0, 0);
       it = this->willBeAttackedList.erase(it);
     } else {
       ++it;
@@ -345,7 +345,7 @@ bool CGameActor::ProcessState() {
     if (this->render.isMotionFinished && this->willBeAttackedList.size() == 0) {
       mode->SendMsg(MM_DELETEREGISTERPOS, static_cast<int>(this->render.accountId), 0, 0, 0);
       const int job = this->GetEffectiveJob(-1);
-      if ((job > 31 && job < 1000) || g_session.IsMonsterClass(job) || this->objectType == NPC_MERSOL_TYPE ||
+      if ((job > JT_MAX_BASIC && job < JT_MON_BEGIN) || g_session.IsMonsterClass(job) || this->objectType == NPC_MERSOL_TYPE ||
           g_session.IsCompanionJob(job)) {
         this->MakeCorpse();
         return false;
@@ -446,9 +446,7 @@ void CGameActor::ResetState() {
   this->statusEffects[8] = 0;
   this->statusEffects[10] = 0;
   this->statusEffects[12] = 0;
-  this->render.position.x = 0.0f;
-  this->render.position.y = 0.0f;
-  this->render.position.z = 0.0f;
+  this->render.position = vector3d{0.0f, 0.0f, 0.0f};
   this->render.angle = 0.0f;
   this->render.animation = 0;
   this->render.previousAnimation = 0;
@@ -457,11 +455,9 @@ void CGameActor::ResetState() {
   this->render.motionType = 0;
   this->render.speed = 1.0f;
   this->render.shadowVisible = 1;
-  this->accel.x = 0.0f;
-  this->accel.y = 0.0f;
-  this->accel.z = 0.0f;
+  this->accel = vector3d{0.0f, 0.0f, 0.0f};
   this->dist = 0;
-  this->render.accountId = 0xFFFFFFFF;
+  this->render.accountId = INVALID_AID;
   this->lastServerTime = g_session.GetServerTime();
   this->lastProcessStateTime = timeGetTime();
   this->render.screenX = 0;
@@ -511,19 +507,16 @@ void CGameActor::ResetState() {
   this->merAI = nullptr;
   this->objectType = 4;
   this->actorWindows[4] = 0;
-  this->transformJobs[0] = -1;
-  this->transformJobs[1] = -1;
-  this->transformJobs[2] = -1;
+  for (int index = 0; index < 3; ++index) {
+    this->transformJobs[index] = -1;
+  }
   this->monsterTransformJob = -1;
   this->transformPriority = 0;
   this->charmType = 0;
   this->charmCount = 0;
-  this->movementState[0] = 0;
-  this->movementState[1] = 0;
-  this->movementState[2] = 0;
-  this->movementState[3] = 0;
-  this->movementState[4] = 0;
-  this->movementState[5] = 0;
+  for (int index = 0; index < 6; ++index) {
+    this->movementState[index] = 0;
+  }
   this->hasHp = 0;
   this->maxHp = 0;
   this->hpGaugeWindow = nullptr;
@@ -531,7 +524,8 @@ void CGameActor::ResetState() {
   this->hasSp = 0;
   this->spGaugeValue = 0;
   this->mountedState = 0;
-  this->actorFlags = 0;
+  this->storedActorEntry = 0;
+  this->modelReady = false;
   this->emblemVersion = 0;
   this->firstFollowerEffect = nullptr;
   this->secondFollowerEffect = nullptr;
@@ -549,6 +543,9 @@ void CGameActor::UpdateGaugePositions() {
     if (timeGetTime() < this->chatTick + 5000) {
       UIWindow* window = this->actorWindows[0];
       int x = this->render.screenX - this->chatWidth / 2;
+      int y = static_cast<int>(
+        static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale - static_cast<float>(this->chatHeight)
+      );
       if (x < -3) {
         x = -3;
       }
@@ -556,9 +553,6 @@ void CGameActor::UpdateGaugePositions() {
       if (x > maximumX) {
         x = maximumX;
       }
-      int y = static_cast<int>(
-        static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale - static_cast<float>(this->chatHeight)
-      );
       if (y < -3) {
         y = -3;
       }
@@ -697,7 +691,7 @@ void CGameActor::UpdateStateEffects() {
   }
 
   const std::uint64_t now = timeGetTime();
-  if (StateFlag00(this->stateFlags) && static_cast<unsigned>(this->effectLaunchCnt) >= static_cast<unsigned>(EffectLifetime(22))) {
+  if (IsSightActive(this->stateFlags) && static_cast<unsigned>(this->effectLaunchCnt) >= static_cast<unsigned>(EffectLifetime(22))) {
     this->effectLaunchCnt = 0;
     CRagEffect* effect = this->LaunchEffect(EF_SIGHT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
@@ -705,7 +699,7 @@ void CGameActor::UpdateStateEffects() {
     }
   }
 
-  if (StateFlag13(this->stateFlags) && static_cast<unsigned>(this->effectLaunchCnt) >= static_cast<unsigned>(EffectLifetime(33))) {
+  if (IsRuwachActive(this->stateFlags) && static_cast<unsigned>(this->effectLaunchCnt) >= static_cast<unsigned>(EffectLifetime(33))) {
     this->effectLaunchCnt = 0;
     CRagEffect* effect = this->LaunchEffect(EF_RUWACH, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (effect) {
@@ -724,7 +718,7 @@ void CGameActor::UpdateHpGauge() {
   }
 
   if (g_serviceOptions.Get(TT_MONSTERHP_ON_OFF) && this->hpGaugeWindow->displayMode != 0 &&
-      !StateFlag01(this->stateFlags) && !StateFlag02(this->stateFlags) && !StateFlag06(this->stateFlags) &&
+      !IsHiding(this->stateFlags) && !IsCloaking(this->stateFlags) && !IsInvisible(this->stateFlags) &&
       g_windowMgr.windowVisibilityState != 2) {
     this->hpGaugeWindow->Show(1);
     if (this->render.state == ST_DEAD && this->hpGaugeWindow->current != 0) {
@@ -764,149 +758,167 @@ bool CGameActor::UpdateFadeOut() {
 
 // OFFSET: 0x00CACFE0
 // FUNCTION: fn_21050
-int __stdcall MountedJob(int job, std::uint32_t flags) {
-  if (job == 0xfd6) {
-    if (StateFlag19(flags)) {
-      return 0xff0;
+int CGameActor::MountedJob(int job, std::uint32_t flags) {
+  if (job == JT_RUNE_KNIGHT) {
+    if (IsRidingGreenDragon(flags)) {
+      return JT_RUNE_CHICKEN;
     }
-    if (StateFlag23(flags)) {
-      return 0xff8;
+    if (IsRidingBrownDragon(flags)) {
+      return JT_RUNE_CHICKEN2;
     }
-    if (StateFlag24(flags)) {
-      return 0xffa;
+    if (IsRidingGrayDragon(flags)) {
+      return JT_RUNE_CHICKEN3;
     }
-    if (StateFlag25(flags)) {
-      return 0xffc;
+    if (IsRidingBlueDragon(flags)) {
+      return JT_RUNE_CHICKEN4;
     }
-    if (StateFlag26(flags)) {
-      return 0xffe;
+    if (IsRidingRedDragon(flags)) {
+      return JT_RUNE_CHICKEN5;
     }
-  } else if (job == 0xfdc) {
-    if (StateFlag19(flags)) {
-      return 0xff1;
+  } else if (job == JT_RUNE_KNIGHT_H) {
+    if (IsRidingGreenDragon(flags)) {
+      return JT_RUNE_CHICKEN_H;
     }
-    if (StateFlag23(flags)) {
-      return 0xff9;
+    if (IsRidingBrownDragon(flags)) {
+      return JT_RUNE_CHICKEN2_H;
     }
-    if (StateFlag24(flags)) {
-      return 0xffb;
+    if (IsRidingGrayDragon(flags)) {
+      return JT_RUNE_CHICKEN3_H;
     }
-    if (StateFlag25(flags)) {
-      return 0xffd;
+    if (IsRidingBlueDragon(flags)) {
+      return JT_RUNE_CHICKEN4_H;
     }
-    if (StateFlag26(flags)) {
-      return 0xfff;
+    if (IsRidingRedDragon(flags)) {
+      return JT_RUNE_CHICKEN5_H;
     }
-  } else if (job == 0x1000) {
-    if (StateFlag19(flags)) {
-      return 0x100d;
+  } else if (job == JT_RUNE_KNIGHT_B) {
+    if (IsRidingGreenDragon(flags)) {
+      return JT_RUNE_CHICKEN_B;
     }
-  } else if (job == 0xfd8) {
-    if (StateFlag21(flags)) {
-      return 0xff4;
+  } else if (job == JT_RANGER) {
+    if (IsRidingWarg(flags)) {
+      return JT_WOLF_RANGER;
     }
-  } else if (job == 0xfde) {
-    if (StateFlag21(flags)) {
-      return 0xff5;
+  } else if (job == JT_RANGER_H) {
+    if (IsRidingWarg(flags)) {
+      return JT_WOLF_RANGER_H;
     }
-  } else if (job == 0x1002) {
-    if (StateFlag21(flags)) {
-      return 0x100f;
+  } else if (job == JT_RANGER_B) {
+    if (IsRidingWarg(flags)) {
+      return JT_WOLF_RANGER_B;
     }
-  } else if (job == 0xfda) {
-    if (StateFlag22(flags)) {
-      return 0xff6;
+  } else if (job == JT_MECHANIC) {
+    if (IsRidingMadogear(flags)) {
+      return JT_MADOGEAR;
     }
-  } else if (job == 0xfe0) {
-    if (StateFlag22(flags)) {
-      return 0xff7;
+  } else if (job == JT_MECHANIC_H) {
+    if (IsRidingMadogear(flags)) {
+      return JT_MADOGEAR_H;
     }
-  } else if (job == 0x1004) {
-    if (StateFlag22(flags)) {
-      return 0x1010;
+  } else if (job == JT_MECHANIC_B) {
+    if (IsRidingMadogear(flags)) {
+      return JT_MADOGEAR_B;
     }
-  } else if (job == 0x7) {
-    if (StateFlag05(flags)) {
-      return 0xd;
+  } else if (job == JT_KNIGHT) {
+    if (IsRidingPeco(flags)) {
+      return JT_CHICKEN;
     }
-  } else if (job == 0xe) {
-    if (StateFlag05(flags)) {
-      return 0x15;
+  } else if (job == JT_CRUSADER) {
+    if (IsRidingPeco(flags)) {
+      return JT_CHICKEN2;
     }
-  } else if (job == 0xfa8) {
-    if (StateFlag05(flags)) {
-      return 0xfae;
+  } else if (job == JT_KNIGHT_H) {
+    if (IsRidingPeco(flags)) {
+      return JT_CHICKEN_H;
     }
-  } else if (job == 0xfbe) {
-    if (StateFlag05(flags)) {
-      return 0xfc4;
+  } else if (job == JT_KNIGHT_B) {
+    if (IsRidingPeco(flags)) {
+      return JT_CHICKEN_B;
     }
-  } else if (job == 0xfaf) {
-    if (StateFlag05(flags)) {
-      return 0xfb6;
+  } else if (job == JT_CRUSADER_H) {
+    if (IsRidingPeco(flags)) {
+      return JT_CHICKEN2_H;
     }
-  } else if (job == 0xfc5) {
-    if (StateFlag05(flags)) {
-      return 0xfcc;
+  } else if (job == JT_CRUSADER_B) {
+    if (IsRidingPeco(flags)) {
+      return JT_CHICKEN2_B;
     }
-  } else if (job == 0xfe2) {
-    if (StateFlag05(flags)) {
-      return 0xff2;
+  } else if (job == JT_ROYAL_GUARD) {
+    if (IsRidingPeco(flags)) {
+      return JT_ROYAL_CHICKEN;
     }
-  } else if (job == 0xfe9) {
-    if (StateFlag05(flags)) {
-      return 0xff3;
+  } else if (job == JT_ROYAL_GUARD_H) {
+    if (IsRidingPeco(flags)) {
+      return JT_ROYAL_CHICKEN_H;
     }
-  } else if (job == 0x1006) {
-    if (StateFlag05(flags)) {
-      return 0x100e;
+  } else if (job == JT_ROYAL_GUARD_B) {
+    if (IsRidingPeco(flags)) {
+      return JT_ROYAL_CHICKEN_B;
     }
-  } else if (job == 0xfcf) {
-    if (StateFlag15(flags)) {
-      return 0xfd0;
+  } else if (job == JT_STAR) {
+    if (IsStarUnion(flags)) {
+      return JT_STAR2;
     }
-  } else if (job == 0x1082) {
-    if (StateFlag15(flags)) {
-      return 0x108e;
+  } else if (job == JT_STAR_B) {
+    if (IsStarUnion(flags)) {
+      return JT_STAR2_B;
     }
-  } else if (job == 0x10a1) {
-    if (StateFlag21(flags) == true) {
-      return 0x10b6;
+  } else if (job == JT_WINDHAWK) {
+    if (IsRidingWarg(flags) == true) {
+      return JT_WOLF_WINDHAWK;
     }
-  } else if (job == 0x109d) {
-    if (StateFlag22(flags) == true) {
-      return 0x10b7;
+  } else if (job == JT_MEISTER) {
+    if (IsRidingMadogear(flags) == true) {
+      return JT_MEISTER_MADOGEAR;
     }
-  } else if (job == 0x109c) {
-    if (StateFlag19(flags) == true) {
-      return 0x10b8;
+  } else if (job == JT_DRAGON_KNIGHT) {
+    if (IsRidingGreenDragon(flags) == true) {
+      return JT_DRAGON_KNIGHT_CHICKEN;
     }
-  } else if (job == 0x10a2) {
-    if (StateFlag05(flags) == true) {
-      return 0x10b9;
+  } else if (job == JT_IMPERIAL_GUARD) {
+    if (IsRidingPeco(flags) == true) {
+      return JT_IMPERIAL_GUARD_CHICKEN;
     }
-  } else if (job == 0x10ce) {
-    if (StateFlag15(flags)) {
-      return 0x10dc;
+  } else if (job == JT_SKY_EMPEROR) {
+    if (IsStarUnion(flags)) {
+      return JT_SKY_EMPEROR2;
     }
   }
   return job;
 }
 
-// OFFSET: 0x00CAD420
-// FUNCTION: fn_21051
-CGameObject* CGameActor::GetEffectCounter(int effectId) {
-  switch (effectId) {
+// OFFSET: 0x00CADB80
+// FUNCTION: fn_46347
+bool __stdcall IsFalconAttackSkill(int skillId) {
+  switch (skillId) {
   case HT_BLITZBEAT:
   case SN_FALCONASSAULT:
   case WH_HAWKRUSH:
   case WH_HAWKBOOMERANG:
   case WH_WILD_WALK:
-    return this->statusEffects[0];
+    return true;
   }
-  switch (effectId) {
+  return false;
+}
+
+// OFFSET: 0x00CADD40
+// FUNCTION: fn_46348
+bool __stdcall IsWugAttackSkill(int skillId) {
+  switch (skillId) {
   case RA_WUGSTRIKE:
   case RA_WUGBITE:
+    return true;
+  }
+  return false;
+}
+
+// OFFSET: 0x00CAD420
+// FUNCTION: fn_21051
+CGameObject* CGameActor::GetEffectCounter(int effectId) {
+  if (IsFalconAttackSkill(effectId)) {
+    return this->statusEffects[0];
+  }
+  if (IsWugAttackSkill(effectId)) {
     return this->statusEffects[1];
   }
   return nullptr;
@@ -916,7 +928,7 @@ CGameObject* CGameActor::GetEffectCounter(int effectId) {
 // FUNCTION: fn_21053
 float CGameActor::GetNameOffset() {
   float scale = 1.0f;
-  if ((this->render.flags & 0x10) != 0) {
+  if (0 != (this->render.flags & 0x10)) {
     const unsigned int angle = this->render.shrinkPhase * 4 + 90;
     if (angle > 270) {
       scale = 0.5f;
@@ -1125,16 +1137,28 @@ void CGameActor::ResetTransformJobs() {
 // OFFSET: 0x00CADC90
 // FUNCTION: fn_21065
 __declspec(noinline) bool CSession::IsMonsterClass(int job) {
-  if ((job > 1000 && job < 3999) || static_cast<unsigned int>(job - 20021) <= 11978) {
+  if ((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || static_cast<unsigned int>(job - 20021) <= 11978) {
     return true;
   }
   return false;
+}
+
+// OFFSET: 0x00CADC80
+// FUNCTION: fn_46345
+int CGameActor::IsBladeStopped() const {
+  return this->isBladeStop != 0;
 }
 
 // OFFSET: 0x00CADCC0
 // FUNCTION: fn_21066
 bool CGameActor::HasPendingDamage() {
   return this->willBeAttackedList.size() > 0;
+}
+
+// OFFSET: 0x00CADCD0
+// FUNCTION: fn_46346
+bool CGameActor::IsInDeathState() const {
+  return this->render.state == ST_DEAD || this->willBeDead == 1 || this->isTrickDead == 1;
 }
 
 // OFFSET: 0x00CADCF0
@@ -1201,7 +1225,8 @@ void __stdcall CreateHallucinationPc(
   argb.red = 0xFF;
   argb.blue = 0xFF;
 
-  g_modeMgr.GetGameMode()->scene->objects.push_back(hallu);
+  CWorld* world = g_modeMgr.GetGameMode()->scene;
+  world->objects.push_back(hallu);
   delete pc;
 }
 

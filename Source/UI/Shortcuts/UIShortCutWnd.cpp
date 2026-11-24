@@ -1,4 +1,6 @@
 #include "Contents/Configuration/ServiceEnums.h"
+#include "Contents/CombatTypes.h"
+#include "Contents/Items/ItemId.h"
 #include "Contents/Items/ItemType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
@@ -193,12 +195,15 @@ __forceinline void UIShortCutWnd::ClickControl(int id) {
   case SHORTCUT_BUTTON_BANK: {
     const int bank = g_session.GetOption(10);
     if (bank == 0) {
-      g_session.SetOption(10, 1, 0);
+      g_session.SetOption(10, 1);
     } else {
-      g_session.SetOption(10, 0, 0);
+      g_session.SetOption(10, 0);
     }
-    this->m_bank->geometry.state = bank == 0;
-    this->m_bank->Invalidate();
+    {
+      UICheckBox* checkBox = this->m_bank;
+      checkBox->geometry.state = bank == 0;
+      checkBox->Invalidate();
+    }
 
     for (std::list<ShortcutCooldownRecord>::iterator record = g_session.m_requestTimers.begin(); record != g_session.m_requestTimers.end(); ++record) {
       record->main.clear();
@@ -211,22 +216,34 @@ __forceinline void UIShortCutWnd::ClickControl(int id) {
   case SHORTCUT_BUTTON_HIDE_ITEMS:
     g_session.ItemSlotActive() = false;
     this->m_showItems->Enable(1);
-    this->m_showItems->SetDisabled(0);
-    this->m_showItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_showItems;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     this->m_hideItems->Enable(0);
-    this->m_hideItems->SetDisabled(1);
-    this->m_hideItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_hideItems;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     this->SendMsg(nullptr, UM_RESIZE, 0, 0, 0, 0);
     return;
 
   case SHORTCUT_BUTTON_SHOW_ITEMS:
     g_session.ItemSlotActive() = true;
     this->m_showItems->Enable(0);
-    this->m_showItems->SetDisabled(1);
-    this->m_showItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_showItems;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     this->m_hideItems->Enable(1);
-    this->m_hideItems->SetDisabled(0);
-    this->m_hideItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_hideItems;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     this->SendMsg(nullptr, UM_RESIZE, 0, 0, 0, 0);
     return;
 
@@ -243,22 +260,33 @@ __forceinline void UIShortCutWnd::PlaceRowButtons() {
   case 1:
     this->m_decrease->Enable(0);
     this->m_increase->Enable(1);
-    this->m_increase->SetDisabled(0);
+    {
+      UIBitmapButton* button = this->m_increase;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     break;
 
   case 4:
     this->m_decrease->Enable(1);
     this->m_increase->Enable(1);
-    this->m_increase->SetDisabled(1);
+    {
+      UIBitmapButton* button = this->m_increase;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     break;
 
   default:
     this->m_decrease->Enable(1);
     this->m_increase->Enable(1);
-    this->m_increase->SetDisabled(0);
+    {
+      UIBitmapButton* button = this->m_increase;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     break;
   }
-  this->m_increase->Invalidate();
 }
 
 // INLINED
@@ -278,22 +306,33 @@ __forceinline void UIShortCutWnd::ResizeRows() {
   case 1:
     this->m_decrease->Enable(0);
     this->m_increase->Enable(1);
-    this->m_increase->SetDisabled(0);
+    {
+      UIBitmapButton* button = this->m_increase;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     break;
 
   case 4:
     this->m_decrease->Enable(1);
     this->m_increase->Enable(1);
-    this->m_increase->SetDisabled(1);
+    {
+      UIBitmapButton* button = this->m_increase;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     break;
 
   default:
     this->m_decrease->Enable(1);
     this->m_increase->Enable(1);
-    this->m_increase->SetDisabled(0);
+    {
+      UIBitmapButton* button = this->m_increase;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     break;
   }
-  this->m_increase->Invalidate();
   this->StoreInfo();
 }
 
@@ -311,21 +350,33 @@ __forceinline void UIShortCutWnd::RestoreLayout(NormalItemSlotWindow* value) {
     this->m_showItems->Move(247, this->m_saved->height - 10);
     this->m_hideItems->Move(247, this->m_saved->height - 10);
     this->m_showItems->Enable(0);
-    this->m_showItems->SetDisabled(1);
-    this->m_showItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_showItems;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     this->m_hideItems->Enable(1);
-    this->m_hideItems->SetDisabled(0);
-    this->m_hideItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_hideItems;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
   } else {
     this->Resize(this->geometry.width, height);
     this->m_showItems->Move(247, height - 10);
     this->m_hideItems->Move(247, height - 10);
     this->m_showItems->Enable(1);
-    this->m_showItems->SetDisabled(0);
-    this->m_showItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_showItems;
+      button->SetDisabled(0);
+      button->Invalidate();
+    }
     this->m_hideItems->Enable(0);
-    this->m_hideItems->SetDisabled(1);
-    this->m_hideItems->Invalidate();
+    {
+      UIBitmapButton* button = this->m_hideItems;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
   }
 
   this->m_grid.rows = height / 33;
@@ -344,7 +395,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     }
 
     const NormalItemSlot* slot = this->m_slots[a + 9 * b];
-    if (slot->itemId == 0) {
+    if (slot->itemId == ITEMID_NONE) {
       return 0;
     }
 
@@ -373,7 +424,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     case TYPE_HEAL:
     case TYPE_SCHANGE:
     case TYPE_SPECIAL:
-      if (item.GetItemId() != 12802 || g_windowMgr.Confirm(LookupMessage(MSI_COMMAND_SETTING), 2, false, false, 0, "Message", 280, 120, 0) != 188) {
+      if (item.GetItemId() != ITEMID_TIME_GUARDIAN_BOX || g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_TO_OPEN_EVENT_ITEM), 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
         mode->SendMsg(MM_USEITEM, item.identity[1], 0, 0, 0);
       }
 
@@ -383,7 +434,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       if (g_session.m_manner >= 0) {
         const int result =
           g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_CONFIRM_TO_OPEN_CASH_ITEM), item.DisplayName(0).c_str()).c_str(), 2, false, false, 0, "Message", 280, 120, 0);
-        if (result == 187) {
+        if (result == ID_YES) {
           mode->SendMsg(MM_USEITEM, item.identity[1], 0, 0, 0);
         }
       }
@@ -394,7 +445,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     case TYPE_AMMO:
     case TYPE_THROWWEAPON:
     case TYPE_CANNONBALL:
-      if (item.identity[3] == 0x8000) {
+      if (item.identity[3] == EQP_AMMO) {
         mode->SendMsg(MM_WEAR_EQUIP_ARROW, item.identity[1], item.identity[2], 0, 0);
       }
 
@@ -422,7 +473,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
         slot = &g_session.m_secondaryShortcutSlots[source];
       }
 
-      if (slot->itemId == 0 || slot->enabled == 0) {
+      if (slot->itemId == ITEMID_NONE || slot->enabled == 0) {
         continue;
       }
 
@@ -546,9 +597,9 @@ void UINewChatWnd::SaveChatWndInfo() {
   sprintf(text, "CanDragWnd = %d\r\n\r\n", g_session.m_canDragWnd == 1);
   file.Write(text, std::strlen(text));
 
-  int index = 1;
+  int index = 0;
   for (std::map<int, SubChatWndInfo>::iterator it = g_session.m_noSubChatWnds.begin(); it != g_session.m_noSubChatWnds.end(); ++it, ++index) {
-    sprintf(text, "ChatSubWnd_%d = {\r\n", index);
+    sprintf(text, "ChatSubWnd_%d = {\r\n", index + 1);
     file.Write(text, std::strlen(text));
     sprintf(text, "\tXPos = 0,\r\n\tYPos = 0,\r\n");
     file.Write(text, std::strlen(text));
@@ -563,9 +614,9 @@ void UINewChatWnd::SaveChatWndInfo() {
     file.Write("}\r\n\r\n", 5);
   }
 
-  index = static_cast<int>(g_session.m_noSubChatWnds.size()) + 1;
+  index = static_cast<int>(g_session.m_noSubChatWnds.size());
   for (std::map<int, SubChatWndInfo>::iterator it = g_session.m_subChatWnds.begin(); it != g_session.m_subChatWnds.end(); ++it, ++index) {
-    sprintf(text, "ChatSubWnd_%d = {\r\n", index);
+    sprintf(text, "ChatSubWnd_%d = {\r\n", index + 1);
     file.Write(text, std::strlen(text));
     sprintf(text, "\tXPos = %d,\r\n\tYPos = %d,\r\n", it->second.x, it->second.y);
     file.Write(text, std::strlen(text));
@@ -709,8 +760,8 @@ void UIRoMapWnd::OnLBtnUp(int x, int y) {
 
       const int below = y + 1;
       const int right = x + 2;
-      const int menuY = this->geometry.height - below - height >= 0 ? below : this->geometry.height - height;
-      const int menuX = this->geometry.width - right - width >= 0 ? right : this->geometry.width - width;
+      const int menuX = this->geometry.width - right - width < 0 ? this->geometry.width - width : right;
+      const int menuY = this->geometry.height - below - height < 0 ? this->geometry.height - height : below;
       menu->Move(menuX, menuY);
     }
   } else if (this->selectedRecord) {
@@ -763,7 +814,7 @@ void UIMemorialDunWnd::OnCreate(int, int) {
   }
 
   this->m_partyButton = new (std::nothrow) UIBasicButton();
-  this->m_partyButton->Configure(125, LookupMessage(MSI_PARTY_NOT_LEAVE_PARTY_UNTIL_YIELD_PARTYMASTER));
+  this->m_partyButton->Configure(125, LookupMessage(MSI_MEMORIAL_DUN_DESTROY));
   this->m_partyButton->Move(-100, -100);
   this->m_partyButton->SetId(ID_DELETE);
   this->AddChild(this->m_partyButton);
@@ -794,7 +845,6 @@ void UIMemorialDunWnd::Paint() {
 
   std::uint32_t color;
   char text[500];
-  char timeText[128];
   const unsigned short codePage = static_cast<unsigned short>(g_textCodePage);
 
   if (g_session.memorialDungeonState != 3) {
@@ -815,8 +865,10 @@ void UIMemorialDunWnd::Paint() {
     const int width = this->ColoredTextWidth(text, 0, 0, 12, 0);
     this->DrawColoredText((this->geometry.width - width) / 2, (this->geometry.height - 17) / 2, text, 0, color, 0, 12, false);
   } else if (g_session.memorialDungeonState == 1) {
+    char timeText[128];
     if (g_session.memorialExpirationTime) {
-      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(&g_session.memorialExpirationTime));
+      const tm* time = _localtime32(&g_session.memorialExpirationTime);
+      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), time);
       sprintf(text, LookupMessage(MSI_MEMORIAL_DUN_NOTIFY), timeText);
       std::vector<std::string> lines;
       this->WrapPixelText(text, lines, this->geometry.width - 20);
@@ -832,9 +884,11 @@ void UIMemorialDunWnd::Paint() {
       }
     }
   } else if (g_session.memorialDungeonState == 2) {
+    char timeText[128];
     if (g_session.memorialCreationTime) {
       this->DrawTextAt(10, 55, LookupMessage(MSI_MEMORIAL_DUN_NOTIFY2), 0, 0, 12, 0, 0, 0);
-      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(&g_session.memorialCreationTime));
+      const tm* time = _localtime32(&g_session.memorialCreationTime);
+      strftime(timeText, 128, LookupMessage(MSI_TIME_TYPE2), time);
       sprintf(text, "^ff0000%s^ffffff", timeText);
       const int width = this->ColoredTextWidth(text, 0, 0, 12, 0);
       this->DrawColoredText((this->geometry.width - width) / 2, 75, text, 0, color, 0, 12, false);
@@ -842,17 +896,13 @@ void UIMemorialDunWnd::Paint() {
   } else if (g_session.memorialDungeonState == 3) {
     std::vector<std::string> lines;
     this->WrapPixelText(LookupMessage(MSI_MEMORIAL_DUN_OUT1), lines, this->geometry.width - 20);
-    int y = 55;
     for (unsigned int index = 0; index < lines.size(); ++index) {
-      this->DrawColoredText(5, y, lines[index].c_str(), 0, color, 0, 12, false);
-      y += 15;
+      this->DrawColoredText(5, 55 + index * 15, lines[index].c_str(), 0, color, 0, 12, false);
     }
 
     this->WrapPixelText(LookupMessage(MSI_MEMORIAL_DUN_OUT2), lines, this->geometry.width - 20);
-    y = 70;
     for (unsigned int index = 0; index < lines.size(); ++index) {
-      this->DrawColoredText(10, y, lines[index].c_str(), 0, color, 0, 12, false);
-      y += 15;
+      this->DrawColoredText(10, 70 + index * 15, lines[index].c_str(), 0, color, 0, 12, false);
     }
   }
 
@@ -865,6 +915,14 @@ void UIMemorialDunWnd::Paint() {
   this->FillRegion(2, this->geometry.height - 1, this->geometry.width - 4, 1, 0x8E8E8E);
   this->FillRegion(this->geometry.width - 2, this->geometry.height - 2, 1, 1, 0x8E8E8E);
 }
+
+// OFFSET: 0x00914950
+// FUNCTION: fn_45681
+UISubChatMiniWnd::~UISubChatMiniWnd() = default;
+
+// OFFSET: 0x009149A0
+// FUNCTION: fn_45682
+UIWindowCallBtnWnd::~UIWindowCallBtnWnd() = default;
 
 // OFFSET: 0x0092AFE0
 // FUNCTION: fn_12656
@@ -972,8 +1030,7 @@ void UINewChatWnd::SaveChatLogs() {
   }
 
   for (std::map<int, UIWindow*>::iterator it = g_windowMgr.retainedWindows.begin(); it != g_windowMgr.retainedWindows.end(); ++it) {
-    UISubChatHisWnd* window = static_cast<UISubChatHisWnd*>(it->second);
-    name = window->Name();
+    name = static_cast<UISubChatHisWnd*>(it->second)->Name();
     sprintf(path, "%s\\Chat\\Chat_%s.txt", g_applicationDirectory, name.c_str());
     int number = 0;
     while (_access(path, 0) == 0) {
@@ -981,7 +1038,7 @@ void UINewChatWnd::SaveChatLogs() {
       sprintf(path, "%s\\Chat\\Chat_%s_%03d.txt", g_applicationDirectory, name.c_str(), number);
     }
 
-    if (window->ChatBox()->SaveChatLog(path)) {
+    if (static_cast<UISubChatHisWnd*>(it->second)->ChatBox()->SaveChatLog(path)) {
       std::string message(path);
       message += " is Saved.";
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
@@ -1028,7 +1085,7 @@ void UIMemorialDunWnd::ArrangeButtons() {
     }
   } else if (g_session.memorialDungeonState == 3) {
     this->m_actionButton->Move((this->geometry.width - this->m_actionButton->geometry.width) / 2, this->geometry.height - 30);
-    this->m_message0 = 184;
+    this->m_message0 = ID_OK;
   }
 
   this->Invalidate();
@@ -1184,18 +1241,6 @@ void UISubChatHisWnd::Resize(int width, int height) {
 
 #include <mbstring.h>
 
-template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
-template __declspec(noinline) std::map<int, SubChatWndInfo>::iterator std::map<int, SubChatWndInfo>::_Mybase::find(const int&);
-template __declspec(noinline) std::map<int, SubChatWndInfo>::iterator std::map<int, SubChatWndInfo>::_Mybase::erase(std::map<int, SubChatWndInfo>::iterator) noexcept;
-template __declspec(noinline) std::map<int, SubChatWndInfo>::map(const std::map<int, SubChatWndInfo>&);
-template __declspec(noinline) void std::map<int, SubChatWndInfo>::_Mybase::clear() noexcept;
-template __declspec(noinline) std::map<int, SubChatWndInfo>::_Mybase::~_Tree() noexcept;
-template __declspec(noinline) SubChatWndInfo& std::map<int, SubChatWndInfo>::operator[](const int&);
-template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, SubChatWndInfo>>>, std::_Iterator_base0>& std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, SubChatWndInfo>>>, std::_Iterator_base0>::operator++() noexcept;
-template __declspec(noinline) std::map<int, UIWindow*>::map(const std::map<int, UIWindow*>&);
-template __declspec(noinline) void std::map<int, UIWindow*>::_Mybase::clear() noexcept;
-template __declspec(noinline) std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, UIWindow*>>>, std::_Iterator_base0>& std::_Tree_unchecked_const_iterator<std::_Tree_val<std::_Tree_simple_types<std::pair<const int, UIWindow*>>>, std::_Iterator_base0>::operator++() noexcept;
-
 // OFFSET: 0x0093C210
 // FUNCTION: fn_12761
 int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
@@ -1205,8 +1250,7 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       std::string local(this->m_edit->Text());
       const int previousWidth = this->m_inputWidth;
       if (local.size() > 0) {
-        const int measured = this->TextWidth(local.c_str(), 0, 0, 12, 0, 0);
-        if (measured + 10 < this->geometry.width - 0x32) {
+        if (this->TextWidth(local.c_str(), 0, 0, 12, 0, 0) + 10 < this->geometry.width - 0x32) {
           this->m_name = local;
           g_session.m_subChatWnds[this->m_index].name = this->m_name;
           const int renamed = this->TextWidth(local.c_str(), 0, 0, 12, 0, 0);
@@ -1216,8 +1260,7 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
           }
         }
       }
-      const int measured = this->TextWidth(local.c_str(), 0, 0, 12, 0, 0);
-      if (measured + 10 >= this->geometry.width - 0x32) {
+      if (this->TextWidth(local.c_str(), 0, 0, 12, 0, 0) + 10 >= this->geometry.width - 0x32) {
         g_windowMgr.Confirm(LookupMessage(MSI_FAILED_CHANGE_TABNAME), 0, true, false, 0, "Message", 0x118, 0x78, 0);
       }
       this->m_edit->Move(-100, -100);
@@ -1228,11 +1271,7 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       RECT rectangle;
       rectangle.left = 0;
       rectangle.top = 0;
-      int span = this->m_inputWidth;
-      if (span < previousWidth) {
-        span = previousWidth;
-      }
-      rectangle.right = span + 0x32;
+      rectangle.right = (previousWidth < this->m_inputWidth ? this->m_inputWidth : previousWidth) + 0x32;
       rectangle.bottom = this->m_inputHeight + 10;
       this->FillSurface(0xFFFF00FF, &rectangle);
       if (UIWindow* window = g_windowMgr.LookupWindow(WID_BATTLEMSGOPTIONWND)) {
@@ -1245,10 +1284,65 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       return 0;
     }
     return 0;
-  case UM_PAGEUPPUSH:
-    if (this->m_chatBox->verticalOverflow != 0) {
-      this->m_chatBox->SendMsg(nullptr, UM_SCROLLVERTPAGEUP, 0, 0, 0, 0);
+  case UM_CHILD_CHANGED:
+    if (sender == this->m_chatBox && this->geometry.height > this->m_inputHeight) {
+      RECT rectangle;
+      rectangle.left = this->m_chatBox->geometry.x;
+      rectangle.top = this->m_chatBox->geometry.y;
+      rectangle.right = this->geometry.width - 3;
+      rectangle.bottom = this->geometry.height - this->headerHeight;
+      this->FillSurface(0xFFFF00FF, &rectangle);
       return 0;
+    }
+    return 0;
+  case UM_SETINFO: {
+    this->m_saved = reinterpret_cast<SubChatHisWndInfo*>(argument1);
+    if (this->m_saved->IsValid() == 0) {
+      this->m_saved->Reset(this->geometry.id);
+    }
+    this->Move(this->m_saved->x, this->m_saved->y);
+    this->Resize(this->m_saved->width, this->m_saved->height);
+    return 0;
+  }
+  case UM_ADDCHAT: {
+    char detail[25];
+    std::memset(detail, 0, sizeof(detail));
+    if (argument3 != 0) {
+      std::strcpy(detail, reinterpret_cast<const char*>(argument3));
+    }
+    const char* text = reinterpret_cast<const char*>(argument1);
+    this->m_chatBox->AddLinkRecord(text, static_cast<int>(argument2), detail);
+    if (_mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>(s_chatItemLinkOpening.c_str())) != nullptr) {
+      this->m_chatBox->AddText(text, static_cast<int>(argument2), detail);
+    } else {
+      this->m_chatBox->AddTextWrapped(text, static_cast<int>(argument2), detail);
+    }
+    return 0;
+  }
+  case UM_RESIZE:
+    if (g_session.m_canDragWnd != 0 && argument1 == 7) {
+      int width = static_cast<int>(argument2);
+      int height = static_cast<int>(argument3);
+      if (width > 0x200) {
+        width = 0x200;
+      }
+      if (height > 0x180) {
+        height = 0x180;
+      }
+      if (width < 0x118) {
+        width = 0x118;
+      }
+      if (height < 0x4A) {
+        height = 0x4A;
+      }
+      width = (width - 0x118) / 32 * 32 + 0x118;
+      height = (height - 0x4A) / 32 * 32 + 0x4A;
+      if (width != this->geometry.width || height != this->geometry.height) {
+        this->Resize(width, height);
+        this->m_resizer->Move(this->geometry.width - 0xF, this->geometry.height - 0xF);
+        this->ApplyButtonLayout();
+        return 0;
+      }
     }
     return 0;
   case UM_PAGEDOWNPUSH:
@@ -1257,11 +1351,26 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       return 0;
     }
     return 0;
+  case UM_PAGEUPPUSH:
+    if (this->m_chatBox->verticalOverflow != 0) {
+      this->m_chatBox->SendMsg(nullptr, UM_SCROLLVERTPAGEUP, 0, 0, 0, 0);
+      return 0;
+    }
+    return 0;
   case UM_COMMAND:
     switch (argument1) {
+    case ID_NAME:
+      g_windowMgr.SelectWhisperName(reinterpret_cast<const char*>(argument2));
+      return 0;
     case ID_OPTION:
       if (UIWindow* window = g_windowMgr.EnsureWindow(WID_BATTLEMSGOPTIONWND)) {
         window->SendMsg(this, UM_COMMAND, ID_OPTION, this->m_index, 0, 0);
+        return 0;
+      }
+      return 0;
+    case ID_STICK_ON:
+      if (ChatWindow() != nullptr) {
+        ChatWindow()->SendMsg(this, UM_ATTACH_CHAT_TAB, 0, 0, 0, 0);
         return 0;
       }
       return 0;
@@ -1297,79 +1406,9 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       }
       return 0;
     }
-    case ID_NAME:
-      g_windowMgr.SelectWhisperName(reinterpret_cast<const char*>(argument2));
-      return 0;
-    case ID_STICK_ON:
-      if (ChatWindow() != nullptr) {
-        ChatWindow()->SendMsg(this, UM_ATTACH_CHAT_TAB, 0, 0, 0, 0);
-        return 0;
-      }
-      return 0;
     default:
       return 0;
     }
-  case UM_RESIZE:
-    if (g_session.m_canDragWnd != 0 && argument1 == 7) {
-      int width = static_cast<int>(argument2);
-      int height = static_cast<int>(argument3);
-      if (width > 0x200) {
-        width = 0x200;
-      }
-      if (height > 0x180) {
-        height = 0x180;
-      }
-      if (width < 0x118) {
-        width = 0x118;
-      }
-      if (height < 0x4A) {
-        height = 0x4A;
-      }
-      width = (width - 0x118) / 32 * 32 + 0x118;
-      height = (height - 0x4A) / 32 * 32 + 0x4A;
-      if (width != this->geometry.width || height != this->geometry.height) {
-        this->Resize(width, height);
-        this->m_resizer->Move(this->geometry.width - 0xF, this->geometry.height - 0xF);
-        this->ApplyButtonLayout();
-        return 0;
-      }
-    }
-    return 0;
-  case UM_SETINFO: {
-    this->m_saved = reinterpret_cast<SubChatHisWndInfo*>(argument1);
-    if (this->m_saved->IsValid() == 0) {
-      this->m_saved->Reset(this->geometry.id);
-    }
-    this->Move(this->m_saved->x, this->m_saved->y);
-    this->Resize(this->m_saved->width, this->m_saved->height);
-    return 0;
-  }
-  case UM_ADDCHAT: {
-    char detail[25];
-    std::memset(detail, 0, sizeof(detail));
-    if (argument3 != 0) {
-      std::strcpy(detail, reinterpret_cast<const char*>(argument3));
-    }
-    const char* text = reinterpret_cast<const char*>(argument1);
-    this->m_chatBox->AddLinkRecord(text, static_cast<int>(argument2), detail);
-    if (_mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>("<ITEML>")) != nullptr) {
-      this->m_chatBox->AddText(text, static_cast<int>(argument2), detail);
-    } else {
-      this->m_chatBox->AddTextWrapped(text, static_cast<int>(argument2), detail);
-    }
-    return 0;
-  }
-  case 0x74:
-    if (sender == this->m_chatBox && this->geometry.height > this->m_inputHeight) {
-      RECT rectangle;
-      rectangle.left = this->m_chatBox->geometry.x;
-      rectangle.top = this->m_chatBox->geometry.y;
-      rectangle.right = this->geometry.width - 3;
-      rectangle.bottom = this->geometry.height - this->headerHeight;
-      this->FillSurface(0xFFFF00FF, &rectangle);
-      return 0;
-    }
-    return 0;
   default:
     break;
   }
@@ -1379,14 +1418,15 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
 // OFFSET: 0x009230A0
 // FUNCTION: fn_12644
 void UINewChatWnd::OnCreate(int width, int height) {
-  if (height <= this->m_inputAreaHeight) {
-    this->geometry.state = 0;
-  } else {
-    int rows = (height - (static_cast<int>(this->geometry.state) + (this->m_inputOffsetY + 74))) / 42 + 1;
+  if (height > this->m_inputAreaHeight) {
+    const int reserved = static_cast<int>(this->geometry.state) + (this->m_inputOffsetY + 74);
+    int rows = (height - reserved) / 42 + 1;
     if (rows > 4) {
       rows = 4;
     }
     this->geometry.state = rows;
+  } else {
+    this->geometry.state = 0;
   }
 
   this->m_tabWidth = 0;
@@ -1451,7 +1491,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
     UIChatHisBox* chatBox = new UIChatHisBox();
     chatBox->Configure(0, 0, this->geometry.width - 8, 70, 0);
     chatBox->Move(-100 - this->geometry.width, -100);
-    chatBox->SetId(0x1ED);
+    chatBox->SetId(ID_CHAT_EDIT);
     this->AddChild(chatBox);
     this->m_tabs.push_back(chatBox);
   }
@@ -1473,7 +1513,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
   this->AddChild(this->m_chatEdit);
   this->m_inputEdit = this->m_chatEdit;
   g_windowMgr.SetFocus(this->m_chatEdit);
-  this->m_chatEdit->SetId(0x1ED);
+  this->m_chatEdit->SetId(ID_CHAT_EDIT);
 
   this->m_whisperEdit = new UIWhisperEditCtrl();
   this->m_whisperEdit->SetSize(90, 16);
@@ -1481,7 +1521,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
   this->m_whisperEdit->maximum = 24;
   this->m_whisperEdit->Background(240, 240, 240);
   this->AddChild(this->m_whisperEdit);
-  this->m_message0 = 0xB8;
+  this->m_message0 = ID_OK;
 
   this->m_inputResizer = new UIResizer();
   this->m_inputResizer->SetBitmapName("유저인터페이스\\basic_interface\\dialog_mid.bmp");
@@ -1499,17 +1539,18 @@ void UINewChatWnd::OnCreate(int width, int height) {
   };
   const int buttonIds[3] = {0xE1, 0xD4, 0xEE};
   const int buttonPositions[3][2] = {{0x61, base + 3}, {0x24A, base + 7}, {0x23C, base + 7}};
-  const char* const tooltips[3] = {LookupMessage(MSI_RODEX_DOWNLOADING), LookupMessage(MSI_RODEX_TITLE), LookupMessage(MSI_RODEX_NOW_LOADING)};
+  const char* const tooltips[3] = {LookupMessage(MSI_CHATWND_RECEIVER_LIST), LookupMessage(MSI_CHATWND_CHANGE_SIZE), LookupMessage(MSI_CHATWND_RECEPTIVE_GROUP_LIST)};
   for (int index = 0; index < 3; ++index) {
-    UIBitmapButton* button = new UIBitmapButton();
-    this->m_inputButtons[index] = button;
-    button->SetBitmap((basePath + buttonNames[index][0] + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((basePath + buttonNames[index][1] + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((basePath + buttonNames[index][2] + ".bmp").c_str(), 2, 0);
-    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    UIWindow*& button = this->m_inputButtons[index];
+    button = new UIBitmapButton();
+    static_cast<UIBitmapButton*>(button)->SetBitmap((basePath + buttonNames[index][0] + ".bmp").c_str(), 0, 0);
+    static_cast<UIBitmapButton*>(button)->SetBitmap((basePath + buttonNames[index][1] + ".bmp").c_str(), 1, 0);
+    static_cast<UIBitmapButton*>(button)->SetBitmap((basePath + buttonNames[index][2] + ".bmp").c_str(), 2, 0);
+    UIBitmapButton* bitmap = static_cast<UIBitmapButton*>(button);
+    bitmap->SetSize(bitmap->BitmapWidth(), bitmap->BitmapHeight());
     button->Move(buttonPositions[index][0], buttonPositions[index][1]);
     button->SetId(buttonIds[index]);
-    button->SetTooltip(tooltips[index]);
+    static_cast<UIBitmapButton*>(button)->SetTooltip(tooltips[index]);
     this->AddChild(button);
   }
 

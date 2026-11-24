@@ -31,14 +31,22 @@ NAsyncWorkPtr NAsyncWorkRequestQueue::Pop() {
     return NAsyncWorkPtr(nullptr, "");
   }
 
-  unsigned examined = 1;
+  int examined = 1;
   for (auto work = this->m_pending.begin(); work != this->m_pending.end(); ++work) {
     if (examined > 40) {
       break;
     }
 
     auto key = work->Get()->GroupKey();
-    if (std::find(this->m_active.begin(), this->m_active.end(), key) == this->m_active.end()) {
+    bool active = false;
+    for (auto entry = this->m_active.begin(); entry != this->m_active.end(); ++entry) {
+      if (entry->first == key.first && entry->second == key.second) {
+        active = true;
+        break;
+      }
+    }
+
+    if (!active) {
       this->m_active.push_back(key);
       NAsyncWorkPtr result(*work);
       this->m_pending.erase(work);
@@ -103,7 +111,7 @@ NAsyncWorkResponseQueue::~NAsyncWorkResponseQueue() {
 // FUNCTION: fn_07575
 void NAsyncWorkResponseQueue::Push(NAsyncWorkPtr& work) {
   NSyncObject held(&this->m_criticalSection);
-  this->m_pending.emplace_back(work);
+  this->m_pending.push_back(work);
 }
 
 // OFFSET: 0x00732740
@@ -111,11 +119,10 @@ void NAsyncWorkResponseQueue::Push(NAsyncWorkPtr& work) {
 NAsyncWorkResponse NAsyncWorkResponseQueue::Pop() {
   NSyncObject held(&this->m_criticalSection);
   if (this->m_pending.empty()) {
-    NAsyncWorkPtr empty(nullptr, "");
-    return {false, empty};
+    return std::make_pair(false, NAsyncWorkPtr(nullptr, ""));
   }
 
   NAsyncWorkPtr work(this->m_pending.front());
   this->m_pending.pop_front();
-  return {true, work};
+  return std::make_pair(true, work);
 }

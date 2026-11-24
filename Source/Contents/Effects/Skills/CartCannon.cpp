@@ -25,6 +25,11 @@ CCartCannon::CCartCannon() : CEffect(-1) {
   this->rotationParameter = 0;
 }
 
+// OFFSET: 0x006FA9C0
+// FUNCTION: fn_46164
+__declspec(noinline) CCartCannon::~CCartCannon() {
+}
+
 // OFFSET: 0x006FAA80
 // FUNCTION: fn_06896
 void CCartCannon::Close() {
@@ -50,20 +55,19 @@ void CCartCannon::Open() {
 
   this->speed = 1.0f;
   this->delay = 0;
-  current.y -= 10.0f;
+  this->currentPosition.y -= 10.0f;
   vector3d target = this->sourcePositionVector;
   this->currentStep = 0;
   target.y -= 10.0f;
 
-  this->stepDelta.x = target.x - current.x;
-  this->stepDelta.y = target.y - current.y;
-  this->stepDelta.z = target.z - current.z;
+  const float deltaX = target.x - current.x;
+  const float deltaY = target.y - current.y;
+  const float deltaZ = target.z - current.z;
+  this->stepDelta.x = deltaX;
+  this->stepDelta.y = deltaY;
+  this->stepDelta.z = deltaZ;
 
-  const float length = SquareRoot(
-    this->stepDelta.x * this->stepDelta.x +
-    this->stepDelta.y * this->stepDelta.y +
-    this->stepDelta.z * this->stepDelta.z
-  );
+  const float length = SquareRoot(deltaY * deltaY + deltaX * deltaX + deltaZ * deltaZ);
 
   this->stepDelta.x /= 10.0f;
   this->stepDelta.y /= 10.0f;
@@ -74,22 +78,25 @@ void CCartCannon::Open() {
     this->stepDelta *= this->speed;
   }
 
-  const float dx = target.x - current.x;
   const float dy = target.y - current.y;
+  const float dx = target.x - current.x;
   const float dz = target.z - current.z;
   const float inverse = 1.0f / SquareRoot(dx * dx + dy * dy + dz * dz);
 
-  current.x = inverse * dx * 4.0f + current.x;
-  current.y = inverse * dy * 4.0f + current.y;
-  current.z = inverse * dz * 4.0f + current.z;
+  const vector3d moved = {inverse * dx * 4.0f + current.x, inverse * dy * 4.0f + current.y, inverse * dz * 4.0f + current.z};
+  current.x = moved.x;
+  this->startPosition.x = moved.x;
+  current.y = moved.y;
+  this->startPosition.y = moved.y;
+  current.z = moved.z;
+  this->startPosition.z = moved.z;
 
-  this->startPosition = this->currentPosition;
-  this->position[0] = current.x;
-  this->position[1] = current.y;
-  this->position[2] = current.z;
+  this->position[0] = moved.x;
+  this->position[1] = moved.y;
+  this->position[2] = moved.z;
 
   CGameMode* mode = g_modeMgr.GetGameMode();
-  const float angle = static_cast<float>(atan2(static_cast<double>(target.z - current.z), static_cast<double>(target.x - current.x)));
+  const float angle = static_cast<float>(atan2(static_cast<double>(target.z - this->currentPosition.z), static_cast<double>(target.x - current.x)));
   float yaw = mode->CameraDesiredYaw() + angle / 3.141592f * 180.0f;
   if (yaw < 0.0f) {
     yaw += 360.0f;
@@ -137,6 +144,25 @@ void CCartCannon::OnProcess() {
   ++this->currentStep;
 }
 
+// OFFSET: 0x006FAFC0
+// FUNCTION: fn_46165
+void CCartCannon::UpdateParticle(CEZ2STRParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  const float step = static_cast<float>(this->currentStep);
+  this->currentPosition.x = step * this->stepDelta.x + this->startPosition.x;
+  this->currentPosition.y = step * this->stepDelta.y + this->startPosition.y;
+  this->currentPosition.z = step * this->stepDelta.z + this->startPosition.z;
+  this->position[0] = this->currentPosition.x;
+  this->position[1] = this->currentPosition.y;
+  this->position[2] = this->currentPosition.z;
+
+  particle->position = this->currentPosition;
+  particle->Process(0.0f, 0.0f, 0.0f);
+}
+
 // OFFSET: 0x006FB080
 // FUNCTION: fn_06900
 void CCartCannon::Render() {
@@ -145,6 +171,17 @@ void CCartCannon::Render() {
     CGameMode* mode = g_modeMgr.GetGameMode();
     particle->DrawScreen(mode->camera->frame.view);
   }
+}
+
+// OFFSET: 0x006FB0B0
+// FUNCTION: fn_46166
+void CCartCannon::RenderParticle(CEZ2STRParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  CGameMode* mode = g_modeMgr.GetGameMode();
+  particle->DrawScreen(mode->camera->frame.view);
 }
 
 // OFFSET: 0x006FB0E0

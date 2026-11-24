@@ -30,7 +30,7 @@ bool UIChatHisBox::Name(const std::string& encoded, std::string& output) {
   this->DecodeItemLinkFields(encoded, fields);
   ITEM_INFO item;
 
-  if (ItemFromLinkFields(fields, item)) {
+  if (this->ItemFromLinkFields(fields, item)) {
     output = item.DisplayName(0);
     return true;
   }
@@ -47,7 +47,7 @@ bool UIChatHisBox::Next(std::string& remaining, std::string& encoded, unsigned& 
     return false;
   }
 
-  do {
+  while (close != std::string::npos) {
     remaining = remaining.substr(0, close);
     auto begin = remaining.find(g_itemLinkTagBegin);
 
@@ -64,11 +64,12 @@ bool UIChatHisBox::Next(std::string& remaining, std::string& encoded, unsigned& 
       do {
         position += static_cast<unsigned>(begin);
         remaining = remaining.substr(begin + g_itemLinkTagBegin.size());
+        const auto beginSize = g_itemLinkTagBegin.size();
         begin = remaining.find(g_itemLinkTagBegin);
         close = remaining.find(g_itemLinkTagEnd);
 
         if (begin != std::string::npos) {
-          position += static_cast<unsigned>(g_itemLinkTagBegin.size());
+          position += static_cast<unsigned>(beginSize);
         }
       } while (begin != std::string::npos);
 
@@ -76,15 +77,15 @@ bool UIChatHisBox::Next(std::string& remaining, std::string& encoded, unsigned& 
       remaining = original;
       std::string name = "";
 
-      if (this->Name(encoded, name)) {
-        remaining = remaining.substr(position + encoded.size() + g_itemLinkTagBegin.size() + g_itemLinkTagEnd.size());
-      } else {
-        position += static_cast<unsigned>(encoded.size() + g_itemLinkTagBegin.size() + g_itemLinkTagEnd.size());
+      if (!this->Name(encoded, name)) {
+        position = static_cast<unsigned>(position + encoded.size() + g_itemLinkTagBegin.size() + g_itemLinkTagEnd.size());
         remaining = remaining.substr(position);
         return true;
       }
+
+      remaining = remaining.substr(position + encoded.size() + g_itemLinkTagBegin.size() + g_itemLinkTagEnd.size());
     }
-  } while (close != std::string::npos);
+  }
 
   return true;
 }
@@ -127,7 +128,7 @@ std::string UIChatHisBox::Convert(const std::string& text) {
 // OFFSET: 0x00884460
 // FUNCTION: fn_11307
 const std::string UIChatHisBox::BracketName(const std::string& name) {
-  std::string result;
+  std::string result("");
   result += '<';
   result += this->FitTextToWidth(name, this->geometry.width / 2);
   result += '>';

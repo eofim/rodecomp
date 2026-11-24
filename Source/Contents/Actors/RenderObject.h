@@ -28,6 +28,7 @@ class CRenderObject : public CGameObject {
 public:
   CRenderObject();
   ~CRenderObject() override;
+  void Reset();
   bool OnProcess() override;
   void SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) override;
   void Render(int argument) override;
@@ -55,7 +56,7 @@ public:
   virtual std::uint32_t GetStateFlags() {
     return 0;
   }
-  static float __stdcall Heading(float x, float z, float targetX, float targetZ);
+  float Heading(float x, float z, float targetX, float targetZ);
   void Face(float x, float z);
   float CalcDist(float x, float z) const;
   float CalcDist(float x, float y, float z) const;
@@ -63,6 +64,9 @@ public:
   void UpdateTlvertex(const float* matrix);
   __declspec(noinline) void SetAnimationSpeed(float speed);
   void SetActionSpeed(float speed);
+  float GetMotionActionSpeed(unsigned animation) const;
+  float GetScaledActionSpeed(unsigned animation, float scale) const;
+  CSprRes* GetSequenceSpriteOverride(int type, int layer);
   void DrawSprite(int argument, bool seasonal, float offset);
   void DrawShadow(int argument, float scale);
   void DrawQuad(const SpriteQuad& quad, const std::uint32_t* palette, int blend, float offsetX, float offsetY, int depthOffset);
@@ -96,7 +100,7 @@ public:
   );
   void ApplySwing(int mode, int& x, int& y, int& outX, int& outY) const;
   void SetInstantValue(int key, std::int64_t value);
-  std::int64_t GetInstant(int key) const;
+  int GetInstant(int key) const;
   const char* GetActName();
   __declspec(noinline) CActRes* GetActRes();
   void SetFrameSequence(

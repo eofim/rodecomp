@@ -26,32 +26,13 @@
 #include <timeapi.h>
 #include <windows.h>
 
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-template __declspec(noinline) std::pair<std::string, std::vector<std::string>>::pair(std::string&, std::vector<std::string>&);
-template __declspec(noinline) std::_Tree_find_result<std::map<int, RobeAlpha>::_Mybase::_Nodeptr> std::map<int, RobeAlpha>::_Mybase::_Find_lower_bound<int>(const int&) const;
-
 // GLOBAL: gl_24705
 int g_serviceMode;
-
-struct NaviUnknownBlock {
-  /* 0000 */ int unknown_0000;
-  /* 0004 */ int unknown_0004;
-  /* 0008 */ int unknown_0008;
-  /* 000C */ int unknown_000C;
-  /* 0010 */ int unknown_0010;
-  /* 0014 */ int unknown_0014;
-  /* 0018 */ int unknown_0018;
-  /* 001C */ int unknown_001C;
-  /* 0020 */ int unknown_0020;
-
-  NaviUnknownBlock();
-};
 
 // OFFSET: 0x00B8C870
 // FUNCTION: fn_19426
 CNavi_Object::CNavi_Object()
-    : cellX(0), cellY(0), job(0), sex(0), bodyPalette(0), head(0), headPalette(0),
-      accessory0(0), accessory1(0), accessory2(0), robe(0) {
+    : cellX(0), cellY(0) {
   this->id = -1;
   this->type = 101;
   this->index = 0;
@@ -62,16 +43,14 @@ CNavi_Object::CNavi_Object()
 
 // OFFSET: 0x00B8C990
 // FUNCTION: fn_19427
-NaviUnknownBlock::NaviUnknownBlock()
-    : unknown_0000(0), unknown_0004(0), unknown_0008(0), unknown_000C(0), unknown_0010(0), unknown_0014(0), unknown_0018(0), unknown_001C(0),
-      unknown_0020(0) {
+NaviNpcLook::NaviNpcLook()
+    : job(0), sex(0), bodyPalette(0), head(0), headPalette(0), accessory0(0), accessory1(0), accessory2(0), robe(0) {
 }
 
 // OFFSET: 0x00B8C710
 // FUNCTION: fn_19425
 CNavi_Object::CNavi_Object(int type, int index, const char* name, const char* title, int cellX, int cellY, CNaviInfo* info)
-    : cellX(0), cellY(0), job(0), sex(0), bodyPalette(0), head(0), headPalette(0), accessory0(0),
-      accessory1(0), accessory2(0), robe(0) {
+    : cellX(0), cellY(0) {
   this->type = type;
   this->id = -1;
   this->index = index;
@@ -161,40 +140,45 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
   std::memset(message, 0, sizeof(message));
   this->data.ClearAll();
 
-  int type;
-  int cellX = 0;
-  int cellY = 0;
+  const char* mapName;
+  const char* name;
+  const char* title;
+  const char* linkedMap;
+  int id;
+  int objectType;
+  int objectIndex;
+  POINT cell = {0, 0};
   int linkedX = 0;
   int linkedY = 0;
   int targetId = -1;
   int cost = 0;
-  for (int index = 1; index < 9999; ++index) {
-    const char* name = nullptr;
-    const char* title = nullptr;
-    if (!script->Call("queryNavi_MapInfo", "d>ssddd", index, &name, &title, &type, &cellX, &cellY)) {
+  int index = 1;
+  for (; index < 9999; ++index) {
+    mapName = nullptr;
+    name = nullptr;
+    if (!script->Call("queryNavi_MapInfo", "d>ssddd", index, &mapName, &name, &id, &cell.x, &cell.y)) {
       std::sprintf(message, "Map 루아 읽기 실패 %d", index);
       MessageBoxA(hWnd, message, "Error", 0);
       break;
     }
-    if (!name) {
+    if (!mapName) {
       break;
     }
-    CNaviInfo* info = new CNaviInfo(static_cast<int>(this->data.destinations.size()), name, title, cellX, cellY, type);
+    CNaviInfo* info = new CNaviInfo(this->data.DestinationCount(), mapName, name, cell.x, cell.y, id);
     if (info) {
       this->data.AddDestination(info);
     }
   }
 
-  for (int index = 1; index < 99999; ++index) {
-    int objectType = 100;
-    const char* title = nullptr;
-    const char* name = nullptr;
-    const char* mapName = nullptr;
-    int objectX = 0;
-    int objectY = 0;
-    int objectIndex = 0;
-    int id;
-    if (!script->Call("queryNavi_NpcInfo", "d>sdddssdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &objectX, &objectY)) {
+  for (index = 1; index < 99999; ++index) {
+    objectType = 100;
+    title = nullptr;
+    name = nullptr;
+    mapName = nullptr;
+    cell.x = 0;
+    cell.y = 0;
+    objectIndex = 0;
+    if (!script->Call("queryNavi_NpcInfo", "d>sdddssdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &cell.x, &cell.y)) {
       std::sprintf(message, "Npc 루아 읽기 실패 %d", index);
       MessageBoxA(hWnd, message, "Error", 0);
       break;
@@ -204,22 +188,21 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     }
     CNaviInfo* info = this->FindObject(mapName);
     if (info) {
-      CNavi_Object* npc = new CNavi_Object(objectType, objectIndex, name, title, objectX, objectY, info);
+      CNavi_Object* npc = new CNavi_Object(objectType, objectIndex, name, title, cell.x, cell.y, info);
       npc->SetId(id);
       info->AddNpc(npc);
     }
   }
 
-  for (int index = 1; index < 99999; ++index) {
-    int objectType = 100;
-    const char* title = nullptr;
-    const char* name = nullptr;
-    const char* mapName = nullptr;
-    int objectX = 0;
-    int objectY = 0;
-    int objectIndex = 0;
-    int id;
-    if (!script->Call("queryNavi_MobInfo", "d>sdddssdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &objectX, &objectY)) {
+  for (index = 1; index < 99999; ++index) {
+    objectType = 100;
+    title = nullptr;
+    name = nullptr;
+    mapName = nullptr;
+    cell.x = 0;
+    cell.y = 0;
+    objectIndex = 0;
+    if (!script->Call("queryNavi_MobInfo", "d>sdddssdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &cell.x, &cell.y)) {
       std::sprintf(message, "몬스터 루아 읽기 실패 %d", index);
       MessageBoxA(hWnd, message, "Error", 0);
       break;
@@ -229,26 +212,25 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     }
     CNaviInfo* info = this->FindObject(mapName);
     if (info) {
-      CNavi_Object* mob = new CNavi_Object(objectType, objectIndex, name, title, objectX, objectY, info);
+      CNavi_Object* mob = new CNavi_Object(objectType, objectIndex, name, title, cell.x, cell.y, info);
       mob->SetId(id);
       info->AddMob(mob);
     }
   }
 
-  for (int index = 1; index < 99999; ++index) {
-    int objectType = 100;
-    const char* linkedMap = nullptr;
-    const char* title = nullptr;
-    const char* name = nullptr;
-    const char* mapName = nullptr;
+  for (index = 1; index < 99999; ++index) {
+    objectType = 100;
+    linkedMap = nullptr;
+    title = nullptr;
+    name = nullptr;
+    mapName = nullptr;
     linkedX = 0;
     linkedY = 0;
-    int objectX = 0;
-    int objectY = 0;
-    int objectIndex = 0;
-    int id;
+    cell.x = 0;
+    cell.y = 0;
+    objectIndex = 0;
     if (!script->Call(
-          "queryNavi_LinkInfo", "d>sdddssddsdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &objectX, &objectY, &linkedMap, &linkedX,
+          "queryNavi_LinkInfo", "d>sdddssddsdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &cell.x, &cell.y, &linkedMap, &linkedX,
           &linkedY
         )) {
       std::sprintf(message, "Link 루아 읽기 실패 %d", index);
@@ -261,7 +243,7 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     CNaviInfo* info = this->FindObject(mapName);
     CNaviInfo* linked = this->FindObject(linkedMap);
     if (info && linked) {
-      CNavi_Link* link = new CNavi_Link(objectType, objectIndex, name, title, objectX, objectY, info, linked, linkedX, linkedY);
+      CNavi_Link* link = new CNavi_Link(objectType, objectIndex, name, title, cell.x, cell.y, info, linked, linkedX, linkedY);
       link->SetId(id);
       info->AddLink(link);
     }
@@ -276,12 +258,13 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
   int accessory1 = 0;
   int accessory2 = 0;
   int robe = 0;
-  for (int index = 1; index < 9999; ++index) {
-    const char* mapName = nullptr;
-    int pickX = 0;
-    int pickY = 0;
+  for (index = 1; index < 9999; ++index) {
+    mapName = nullptr;
+    cell.x = 0;
+    cell.y = 0;
+    objectIndex = 0;
     if (!script->Call(
-          "queryNavi_PickNpc", "d>sddddddddddd", index, &mapName, &pickX, &pickY, &job, &sex, &bodyPalette, &head, &headPalette, &accessory0, &accessory1,
+          "queryNavi_PickNpc", "d>sddddddddddd", index, &mapName, &cell.x, &cell.y, &job, &sex, &bodyPalette, &head, &headPalette, &accessory0, &accessory1,
           &accessory2, &robe
         )) {
       StringFormat(message, sizeof(message), static_cast<std::size_t>(-1), "Failed to read Link lua %d", index);
@@ -293,23 +276,23 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     }
     CNaviInfo* info = this->FindObject(mapName);
     if (info) {
-      CNavi_Object* npc = info->FindNpcAt(pickX, pickY);
+      CNavi_Object* npc = info->FindNpcAt(cell.x, cell.y);
       if (npc) {
-        npc->job = job;
-        npc->sex = sex;
-        npc->bodyPalette = bodyPalette;
-        npc->head = head;
-        npc->headPalette = headPalette;
-        npc->accessory0 = accessory0;
-        npc->accessory1 = accessory1;
-        npc->accessory2 = accessory2;
-        npc->robe = robe;
+        npc->look.job = job;
+        npc->look.sex = sex;
+        npc->look.bodyPalette = bodyPalette;
+        npc->look.head = head;
+        npc->look.headPalette = headPalette;
+        npc->look.accessory0 = accessory0;
+        npc->look.accessory1 = accessory1;
+        npc->look.accessory2 = accessory2;
+        npc->look.robe = robe;
       }
     }
   }
 
   for (int map = 1; map < 999999; map += 3) {
-    const char* mapName = nullptr;
+    mapName = nullptr;
     int count = 0;
     if (!script->Call("queryNavi_Distance_Map", "d>sd", map, &mapName, &count)) {
       std::sprintf(message, "워프 길 정보 읽기 실패 %d", map);
@@ -324,30 +307,30 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
       continue;
     }
     for (int entry = 1; entry < count + 1; ++entry) {
-      int linkId = -1;
-      if (!script->Call("queryNavi_Distance_Link", "dd>d", map, entry, &linkId)) {
+      id = -1;
+      if (!script->Call("queryNavi_Distance_Link", "dd>d", map, entry, &id)) {
         continue;
       }
-      CNavi_Link* link = info->FindLink(linkId, true);
+      CNavi_Link* link = info->FindLink(id, true);
       if (!link) {
         continue;
       }
       for (int pass = 1;; ++pass) {
-        const char* kind = nullptr;
+        name = nullptr;
         targetId = -1;
         cost = 0;
-        if (!script->Call("queryNavi_Distance_Pass", "ddd>sdd", map, entry, pass, &kind, &targetId, &cost)) {
+        if (!script->Call("queryNavi_Distance_Pass", "ddd>sdd", map, entry, pass, &name, &targetId, &cost)) {
           continue;
         }
-        if (std::strcmp("NULL", kind) == 0) {
+        if (std::strcmp("NULL", name) == 0) {
           break;
         }
-        if (std::strcmp(kind, "P") == 0) {
+        if (std::strcmp(name, "P") == 0) {
           CNavi_Link* target = info->FindLink(targetId, true);
           if (target) {
             link->AddLink(NaviLink{target, cost});
           }
-        } else if (std::strcmp(kind, "E") == 0) {
+        } else if (std::strcmp(name, "E") == 0) {
           CNavi_Link* target = link->GetLinkedInfo()->FindLink(targetId, true);
           if (target) {
             link->AddLinkedLink(NaviLink{target, cost});
@@ -358,7 +341,7 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
   }
 
   for (int map = 1; map < 999999; map += 3) {
-    const char* mapName = nullptr;
+    mapName = nullptr;
     int count = 0;
     if (!script->Call("queryNavi_NpcDistance_Map", "d>sd", map, &mapName, &count)) {
       std::sprintf(message, "Npc 워프 길 정보 읽기 실패 %d", map);
@@ -373,25 +356,25 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
       continue;
     }
     for (int entry = 1; entry < count + 1; ++entry) {
-      int npcId = -1;
-      if (!script->Call("queryNavi_NpcDistance_Link", "dd>d", map, entry, &npcId)) {
+      id = -1;
+      if (!script->Call("queryNavi_NpcDistance_Link", "dd>d", map, entry, &id)) {
         continue;
       }
-      CNavi_Object* npc = info->FindNpc(npcId, true);
+      CNavi_Object* npc = info->FindNpc(id, true);
       if (!npc) {
         continue;
       }
       for (int pass = 1;; ++pass) {
-        const char* targetMap = nullptr;
+        name = nullptr;
         targetId = -1;
         cost = 0;
-        if (!script->Call("queryNavi_NpcDistance_Pass", "ddd>sdd", map, entry, pass, &targetMap, &targetId, &cost)) {
+        if (!script->Call("queryNavi_NpcDistance_Pass", "ddd>sdd", map, entry, pass, &name, &targetId, &cost)) {
           continue;
         }
         if (targetId == 0 && cost == 0) {
           break;
         }
-        CNaviInfo* targetInfo = this->FindObject(targetMap);
+        CNaviInfo* targetInfo = this->FindObject(name);
         CNavi_Link* target = targetInfo == nullptr ? this->data.FindLink(targetId, true) : targetInfo->FindLink(targetId, true);
         if (target) {
           npc->AddLink(NaviLink{target, cost});
@@ -400,24 +383,24 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     }
   }
 
-  for (int index = 1; index < 200; ++index) {
-    const char* name = nullptr;
-    const char* mapName = nullptr;
-    int id = 0;
-    int objectIndex = 0;
+  for (index = 1; index < 200; ++index) {
+    name = nullptr;
+    linkedMap = nullptr;
+    id = 0;
+    objectIndex = 0;
     linkedX = 0;
     linkedY = 0;
-    if (!script->Call("queryNavi_Scroll", "d>sddsdd", index, &name, &id, &objectIndex, &mapName, &linkedX, &linkedY)) {
+    if (!script->Call("queryNavi_Scroll", "d>sddsdd", index, &name, &id, &objectIndex, &linkedMap, &linkedX, &linkedY)) {
       char text[260];
       std::memset(text, 0, sizeof(text));
       std::sprintf(text, "Scroll 정보 읽기 실패 %d", index);
       MessageBoxA(hWnd, text, "Error", 0);
       break;
     }
-    if (std::strcmp("NULL", name) == 0 && std::strcmp("NULL", mapName) == 0) {
+    if (std::strcmp("NULL", name) == 0 && std::strcmp("NULL", linkedMap) == 0) {
       break;
     }
-    CNaviInfo* info = this->FindObject(mapName);
+    CNaviInfo* info = this->FindObject(linkedMap);
     if (!info) {
       continue;
     }
@@ -602,7 +585,7 @@ SessionShop* CSession::GetShop(int shopId) {
     return &found->second;
   }
 
-  this->m_shops[shopId] = SessionShop{};
+  this->m_shops[shopId] = SessionShop();
   return &this->m_shops[shopId];
 }
 
@@ -626,9 +609,8 @@ void CSession::SetShopItem(int shopId, unsigned int index, int itemId, int first
     shop->items.resize(index + 1);
   }
 
-  std::map<int, std::pair<int, int>>& items = shop->items[index];
-  if (items.find(itemId) == items.end()) {
-    items[itemId] = index == 0 ? std::make_pair(1, second) : std::make_pair(first, second);
+  if (shop->items[index].find(itemId) == shop->items[index].end()) {
+    shop->items[index][itemId] = index == 0 ? std::make_pair(1, second) : std::make_pair(first, second);
   }
 }
 
@@ -707,9 +689,9 @@ void CSession::LoadRobeAlpha() {
   for (int index = 1; index < 1000; ++index) {
     int robeId = 0;
     RobeAlpha alpha;
+    alpha.period = 0;
     alpha.from = 0;
     alpha.to = 0;
-    alpha.period = 0;
     LuaScript* script = this->m_hotkeyScript;
 
     if (!script->Call(OBFUSCATE_TEXT("querytransparentiteminfo", 0xD51953E763B94747ULL), OBFUSCATE_TEXT("d>dddd", 0x6373E5456BAD7B71ULL), index, &robeId, &alpha.from, &alpha.to, &alpha.period)) {
@@ -745,7 +727,7 @@ int CSession::GetPlayerSkillMode() const {
 void CSession::UnflagInventoryItem(int id) {
   for (ITEM_INFO& entry : this->m_inventoryItems) {
     if (entry.identity[1] == static_cast<std::uint32_t>(id)) {
-      entry.flags[2] = 0;
+      entry.flagged = 0;
       break;
     }
   }
@@ -756,7 +738,7 @@ void CSession::UnflagInventoryItem(int id) {
 void CSession::UnflagMerchantShopItem(int id) {
   for (ITEM_INFO& entry : this->m_merchantShopItems) {
     if (entry.identity[1] == static_cast<std::uint32_t>(id)) {
-      entry.flags[2] = 0;
+      entry.flagged = 0;
       break;
     }
   }
@@ -767,7 +749,7 @@ void CSession::UnflagMerchantShopItem(int id) {
 void CSession::UnflagCartItem(int id) {
   for (ITEM_INFO& entry : this->m_cartItems) {
     if (entry.identity[1] == static_cast<std::uint32_t>(id)) {
-      entry.flags[2] = 0;
+      entry.flagged = 0;
       break;
     }
   }
@@ -826,7 +808,7 @@ void CSession::LoadDamageSkinSettings() {
 
 // OFFSET: 0x00DE53C0
 // FUNCTION: fn_23491
-bool CSession::LoadExceptionMinimapNameTable() {
+BOOL CSession::LoadExceptionMinimapNameTable() {
   std::vector<char*> tokens;
   this->m_navigationForbiddenMaps.clear();
   this->m_navigationForbiddenMaps.reserve(512);
@@ -834,11 +816,11 @@ bool CSession::LoadExceptionMinimapNameTable() {
   CCommonObject& storage = this->m_tableLoader;
   const bool loaded = storage.LoadTokens(tokens, "ExceptionMinimapNameTable.txt", 0);
 
-  for (char* token : tokens) {
-    this->m_navigationForbiddenMaps.push_back(std::string(token));
+  for (auto token = tokens.begin(); token != tokens.end(); ++token) {
+    this->m_navigationForbiddenMaps.push_back(std::string(*token));
   }
 
-  std::sort(this->m_navigationForbiddenMaps.begin(), this->m_navigationForbiddenMaps.end(), std::less<std::string>());
+  std::sort(this->m_navigationForbiddenMaps.begin(), this->m_navigationForbiddenMaps.end());
   return loaded;
 }
 
@@ -847,49 +829,49 @@ bool CSession::LoadExceptionMinimapNameTable() {
 bool CSession::LoadFogParameters() {
   this->m_fogParameters.clear();
 
+  bool result = false;
   CFile file;
-  if (!file.Open("fogParameterTable.txt", 0, true, false)) {
-    return false;
-  }
+  if (file.Open("fogParameterTable.txt", 0, true, false)) {
+    const char* cursor = static_cast<const char*>(file.GetData());
+    const char* end = cursor + file.GetSize();
+    std::string name;
+    std::vector<std::string> values;
 
-  const char* cursor = static_cast<const char*>(file.GetData());
-  const char* end = cursor + file.GetSize();
-  std::string name;
-  std::vector<std::string> values;
+    for (const char* start = cursor; cursor < end; ++cursor) {
+      const char value = *cursor;
+      if (value == '\n' || value == '\r') {
+        start = cursor + 1;
+        continue;
+      }
 
-  for (const char* start = cursor; cursor < end; ++cursor) {
-    const char value = *cursor;
-    if (value == '\n' || value == '\r') {
+      if (value != '#') {
+        continue;
+      }
+
+      if (name.empty()) {
+        name.assign(start, cursor - start);
+      } else if (values.size() < 3) {
+        values.push_back(std::string(start, cursor));
+      } else {
+        values.push_back(std::string(start, cursor));
+        this->m_fogParameters.push_back(std::pair<std::string, std::vector<std::string>>(name, values));
+        name.clear();
+        values.clear();
+      }
+
       start = cursor + 1;
-      continue;
     }
 
-    if (value != '#') {
-      continue;
-    }
-
-    if (name.empty()) {
-      name.assign(start, cursor - start);
-    } else if (values.size() < 3) {
-      values.push_back(std::string(start, cursor));
-    } else {
-      std::string last(start, cursor);
-      values.push_back(std::move(last));
-      this->m_fogParameters.push_back(std::make_pair(name, values));
-      name.clear();
-      values.clear();
-    }
-
-    start = cursor + 1;
+    std::sort(this->m_fogParameters.begin(), this->m_fogParameters.end(),
+              [](const std::pair<std::string, std::vector<std::string>>& left,
+                 const std::pair<std::string, std::vector<std::string>>& right) {
+                return std::strcmp(left.first.c_str(), right.first.c_str()) < 0;
+              });
+    file.Close();
+    result = true;
   }
 
-  std::sort(this->m_fogParameters.begin(), this->m_fogParameters.end(),
-            [](const std::pair<std::string, std::vector<std::string>>& left,
-               const std::pair<std::string, std::vector<std::string>>& right) {
-              return std::strcmp(left.first.c_str(), right.first.c_str()) < 0;
-            });
-  file.Close();
-  return true;
+  return result;
 }
 
 // OFFSET: 0x00DE5B40

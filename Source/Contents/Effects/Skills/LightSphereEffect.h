@@ -11,6 +11,7 @@ class CParticle;
 class CLightSphereEffect : public CEffect {
 public:
   CLightSphereEffect();
+  ~CLightSphereEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -18,9 +19,17 @@ public:
   bool IsAlive() override;
 
   void CreateRayParticles(int param);
+  void UpdateRayVertices(CParticle* particle);
+  void UpdateRay(CParticle* particle);
 
   /* 00CC */ std::vector<CParticle*> spheres;
   /* 00D8 */ std::vector<CParticle*> rays;
+
+private:
+  void CreateSphereParticles();
+  void UpdateSphere(CParticle* particle);
+  void RenderRay(CParticle* particle);
+  void RenderSphere(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

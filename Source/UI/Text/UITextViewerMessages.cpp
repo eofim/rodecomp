@@ -26,8 +26,6 @@
 #include <cstdlib>
 #include <shellapi.h>
 
-template __declspec(noinline) std::string::~basic_string() noexcept;
-
 // INLINED
 __forceinline void UITextViewer::Activate(UITextButton* button, int id) {
   switch (id) {
@@ -37,6 +35,16 @@ __forceinline void UITextViewer::Activate(UITextButton* button, int id) {
 
       if (!url.empty()) {
         ShellExecuteA(hWnd, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+      }
+    }
+
+    break;
+  case LINE_SEGMENT_TIPBOX:
+    if (button && button->GetLinesCount() != 0) {
+      const std::string& tip = button->GetLine(0);
+
+      if (UIWindow* window = g_windowMgr.EnsureWindow(WID_TIPBOXWND)) {
+        static_cast<UITipboxWnd*>(window)->ShowTip(std::atoi(tip.c_str()));
       }
     }
 
@@ -61,7 +69,7 @@ __forceinline void UITextViewer::Activate(UITextButton* button, int id) {
       int policy = std::atoi(button->GetLine(4).c_str());
 
       if (policy == -222) {
-        std::string name = "$$DB ";
+        std::string name("$$DB ", 5);
 
         if (type != 3) {
           name.clear();
@@ -120,20 +128,10 @@ __forceinline void UITextViewer::Activate(UITextButton* button, int id) {
 
     break;
   }
-  case LINE_SEGMENT_TIPBOX:
-    if (button && button->GetLinesCount() != 0) {
-      const std::string& tip = button->GetLine(0);
-
-      if (UIWindow* window = g_windowMgr.EnsureWindow(WID_TIPBOXWND)) {
-        static_cast<UITipboxWnd*>(window)->ShowTip(std::atoi(tip.c_str()));
-      }
-    }
-
-    break;
   case LINE_SEGMENT_QUEST:
     if (button) {
       const int value = std::atoi(button->GetLine(0).c_str());
-      g_modeMgr.GetGameMode()->ReceiveServiceRequest(6, value);
+      static_cast<CGameMode*>(g_modeMgr.GetGameMode())->ReceiveServiceRequest(6, value);
     }
 
     break;
@@ -154,7 +152,7 @@ __forceinline void UITextViewer::AppendText(char* text, int width, int carriageR
       this->AddLine(wrapped[index].c_str());
     }
 
-    this->plainTextMode = (this->plainTextMode & ~255) | 1;
+    this->plainTextMode = 1;
     return;
   }
 
@@ -168,21 +166,29 @@ __forceinline void UITextViewer::AppendText(char* text, int width, int carriageR
     display = RemoveTextLinkInfo(display);
 
     if (g_windowMgr.chatWnd) {
-      display = g_windowMgr.chatWnd->ConvertChat(display);
+      display = g_windowMgr.chatWnd->ConvertChat(std::move(display));
     }
 
-    std::string navigation = g_navigationLinkParser->DisplayNavigationLink(display);
-    display = DisplayQuestTextTag(navigation);
+    display = g_navigationLinkParser->DisplayNavigationLink(display);
+    display = DisplayQuestTextTag(display);
 
     if (pixels) {
-      const int scrollWidth = carriageReturns ? this->verticalBar->geometry.width + 2 : 0;
+      int scrollWidth = 0;
+      if (carriageReturns) {
+        scrollWidth = this->verticalBar->geometry.width + 2;
+      }
+
       this->WrapPixelText(display.c_str(), wrapped, this->geometry.width - scrollWidth - 4);
+
+      for (unsigned index = 0; index < wrapped.size(); ++index) {
+        this->AddLine(wrapped[index].c_str());
+      }
     } else {
       WrapRichText(display.c_str(), wrapped, lineWidth, carriageReturns != 0);
-    }
 
-    for (unsigned index = 0; index < wrapped.size(); ++index) {
-      this->AddLine(wrapped[index].c_str());
+      for (unsigned index = 0; index < wrapped.size(); ++index) {
+        this->AddLine(wrapped[index].c_str());
+      }
     }
 
     this->AddItemLinks(text, static_cast<unsigned>(wrapped.size()));
@@ -190,20 +196,30 @@ __forceinline void UITextViewer::AppendText(char* text, int width, int carriageR
     this->AddNaviLinks(text, static_cast<unsigned>(wrapped.size()));
     this->AddTipLinks(text, static_cast<unsigned>(wrapped.size()));
     this->AddQuestLinks(text, static_cast<unsigned>(wrapped.size()));
+    this->plainTextMode = 0;
+    return;
   } else {
     if (pixels) {
-      const int scrollWidth = carriageReturns ? this->verticalBar->geometry.width + 2 : 0;
+      int scrollWidth = 0;
+      if (carriageReturns) {
+        scrollWidth = this->verticalBar->geometry.width + 2;
+      }
+
       this->WrapPixelText(text, wrapped, this->geometry.width - scrollWidth - 4);
+
+      for (unsigned index = 0; index < wrapped.size(); ++index) {
+        this->AddLine(wrapped[index].c_str());
+      }
     } else {
       WrapRichText(text, wrapped, lineWidth, carriageReturns != 0);
-    }
 
-    for (unsigned index = 0; index < wrapped.size(); ++index) {
-      this->AddLine(wrapped[index].c_str());
+      for (unsigned index = 0; index < wrapped.size(); ++index) {
+        this->AddLine(wrapped[index].c_str());
+      }
     }
   }
 
-  this->plainTextMode &= ~255;
+  this->plainTextMode = 0;
 }
 
 // OFFSET: 0x00899E90
@@ -225,72 +241,9 @@ int UITextViewer::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     return 0;
 
   case UM_SETTEXT:
-  {
-    char* text = reinterpret_cast<char*>(argument1);
-    const int width = static_cast<int>(argument2);
-    const bool carriageReturns = argument3 != 0;
-    const bool pixels = argument4 != 0;
-    const int lineWidth = width == 0 ? 35 : width;
-    std::vector<std::string> wrapped;
-
-    if (width == 138) {
-      WrapPlainText(text, wrapped, 38);
-      for (const auto& line : wrapped) {
-        this->AddLine(line.c_str());
-      }
-      this->plainTextMode = (this->plainTextMode & ~255) | 1;
-      this->Invalidate();
-      return 0;
-    }
-
-    if (HasTextLinks(text)) {
-      const std::string expanded = ExpandTextEscapes(text);
-      strcpy_s(text, std::strlen(text) + 1, expanded.c_str());
-      std::string display = DisplayUrlTextTag(text);
-      display = DisplayNavigationTextTag(display);
-      display = DisplayTipBoxTextTag(display);
-      display = DisplayItemTextTag(display);
-      display = RemoveTextLinkInfo(display);
-
-      if (g_windowMgr.chatWnd) {
-        display = g_windowMgr.chatWnd->ConvertChat(display);
-      }
-
-      std::string navigation = g_navigationLinkParser->DisplayNavigationLink(display);
-      display = DisplayQuestTextTag(navigation);
-
-      if (pixels) {
-        const int scrollWidth = carriageReturns ? this->verticalBar->geometry.width + 2 : 0;
-        this->WrapPixelText(display.c_str(), wrapped, this->geometry.width - scrollWidth - 4);
-      } else {
-        WrapRichText(display.c_str(), wrapped, lineWidth, carriageReturns);
-      }
-
-      for (const auto& line : wrapped) {
-        this->AddLine(line.c_str());
-      }
-      this->AddItemLinks(text, static_cast<unsigned>(wrapped.size()));
-      this->AddUrlLinks(text, static_cast<unsigned>(wrapped.size()));
-      this->AddNaviLinks(text, static_cast<unsigned>(wrapped.size()));
-      this->AddTipLinks(text, static_cast<unsigned>(wrapped.size()));
-      this->AddQuestLinks(text, static_cast<unsigned>(wrapped.size()));
-    } else {
-      if (pixels) {
-        const int scrollWidth = carriageReturns ? this->verticalBar->geometry.width + 2 : 0;
-        this->WrapPixelText(text, wrapped, this->geometry.width - scrollWidth - 4);
-      } else {
-        WrapRichText(text, wrapped, lineWidth, carriageReturns);
-      }
-
-      for (const auto& line : wrapped) {
-        this->AddLine(line.c_str());
-      }
-    }
-
-    this->plainTextMode &= ~255;
+    this->AppendText(reinterpret_cast<char*>(argument1), static_cast<int>(argument2), static_cast<int>(argument3), static_cast<int>(argument4));
     this->Invalidate();
     return 0;
-  }
 
   case UM_SCROLLVERT:
   case UM_SCROLLHORZ:
@@ -322,79 +275,8 @@ int UITextViewer::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
   }
 
   case UM_TEXT_LBTN_UP:
-  {
-    auto* button = static_cast<UITextButton*>(sender);
-    const int id = static_cast<int>(argument1);
-    switch (id) {
-    case LINE_SEGMENT_URL:
-      if (button && !button->GetLine(0).empty()) {
-        ShellExecuteA(hWnd, "open", button->GetLine(0).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-      }
-      break;
-    case LINE_SEGMENT_NAVI:
-      if (button && button->GetLinesCount() != 0) {
-        const int count = button->GetLinesCount();
-        const std::string& map = button->GetLine(0);
-        const int x = std::atoi(button->GetLine(1).c_str());
-        const int y = std::atoi(button->GetLine(2).c_str());
-        if (count > 3) {
-          const int type = std::atoi(button->GetLine(3).c_str());
-          int policy = std::atoi(button->GetLine(4).c_str());
-          if (policy == -222) {
-            std::string name = "$$DB ";
-            if (type != 3) {
-              name = "";
-            }
-            name += map;
-            g_navigationManager.SearchNavigation(name, type, 0);
-            break;
-          }
-          const int option = std::atoi(button->GetLine(5).c_str());
-          const int target = std::atoi(button->GetLine(6).c_str());
-          unsigned char flag = 0;
-          if (policy >= 100) { flag = 1; policy -= 100; }
-          if (policy >= 10) { flag += 2; policy -= 10; }
-          if (policy >= 1) { flag += 4; }
-          g_navigationManager.StartNavigation(map.c_str(), type, flag, option == 0, x, y, target);
-        } else {
-          g_navigationManager.StartNavigation(map.c_str(), 2, 5, false, x, y, 1002);
-        }
-      }
-      break;
-    case LINE_SEGMENT_ITEM:
-      if (button && button->GetLinesCount() != 0) {
-        int idValue = 0;
-        if (!button->GetLine(1).empty()) {
-          idValue = std::atoi(button->GetLine(1).c_str());
-        }
-        ITEM_INFO item;
-        item.identified = 1;
-        item.identity[0] = static_cast<unsigned>(idValue);
-        item.refiningLevel = 0;
-        item.itemId = button->GetLine(0);
-        if (UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)) {
-          window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
-        }
-      }
-      break;
-    case LINE_SEGMENT_TIPBOX:
-      if (button && button->GetLinesCount() != 0) {
-        const std::string& tip = button->GetLine(0);
-        if (UIWindow* window = g_windowMgr.EnsureWindow(WID_TIPBOXWND)) {
-          static_cast<UITipboxWnd*>(window)->ShowTip(std::atoi(tip.c_str()));
-        }
-      }
-      break;
-    case LINE_SEGMENT_QUEST:
-      if (button) {
-        g_modeMgr.GetGameMode()->ReceiveServiceRequest(6, std::atoi(button->GetLine(0).c_str()));
-      }
-      break;
-    default:
-      break;
-    }
+    this->Activate(static_cast<UITextButton*>(sender), static_cast<int>(argument1));
     return 0;
-  }
 
   default:
     return UIListBox::SendMsg(sender, message, argument1, argument2, argument3, argument4);

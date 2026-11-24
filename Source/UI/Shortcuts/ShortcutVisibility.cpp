@@ -18,33 +18,41 @@
 namespace {
   // INLINED
   __forceinline void PromoteWindow(UIWindow* window) {
-    if ((g_windowMgr.modal != nullptr && g_windowMgr.navigationWnd != window) || g_windowMgr.LookupWindow(WID_NEWMAKECHARWND) || g_windowMgr.LookupWindow(WID_MAKECHARWND) ||
-        g_windowMgr.LookupWindow(WID_SECONDPASSWORDINPUTWND) || g_windowMgr.LookupWindow(WID_SECONDPASSWORDEDITWND)) {
+    if (!window || (g_windowMgr.modal != nullptr && g_windowMgr.navigationWnd != window)) {
+      return;
+    }
+
+    if (g_windowMgr.LookupWindow(WID_NEWMAKECHARWND) || g_windowMgr.LookupWindow(WID_MAKECHARWND) || g_windowMgr.LookupWindow(WID_SECONDPASSWORDINPUTWND) ||
+        g_windowMgr.LookupWindow(WID_SECONDPASSWORDEDITWND)) {
       return;
     }
 
     int companion = -1;
-    if (window->geometry.id == 12) {
+    if (window->geometry.id == WID_ITEMCOLLECTIONWND) {
       companion = 234;
-    } else if (window->geometry.id == 82) {
+    }
+    if (window->geometry.id == WID_COMBINEDCARDITEMCOLLECTIONWND) {
       companion = 250;
     }
 
     if (companion != -1) {
-      const auto found = std::find_if(g_windowMgr.rendered.begin(), g_windowMgr.rendered.end(), [&](const UIWindow* value) {
-        return value->geometry.id == companion;
-      });
-      if (found != g_windowMgr.rendered.end()) {
-        UIWindow* value = *found;
-        g_windowMgr.rendered.erase(found);
-        g_windowMgr.rendered.push_back(value);
+      for (auto it = g_windowMgr.rendered.begin(); it != g_windowMgr.rendered.end(); ++it) {
+        if ((*it)->geometry.id == companion) {
+          UIWindow* const value = *it;
+          g_windowMgr.rendered.erase(it);
+          g_windowMgr.rendered.emplace_back(value);
+          break;
+        }
       }
     }
 
-    const auto found = std::find(g_windowMgr.rendered.begin(), g_windowMgr.rendered.end(), window);
-    if (found != g_windowMgr.rendered.end()) {
-      g_windowMgr.rendered.erase(found);
-      g_windowMgr.rendered.push_back(window);
+    for (auto it = g_windowMgr.rendered.begin(); it != g_windowMgr.rendered.end(); ++it) {
+      if (*it == window) {
+        UIWindow* const value = *it;
+        g_windowMgr.rendered.erase(it);
+        g_windowMgr.rendered.emplace_back(value);
+        break;
+      }
     }
   }
 }

@@ -12,7 +12,6 @@
 
 #include "Resource/MSGSTRINGID.h"
 
-template __declspec(noinline) std::string::basic_string(const std::string&);
 // OFFSET: 0x007BAE20
 // FUNCTION: fn_09277
 UIPartyInfoWnd::UIPartyInfoWnd()
@@ -20,7 +19,26 @@ UIPartyInfoWnd::UIPartyInfoWnd()
   this->m_drawLabel = 0;
 }
 
+// OFFSET: 0x007BB370
+// FUNCTION: fn_45804
 UIPartyInfoWnd::~UIPartyInfoWnd() = default;
+
+// OFFSET: 0x007BBE70
+// FUNCTION: fn_45812
+const char* PartyRoleBitmap(PartyRole role, unsigned char selected) {
+  switch (role) {
+  case PartyRole::Tanker:
+    return selected == 1 ? "유저인터페이스\\UIadventurerAgency\\btn_job_def_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_def_off.bmp";
+  case PartyRole::Dealer:
+    return selected == 1 ? "유저인터페이스\\UIadventurerAgency\\btn_job_atk_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_atk_off.bmp";
+  case PartyRole::Healer:
+    return selected == 1 ? "유저인터페이스\\UIadventurerAgency\\btn_job_heal_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_heal_off.bmp";
+  case PartyRole::Assist:
+    return selected == 1 ? "유저인터페이스\\UIadventurerAgency\\btn_job_buf_on.bmp" : "유저인터페이스\\UIadventurerAgency\\btn_job_buf_off.bmp";
+  default:
+    return nullptr;
+  }
+}
 
 // OFFSET: 0x007BBEF0
 // FUNCTION: fn_09293
@@ -33,19 +51,19 @@ CAdvenPartyInfo* UIPartyInfoWnd::Info() {
 const char* UIPartyInfoWnd::TypeName(int value) {
   switch (value) {
   case 0:
-    return LookupMessage(MSI_ACCOUNT);
+    return LookupMessage(MSI_ALL_AREA);
   case 1:
-    return LookupMessage(MSI_ADVEN_MD);
+    return LookupMessage(MSI_ADVEN_QUEST);
   case 2:
-    return LookupMessage(MSI_ADVEN_EDEN_GROUP);
+    return LookupMessage(MSI_ADVEN_FIELD);
   case 3:
-    return LookupMessage(MSI_ADVEN_ETC);
+    return LookupMessage(MSI_ADVEN_DUNJUN);
   case 4:
-    return LookupMessage(MSI_ADVEN_SEARCH);
+    return LookupMessage(MSI_ADVEN_MD);
   case 5:
-    return LookupMessage(MSI_ADVEN_RESET);
+    return LookupMessage(MSI_ADVEN_EDEN_GROUP);
   case 6:
-    return LookupMessage(MSI_ADVEN_JOIN_PARTY);
+    return LookupMessage(MSI_ADVEN_ETC);
   default:
     return "";
   }
@@ -82,18 +100,18 @@ void UIPartyInfoWnd::Paint() {
 
   switch (this->geometry.state) {
   case 0:
-    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[0].c_str())));
+    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_normalName.c_str())));
     break;
   case 1:
-    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[1].c_str())));
+    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_hoverName.c_str())));
     break;
   case 2:
-    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[2].c_str())));
+    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_pressedName.c_str())));
     break;
   }
 
-  if (this->m_disabled != 0 && this->m_names[3].size() > 0) {
-    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[3].c_str())));
+  if (this->m_disabled != 0 && this->m_disabledName.size() > 0) {
+    background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_disabledName.c_str())));
   }
 
   if (background) {

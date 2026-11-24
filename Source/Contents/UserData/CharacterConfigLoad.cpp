@@ -2,19 +2,31 @@
 #include "Contents/Async/AsyncWorkMgr.h"
 #include "Contents/UserData/CharacterLinkedUserDataMgr.h"
 #include "Contents/Configuration/ServiceOptions.h"
-#include "Contents/Skills/SkillLevelRegistry.h"
+#include "UI/GameSettings/TalkType.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Utility/Async/AsyncDiagnostic.h"
 
 #include <json/reader.h>
 #include <json/value.h>
 
+// OFFSET: 0x005E5FD0
+// FUNCTION: fn_03925
+std::string CCharacterLinkedUserDataMgr::LoadUrl() const {
+  return this->m_loadUrl;
+}
+
+// OFFSET: 0x005E6030
+// FUNCTION: fn_03926
+std::string CCharacterLinkedUserDataMgr::SaveUrl() const {
+  return this->m_saveUrl;
+}
+
 // OFFSET: 0x005E6090
 // FUNCTION: fn_03927
 void CCharacterLinkedUserDataMgr::CompleteLoad(
   AsyncDiagnostic diagnostic, std::uint32_t accountId, std::uint32_t characterId, std::string accountName, std::string response
 ) {
-  if (!diagnostic.success) {
+  if (!std::get<0>(diagnostic)) {
     return;
   }
 
@@ -32,7 +44,7 @@ void CCharacterLinkedUserDataMgr::CompleteLoad(
 
     {
       const Json::Value comparison = root["data"]["ItemComparison"];
-      g_serviceOptions.Set(264, comparison.isNull() ? true : comparison.asBool());
+      g_serviceOptions.Set(TT_ITEM_COMPARE_ON_OFF, comparison.isNull() ? true : comparison.asBool());
     }
 
     {
@@ -45,9 +57,9 @@ void CCharacterLinkedUserDataMgr::CompleteLoad(
     break;
   }
   case 4:
-    LoadSkillUseLevelRegistry();
-    g_session.SetOption(7, 1, 0);
-    g_session.SetOption(8, 1, 0);
+    g_windowMgr.LoadSkillUseLevelRegistry();
+    g_session.SetOption(7, 1);
+    g_session.SetOption(8, 1);
     this->m_loaded = true;
     break;
   }

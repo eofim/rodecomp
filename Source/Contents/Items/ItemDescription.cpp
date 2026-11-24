@@ -23,10 +23,6 @@ ITEM_DESC::ITEM_DESC()
 ITEM_DESC::ITEM_DESC(const ITEM_DESC&) = default;
 #pragma inline_depth()
 
-// OFFSET: 0x006D3610
-// FUNCTION: fn_06541
-ITEM_DESC::~ITEM_DESC() = default;
-
 // OFFSET: 0x006D5160
 // FUNCTION: fn_06568
 ITEM_DESC& ITEM_DESC::operator=(const ITEM_DESC& other) = default;
@@ -40,17 +36,6 @@ ITEM_DESC& FindItemDescription(int id, std::map<int, ITEM_DESC>& values) {
   return entry == values.end() ? missing : entry->second;
 }
 
-// OFFSET: 0x006D3AE0
-// FUNCTION: fn_06546
-ItemCardName& EnsureItemCardName(int id, std::map<int, ItemCardName>& values) {
-  const auto entry = values.find(id);
-  if (entry != values.end()) {
-    return entry->second;
-  }
-
-  return values.insert({id, ItemCardName{nullptr, nullptr, nullptr}}).first->second;
-}
-
 // OFFSET: 0x006D3C10
 // FUNCTION: fn_06547
 std::vector<const char*>& EnsureItemDescriptionLines(int id, std::map<int, std::vector<const char*>>& values) {
@@ -59,7 +44,8 @@ std::vector<const char*>& EnsureItemDescriptionLines(int id, std::map<int, std::
     return entry->second;
   }
 
-  return values.insert({id, std::vector<const char*>()}).first->second;
+  const auto inserted = values.insert(std::pair<int, std::vector<const char*>>(id, std::vector<const char*>()));
+  return inserted.first->second;
 }
 
 // OFFSET: 0x006D5890
@@ -76,7 +62,8 @@ ITEM_DESC& EnsureItemDescription(int id, std::map<int, ITEM_DESC>& values) {
     return entry->second;
   }
 
-  return values.insert({id, ITEM_DESC()}).first->second;
+  const auto inserted = values.insert({id, ITEM_DESC()});
+  return inserted.first->second;
 }
 
 // OFFSET: 0x00DDD280
@@ -99,21 +86,29 @@ const std::vector<const char*>& ITEM_INFO::Description() const {
   return FindItemDescription(id, g_itemDescriptions).unidentifiedDescription;
 }
 
+namespace {
+  // INLINED
+  __forceinline int CopyText(char* output, int& capacity, unsigned char consume, const char* text) {
+    const int error = strncpy_s(output, capacity, text, _TRUNCATE);
+    if (error != 0 && error != 80) {
+      return 0;
+    }
+
+    const int written = !output ? 0 : static_cast<int>(strnlen(output, capacity));
+    if (consume) {
+      capacity -= written;
+    }
+    return written;
+  }
+}
+
 // OFFSET: 0x006D5810
 // FUNCTION: fn_06578
 int ITEM_INFO::GetIdDisplayName(char* output, int& capacity, unsigned char consume) const {
   const int id = std::atoi(this->itemId.c_str());
-  const char* name = FindItemDescription(id, g_itemDescriptions).identifiedName;
-  const int error = strncpy_s(output, capacity, name ? name : " ", _TRUNCATE);
-
-  if (error != 0 && error != 80) {
-    return 0;
+  const ITEM_DESC& desc = FindItemDescription(id, g_itemDescriptions);
+  if (desc.identifiedName) {
+    return CopyText(output, capacity, consume, desc.identifiedName);
   }
-
-  const int length = !output ? 0 : static_cast<int>(strnlen(output, capacity));
-  if (consume != 0) {
-    capacity -= length;
-  }
-
-  return length;
+  return CopyText(output, capacity, consume, " ");
 }

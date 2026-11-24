@@ -7,8 +7,6 @@
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
 
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
@@ -24,6 +22,11 @@ extern "C" {
 
 // GLOBAL: gl_24856
 CAchievementMgr* g_achievementMgr;
+
+// OFFSET: 0x007B1D80
+// FUNCTION: fn_09180
+AchievementInfo::AchievementInfo() {
+}
 
 // OFFSET: 0x0066D3A0
 // FUNCTION: fn_05311
@@ -131,7 +134,7 @@ std::string CAchievementMgr::GetSummaryText(int id) {
 // FUNCTION: fn_05318
 int CAchievementMgr::GetRewardTitleId(int id) {
   if (this->achievements.find(id) != this->achievements.end()) {
-    return this->achievements[id].rewardTitleId;
+    return this->achievements[id].reward.titleId;
   }
   return -1;
 }
@@ -217,72 +220,72 @@ bool CAchievementMgr::FindTab(int id, int& group, int& index) {
 // FUNCTION: fn_05322
 bool CAchievementMgr::LoadAchievementInfo() {
   NLuaState lua;
-  if (lua.IsValid()) {
-    luaL_openlibs(lua.GetState());
-    lua_register(lua.GetState(), "InsertAchieveInfo", CAchievementMgr::L_InsertAchieveInfo);
-    lua_register(lua.GetState(), "InsertAchieveResource", CAchievementMgr::L_InsertAchieveResource);
-    lua_register(lua.GetState(), "InsertAchieveRewardItem", CAchievementMgr::L_InsertAchieveRewardItem);
-    lua_register(lua.GetState(), "InsertAchieveRewardTitle", CAchievementMgr::L_InsertAchieveRewardTitle);
-    lua_register(lua.GetState(), "InsertAchieveRewardBuff", CAchievementMgr::L_InsertAchieveRewardBuff);
-    lua_register(lua.GetState(), "InsertAchieveUIType", CAchievementMgr::L_InsertAchieveUIType);
-    lua_register(lua.GetState(), "SetAchieveIDByTab", CAchievementMgr::L_SetAchieveIDByTab);
-    if (luaL_loadfile(lua.GetState(), OBFUSCATE_TEXT_NAMED("system\\Achievement_list.lub", 0x490FFB43A12F0DB9ULL, path)) != 0 || lua_pcall(lua.GetState(), 0, 0, 0) != 0) {
-      MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CAchievementMgr", 0);
-      return false;
-    }
-    lua_getglobal(lua.GetState(), "main");
-    if (lua_pcall(lua.GetState(), 0, 2, 0) != 0) {
-      MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CAchievementMgr", 0);
-      return false;
-    }
-    if (!lua_isstring(lua.GetState(), -1)) {
-      MessageBoxA(nullptr, "second return value is not string...", "CAchievementMgr", 0);
-      return false;
-    }
-    if (!lua_toboolean(lua.GetState(), -2)) {
-      MessageBoxA(nullptr, FormatString("error : %s", lua_tostring(lua.GetState(), -1)), "CAchievementMgr", 0);
-      return false;
-    }
-    return true;
+  if (!lua.IsValid()) {
+    return false;
   }
-
-  return false;
+  luaL_openlibs(lua.GetState());
+  lua_register(lua.GetState(), "InsertAchieveInfo", CAchievementMgr::L_InsertAchieveInfo);
+  lua_register(lua.GetState(), "InsertAchieveResource", CAchievementMgr::L_InsertAchieveResource);
+  lua_register(lua.GetState(), "InsertAchieveRewardItem", CAchievementMgr::L_InsertAchieveRewardItem);
+  lua_register(lua.GetState(), "InsertAchieveRewardTitle", CAchievementMgr::L_InsertAchieveRewardTitle);
+  lua_register(lua.GetState(), "InsertAchieveRewardBuff", CAchievementMgr::L_InsertAchieveRewardBuff);
+  lua_register(lua.GetState(), "InsertAchieveUIType", CAchievementMgr::L_InsertAchieveUIType);
+  lua_register(lua.GetState(), "SetAchieveIDByTab", CAchievementMgr::L_SetAchieveIDByTab);
+  if (luaL_loadfile(lua.GetState(), OBFUSCATE_TEXT_NAMED("system\\Achievement_list.lub", 0x490FFB43A12F0DB9ULL, path)) != 0) {
+    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CAchievementMgr", 0);
+    return false;
+  }
+  if (lua_pcall(lua.GetState(), 0, 0, 0) != 0) {
+    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CAchievementMgr", 0);
+    return false;
+  }
+  lua_getglobal(lua.GetState(), "main");
+  if (lua_pcall(lua.GetState(), 0, 2, 0) != 0) {
+    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CAchievementMgr", 0);
+    return false;
+  }
+  if (!lua_isstring(lua.GetState(), -1)) {
+    MessageBoxA(nullptr, "second return value is not string...", "CAchievementMgr", 0);
+    return false;
+  }
+  if (!lua_toboolean(lua.GetState(), -2)) {
+    MessageBoxA(nullptr, FormatString("error : %s", lua_tostring(lua.GetState(), -1)), "CAchievementMgr", 0);
+    return false;
+  }
+  return true;
 }
 
 // OFFSET: 0x0066ED90
 // FUNCTION: fn_05323
 std::pair<bool, std::string> CAchievementMgr::InsertAchieveInfo(int id, std::string title, std::string summaryText, std::string description, int points) {
-  if (this->achievements.find(id) != this->achievements.end()) {
-    const std::string message = FormatOwnedString("duplicate achievement info [%d]", id);
-    return std::make_pair(false, message);
+  const auto found = this->achievements.find(id);
+  if (found == this->achievements.end()) {
+    const auto inserted = this->achievements.insert(std::pair<int, AchievementInfo>(id, AchievementInfo(title, summaryText, description, points)));
+    if (inserted.second == true) {
+      return std::make_pair(true, "good");
+    } else {
+      return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("achievement info [%d] insert fail", id)));
+    }
+  } else {
+    return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("duplicate achievement info [%d]", id)));
   }
-
-  if (this->achievements.insert(std::pair<int, AchievementInfo>(id, AchievementInfo(title, summaryText, description, points))).second == true) {
-    return std::make_pair(true, "good");
-  }
-
-  const std::string message = FormatOwnedString("achievement info [%d] insert fail", id);
-  return std::make_pair(false, message);
 }
 
 // OFFSET: 0x0066F170
 // FUNCTION: fn_05324
 std::pair<bool, std::string> CAchievementMgr::InsertAchieveResource(int id, std::string text, int targetCount, int conditionId) {
   const auto found = this->achievements.find(id);
-  if (found == this->achievements.end()) {
-    const std::string message = FormatOwnedString("achievement info [%d] cannot be find", id);
-    return std::make_pair(false, message);
+  if (found != this->achievements.end()) {
+    const auto end = found->second.rewards.end();
+    if (end == std::find_if(found->second.rewards.begin(), end, [text](const AchievementReward& reward) { return text.compare(reward.text) == 0; })) {
+      found->second.rewards.push_back(AchievementReward(text, targetCount, conditionId));
+      return std::make_pair(true, "good");
+    } else {
+      return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("achievement info [%d] - resource info already exist", id)));
+    }
+  } else {
+    return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("achievement info [%d] cannot be find", id)));
   }
-
-  std::vector<AchievementReward>& rewards = found->second.rewards;
-  const auto end = rewards.end();
-  if (std::find_if(rewards.begin(), end, [text](const AchievementReward& reward) { return text.compare(reward.text) == 0; }) == end) {
-    rewards.push_back(AchievementReward(text, targetCount, conditionId));
-    return std::make_pair(true, "good");
-  }
-
-  const std::string message = FormatOwnedString("achievement info [%d] - resource info already exist", id);
-  return std::make_pair(false, message);
 }
 
 // OFFSET: 0x0066F450
@@ -290,7 +293,7 @@ std::pair<bool, std::string> CAchievementMgr::InsertAchieveResource(int id, std:
 std::pair<bool, std::string> CAchievementMgr::InsertAchieveRewardBuff(int id, int value) {
   const auto found = this->achievements.find(id);
   if (found != this->achievements.end()) {
-    found->second.rewardBuffId = value;
+    found->second.reward.buffId = value;
     return std::make_pair(true, "good");
   } else {
     return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("achievement info [%d] cannot be find", id)));
@@ -302,7 +305,7 @@ std::pair<bool, std::string> CAchievementMgr::InsertAchieveRewardBuff(int id, in
 std::pair<bool, std::string> CAchievementMgr::InsertAchieveRewardItem(int id, int value) {
   const auto found = this->achievements.find(id);
   if (found != this->achievements.end()) {
-    found->second.rewardItemId = value;
+    found->second.reward.itemId = value;
     return std::make_pair(true, "good");
   } else {
     return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("achievement info [%d] cannot be find", id)));
@@ -314,7 +317,7 @@ std::pair<bool, std::string> CAchievementMgr::InsertAchieveRewardItem(int id, in
 std::pair<bool, std::string> CAchievementMgr::InsertAchieveRewardTitle(int id, int value) {
   const auto found = this->achievements.find(id);
   if (found != this->achievements.end()) {
-    found->second.rewardTitleId = value;
+    found->second.reward.titleId = value;
     return std::make_pair(true, "good");
   } else {
     return std::make_pair(false, static_cast<const std::string&>(FormatOwnedString("achievement info [%d] cannot be find", id)));
@@ -342,9 +345,9 @@ bool CAchievementMgr::HasReward(int id) {
   }
 
   const AchievementInfo& info = this->achievements[id];
-  bool result = info.rewardBuffId > 0;
-  result |= info.rewardTitleId > 0;
-  if (info.rewardItemId > 0) {
+  bool result = info.reward.buffId > 0;
+  result |= info.reward.titleId > 0;
+  if (info.reward.itemId > 0) {
     result = true;
   }
   return result;
@@ -418,9 +421,9 @@ int CAchievementMgr::L_InsertAchieveResource(lua_State* state) {
     const int id = static_cast<int>(lua_tonumber(state, -4));
     const std::string text = lua_tostring(state, -3);
     const int targetCount = static_cast<int>(lua_tonumber(state, -2));
+    const int value = static_cast<int>(lua_tonumber(state, -1));
     CAchievementMgr* const manager = g_achievementMgr;
-    const std::pair<bool, std::string> result =
-      manager->InsertAchieveResource(id, text, targetCount, static_cast<int>(lua_tonumber(state, -1)));
+    const std::pair<bool, std::string> result = manager->InsertAchieveResource(id, text, targetCount, value);
     if (!result.first) {
       lua_pushboolean(state, 0);
       lua_pushstring(state, FormatString("InsertAchieveResource : %s", result.second.c_str()));

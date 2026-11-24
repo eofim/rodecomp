@@ -84,8 +84,8 @@ ITEM_INFO UIRoulletteWnd::ItemAt(int x, int y) {
 
     this->m_row = row;
     const int count = 9 - row;
-    int right = row * 36 + 185;
-    for (int column = 0; column < count; ++column, right += 36) {
+    for (int column = 0; column < count; ++column) {
+      const int right = (row + column) * 36 + 185;
       if (right - 27 > x || right < x) {
         continue;
       }
@@ -115,7 +115,7 @@ void UIRoulletteWnd::OnCreate(int, int) {
   this->m_startButton->SetBitmap("유저인터페이스\\basic_interface\\roullette\\StartRoullette_b.bmp", 2, 0);
   this->m_startButton->SetSize(this->m_startButton->BitmapWidth(), this->m_startButton->BitmapHeight());
   this->m_startButton->Move(-100, -100);
-  this->m_startButton->SetId(409);
+  this->m_startButton->SetId(ID_ROULETTE_GENERATE);
   this->AddChild(this->m_startButton);
 
   if (g_effectDetailLevel == 2) {
@@ -156,7 +156,7 @@ void UIRoulletteWnd::OnCreate(int, int) {
   this->m_prizeButton->SetBitmap("유저인터페이스\\basic_interface\\roullette\\GetWinPrize_b.bmp", 2, 0);
   this->m_prizeButton->SetSize(this->m_prizeButton->BitmapWidth(), this->m_prizeButton->BitmapHeight());
   this->m_prizeButton->Move(-100, -100);
-  this->m_prizeButton->SetId(410);
+  this->m_prizeButton->SetId(ID_ROULETTE_RECEIVE_ITEM);
   this->AddChild(this->m_prizeButton);
 
   this->m_goldText = new UIStaticText();
@@ -181,7 +181,7 @@ void UIRoulletteWnd::OnCreate(int, int) {
 // OFFSET: 0x0080C220
 // FUNCTION: fn_10087
 void UIRoulletteWnd::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_CHECK_USER_NAME), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_ROULLETTE_WND), 0);
   this->DrawPanelBackground(17, 0, "유저인터페이스\\basic_interface\\roullette\\roulletteBG.bmp");
 
   char buffer[40] = {};
@@ -247,11 +247,12 @@ void UIRoulletteWnd::OnMouseHover(int x, int y) {
 
   if (item.quantity != 0) {
     this->ToScreen(tooltipX, tooltipY);
-    CMode* tooltip = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
-      tooltip->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
+      CMode* tooltip = g_modeMgr.currentMode;
+      tooltip->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA6), item.DisplayName(0).c_str(), item.optionCount).c_str(), tooltipX, tooltipY,
                     g_session.GetItemNameColor(item), 0, 1);
     } else {
+      CMode* tooltip = g_modeMgr.currentMode;
       tooltip->ShowTooltip(item.DisplayName(0).c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
     }
   }
@@ -279,7 +280,7 @@ void UIRoulletteWnd::OnProcess() {
   if (this->m_startButton->geometry.state == 1 && this->m_enabled == 1) {
     if (g_rouletteMgr->m_spinning == 0) {
       this->m_startSprite->Move(339, 398);
-      this->m_startSprite->SetTooltip(LookupMessage(MSI_GUILD_MAKE_GUILD_NOT_PERMITTED_MAP));
+      this->m_startSprite->SetTooltip(LookupMessage(MSI_NOTICE_NEXT_ROULLETE_STAGE));
       this->m_stageArrow->Move(480, 337 - (this->CoinType() + g_rouletteMgr->m_stage) * 40);
     }
     if (g_rouletteMgr->m_resultShown == 1 && g_rouletteMgr->m_bonus == 0) {
@@ -298,7 +299,7 @@ void UIRoulletteWnd::OnProcess() {
 
   if (this->m_prizeButton->geometry.state == 1) {
     this->m_prizeSprite->Move(203, 398);
-    this->m_prizeSprite->SetTooltip(LookupMessage(MSI_TAKEOFF_TITLE));
+    this->m_prizeSprite->SetTooltip(LookupMessage(MSI_GET_ROULLETE_PRIZE));
     this->m_prizeButton->SetState(0);
   }
 
@@ -358,7 +359,7 @@ int UIRoulletteWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
               return 0;
             }
           } else {
-            g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_SEND_MAIL_ITEMS)), 0x6464FF, 0, 0, 0);
+            g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_CLOSE_ROULLETTEWND)), 0x6464FF, 0, 0, 0);
           }
           break;
         case ID_ROULETTE_GENERATE:
@@ -380,13 +381,14 @@ int UIRoulletteWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
           }
           break;
       }
-      return 0;
+      break;
     case UM_REFRESH:
       this->Invalidate();
-      return 0;
+      break;
     default:
       return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
+  return 0;
 }
 
 // OFFSET: 0x0080CCE0
@@ -435,19 +437,21 @@ void UIRoulletteWnd::UpdateButtons() {
 // FUNCTION: fn_10094
 int UIRoulletteWnd::CoinType() const {
   const RouletteMgr* roulette = g_rouletteMgr;
+  int type = 0;
 
   if (roulette->m_resultShown == 1) {
     if (roulette->m_stage + 1 < 7 && roulette->m_bonus == 0) {
-      return 1;
+      type = 1;
+    } else {
+      type = 0;
     }
-    return 0;
+  } else if (roulette->m_bronzePoint > 0) {
+    type = 0;
+  } else if (roulette->m_silverPoint >= 10) {
+    type = 2;
+  } else if (roulette->m_goldPoint >= 10) {
+    type = 4;
   }
 
-  if (roulette->m_bronzePoint > 0) {
-    return 0;
-  }
-  if (roulette->m_silverPoint >= 10) {
-    return 2;
-  }
-  return roulette->m_goldPoint >= 10 ? 4 : 0;
+  return type;
 }

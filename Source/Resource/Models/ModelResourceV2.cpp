@@ -19,10 +19,13 @@ struct ModelFaceRecord {
   /* 0014 */ std::uint32_t smoothing;
 };
 
-// INLINED
-static bool operator<(const ModelFace& a, const ModelFace& b) {
-  return a.texture < b.texture;
-}
+struct ModelFaceHeader {
+  /* 0000 */ std::uint16_t vertices[3];
+  /* 0006 */ std::uint16_t textureVertices[3];
+  /* 000C */ std::uint16_t texture;
+  /* 000E */ std::uint16_t padding_000E;
+  /* 0010 */ std::uint32_t twoSided;
+};
 
 // OFFSET: 0x007555C0
 // FUNCTION: fn_07984
@@ -119,32 +122,36 @@ void C3dModelResV2::ReadVersion1(CFile& input) {
   for (int index = 0; index < nodeCount; ++index) {
     auto* node = new ModelNodeV2;
     node->model = this;
-    node->mesh.reset(new ModelMesh);
-    int bytes = 0;
-    input.Read(&bytes, 4);
-    char name[40]{};
-    input.Read(name, bytes);
-    node->name = name;
-    bytes = 0;
-    input.Read(&bytes, 4);
+    node->mesh = new ModelMesh;
+    {
+      int bytes = 0;
+      input.Read(&bytes, 4);
+      char name[40]{};
+      input.Read(name, bytes);
+      node->name = name;
+      bytes = 0;
+      input.Read(&bytes, 4);
 
-    if (bytes > 0) {
-      char parentName[40]{};
-      input.Read(parentName, bytes);
-      node->parentName = parentName;
+      if (bytes > 0) {
+        char parentName[40]{};
+        input.Read(parentName, bytes);
+        node->parentName = parentName;
+      }
     }
 
-    int nodeTextureCount = 0;
-    input.Read(&nodeTextureCount, 4);
+    {
+      int nodeTextureCount = 0;
+      input.Read(&nodeTextureCount, 4);
 
-    for (int texture = 0; texture < nodeTextureCount; ++texture) {
-      int textureIndex = 0;
-      input.Read(&textureIndex, 4);
-      CTexture* loaded = g_texMgr.Load(textureNames[textureIndex].c_str(), 0, false, true, false);
-      node->textures.push_back(loaded);
+      for (int texture = 0; texture < nodeTextureCount; ++texture) {
+        int textureIndex = 0;
+        input.Read(&textureIndex, 4);
+        CTexture* loaded = g_texMgr.Load(textureNames[textureIndex].c_str(), 0, false, true, false);
+        node->textures.push_back(loaded);
 
-      if (loaded) {
-        loaded->Retain();
+        if (loaded) {
+          loaded->Retain();
+        }
       }
     }
 
@@ -152,9 +159,9 @@ void C3dModelResV2::ReadVersion1(CFile& input) {
     int vertexCount = 0;
     input.Read(&vertexCount, 4);
     node->mesh->vertexCount = vertexCount;
-    auto* vertices = new std::array<float, 3>[vertexCount]{};
+    ShadeVector* vertices = new ShadeVector[vertexCount];
     input.Read(vertices, static_cast<unsigned>(vertexCount) * 12u);
-    node->mesh->vertices = vertices;
+    node->mesh->vertices = reinterpret_cast<std::array<float, 3>*>(vertices);
     int textureVertexCount = 0;
     input.Read(&textureVertexCount, 4);
     node->mesh->textureVertexCount = textureVertexCount;
@@ -191,16 +198,17 @@ void C3dModelResV2::ReadVersion1(CFile& input) {
     node->rotationKeys.Read(input);
     node->positionKeys.Read(input);
     this->nodes.push_back(node);
-    this->meshes[node->name] = node->mesh.get();
+    this->meshes[node->name] = node->mesh;
   }
 
-  for (ModelNode* node : this->nodes) {
+  for (auto it = this->nodes.begin(); it != this->nodes.end(); ++it) {
+    ModelNode* node = *it;
     if (!node->parentName.empty()) {
       ModelNode* parent = this->FindNode(node->parentName.c_str());
 
       if (parent) {
         node->parent = parent;
-        parent->children.push_back(node);
+        parent->children.push_back(*it);
       }
     }
   }
@@ -211,7 +219,6 @@ void C3dModelResV2::ReadVersion1(CFile& input) {
 
     for (int index = 0; index < volumeCount; ++index) {
       auto* volume = new ModelVolume;
-      std::memset(volume, 0, 132);
       input.Read(volume, sizeof(ModelVolume));
       this->volumes.push_back(volume);
     }
@@ -254,7 +261,7 @@ void C3dModelResV2::ReadVersion2(CFile& input) {
   for (int index = 0; index < nodeCount; ++index) {
     auto* node = new ModelNodeV2;
     node->model = this;
-    node->mesh.reset(new ModelMesh);
+    node->mesh = new ModelMesh;
     unsigned bytes = 0;
     input.Read(&bytes, 4);
     char name[40]{};
@@ -284,125 +291,12 @@ void C3dModelResV2::ReadVersion2(CFile& input) {
     }
 
     input.Read(node->transform, sizeof(node->transform));
-    ModelMesh& mesh = *node->mesh;
-    input.Read(&mesh.vertexCount, 4);
-    mesh.vertices = new std::array<float, 3>[mesh.vertexCount]{};
-    input.Read(mesh.vertices, static_cast<unsigned>(mesh.vertexCount) * 12u);
-    input.Read(&mesh.textureVertexCount, 4);
-    mesh.textureVertices = new ModelTextureVertex[mesh.textureVertexCount];
-    input.Read(mesh.textureVertices, static_cast<unsigned>(mesh.textureVertexCount) * 12u);
-    input.Read(&mesh.faceCount, 4);
-    mesh.faces = new ModelFace[mesh.faceCount];
-
-    for (int face = 0; face < mesh.faceCount; ++face) {
-      ModelFace& target = mesh.faces[face];
-      unsigned size = 0;
-      input.Read(&size, 4);
-      std::vector<unsigned char> record(size);
-      input.Read(record.data(), size);
-      std::memcpy(&target, record.data(), 20);
-      const unsigned groups = (size - 20u) / 4u;
-      target.smoothing.resize(groups);
-      std::memcpy(target.smoothing.data(), record.data() + 20, groups * 4u);
-    }
-
-    std::sort(mesh.faces, mesh.faces + mesh.faceCount);
-    mesh.CalculateNormals();
-    node->scaleKeys.Read(input);
-    node->rotationKeys.Read(input);
-    node->positionKeys.Read(input);
-    this->nodes.push_back(node);
-    this->meshes[node->name] = node->mesh.get();
-  }
-
-  for (auto it = this->nodes.begin(); it != this->nodes.end(); ++it) {
-    ModelNode* node = *it;
-
-    if (!node->parentName.empty()) {
-      ModelNode* parent = this->FindNode(node->parentName.c_str());
-
-      if (parent) {
-        node->parent = parent;
-        parent->children.push_back(*it);
-      }
-    }
-  }
-
-  int volumeCount = 0;
-  input.Read(&volumeCount, 4);
-
-  for (int index = 0; index < volumeCount; ++index) {
-    auto* volume = new ModelVolume;
-    std::memset(volume, 0, 132);
-    input.Read(volume, sizeof(ModelVolume));
-    this->volumes.push_back(volume);
-  }
-}
-
-// OFFSET: 0x0075B8E0
-// FUNCTION: fn_08022
-void C3dModelResV2::ReadVersion3(CFile& input) {
-  input.Read(&this->animationLength, 4);
-  input.Read(&this->shade, 4);
-  input.Read(&this->alpha, 1);
-  input.Read(&this->framesPerSecond, 4);
-  int rootCount = 0;
-  input.Read(&rootCount, 4);
-
-  for (int index = 0; index < rootCount; ++index) {
-    unsigned bytes = 0;
-    input.Read(&bytes, 4);
-    char name[40]{};
-    input.Read(name, bytes);
-    this->rootNames.push_back(name);
-  }
-
-  int nodeCount = 0;
-  input.Read(&nodeCount, 4);
-
-  for (int index = 0; index < nodeCount; ++index) {
-    auto* node = new ModelNodeV2;
-    node->model = this;
-    node->mesh.reset(new ModelMesh);
-    {
-      int bytes = 0;
-      input.Read(&bytes, 4);
-      char name[40]{};
-      input.Read(name, bytes);
-      node->name = name;
-      bytes = 0;
-      input.Read(&bytes, 4);
-
-      if (bytes > 0) {
-        char parentName[40]{};
-        input.Read(parentName, bytes);
-        node->parentName = parentName;
-      }
-    }
-
-    int nodeTextureCount = 0;
-    input.Read(&nodeTextureCount, 4);
-
-    for (int texture = 0; texture < nodeTextureCount; ++texture) {
-      unsigned textureBytes = 0;
-      input.Read(&textureBytes, 4);
-      char textureName[40]{};
-      input.Read(textureName, textureBytes);
-      CTexture* loaded = g_texMgr.Load(textureName, 0, false, true, false);
-      node->textures.push_back(loaded);
-
-      if (loaded) {
-        loaded->Retain();
-      }
-    }
-
-    input.Read(node->transform, sizeof(node->transform));
     int vertexCount = 0;
     input.Read(&vertexCount, 4);
     node->mesh->vertexCount = vertexCount;
-    auto* vertices = new std::array<float, 3>[vertexCount]{};
+    ShadeVector* vertices = new ShadeVector[vertexCount];
     input.Read(vertices, static_cast<unsigned>(vertexCount) * 12u);
-    node->mesh->vertices = vertices;
+    node->mesh->vertices = reinterpret_cast<std::array<float, 3>*>(vertices);
     int textureVertexCount = 0;
     input.Read(&textureVertexCount, 4);
     node->mesh->textureVertexCount = textureVertexCount;
@@ -442,31 +336,19 @@ void C3dModelResV2::ReadVersion3(CFile& input) {
     node->scaleKeys.Read(input);
     node->rotationKeys.Read(input);
     node->positionKeys.Read(input);
-    int textureAnimations = 0;
-    input.Read(&textureAnimations, 4);
-
-    for (int animation = 0; animation < textureAnimations; ++animation) {
-      int texture = 0;
-      input.Read(&texture, 4);
-      ModelTextureChannelMap channels;
-      channels.Read(input);
-
-      node->textureKeys[texture] = channels;
-    }
-
     this->nodes.push_back(node);
-    this->meshes[node->name] = node->mesh.get();
+    this->meshes[node->name] = node->mesh;
   }
 
   for (auto it = this->nodes.begin(); it != this->nodes.end(); ++it) {
-    ModelNode* node = *it;
+    ModelNode* const& node = *it;
 
     if (!node->parentName.empty()) {
       ModelNode* parent = this->FindNode(node->parentName.c_str());
 
       if (parent) {
         node->parent = parent;
-        parent->children.push_back(*it);
+        parent->children.push_back(node);
       }
     }
   }
@@ -476,9 +358,148 @@ void C3dModelResV2::ReadVersion3(CFile& input) {
 
   for (int index = 0; index < volumeCount; ++index) {
     auto* volume = new ModelVolume;
-    std::memset(volume, 0, 132);
     input.Read(volume, sizeof(ModelVolume));
     this->volumes.push_back(volume);
+  }
+}
+
+// OFFSET: 0x0075B8E0
+// FUNCTION: fn_08022
+void C3dModelResV2::ReadVersion3(CFile& input) {
+  input.Read(&this->animationLength, 4);
+  input.Read(&this->shade, 4);
+  input.Read(&this->alpha, 1);
+  input.Read(&this->framesPerSecond, 4);
+  int rootCount = 0;
+  input.Read(&rootCount, 4);
+
+  for (int index = 0; index < rootCount; ++index) {
+    unsigned bytes = 0;
+    input.Read(&bytes, 4);
+    char name[40]{};
+    input.Read(name, bytes);
+    this->rootNames.push_back(name);
+  }
+
+  int nodeCount = 0;
+  input.Read(&nodeCount, 4);
+
+  for (int index = 0; index < nodeCount; ++index) {
+    auto* node = new ModelNodeV2;
+    node->model = this;
+    node->mesh = new ModelMesh;
+    {
+      int bytes = 0;
+      input.Read(&bytes, 4);
+      char name[40]{};
+      input.Read(name, bytes);
+      node->name = name;
+      bytes = 0;
+      input.Read(&bytes, 4);
+
+      if (bytes > 0) {
+        char parentName[40]{};
+        input.Read(parentName, bytes);
+        node->parentName = parentName;
+      }
+    }
+
+    int nodeTextureCount = 0;
+    input.Read(&nodeTextureCount, 4);
+
+    for (int texture = 0; texture < nodeTextureCount; ++texture) {
+      unsigned textureBytes = 0;
+      input.Read(&textureBytes, 4);
+      char textureName[40]{};
+      input.Read(textureName, textureBytes);
+      CTexture* loaded = g_texMgr.Load(textureName, 0, false, true, false);
+      node->textures.push_back(loaded);
+
+      if (loaded) {
+        loaded->Retain();
+      }
+    }
+
+    input.Read(node->transform, sizeof(node->transform));
+    int vertexCount = 0;
+    input.Read(&vertexCount, 4);
+    node->mesh->vertexCount = vertexCount;
+    ShadeVector* vertices = new ShadeVector[vertexCount];
+    input.Read(vertices, static_cast<unsigned>(vertexCount) * 12u);
+    node->mesh->vertices = reinterpret_cast<std::array<float, 3>*>(vertices);
+    int textureVertexCount = 0;
+    input.Read(&textureVertexCount, 4);
+    node->mesh->textureVertexCount = textureVertexCount;
+    ModelTextureVertex* textureVertices = new ModelTextureVertex[textureVertexCount];
+    input.Read(textureVertices, static_cast<unsigned>(textureVertexCount) * 12u);
+    node->mesh->textureVertices = textureVertices;
+    int faceCount = 0;
+    input.Read(&faceCount, 4);
+    node->mesh->faceCount = faceCount;
+    ModelFace* faces = new ModelFace[faceCount];
+
+    for (int face = 0; face < faceCount; ++face) {
+      ModelFace& target = faces[face];
+      unsigned size = 0;
+      input.Read(&size, 4);
+      std::vector<unsigned char> buffer;
+      buffer.resize(size);
+      input.Read(buffer.data(), size);
+      ModelFaceHeader record;
+      std::memcpy(&record, buffer.data(), sizeof(record));
+      std::memcpy(target.vertices, record.vertices, sizeof(target.vertices));
+      std::memcpy(target.textureVertices, record.textureVertices, sizeof(target.textureVertices));
+      target.texture = record.texture;
+      target.twoSided = record.twoSided;
+      const unsigned groups = (buffer.size() - 20u) / 4u;
+      target.smoothing.resize(groups);
+      std::memcpy(target.smoothing.data(), buffer.data() + 20, groups * 4u);
+    }
+
+    node->mesh->faces = faces;
+    std::sort(node->mesh->faces, node->mesh->faces + node->mesh->faceCount);
+    node->mesh->CalculateNormals();
+    node->scaleKeys.Read(input);
+    node->rotationKeys.Read(input);
+    node->positionKeys.Read(input);
+    int textureAnimations = 0;
+    input.Read(&textureAnimations, 4);
+
+    for (int animation = 0; animation < textureAnimations; ++animation) {
+      int texture = 0;
+      input.Read(&texture, 4);
+      ModelTextureChannels channels;
+      channels.Read(input);
+
+      node->textureKeys[texture] = channels;
+    }
+
+    this->nodes.push_back(node);
+    this->meshes[node->name] = node->mesh;
+  }
+
+  for (auto it = this->nodes.begin(); it != this->nodes.end(); ++it) {
+    ModelNode* node = *it;
+
+    if (!node->parentName.empty()) {
+      ModelNode* parent = this->FindNode(node->parentName.c_str());
+
+      if (parent) {
+        (*it)->parent = parent;
+        parent->children.push_back(*it);
+      }
+    }
+  }
+
+  {
+    int volumeCount = 0;
+    input.Read(&volumeCount, 4);
+
+    for (int index = 0; index < volumeCount; ++index) {
+      auto* volume = new ModelVolume;
+      input.Read(volume, sizeof(ModelVolume));
+      this->volumes.push_back(volume);
+    }
   }
 }
 

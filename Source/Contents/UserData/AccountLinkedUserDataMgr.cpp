@@ -7,6 +7,7 @@
 #include "Contents/Hotkeys/EmotionHotkeys.h"
 #include "Contents/Hotkeys/UserHotkeyMgr.h"
 #include "Contents/Messenger/WhisperBlockMgr.h"
+#include "Network/TextEncoding.h"
 #include "Utility/Async/AsyncDiagnostic.h"
 #include "Utility/Cipher/XorBytes.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
@@ -15,6 +16,7 @@
 
 #include <json/reader.h>
 #include <json/writer.h>
+#include <algorithm>
 #include <cstddef>
 #include <new>
 
@@ -29,14 +31,45 @@ namespace {
 // GLOBAL: gl_24351
 CAccountLinkedUserDataMgr* g_accountLinkedUserDataMgr;
 
-// INLINED
+// OFFSET: 0x005BB530
+// FUNCTION: fn_46463
 CAccountLinkedUserDataMgr::CAccountLinkedUserDataMgr()
     : m_accountId(0), m_accountName(DefaultAccountName()), m_loaded(false), m_pendingLoads(0), m_saveUrl(""), m_loadUrl("") {
   this->m_enabled = true;
 }
 
+// OFFSET: 0x005BBB00
+// FUNCTION: fn_46464
+__declspec(noinline) CAccountLinkedUserDataMgr::~CAccountLinkedUserDataMgr() = default;
+
+class WhisperNameAppender {
+  /* 0000 */ Json::Value& values;
+
+public:
+  // INLINED
+  explicit WhisperNameAppender(Json::Value& output) : values(output) {}
+
+  // INLINED
+  void operator()(std::string name) const {
+    this->values.append(ToUtf8(name, g_textCodePage));
+  }
+};
+
+// OFFSET: 0x005BB190
+// FUNCTION: fn_03454
+template <>
+__declspec(noinline) WhisperNameAppender std::for_each(std::set<std::string>::const_iterator first, std::set<std::string>::const_iterator last, WhisperNameAppender function) {
+  for (; first != last; ++first) {
+    function(*first);
+  }
+
+  return function;
+}
+
 // INLINED
-CAccountLinkedUserDataMgr::~CAccountLinkedUserDataMgr() = default;
+void CWhisperBlockMgr::Export(Json::Value& values) const {
+  std::for_each(this->m_names.begin(), this->m_names.end(), WhisperNameAppender{values});
+}
 
 // OFFSET: 0x005BBF50
 // FUNCTION: fn_03459
@@ -85,33 +118,31 @@ std::string CAccountLinkedUserDataMgr::SaveUrl() const {
 void CAccountLinkedUserDataMgr::CompleteLoad(
   AsyncDiagnostic diagnostic, std::uint32_t accountId, std::string accountName, std::string response
 ) {
-  if (diagnostic.success && this->m_accountId == 0) {
+  if (std::get<0>(diagnostic) && this->m_accountId == 0) {
     Json::Value root;
     Json::Reader reader;
     if (reader.parse(response, root, true)) {
       constexpr std::array<std::uint8_t, 5> typeSourceArray = OBFUSCATE_SOURCE("Type", 0xC52FB5FBB94FF917ULL);
       const std::uint8_t (&typeSource)[5] = typeSourceArray._Elems;
-      switch (root[(OBFUSCATE_DECRYPT(0xC52FB5FBB94FF917ULL, typeSource))].asInt()) {
-      case 1: {
-        constexpr std::array<std::uint8_t, 5> whisperSourceArray = OBFUSCATE_SOURCE("data", 0x93E7A3A1F587CDC5ULL);
-        const std::uint8_t (&whisperSource)[5] = whisperSourceArray._Elems;
-        LoadWhisperBlockList(root[(OBFUSCATE_DECRYPT(0x93E7A3A1F587CDC5ULL, whisperSource))]);
-        constexpr std::array<std::uint8_t, 5> emotionSourceArray = OBFUSCATE_SOURCE("data", 0x2FF3C5036D070127ULL);
-        const std::uint8_t (&emotionSource)[5] = emotionSourceArray._Elems;
-        g_session.m_emotionHotkeys.Load(root[(OBFUSCATE_DECRYPT(0x2FF3C5036D070127ULL, emotionSource))]);
-        constexpr std::array<std::uint8_t, 5> hotkeySourceArray = OBFUSCATE_SOURCE("data", 0x17359BF953C367B3ULL);
-        const std::uint8_t (&hotkeySource)[5] = hotkeySourceArray._Elems;
-        g_userHotkeyMgr->LoadV2(root[(OBFUSCATE_DECRYPT(0x17359BF953C367B3ULL, hotkeySource))]);
-      }
-        [[fallthrough]];
-      case 2:
+      const int type = root[(OBFUSCATE_DECRYPT(0xC52FB5FBB94FF917ULL, typeSource))].asInt();
+      if (type == 1 || type == 2) {
+        if (type == 1) {
+          constexpr std::array<std::uint8_t, 5> whisperSourceArray = OBFUSCATE_SOURCE("data", 0x93E7A3A1F587CDC5ULL);
+          const std::uint8_t (&whisperSource)[5] = whisperSourceArray._Elems;
+          LoadWhisperBlockList(root[(OBFUSCATE_DECRYPT(0x93E7A3A1F587CDC5ULL, whisperSource))]);
+          constexpr std::array<std::uint8_t, 5> emotionSourceArray = OBFUSCATE_SOURCE("data", 0x2FF3C5036D070127ULL);
+          const std::uint8_t (&emotionSource)[5] = emotionSourceArray._Elems;
+          g_session.m_emotionHotkeys.Load(root[(OBFUSCATE_DECRYPT(0x2FF3C5036D070127ULL, emotionSource))]);
+          constexpr std::array<std::uint8_t, 5> hotkeySourceArray = OBFUSCATE_SOURCE("data", 0x17359BF953C367B3ULL);
+          const std::uint8_t (&hotkeySource)[5] = hotkeySourceArray._Elems;
+          g_userHotkeyMgr->LoadV2(root[(OBFUSCATE_DECRYPT(0x17359BF953C367B3ULL, hotkeySource))]);
+        }
         g_whisperBlockMgr->m_tracking = true;
         g_userHotkeyMgr->m_loaded = true;
         this->m_accountId = accountId;
         this->m_accountName = accountName;
         this->m_loaded = true;
         g_session.SaveEmotionHotkeys();
-        break;
       }
     }
   }
@@ -145,6 +176,17 @@ void CAccountLinkedUserDataMgr::CompleteSave() {
   --this->m_pendingLoads;
 }
 
+// INLINED
+void EmotionHotkeys::Export(Json::Value& data) const {
+  Json::Value values;
+
+  for (int index = 0; index < 10; ++index) {
+    values.append(ToUtf8(this->current[index], g_textCodePage));
+  }
+
+  data["EmotionHotkey"] = values;
+}
+
 // OFFSET: 0x005BCE50
 // FUNCTION: fn_03469
 void CAccountLinkedUserDataMgr::Save() {
@@ -161,7 +203,7 @@ void CAccountLinkedUserDataMgr::Save() {
     data["WhisperBlockList"] = values;
   }
 
-  if (g_session.HasEmotionHotkeyChanges()) {
+  if (g_session.HasEmotionHotkeyChanges() == true) {
     g_session.m_emotionHotkeys.Export(data);
   }
 
@@ -169,13 +211,16 @@ void CAccountLinkedUserDataMgr::Save() {
     this->ExportUserHotkey(data);
   }
 
-  if (!data.isNull()) {
-    root["data"] = data;
-    Json::StyledWriter writer;
-    const std::string response = writer.write(root);
-    g_asyncWorkMgr->SaveAccount(this->m_accountId, this->m_accountName, this->SaveUrl(), std::string(g_session.m_webAuthToken, 16), response);
-    ++this->m_pendingLoads;
+  if (data.isNull() == true) {
+    return;
   }
+
+  root["data"] = data;
+  Json::StyledWriter writer;
+  const std::string response = writer.write(root);
+  CAsyncWorkMgr* asyncWorkMgr = g_asyncWorkMgr;
+  asyncWorkMgr->SaveAccount(this->m_accountId, this->m_accountName, this->SaveUrl(), std::string(g_session.m_webAuthToken, g_session.m_webAuthToken + 16), response);
+  ++this->m_pendingLoads;
 }
 
 // OFFSET: 0x005BCD80
@@ -187,5 +232,6 @@ void CAccountLinkedUserDataMgr::Load(std::uint32_t accountId, std::string accoun
     return;
   }
 
-  g_asyncWorkMgr->LoadAccount(accountId, accountName, this->LoadUrl());
+  CAsyncWorkMgr* asyncWorkMgr = g_asyncWorkMgr;
+  asyncWorkMgr->LoadAccount(accountId, accountName, this->LoadUrl());
 }

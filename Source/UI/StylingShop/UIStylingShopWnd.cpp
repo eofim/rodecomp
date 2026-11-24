@@ -23,8 +23,6 @@
 #include <mbstring.h>
 #include "Resource/MSGSTRINGID.h"
 
-template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
-
 // OFFSET: 0x00829B50
 // FUNCTION: fn_10341
 void UIStylingshopTabParentWnd::OnCreate(int, int) {
@@ -90,6 +88,16 @@ void UICostumeChangeWnd::Paint() {
   this->DrawCenteredText(43, 248, g_session.GetJobName(this->m_display->job, -1), 161, 0, 11, 0, 0);
 }
 
+// INLINED
+static void ClearChangedStyles(bool (&changed)[6]) {
+  changed[STYLE_TABLE_HEAD_PALETTE - 1] = false;
+  changed[STYLE_TABLE_HEAD_STYLE - 1] = false;
+  changed[STYLE_TABLE_BODY_PALETTE - 1] = false;
+  changed[STYLE_TABLE_TOP_ACCESSORY - 1] = false;
+  changed[STYLE_TABLE_MID_ACCESSORY - 1] = false;
+  changed[STYLE_TABLE_BOTTOM_ACCESSORY - 1] = false;
+}
+
 // OFFSET: 0x00827670
 // FUNCTION: fn_10328
 void UIShowInfoWnd::ResetCheckBoxes() {
@@ -98,7 +106,7 @@ void UIShowInfoWnd::ResetCheckBoxes() {
     this->m_checks[i]->SetBitmaps("유저인터페이스\\styleshop\\check_able.bmp", "유저인터페이스\\styleshop\\Notcheck.bmp");
   }
 
-  std::memset(this->m_changed, 0, sizeof(this->m_changed));
+  ClearChangedStyles(this->m_changed);
   this->costumeChanged = 0;
   for (unsigned int i = 0; i < this->m_list.size(); ++i) {
     this->m_list.clear();
@@ -160,19 +168,12 @@ void UIStylingShopButton::OnLBtnUp(int, int) {
   if (this->parent) {
     if (g_windowMgr.WindowPolicy(3, this->parent->geometry.id) != 0) {
       int id = this->geometry.id;
-      if (id == ID_CANCEL && g_modeMgr.currentMode && g_modeMgr.currentMode->cursorType == 2) {
-        const char* text = LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT);
-        if (g_windowMgr.Confirm(text, 2, true, false, 0, "Message", 280, 120, 0) == 187) {
-          g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
-        }
-      } else {
-        if (id == ID_OK || id == ID_SEARCH) {
-          this->parent->RecordEditTexts();
-          id = this->geometry.id;
-        }
-
-        this->parent->SendMsg(this, UM_COMMAND, id, this->m_argument, 0, 0);
+      if (id == ID_OK || id == ID_SEARCH) {
+        this->parent->RecordEditTexts();
+        id = this->geometry.id;
       }
+
+      this->parent->SendMsg(this, UM_COMMAND, id, this->m_argument, 0, 0);
     }
   } else {
     g_modeMgr.currentMode->SendMsg(MM_COMMAND, this->geometry.id, this->m_argument, 0, 0);
@@ -185,7 +186,7 @@ void UIStylingShopButton::OnLBtnUp(int, int) {
 // OFFSET: 0x0082A1C0
 // FUNCTION: fn_10357
 void UIStylingShopButton::OnMouseHover(int, int) {
-  if (!this->m_names[1].empty()) {
+  if (!this->m_hoverName.empty()) {
     return;
   }
 
@@ -296,7 +297,7 @@ int UIBasicStylingWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
           this->m_display->headPalette = i + 1;
           this->m_display->Invalidate();
         } else {
-          g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_BASICSTYLE), 0, false, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_IS_NOT_COLORING_HEAD), 0, false, false, 0, "Message", 280, 120, 0);
         }
       } else {
         this->m_paletteButtons[i]->SetState(0);
@@ -330,7 +331,10 @@ int UICostumeChangeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
   case STYLINGSHOP_BUTTON_JOB_PREV: {
     UIDisplayCharacter* display = this->m_display;
     if (display->m_jobs.size() >= 2) {
-      std::map<int, int>::iterator it = display->m_jobs.find(display->job);
+      std::map<int, int>::iterator it = display->m_jobs.lower_bound(display->job);
+      if (it != display->m_jobs.end() && it->first > display->job) {
+        it = display->m_jobs.end();
+      }
       if (it == display->m_jobs.end()) {
         --it;
       }
@@ -344,16 +348,18 @@ int UICostumeChangeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     break;
   }
   case STYLINGSHOP_BUTTON_JOB_NEXT: {
-    UIDisplayCharacter* display = this->m_display;
-    if (display->m_jobs.size() >= 2) {
-      std::map<int, int>::iterator it = display->m_jobs.find(display->job);
-      if (it != display->m_jobs.end()) {
+    if (this->m_display->m_jobs.size() >= 2) {
+      std::map<int, int>::iterator it = this->m_display->m_jobs.lower_bound(this->m_display->job);
+      if (it != this->m_display->m_jobs.end() && it->first != this->m_display->job) {
+        it = this->m_display->m_jobs.end();
+      }
+      if (it != this->m_display->m_jobs.end()) {
         ++it;
       }
-      if (it == display->m_jobs.end()) {
-        it = display->m_jobs.begin();
+      if (it == this->m_display->m_jobs.end()) {
+        it = this->m_display->m_jobs.begin();
       }
-      display->job = it->first;
+      this->m_display->job = it->first;
     }
     break;
   }
@@ -389,7 +395,7 @@ int UIMyStyleWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
   } else {
     switch (argument1) {
     case ID_CLOSE:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_REGISTER_BOOKMARK), 2, false, false, 0, "Message", 280, 120, 0) != 188) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_DELETE_CHAR), 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
         for (int i = 0; i < 2; ++i) {
           if (sender == this->deleteStyleButtons[i]) {
             this->RemoveChild(this->m_slots[i], 1);
@@ -504,8 +510,7 @@ UICostumeChangeWnd::UICostumeChangeWnd() : UIStylingshopTabParentWnd() {
 UIDisplayCharacter::UIDisplayCharacter()
     : UIWindow(0), slotNumber(0), direction(0), robe(0), head(0), job(0), headPalette(0), bodyStyle(0), topAccessory(0), middleAccessory(0),
       bottomAccessory(0), hideFavoriteButton(false), topAccessoryItemId(0), middleAccessoryItemId(0), bottomAccessoryItemId(0) {
-  this->shadowX = 0;
-  this->shadowY = 0;
+  std::memset(&this->shadow, 0, sizeof(this->shadow));
   this->shadowBitmapName = "유저인터페이스\\styleshop\\shadow_chr_off.bmp";
 }
 
@@ -513,8 +518,7 @@ UIDisplayCharacter::UIDisplayCharacter()
 inline UIDisplayCharacter::UIDisplayCharacter(bool hideFavoriteButton)
     : UIWindow(0), slotNumber(0), direction(0), robe(0), head(0), job(0), headPalette(0), bodyStyle(0), topAccessory(0), middleAccessory(0),
       bottomAccessory(0), hideFavoriteButton(hideFavoriteButton), topAccessoryItemId(0), middleAccessoryItemId(0), bottomAccessoryItemId(0) {
-  this->shadowX = 0;
-  this->shadowY = 0;
+  std::memset(&this->shadow, 0, sizeof(this->shadow));
   this->shadowBitmapName = "유저인터페이스\\styleshop\\shadow_chr_off.bmp";
 }
 
@@ -537,6 +541,22 @@ void UIDisplayCharacter::CopyStyle(const UIDisplayCharacter* other) {
   this->Invalidate();
 }
 
+// INLINED
+static bool IsSavedStyle(UIMyStyleWnd* myStyle, UIDisplayCharacter* display) {
+  for (int i = 0; i < 2; ++i) {
+    UISlotOfMyStyleWnd* slot = myStyle->m_slots[i];
+    if (slot) {
+      UIDisplayCharacter* saved = slot->m_display;
+      if (saved->head == display->head && saved->headPalette == display->headPalette && saved->bodyStyle == display->bodyStyle &&
+          saved->topAccessory == display->topAccessory && saved->middleAccessory == display->middleAccessory && saved->bottomAccessory == display->bottomAccessory &&
+          saved->job == display->job) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // OFFSET: 0x00824760
 // FUNCTION: fn_10315
 void UIStylingShopWnd::RefreshFavoriteButton() {
@@ -555,20 +575,7 @@ void UIStylingShopWnd::RefreshFavoriteButton() {
     if (it->first->geometry.id == STYLINGSHOP_TAB_FAVORITE) {
       UIMyStyleWnd* myStyle = static_cast<UIMyStyleWnd*>(it->second);
       UIDisplayCharacter* display = visibleTab->m_display;
-      bool favorite = false;
-      for (int i = 0; i < 2; ++i) {
-        UISlotOfMyStyleWnd* slot = myStyle->m_slots[i];
-        if (slot) {
-          UIDisplayCharacter* saved = slot->m_display;
-          if (saved->head == display->head && saved->headPalette == display->headPalette && saved->bodyStyle == display->bodyStyle &&
-              saved->topAccessory == display->topAccessory && saved->middleAccessory == display->middleAccessory && saved->bottomAccessory == display->bottomAccessory &&
-              saved->job == display->job) {
-            favorite = true;
-            break;
-          }
-        }
-      }
-
+      const bool favorite = IsSavedStyle(myStyle, display);
       visibleTab->UpdateFavoriteButton(favorite);
     }
   }
@@ -672,16 +679,16 @@ void UIStylingShopWnd::SetBuyEnabled(bool enabled) {
   const char* normal;
   const char* hover;
   const char* pressed;
-  if (enabled) {
-    this->m_buyButton->m_argument = 0;
-    normal = "유저인터페이스\\styleshop\\btn_buy_out.bmp";
-    hover = "유저인터페이스\\styleshop\\btn_buy_over.bmp";
-    pressed = "유저인터페이스\\styleshop\\btn_buy_down.bmp";
-  } else {
+  if (!enabled) {
     this->m_buyButton->m_argument = 1;
     pressed = "유저인터페이스\\styleshop\\btn_buy_disable.bmp";
     hover = pressed;
     normal = pressed;
+  } else {
+    this->m_buyButton->m_argument = 0;
+    normal = "유저인터페이스\\styleshop\\btn_buy_out.bmp";
+    hover = "유저인터페이스\\styleshop\\btn_buy_over.bmp";
+    pressed = "유저인터페이스\\styleshop\\btn_buy_down.bmp";
   }
 
   this->m_buyButton->SetBitmap(normal, 0, 0);
@@ -695,7 +702,7 @@ void UIStylingShopWnd::SetBuyEnabled(bool enabled) {
 void UIStylingShopWnd::Paint() {
   this->RefreshFavoriteButton();
   this->ClearSurface(0xFFFFFFFF);
-  this->DrawTitleBar(true, LookupMessage(MSI_STYLING_SHOP_DELETE_CHAR), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_STYLING_SHOP), 0);
   CBitmapRes* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\styleshop\\bg_styling.bmp")));
   if (background) {
     this->DrawBitmap(0, 0, background, false);
@@ -728,7 +735,7 @@ void UIShowInfoWnd::CheckColoringGoods(bool* coloring) {
     this->m_checks[i]->SetChecked(0);
   }
   this->m_list.clear();
-  std::memset(this->m_changed, 0, sizeof(this->m_changed));
+  ClearChangedStyles(this->m_changed);
   this->costumeChanged = 0;
 }
 
@@ -762,8 +769,8 @@ void UIShowInfoWnd::ArrangeCheckBoxes(const int& layout) {
   case STYLINGSHOP_TAB_FAVORITE:
     this->m_checkTop = 1;
     this->paymentFontSize = 11;
-    this->paymentTextX = 24;
-    this->paymentTextYOffset = 0;
+    this->m_paymentLayout.textX = 24;
+    this->m_paymentLayout.textYOffset = 0;
     this->m_offBitmap = "유저인터페이스\\styleshop\\checkbox_mini_off.bmp";
     for (int row = static_cast<int>(this->m_list.size()); row < 4; ++row) {
       for (int column = static_cast<int>(this->m_list.size()); column < 2; ++column) {
@@ -778,10 +785,10 @@ void UIShowInfoWnd::ArrangeCheckBoxes(const int& layout) {
     this->showPaymentItems = 1;
     this->showDottedLines = 1;
     this->showPayments = 1;
-    this->paymentIconX = 41;
-    this->paymentIconYOffset = -2;
-    this->paymentTextX = 68;
-    this->paymentTextYOffset = 6;
+    this->m_paymentLayout.iconX = 41;
+    this->m_paymentLayout.iconYOffset = -2;
+    this->m_paymentLayout.textX = 68;
+    this->m_paymentLayout.textYOffset = 6;
     this->m_offBitmap = "유저인터페이스\\styleshop\\checkbox_off.bmp";
     for (int i = static_cast<int>(this->m_list.size()); i < 8; ++i) {
       this->m_checks[i]->SetBitmaps("유저인터페이스\\styleshop\\check_able.bmp", "유저인터페이스\\styleshop\\Notcheck.bmp");
@@ -791,8 +798,8 @@ void UIShowInfoWnd::ArrangeCheckBoxes(const int& layout) {
   case STYLINGSHOP_TAB_ACCESSORY:
     this->m_checkTop = 1;
     this->paymentFontSize = 11;
-    this->paymentTextX = 24;
-    this->paymentTextYOffset = 0;
+    this->m_paymentLayout.textX = 24;
+    this->m_paymentLayout.textYOffset = 0;
     this->m_offBitmap = "유저인터페이스\\styleshop\\checkbox_mini_off.bmp";
     for (int row = static_cast<int>(this->m_list.size()); row < 4; ++row) {
       for (int column = static_cast<int>(this->m_list.size()); column < 2; ++column) {
@@ -808,10 +815,10 @@ void UIShowInfoWnd::ArrangeCheckBoxes(const int& layout) {
     this->showPaymentItems = 1;
     this->showDottedLines = 1;
     this->showPayments = 1;
-    this->paymentIconX = 41;
-    this->paymentIconYOffset = -2;
-    this->paymentTextX = 68;
-    this->paymentTextYOffset = 6;
+    this->m_paymentLayout.iconX = 41;
+    this->m_paymentLayout.iconYOffset = -2;
+    this->m_paymentLayout.textX = 68;
+    this->m_paymentLayout.textYOffset = 6;
     this->m_offBitmap = "유저인터페이스\\styleshop\\checkbox_off.bmp";
     for (int i = static_cast<int>(this->m_list.size()); i < 8; ++i) {
       this->m_checks[i]->SetBitmaps("유저인터페이스\\styleshop\\check_able.bmp", "유저인터페이스\\styleshop\\Notcheck.bmp");
@@ -823,7 +830,7 @@ void UIShowInfoWnd::ArrangeCheckBoxes(const int& layout) {
 
 // OFFSET: 0x0082E500
 // FUNCTION: fn_10378
-__declspec(noinline) void ToggleStylingAccessory(int itemId, int slot) {
+__declspec(noinline) void __stdcall ToggleStylingAccessory(int itemId, int slot) {
   UIStylingShopWnd* shop = static_cast<UIStylingShopWnd*>(g_windowMgr.LookupWindow(WID_STYLINGSHOPWND));
   auto it = shop->m_tabs.begin();
   for (; it != shop->m_tabs.end(); ++it) {
@@ -982,14 +989,17 @@ std::string UIDisplayCharacter::GetStyleTable(const int& type) {
 // FUNCTION: fn_10330
 bool UIShowInfoWnd::CheckPayment(const int& index, const int& zeny, const int& itemId, const int& costumeItemId) {
   if (zeny) {
-    UICheckBox* check = this->m_checks[index];
     bool enough;
     if (g_session.m_zeny >= zeny) {
       enough = true;
-      check->SetTooltip("");
+      this->m_checks[index]->SetTooltip("");
     } else {
-      check->SetTooltip(LookupMessage(g_session.m_zeny + g_session.m_bankBalance >= zeny ? 2820 : 2780));
       enough = false;
+      if (g_session.m_zeny + g_session.m_bankBalance >= zeny) {
+        this->m_checks[index]->SetTooltip(LookupMessage(MSI_STYLING_SHOP_SUGGEST_TO_GO_TO_BANK));
+      } else {
+        this->m_checks[index]->SetTooltip(LookupMessage(MSI_BANK_0_MINI));
+      }
     }
     return enough;
   }
@@ -1129,14 +1139,14 @@ int UIDisplayCharacter::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     this->SelectNextStyle(this->GetStyleTable(STYLE_TABLE_BODY_PALETTE).c_str(), &this->bodyStyle);
     break;
   case STYLINGSHOP_BUTTON_PALETTE:
-    shop->SendMsg(nullptr, 495, 0, 0, 0, 0);
+    shop->SendMsg(nullptr, UM_STYLINGSHOP_PALETTE, 0, 0, 0, 0);
     break;
   case ID_BOOKMARK:
     if (this->m_favoriteButton->m_argument == 0) {
       if (shop->AddToMyStyle() == true) {
-        g_windowMgr.Confirm(LookupMessage(MSI_PRIVATE_AIRPLANE_FAIL_LOCALIZING), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_REGISTER_BOOKMARK), 0, true, false, 0, "Message", 280, 120, 0);
       } else {
-        this->m_favoriteButton->SetTooltip(LookupMessage(MSI_STYLING_SHOP_SUGGEST_TO_GO_TO_BANK));
+        this->m_favoriteButton->SetTooltip(LookupMessage(MSI_STYLING_SHOP_FAIL_TO_ADD_CHAR_TO_LIKE));
       }
     }
     break;
@@ -1300,12 +1310,12 @@ void UIShowInfoWnd::DrawPaymentItem(const int& type, const int& zeny, const int&
   }
 
   if (!enabled) {
-    this->DrawAuxiliary(1, this->paymentIconX, this->geometry.height / 8 * row + this->paymentIconYOffset, bitmap, true, false);
+    this->DrawAuxiliary(1, this->m_paymentLayout.iconX, this->geometry.height / 8 * row + this->m_paymentLayout.iconYOffset, bitmap, true, false);
     return;
   }
 
   if (bitmap) {
-    this->DrawBitmap(this->paymentIconX, this->geometry.height / 8 * row + this->paymentIconYOffset, bitmap, false);
+    this->DrawBitmap(this->m_paymentLayout.iconX, this->geometry.height / 8 * row + this->m_paymentLayout.iconYOffset, bitmap, false);
   }
 }
 
@@ -1319,11 +1329,24 @@ __declspec(noinline) UIShowInfoWnd::~UIShowInfoWnd() {
 UIMyStyleWnd::UIMyStyleWnd() : UIStylingshopTabParentWnd(), m_selectedSlot(0), m_slots{} {
 }
 
+// OFFSET: 0x00825720
+// FUNCTION: fn_45610
+void UIMyStyleWnd::RemoveSelectedStyle() {
+  UISlotOfMyStyleWnd* slot = this->m_slots[this->m_selectedSlot];
+  if (slot && slot->m_showInfo && slot->m_showInfo->SendStyleChange() == true) {
+    this->RemoveChild(this->m_slots[this->m_selectedSlot], 1);
+    this->m_slots[this->m_selectedSlot] = nullptr;
+    this->deleteStyleButtons[this->m_selectedSlot]->Enable(0);
+  }
+}
+
 // OFFSET: 0x00823210
 // FUNCTION: fn_10291
 UIShowInfoWnd::UIShowInfoWnd()
-    : UIWindow(0), m_display(nullptr), showPayments(0), showPaymentItems(0), showDottedLines(0), m_checkTop(5), paymentFontSize(12), m_changed{},
-      costumeChanged(0), paymentIconX(0), paymentIconYOffset(0), paymentTextX(0), paymentTextYOffset(0), m_offBitmap(nullptr) {
+    : UIWindow(0), m_display(nullptr), showPayments(0), showPaymentItems(0), showDottedLines(0), m_checkTop(5), paymentFontSize(12),
+      m_changed{false, false, false, false, false, false},
+      costumeChanged(0), m_offBitmap(nullptr) {
+  this->m_paymentLayout = PaymentLayout{};
 }
 
 // OFFSET: 0x008232F0
@@ -1350,7 +1373,7 @@ int UIAccessoryShowCase::SendMsg(UIWindow* sender, int message, std::intptr_t ar
     if (argument1 == ID_BUTTON1 && sender) {
       UIAccBitmapButton* button = static_cast<UIAccBitmapButton*>(sender);
       for (unsigned int i = 0; i < this->m_itemFrames.size(); ++i) {
-        this->m_itemFrames[i]->SetBitmap(i == button->Argument() - 1 ? "유저인터페이스\\styleshop\\shadow_item_on.bmp" : "유저인터페이스\\styleshop\\shadow_item_off.bmp");
+        this->m_itemFrames[i]->SetBitmap(i != button->Argument() - 1 ? "유저인터페이스\\styleshop\\shadow_item_off.bmp" : "유저인터페이스\\styleshop\\shadow_item_on.bmp");
       }
 
       memset(table, 0, sizeof(table));
@@ -1438,7 +1461,7 @@ int UIStylingShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
           }
           if (it->first->geometry.id == STYLINGSHOP_LAYOUT_2ND_COSTUME) {
             UI2ndCostumeWnd* costume = static_cast<UI2ndCostumeWnd*>(it->second);
-            costume->m_hideCheckBox->SetChecked(costume->m_display->job == 0);
+            costume->m_hideCheckBox->SetChecked(costume->m_display->job == JT_NOVICE);
             costume->m_showCheckBox->SetChecked(costume->m_hideCheckBox->geometry.state == 0);
           }
           it->second->Show(1);
@@ -1456,7 +1479,7 @@ int UIStylingShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
     break;
   case ID_BUY:
     if (this->m_buyButton->m_argument == 0 &&
-        g_windowMgr.Confirm(LookupMessage(MSI_ASK_MOVE_BY_PRIVATE_AIRPLANE), 2, false, false, 0, "Message", 280, 120, 0) != 188) {
+        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_ADJUST_NEW_CHAR_STYLE), 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
       for (std::map<UIWindow*, UIStylingshopTabParentWnd*>::iterator it = this->m_tabs.begin(); it != this->m_tabs.end(); ++it) {
         UIStylingshopTabParentWnd* tab = it->second;
         if (tab->geometry.visible == 0) {
@@ -1464,12 +1487,7 @@ int UIStylingShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
         }
         if (it->first->geometry.id == STYLINGSHOP_TAB_FAVORITE) {
           UIMyStyleWnd* myStyle = static_cast<UIMyStyleWnd*>(tab);
-          UISlotOfMyStyleWnd* slot = myStyle->m_slots[myStyle->m_selectedSlot];
-          if (slot && slot->m_showInfo && slot->m_showInfo->SendStyleChange() == true) {
-            myStyle->RemoveChild(myStyle->m_slots[myStyle->m_selectedSlot], 1);
-            myStyle->m_slots[myStyle->m_selectedSlot] = nullptr;
-            myStyle->deleteStyleButtons[myStyle->m_selectedSlot]->Enable(0);
-          }
+          myStyle->RemoveSelectedStyle();
         } else if (tab->m_showInfo) {
           tab->m_showInfo->SendStyleChange();
         }
@@ -1557,27 +1575,27 @@ void UIStylingShopWnd::OnCreate(int, int) {
 
   UIBasicStylingWnd* basic = new (std::nothrow) UIBasicStylingWnd();
   this->AddTab("유저인터페이스\\styleshop\\tab_hair_off.bmp", "유저인터페이스\\styleshop\\tab_hair_off.bmp", "유저인터페이스\\styleshop\\tab_hair_on.bmp", ID_BASE, basic,
-               LookupMessage(MSI_SKILL_FAIL_MHP_TOO_FEW));
+               LookupMessage(MSI_STYLING_SHOP_BASICSTYLE));
   basic->Show(1);
   static_cast<UIButton*>(this->m_tabs.begin()->first)->SetState(2);
 
   UIAccessoryCusWnd* accessory = new (std::nothrow) UIAccessoryCusWnd();
   this->AddTab("유저인터페이스\\styleshop\\tab_accessories_off.bmp", "유저인터페이스\\styleshop\\tab_accessories_off_over.bmp",
-               "유저인터페이스\\styleshop\\tab_accessories_on.bmp", STYLINGSHOP_TAB_ACCESSORY, accessory, LookupMessage(MSI_STYLING_SHOP_IS_NOT_COLORING_HEAD));
+               "유저인터페이스\\styleshop\\tab_accessories_on.bmp", STYLINGSHOP_TAB_ACCESSORY, accessory, LookupMessage(MSI_STYLING_SHOP_ACCESSORYWND));
 
   if (g_session.IsTreeGroupThree(g_session.GetDisplayJob()) == true || g_session.IsTreeGroupTwo(g_session.GetDisplayJob()) == 1) {
     UICostumeChangeWnd* costume = new UICostumeChangeWnd();
     this->AddTab("유저인터페이스\\styleshop\\tab_2ndcostume_off.bmp", "유저인터페이스\\styleshop\\tab_2ndcostume_on_over.bmp", "유저인터페이스\\styleshop\\tab_2ndcostume_on.bmp", STYLINGSHOP_TAB_COSTUME_CHANGE,
-                 costume, LookupMessage(MSI_STYLING_SHOP_OPENING_COMMENT));
+                 costume, LookupMessage(MSI_STYLING_SHOP_2NDCOSTUMEWND));
   } else {
     UICostumeChangeWnd* costume = new UICostumeChangeWnd();
     this->AddTab("유저인터페이스\\styleshop\\tab_2ndcostume_off.bmp", "유저인터페이스\\styleshop\\tab_2ndcostume_off.bmp", "유저인터페이스\\styleshop\\tab_2ndcostume_off.bmp", STYLINGSHOP_TAB_COSTUME_CHANGE,
-                 costume, LookupMessage(MSI_STYLING_SHOP_OPENING_COMMENT));
+                 costume, LookupMessage(MSI_STYLING_SHOP_2NDCOSTUMEWND));
   }
 
   UIMyStyleWnd* myStyle = new (std::nothrow) UIMyStyleWnd();
   this->AddTab("유저인터페이스\\styleshop\\tab_favorite_off.bmp", "유저인터페이스\\styleshop\\tab_favorite_off_over.bmp", "유저인터페이스\\styleshop\\tab_favorite_on.bmp", STYLINGSHOP_TAB_FAVORITE,
-               myStyle, LookupMessage(MSI_STYLING_SHOP_SUCCESS));
+               myStyle, LookupMessage(MSI_STYLING_SHOP_LIKELISTWND));
 
   this->m_preview = new UIDisplayCharacter();
   this->m_preview->SetSize(120, 120);
@@ -1594,7 +1612,7 @@ void UIStylingShopWnd::OnCreate(int, int) {
   this->AddChild(this->m_buyButton);
 
   char zeny[256] = {};
-  std::string text(LookupMessage(MSI_BANK_6));
+  std::string text(LookupMessage(MSI_BANK_3));
   text += " ";
   text += FormatGroupedInteger(g_session.m_zeny, zeny, 256);
   text += "\tz";
@@ -1614,7 +1632,7 @@ void UIDisplayCharacter::Paint() {
   this->ClearSurface(0xFFFFFFFF);
   CBitmapRes* shadow = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->shadowBitmapName)));
   if (shadow) {
-    this->DrawBitmap(this->shadowX, this->shadowY, shadow, false);
+    this->DrawBitmap(this->shadow.x, this->shadow.y, shadow, false);
   }
 
   CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
@@ -1622,13 +1640,13 @@ void UIDisplayCharacter::Paint() {
     return;
   }
 
-  FuncDrawWNDChar draw(
+  const int previewBodyStyle = g_session.GetBodyStyle(player->GetEffectiveJob(-1), this->bodyStyle, this->job);
+  FuncDrawWNDChar(
     this, this->geometry.width / 2, this->geometry.height - 33, static_cast<unsigned char>(player->sex), static_cast<short>(player->GetEffectiveJob(-1)),
     player->appearanceJob, static_cast<short>(this->job), static_cast<short>(this->head), static_cast<short>(this->bottomAccessory),
     static_cast<short>(this->topAccessory), static_cast<short>(this->middleAccessory), this->robe, player->isRiding, player->GetMadogearType(),
-    g_session.GetBodyStyle(player->GetEffectiveJob(-1), this->bodyStyle, this->job), this->headPalette, this->direction, 0, this->animationStartTick
-  );
-  draw.Draw(false);
+    previewBodyStyle, this->headPalette, this->direction, 0, this->animationStartTick
+  ).Draw(false);
 }
 
 #include "Render/Text/TextContext.h"
@@ -1641,26 +1659,22 @@ void UIDisplayCharacter::Paint() {
 // FUNCTION: fn_10364
 void UIShowInfoWnd::DrawPayments() {
   int positions[8][2];
-  if (dynamic_cast<UIStylingshopTabParentWnd*>(this->parent)->primaryTabVisible == true ||
-      dynamic_cast<UIStylingshopTabParentWnd*>(this->parent)->accessoryTabVisible == true) {
+  const bool primary = dynamic_cast<UIStylingshopTabParentWnd*>(this->parent)->primaryTabVisible;
+  if (primary == true || dynamic_cast<UIStylingshopTabParentWnd*>(this->parent)->accessoryTabVisible == true) {
     for (int i = 0; i < 8; ++i) {
-      positions[i][0] = this->paymentTextX + 3;
-      positions[i][1] = this->paymentTextYOffset + this->geometry.height / 8 * i;
+      positions[i][0] = this->m_paymentLayout.textX + 3;
+      positions[i][1] = this->m_paymentLayout.textYOffset + this->geometry.height / 8 * i;
     }
   } else {
     for (int i = 0; i < 4; ++i) {
-      const int left = this->paymentTextX - 4;
-      const int right = this->paymentTextX + 101;
+      positions[i * 2][0] = this->m_paymentLayout.textX - 4;
+      positions[i * 2 + 1][0] = this->m_paymentLayout.textX + 101;
       if (i == 0) {
-        positions[i * 2][0] = left;
-        positions[i * 2][1] = this->paymentTextYOffset;
-        positions[i * 2 + 1][0] = right;
-        positions[i * 2 + 1][1] = this->paymentTextYOffset;
+        positions[i * 2][1] = this->m_paymentLayout.textYOffset;
+        positions[i * 2 + 1][1] = this->m_paymentLayout.textYOffset;
       } else {
-        positions[i * 2][0] = left;
-        positions[i * 2][1] = this->geometry.height / 8 * i + this->paymentTextYOffset;
-        positions[i * 2 + 1][0] = right;
-        positions[i * 2 + 1][1] = this->geometry.height / 8 * i + this->paymentTextYOffset;
+        positions[i * 2][1] = this->geometry.height / 8 * i + this->m_paymentLayout.textYOffset;
+        positions[i * 2 + 1][1] = this->geometry.height / 8 * i + this->m_paymentLayout.textYOffset;
       }
     }
   }
@@ -1715,14 +1729,14 @@ void UIShowInfoWnd::DrawPayments() {
     } else if (itemId) {
       this->DrawPaymentItem(*it, zeny, itemId, payable, row);
       if (!payable) {
-        this->m_checks[row]->SetTooltip(LookupMessage(MSI_STYLING_SHOP_FAIL_TO_ADD_CHAR_TO_LIKE));
+        this->m_checks[row]->SetTooltip(LookupMessage(MSI_STYLING_SHOP_NEED_COUPON));
         if (costumeItemId) {
           const int noZeny = 0;
           const int noItem = 0;
           const bool costumePayable = this->CheckPayment(row, noZeny, noItem, costumeItemId);
           if (costumePayable == true) {
             this->DrawPaymentItem(*it, zeny, itemId, true, row);
-            this->m_checks[row]->SetTooltip(LookupMessage(MSI_STYLING_SHOP_ADJUST_NEW_CHAR_STYLE));
+            this->m_checks[row]->SetTooltip(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON));
             ITEM_DESC description = FindItemDescription(costumeItemId);
             this->DrawTextAt(x, y, description.identifiedName, 0, 0, this->paymentFontSize, color, 0, 0);
           } else {
@@ -1745,14 +1759,14 @@ void UIShowInfoWnd::DrawPayments() {
       std::memset(text, 0, sizeof(text));
       if (*it == 1) {
         icon = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\styleshop\\icon_color_off.bmp")));
-        StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), LookupMessage(MSI_CASHSHOP_FREE));
+        StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), LookupMessage(MSI_STYLINGSHOP_COLOR_RESET));
       } else if (*it == 7) {
         icon = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\styleshop\\icon_zeny.bmp")));
         StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d\tZeny", zeny);
       }
 
       if (this->showPaymentItems == 1) {
-        this->DrawBitmap(this->paymentIconX, this->geometry.height / 8 * row + this->paymentIconYOffset, icon, false);
+        this->DrawBitmap(this->m_paymentLayout.iconX, this->geometry.height / 8 * row + this->m_paymentLayout.iconYOffset, icon, false);
       }
       this->DrawTextAt(x, y, text, 0, 0, this->paymentFontSize, 0x5A5A84, 0, 0);
     }
@@ -1766,14 +1780,14 @@ void UIShowInfoWnd::DrawPayments() {
 
   if (this->m_list.size() == 0) {
     for (int i = 0; i < 8; ++i) {
-      positions[i][0] = this->paymentTextX;
-      positions[i][1] = this->paymentTextYOffset + this->geometry.height / 8 * i;
+      positions[i][0] = this->m_paymentLayout.textX;
+      positions[i][1] = this->m_paymentLayout.textYOffset + this->geometry.height / 8 * i;
     }
     this->m_buyable = false;
 
     if (this->showPayments == 1) {
       std::vector<std::string> lines;
-      this->WrapPixelText(LookupMessage(MSI_UPGRADESKILLERROR_MORE_BASE_LEVEL), lines, this->geometry.width - 20);
+      this->WrapPixelText(LookupMessage(MSI_STYLING_SHOP_OPENING_COMMENT), lines, this->geometry.width - 20);
       for (unsigned int i = 0; i < lines.size(); ++i) {
         this->DrawTextAt(20, positions[i][1], lines[i].c_str(), 0, 0, 11, 0, 0, 0);
       }
@@ -1785,29 +1799,30 @@ void UIShowInfoWnd::DrawPayments() {
     return;
   }
 
+  bool favoriteVisible = false;
   for (std::map<UIWindow*, UIStylingshopTabParentWnd*>::iterator it = shop->m_tabs.begin(); it != shop->m_tabs.end(); ++it) {
     if (it->first->geometry.id == STYLINGSHOP_TAB_FAVORITE) {
-      if (it->second->geometry.visible != 0) {
-        for (std::map<UIWindow*, UIStylingshopTabParentWnd*>::iterator tab = shop->m_tabs.begin(); tab != shop->m_tabs.end(); ++tab) {
-          if (tab->first->geometry.id == STYLINGSHOP_TAB_FAVORITE) {
-            UIMyStyleWnd* myStyle = static_cast<UIMyStyleWnd*>(tab->second);
-            bool buyable;
-            if (myStyle->m_selectedSlot < 2 && myStyle->m_slots[myStyle->m_selectedSlot]) {
-              buyable = myStyle->m_slots[myStyle->m_selectedSlot]->m_showInfo->m_buyable;
-            } else {
-              buyable = false;
-            }
-            shop->SetBuyEnabled(buyable);
-          }
-        }
-        shop->Invalidate();
-        return;
-      }
+      favoriteVisible = it->second->geometry.visible != 0;
       break;
     }
   }
 
-  shop->SetBuyEnabled(this->m_buyable);
+  if (!favoriteVisible) {
+    shop->SetBuyEnabled(this->m_buyable);
+  } else {
+    for (std::map<UIWindow*, UIStylingshopTabParentWnd*>::iterator tab = shop->m_tabs.begin(); tab != shop->m_tabs.end(); ++tab) {
+      if (tab->first->geometry.id == STYLINGSHOP_TAB_FAVORITE) {
+        UIMyStyleWnd* myStyle = static_cast<UIMyStyleWnd*>(tab->second);
+        bool buyable;
+        if (myStyle->m_selectedSlot < 2 && myStyle->m_slots[myStyle->m_selectedSlot]) {
+          buyable = myStyle->m_slots[myStyle->m_selectedSlot]->m_showInfo->m_buyable;
+        } else {
+          buyable = false;
+        }
+        shop->SetBuyEnabled(buyable);
+      }
+    }
+  }
   shop->Invalidate();
 }
 
@@ -1843,62 +1858,73 @@ bool UIShowInfoWnd::SendStyleChange() {
   header.packetLength = count * 8 + 6;
 
   memset(&packet[sizeof(header)], 0, sizeof(packet) - sizeof(header));
-  *reinterpret_cast<StyleChangeHeader*>(packet) = header;
+  memcpy(packet, &header, offsetof(StyleChangeHeader, count));
   reinterpret_cast<StyleChangeHeader*>(packet)->count = count;
 
   bool changed = false;
   int index = 0;
   for (std::list<int>::iterator it = this->m_list.begin(); it != this->m_list.end(); ++it, ++index) {
-    int value = 0;
     int kind = 0;
+    int value = 0;
     const int type = *it;
     if (type == STYLE_TABLE_HEAD_PALETTE) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
         int table = STYLE_TABLE_HEAD_PALETTE;
-        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->headPalette, &value);
+        int seq = 0;
+        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->headPalette, &seq);
+        value = seq;
       }
     } else if (type == STYLE_TABLE_HEAD_STYLE) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
         int table = STYLE_TABLE_HEAD_STYLE;
-        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->head, &value);
+        int seq = 0;
+        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->head, &seq);
         kind = g_session.IsDoramJob(g_session.GetDisplayJob()) == true ? 6 : 1;
+        value = seq;
       }
     } else if (type == STYLE_TABLE_BODY_PALETTE) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
         int table = STYLE_TABLE_BODY_PALETTE;
-        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->bodyStyle, &value);
+        int seq = 0;
+        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->bodyStyle, &seq);
         kind = g_session.IsDoramJob(g_session.GetDisplayJob()) == true ? 8 : 2;
+        value = seq;
       }
     } else if (type == STYLE_TABLE_TOP_ACCESSORY) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
         int table = STYLE_TABLE_TOP_ACCESSORY;
-        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->topAccessoryItemId, &value);
+        int seq = 0;
+        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->topAccessoryItemId, &seq);
         kind = 3;
+        value = seq;
       }
     } else if (type == STYLE_TABLE_MID_ACCESSORY) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
         int table = STYLE_TABLE_MID_ACCESSORY;
-        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->middleAccessoryItemId, &value);
+        int seq = 0;
+        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->middleAccessoryItemId, &seq);
         kind = 4;
+        value = seq;
       }
     } else if (type == STYLE_TABLE_BOTTOM_ACCESSORY) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
         int table = STYLE_TABLE_BOTTOM_ACCESSORY;
-        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->bottomAccessoryItemId, &value);
+        int seq = 0;
+        g_session.m_hotkeyScript->Call("StylingShop_GetSeqnumber_by_goods", "sd>d", this->m_display->GetStyleTable(table).c_str(), this->m_display->bottomAccessoryItemId, &seq);
         kind = 5;
+        value = seq;
       }
     } else if (type == STYLE_TABLE_BODY_STYLE) {
       if (this->m_checks[index]->geometry.state != 0) {
         changed = true;
-        UIDisplayCharacter* display = this->m_display;
-        std::map<int, int>::iterator job = display->m_jobs.find(display->job);
-        if (job != display->m_jobs.end()) {
+        std::map<int, int>::iterator job = this->m_display->m_jobs.find(this->m_display->job);
+        if (this->m_display->m_jobs.end() != job) {
           value = job->second;
           kind = 9;
         }
@@ -2069,7 +2095,7 @@ void UIMyStyleWnd::LoadLikeList() {
         }
 
         UISlotOfMyStyleWnd* slot = new UISlotOfMyStyleWnd();
-        int width = static_cast<int>(roundf(static_cast<float>(this->geometry.width) * 0.5f));
+        int width = static_cast<int>(std::round(static_cast<float>(this->geometry.width) * 0.5f));
         slot->SetSize(width, this->geometry.height + 25);
         slot->Move(width * style.slotNum, 0);
         slot->m_display->CopyStyle(display);
@@ -2290,8 +2316,8 @@ void UIDisplayCharacter::OnCreate(int width, int height) {
   this->topAccessory = g_session.m_accessory2;
   this->middleAccessory = g_session.m_accessory3;
   this->bottomAccessory = g_session.m_accessory;
-  this->shadowX = static_cast<int>(std::round(static_cast<float>(this->geometry.width) * 0.55f) - 40.0f);
-  this->shadowY = static_cast<int>(std::round(static_cast<float>(this->geometry.height) * 0.877f) - 17.0f);
+  this->shadow.x = static_cast<int>(std::round(static_cast<float>(this->geometry.width) * 0.55f) - 40.0f);
+  this->shadow.y = static_cast<int>(std::round(static_cast<float>(this->geometry.height) * 0.877f) - 17.0f);
 }
 
 // OFFSET: 0x00829080
@@ -2307,16 +2333,7 @@ void UIShowInfoWnd::OnCreate(int, int) {
     this->AddChild(this->m_checks[i]);
   }
 
-  for (int i = 0; i < 8; ++i) {
-    this->m_checks[i]->SetChecked(0);
-    this->m_checks[i]->SetBitmaps("유저인터페이스\\styleshop\\check_able.bmp", "유저인터페이스\\styleshop\\Notcheck.bmp");
-  }
-
-  std::memset(this->m_changed, 0, sizeof(this->m_changed));
-  this->costumeChanged = 0;
-  for (unsigned int i = 0; i < this->m_list.size(); ++i) {
-    this->m_list.clear();
-  }
+  this->ResetCheckBoxes();
 }
 
 // OFFSET: 0x00827D00
@@ -2338,7 +2355,7 @@ void UI2ndCostumeWnd::OnCreate(int, int) {
   UIStaticText* hideText = new (std::nothrow) UIStaticText();
   hideText->SetSize(100, 12);
   hideText->Move(this->m_hideCheckBox->geometry.x + this->m_hideCheckBox->geometry.width + 5, 235);
-  hideText->SetText(LookupMessage(MSI_SKILL_FAIL_MHP_TOO_FEW), 0);
+  hideText->SetText(LookupMessage(MSI_STYLING_SHOP_BASICSTYLE), 0);
   hideText->SetFont(0, 11, 0, 0);
   this->AddChild(hideText);
 
@@ -2352,7 +2369,7 @@ void UI2ndCostumeWnd::OnCreate(int, int) {
   UIStaticText* showText = new (std::nothrow) UIStaticText();
   showText->SetSize(100, 12);
   showText->Move(this->m_showCheckBox->geometry.x + this->m_showCheckBox->geometry.width + 5, 260);
-  showText->SetText(LookupMessage(MSI_STYLING_SHOP_OPENING_COMMENT), 0);
+  showText->SetText(LookupMessage(MSI_STYLING_SHOP_2NDCOSTUMEWND), 0);
   showText->SetFont(0, 11, 0, 0);
   this->AddChild(showText);
 
@@ -2364,7 +2381,7 @@ void UI2ndCostumeWnd::OnCreate(int, int) {
   this->m_showInfo->m_display = this->m_display;
   this->AddChild(this->m_showInfo);
 
-  this->m_hideCheckBox->SetChecked(this->m_display->job == 0);
+  this->m_hideCheckBox->SetChecked(this->m_display->job == JT_NOVICE);
   this->m_showCheckBox->SetChecked(this->m_hideCheckBox->geometry.state == 0);
 }
 
@@ -2393,6 +2410,7 @@ void UIBasicStylingWnd::OnCreate(int, int) {
     sprintf_s(pressed, sizeof(pressed), "유저인터페이스\\styleshop\\color%02d_on.bmp", i + 1);
 
     UIStylingShopButton* button = new (std::nothrow) UIStylingShopButton();
+    UIButton* paletteButton = button;
     button->SetBitmap(normal, 0, 0);
     button->SetBitmap(hover, 1, 0);
     button->SetBitmap(pressed, 2, 0);
@@ -2400,7 +2418,7 @@ void UIBasicStylingWnd::OnCreate(int, int) {
     button->Move((button->BitmapWidth() + 4) * (i % 4) + 108, (button->BitmapHeight() + 4) * (i / 4) + 237);
     button->SetId(STYLINGSHOP_BUTTON_PALETTE);
     this->AddChild(button);
-    this->m_paletteButtons.push_back(button);
+    this->m_paletteButtons.push_back(paletteButton);
   }
 
   UIStylingShopButton* defaultButton = new (std::nothrow) UIStylingShopButton();

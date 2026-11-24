@@ -21,15 +21,16 @@ UIComboBoxEx::UIComboBoxEx() : UIListBoxEx(), targetId(10041) {
 // OFFSET: 0x0086DA90
 // FUNCTION: fn_11056
 UIListBoxEx::UIListBoxEx()
-    : UIWindow(0), backgroundRed(255), backgroundGreen(255), backgroundBlue(255), selected(0), topLine(0), horizontalOffset(0), contentWidth(0),
-      verticalOverflow(0), bottomMargin(0), verticalBar(nullptr), horizontalBar(nullptr), transparent(0), lineHeight(16), selectionColor(0) {
-  const SkinPaletteCell cell = {2, 2};
-  this->selectionColor = g_skinInfo.PaletteColor(cell, g_skinInfo.Selected());
+    : UIWindow(0), selected(0), topLine(0), horizontalOffset(0), contentWidth(0), verticalBar(nullptr), horizontalBar(nullptr) {
+  this->verticalOverflow = 0;
+  this->bottomMargin = 0;
+  this->transparent = 0;
+  this->lineHeight = 16;
+  this->backgroundRed = 255;
+  this->backgroundGreen = 255;
+  this->backgroundBlue = 255;
+  this->selectionColor = g_skinInfo.PaletteColor({2, 2}, g_skinInfo.Selected());
 }
-
-// OFFSET: 0x00873710
-// FUNCTION: fn_11157
-UIListBoxEx::~UIListBoxEx() = default;
 
 // OFFSET: 0x0087B690
 // FUNCTION: fn_11246
@@ -94,7 +95,7 @@ void UIListBoxEx::Resize(int width, int height) {
 // OFFSET: 0x00875BE0
 // FUNCTION: fn_11202
 void UIListBoxEx::AddLine(const char* text, std::uint32_t color) {
-  this->lines.emplace(static_cast<int>(this->lines.size()), ExtendedListLine{text, color});
+  this->lines.insert(std::pair<const int, ExtendedListLine>(std::piecewise_construct, std::forward_as_tuple(static_cast<int>(this->lines.size())), std::forward_as_tuple(text, color)));
   const int width = this->TextWidth(text, 0, 0, 12, 0, 0);
   this->contentWidth = std::max(this->contentWidth, width);
   this->Refresh();
@@ -124,13 +125,13 @@ void UIListBoxEx::Refresh() {
   }
 
   this->verticalOverflow = overflow != 0;
-  auto* bar = this->verticalBar;
-
   if (overflow != 0) {
-    bar->maximum = this->bottomMargin + overflow;
+    this->verticalBar->maximum = this->bottomMargin + overflow;
   } else {
-    bar->maximum = 0;
+    this->verticalBar->maximum = 0;
   }
+
+  auto* bar = this->verticalBar;
 
   bar->total = count;
   bar->visible = visible;
@@ -184,21 +185,20 @@ void UIListBoxEx::Paint() {
     this->ClearSurface(RGB(this->backgroundRed, this->backgroundGreen, this->backgroundBlue));
   }
 
-  const unsigned end = std::min(
-    static_cast<unsigned>(this->lines.size()), static_cast<unsigned>(this->topLine + (this->geometry.height / this->lineHeight - this->bottomMargin))
-  );
+  const int first = this->topLine;
+  const int visible = this->geometry.height / this->lineHeight - this->bottomMargin;
+  const unsigned end = std::min(static_cast<unsigned>(visible + first), static_cast<unsigned>(this->lines.size()));
 
-  for (int index = this->topLine; index < static_cast<int>(end); ++index) {
-    const int y = this->lineHeight * (index - this->topLine);
-
+  for (int index = first; index < static_cast<int>(end); ++index) {
     if (index == this->selected) {
-      this->FillRegion(0, y, this->geometry.width, this->lineHeight - 1, this->selectionColor);
+      this->FillRegion(0, (index - first) * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->selectionColor);
     }
 
+    const int x = 3 - this->horizontalOffset;
+    const int y = (index - first) * this->lineHeight;
     std::uint32_t color = this->lines[index].color;
     this->DrawColoredText(
-      3 - this->horizontalOffset, y, this->lines[index].text.c_str(), static_cast<unsigned>(this->lines[index].text.size()), color, 0, 12,
-      false
+      x, y, this->lines[index].text.c_str(), static_cast<unsigned>(this->lines[index].text.size()), color, 0, 12, false
     );
   }
 }
@@ -291,17 +291,20 @@ int UIListBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
   case UM_SCROLLHORZPAGEUP:
   case UM_SCROLLHORZPAGEDOWN: {
     const int previous = this->horizontalOffset;
-    const int delta = message == UM_SCROLLHORZPAGEUP ? -15 : message == UM_SCROLLHORZPAGEDOWN ? 15 : value;
-    this->horizontalOffset = previous + delta;
+    if (message == UM_SCROLLHORZPAGEUP) {
+      this->horizontalOffset = previous - 15;
+    } else if (message == UM_SCROLLHORZPAGEDOWN) {
+      this->horizontalOffset = previous + 15;
+    } else {
+      this->horizontalOffset = previous + value;
+    }
 
     if (this->horizontalOffset < 0) {
       this->horizontalOffset = 0;
     }
 
-    const int maximum = (((16 * this->verticalOverflow) - this->geometry.width) + this->contentWidth);
-
-    if (this->horizontalOffset > maximum) {
-      this->horizontalOffset = maximum;
+    if (this->horizontalOffset > 16 * this->verticalOverflow - this->geometry.width + this->contentWidth) {
+      this->horizontalOffset = 16 * this->verticalOverflow - this->geometry.width + this->contentWidth;
     }
 
     this->horizontalBar->position = this->horizontalOffset;

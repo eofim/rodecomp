@@ -46,7 +46,7 @@ void UpdateWorldProximityNotification(
 
   if (nearby()) {
     unsigned char packet[9];
-    const std::uint16_t id = 0x0BB0;
+    const std::uint16_t id = ID_CZ_APPROXIMATE_ACTOR;
     const std::uint16_t enabled = 1;
     std::memcpy(packet, &id, sizeof(id));
     std::memcpy(packet + 2, &accountId, sizeof(accountId));
@@ -79,6 +79,12 @@ void CWorld::UpdateGuildMasterApproach(std::function<bool()> isNearby) {
   }
 }
 
+// OFFSET: 0x00AC9390
+// FUNCTION: fn_46299
+__forceinline float CWorld::ActorCellKey(const CellFloatPos& cell) const {
+  return static_cast<float>(this->terrain->width) * cell.z + cell.x;
+}
+
 // OFFSET: 0x00AC8A40
 // FUNCTION: fn_17678
 __declspec(noinline) bool CWorld::FindActorInCell(const float* position, std::function<bool(std::uint32_t)> predicate) const {
@@ -90,23 +96,28 @@ __declspec(noinline) bool CWorld::FindActorInCell(const float* position, std::fu
   }
 
   const std::list<std::uint32_t>& ids = found->second;
-  return std::find_if(ids.begin(), ids.end(), predicate) != ids.end();
+  return std::find_if(ids.begin(), ids.end(), [predicate](std::uint32_t id) { return predicate(id); }) != ids.end();
 }
 
-// OFFSET: 0x00AC8BA0
-// FUNCTION: fn_17679
-bool CWorld::IsGuildMaster(std::uint32_t aid) {
-  for (CGameActor* actor : this->actors) {
-    if (actor->render.accountId == aid) {
-      if (!actor) {
-        return false;
+// INLINED
+__forceinline static bool IsGuildMasterActor(const std::list<CGameActor*>& actors, std::uint32_t aid) {
+  for (auto it = actors.begin(); it != actors.end(); ++it) {
+    if ((*it)->render.accountId == aid) {
+      CGameActor* actor = *it;
+      if (actor && static_cast<int>(g_guildInfo.masterCharacterId) == actor->GetPkState()) {
+        return true;
       }
-
-      return actor->GetPkState() == static_cast<int>(g_guildInfo.masterCharacterId);
+      break;
     }
   }
 
   return false;
+}
+
+// OFFSET: 0x00AC8BA0
+// FUNCTION: fn_17679
+__declspec(noinline) bool CWorld::IsGuildMaster(std::uint32_t aid) {
+  return IsGuildMasterActor(this->actors, aid);
 }
 
 // OFFSET: 0x00AC8750
@@ -128,21 +139,20 @@ bool CWorld::IsExistGuildMasterNearby(const float& x, const float& z) {
   }
 
   for (std::uint32_t aid : this->unindexedActorIds) {
-    if (!this->IsGuildMaster(aid)) {
+    if (!IsGuildMasterActor(this->actors, aid)) {
       continue;
     }
 
     CRenderObject* actor = g_session.FindGameActor(aid);
     if (actor->render.state == 1) {
-      float centerX = 0.0f;
-      float centerZ = 0.0f;
+      float center[2] = {0.0f, 0.0f};
       int column = 0;
       int row = 0;
       CGameMode* mode = g_modeMgr.GetGameMode();
       mode->WorldCell(actor->render.position.x + 0.5f, actor->render.position.z + 0.5f, column, row);
       mode = g_modeMgr.GetGameMode();
-      mode->CellCenter(column, row, centerX, centerZ);
-      return std::fabs(centerX - x) <= static_cast<float>(this->nearbyRange) && std::fabs(centerZ - z) <= static_cast<float>(this->nearbyRange);
+      mode->CellCenter(column, row, center[0], center[1]);
+      return std::fabs(center[0] - x) <= static_cast<float>(this->nearbyRange) && std::fabs(center[1] - z) <= static_cast<float>(this->nearbyRange);
     }
 
     return std::fabs(actor->render.position.x - x) <= static_cast<float>(this->nearbyRange) &&
@@ -185,11 +195,8 @@ void CWorld::RemovePcPos(std::uint32_t aid, bool notify) {
 // OFFSET: 0x00ACA7B0
 // FUNCTION: fn_17696
 void CWorld::RemovePcPosForMove(std::uint32_t aid, bool notify) {
-  for (auto entry = this->unindexedActorIds.begin(); entry != this->unindexedActorIds.end(); ++entry) {
-    if (*entry != aid) {
-      continue;
-    }
-
+  const auto entry = std::find(this->unindexedActorIds.begin(), this->unindexedActorIds.end(), aid);
+  if (entry != this->unindexedActorIds.end()) {
     if (notify && this->guildMasterNearby) {
       if (this->IsGuildMaster(aid)) {
         this->UpdateGuildMasterApproach([this]() { return false; });
@@ -197,7 +204,6 @@ void CWorld::RemovePcPosForMove(std::uint32_t aid, bool notify) {
     }
 
     this->unindexedActorIds.erase(entry);
-    return;
   }
 }
 
@@ -223,24 +229,7 @@ bool WorldProximityRejectB() {
 // OFFSET: 0x00ACBA30
 // FUNCTION: fn_17719
 bool WorldProximityGuildMasterCallback::Invoke(const std::uint32_t& aidRef) {
-  const std::uint32_t aid = aidRef;
-  auto it = std::find_if(this->world->actors.begin(), this->world->actors.end(), [aid](CGameActor* actor) {
-    return actor->render.accountId == aid;
-  });
-  if (it == this->world->actors.end()) {
-    return false;
-  }
-
-  CGameActor* gameActor = *it;
-  if (!gameActor) {
-    return false;
-  }
-
-  if (static_cast<int>(g_guildInfo.masterCharacterId) != gameActor->GetPkState()) {
-    return false;
-  }
-
-  return true;
+  return IsGuildMasterActor(this->world->actors, aidRef);
 }
 
 struct WorldProximityRangeCallback {
@@ -290,16 +279,8 @@ void CWorld::PlayerMove(const float& x, const float& z) {
 __declspec(noinline) void CWorld::AddPcPos(std::uint32_t aid, const CellFloatPos& cell) {
   this->RemovePcPos(aid, false);
 
-  for (auto entry = this->unindexedActorIds.begin(); entry != this->unindexedActorIds.end(); ++entry) {
-    if (*entry != aid) {
-      continue;
-    }
-
-    this->unindexedActorIds.erase(entry);
-    break;
-  }
-
-  const float key = static_cast<float>(this->terrain->width) * cell.z + cell.x;
+  this->RemovePcPosForMove(aid, false);
+  const float key = this->ActorCellKey(cell);
   this->actorCells[key].emplace_back(aid);
   this->PcApproachToPlayer(aid, cell);
 }
@@ -316,18 +297,18 @@ void CWorld::AddPcPosFromCell(std::uint32_t aid, const int* cell) {
 
 // OFFSET: 0x00ACABE0
 // FUNCTION: fn_17701
-void CWorld::AddPcPosUnindexed(std::uint32_t aid, const CellFloatPos& cell) {
+__forceinline void CWorld::AddPcPosUnindexed(std::uint32_t aid, const CellFloatPos& cell) {
   this->RemovePcPos(aid, false);
 
-  for (auto entry = this->unindexedActorIds.begin(); entry != this->unindexedActorIds.end(); ++entry) {
-    if (*entry != aid) {
-      continue;
-    }
-
-    this->unindexedActorIds.erase(entry);
-    break;
-  }
-
+  this->RemovePcPosForMove(aid, false);
   this->unindexedActorIds.emplace_back(aid);
   this->PcApproachToPlayer(aid, cell);
+}
+
+// OFFSET: 0x00ACAC60
+// FUNCTION: fn_46300
+void CWorld::AddPcPosUnindexedFromCell(std::uint32_t aid, const int* cell) {
+  CellFloatPos position(0.0f, 0.0f);
+  g_modeMgr.GetGameMode()->CellCenter(cell[0], cell[1], position.x, position.z);
+  this->AddPcPosUnindexed(aid, position);
 }

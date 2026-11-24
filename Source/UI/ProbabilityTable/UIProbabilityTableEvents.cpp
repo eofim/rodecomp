@@ -11,6 +11,7 @@
 #include "UI/Edit/UIEditBoxEx.h"
 #include "UI/Text/UIStaticTextControl.h"
 
+#include <algorithm>
 #include <atlconv.h>
 #include <cmath>
 #include <iterator>
@@ -22,26 +23,21 @@
 #include <utility>
 #include <windows.h>
 
-template __declspec(noinline) std::list<ProbabilityTable::CItemData>::iterator std::next(std::list<ProbabilityTable::CItemData>::iterator, std::ptrdiff_t);
-template __declspec(noinline) void std::_List_node<ProbabilityTable::CItemData, void*>::_Free_non_head(
-  std::allocator<std::_List_node<ProbabilityTable::CItemData, void*>>&, std::_List_node<ProbabilityTable::CItemData, void*>*) noexcept;
-
 // OFFSET: 0x00A4E3B0
 // FUNCTION: fn_16206
 template <>
 bool CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>::RebindIndex(int index) {
-  if (index != -1) {
-    for (ProbabilityTable::CUIItem* item : this->items) {
-      if (index == item->index) {
-        if (!this->binder) {
-          return false;
-        }
-        this->binder(item, *std::next(this->data.begin(), index));
-        return true;
-      }
-    }
+  if (index == -1) {
+    return false;
   }
-  return false;
+
+  auto found = std::find_if(this->items.begin(), this->items.end(), [index](ProbabilityTable::CUIItem* item) { return index == item->index; });
+  if (found == this->items.end() || !this->binder) {
+    return false;
+  }
+
+  this->binder(*found, *std::next(this->data.begin(), index));
+  return true;
 }
 
 // OFFSET: 0x00A4E490
@@ -85,7 +81,10 @@ void CUIProbabilityTable::SetItem(int itemId) {
     for (const NEO_PACKAGEITEM::PackageEntry& entry : entries) {
       long long value = static_cast<long long>(std::pow(10.0, 6.0));
       if (group.first != 0) {
-        value = (static_cast<long long>(std::pow(10.0, 7.0) * entry.probability / group.second.totalProbability) + 5) / 10;
+        const double scale = std::pow(10.0, 7.0);
+        const double probability = entry.probability;
+        const double total = group.second.totalProbability;
+        value = (static_cast<long long>(scale * probability / total) + 5) / 10;
       }
 
       ProbabilityTable::CItemData data;

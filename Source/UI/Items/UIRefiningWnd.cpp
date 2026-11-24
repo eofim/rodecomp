@@ -56,6 +56,26 @@ struct RefiningClosePacket {
 };
 #pragma pack(pop)
 
+// INLINED
+inline void UIRefining_Notice::SetNoticeInline(const char* value, int duration, unsigned char highlight) {
+  this->highlight = highlight;
+  this->text = value;
+  if (duration == 0) {
+    this->saved.text = value;
+    this->saved.highlight = highlight;
+  } else {
+    this->expireTick = timeGetTime() + duration;
+    if (this->geometry.visible == 0) {
+      this->autoShown = 1;
+      this->geometry.visible = 1;
+    }
+  }
+  this->Invalidate();
+  if (this->parent) {
+    this->parent->Invalidate();
+  }
+}
+
 // OFFSET: 0x007F4920
 // FUNCTION: fn_09890
 UIRefiningWnd::UIRefiningWnd()
@@ -64,6 +84,10 @@ UIRefiningWnd::UIRefiningWnd()
       catalystItemId(0), catalystCount(0), item(0), requestPending(0), nextMaterials(), nextCatalystCount(0), nextItem(0) {
   this->catalystItemId = 6635;
 }
+
+// OFFSET: 0x007F4D20
+// FUNCTION: fn_46430
+__declspec(noinline) UIRefiningWnd::~UIRefiningWnd() = default;
 
 // OFFSET: 0x007F4A70
 // FUNCTION: fn_09891
@@ -135,7 +159,7 @@ void UIRefiningWnd::OnCreate(int width, int height) {
   help->SetBitmap("유저인터페이스\\basic_interface\\btn_help_disabled.bmp", 3, 0);
   help->SetSize(help->BitmapWidth(), help->BitmapHeight());
   help->Move(230, 20);
-  help->SetTooltip(LookupMessage(MSI_PROBABILITY_TITLE));
+  help->SetTooltip(LookupMessage(MSI_CHECK_PROBABILITY));
   help->SetId(REFINING_BUTTON_PROBABILITY);
   this->AddChild(help);
 }
@@ -159,7 +183,7 @@ __declspec(noinline) void UIRefiningWnd::Reset() {
   this->materials.clear();
   this->catalystEnabled = 0;
   this->catalystCount = 0;
-  this->notice->SetNotice("", 0, 0);
+  this->notice->SetNoticeInline("", 0, 0);
 
   {
     UIRefining_BtnRefining* button = this->refiningButton;
@@ -230,7 +254,7 @@ static __forceinline int SelectedSuccessRate(const UIRefiningWnd* window) {
 // OFFSET: 0x007F55A0
 // FUNCTION: fn_09906
 void UIRefiningWnd::ApplyResult() {
-  this->notice->SetNotice("", 0, 0);
+  this->notice->SetNoticeInline("", 0, 0);
   this->item = this->nextItem;
   this->refiningButton->Enable(0);
   this->returnButton->Enable(1);
@@ -238,25 +262,46 @@ void UIRefiningWnd::ApplyResult() {
 
   switch (this->result) {
   case REFINING_STATE_SUCCESS:
-    this->returnButton->highlighted = 1;
-    this->returnButton->UpdateBitmaps();
-    this->againButton->success = 1;
-    this->againButton->UpdateBitmaps();
+    {
+      UIRefining_BtnReturn* button = this->returnButton;
+      button->highlighted = 1;
+      button->UpdateBitmaps();
+    }
+    {
+      UIRefining_BtnAgain* button = this->againButton;
+      button->success = 1;
+      button->UpdateBitmaps();
+    }
     break;
   case REFINING_STATE_FAIL:
-    this->returnButton->highlighted = 0;
-    this->returnButton->UpdateBitmaps();
-    this->againButton->success = 0;
-    this->againButton->UpdateBitmaps();
-    this->againButton->SetDisabled(1);
-    this->againButton->Invalidate();
+    {
+      UIRefining_BtnReturn* button = this->returnButton;
+      button->highlighted = 0;
+      button->UpdateBitmaps();
+    }
+    {
+      UIRefining_BtnAgain* button = this->againButton;
+      button->success = 0;
+      button->UpdateBitmaps();
+    }
+    {
+      UIRefining_BtnAgain* button = this->againButton;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
     break;
   case REFINING_STATE_DOWNGRADE:
   case REFINING_STATE_FAIL2:
-    this->returnButton->highlighted = 0;
-    this->returnButton->UpdateBitmaps();
-    this->againButton->success = 0;
-    this->againButton->UpdateBitmaps();
+    {
+      UIRefining_BtnReturn* button = this->returnButton;
+      button->highlighted = 0;
+      button->UpdateBitmaps();
+    }
+    {
+      UIRefining_BtnAgain* button = this->againButton;
+      button->success = 0;
+      button->UpdateBitmaps();
+    }
     break;
   }
 
@@ -269,28 +314,36 @@ void UIRefiningWnd::ApplyResult() {
   }
 
   if (g_session.m_zeny < static_cast<int>(this->SelectedMaterialValue())) {
-    this->notice->SetNotice(LookupMessage(MSI_NPC_ALL_STAT_DOWN), 5000, 1);
-    this->againButton->SetDisabled(1);
+    this->notice->SetNoticeInline(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_MONEY), 5000, 1);
+    UIRefining_BtnAgain* button = this->againButton;
+    button->SetDisabled(1);
+    button->Invalidate();
   } else {
-    this->againButton->cost = this->SelectedMaterialValue();
+    UIRefining_BtnAgain* button = this->againButton;
+    button->cost = this->SelectedMaterialValue();
+    button->Invalidate();
   }
-  this->againButton->Invalidate();
 
   this->catalystCount = this->nextCatalystCount;
   if (this->catalystEnabled == 1) {
     if (this->nextCatalystCount == 0) {
       this->catalystEnabled = 0;
-      this->notice->SetNotice(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_BLACKSMITHBLESSING), 5000, 1);
-      this->againButton->SetDisabled(1);
-      this->againButton->Invalidate();
+      this->notice->SetNoticeInline(LookupMessage(MSI_REFINING_AGAIN_FAILED_INGREDIENT_CHANGED), 5000, 1);
+      {
+        UIRefining_BtnAgain* button = this->againButton;
+        button->SetDisabled(1);
+        button->Invalidate();
+      }
     } else {
-      this->notice->SetNotice(LookupMessage(MSI_CANNOT_REFINE_ITEM), 0, 0);
-      const int owned = g_session.LookupClientItem(this->catalystItemId, 0).quantity;
-      if (this->catalystCount > owned) {
+      this->notice->SetNoticeInline(LookupMessage(MSI_USING_BLACKSMITH_BLESSING), 0, 0);
+      if (this->catalystCount > g_session.LookupClientItem(this->catalystItemId, 0).quantity) {
         this->catalystEnabled = 0;
-        this->notice->SetNotice(LookupMessage(MSI_NPC_ALL_STAT_DOWN_RESET), 5000, 1);
-        this->againButton->SetDisabled(1);
-        this->againButton->Invalidate();
+        this->notice->SetNoticeInline(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_BLACKSMITHBLESSING), 5000, 1);
+        {
+          UIRefining_BtnAgain* button = this->againButton;
+          button->SetDisabled(1);
+          button->Invalidate();
+        }
       }
     }
   }
@@ -299,9 +352,12 @@ void UIRefiningWnd::ApplyResult() {
   if (count == 0) {
     this->materials.clear();
     this->selectedMaterial = -1;
-    this->notice->SetNotice(LookupMessage(MSI_RETURN), 5000, 1);
-    this->againButton->SetDisabled(1);
-    this->againButton->Invalidate();
+    this->notice->SetNoticeInline(LookupMessage(MSI_CANNOT_REFINE_ITEM), 5000, 1);
+    {
+      UIRefining_BtnAgain* button = this->againButton;
+      button->SetDisabled(1);
+      button->Invalidate();
+    }
   } else {
     bool same = true;
     if (this->materials.size() == count) {
@@ -309,7 +365,7 @@ void UIRefiningWnd::ApplyResult() {
         auto found = std::find_if(this->nextMaterials.begin(), this->nextMaterials.end(), [&material](const RefiningMaterial& next) {
           return material.itemId == next.itemId;
         });
-        if (found == this->nextMaterials.end()) {
+        if (this->nextMaterials.end() == found) {
           same = false;
           break;
         }
@@ -318,19 +374,25 @@ void UIRefiningWnd::ApplyResult() {
       same = false;
     }
 
-    this->materials = this->nextMaterials;
+    this->materials.assign(this->nextMaterials.begin(), this->nextMaterials.end());
 
-    this->againButton->remainingCount = this->item.identity[1] > 0 && this->materials.size() > 0 && this->selectedMaterial >= 0 &&
-        this->materials.size() > static_cast<unsigned>(this->selectedMaterial)
-      ? this->materials[this->selectedMaterial].successRate
-      : 0;
-    this->againButton->Invalidate();
+    {
+      UIRefining_BtnAgain* button = this->againButton;
+      button->remainingCount = this->item.identity[1] > 0 && this->materials.size() > 0 && this->selectedMaterial >= 0 &&
+          this->materials.size() > static_cast<unsigned>(this->selectedMaterial)
+        ? this->materials[this->selectedMaterial].successRate
+        : 0;
+      button->Invalidate();
+    }
 
     if (!same) {
       this->selectedMaterial = -1;
-      this->notice->SetNotice(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_BLACKSMITHBLESSING), 5000, 1);
-      this->againButton->SetDisabled(1);
-      this->againButton->Invalidate();
+      this->notice->SetNoticeInline(LookupMessage(MSI_REFINING_AGAIN_FAILED_INGREDIENT_CHANGED), 5000, 1);
+      {
+        UIRefining_BtnAgain* button = this->againButton;
+        button->SetDisabled(1);
+        button->Invalidate();
+      }
     } else if (this->selectedMaterial >= 0 && static_cast<unsigned>(this->selectedMaterial) < this->materials.size()) {
       this->selectedMaterial = nextIndex;
       const std::uint32_t itemId = this->materials[nextIndex].itemId;
@@ -345,9 +407,12 @@ void UIRefiningWnd::ApplyResult() {
 
       const ITEM_INFO owned = g_session.LookupClientItem(itemId, 0);
       if (owned.quantity == 0) {
-        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_BROKEN_ITEM), 5000, 1);
-        this->againButton->SetDisabled(1);
-        this->againButton->Invalidate();
+        this->notice->SetNoticeInline(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_INGREDIENT), 5000, 1);
+        {
+          UIRefining_BtnAgain* button = this->againButton;
+          button->SetDisabled(1);
+          button->Invalidate();
+        }
       }
     }
   }
@@ -361,21 +426,21 @@ void UIRefiningWnd::ApplyResult() {
 void UIRefining_BtnAgain::Paint() {
   UIBitmapButton::Paint();
   if (this->m_disabled == 1) {
-    int width = this->TextWidth(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_MONEY), 0, 0, 12, 1, 0);
+    int width = this->TextWidth(LookupMessage(MSI_AGAIN), 0, 0, 12, 1, 0);
     std::uint32_t color = this->success == 1 ? 0xE1C1F : (this->m_disabled == 1 ? 0x6F4333 : 0x3E1B12);
     this->DrawTextAt(static_cast<int>(static_cast<float>(this->geometry.width - width) * 0.5f),
-      (this->geometry.state == 2) + 14, LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_MONEY), 0, 0, 12, color, 1, 0
+      (this->geometry.state == 2) + 14, LookupMessage(MSI_AGAIN), 0, 0, 12, color, 1, 0
     );
     return;
   }
 
-  int width = this->TextWidth(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_MONEY), 0, 0, 12, 1, 0);
+  int width = this->TextWidth(LookupMessage(MSI_AGAIN), 0, 0, 12, 1, 0);
   std::uint32_t color = this->success == 1 ? 0xE1C1F : (this->m_disabled == 1 ? 0x6F4333 : 0x3E1B12);
   this->DrawTextAt(static_cast<int>(static_cast<float>(this->geometry.width - width) * 0.5f),
-    (this->geometry.state == 2) + 9, LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_MONEY), 0, 0, 12, color, 1, 0
+    (this->geometry.state == 2) + 9, LookupMessage(MSI_AGAIN), 0, 0, 12, color, 1, 0
   );
 
-  std::string count = FormatOwnedString(LookupMessage(MSI_CASHSHOP_SALE_LIST), this->remainingCount);
+  std::string count = FormatOwnedString(LookupMessage(MSI_REFINING_RATE), this->remainingCount);
   width = this->TextWidth(count.c_str(), 0, 0, 11, 0, 0);
   this->DrawTextAt(static_cast<int>(static_cast<float>(this->geometry.width - width) * 0.5f),
     (this->geometry.state == 2) + 22, count.c_str(), 0, 0, 11, 0, 0, 0
@@ -391,10 +456,10 @@ void UIRefining_BtnAgain::Paint() {
 // FUNCTION: fn_09910
 void UIRefining_BtnRefining::Paint() {
   UIBitmapButton::Paint();
-  int width = this->TextWidth(LookupMessage(MSI_NOTENOUGH_BLACKSMITH_BLESSING), 0, 0, 13, 1, 0);
+  int width = this->TextWidth(LookupMessage(MSI_REFINING), 0, 0, 13, 1, 0);
   std::uint32_t color = this->m_disabled == 1 ? 0x94644A : 0x3E1B12;
   this->DrawTextAt(static_cast<int>(static_cast<float>(this->geometry.width - width) * 0.5f),
-    (this->geometry.state == 2) + 11, LookupMessage(MSI_NOTENOUGH_BLACKSMITH_BLESSING), 0, 0, 12, color, 1, 0
+    (this->geometry.state == 2) + 11, LookupMessage(MSI_REFINING), 0, 0, 12, color, 1, 0
   );
 
   if (this->m_disabled == 0) {
@@ -408,10 +473,10 @@ void UIRefining_BtnRefining::Paint() {
 // FUNCTION: fn_09911
 void UIRefining_BtnReturn::Paint() {
   UIBitmapButton::Paint();
-  int width = this->TextWidth(LookupMessage(MSI_MANUFACTURED_MARRIAGERING_ITEM), 0, 0, 12, 1, 0);
+  int width = this->TextWidth(LookupMessage(MSI_RETURN), 0, 0, 12, 1, 0);
   std::uint32_t color = this->highlighted == 1 ? 0xE1C1F : 0x3E1B12;
   this->DrawTextAt(static_cast<int>(static_cast<float>(this->geometry.width - width) * 0.5f),
-    (this->geometry.state == 2) + 14, LookupMessage(MSI_MANUFACTURED_MARRIAGERING_ITEM), 0, 0, 12, color, 1, 0
+    (this->geometry.state == 2) + 14, LookupMessage(MSI_RETURN), 0, 0, 12, color, 1, 0
   );
 }
 
@@ -452,7 +517,7 @@ void UIRefiningWnd::OnLBtnDown(int x, int y) {
   }
 
   if (this->state == REFINING_STATE_READY && this->item.identity[1] > 0 && static_cast<unsigned>(x - 109) <= 46 && static_cast<unsigned>(y - 201) <= 46) {
-    g_modeMgr.GetGameMode()->BeginDragItem(28, this->item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_REFINING, this->item, 1, -1);
   }
 }
 
@@ -475,7 +540,7 @@ void UIRefiningWnd::OnLBtnUp(int x, int y) {
 
   if (static_cast<unsigned>(slot) < this->materials.size()) {
     const int owned = g_session.LookupClientItem(this->materials[slot].itemId, 0).quantity;
-    if (owned < 1) {
+    if (owned <= 0) {
       return;
     }
 
@@ -484,62 +549,71 @@ void UIRefiningWnd::OnLBtnUp(int x, int y) {
     button->cost = this->SelectedMaterialValue();
     button->Invalidate();
 
-    if (this->materials[slot].successRate <= 99 && this->catalystEnabled == 0) {
-      int message;
+    if (this->materials[slot].successRate < 100 && this->catalystEnabled == 0) {
       switch (this->materials[slot].itemId) {
-      case Carnium:
-      case Bradium:
-        message = MSI_REFINING_FAIL_CLOSE_UI;
+      case ITEMID_CARNIUM:
+      case ITEMID_BRADIUM:
+        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_ITEM_DISAPPEAR_OR_ITEM_DOWNGRADE), 0, 0);
         break;
-      case HD_Carnium:
-      case HD_Bradium:
-      case HD_Oridecon:
-      case HD_Elunium:
-      case LI_HD_Bradium:
-      case LI_HD_Carnium:
-      case LI_HD_Oridecon:
-      case LI_HD_Elunium:
-      case Ethernium:
-      case Etherdeocon:
-      case Enriched_Ethernium:
-      case Enriched_Etherdeocon:
-        message = MSI_CANNOT_OPEN_RODEX_DURING_REFINING;
+      case ITEMID_HD_CARNIUM:
+      case ITEMID_HD_BRADIUM:
+      case ITEMID_HD_ORIDECON:
+      case ITEMID_HD_ELUNIUM:
+      case ITEMID_LI_HD_BRADIUM:
+      case ITEMID_LI_HD_CARNIUM:
+      case ITEMID_LI_HD_ORIDECON:
+      case ITEMID_LI_HD_ELUNIUM:
+      case ITEMID_ETHERNIUM:
+      case ITEMID_ETHERDEOCON:
+      case ITEMID_ENRICHED_ETHERNIUM:
+      case ITEMID_ENRICHED_ETHERDEOCON:
+        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_ITEM_DOWMGRADE), 0, 0);
         break;
       case ITEMID_ORIDECON:
-      case Elunium:
+      case ITEMID_ELUNIUM:
       case ITEMID_PHRACON:
       case ITEMID_EMVERETARCON:
-      case Enriched_Elunium:
-      case Enriched_Oridecon:
-      case HD_Ethernium:
-      case HD_Etherdeocon:
-      case Etel_Bradium:
-      case HD_Etel_Bradium:
-      case Etel_Carnium:
-      case HD_Etel_Carnium:
-        message = MSI_CLOSE_RODEX_FOR_REFINING;
+      case ITEMID_ENRICHED_ELUNIUM:
+      case ITEMID_ENRICHED_ORIDECON:
+      case ITEMID_HD_ETHERNIUM:
+      case ITEMID_HD_ETHERDEOCON:
+      case ITEMID_ETEL_BRADIUM:
+      case ITEMID_HD_ETEL_BRADIUM:
+      case ITEMID_ETEL_CARNIUM:
+      case ITEMID_HD_ETEL_CARNIUM:
+        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_ITEM_DISAPPEAR), 0, 0);
         break;
       default:
         this->Invalidate();
         return;
       }
-      this->notice->SetNotice(LookupMessage(message), 0, 0);
     }
   } else {
-    if (slot != 4 || this->catalystCount < 1) {
+    if (slot != 4 || this->catalystCount <= 0) {
       return;
     }
 
-    const int owned = g_session.LookupClientItem(this->catalystItemId, 0).quantity;
-    if (owned < this->catalystCount) {
-      this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL), 3000, 1);
-    } else if (this->catalystEnabled == 1) {
-      this->catalystEnabled = 0;
-      this->notice->SetNotice("", 0, 0);
+    const bool enough = this->catalystCount <= g_session.LookupClientItem(this->catalystItemId, 0).quantity;
+    UIRefining_Notice* const notice = this->notice;
+    const char* text;
+    int duration;
+    unsigned char highlight;
+    if (enough) {
+      if (this->catalystEnabled == 1) {
+        this->catalystEnabled = 0;
+        text = "";
+      } else {
+        this->catalystEnabled = 1;
+        text = LookupMessage(MSI_USING_BLACKSMITH_BLESSING);
+      }
+      duration = 0;
+      highlight = 0;
     } else {
-      this->catalystEnabled = 1;
-      this->notice->SetNotice(LookupMessage(MSI_CANNOT_REFINE_ITEM), 0, 0);
+      text = LookupMessage(MSI_NOTENOUGH_BLACKSMITH_BLESSING);
+      duration = 3000;
+      highlight = 1;
     }
+    notice->SetNotice(text, duration, highlight);
   }
 
   this->Invalidate();
@@ -555,7 +629,11 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
   char name[260];
   std::memset(name, 0, sizeof(name));
 
-  if (this->selectedMaterial != -1 && x >= 81 && x <= 105 && y >= 150 && y <= 174) {
+  auto inRect = [&](int left, int top, int right, int bottom) {
+    return x >= left && x <= right && y >= top && y <= bottom;
+  };
+
+  if (this->selectedMaterial != -1 && inRect(81, 150, 105, 174)) {
     ITEM_INFO info;
     info.SetItemId(this->materials[this->selectedMaterial].itemId);
     int capacity = 260;
@@ -567,7 +645,7 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
     return;
   }
 
-  if (this->catalystEnabled == 1 && x >= 161 && x <= 185 && y >= 150 && y <= 174) {
+  if (this->catalystEnabled == 1 && inRect(161, 150, 185, 174)) {
     ITEM_INFO info;
     info.SetItemId(this->catalystItemId);
     int capacity = 260;
@@ -579,12 +657,8 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
     return;
   }
 
-  const int offsetX = x - 11;
-  if (static_cast<unsigned>(offsetX) > 242 || static_cast<unsigned>(y - 55) > 52) {
-    return;
-  }
-  const int slot = offsetX / 49;
-  if (x > slot * 49 + 57 || slot >= 5 || slot < 0) {
+  const int slot = this->SlotAt(x, y);
+  if (slot < 0) {
     return;
   }
 
@@ -691,8 +765,8 @@ void UIRefining_Notice::OnProcess() {
       this->autoShown = 0;
       this->geometry.visible = 0;
     }
-    this->text = this->savedText;
-    this->highlight = this->savedHighlight;
+    this->text = this->saved.text;
+    this->highlight = this->saved.highlight;
     this->Invalidate();
     if (this->parent) {
       this->parent->Invalidate();
@@ -712,8 +786,12 @@ void UIRefiningWnd::OnRBtnUp(int x, int y) {
     return;
   }
 
+  auto inRect = [&](int left, int top, int right, int bottom) {
+    return x >= left && x <= right && y >= top && y <= bottom;
+  };
+
   if (this->state == REFINING_STATE_READY) {
-    if (this->selectedMaterial != -1 && x >= 81 && x <= 105 && y >= 150 && y <= 174) {
+    if (this->selectedMaterial != -1 && inRect(81, 150, 105, 174)) {
       UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
       if (!window) {
         return;
@@ -723,7 +801,7 @@ void UIRefiningWnd::OnRBtnUp(int x, int y) {
       return;
     }
 
-    if (this->catalystEnabled == 1 && x >= 161 && x <= 185 && y >= 150 && y <= 174) {
+    if (this->catalystEnabled == 1 && inRect(161, 150, 185, 174)) {
       UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
       if (!window) {
         return;
@@ -747,7 +825,7 @@ void UIRefiningWnd::OnRBtnUp(int x, int y) {
       }
 
       if (slot == 4) {
-        if (this->catalystCount < 1) {
+        if (this->catalystCount <= 0) {
           return;
         }
         ITEM_INFO info = g_session.LookupClientItem(this->catalystItemId, 0);
@@ -811,14 +889,14 @@ int UIRefiningWnd::SendMsg(
   case UM_COMMAND:
     switch (argument1) {
     case REFINING_BUTTON_PROBABILITY:
-      ShellExecuteA(hWnd, "open", LookupMessage(MSI_SELLINGSLOT_ERROR_MAXSLOT), nullptr, nullptr, SW_SHOWNORMAL);
+      ShellExecuteA(hWnd, "open", LookupMessage(MSI_REFINING_PROBABILITY_URL), nullptr, nullptr, SW_SHOWNORMAL);
       break;
     case ID_OK:
       if (this->requestPending != 1) {
         const std::uint32_t index = this->item.identity[1];
         if (index != 0) {
           if (g_session.m_zeny < static_cast<int>(this->SelectedMaterialValue())) {
-            this->notice->SetNotice(LookupMessage(MSI_REFINING_SUCCESS), 3000, 1);
+            this->notice->SetNotice(LookupMessage(MSI_NOTENOUGH_ZENY), 3000, 1);
           } else {
             this->requestPending = 1;
             RefiningRequestPacket packet;
@@ -841,7 +919,7 @@ int UIRefiningWnd::SendMsg(
       }
       break;
     case REFINING_BUTTON_RETURN:
-      this->notice->SetNotice("", 0, 0);
+      this->notice->SetNoticeInline("", 0, 0);
       this->selectedMaterial = -1;
       this->catalystEnabled = 0;
       if (this->state == REFINING_STATE_FAIL) {
@@ -870,7 +948,7 @@ int UIRefiningWnd::SendMsg(
           packet.index = static_cast<std::uint16_t>(argument1);
           GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
         } else {
-          this->notice->SetNotice(LookupMessage(MSI_RETURN), 3000, 1);
+          this->notice->SetNotice(LookupMessage(MSI_CANNOT_REFINE_ITEM), 3000, 1);
         }
       }
     }
@@ -887,18 +965,18 @@ void UIRefiningWnd::ApplyItem(int id, int count, const RefiningMaterial* materia
   case REFINING_STATE_WAIT:
   case REFINING_STATE_READY: {
     if (id == -1 || count == 0) {
-      this->notice->SetNotice(LookupMessage(MSI_RETURN), 3000, 1);
+      this->notice->SetNotice(LookupMessage(MSI_CANNOT_REFINE_ITEM), 3000, 1);
       return;
     }
 
     ITEM_INFO found = g_session.LookupClientItemByIdentity(id);
-    if (found.identity[1] == 0) {
+    if (found.identity[1] <= 0) {
       return;
     }
 
     this->item = found;
     int highlightColor;
-    std::vector<char*> breaks;
+    std::vector<const char*> breaks;
     char text[0x104];
     std::memset(text, 0, sizeof(text));
     char* highlight = nullptr;
@@ -906,7 +984,7 @@ void UIRefiningWnd::ApplyItem(int id, int count, const RefiningMaterial* materia
     char* cursor = text;
     this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
     if (this->item.identified == 1 && this->item.optionCount != 0) {
-      sprintf_s(text, sizeof(text), LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), text, this->item.optionCount);
+      sprintf_s(text, sizeof(text), LookupMessage(MSI_EA6), text, this->item.optionCount);
     }
 
     this->item.SetName(text);
@@ -950,13 +1028,13 @@ void UIRefiningWnd::ApplyItem(int id, int count, const RefiningMaterial* materia
     }
 
     ITEM_INFO found = g_session.LookupClientItemByIdentity(id);
-    if (found.identity[1] == 0) {
+    if (found.identity[1] <= 0) {
       return;
     }
 
     this->nextItem = found;
     int highlightColor;
-    std::vector<char*> breaks;
+    std::vector<const char*> breaks;
     char text[0x104];
     std::memset(text, 0, sizeof(text));
     char* cursor = nullptr;
@@ -964,7 +1042,7 @@ void UIRefiningWnd::ApplyItem(int id, int count, const RefiningMaterial* materia
     char* name = text;
     this->BuildItemName(&this->nextItem, &highlightColor, &breaks, &name, &remaining, &cursor, 1, 0);
     if (this->nextItem.identified == 1 && this->nextItem.optionCount != 0) {
-      sprintf_s(text, sizeof(text), LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), text, this->nextItem.optionCount);
+      sprintf_s(text, sizeof(text), LookupMessage(MSI_EA6), text, this->nextItem.optionCount);
     }
 
     this->nextItem.SetName(text);
@@ -1062,8 +1140,8 @@ void UIRefining_Notice::SetNotice(const char* value, int duration, unsigned char
   this->highlight = highlight;
   this->text = value;
   if (duration == 0) {
-    this->savedText = value;
-    this->savedHighlight = highlight;
+    this->saved.text = value;
+    this->saved.highlight = highlight;
   } else {
     this->expireTick = timeGetTime() + duration;
     if (this->geometry.visible == 0) {
@@ -1121,29 +1199,26 @@ void UIRefiningWnd::Paint() {
       this->DrawBitmap(207, 55, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\refining_renewal\\slot_select_red.bmp"))), false);
     }
 
-    const char* color = "^CA152E";
-    int x = 10;
     int index = 0;
-    for (auto material = this->materials.begin(); material != this->materials.end(); ++material) {
+    for (auto material = this->materials.begin(); material != this->materials.end(); ++index, ++material) {
+      const int x = index * 49 + 10;
       ITEM_INFO icon;
       icon.SetItemId(material->itemId);
-      const int owned = g_session.LookupClientItem(material->itemId, 0).quantity;
+      icon.quantity = g_session.LookupClientItem(material->itemId, 0).quantity;
       this->DrawItemIcon(x + 12, 69, icon, 0);
-      const std::string count = FormatOwnedString("%s%d^000000/1", owned == 0 ? color : "", owned);
+      const std::string count = FormatOwnedString("%s%d^000000/1", icon.quantity == 0 ? "^CA152E" : "", icon.quantity);
       this->DrawFormattedText(x, 107, count, 48, 6, 0, 12, 0, 0);
       if (index == this->selectedMaterial && (this->state == REFINING_STATE_READY || (this->state == REFINING_STATE_PROCESS && this->frame == 0))) {
         this->DrawItemIcon(81, 150, icon, 0);
       }
-      ++index;
-      x += 49;
     }
 
     if (this->catalystItemId > 0 && this->catalystCount > 0) {
       ITEM_INFO icon;
       icon.SetItemId(this->catalystItemId);
-      const int owned = g_session.LookupClientItem(this->catalystItemId, 0).quantity;
+      icon.quantity = g_session.LookupClientItem(this->catalystItemId, 0).quantity;
       this->DrawItemIcon(218, 69, icon, 0);
-      const std::string count = FormatOwnedString("%s%d^000000/%d", this->catalystCount > owned ? color : "", owned, this->catalystCount);
+      const std::string count = FormatOwnedString("%s%d^000000/%d", this->catalystCount > icon.quantity ? "^CA152E" : "", icon.quantity, this->catalystCount);
       this->DrawFormattedText(206, 107, count, 48, 6, 0, 12, 0, 0);
       if (this->catalystEnabled == 1 && (this->state == REFINING_STATE_READY || (this->state == REFINING_STATE_PROCESS && this->frame < 13))) {
         this->DrawItemIcon(161, 150, icon, 0);
@@ -1165,7 +1240,7 @@ void UIRefiningWnd::Paint() {
     this->DrawCenteredText(0, 246, this->item.displayName.c_str(), 264, 0, 12, 0x462117, 1);
     break;
   case REFINING_STATE_FAIL:
-    this->DrawCenteredText(0, 249, LookupMessage(MSI_OTP_MUST_8_CHAR), 264, 0, 12, 0x462117, 1);
+    this->DrawCenteredText(0, 249, LookupMessage(MSI_REFINING_FAIL_BROKEN_ITEM), 264, 0, 12, 0x462117, 1);
     break;
   case REFINING_STATE_SUCCESS:
   case REFINING_STATE_DOWNGRADE:
@@ -1182,33 +1257,34 @@ void UIRefiningWnd::Paint() {
       break;
     }
 
-    const std::string label = FormatOwnedString("%s %d%%", LookupMessage(MSI_CHANGE_HOMUN_NAME), SelectedSuccessRate(this));
+    const std::string label = FormatOwnedString("%s %d%%", LookupMessage(MSI_SUCCESS), SelectedSuccessRate(this));
     const int labelWidth = this->TextWidth(label.c_str(), 0, 0, 12, 1, 0);
 
     const std::string percent = FormatOwnedString("%d%%", SelectedSuccessRate(this));
     const int percentWidth = this->TextWidth(percent.c_str(), 0, 0, 12, 1, 0);
 
     const int x = static_cast<int>((this->geometry.width - labelWidth) * 0.5);
-    this->DrawTextAt(x, 31, LookupMessage(MSI_CHANGE_HOMUN_NAME), 0, 0, 12, 0x422B1F, 1, 0);
-    this->DrawTextAt(x - percentWidth + labelWidth, 31, percent.c_str(), 0, 0, 12, 0xDE612A, 1, 0);
+    const int percentX = x - percentWidth + labelWidth;
+    this->DrawTextAt(x, 31, LookupMessage(MSI_SUCCESS), 0, 0, 12, 0x422B1F, 1, 0);
+    this->DrawTextAt(percentX, 31, percent.c_str(), 0, 0, 12, 0xDE612A, 1, 0);
     break;
   }
   case REFINING_STATE_SUCCESS: {
-    const int width = this->TextWidth(LookupMessage(MSI_SUCCESS), 0, 0, 12, 1, 0);
-    this->DrawTextAt(static_cast<int>((this->geometry.width - width) * 0.5), 31, LookupMessage(MSI_SUCCESS), 0, 0, 12, 0x422B1F, 1, 0
+    const int width = this->TextWidth(LookupMessage(MSI_REFINING_SUCCESS), 0, 0, 12, 1, 0);
+    this->DrawTextAt(static_cast<int>((this->geometry.width - width) * 0.5), 31, LookupMessage(MSI_REFINING_SUCCESS), 0, 0, 12, 0x422B1F, 1, 0
     );
     break;
   }
   case REFINING_STATE_FAIL:
   case REFINING_STATE_DOWNGRADE:
   case REFINING_STATE_FAIL2: {
-    const int width = this->TextWidth(LookupMessage(MSI_RESET), 0, 0, 12, 1, 0);
-    this->DrawTextAt(static_cast<int>((this->geometry.width - width) * 0.5), 31, LookupMessage(MSI_RESET), 0, 0, 12, 0x422B1F, 1, 0
+    const int width = this->TextWidth(LookupMessage(MSI_REFINING_FAIL), 0, 0, 12, 1, 0);
+    this->DrawTextAt(static_cast<int>((this->geometry.width - width) * 0.5), 31, LookupMessage(MSI_REFINING_FAIL), 0, 0, 12, 0x422B1F, 1, 0
     );
     break;
   }
   }
 
   this->DrawButtonBar(2, 0, 1);
-  this->DrawTitleBar(false, LookupMessage(MSI_NOTENOUGH_BLACKSMITH_BLESSING), 0);
+  this->DrawTitleBar(false, LookupMessage(MSI_REFINING), 0);
 }

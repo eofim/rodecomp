@@ -11,6 +11,7 @@ class CParticle;
 
 class CElectricEffect : public CEffect {
 public:
+  ~CElectricEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -18,6 +19,11 @@ public:
   bool IsAlive() override;
 
   void AddBolt(int tilt);
+  static void __stdcall SetHeadingFromVector(float x, float z, short* heading);
+  void UpdateParticle(CParticle* particle);
+  __declspec(noinline) void UpdateParticleState(CParticle* particle);
+  __declspec(noinline) void RenderParticle(CParticle* particle);
+  void UpdateTick();
 
   /* 00CC */ short angle;
   /* 00CE */ unsigned char padding_00CE[2];

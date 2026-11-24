@@ -201,9 +201,15 @@ class GrannyAnimationLibrary {
 public:
   ~GrannyAnimationLibrary();
   bool Load(const char* name, int job, int action);
+  granny_animation* GetAnimation(unsigned job, unsigned action);
+  granny_animation* LoadAnimation(const GrannyModelInstance* instance, char* name, const char* suffix);
+  void InitializeMesh(GrannyMeshEntry& entry, granny_mesh* mesh, granny_model_instance* instance);
+  void InstantiateModel(GrannyModelInstance* target, const granny_model* model);
   void Initialize();
   void FreeInstance();
+  void Release();
   granny_file* ReadAnimationFile(const char* name, const char* suffix);
+  void SetAnimationDuration(float duration);
 
   /* 0000 */ float animationDuration;
   /* 0004 */ unsigned char padding_0004[0x14C];
@@ -231,12 +237,16 @@ class C3dGrannyModelRes : public CRes {
 public:
   C3dGrannyModelRes();
   C3dGrannyModelRes(const char* extension, const char* prefix);
+  ~C3dGrannyModelRes() override;
   C3dGrannyModelRes* Create() override;
   void Unload() override;
   bool Load(const char* name) override;
   void RebindMeshes(const C3dGrannyModelRes& target);
+  void InitializeMesh(GrannyMeshEntry& entry, granny_mesh* mesh, granny_model_instance* instance);
+  GrannyTextureEntry* FindMaterialTexture(const granny_material* material) const;
   void InstantiateModel(GrannyModelInstance* target, const granny_model* model);
   CTexture* CreateTexture(const granny_texture* texture, int option);
+  void InitializeTexture(GrannyTextureEntry& entry, const granny_texture* texture);
   void FreeControl(granny_control* control);
   granny_control* PlayAnimation(unsigned action, granny_model_instance* instance, granny_control* control, int loopCount);
   bool ProjectBounds(float* rect, const matrix& view, const matrix& world, const float* eye) const;
@@ -252,6 +262,7 @@ public:
   bool FindHairPivot();
   void Release();
   granny_world_pose* Animate(float seconds, granny_model_instance* instance);
+  void SetAnimationDuration(float duration);
 
   /* 0110 */ float animationDuration;
   /* 0114 */ unsigned char padding_0114[0x14C];

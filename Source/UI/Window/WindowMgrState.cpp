@@ -16,6 +16,7 @@ __declspec(noinline) RenderSystemHolder* GetRenderSystemHolder();
 #include "Contents/Actors/MercenaryAI.h"
 #include "Contents/Actors/Pc.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Messenger/ClientMessenger.h"
 #include "Contents/Messenger/MessengerMember.h"
 #include "Contents/Navigation/NavigationManager.h"
@@ -630,27 +631,27 @@ void UIWindowMgr::SaveVisibleWindowIds() {
   this->savedWindowIds.clear();
   for (auto it = this->rendered.begin(); it != this->rendered.end(); ++it) {
     int id = (*it)->geometry.id;
-    if (id == 8) {
+    if (id == WID_ITEMWND) {
       if (this->itemWndInfo.visible) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 10) {
+    } else if (id == WID_EQUIPWND) {
       if (this->equipWndInfo.visible) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 11) {
+    } else if (id == WID_STATUSWND) {
       if (this->statusWndInfo.visible) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 13) {
+    } else if (id == WID_OPTIONWND) {
       if (this->optionWndInfo.visible) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 37) {
+    } else if (id == WID_SKILLLISTWND) {
       if (this->skillListWndVisible) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 321) {
+    } else if (id == WID_RENEWQUESTWND) {
       if (this->questWndVisible) {
         this->savedWindowIds.push_back(id);
       }
@@ -662,23 +663,23 @@ void UIWindowMgr::SaveVisibleWindowIds() {
       if (this->questWndVisible) {
         this->savedWindowIds.push_back(id);
       }
-    } else if ((id == 69 || id == 34) && this->messengerGroupWndInfo.visible) {
+    } else if ((id == WID_MESSENGERWND || id == WID_MESSENGERGROUPWND) && this->messengerGroupWndInfo.visible) {
       this->savedWindowIds.push_back(id);
-    } else if (id == 271) {
+    } else if (id == WID_ACHTRACINGWND) {
       if (g_session.HasTrackedAchievements() == true) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 286) {
+    } else if (id == WID_MACROREPORTERWND) {
       if (this->macroReporterVisible == true) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 10014) {
+    } else if (id == WID_GAMESETTINGSUI) {
       if (g_session.lowMemory && g_session.performanceWarningEnabled && g_effectDetailLevel == 2 && g_textureDetailLevel == 2) {
         this->savedWindowIds.push_back(id);
       }
-    } else if (id == 301) {
+    } else if (id == WID_MINIPARTYWND) {
       for (auto entry = this->savedWindowIds.begin(); entry != this->savedWindowIds.end(); ++entry) {
-        if (*entry == 301) {
+        if (*entry == WID_MINIPARTYWND) {
           this->savedWindowIds.erase(entry);
           break;
         }
@@ -1077,31 +1078,71 @@ void UIWindowMgr::SendFlagEffect(int hotkey) {
 
   switch (hotkey) {
   case HK_FLAG_1 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceIndonesia) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceBrazil) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_BR_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG8"), 0, 0, 0);
+    } else if (g_serviceType == ServiceIndia) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDIA_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_2 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDONESIA_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceIndonesia) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDONESIA_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG9"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_3 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_PH_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea || g_serviceType == ServicePhilippine) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_PH_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_4 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_MY_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceMalaysia) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_MY_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDONESIA_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_5 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_SI_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceMalaysia) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_SI_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_PH_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_6 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_BR_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_BR_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_MY_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_7 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDIA_FLAG"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea || g_serviceType == ServiceTaiwan) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDIA_FLAG"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_SI_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_8 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG8"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG8"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_BR_FLAG"), 0, 0, 0);
+    }
     break;
   case HK_FLAG_9 + 200:
-    mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG9"), 0, 0, 0);
+    if (g_serviceType == ServiceKorea) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_FLAG9"), 0, 0, 0);
+    } else if (g_serviceType == ServiceRussia || g_serviceType == ServiceEu) {
+      mode->SendMsg(MM_CASH_EMOTION, reinterpret_cast<int>("ET_INDIA_FLAG"), 0, 0, 0);
+    }
     break;
   }
 }
@@ -1118,12 +1159,10 @@ bool UIWindowMgr::DropAt(int x, int y, ModeDragState* drag) {
       offsetY += node->geometry.y;
     }
 
-    x -= offsetX;
-    y -= offsetY;
-    window->RecordDrop(x, y, *drag, -1);
+    window->RecordDrop(x - offsetX, y - offsetY, *drag, -1);
     drag->sourceWindow = window;
     if (this->itemDropCntWnd != window->Root()) {
-      window->DragAndDrop(x, y, reinterpret_cast<std::intptr_t>(drag));
+      window->DragAndDrop(x - offsetX, y - offsetY, reinterpret_cast<std::intptr_t>(drag));
     }
 
     return true;
@@ -1173,7 +1212,7 @@ void UIWindowMgr::RestoreHiddenWindows() {
     this->EnsureWindow(WID_MINIMAPZOOMWND);
   }
 
-  g_modeMgr.GetGameMode()->scene->player->RefreshEffect164();
+  g_modeMgr.GetGameMode()->scene->player->RelaunchStatusStateEffect();
   this->windowVisibilityState = 1;
 
   for (std::map<int, UIWindow*>::iterator it = this->overlays.begin(); it != this->overlays.end(); ++it) {
@@ -1188,6 +1227,11 @@ void UIWindowMgr::CycleWindowVisibilityTwice() {
   this->CycleWindowVisibility(4);
 }
 
+// INLINED
+static void PushRendered(UIWindowMgr* manager, UIWindow* window) {
+  manager->rendered.push_back(window);
+}
+
 // OFFSET: 0x00A8FDB0
 // FUNCTION: fn_17151
 int UIWindowMgr::RunEmailAddress() {
@@ -1198,7 +1242,7 @@ int UIWindowMgr::RunEmailAddress() {
   UIWindow* window = new UIEmailAddressWnd();
   window->SetSize(280, 48);
   window->Move((g_renderer->viewport.width - 640) / 2 + 185, (g_renderer->viewport.height - 480) / 2 + 180);
-  this->rendered.push_back(window);
+  PushRendered(this, window);
 
   if (this->inputWindow) {
     this->persistentWindows.insert(this->inputWindow->Root());
@@ -1208,7 +1252,6 @@ int UIWindowMgr::RunEmailAddress() {
   this->modalResponse = 0;
   this->modalWindows.push_back(window);
   int response;
-  CMode* pump = g_modeMgr.currentMode;
 
   for (;;) {
     if (g_modalImmediate != 0) {
@@ -1244,12 +1287,11 @@ int UIWindowMgr::RunEmailAddress() {
       break;
     }
 
-    if (pump) {
-      pump->Update();
-      pump = g_modeMgr.currentMode;
+    if (g_modeMgr.currentMode) {
+      g_modeMgr.currentMode->Update();
     }
 
-    if (g_session.GetOption(20) > 0) {
+    if (static_cast<int>(g_session.m_options.Get(20)) > 0) {
       this->activeWindowId = 0;
       this->modalResponse = 0;
 

@@ -40,8 +40,24 @@ extern "C" {
 #include <vector>
 #include <windows.h>
 
-template __declspec(noinline) SubChatWndInfo& std::map<int, SubChatWndInfo>::operator[](int&&);
-template __declspec(noinline) std::vector<std::string>& std::map<std::string, std::vector<std::string>>::operator[](const std::string&);
+// OFFSET: 0x00910BE0
+// FUNCTION: fn_12509
+SubChatWndInfo::SubChatWndInfo() {
+}
+
+// OFFSET: 0x00914AD0
+// FUNCTION: fn_12545
+SubChatWndInfo& SubChatWndInfo::operator=(const SubChatWndInfo& other) {
+  this->name = other.name;
+  for (int index = 0; index < 25; ++index) {
+    this->options[index] = other.options[index];
+  }
+  this->x = other.x;
+  this->y = other.y;
+  this->width = other.width;
+  this->height = other.height;
+  return *this;
+}
 
 struct MiniMapPosition {
   MiniMapPosition() {
@@ -50,8 +66,6 @@ struct MiniMapPosition {
   /* 0000 */ float x;
   /* 0004 */ float y;
 };
-
-template __declspec(noinline) MiniMapPosition& std::map<std::string, MiniMapPosition>::operator[](const std::string&);
 
 // GLOBAL: gl_24913
 std::map<std::string, MiniMapPosition> g_exceptionMiniMapPosList;
@@ -665,14 +679,14 @@ int SetWindEffectInfo(lua_State* state) {
     effect->ringCount = static_cast<unsigned short>(luaL_checknumber(state, 3));
     break;
   case MSG_SET_COLOR: {
-    const double alpha = luaL_checknumber(state, 3);
-    const double red = luaL_checknumber(state, 4);
-    const double green = luaL_checknumber(state, 5);
-    const double blue = luaL_checknumber(state, 6);
-    effect->green = static_cast<unsigned char>(static_cast<int>(green));
-    effect->maxAlpha = static_cast<unsigned char>(static_cast<int>(alpha));
-    effect->blue = static_cast<unsigned char>(static_cast<int>(blue));
-    effect->red = static_cast<unsigned char>(static_cast<int>(red));
+    const int alpha = static_cast<int>(luaL_checknumber(state, 3));
+    const int red = static_cast<int>(luaL_checknumber(state, 4));
+    const int green = static_cast<int>(luaL_checknumber(state, 5));
+    const int blue = static_cast<int>(luaL_checknumber(state, 6));
+    effect->maxAlpha = static_cast<unsigned char>(alpha);
+    effect->red = static_cast<unsigned char>(red);
+    effect->green = static_cast<unsigned char>(green);
+    effect->blue = static_cast<unsigned char>(blue);
     break;
   }
   case MSG_SET_SIZE:
@@ -699,15 +713,14 @@ int SetWindEffectInfo(lua_State* state) {
     break;
   }
   case MSG_SET_SRCMODE:
-    effect->sourceBlend = static_cast<int>(luaL_checknumber(state, 3));
+    effect->sourceBlend = static_cast<unsigned int>(luaL_checknumber(state, 3));
     break;
   case MSG_SET_DESTMODE:
-    effect->destinationBlend = static_cast<int>(luaL_checknumber(state, 3));
+    effect->destinationBlend = static_cast<unsigned int>(luaL_checknumber(state, 3));
     break;
   case MSG_SET_TEXTURE: {
-    std::string name = luaL_checkstring(state, 3);
-    std::string texture = name;
-    effect->textureName = texture;
+    std::string texture = luaL_checkstring(state, 3);
+    effect->SetTexture(texture);
     break;
   }
   }
@@ -948,7 +961,7 @@ bool LuaScript::Load(const char* name, bool resourcePath, bool looseOnly) {
     return false;
   }
 
-  std::string prefix;
+  std::string prefix("");
   if (!looseOnly) {
     prefix = std::string("LuaFiles514\\");
   }
@@ -1311,8 +1324,8 @@ int LuaScript::TableInteger(std::string table, int keyType, std::intptr_t key) {
 // FUNCTION: fn_17157
 int UIWindowMgr::GetHotkeyBehavior() {
   int behavior = -1;
-  const int mode = static_cast<int>(g_session.m_options.Get(10));
-  g_session.m_hotkeyScript->Call("GetBehaviorOfHotKey2", "ddd>d", mode, this->keyCode, this->modifierKey, &behavior);
+  const std::int64_t mode = g_session.m_options.Get(10);
+  g_session.m_hotkeyScript->Call("GetBehaviorOfHotKey2", "ddd>d", static_cast<int>(mode), this->keyCode, this->modifierKey, &behavior);
   if (behavior != -1) {
     return behavior;
   }

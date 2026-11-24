@@ -28,6 +28,11 @@ namespace {
 CCherryBlossomEffect::CCherryBlossomEffect() : CEffect(1013) {
 }
 
+// OFFSET: 0x00B43A70
+// FUNCTION: fn_46010
+__declspec(noinline) CCherryBlossomEffect::~CCherryBlossomEffect() {
+}
+
 // OFFSET: 0x00B43B50
 // FUNCTION: fn_18884
 void CCherryBlossomEffect::Close() {
@@ -54,10 +59,9 @@ void CCherryBlossomEffect::Open() {
         particle->scale = 0.55f;
         particle->alpha = 0;
 
-        const float height = static_cast<float>(Random(100));
-        this->offsets[row * 4 + column].x = 0.0f;
-        this->offsets[row * 4 + column].y = height;
-        this->offsets[row * 4 + column].z = 0.0f;
+        EffectPoint offset;
+        offset.y = static_cast<float>(Random(100));
+        this->offsets[row * 4 + column] = offset;
 
         for (int i = 0; i < 4; ++i) {
           particle->animationValues[i] = static_cast<float>(Random(360));
@@ -66,6 +70,72 @@ void CCherryBlossomEffect::Open() {
         this->petals.push_back(particle);
       }
     }
+  }
+}
+
+// OFFSET: 0x00B44120
+// FUNCTION: fn_46280
+__forceinline void CCherryBlossomEffect::UpdatePetal(CParticle* particle) {
+  if (particle) {
+    const int index = particle->columnIndex + particle->rowIndex * 4;
+    const float speed = particle->speedParameter;
+    if (this->offsets[index].y < 0.0f) {
+      if (this->offsets[index].y < -30.0f) {
+        this->offsets[index].x = 0.0f;
+        this->offsets[index].y = static_cast<float>(Random(100));
+        this->offsets[index].z = 0.0f;
+
+        for (int i = 0; i < 4; ++i) {
+          particle->animationValues[i] = static_cast<float>(Random(360));
+        }
+
+        particle->alpha = 0;
+      } else {
+        float* angles = particle->animationValues;
+        for (int i = 0; i < 2; ++i) {
+          const int current = static_cast<int>(angles[i]);
+          const int delta = static_cast<int>(angles[i + 2]) - current;
+          angles[i] = static_cast<float>(current + (delta > 0 ? 3 : -2));
+          if (std::abs(delta) < 3) {
+            if (delta > 0) {
+              angles[i + 2] = static_cast<float>(Random(current));
+            } else {
+              angles[i + 2] = static_cast<float>(359 - Random(current));
+            }
+          }
+        }
+
+        this->offsets[index].x += speed * g_sinTable[static_cast<int>(angles[0])];
+        this->offsets[index].z += speed * g_sinTable[static_cast<int>(angles[1])];
+        if (this->offsets[index].y < -20.0f) {
+          const int alpha = particle->alpha - 4;
+          particle->alpha = alpha >= 0 ? alpha : 0;
+        } else if (particle->alpha != 255) {
+          particle->alpha = 255;
+        }
+      }
+    }
+
+    this->offsets[index].y -= speed;
+
+    matrix rotation;
+    std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
+    rotation.MakeXRotation(3.141592f);
+    rotation.AppendXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
+
+    matrix translation;
+    std::memcpy(translation.values, g_identityMatrix, sizeof(translation.values));
+    translation.MakeTranslate(this->offsets[index].x, this->offsets[index].y, this->offsets[index].z);
+
+    matrix scale;
+    std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
+    scale.SetScale(particle->scale, particle->scale, 1.0f);
+
+    matrix scaled;
+    scaled.Compose(scale, rotation);
+    matrix result;
+    result.Compose(scaled, translation);
+    particle->transform = result;
   }
 }
 
@@ -78,71 +148,21 @@ void CCherryBlossomEffect::OnProcess() {
     particlePosition.x = this->position[0];
     particlePosition.y = this->position[1];
     particlePosition.z = this->position[2];
-    if (particle) {
-      const int index = particle->columnIndex + particle->rowIndex * 4;
-      const float speed = particle->speedParameter;
-      if (this->offsets[index].y < 0.0f) {
-        if (this->offsets[index].y < -30.0f) {
-          const float height = static_cast<float>(Random(100));
-          this->offsets[index].x = 0.0f;
-          this->offsets[index].y = height;
-          this->offsets[index].z = 0.0f;
-
-          float* angle = &particle->animationParameter;
-          for (int i = 0; i < 4; ++i) {
-            *angle++ = static_cast<float>(Random(360));
-          }
-
-          particle->alpha = 0;
-        } else {
-          float* angles = &particle->animationParameter;
-          for (int i = 0; i < 2; ++i) {
-            const int current = static_cast<int>(angles[i]);
-            const int delta = static_cast<int>(angles[i + 2]) - current;
-            angles[i] = static_cast<float>(current + (delta > 0 ? 3 : -2));
-            if (std::abs(delta) < 3) {
-              if (delta > 0) {
-                angles[i + 2] = static_cast<float>(Random(current));
-              } else {
-                angles[i + 2] = static_cast<float>(359 - Random(current));
-              }
-            }
-          }
-
-          this->offsets[index].x += speed * g_sinTable[static_cast<int>(angles[0])];
-          this->offsets[index].z += speed * g_sinTable[static_cast<int>(angles[1])];
-          if (this->offsets[index].y < -20.0f) {
-            const int alpha = particle->alpha - 4;
-            particle->alpha = alpha >= 0 ? alpha : 0;
-          } else if (particle->alpha != 255) {
-            particle->alpha = 255;
-          }
-        }
-      }
-
-      this->offsets[index].y -= speed;
-
-      matrix rotation;
-      std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
-      rotation.MakeXRotation(3.141592f);
-      rotation.AppendXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
-
-      matrix translation;
-      std::memcpy(translation.values, g_identityMatrix, sizeof(translation.values));
-      translation.MakeTranslate(this->offsets[index].x, this->offsets[index].y, this->offsets[index].z);
-
-      matrix scale;
-      std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
-      scale.SetScale(particle->scale, particle->scale, 1.0f);
-
-      matrix scaled;
-      scaled.Compose(scale, rotation);
-      matrix result;
-      result.Compose(scaled, translation);
-      particle->transform = result;
-    }
+    this->UpdatePetal(particle);
 
     ++particle->elapsedFrames;
+  }
+}
+
+// OFFSET: 0x00B44580
+// FUNCTION: fn_45966
+void CCherryBlossomEffect::RenderPetal(CParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  for (int i = 0; i < 2; ++i) {
+    particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
   }
 }
 
@@ -150,11 +170,6 @@ void CCherryBlossomEffect::OnProcess() {
 // FUNCTION: fn_18888
 void CCherryBlossomEffect::Render() {
   for (std::vector<CParticle*>::iterator it = this->petals.begin(); it != this->petals.end(); ++it) {
-    CParticle* particle = *it;
-    if (particle) {
-      for (int i = 0; i < 2; ++i) {
-        particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
-      }
-    }
+    this->RenderPetal(*it);
   }
 }

@@ -1,6 +1,8 @@
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Render/DeviceContext/DCSurface.h"
 #include "Render/Primitives/RenderPrimitivePool.h"
+#include "Render/Projection/RenderProjection.h"
 #include "Render/Renderer.h"
 #include "Render/Textures/SpriteAtlas.h"
 #include "Render/Textures/SpritePixels.h"
@@ -8,6 +10,12 @@
 #include "Resource/ResourceMgr.h"
 #include "UI/Window/UIWindow.h"
 #include "Utility/Math/AffineMatrix.h"
+
+// INLINED
+static void PushOverlay(std::vector<RenderPrimitive*>& overlays, RenderPrimitive* primitive)
+{
+  overlays.push_back(primitive);
+}
 
 // OFFSET: 0x00A7A0C0
 // FUNCTION: fn_16922
@@ -52,19 +60,18 @@ void UIWindow::AddSpriteCellOverlay(
     const float cosine = ClientCosine(static_cast<int>(angle));
     const float sine = ClientSine(static_cast<int>(angle));
     const float upper = static_cast<float>(cell->y) * scale + static_cast<float>(y);
-    const float lower = static_cast<float>((static_cast<std::int16_t>(image->doubleHeight) + 1) * image->height + cell->y) * scale + static_cast<float>(y) + 1.0f;
-    const int width = image->width;
+    const float lower = static_cast<float>((static_cast<std::int16_t>(image->doubleHeight) + 1) * image->height + cell->y) * scale + static_cast<float>(y);
     float startX;
     float endX;
     if (cell->mirrored & 1) {
-      startX = static_cast<float>((static_cast<std::int16_t>(image->doubleWidth) + 1) * width + cell->x) * scale + static_cast<float>(x);
-      endX = static_cast<float>(cell->x) * scale + static_cast<float>(x) + 1.0f;
+      startX = static_cast<float>((static_cast<std::int16_t>(image->doubleWidth) + 1) * image->width + cell->x) * scale + static_cast<float>(x);
+      endX = static_cast<float>(cell->x) * scale + static_cast<float>(x);
     } else {
       startX = static_cast<float>(cell->x) * scale + static_cast<float>(x);
-      endX = static_cast<float>((static_cast<std::int16_t>(image->doubleWidth) + 1) * width + cell->x) * scale + static_cast<float>(x) + 1.0f;
+      endX = static_cast<float>((static_cast<std::int16_t>(image->doubleWidth) + 1) * image->width + cell->x) * scale + static_cast<float>(x);
     }
-    const float halfWidth = (endX - startX) * 0.5f;
-    const float halfHeight = (lower - upper) * 0.5f;
+    const float halfWidth = (endX - startX + g_projectionDepthNumerator) * g_depthAverageHalf;
+    const float halfHeight = (lower - upper + g_projectionDepthNumerator) * g_depthAverageHalf;
     const float centerX = startX + halfWidth;
     const float centerY = upper + halfHeight;
     x0 = (-halfWidth) * cosine - (-halfHeight) * sine + centerX;
@@ -94,14 +101,14 @@ void UIWindow::AddSpriteCellOverlay(
   }
 
   RenderVertex* vertices = primitive->quad;
-  vertices[0].x = x0 + 0.5f;
-  vertices[0].y = y0 + 0.5f;
-  vertices[1].x = x1 + 0.5f;
-  vertices[1].y = y1 + 0.5f;
-  vertices[2].x = x2 + 0.5f;
-  vertices[2].y = y2 + 0.5f;
-  vertices[3].x = x3 + 0.5f;
-  vertices[3].y = y3 + 0.5f;
+  vertices[0].x = x0 + g_depthAverageHalf;
+  vertices[0].y = y0 + g_depthAverageHalf;
+  vertices[1].x = x1 + g_depthAverageHalf;
+  vertices[1].y = y1 + g_depthAverageHalf;
+  vertices[2].x = x2 + g_depthAverageHalf;
+  vertices[2].y = y2 + g_depthAverageHalf;
+  vertices[3].x = x3 + g_depthAverageHalf;
+  vertices[3].y = y3 + g_depthAverageHalf;
 
   vertices[0].z = 0.000001f;
   vertices[0].rhw = 0.999999f;
@@ -124,8 +131,7 @@ void UIWindow::AddSpriteCellOverlay(
   vertices[3].diffuse = color;
   vertices[3].v = record.v1;
 
-  std::vector<RenderPrimitive*>& overlays = this->m_overlayPrimitives;
-  overlays.push_back(primitive);
+  PushOverlay(this->m_overlayPrimitives, primitive);
 }
 
 // OFFSET: 0x00A7A5C0
@@ -162,8 +168,8 @@ void UIWindow::AddRotatedSpriteCellOverlay(
   const int left = static_cast<int>(cell->x * static_cast<double>(cell->scaleX) + 1.0);
   const int right = static_cast<int>(((static_cast<std::int16_t>(image->doubleWidth) + 1) * image->width + cell->x) * static_cast<double>(cell->scaleX));
   const int top = static_cast<int>(cell->y * static_cast<double>(cell->scaleY));
-  const int startX = (cell->mirrored & 1) ? right : left;
-  const int endX = (cell->mirrored & 1) ? left : right;
+  const int startX = !(cell->mirrored & 1) ? left : right;
+  const int endX = !(cell->mirrored & 1) ? right : left;
   const float halfWidth = static_cast<float>(endX - startX) * 0.5f;
   const int bottom =
     static_cast<int>(((static_cast<std::int16_t>(image->doubleHeight) + 1) * image->height + cell->y) * static_cast<double>(cell->scaleY) + 1.0);
@@ -182,10 +188,8 @@ void UIWindow::AddRotatedSpriteCellOverlay(
   const SpriteCellColor& rgba = cell->colorChannels;
   RenderVertex* vertices = primitive->quad;
   for (unsigned int i = 0; i < 4; ++i) {
-    const float cornerX = corners[i][0];
-    const float cornerY = corners[i][1];
-    vertices[i].x = ClientCos(angle) * cornerX - ClientSin(angle) * cornerY + centerX + 0.5f;
-    vertices[i].y = ClientCos(angle) * cornerY + ClientSin(angle) * cornerX + centerY + 0.5f;
+    vertices[i].x = ClientCos(angle) * corners[i][0] - ClientSin(angle) * corners[i][1] + centerX + 0.5f;
+    vertices[i].y = ClientCos(angle) * corners[i][1] + ClientSin(angle) * corners[i][0] + centerY + 0.5f;
     vertices[i].z = 0.000001f;
     vertices[i].rhw = 0.999999f;
     vertices[i].diffuse = (((((rgba.alpha << 8) | rgba.red) << 8) | rgba.green) << 8) | rgba.blue;
@@ -201,7 +205,7 @@ void UIWindow::AddRotatedSpriteCellOverlay(
 
   for (UIWindow* window = this->parent; window; window = window->parent) {
     if (!window->parent) {
-      window->m_overlayPrimitives.push_back(primitive);
+      PushOverlay(window->m_overlayPrimitives, primitive);
     }
   }
 }

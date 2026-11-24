@@ -29,6 +29,11 @@ CCaneOfEvilEyeEffect::CCaneOfEvilEyeEffect() : CEffect(-1) {
   this->startTime = timeGetTime();
 }
 
+// OFFSET: 0x006F8800
+// FUNCTION: fn_46161
+__declspec(noinline) CCaneOfEvilEyeEffect::~CCaneOfEvilEyeEffect() {
+}
+
 // OFFSET: 0x006F8900
 // FUNCTION: fn_06872
 CEZ2STRParticle* CCaneOfEvilEyeEffect::CreateEye(int type, const float* position) {
@@ -55,7 +60,7 @@ CEZ2STRParticle* CCaneOfEvilEyeEffect::CreateEye(int type, const float* position
   eye->offsetX = position[0];
   eye->offsetY = position[1];
   eye->offsetZ = position[2];
-  eye->animationState = static_cast<unsigned char>(type);
+  eye->animationState = static_cast<signed char>(type);
   return eye;
 }
 
@@ -82,7 +87,7 @@ CEZ2STRParticle* CCaneOfEvilEyeEffect::CreateLight(int type, const float* positi
   light->originX = position[0];
   light->originY = position[1];
   light->originZ = position[2];
-  light->animationState = static_cast<unsigned char>(type);
+  light->animationState = static_cast<signed char>(type);
   return light;
 }
 
@@ -152,10 +157,15 @@ void CCaneOfEvilEyeEffect::Finish() {
 
   for (auto it = this->lights.begin(); it != this->lights.end(); ++it) {
     CEZ2STRParticle* light = *it;
-    if (light && light->animationState != 3) {
-      *it = this->CreateLight(3, &light->originX);
-      FreeParticle(light);
+    if (!light) {
+      continue;
     }
+    const signed char state = light->animationState;
+    if (state == 3) {
+      continue;
+    }
+    *it = this->CreateLight(3, &light->originX);
+    FreeParticle(light);
   }
 }
 
@@ -206,22 +216,19 @@ void CCaneOfEvilEyeEffect::UpdateEyes() {
   for (auto it = this->eyes.begin(); it != this->eyes.end(); ++it) {
     CEZ2STRParticle* eye = *it;
     if (eye) {
-      const float x = this->position[0] + eye->offsetX;
-      const float y = this->position[1] + eye->offsetY;
-      const float z = this->position[2] + eye->offsetZ;
+      vector3d position = {this->position[0], this->position[1], this->position[2]};
+      position += eye->offset;
 
       const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
-      const float viewX = y * view[3] + x * view[0] + z * view[6] + view[9];
-      const float viewY = y * view[4] + x * view[1] + z * view[7] + view[10];
-      const float viewZ = y * view[5] + x * view[2] + z * view[8] + view[11];
+      const float viewX = position.y * view[3] + position.x * view[0] + position.z * view[6] + view[9];
+      const float viewY = position.y * view[4] + position.x * view[1] + position.z * view[7] + view[10];
+      const float viewZ = position.y * view[5] + position.x * view[2] + position.z * view[8] + view[11];
 
       const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
-      const float worldX = viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9];
-      const float worldY = viewY * inverse[4] + viewX * inverse[1] + viewZ * inverse[7] + inverse[10];
-      const float worldZ = viewY * inverse[5] + viewX * inverse[2] + viewZ * inverse[8] + inverse[11];
-      eye->position.x = worldX;
-      eye->position.y = worldY;
-      eye->position.z = worldZ;
+      const vector3d world = {viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9],
+                              viewY * inverse[4] + viewX * inverse[1] + viewZ * inverse[7] + inverse[10],
+                              viewY * inverse[5] + viewX * inverse[2] + viewZ * inverse[8] + inverse[11]};
+      eye->position = world;
       eye->Process(0.0f, 0.0f, 0.0f);
     }
   }
@@ -289,22 +296,19 @@ void CCaneOfEvilEyeEffect::UpdateLights() {
       light->m_angle = static_cast<float>(angle);
       light->m_scale = SquareRoot(distance) * 0.0044f;
 
-      const float x = light->offsetX + this->position[0];
-      const float y = light->offsetY + this->position[1];
-      const float z = light->offsetZ + this->position[2];
+      vector3d position = {this->position[0], this->position[1], this->position[2]};
+      position += light->offset;
 
       const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
-      const float viewX = y * view[3] + x * view[0] + z * view[6] + view[9];
-      const float viewY = y * view[4] + x * view[1] + z * view[7] + view[10];
-      const float viewZ = y * view[5] + x * view[2] + z * view[8] + view[11];
+      const float viewX = position.y * view[3] + position.x * view[0] + position.z * view[6] + view[9];
+      const float viewY = position.y * view[4] + position.x * view[1] + position.z * view[7] + view[10];
+      const float viewZ = position.y * view[5] + position.x * view[2] + position.z * view[8] + view[11];
 
       const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
-      const float worldX = viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9];
-      const float worldY = viewY * inverse[4] + viewX * inverse[1] + viewZ * inverse[7] + inverse[10];
-      const float worldZ = viewY * inverse[5] + viewX * inverse[2] + viewZ * inverse[8] + inverse[11];
-      light->position.x = worldX;
-      light->position.y = worldY;
-      light->position.z = worldZ;
+      const vector3d world = {viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9],
+                              viewY * inverse[4] + viewX * inverse[1] + viewZ * inverse[7] + inverse[10],
+                              viewY * inverse[5] + viewX * inverse[2] + viewZ * inverse[8] + inverse[11]};
+      light->position = world;
       light->Process(0.0f, 0.0f, 0.0f);
     }
   }
@@ -314,14 +318,39 @@ void CCaneOfEvilEyeEffect::UpdateLights() {
 // FUNCTION: fn_06882
 void CCaneOfEvilEyeEffect::Render() {
   for (auto it = this->eyes.begin(); it != this->eyes.end(); ++it) {
-    if (*it) {
-      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    this->RenderParticle(*it);
   }
 
   for (auto it = this->lights.begin(); it != this->lights.end(); ++it) {
-    if (*it) {
-      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    this->RenderParticle(*it);
+  }
+}
+
+// OFFSET: 0x006F9DD0
+// FUNCTION: fn_46162
+__forceinline void CCaneOfEvilEyeEffect::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+  }
+}
+
+// OFFSET: 0x006F9BA0
+// FUNCTION: fn_46281
+void CCaneOfEvilEyeEffect::ProcessParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    vector3d position = {this->position[0], this->position[1], this->position[2]};
+    position += particle->offset;
+
+    const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
+    const vector3d viewPos = {position.y * view[3] + position.x * view[0] + position.z * view[6] + view[9],
+                              position.y * view[4] + position.x * view[1] + position.z * view[7] + view[10],
+                              position.y * view[5] + position.x * view[2] + position.z * view[8] + view[11]};
+
+    const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
+    const vector3d world = {viewPos.y * inverse[3] + viewPos.x * inverse[0] + viewPos.z * inverse[6] + inverse[9],
+                            viewPos.y * inverse[4] + viewPos.x * inverse[1] + viewPos.z * inverse[7] + inverse[10],
+                            viewPos.y * inverse[5] + viewPos.x * inverse[2] + viewPos.z * inverse[8] + inverse[11]};
+    particle->position = world;
+    particle->Process(0.0f, 0.0f, 0.0f);
   }
 }

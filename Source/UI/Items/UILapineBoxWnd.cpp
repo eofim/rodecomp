@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Client/Mode/ModeDragState.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Items/UILapineScrollBar.h"
 #include "UI/Window/UIEnums.h"
@@ -52,13 +53,13 @@ void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
     return;
   }
 
+  UILapineBox_IngredientListWnd* list = static_cast<UILapineBox_IngredientListWnd*>(this->parent);
   const int id = this->item.identity[1];
   if (id == 0) {
     return;
   }
 
   const int quantity = this->quantity;
-  UILapineBox_IngredientListWnd* list = static_cast<UILapineBox_IngredientListWnd*>(this->parent);
   UILapineBoxWnd* box = static_cast<UILapineBoxWnd*>(list->parent);
   if (box->items.size() < static_cast<std::size_t>(box->maxItems)) {
     if (list->SendMsg(list, UM_DECITEM, id, 0, 0, 0) >= 0) {
@@ -71,7 +72,7 @@ void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
 // FUNCTION: fn_04162
 void UIIngredientInfoWnd::OnLBtnDown(int x, int y) {
   if (this->insufficient != 1 && this->item.identity[1] > 0) {
-    g_modeMgr.GetGameMode()->BeginDragItem(27, this->item, this->quantity, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_LAPINE_INGREDIENT, this->item, this->quantity, -1);
   }
 }
 
@@ -123,7 +124,7 @@ void UILapineBoxWnd::OnLBtnDown(int x, int y) {
   const ITEM_INFO item = this->ReadMaterial(x, y);
 
   if (item.identity[1] > 0) {
-    g_modeMgr.GetGameMode()->BeginDragItem(0x1A, item, item.quantity, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_LAPINE_BOX, item, item.quantity, -1);
   }
 }
 
@@ -138,8 +139,8 @@ void UILapineBoxWnd::OnMouseHover(int x, int y) {
     int tipX = 0;
     int tipY = -20;
     for (unsigned int index = 0; index < this->items.size(); ++index) {
-      if (this->items[index].identity[1] == item.identity[1]) {
-        int position[2] = {0, 0};
+      if (item.identity[1] == this->items[index].identity[1]) {
+        int position[2];
         this->MaterialPosition(position, index);
         tipX = position[0];
         tipY = position[1] - 0x14;
@@ -212,9 +213,8 @@ __declspec(noinline) void UILapineBoxWnd::MaterialPosition(int* out, int index) 
 // OFFSET: 0x00602410
 // FUNCTION: fn_04180
 __declspec(noinline) ITEM_INFO UILapineBoxWnd::ReadMaterial(int x, int y) {
-  const auto first = this->items.begin();
-  const unsigned int count = this->items.size();
-  for (unsigned int index = 0; index < count; ++index) {
+  const ITEM_INFO* first = &this->items[0];
+  for (unsigned int index = 0, count = this->items.size(); index < count; ++index) {
     int position[2];
     this->MaterialPosition(position, index);
     if (x >= position[0] && x <= position[0] + 0x18 && y >= position[1] && y <= position[1] + 0x18) {
@@ -244,26 +244,25 @@ bool UILapineBox_IngredientListWnd::CanUseIngredient(std::uint32_t identity) {
   }
 
   if (material->quantity > item.quantity) {
-    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_INPUT_FREE_MESSAGE), material->quantity).c_str()), 0, 0, 0);
+    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_LAPINE_FAIL_NOT_ENOUGH_ITEM_COUNT), material->quantity).c_str()), 0, 0, 0);
     return false;
   }
   if (this->minRefine > item.refiningLevel) {
-    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CAPTCHA_INPUT_ANSWER)), 0, 0, 0);
+    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_FAIL_NOT_ENOUGH_REFINING_LEVEL)), 0, 0, 0);
     return false;
   }
   if (this->maxRefine < item.refiningLevel) {
-    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_COUNT_INFINITY)), 0, 0, 0);
+    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_FAIL_REFINING_LEVEL_OVERFLOW_NEEDED)), 0, 0, 0);
     return false;
   }
   if (this->minRefine != 0 && this->minRefine < item.refiningLevel) {
-    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEMSHOP_CURRENCY)), 0, 0, 0);
+    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_WARNING_REFINING_LEVEL_HIGHER_THAN_NEEDED)), 0, 0, 0);
   }
 
   if (item.IsEquipment() == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
-    const std::uint32_t* card = item.cards;
-    for (int index = 0; index < item.SlotCount(); ++index, ++card) {
-      if (index < 4 && static_cast<int>(*card) > 0) {
-        this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PURCHASEWND_TOTAL)), 0, 0, 0);
+    for (int index = 0; index < item.SlotCount(); ++index) {
+      if (index < 4 && static_cast<int>(item.cards[index]) > 0) {
+        this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_WARNING_HAS_CARD_OR_ENCHANTED)), 0, 0, 0);
         return true;
       }
     }
@@ -323,11 +322,11 @@ int UILapineBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     case ID_LAPINE_COMBINE_ITEMS: {
       RandomCombineItemPacket* packet = new (std::nothrow) RandomCombineItemPacket;
       packet->id = ID_CZ_REQ_RANDOM_COMBINE_ITEM;
-      const std::int16_t materialsLength = static_cast<std::int16_t>(this->items.size() * 4);
-      packet->length = materialsLength + 8;
+      const std::size_t materialsLength = this->items.size() * 4;
+      packet->length = static_cast<std::int16_t>(materialsLength + 8);
       packet->ingredientId = this->ingredientId;
 
-      char* payload = new (std::nothrow) char[materialsLength + 8];
+      char* payload = new (std::nothrow) char[static_cast<std::int16_t>(materialsLength) + 8];
       memcpy_s(payload, packet->length, packet, 8);
 
       for (std::size_t index = 0; index < this->items.size(); ++index) {
@@ -339,25 +338,26 @@ int UILapineBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       GetRagConnection().Send(packet->length, payload);
 
       this->waiting = 1;
-      this->makeButton->SetDisabled(1);
-      this->makeButton->Invalidate();
+      auto* button = this->makeButton;
+      button->SetDisabled(1);
+      button->Invalidate();
       this->Invalidate();
 
       delete packet;
-      delete[] payload;
+      if (payload) {
+        delete[] payload;
+      }
       break;
     }
     case ID_LAPINE_ADD_INGREDIENT: {
       const std::vector<UIIngredientInfoWnd*>& entries = this->ingredientList->items;
-      const auto selected = std::find_if(entries.begin(), entries.end(), [](UIIngredientInfoWnd* entry) {
-        return entry->selected == 1;
-      });
-
-      if (selected != entries.end()) {
-        UIIngredientInfoWnd* entry = *selected;
-
-        if (entry != nullptr && entry->insufficient != 1 && this->ingredientList->SendMsg(this, UM_DECITEM, entry->item.identity[1], 0, 0, 0) >= 0) {
-          this->AddIngredient(entry->item.identity[1], entry->quantity);
+      for (std::vector<UIIngredientInfoWnd*>::const_iterator it = entries.begin(); it != entries.end(); ++it) {
+        if ((*it)->selected == 1) {
+          UIIngredientInfoWnd* entry = *it;
+          if (entry != nullptr && entry->insufficient != 1 && this->ingredientList->SendMsg(this, UM_DECITEM, entry->item.identity[1], 0, 0, 0) >= 0) {
+            this->AddIngredient(entry->item.identity[1], entry->quantity);
+          }
+          break;
         }
       }
       break;
@@ -370,9 +370,10 @@ int UILapineBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     if (found != this->items.end()) {
       this->items.erase(found);
 
-      if (this->items.size() < static_cast<std::size_t>(this->maxItems)) {
-        this->moveButton->SetDisabled(0);
-        this->moveButton->Invalidate();
+      if (static_cast<std::size_t>(this->maxItems) > this->items.size()) {
+        auto* button = this->moveButton;
+        button->SetDisabled(0);
+        button->Invalidate();
       }
 
       this->Invalidate();
@@ -397,7 +398,8 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
   switch (message) {
   case UM_REFRESHITEM:
     for (std::vector<ITEM_INFO>::iterator material = this->materials.begin(); material != this->materials.end(); ++material) {
-      std::vector<int> ids = g_session.FindInventoryIndicesByItemId(std::atoi(material->itemId.c_str()), 1);
+      const int itemId = std::atoi(material->itemId.c_str());
+      std::vector<int> ids = g_session.FindInventoryIndicesByItemId(itemId, 1);
       for (std::vector<int>::iterator id = ids.begin(); id != ids.end(); ++id) {
         this->AddIngredient(*id);
       }
@@ -405,7 +407,7 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
 
     for (std::vector<UIIngredientInfoWnd*>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
       ITEM_INFO owned = g_session.LookupClientItemByIdentity((*it)->item.identity[1]);
-      if (owned.identity[1] == 0) {
+      if (owned.identity[1] <= 0) {
         (*it)->Show(0);
       }
     }
@@ -424,38 +426,33 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
     break;
 
   case UM_DECITEM: {
-    std::vector<UIIngredientInfoWnd*>::iterator it;
-    for (it = this->items.begin(); it != this->items.end(); ++it) {
-      if (static_cast<std::uint32_t>(a) == (*it)->item.identity[1]) {
-        break;
-      }
-    }
+    const std::vector<UIIngredientInfoWnd*>::iterator it =
+        std::find_if(this->items.begin(), this->items.end(), [a](UIIngredientInfoWnd* item) {
+          return static_cast<std::uint32_t>(a) == item->item.identity[1];
+        });
     if (it == this->items.end()) {
       break;
     }
 
     UIIngredientInfoWnd* selected = *it;
-    std::vector<ITEM_INFO>::iterator found = this->materials.begin();
-    const std::vector<ITEM_INFO>::iterator end = this->materials.end();
-    for (; found != end; ++found) {
-      ITEM_INFO copy(*found);
-      if (std::atoi(selected->item.itemId.c_str()) == std::atoi(copy.itemId.c_str())) {
-        break;
-      }
-    }
+    const std::vector<ITEM_INFO>::iterator found =
+        std::find_if(this->materials.begin(), this->materials.end(), [selected](ITEM_INFO material) {
+          const int itemId = std::atoi(selected->item.itemId.c_str());
+          return itemId == std::atoi(material.itemId.c_str());
+        });
 
     if (found == this->materials.end()) {
       break;
     }
 
     const int need = found->quantity;
-    if (selected->item.quantity < need) {
-      this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_INPUT_FREE_MESSAGE), need).c_str()), 0, 0, 0);
+    if (need > selected->item.quantity) {
+      this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_LAPINE_FAIL_NOT_ENOUGH_ITEM_COUNT), found->quantity).c_str()), 0, 0, 0);
       return -1;
     }
 
-    if (selected->item.refiningLevel < found->refiningLevel) {
-      this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CAPTCHA_INPUT_ANSWER)), 0, 0, 0);
+    if (found->refiningLevel > selected->item.refiningLevel) {
+      this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_FAIL_NOT_ENOUGH_REFINING_LEVEL)), 0, 0, 0);
       return -1;
     }
 
@@ -471,17 +468,17 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
   }
 
   case UM_SETPOS: {
-    int y = 7;
+    int row = 0;
     for (std::vector<UIIngredientInfoWnd*>::iterator it = this->items.begin(); it != this->items.end();) {
       UIIngredientInfoWnd* entry = *it;
       if (entry->geometry.visible == 0) {
         entry->Invalidate();
         it = this->items.erase(it);
       } else {
-        this->MoveScrollChild(entry, 0, y);
+        this->MoveScrollChild(entry, 0, row * 0x1E + 7);
         (*it)->Invalidate();
+        ++row;
         ++it;
-        y += 0x1E;
       }
     }
     this->UpdateScrollRange();
@@ -535,21 +532,18 @@ void UILapineBoxWnd::SetIngredient(int id) {
 // FUNCTION: fn_04176
 void UILapineBoxWnd::AddMaterial(int id, int quantity) {
   std::vector<ITEM_INFO>& materials = this->ingredientList->materials;
-  std::vector<ITEM_INFO>::iterator it;
-  const std::vector<ITEM_INFO>::iterator end = materials.end();
-  for (it = materials.begin(); it != end; ++it) {
-    ITEM_INFO copy(*it);
-    if (std::atoi(copy.itemId.c_str()) == id) {
-      break;
-    }
+  const std::vector<ITEM_INFO>::iterator it = std::find_if(materials.begin(), materials.end(), [id](ITEM_INFO material) {
+    return id == std::atoi(material.itemId.c_str());
+  });
+
+  if (it != materials.end()) {
+    return;
   }
 
-  if (it == end) {
-    ITEM_INFO material;
-    material.SetItemId(id);
-    material.quantity = quantity;
-    materials.push_back(material);
-  }
+  ITEM_INFO material;
+  material.SetItemId(id);
+  material.quantity = quantity;
+  materials.push_back(material);
 }
 
 // OFFSET: 0x006028C0
@@ -557,23 +551,23 @@ void UILapineBoxWnd::AddMaterial(int id, int quantity) {
 void UIIngredientInfoWnd::SetIngredientItem(std::uint32_t id) {
   this->item = g_session.LookupClientItemByIdentity(id);
 
-  std::vector<char*> breaks;
-  char name[260];
-  std::memset(name, 0, sizeof(name));
-  char* highlight = nullptr;
-  int remaining = sizeof(name);
-  char* cursor = name;
-  int highlightColor;
-  this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
+  {
+    std::vector<const char*> breaks;
+    char name[260];
+    std::memset(name, 0, sizeof(name));
+    char* highlight = nullptr;
+    int remaining = sizeof(name);
+    char* cursor = name;
+    int highlightColor;
+    this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
 
-  if (this->item.identified == 1) {
-    const int count = this->item.optionCount;
-    if (count != 0) {
-      sprintf_s(name, sizeof(name), LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), name, count);
+    if (this->item.identified == 1 && this->item.optionCount != 0) {
+      sprintf_s(name, sizeof(name), LookupMessage(MSI_EA6), name, this->item.optionCount);
     }
+
+    this->item.SetName(name);
+    this->tooltip = name;
   }
 
-  this->item.SetName(name);
-  this->tooltip = name;
   this->Invalidate();
 }

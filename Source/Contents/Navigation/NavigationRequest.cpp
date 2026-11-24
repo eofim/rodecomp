@@ -10,8 +10,6 @@
 #include <windows.h>
 #include <shlwapi.h>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // OFFSET: 0x00B8C0B0
 // FUNCTION: fn_19420
 __declspec(noinline) CNavi_Object* FindNaviObjectByName(const char* name, const std::vector<CNavi_Object*>& objects) {
@@ -29,7 +27,7 @@ __declspec(noinline) CNavi_Object* FindNaviObjectByName(const char* name, const 
 // OFFSET: 0x00B8DF10
 // FUNCTION: fn_19461
 int CNavi_Object::GetFlag() const {
-  return this->flag;
+  return static_cast<std::uint16_t>(this->index >> 16);
 }
 
 // OFFSET: 0x00B8E600
@@ -74,7 +72,7 @@ std::size_t CNaviInfo::GetNameLength() const {
 // FUNCTION: fn_19488
 int CNavi_Object::GetIndex() const {
   if (this->type == 300 || this->type == 301) {
-    return this->shortIndex;
+    return static_cast<std::uint16_t>(this->index);
   }
   return this->index;
 }
@@ -125,7 +123,7 @@ bool CNavigationManager::UpdateGround() {
     return false;
   }
   this->ground = scene->ground;
-  this->pathFinder.attr = terrain;
+  this->pathFinder.SetAttr(terrain);
   return true;
 }
 
@@ -272,38 +270,39 @@ int CNaviInfo::GetIndex() const {
   return this->index;
 }
 
+// INLINED
+template <typename T>
+static T* FindNaviObjectById(const std::vector<T*>& objects, unsigned int id) {
+  for (T* object : objects) {
+    if (static_cast<unsigned int>(object->id) == id) {
+      return object;
+    }
+  }
+  return nullptr;
+}
+
 // OFFSET: 0x00B8DF40
 // FUNCTION: fn_19464
 CNavi_Link* CNaviInfo::FindLink(unsigned int key, bool byId) {
   if (byId) {
-    for (CNavi_Link* link : this->links) {
-      if (static_cast<unsigned int>(link->id) == key) {
-        return link;
-      }
-    }
+    return FindNaviObjectById(this->links, key);
+  }
+  if (this->links.empty()) {
     return nullptr;
   }
-  if (this->links.empty() || key >= this->links.size()) {
-    return nullptr;
-  }
-  return this->links[key];
+  return key >= this->links.size() ? nullptr : this->links[key];
 }
 
 // OFFSET: 0x00B8E640
 // FUNCTION: fn_19478
 CNavi_Object* CNaviInfo::FindNpc(unsigned int key, bool byId) {
   if (byId) {
-    for (CNavi_Object* npc : this->npcs) {
-      if (static_cast<unsigned int>(npc->id) == key) {
-        return npc;
-      }
-    }
+    return FindNaviObjectById(this->npcs, key);
+  }
+  if (this->npcs.empty()) {
     return nullptr;
   }
-  if (this->npcs.empty() || key >= this->npcs.size()) {
-    return nullptr;
-  }
-  return this->npcs[key];
+  return key >= this->npcs.size() ? nullptr : this->npcs[key];
 }
 
 // OFFSET: 0x00B8E6F0
@@ -325,7 +324,9 @@ std::vector<CNavi_Object*>* CNaviInfo::Npcs() {
 
 // INLINED
 static CNavi_Link* FindSameLink(const std::vector<CNavi_Link*>& links, CNavi_Link target) {
-  for (CNavi_Link* candidate : links) {
+  const auto end = links.end();
+  for (auto it = links.begin(); it != end; ++it) {
+    CNavi_Link* candidate = *it;
     if (candidate->cellX == target.cellX && candidate->cellY == target.cellY && candidate->linkedCellX == target.linkedCellX &&
         candidate->linkedCellY == target.linkedCellY && candidate->info != nullptr &&
         std::strcmp(candidate->info->name.c_str(), target.info->name.c_str()) == 0 && candidate->linkedInfo != nullptr &&
@@ -364,17 +365,12 @@ std::vector<CNavi_Link*>* CNaviInfo::Links() {
 // FUNCTION: fn_19469
 CNavi_Object* CNaviInfo::FindMob(unsigned int key, bool byId) {
   if (byId) {
-    for (CNavi_Object* mob : this->mobs) {
-      if (static_cast<unsigned int>(mob->id) == key) {
-        return mob;
-      }
-    }
+    return FindNaviObjectById(this->mobs, key);
+  }
+  if (this->mobs.empty()) {
     return nullptr;
   }
-  if (this->mobs.empty() || key >= this->mobs.size()) {
-    return nullptr;
-  }
-  return this->mobs[key];
+  return key >= this->mobs.size() ? nullptr : this->mobs[key];
 }
 
 // OFFSET: 0x00B8E450
@@ -429,7 +425,8 @@ void CNaviInfo::SearchMobs(const std::vector<std::string>& keywords, std::vector
   std::memset(buffer, 0, sizeof(buffer));
 
   std::vector<std::wstring> wideKeywords;
-  for (const std::string& keyword : keywords) {
+  for (auto keywordIt = keywords.begin(); keywordIt != keywords.end(); ++keywordIt) {
+    const std::string& keyword = *keywordIt;
     MultiByteToWideChar(CP_ACP, 0, keyword.c_str(), -1, buffer, 100);
     wideKeywords.push_back(std::wstring(buffer));
   }
@@ -442,24 +439,24 @@ void CNaviInfo::SearchMobs(const std::vector<std::string>& keywords, std::vector
   MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, buffer, 100);
   const std::wstring wideText(buffer);
 
-  for (CNavi_Object* mob : this->mobs) {
-    MultiByteToWideChar(CP_ACP, 0, mob->GetName(), -1, buffer, 100);
+  for (auto mobIt = this->mobs.begin(); mobIt != this->mobs.end(); ++mobIt) {
+    MultiByteToWideChar(CP_ACP, 0, (*mobIt)->GetName(), -1, buffer, 100);
     entryText = buffer;
 
     bool matched = true;
-    for (const std::wstring& keyword : wideKeywords) {
-      matched &= StrStrIW(entryText.c_str(), keyword.c_str()) != nullptr;
+    for (auto keywordIt = wideKeywords.begin(); keywordIt != wideKeywords.end(); ++keywordIt) {
+      matched &= StrStrIW(entryText.c_str(), keywordIt->c_str()) != nullptr;
     }
     if (!matched) {
       continue;
     }
 
     NaviCell cell;
-    const NaviCell* position = mob->GetCell(&cell);
+    const NaviCell* position = (*mobIt)->GetCell(&cell);
     target.x = position->x;
     target.y = position->y;
-    target.name = mob->GetName();
-    target.object = mob;
+    target.name = (*mobIt)->GetName();
+    target.object = *mobIt;
     out.push_back(target);
   }
 }
@@ -472,30 +469,31 @@ void CNaviInfo::SearchNpcs(const std::vector<std::string>& keywords, std::vector
   std::memset(buffer, 0, sizeof(buffer));
 
   std::vector<std::wstring> wideKeywords;
-  for (const std::string& keyword : keywords) {
+  for (auto keywordIt = keywords.begin(); keywordIt != keywords.end(); ++keywordIt) {
+    const std::string& keyword = *keywordIt;
     MultiByteToWideChar(CP_ACP, 0, keyword.c_str(), -1, buffer, 100);
     wideKeywords.push_back(std::wstring(buffer));
   }
 
   std::wstring entryText;
-  for (CNavi_Object* npc : this->npcs) {
-    MultiByteToWideChar(CP_ACP, 0, npc->GetName(), -1, buffer, 100);
+  for (auto npcIt = this->npcs.begin(); npcIt != this->npcs.end(); ++npcIt) {
+    MultiByteToWideChar(CP_ACP, 0, (*npcIt)->GetName(), -1, buffer, 100);
     entryText = buffer;
 
     bool matched = true;
-    for (const std::wstring& keyword : wideKeywords) {
-      matched &= StrStrIW(entryText.c_str(), keyword.c_str()) != nullptr;
+    for (auto keywordIt = wideKeywords.begin(); keywordIt != wideKeywords.end(); ++keywordIt) {
+      matched &= StrStrIW(entryText.c_str(), keywordIt->c_str()) != nullptr;
     }
     if (!matched) {
       continue;
     }
 
     NaviCell cell;
-    const NaviCell* position = npc->GetCell(&cell);
+    const NaviCell* position = (*npcIt)->GetCell(&cell);
     target.x = position->x;
     target.y = position->y;
-    target.name = npc->GetName();
-    target.object = npc;
+    target.name = (*npcIt)->GetName();
+    target.object = *npcIt;
     out.push_back(target);
   }
 }

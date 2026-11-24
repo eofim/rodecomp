@@ -15,6 +15,11 @@
 CCresciveBolt::CCresciveBolt() : CEffect(1951), particle(nullptr) {
 }
 
+// OFFSET: 0x0070AB40
+// FUNCTION: fn_46196
+__declspec(noinline) CCresciveBolt::~CCresciveBolt() {
+}
+
 // OFFSET: 0x0070AC00
 // FUNCTION: fn_07108
 void CCresciveBolt::Close() {
@@ -29,18 +34,18 @@ void CCresciveBolt::Close() {
 void CCresciveBolt::Open() {
   float fromReciprocalDepth = 0.0f;
   float toReciprocalDepth = 0.0f;
-  float fromX;
-  float fromY;
-  float toX;
-  float toY;
-  g_renderer->ProjectViewport(this->position, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
-  g_renderer->ProjectViewport(this->sourcePosition, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
+  float fromScreen[2];
+  float toScreen[2];
+  g_renderer->ProjectViewport(this->position, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromScreen[0], &fromScreen[1], &fromReciprocalDepth);
+  const float* const toMatrix = g_modeMgr.GetGameMode()->camera->frame.view.values;
+  const float* const toPosition = this->sourcePosition;
+  g_renderer->ProjectViewport(toPosition, toMatrix, &toScreen[0], &toScreen[1], &toReciprocalDepth);
 
-  const float dx = toX - fromX;
-  const float dy = toY - fromY;
+  const float dx = toScreen[0] - fromScreen[0];
+  const float dy = toScreen[1] - fromScreen[1];
   const float length = SquareRoot(dy * dy + dx * dx);
   double angle = static_cast<float>(std::acos(static_cast<double>(-dx / length))) / 3.141592f * 180.0f;
-  if (toY > fromY) {
+  if (toScreen[1] > fromScreen[1]) {
     angle = 360.0 - angle;
   }
 
@@ -71,19 +76,26 @@ bool CCresciveBolt::IsAlive() {
 // OFFSET: 0x0070AED0
 // FUNCTION: fn_07111
 void CCresciveBolt::OnProcess() {
-  if (!this->particle) {
+  CEZ2STRParticle* particle = this->particle;
+  if (!particle) {
     return;
   }
 
-  this->particle->position = vector3d(this->position[0] + 0.0f, this->position[1] - 3.0f, this->position[2] + 0.0f);
+  const float x = this->position[0];
+  const float y = this->position[1];
+  const float z = this->position[2];
+  particle->position.x = x + 0.0f;
+  particle->position.y = y - 3.0f;
+  particle->position.z = z + 0.0f;
 
-  const float angle = static_cast<float>(static_cast<double>(this->particle->m_angle));
+  particle = this->particle;
+  const float angle = static_cast<float>(static_cast<double>(particle->m_angle));
   if (angle <= 90.0f || angle >= 270.0f) {
-    this->particle->Process(0.0f, -40.0f, 0.0f);
+    particle->Process(0.0f, -40.0f, 0.0f);
     return;
   }
 
-  this->particle->Process(0.0f, 0.0f, 0.0f);
+  particle->Process(0.0f, 0.0f, 0.0f);
 }
 
 // OFFSET: 0x0070AF80

@@ -18,7 +18,26 @@ namespace {
     const float offset = static_cast<float>(center) * scale;
     const float coordinate = static_cast<float>(position) - offset;
 
-    return TruncateToInt(coordinate / scale);
+    return static_cast<int>(coordinate / scale);
+  }
+
+  // INLINED
+  __forceinline bool SpriteImageSize(const char* spriteName, const SpriteFrameCell& cell, int& width, int& height) {
+    auto* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(spriteName));
+
+    if (!sprite) {
+      return false;
+    }
+
+    const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
+
+    if (!image) {
+      return false;
+    }
+
+    width = image->doubleWidth != 0 ? image->width * 2 : image->width;
+    height = image->doubleHeight != 0 ? image->height * 2 : image->height;
+    return true;
   }
 }
 
@@ -37,17 +56,32 @@ CActRes* CActRes::Create() {
   return new CActRes;
 }
 
+// OFFSET: 0x007474A0
+// FUNCTION: fn_45820
+__forceinline void CActRes::AdjustCellPosition(SpriteFrameCell* cell, int width, int height, int doubleWidth,
+                                               int doubleHeight) {
+  if (!cell) {
+    this->Unload();
+    ShowErrorDialog("Error While Load Act", 0);
+    return;
+  }
+
+  const int imageWidth = doubleWidth ? width * 2 : width;
+  const int imageHeight = doubleHeight ? height * 2 : height;
+  cell->x = RelativeCoordinate(cell->x, imageWidth, cell->scaleX);
+  cell->y = RelativeCoordinate(cell->y, imageHeight, cell->scaleY);
+}
+
 // OFFSET: 0x007437B0
 // FUNCTION: fn_07750
 bool CActRes::Load(const char* name) {
   CFile file;
+  bool loaded;
+
   if (!file.Open(name, 0, true, false)) {
-    const std::string path(name);
-    const std::string prefix("Cannot find File : ");
-    const std::string message = prefix + path;
-    ShowErrorDialog(message.c_str(), 0);
-    return false;
-  }
+    loaded = false;
+    ShowErrorDialog((std::string("Cannot find File : ") + std::string(name)).c_str(), 0);
+  } else {
 
   struct Header {
     std::uint16_t magic;
@@ -75,9 +109,7 @@ bool CActRes::Load(const char* name) {
     return false;
   }
 
-  this->Unload();
-  this->animations.resize(header.count);
-  this->speeds.resize(header.count, 4.0f);
+  this->InitializeAnimations(header.count);
 
   for (unsigned animationIndex = 0; animationIndex < this->animations.size(); ++animationIndex) {
     std::vector<ActionFrame>& animation = this->animations[animationIndex];
@@ -106,6 +138,8 @@ bool CActRes::Load(const char* name) {
 
       for (int index = 0; index < cellCount; ++index) {
         SpriteFrameCell& cell = frame.cells[index];
+        int width;
+        int height;
 
         if (header.version < 0x0200) {
           file.Read(&cell, 16);
@@ -123,41 +157,49 @@ bool CActRes::Load(const char* name) {
             std::int32_t y;
             std::int32_t image;
             std::int32_t mirrored;
-            std::uint32_t color;
+            SpriteCellColor color;
             float scale;
             std::int32_t rotation;
             std::int32_t imageType;
           } legacy;
           file.Read(&legacy, sizeof(legacy));
-          cell = {legacy.x, legacy.y, legacy.image, legacy.mirrored, legacy.color, legacy.scale, legacy.scale, legacy.rotation, legacy.imageType};
+          cell.colorChannels.alpha = legacy.color.alpha;
+          cell.colorChannels.red = legacy.color.red;
+          cell.colorChannels.green = legacy.color.green;
+          cell.colorChannels.blue = legacy.color.blue;
+          cell.x = legacy.x;
+          cell.y = legacy.y;
+          cell.rotation = legacy.rotation;
+          cell.mirrored = legacy.mirrored;
+          cell.imageType = legacy.imageType;
+          cell.image = legacy.image;
+          cell.scaleX = legacy.scale;
+          cell.scaleY = legacy.scale;
+
+          if (cell.image == -1 || !SpriteImageSize(spriteName.c_str(), cell, width, height)) {
+            continue;
+          }
         } else {
           file.Read(&cell, sizeof(cell));
-        }
 
-        if (header.version >= 0x0205) {
-          int width;
-          int height;
-          file.Read(&width, sizeof(width));
-          file.Read(&height, sizeof(height));
+          if (header.version >= 0x0205) {
+            int imageWidth;
+            int imageHeight;
+            file.Read(&imageWidth, sizeof(imageWidth));
+            file.Read(&imageHeight, sizeof(imageHeight));
 
-          if (cell.image != -1) {
-            cell.x = RelativeCoordinate(cell.x, width, cell.scaleX);
-            cell.y = RelativeCoordinate(cell.y, height, cell.scaleY);
-          }
-        } else if (cell.image != -1) {
-          auto* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(spriteName.c_str()));
-
-          if (sprite) {
-            const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
-
-            if (image) {
-              const int width = image->width * (image->doubleWidth != 0 ? 2 : 1);
-              const int height = image->height * (image->doubleHeight != 0 ? 2 : 1);
-              cell.x = RelativeCoordinate(cell.x, width, cell.scaleX);
-              cell.y = RelativeCoordinate(cell.y, height, cell.scaleY);
+            if (cell.image == -1) {
+              continue;
             }
+
+            width = imageWidth;
+            height = imageHeight;
+          } else if (cell.image == -1 || !SpriteImageSize(spriteName.c_str(), cell, width, height)) {
+            continue;
           }
         }
+
+        this->AdjustCellPosition(&cell, width, height, 0, 0);
       }
 
       if (header.version >= 0x0200) {
@@ -205,7 +247,10 @@ bool CActRes::Load(const char* name) {
   }
 
   file.Close();
-  return true;
+  loaded = true;
+  }
+
+  return loaded;
 }
 
 // OFFSET: 0x007445A0
@@ -213,6 +258,24 @@ bool CActRes::Load(const char* name) {
 void CActRes::Unload() {
   this->animations.clear();
   this->sounds.clear();
+}
+
+// OFFSET: 0x00746CF0
+// FUNCTION: fn_46343
+void CActRes::InitializeAnimations(unsigned animationCount) {
+  this->Unload();
+  this->animations.resize(animationCount);
+  this->speeds.resize(animationCount, 4.0f);
+}
+
+// OFFSET: 0x00746ED0
+// FUNCTION: fn_46342
+void ActionFrame::InitializeCells(unsigned cellCount) {
+  this->cellCount = cellCount;
+  this->sound = -1;
+  this->cells.resize((std::min)(1000u, cellCount), SpriteFrameCell{});
+  this->anchors.clear();
+  this->anchorCount = 0;
 }
 
 // OFFSET: 0x00746F80

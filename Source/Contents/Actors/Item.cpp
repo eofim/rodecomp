@@ -42,6 +42,11 @@ struct ItemFallEntry {
   /* 0042 */ std::uint16_t grade;
 };
 
+// INLINED
+static float TerrainHeight(const CGameMode* mode, float x, float z) {
+  return mode->scene->terrain->Height(x, z);
+}
+
 // OFFSET: 0x00D8BE00
 // FUNCTION: fn_22253
 void CItem::SetRenderInfo(const float* bounds, float x, float y) {
@@ -51,29 +56,29 @@ void CItem::SetRenderInfo(const float* bounds, float x, float y) {
     // GLOBAL: gl_25149
     static const int minimumSize = static_cast<int>(g_renderer->UiScaleX() * 34.0f);
     ActorPickInfo* info = new ActorPickInfo;
-    info->left = std::min(bounds[0], bounds[2]);
-    info->top = bounds[1];
-    info->depth = bounds[4] + 300.0f;
-    info->right = std::max(bounds[0], bounds[2]);
-    info->bottom = bounds[3];
-    info->depthOffset = bounds[4] + 300.0f;
+    info->corners[0].x = bounds[0] < bounds[2] ? bounds[0] : bounds[2];
+    info->corners[0].y = bounds[1];
+    info->corners[0].z = bounds[4] + 300.0f;
+    info->corners[1].x = bounds[0] > bounds[2] ? bounds[0] : bounds[2];
+    info->corners[1].y = bounds[3];
+    info->corners[1].z = bounds[4] + 300.0f;
     info->accountId = this->itemAid;
     info->job = ItemPickJob;
     info->healthState = 0;
     info->kind = 1;
 
-    const int width = static_cast<int>(info->right - info->left);
+    const int width = static_cast<int>(info->corners[1].x - info->corners[0].x);
     if (width < minimumSize) {
-      const float grow = static_cast<float>((minimumSize - width) / 2);
-      info->left -= grow;
-      info->right += grow;
+      const int grow = (minimumSize - width) / 2;
+      info->corners[1].x += grow;
+      info->corners[0].x -= grow;
     }
 
-    const int height = static_cast<int>(info->bottom - info->top);
+    const int height = static_cast<int>(info->corners[1].y - info->corners[0].y);
     if (height < minimumSize) {
-      const float grow = static_cast<float>((minimumSize - height) / 2);
-      info->top -= grow;
-      info->bottom += grow;
+      const int grow = (minimumSize - height) / 2;
+      info->corners[1].y += grow;
+      info->corners[0].y -= grow;
     }
 
     g_actorPickNode.AddPickInfo(info);
@@ -106,13 +111,17 @@ void CItem::SubD8B5B0() {
 // FUNCTION: fn_22250
 bool CItem::OnProcess() {
   const float elapsed = static_cast<float>((timeGetTime() - this->render.motionStartTime) / 24.0);
-  this->render.isSingleColor = static_cast<int>(elapsed) % 92 >= 90;
+  if (static_cast<int>(elapsed) % 92 < 90) {
+    this->render.isSingleColor = 0;
+  } else {
+    this->render.isSingleColor = 1;
+  }
 
   if (this->isFalling) {
     this->render.position.y = (elapsed * 0.083f + this->fallVelocity) * elapsed + this->fallOrigin;
     CGameMode* mode = g_modeMgr.GetGameMode();
-    if (this->render.position.y > mode->scene->terrain->Height(this->render.position.x, this->render.position.z)) {
-      this->render.position.y = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
+    if (this->render.position.y > TerrainHeight(mode, this->render.position.x, this->render.position.z)) {
+      this->render.position.y = TerrainHeight(mode, this->render.position.x, this->render.position.z);
       this->isFalling = 0;
     }
   }
@@ -143,7 +152,7 @@ void CItem::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, s
   this->name = entry->itemId;
   std::string itemName = this->name;
   mode->SubcellPosition(entry->column, entry->row, entry->subColumn, entry->subRow, this->render.position.x, this->render.position.z);
-  this->render.position.y = mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
+  this->render.position.y = TerrainHeight(mode, this->render.position.x, this->render.position.z);
   if (entry->falling) {
     this->fallVelocity = -0.6f;
     this->render.position.y -= 15.0f;
@@ -173,9 +182,9 @@ void CItem::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, s
   this->render.motionStartTime = timeGetTime();
 
   if (entry->showEffect == 1) {
+    const float height = TerrainHeight(mode, this->render.position.x, this->render.position.z);
     const float x = this->render.position.x;
     const float z = this->render.position.z;
-    const float height = mode->scene->terrain->Height(x, z);
     const vector3d position{x, height, z};
     const int effectId = g_itemInfoMgr->GetEffectId(this->itemIndex);
     if (effectId >= 0 && !g_effectMgr->Spawn(entry->aid, effectId, position, 0, -1, 0, 0)) {

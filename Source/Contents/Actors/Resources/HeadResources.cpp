@@ -6,8 +6,6 @@
 
 #include <string>
 
-template __declspec(noinline) std::string std::operator+(const std::string&, const std::string&);
-
 // GLOBAL: gl_24703
 EquipmentResourceMgr* g_equipmentResourceMgr;
 // GLOBAL: gl_24539
@@ -18,135 +16,135 @@ const char* g_equipmentResourceExtensions[2] = {"act", "spr"};
 int CSession::GetDisplayJob() {
   const int job = this->m_job;
 
-  if (job == 7) {
+  if (job == JT_KNIGHT) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 6;
     }
-  } else if (job == 14) {
+  } else if (job == JT_CRUSADER) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 7;
     }
-  } else if (job == 4008) {
+  } else if (job == JT_KNIGHT_H) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 6;
     }
-  } else if (job == 4030) {
+  } else if (job == JT_KNIGHT_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 6;
     }
-  } else if (job == 4015) {
+  } else if (job == JT_CRUSADER_H) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 7;
     }
-  } else if (job == 4037) {
+  } else if (job == JT_CRUSADER_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 7;
     }
-  } else if (job == 4066) {
+  } else if (job == JT_ROYAL_GUARD) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 16;
     }
-  } else if (job == 4073) {
+  } else if (job == JT_ROYAL_GUARD_H) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 10;
     }
-  } else if (job == 4102) {
+  } else if (job == JT_ROYAL_GUARD_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 8;
     }
-  } else if (job == 4054) {
+  } else if (job == JT_RUNE_KNIGHT) {
     if (static_cast<bool>(g_session.m_jobFlags >> 19 & 1)) {
-      return 4080;
+      return JT_RUNE_CHICKEN;
     }
     if (static_cast<bool>(g_session.m_jobFlags >> 23 & 1)) {
-      return 4088;
+      return JT_RUNE_CHICKEN2;
     }
-    if (g_session.m_jobFlags & 0x1000000) {
-      return 4090;
+    if (static_cast<bool>(g_session.m_jobFlags >> 24 & 1)) {
+      return JT_RUNE_CHICKEN3;
     }
     if (static_cast<bool>(g_session.m_jobFlags >> 25 & 1)) {
-      return 4092;
+      return JT_RUNE_CHICKEN4;
     }
     if (static_cast<bool>(g_session.m_jobFlags >> 26 & 1)) {
-      return 4094;
+      return JT_RUNE_CHICKEN5;
     }
-  } else if (job == 4060) {
+  } else if (job == JT_RUNE_KNIGHT_H) {
     if (static_cast<bool>(g_session.m_jobFlags >> 19 & 1)) {
-      return 4081;
+      return JT_RUNE_CHICKEN_H;
     }
     if (static_cast<bool>(g_session.m_jobFlags >> 23 & 1)) {
-      return 4089;
+      return JT_RUNE_CHICKEN2_H;
     }
-    if (g_session.m_jobFlags & 0x1000000) {
-      return 4091;
+    if (static_cast<bool>(g_session.m_jobFlags >> 24 & 1)) {
+      return JT_RUNE_CHICKEN3_H;
     }
     if (static_cast<bool>(g_session.m_jobFlags >> 25 & 1)) {
-      return 4093;
+      return JT_RUNE_CHICKEN4_H;
     }
     if (static_cast<bool>(g_session.m_jobFlags >> 26 & 1)) {
-      return 4095;
+      return JT_RUNE_CHICKEN5_H;
     }
-  } else if (job == 4096) {
+  } else if (job == JT_RUNE_KNIGHT_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 19 & 1)) {
       return job + 13;
     }
-  } else if (job == 4047) {
+  } else if (job == JT_STAR) {
     if (static_cast<bool>(g_session.m_jobFlags >> 15 & 1)) {
       return job + 1;
     }
-  } else if (job == 4056) {
+  } else if (job == JT_RANGER) {
     if (static_cast<bool>(g_session.m_jobFlags >> 21 & 1)) {
       return job + 28;
     }
-  } else if (job == 4062) {
+  } else if (job == JT_RANGER_H) {
     if (static_cast<bool>(g_session.m_jobFlags >> 21 & 1)) {
       return job + 23;
     }
-  } else if (job == 4098) {
+  } else if (job == JT_RANGER_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 21 & 1)) {
       return job + 13;
     }
-  } else if (job == 4058) {
+  } else if (job == JT_MECHANIC) {
     if (g_session.madogearType != 0) {
       return job + 28;
     }
-  } else if (job == 4064) {
+  } else if (job == JT_MECHANIC_H) {
     if (g_session.madogearType != 0) {
       return job + 23;
     }
-  } else if (job == 4100) {
+  } else if (job == JT_MECHANIC_B) {
     if (g_session.madogearType != 0) {
       return job + 12;
     }
-  } else if (job == 4253) {
+  } else if (job == JT_MEISTER) {
     if (g_session.madogearType != 0) {
       return job + 26;
     }
-  } else if (job == 4226) {
+  } else if (job == JT_STAR_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 15 & 1)) {
       return job + 12;
     }
-  } else if (job == 4239) {
+  } else if (job == JT_STAR_EMPEROR) {
     if (static_cast<bool>(g_session.m_jobFlags >> 15 & 1)) {
       return job + 4;
     }
-  } else if (job == 4241) {
+  } else if (job == JT_STAR_EMPEROR_B) {
     if (static_cast<bool>(g_session.m_jobFlags >> 15 & 1)) {
       return job + 3;
     }
-  } else if (job == 4257) {
+  } else if (job == JT_WINDHAWK) {
     if (static_cast<bool>(g_session.m_jobFlags >> 21 & 1)) {
       return job + 21;
     }
-  } else if (job == 4252) {
+  } else if (job == JT_DRAGON_KNIGHT) {
     if (static_cast<bool>(g_session.m_jobFlags >> 19 & 1)) {
       return job + 28;
     }
-  } else if (job == 4258) {
+  } else if (job == JT_IMPERIAL_GUARD) {
     if (static_cast<bool>(g_session.m_jobFlags >> 5 & 1)) {
       return job + 23;
     }
-  } else if (job == 4302) {
+  } else if (job == JT_SKY_EMPEROR) {
     if (static_cast<bool>(g_session.m_jobFlags >> 15 & 1)) {
       return job + 14;
     }
@@ -167,17 +165,22 @@ std::string CSession::GetImfName(int job) {
   return this->m_imfNames[job];
 }
 
+// INLINED
+static const std::string SexNameOf(int sex) {
+  return g_session.GetSexName(sex);
+}
+
 // OFFSET: 0x00BAB110
 // FUNCTION: fn_19751
 std::string EquipmentResourceMgr::GetHeadName(int type, int job, int sex, int* head) {
-  if (job < 0 || (job > 30 && job < 1000) || (job > 1000 && job < 3999) || (job >= 20021 && job < 32000)) {
+  if (job < JT_NOVICE || (job > JT_SUMMER2 && job < JT_MON_BEGIN) || (job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || (job >= JT_EXTENDED_JOB_NAME_START && job < JT_EXTENDED_JOB_NAME_END)) {
     job = 0;
   }
 
-  std::string result = "";
   if (sex != 0) {
     sex = 1;
   }
+  std::string result = "";
   std::string sexName = "";
   std::string headName = "";
 
@@ -203,7 +206,7 @@ std::string EquipmentResourceMgr::GetHeadName(int type, int job, int sex, int* h
     }
   }
 
-  sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
+  sexName = SexNameOf(sex);
   result = static_cast<const std::string&>(this->GetBodyRacePrefix(job)) +
            static_cast<const std::string&>(FormatOwnedString("\\머리통\\%s\\%s_%s.%s", sexName.c_str(), headName.c_str(), sexName.c_str(), g_equipmentResourceExtensions[type]));
   return result;
@@ -216,29 +219,36 @@ void CSession::NormalizeHead(int* head, int job) {
     return;
   }
 
-  if (job < 23) {
-    switch (job) {
-    case JT_SWORDMAN:
-      *head = 2;
-      return;
-    case JT_ACOLYTE:
-      *head = 5;
-      return;
-    case JT_MAGICIAN:
-      *head = 3;
-      return;
-    case JT_ARCHER:
-      *head = 4;
-      return;
-    case JT_MERCHANT:
-      *head = 6;
-      return;
-    case JT_THIEF:
-      *head = 7;
-      return;
-    }
+  switch (job) {
+  case JT_NOVICE:
+  case JT_SUPERNOVICE:
+  case JT_NOVICE_H:
+  case JT_NOVICE_B:
+  case JT_SUPERNOVICE_B:
+    *head = 1;
+    break;
+  case JT_SWORDMAN:
+    *head = 2;
+    break;
+  case JT_ACOLYTE:
+    *head = 5;
+    break;
+  case JT_MAGICIAN:
+    *head = 3;
+    break;
+  case JT_ARCHER:
+    *head = 4;
+    break;
+  case JT_MERCHANT:
+    *head = 6;
+    break;
+  case JT_THIEF:
+    *head = 7;
+    break;
+  default:
+    *head = 1;
+    break;
   }
-  *head = 1;
 }
 
 // OFFSET: 0x00BAAB10
@@ -260,7 +270,7 @@ std::string EquipmentResourceMgr::GetHeadPalName(int head, int job, int sex, int
     }
 
     if (!ResourceMgr::Instance().Exists(result.c_str())) {
-      sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
+      sexName = SexNameOf(sex);
       result = static_cast<const std::string&>(FormatOwnedString("%s\\머리\\머리%s_%s_%d.pal", this->GetBodyRacePrefix(job).c_str(), headName.c_str(), sexName.c_str(), palette));
     }
 
@@ -274,7 +284,7 @@ std::string EquipmentResourceMgr::GetHeadPalName(int head, int job, int sex, int
       headName = g_session.m_humanFemaleHeadNames[head];
     }
 
-    sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
+    sexName = SexNameOf(sex);
     result = static_cast<const std::string&>(FormatOwnedString("머리\\머리%s_%s_%d.pal", headName.c_str(), sexName.c_str(), palette));
     return result;
   }

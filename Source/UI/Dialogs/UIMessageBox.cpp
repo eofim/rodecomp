@@ -1,4 +1,5 @@
 #include "Render/DeviceContext/DCSurface.h"
+#include "Contents/Jobs/JobId.h"
 #include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
@@ -64,6 +65,7 @@
 #include "Resource/Sprites/ActionResource.h"
 #include "Resource/Sprites/SpriteResource.h"
 #include <cstring>
+#include <fmt/core.h>
 #include <format>
 #include "Client/Mode/CGameMode.h"
 #include <cstdio>
@@ -105,19 +107,41 @@
 
 #include "Resource/MSGSTRINGID.h"
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // GLOBAL: gl_25153
-static const std::string s_messageBoxItemLinkOpening = "<ITEML>";
+const std::string s_messageBoxItemLinkOpening = "<ITEML>";
 
 // GLOBAL: gl_25154
-static const std::string s_messageBoxItemLinkClosing = "</ITEML>";
+const std::string s_messageBoxItemLinkClosing = "</ITEML>";
 
 namespace {
   // INLINED
   int TileCount(int length, int tile) {
     const std::div_t tiles = std::div(length, tile);
     return tiles.quot + (tiles.rem != 0);
+  }
+
+#pragma pack(push, 1)
+  struct ChatRoomRecordHeader {
+    /* 0000 */ std::uint16_t id;
+    /* 0002 */ std::uint32_t bytes;
+  };
+#pragma pack(pop)
+
+  // INLINED
+  inline std::vector<unsigned char> MakeChatRoomRecord(std::uint16_t id, const void* data, std::uint32_t bytes) {
+    std::vector<unsigned char> record(bytes + sizeof(ChatRoomRecordHeader), 0);
+    ChatRoomRecordHeader* header = reinterpret_cast<ChatRoomRecordHeader*>(record.data());
+    header->id = id;
+    header->bytes = bytes;
+    if (bytes != 0) {
+      std::memcpy(record.data() + sizeof(ChatRoomRecordHeader), data, bytes);
+    }
+    return record;
+  }
+
+  // INLINED
+  void AppendRecord(std::vector<unsigned char>& records, const std::vector<unsigned char>& record) {
+    records.insert(records.end(), record.begin(), record.end());
   }
 
   struct HangameJoinUrl {
@@ -146,13 +170,13 @@ UIMakeCharWnd::UIMakeCharWnd()
   this->m_info.name[0] = 0;
   this->m_info.job = 0;
   this->m_info.jobPoint = 0;
-  this->m_info.hp = 100;
-  this->m_info.maxHp = 100;
-  this->m_info.sp = 100;
-  this->m_info.maxSp = 100;
-  this->m_info.exp = 0;
   this->m_info.level = 1;
   this->m_info.skillPoint = 1;
+  this->m_info.maxHp = 100;
+  this->m_info.hp = 100;
+  this->m_info.maxSp = 100;
+  this->m_info.sp = 100;
+  this->m_info.exp = 0;
   this->m_info.slot = static_cast<unsigned char>(g_selectedSlotIndex);
   this->m_info.headPalette = 0;
   this->m_info.bodyStyle = 0;
@@ -165,28 +189,28 @@ UIMakeCharWnd::UIMakeCharWnd()
   this->m_view.x = 70;
   this->m_view.y = 123;
 
-  this->m_view.actionNames[0].assign(g_session.GetBodyActionResourceName(this->m_info.job, this->m_info.sex, 0, 0));
-  this->m_view.spriteNames[0].assign(g_session.GetBodySprName(this->m_info.job, this->m_info.sex, 0, 0));
+  this->m_view.actionNames[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(this->m_info.job, this->m_info.sex, 0, 0));
+  this->m_view.spriteNames[0] = static_cast<const std::string&>(g_session.GetBodySprName(this->m_info.job, this->m_info.sex, 0, 0));
 
   if (this->m_info.sex == 1 && 13 == this->m_info.head) {
     this->m_info.head = 14;
   }
 
   int head = this->m_info.head;
-  this->m_view.actionNames[1].assign(g_session.GetHeadActName(this->m_info.job, this->m_info.sex, &head));
-  this->m_view.spriteNames[1].assign(g_session.GetHeadSprName(this->m_info.job, this->m_info.sex, &head));
+  this->m_view.actionNames[1] = static_cast<const std::string&>(g_session.GetHeadActName(this->m_info.job, this->m_info.sex, &head));
+  this->m_view.spriteNames[1] = static_cast<const std::string&>(g_session.GetHeadSprName(this->m_info.job, this->m_info.sex, &head));
 
   const int bodyPalette = this->m_info.bodyStyle;
   this->m_info.head = static_cast<std::int16_t>(head);
   this->m_view.bodyPalette = bodyPalette;
   if (bodyPalette) {
-    this->m_view.bodyPaletteName.assign(g_session.GetBodyPalName(this->m_info.job, this->m_info.sex, bodyPalette, this->m_info.bodyCostume, 0, 0));
+    this->m_view.bodyPaletteName = static_cast<const std::string&>(g_session.GetBodyPalName(this->m_info.job, this->m_info.sex, bodyPalette, this->m_info.bodyCostume, 0, 0));
   }
 
   const int headPalette = this->m_info.headPalette;
   this->m_view.headPalette = headPalette;
   if (headPalette) {
-    this->m_view.headPaletteName.assign(g_session.GetHeadPalName(head, this->m_info.job, this->m_info.sex, headPalette));
+    this->m_view.headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_info.job, this->m_info.sex, headPalette));
   }
 
   this->m_view.imfName = g_session.GetBodyImfName(this->m_info.job, this->m_info.sex, this->m_info.head, this->m_info.bodyCostume);
@@ -218,12 +242,6 @@ UIMonsterInfoWnd::UIMonsterInfoWnd()
     : UIFrameWnd(0) {
   std::memset(&this->info, 0, offsetof(MonsterInfo, resistances) + sizeof(this->info.resistances));
   this->actorId = 0;
-}
-
-// INLINED
-UIReplayRECControlWnd::~UIReplayRECControlWnd() {
-  this->recordStart = 0;
-  this->mode = 0;
 }
 
 // OFFSET: 0x008B8E60
@@ -280,9 +298,8 @@ void UILoginWnd::Paint() {
 // OFFSET: 0x008B8620
 // FUNCTION: fn_11766
 void UIMakeCharWnd::Paint() {
-  CBitmapRes* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\login_interface\\win_make2.bmp")));
-  this->DrawBitmap(0, 17, background, false);
-  this->DrawTitleBar(true, LookupMessage(MSI_SELECT_SEX), 0);
+  this->DrawBitmap(0, 17, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\login_interface\\win_make2.bmp"))), false);
+  this->DrawTitleBar(true, LookupMessage(MSI_STR_MAKECHARACTER), 0);
   this->DrawButtonBar(2, 0, 1);
 
   SpriteAtlasRecord record{};
@@ -291,14 +308,16 @@ void UIMakeCharWnd::Paint() {
     CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_view.actionNames[i].c_str()));
     CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(this->m_view.spriteNames[i].c_str()));
     const ActionFrame& frame = action->Frame(this->m_view.action, this->m_view.frame);
-    POINT offset = offsets->GetLongPoint(i, this->m_view.action, this->m_view.frame);
+    const POINT point = offsets->GetLongPoint(i, this->m_view.action, this->m_view.frame);
+    int offsetX = point.x;
+    int offsetY = point.y;
 
     if (i == 1) {
       CActRes* body = static_cast<CActRes*>(ResourceMgr::Instance().Load(this->m_view.actionNames[0].c_str()));
       const ActionFrame& bodyFrame = body->Frame(this->m_view.action, this->m_view.frame);
       if (frame.anchorCount != 0 && bodyFrame.anchorCount != 0 && frame.anchors[0].attachmentId == bodyFrame.anchors[0].attachmentId) {
-        offset.x += bodyFrame.anchors[0].x - frame.anchors[0].x;
-        offset.y += bodyFrame.anchors[0].y - frame.anchors[0].y;
+        offsetX += bodyFrame.anchors[0].x - frame.anchors[0].x;
+        offsetY += bodyFrame.anchors[0].y - frame.anchors[0].y;
       }
     }
 
@@ -333,7 +352,7 @@ void UIMakeCharWnd::Paint() {
     }
 
     this->geometry.surface->DrawSurface(
-      this->m_view.x + cell.x + offset.x, this->m_view.y + cell.y + offset.y, texture, static_cast<int>(record.u0 * 256.0f),
+      this->m_view.x + cell.x + offsetX, this->m_view.y + cell.y + offsetY, texture, static_cast<int>(record.u0 * 256.0f),
       static_cast<int>(record.v0 * 256.0f), image->width, image->height, cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
     );
   }
@@ -389,7 +408,8 @@ void UIMerInfoWnd::Paint() {
   this->DrawTextAt(218, 70, text, bytes, 1, 14, 0, 0, 0);
   bytes = std::sprintf(text, "%d / %d", g_session.m_mercenarySp, g_session.m_mercenaryMaxSp);
   this->DrawTextAt(218, 85, text, bytes, 1, 14, 0, 0, 0);
-  std::strftime(text, 128, LookupMessage(MSI_TIME_TYPE2), _localtime32(&g_session.m_mercenaryExpiration));
+  const tm* expiration = _localtime32(&g_session.m_mercenaryExpiration);
+  std::strftime(text, 128, LookupMessage(MSI_TIME_TYPE2), expiration);
   this->DrawTextAt(155, 111, text, static_cast<int>(std::strlen(text)), 0, 12, 255, 0, 0);
   bytes = std::sprintf(text, "%d", g_session.m_mercenaryLoyalty);
   this->DrawTextAt(170, 133, text, bytes, 1, 14, 0, 0, 0);
@@ -404,56 +424,59 @@ void UIMerInfoWnd::Paint() {
 long long UIBank_NewWnd::TransactionAmount(unsigned char deposit) {
   std::string text = this->m_amountEdit->Text();
   this->m_amountEdit->SetText("");
-  if (text == std::string(LookupMessage(MSI_BANK_1_MINI))) {
+  if (std::string(LookupMessage(MSI_BANK_MAX)) == text) {
     const long long cash = g_session.m_zeny;
     const long long balance = g_session.m_bankBalance;
-    const long long excess = cash + balance > 0x7FFFFFFF ? cash + balance - 0x7FFFFFFF : 0;
+    long long excess = 0;
+    if (cash + balance > 0x7FFFFFFF) {
+      excess = cash + balance - 0x7FFFFFFF;
+    }
     if (deposit) {
       if (balance >= 0x7FFFFFFF) {
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEMMOVEINFO_CART)), 255, 0, 0, 0);
-        this->m_status = LookupMessage(MSI_BANK_6_MINI);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_7_MINI)), 255, 0, 0, 0);
+        this->m_status = LookupMessage(MSI_BANK_3_MINI);
         return 0;
       }
       if (g_session.m_zeny == 0) {
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_3)), 255, 0, 0, 0);
-        this->m_status = LookupMessage(MSI_BANK_3_MINI);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_0_MONEY)), 255, 0, 0, 0);
+        this->m_status = LookupMessage(MSI_BANK_0_MINI);
         return 0;
       }
       const long long amount = cash - excess;
       if (amount < 0) {
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_NOT_VALID_AUTH_TICKET)), 255, 0, 0, 0);
-        this->m_status = LookupMessage(MSI_BANK_3_MINI);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_WARNING)), 255, 0, 0, 0);
+        this->m_status = LookupMessage(MSI_BANK_0_MINI);
         return 0;
       }
       return amount;
     }
-    if (balance == 0) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_3)), 255, 0, 0, 0);
-      this->m_status = LookupMessage(MSI_BANK_3_MINI);
+    if (0 == balance) {
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_0_MONEY)), 255, 0, 0, 0);
+      this->m_status = LookupMessage(MSI_BANK_0_MINI);
       return 0;
     }
     const long long amount = balance - excess;
     return cash + amount > 0x7FFFFFFF ? static_cast<long long>(0x7FFFFFFF - g_session.m_zeny) : amount;
   }
   if (text.empty()) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_2_MINI)), 255, 0, 0, 0);
-    this->m_status = LookupMessage(MSI_BANK_4_MINI);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_NOMSG)), 255, 0, 0, 0);
+    this->m_status = LookupMessage(MSI_BANK_1_MINI);
     return 0;
   }
   if (!this->IsNumeric(text)) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_COMPARISON)), 255, 0, 0, 0);
-    this->m_status = LookupMessage(MSI_BANK_5_MINI);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_CHECK_NUM)), 255, 0, 0, 0);
+    this->m_status = LookupMessage(MSI_BANK_2_MINI);
     return 0;
   }
   const long long amount = _atoi64(text.c_str());
   if (amount > 0x7FFFFFFF) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_1)), 255, 0, 0, 0);
-    this->m_status = LookupMessage(MSI_BANK_6_MINI);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_MAX_MONEY)), 255, 0, 0, 0);
+    this->m_status = LookupMessage(MSI_BANK_3_MINI);
     return 0;
   }
   if (amount < 1) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_2)), 255, 0, 0, 0);
-    this->m_status = LookupMessage(MSI_BANK_7_MINI);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_MIN_MONEY)), 255, 0, 0, 0);
+    this->m_status = LookupMessage(MSI_BANK_4_MINI);
     return 0;
   }
   return amount;
@@ -501,16 +524,16 @@ bool UIBank_NewWnd::IsNumeric(std::string text) {
 // FUNCTION: fn_11760
 void UIBank_NewWnd::Paint() {
   auto* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\bank\\bg_bank.bmp")));
-  this->DrawBitmap(0, this->DrawTitleBar(true, LookupMessage(MSI_BANK_4), 0), background, false);
+  this->DrawBitmap(0, this->DrawTitleBar(true, LookupMessage(MSI_BANK_1), 0), background, false);
 
   char number[260] = {};
   char text[260] = {};
-  this->DrawTextAt(30, 29, LookupMessage(MSI_BANK_5), 0, 0, 12, 0, 0, 0);
-  const int x = this->VerticalTextHeight(LookupMessage(MSI_BANK_5), 0, 0, 12, 0) + 43;
+  this->DrawTextAt(30, 29, LookupMessage(MSI_BANK_2), 0, 0, 12, 0, 0, 0);
+  const int x = this->VerticalTextHeight(LookupMessage(MSI_BANK_2), 0, 0, 12, 0) + 43;
   FormatGroupedInteger(g_session.m_bankBalance, number, 260);
   std::sprintf(text, "%s z", number);
   this->DrawTextAt(x, 29, text, 0, 0, 11, 0, 0, 0);
-  this->DrawTextAt(30, 46, LookupMessage(MSI_BANK_6), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(30, 46, LookupMessage(MSI_BANK_3), 0, 0, 12, 0, 0, 0);
   FormatGroupedInteger(g_session.m_zeny, number, 260);
   std::sprintf(text, "%s z", number);
   this->DrawTextAt(x, 46, text, 0, 0, 11, 0, 0, 0);
@@ -634,11 +657,15 @@ void UIMessageBox::Configure(
   this->viewer->SetBackgroundColor(RGB(red, green, blue) | 0xFF000000u);
   this->AddChild(this->viewer);
   this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(this->messageText.data()), static_cast<int>(static_cast<double>(width) / 7.5), 0, 0);
-  this->m_message0 = type != 2 ? 185 : 188;
+  if (type == 2) {
+    this->m_message0 = ID_NO;
+  } else {
+    this->m_message0 = ID_CANCEL;
+  }
 
   const std::string prefix("유저인터페이스\\");
   const char* names[3][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
-  int ids[3] = {184, 187, 188};
+  int ids[3] = {ID_OK, ID_YES, ID_NO};
   int positions[3][2] = {{189, height - 24}, {189, height - 24}, {234, height - 24}};
 
   switch (type) {
@@ -684,7 +711,11 @@ void UIMessageBox::Configure(
       x += 45;
     }
 
-    this->m_message0 = defaultAccept ? 187 : 188;
+    if (defaultAccept) {
+      this->m_message0 = ID_YES;
+    } else {
+      this->m_message0 = ID_NO;
+    }
     this->m_message1 = 188;
     break;
   }
@@ -701,10 +732,10 @@ void UIMessageBox::Configure(
     this->m_message0 = ID_OK;
 
     auto* link = new UITextButton();
-    link->Configure(LookupMessage(MSI_FRIEND_ALREADY_FRIEND), 0x00F4934A, 0, 12, 0, 0);
+    link->Configure(LookupMessage(MSI_WEB_ADDRESS_FOR_RESTART), 0x00F4934A, 0, 12, 0, 0);
     link->m_hoverColor = 0x00FF7864;
     link->Move(14, 70);
-    link->SetId(426);
+    link->SetId(ID_RESTART_WEB_LINK);
     link->SetDisabled(0);
     link->Invalidate();
     this->AddChild(link);
@@ -723,7 +754,7 @@ void UIMessageBox::OnProcess() {
   }
 
   if (timeGetTime() > this->deadline) {
-    g_windowMgr.modalResponse = 187;
+    g_windowMgr.modalResponse = ID_YES;
     this->counting = 0;
     return;
   }
@@ -768,8 +799,8 @@ int UIMessageBox::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     }
     break;
   case UM_TEXT_LBTN_UP:
-    if (a == 426) {
-      ShellExecuteA(hWnd, "open", LookupMessage(MSI_FRIEND_ALREADY_FRIEND), nullptr, nullptr, SW_SHOWNORMAL);
+    if (a == ID_RESTART_WEB_LINK) {
+      ShellExecuteA(hWnd, "open", LookupMessage(MSI_WEB_ADDRESS_FOR_RESTART), nullptr, nullptr, SW_SHOWNORMAL);
     }
     break;
   case UM_SET_MESSAGE_PROTECTED:
@@ -937,24 +968,14 @@ void UIMerInfoWnd::StoreInfo() {
 int UIMerInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
   case UM_DEFPUSH:
-    return 0;
+    break;
   case UM_COMMAND:
     this->RecordResponse(static_cast<int>(a), b, c, d);
 
     switch (a) {
     case ID_OK:
       this->Invalidate();
-      return 0;
-    case ID_CLOSE:
-      g_windowMgr.CloseWindow(WID_MERINFOWND);
-      return 0;
-    case ID_OPEN_MERSKILLLIST:
-      if (!g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_1)) {
-        g_windowMgr.EnsureWindow(WID_SKILLLISTWND_SKILLTAB_1);
-        return 0;
-      }
-
-      return 0;
+      break;
     case ID_FIRE_MER: {
       CGameMode* mode = g_modeMgr.GetGameMode();
 
@@ -964,14 +985,19 @@ int UIMerInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
         g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_1);
         g_session.ResetMercenaryStats();
         g_session.mercenaryAlive = 0;
-        return 0;
       }
-
-      return 0;
+      break;
     }
-    default:
-      return 0;
+    case ID_OPEN_MERSKILLLIST:
+      if (!g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_1)) {
+        g_windowMgr.EnsureWindow(WID_SKILLLISTWND_SKILLTAB_1);
+      }
+      break;
+    case ID_CLOSE:
+      g_windowMgr.CloseWindow(WID_MERINFOWND);
+      break;
     }
+    break;
   case UM_SETINFO:
     this->saved = reinterpret_cast<MerInfoWndInfo*>(a);
 
@@ -980,10 +1006,11 @@ int UIMerInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     }
 
     this->Move(this->saved->x, this->saved->y);
-    return 0;
+    break;
   default:
     return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
+  return 0;
 }
 
 // OFFSET: 0x008C3670
@@ -1037,34 +1064,34 @@ void UILoginOTPWnd::OnCreate(int, int) {
 
   UIStaticText* label = new UIStaticText();
   label->SetSize(80, 20);
-  label->Move(141 - this->TextWidth(LookupMessage(MSI_ID), 0, 0, 12, 0, 0), 67);
-  label->SetText(LookupMessage(MSI_ID), 0);
+  label->Move(141 - this->TextWidth(LookupMessage(MSI_OTP_INPUT_TIME), 0, 0, 12, 0, 0), 67);
+  label->SetText(LookupMessage(MSI_OTP_INPUT_TIME), 0);
   this->AddChild(label);
 
   this->timerText = new UIStaticText();
   this->timerText->SetSize(80, 20);
   this->timerText->Move(150, 66);
-  this->timerText->SetText(LookupMessage(MSI_ID), 0);
+  this->timerText->SetText(LookupMessage(MSI_OTP_INPUT_TIME), 0);
   this->timerText->SetFont(0, 14, 1, 0);
   this->timerText->SetColor(205, 19, 41);
   this->AddChild(this->timerText);
 
   label = new UIStaticText();
   label->SetSize(200, 40);
-  label->SetText(LookupMessage(MSI_JOBNAME_TAEKWON), 0);
-  label->Move(static_cast<int>(141.0f - this->TextWidth(LookupMessage(MSI_JOBNAME_TAEKWON), 0, 0, 12, 0, 0) * 0.5f), 28);
+  label->SetText(LookupMessage(MSI_OTPWND_DESCRIPTION_1), 0);
+  label->Move(static_cast<int>(141.0f - this->TextWidth(LookupMessage(MSI_OTPWND_DESCRIPTION_1), 0, 0, 12, 0, 0) * 0.5f), 28);
   this->AddChild(label);
 
   label = new UIStaticText();
   label->SetSize(200, 40);
-  label->SetText(LookupMessage(MSI_TO_BLOCK_WHISPER), 0);
-  label->Move(static_cast<int>(141.0f - this->TextWidth(LookupMessage(MSI_TO_BLOCK_WHISPER), 0, 0, 12, 0, 0) * 0.5f), 42);
+  label->SetText(LookupMessage(MSI_OTPWND_DESCRIPTION_2), 0);
+  label->Move(static_cast<int>(141.0f - this->TextWidth(LookupMessage(MSI_OTPWND_DESCRIPTION_2), 0, 0, 12, 0, 0) * 0.5f), 42);
   this->AddChild(label);
 
   label = new UIStaticText();
   label->SetSize(80, 20);
-  label->Move(74 - this->TextWidth(LookupMessage(MSI_SERVER_PROPERTY_ADULT_NO_COUNT), 0, 0, 12, 0, 0), 98);
-  label->SetText(LookupMessage(MSI_SERVER_PROPERTY_ADULT_NO_COUNT), 0);
+  label->Move(74 - this->TextWidth(LookupMessage(MSI_AUTHORIZATION_CODE), 0, 0, 12, 0, 0), 98);
+  label->SetText(LookupMessage(MSI_AUTHORIZATION_CODE), 0);
   label->SetFont(0, 12, 1, 0);
   label->SetColor(64, 64, 64);
   this->AddChild(label);
@@ -1078,8 +1105,8 @@ void UILoginOTPWnd::OnCreate(int, int) {
   button->SetBitmap(pressedName.Text(), 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(186, 92);
-  button->SetId(382);
-  button->SetText(LookupMessage(MSI_PRIVATE_AIRPLANE_WARNNING_SELECT_NPC));
+  button->SetId(ID_OTP_CONFIRM);
+  button->SetText(LookupMessage(MSI_OK));
   button->AddTextStyle(0, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(1, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(2, 12, 0x313131, 1, 1, -1000, -1000);
@@ -1093,7 +1120,7 @@ void UILoginOTPWnd::Paint() {
   auto& resources = ResourceMgr::Instance();
   auto* background = static_cast<CBitmapRes*>(resources.Load(Resolve(OBFUSCATE_TEXT("유저인터페이스\\login_interface\\bg_newotp1.bmp", 0x2FEB8739E5975BD1ULL))));
   this->DrawBitmap(0, 0, background, false);
-  this->DrawTitleBar(true, LookupMessage(MSI_PARTY_DO_YOU_WANT_BREAKING_UP), 280);
+  this->DrawTitleBar(true, LookupMessage(MSI_MOTP), 280);
 }
 
 // OFFSET: 0x008C3620
@@ -1130,8 +1157,8 @@ void UILoginWnd::SaveLogin() {
   EncryptedName<10, 0x03772763F96D9DA5ULL>& checkName = OBFUSCATE_STRING("CHECKSAVE", 0x03772763F96D9DA5ULL);
   RegSetValueExA(key, checkName.Text(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&saveId), 4);
 
-  int bitwise = 1;
   EncryptedName<8, 0x0B7109397F6B1387ULL>& bitwiseName = OBFUSCATE_STRING("BITWISE", 0x0B7109397F6B1387ULL);
+  int bitwise = 1;
   RegSetValueExA(key, bitwiseName.Text(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&bitwise), 4);
   RegCloseKey(key);
 }
@@ -1288,14 +1315,16 @@ void UINoticeWnd::Paint() {
     this->DrawBitmap(this->geometry.width - right->image.width, 8 * index + 17, right, false);
   }
 
-  unsigned red;
-  unsigned green;
-  unsigned blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(20, 17, this->geometry.width - 40, this->geometry.height - 38, RGB(red, green, blue));
-  this->FillRegion(
-    20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, (this->geometry.height - 38) % 32, RGB(red, green, blue)
-  );
+  {
+    unsigned red;
+    unsigned green;
+    unsigned blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(20, 17, this->geometry.width - 40, this->geometry.height - 38, RGB(red, green, blue));
+    this->FillRegion(
+      20, (this->geometry.height - 38) / 32 * 32 + 17, this->geometry.width - 24, (this->geometry.height - 38) % 32, RGB(red, green, blue)
+    );
+  }
   this->DrawButtonBar(2, 0, 1);
 }
 
@@ -1373,14 +1402,18 @@ int UINoticeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
       delta = 1;
     }
 
-    this->m_scroll = previous + delta;
-
-    if (this->m_scroll > this->m_bottomPositions[this->m_index] - 19) {
-      this->m_scroll = this->m_bottomPositions[this->m_index] - 19;
+    int current = previous + delta;
+    this->m_scroll = current;
+    const int index = this->m_index;
+    const int upper = this->m_bottomPositions[index] - 19;
+    if (current > upper) {
+      this->m_scroll = upper;
+      current = upper;
     }
 
-    if (this->m_scroll < this->m_scrollPositions[this->m_index]) {
-      this->m_scroll = this->m_scrollPositions[this->m_index];
+    const int lower = this->m_scrollPositions[index];
+    if (current < lower) {
+      this->m_scroll = lower;
     }
 
     this->LoadNotice();
@@ -1404,7 +1437,7 @@ void UINoticeWnd::OnWheel(int delta) {
 // OFFSET: 0x008A8AD0
 // FUNCTION: fn_11715
 void UIPayConfirmWnd::Configure(const std::string& text, int itemId) {
-  UIMessageBox::Configure(text.c_str(), 2, 187, 0, LookupMessage(MSI_TITLE_QUEST_BOARD_INFO), 0xDC, 0x85, 1, nullptr);
+  UIMessageBox::Configure(text.c_str(), 2, 187, 0, LookupMessage(MSI_WARNING), 0xDC, 0x85, 1, nullptr);
 
   this->viewer->Resize(0xA5, 0x50);
   this->viewer->Move(7, 0x17);
@@ -1427,7 +1460,7 @@ void UIPayConfirmWnd::Configure(const std::string& text, int itemId) {
 
   std::string resource(FindItemDescription(itemId).identifiedResource);
   if (!resource.empty()) {
-    this->m_image = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(std::format("유저인터페이스\\collection\\{}.bmp", resource)));
+    this->m_image = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(fmt::format("유저인터페이스\\collection\\{}.bmp", resource)));
   }
 }
 
@@ -1472,21 +1505,21 @@ void UIReplayRECControlWnd::Paint() {
 // OFFSET: 0x008BA010
 // FUNCTION: fn_11776
 void UISelectReplayDataWnd::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_NOT_MOVEABLE_TRADE), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_REPLAY_STR_REPLAYFILELIST), 0);
   this->DrawPanelBackground(17, 0, "");
   this->DrawButtonBar(2, 0, 1);
   this->FillRegion(6, 32, 268, 77, 0xFFE7E7E7);
-  this->DrawTextAt(6, 19, LookupMessage(MSI_GUILD_DISBAND), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(6, 112, LookupMessage(MSI_PUT_DISBAND_GUILDNAME), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(6, 19, LookupMessage(MSI_REPLAY_STR_FILEINFO), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(6, 112, LookupMessage(MSI_REPLAY_STR_FILELIST), 0, 0, 12, 0, 0, 0);
 }
 
 // OFFSET: 0x008BA0B0
 // FUNCTION: fn_11777
 void UISelectServerWnd::Paint() {
-  const char* title = LookupMessage(MSI_REPLAY_STR_FILEINFO);
+  const char* title = LookupMessage(MSI_SERVICESELECT);
 
   if (g_modeMgr.GetLoginMode()->cursorType == 30) {
-    title = LookupMessage(MSI_REPLAY_STR_FILELIST);
+    title = LookupMessage(MSI_SHOW_MAPNAMETITLE);
   }
 
   this->DrawTitleBar(true, title, 0);
@@ -1514,6 +1547,19 @@ void UILoginWnd::OnMouseMove(int, int) {
 // OFFSET: 0x008BADB0
 // FUNCTION: fn_11790
 void UIMakeCharWnd::OnProcess() {
+}
+
+// OFFSET: 0x008BB2F0
+// FUNCTION: fn_45657
+void UIMakeCharWnd::SetHairScrollRanges() {
+  if (this->m_hairStyleBar) {
+    this->m_hairStyleBar->SetRange(22, 1, 23);
+    this->m_hairStyleBar->Invalidate();
+  }
+  if (this->m_hairColorBar) {
+    this->m_hairColorBar->SetRange(8, 1, 9);
+    this->m_hairColorBar->Invalidate();
+  }
 }
 
 // OFFSET: 0x008AC490
@@ -1544,7 +1590,7 @@ void UIMakeCharWnd::InitHairControls() {
   this->m_rotateLeftButton->SetSize(this->m_rotateLeftButton->BitmapWidth(), this->m_rotateLeftButton->BitmapHeight());
   this->m_rotateLeftButton->Move(20, 80);
   this->m_rotateLeftButton->SetId(ID_LEFT);
-  this->m_rotateLeftButton->SetTooltip(LookupMessage(MSI_VIEW_BEFORE_WORLDINFO_TITLE));
+  this->m_rotateLeftButton->SetTooltip(LookupMessage(MSI_CHARACTER_LEFT_ROLL));
   this->AddChild(this->m_rotateLeftButton);
 
   this->m_rotateRightButton = new (std::nothrow) UIBitmapButton();
@@ -1554,7 +1600,7 @@ void UIMakeCharWnd::InitHairControls() {
   this->m_rotateRightButton->SetSize(this->m_rotateLeftButton->BitmapWidth(), this->m_rotateLeftButton->BitmapHeight());
   this->m_rotateRightButton->Move(110, 80);
   this->m_rotateRightButton->SetId(ID_RIGHT);
-  this->m_rotateRightButton->SetTooltip(LookupMessage(MSI_VIEW_BEFORE_SERVERINFO));
+  this->m_rotateRightButton->SetTooltip(LookupMessage(MSI_CHARACTER_RIGHT_ROLL));
   this->AddChild(this->m_rotateRightButton);
 
   this->m_hairStyle = this->m_info.head - 1;
@@ -1571,14 +1617,7 @@ void UIMakeCharWnd::InitHairControls() {
   this->m_hairColorBar->Configure(10, 230, 0, 130);
   this->AddChild(this->m_hairColorBar);
 
-  if (this->m_hairStyleBar) {
-    this->m_hairStyleBar->SetRange(22, 1, 23);
-    this->m_hairStyleBar->Invalidate();
-  }
-  if (this->m_hairColorBar) {
-    this->m_hairColorBar->SetRange(8, 1, 9);
-    this->m_hairColorBar->Invalidate();
-  }
+  this->SetHairScrollRanges();
   this->m_hairStyleBar->SetPosition(this->m_hairStyle);
   this->m_hairColorBar->SetPosition(this->m_hairColor);
 }
@@ -1592,7 +1631,7 @@ void UIMakeCharWnd::OnCreate(int, int) {
   this->m_nameEdit->SetSize(this->m_nameEdit->geometry.width, this->m_nameEdit->geometry.height);
   this->m_nameEdit->Move(40, 142);
   this->m_nameEdit->maximum = 24;
-  this->m_nameEdit->SetId(184);
+  this->m_nameEdit->SetId(ID_OK);
   this->AddChild(this->m_nameEdit);
   this->InitHairControls();
   g_windowMgr.SetFocus(this->m_nameEdit);
@@ -1626,19 +1665,19 @@ void UIChatRoomWnd::OnCreate(int, int) {
   this->edit->Background(242, 242, 242);
   this->AddChild(this->edit);
   g_windowMgr.SetFocus(this->edit);
-  this->edit->SetId(494);
+  this->edit->SetId(ID_CHATROOM_EDIT);
 
   UIChatHisBox2* history = new UIChatHisBox2();
   this->history = history;
   history->Configure(0, 0, this->geometry.width - this->geometry.width * 56 / 280 - 3, this->geometry.height - 38, 0);
   this->history->Move(1, 17);
-  this->history->SetId(184);
+  this->history->SetId(ID_OK);
   this->AddChild(this->history);
 
   this->memberList = new UIMemberListBox();
   this->memberList->Configure(0, 0, this->geometry.width * 56 / 280, this->geometry.height - 38, 0);
   this->memberList->Move(this->geometry.width - this->geometry.width * 56 / 280 - 1, 17);
-  this->memberList->SetId(184);
+  this->memberList->SetId(ID_OK);
   this->AddChild(this->memberList);
 
   this->closeButton = this->AddCloseButton("/q", 0);
@@ -1711,7 +1750,7 @@ void UINoticeWnd::OnCreate(int, int) {
   checkText[checkSize] = 0;
   std::fclose(check);
 
-  int lines[20];
+  int lines[21];
   lines[0] = 0;
   int lineCount = 1;
   this->lineCount = 0;
@@ -1759,13 +1798,17 @@ void UINoticeWnd::OnCreate(int, int) {
   }
 
   for (int i = 0, y = 22; y < 364; ++i, y += 18) {
-    this->m_texts[i]->SetSize(540, 16);
-    this->m_texts[i]->SetFont(0, 16, 0, 0);
+    const char* text;
     if (i < lineCount) {
-      this->m_texts[i]->SetText(patchText + lines[i], 1);
+      this->m_texts[i]->SetSize(540, 16);
+      this->m_texts[i]->SetFont(0, 16, 0, 0);
+      text = patchText + lines[i];
     } else {
-      this->m_texts[i]->SetText("", 1);
+      this->m_texts[i]->SetSize(540, 16);
+      this->m_texts[i]->SetFont(0, 16, 0, 0);
+      text = "";
     }
+    this->m_texts[i]->SetText(text, 1);
     this->m_texts[i]->Move(30, y);
     this->AddChild(this->m_texts[i]);
   }
@@ -1919,12 +1962,14 @@ void UIReplayRECControlWnd::OnCreate(int, int) {
 // OFFSET: 0x008B5A50
 // FUNCTION: fn_11750
 void UISelectReplayDataWnd::OnCreate(int width, int height) {
+  const int listWidth = width - 12;
+  const int listHeight = height - 170;
   this->m_list = new UIReplayListBox();
-  this->m_list->Configure(6, 127, width - 12, height - 170, 0);
+  this->m_list->Configure(6, 127, listWidth, listHeight, 0);
   this->m_list->backgroundRed = 240;
   this->m_list->backgroundGreen = 240;
   this->m_list->backgroundBlue = 240;
-  this->m_list->SetId(184);
+  this->m_list->SetId(ID_OK);
   this->AddChild(this->m_list);
 
   const std::string prefix("유저인터페이스\\");
@@ -1937,21 +1982,11 @@ void UISelectReplayDataWnd::OnCreate(int width, int height) {
   int ids[4] = {184, 185, 221, 400};
   int positions[4][2] = {{189, height - 25}, {-100, -100}, {234, height - 25}, {100, height - 25}};
 
-  std::string name;
   for (int index = 0; index < 4; ++index) {
     auto* button = new UIBitmapButton();
-    name.assign(prefix);
-    name += names[index][0];
-    name += ".bmp";
-    button->SetBitmap(name.c_str(), 0, 0);
-    name.assign(prefix);
-    name += names[index][1];
-    name += ".bmp";
-    button->SetBitmap(name.c_str(), 1, 0);
-    name.assign(prefix);
-    name += names[index][2];
-    name += ".bmp";
-    button->SetBitmap(name.c_str(), 2, 0);
+    button->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
+    button->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
+    button->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
     button->Move(positions[index][0], positions[index][1]);
     button->SetId(ids[index]);
@@ -2049,7 +2084,7 @@ void UIMessageBoxAutoreturn::OnProcess() {
   }
 
   if (timeGetTime() > this->deadline) {
-    g_windowMgr.modalResponse = 187;
+    g_windowMgr.modalResponse = ID_YES;
     this->counting = 0;
     return;
   }
@@ -2101,7 +2136,8 @@ void UIMonsterInfoWnd::Paint() {
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   const std::uint32_t fill = RGB(red, green, blue);
   this->ClearSurface(fill);
-  this->DrawPanelBackground(this->DrawTitleBar(false, "", 0), 0, "");
+  const int titleHeight = this->DrawTitleBar(false, "", 0);
+  this->DrawPanelBackground(titleHeight, 0, "");
   this->DrawButtonBar(2, 0, 1);
   g_skinInfo.PaletteChannels(22, 2, red, green, blue);
   const std::uint32_t border = RGB(red, green, blue);
@@ -2119,19 +2155,19 @@ void UIMonsterInfoWnd::Paint() {
   this->DrawTextAt(120, 70, LookupMessage(MSI_HP), 0, 0, 12, 0, 0, 0);
   this->DrawTextAt(160, 70, text, 0, 0, 12, 0, 0, 0);
   StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d", this->info.defense);
-  this->DrawTextAt(120, 90, LookupMessage(MSI_ZEROQUEST_ALLSELECT), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(120, 90, LookupMessage(MSI_MONSTERINFO_DEF), 0, 0, 12, 0, 0, 0);
   this->DrawTextAt(160, 90, text, 0, 0, 12, 0, 0, 0);
 
   this->DrawTextAt(260, 30, LookupMessage(MSI_SIZE), 0, 0, 12, 0, 0, 0);
   switch (this->info.size) {
   case SZ_SMALL:
-    this->DrawTextAt(300, 30, LookupMessage(MSI_MONSTERINFO_DEF), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 30, LookupMessage(MSI_MONSTERINFO_SIZE_SMALL), 0, 0, 12, 0, 0, 0);
     break;
   case SZ_MEDIUM:
-    this->DrawTextAt(300, 30, LookupMessage(MSI_BAN_TEENAGER), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 30, LookupMessage(MSI_MONSTERINFO_SIZE_MIDDLE), 0, 0, 12, 0, 0, 0);
     break;
   case SZ_BIG:
-    this->DrawTextAt(300, 30, LookupMessage(MSI_STYLINGSHOP_COLOR_RESET), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 30, LookupMessage(MSI_MONSTERINFO_SIZE_BIG), 0, 0, 12, 0, 0, 0);
     break;
   }
 
@@ -2139,34 +2175,34 @@ void UIMonsterInfoWnd::Paint() {
   this->DrawTextAt(260, 50, LookupMessage(MSI_RACETYPE), 0, 0, 12, 0, 0, 0);
   switch (this->info.race) {
   case RC_FORMLESS:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_PLANT), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_UNKNOWN), 0, 0, 12, 0, 0, 0);
     break;
   case RC_UNDEAD:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_INSECT), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_UNDEAD), 0, 0, 12, 0, 0, 0);
     break;
   case RC_BRUTE:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_MARINE), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_ANIMAL), 0, 0, 12, 0, 0, 0);
     break;
   case RC_PLANT:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_DEVIL), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_PLANT), 0, 0, 12, 0, 0, 0);
     break;
   case RC_INSECT:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_HUMAN), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_INSECT), 0, 0, 12, 0, 0, 0);
     break;
   case RC_FISH:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_ANGEL), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_MARINE), 0, 0, 12, 0, 0, 0);
     break;
   case RC_DEMON:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_DRAGON), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_DEVIL), 0, 0, 12, 0, 0, 0);
     break;
   case RC_DEMIHUMAN:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_PROPERTY_NEUTURAL), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_HUMAN), 0, 0, 12, 0, 0, 0);
     break;
   case RC_ANGEL:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_PROPERTY_WATER), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_ANGEL), 0, 0, 12, 0, 0, 0);
     break;
   case RC_DRAGON:
-    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_PROPERTY_EARTH), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 50, LookupMessage(MSI_MONSTERINFO_TRIBE_DRAGON), 0, 0, 12, 0, 0, 0);
     break;
   }
 
@@ -2177,46 +2213,46 @@ void UIMonsterInfoWnd::Paint() {
   this->DrawTextAt(260, 70, LookupMessage(MSI_PROPERTY), 0, 0, 12, 0, 0, 0);
   switch (this->info.element % 20) {
   case ELE_NEUTRAL:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_FIRE), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_NEUTURAL), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_WATER:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_WIND), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_WATER), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_EARTH:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_POISON), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_EARTH), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_FIRE:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_SAINT), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_FIRE), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_WIND:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_DARK), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_WIND), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_POISON:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_MENTAL), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_POISON), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_HOLY:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_UNDEAD), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_SAINT), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_DARK:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_SIZE_SMALL), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_DARK), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_GHOST:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_SIZE_MIDDLE), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_MENTAL), 0, 0, 12, 0, 0, 0);
     break;
   case ELE_UNDEAD:
-    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_SIZE_BIG), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(300, 70, LookupMessage(MSI_MONSTERINFO_PROPERTY_UNDEAD), 0, 0, 12, 0, 0, 0);
     break;
   }
 
-  this->DrawResistance(120, 110, LookupMessage(MSI_MONSTERINFO_PROPERTY_WIND), this->info.resistances[0], border, fill);
-  this->DrawResistance(120, 128, LookupMessage(MSI_MONSTERINFO_PROPERTY_POISON), this->info.resistances[1], border, fill);
-  this->DrawResistance(120, 146, LookupMessage(MSI_MONSTERINFO_PROPERTY_SAINT), this->info.resistances[2], border, fill);
-  this->DrawResistance(200, 110, LookupMessage(MSI_MONSTERINFO_PROPERTY_DARK), this->info.resistances[3], border, fill);
-  this->DrawResistance(200, 128, LookupMessage(MSI_MONSTERINFO_PROPERTY_MENTAL), this->info.resistances[4], border, fill);
-  this->DrawResistance(200, 146, LookupMessage(MSI_MONSTERINFO_PROPERTY_UNDEAD), this->info.resistances[5], border, fill);
-  this->DrawResistance(280, 110, LookupMessage(MSI_MONSTERINFO_SIZE_SMALL), this->info.resistances[6], border, fill);
-  this->DrawResistance(280, 128, LookupMessage(MSI_MONSTERINFO_SIZE_MIDDLE), this->info.resistances[7], border, fill);
-  this->DrawResistance(280, 146, LookupMessage(MSI_MONSTERINFO_SIZE_BIG), this->info.resistances[8], border, fill);
+  this->DrawResistance(120, 110, LookupMessage(MSI_MONSTERINFO_PROPERTY_WATER), this->info.resistances[0], border, fill);
+  this->DrawResistance(120, 128, LookupMessage(MSI_MONSTERINFO_PROPERTY_EARTH), this->info.resistances[1], border, fill);
+  this->DrawResistance(120, 146, LookupMessage(MSI_MONSTERINFO_PROPERTY_FIRE), this->info.resistances[2], border, fill);
+  this->DrawResistance(200, 110, LookupMessage(MSI_MONSTERINFO_PROPERTY_WIND), this->info.resistances[3], border, fill);
+  this->DrawResistance(200, 128, LookupMessage(MSI_MONSTERINFO_PROPERTY_POISON), this->info.resistances[4], border, fill);
+  this->DrawResistance(200, 146, LookupMessage(MSI_MONSTERINFO_PROPERTY_SAINT), this->info.resistances[5], border, fill);
+  this->DrawResistance(280, 110, LookupMessage(MSI_MONSTERINFO_PROPERTY_DARK), this->info.resistances[6], border, fill);
+  this->DrawResistance(280, 128, LookupMessage(MSI_MONSTERINFO_PROPERTY_MENTAL), this->info.resistances[7], border, fill);
+  this->DrawResistance(280, 146, LookupMessage(MSI_MONSTERINFO_PROPERTY_UNDEAD), this->info.resistances[8], border, fill);
 
   char spriteName[128];
   StringFormat(spriteName, sizeof(spriteName), static_cast<std::size_t>(-1), "몬스터\\%s.spr", g_session.GetJobName(this->info.job, -1));
@@ -2280,66 +2316,63 @@ int UIReplayRECControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         this->mode = 1;
         g_modeMgr.currentMode->SendMsg(MM_START_REPLAY_RECORDING, 0, 0, 0, 0);
         this->ApplyMode();
-        return 0;
+        break;
       }
 
       this->mode = 3;
       this->ApplyMode();
-      return 0;
+      break;
     case ID_STOP_REPLAY_RECORDING:
       this->mode = 0;
       this->ApplyMode();
       g_modeMgr.currentMode->SendMsg(MM_STOP_REPLAY_RECORDING, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_CONFIRM_REPLAY_RECORDING_PATH: {
-      auto* edit = this->filenameEdit;
-      if (edit->Length() <= 0) {
+      if (this->filenameEdit->Length() <= 0) {
         g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_ENTERTHEFILENAME), 0, true, false, 0, "Message", 280, 120, 0);
-        return 0;
+        break;
       }
 
-      if (_mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
-          _mbsstr(reinterpret_cast<const unsigned char*>(edit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON), 0, true, false, 0, "Message", 280, 120, 0);
-        return 0;
+      if (_mbsstr(reinterpret_cast<const unsigned char*>(this->filenameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
+          _mbsstr(reinterpret_cast<const unsigned char*>(this->filenameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        break;
       }
 
-      ReplayFileList::Instance().SetPath(edit->Text());
+      ReplayFileList::Instance().SetPath(this->filenameEdit->Text());
       g_windowMgr.SetFocus(nullptr);
-      edit->SetText("");
+      this->filenameEdit->SetText("");
       g_modeMgr.currentMode->SendMsg(MM_START_REPLAY_RECORDING, 0, 0, 0, 0);
 
-      if (Replay::Instance().state == 1) {
-        return 0;
+      if (Replay::Instance().state != 1) {
+        this->mode = 1;
+        this->ApplyMode();
       }
-
-      this->mode = 1;
-      this->ApplyMode();
-      return 0;
+      break;
     }
     case ID_REPLAY_RECORDING_OPTIONS:
       this->mode = 2;
       this->ApplyMode();
-      return 0;
+      break;
     case ID_CANCEL_REPLAY_RECORDING_OPTIONS:
       this->mode = 0;
       this->ApplyMode();
-      return 0;
+      break;
     case ID_CLOSE_REPLAY_RECORDING:
       this->mode = 0;
       g_windowMgr.CloseWindow(WID_REPLAYRECCONTROLWND);
-      return 0;
+      break;
     case ID_CHECK:
       if (sender == this->userFilenameCheckBox) {
         ReplayFileList::Instance().pathEnabled = b != 0;
         this->replayPathEnabled = ReplayFileList::Instance().pathEnabled;
-        return 0;
+        break;
       }
 
       if (sender == this->rejectExistingNameCheckBox) {
         ReplayFileList::Instance().rejectExistingName = b != 0;
         this->replayOption119 = ReplayFileList::Instance().rejectExistingName;
-        return 0;
+        break;
       }
 
       if (sender == this->options[9]) {
@@ -2381,10 +2414,9 @@ int UIReplayRECControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       }
 
       Replay::Instance().SetOptions(this->recordOptions, 10);
-      return 0;
-    default:
-      return 0;
+      break;
     }
+    break;
   case UM_UPDATE_RECORD_TIME:
     this->UpdateRecordTime();
     return 0;
@@ -2395,12 +2427,14 @@ int UIReplayRECControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
   case UM_REFRESH:
     this->Invalidate();
     this->InvalidateChildren();
+    break;
   case UM_REPLAY_FRAMED_DATA:
   case 251:
-    return 0;
+    break;
   default:
     return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
+  return 0;
 }
 
 // OFFSET: 0x008BA820
@@ -2474,7 +2508,7 @@ void UIChatRoomWnd::SaveChatLog() {
     return;
   }
 
-  std::string name = this->title;
+  std::string name = this->info.title;
   for (unsigned position = 0; position < name.size(); ++position) {
     const char character = name[position];
     if (character == '\\' || character == '/' || character == ':' || character == '*' || character == '?' || character == '"' || character == '<' ||
@@ -2501,57 +2535,28 @@ void UIChatRoomWnd::SaveChatLog() {
 // FUNCTION: fn_11725
 std::vector<unsigned char> UIChatRoomWnd::SerializeReplayData() {
   std::vector<unsigned char> records;
-  {
-    const auto record = BuildReplayTaggedRecord(0x5014, nullptr, 0);
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x5016, this->saved, 0x10);
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x5017, this->title.data(), static_cast<std::uint32_t>(this->title.size()));
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x5018, this->roomSettingsText.data(), static_cast<std::uint32_t>(this->roomSettingsText.size()));
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x5019, this->roomStatusValues, 4);
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x501A, this->roomStatusValues + 4, 4);
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x501B, this->roomStatusValues + 8, 4);
-    records.insert(records.end(), record.begin(), record.end());
-  }
-  {
-    const auto record = BuildReplayTaggedRecord(0x501C, this->roomStatusValues + 12, 4);
-    records.insert(records.end(), record.begin(), record.end());
-  }
+  AppendRecord(records, BuildReplayTaggedRecord(0x5014, nullptr, 0));
+  AppendRecord(records, BuildReplayTaggedRecord(0x5016, this->saved, 0x10));
+  AppendRecord(records, BuildReplayTaggedRecord(0x5017, this->info.title.data(), static_cast<std::uint32_t>(this->info.title.size())));
+  AppendRecord(records, BuildReplayTaggedRecord(0x5018, this->info.password.data(), static_cast<std::uint32_t>(this->info.password.size())));
+  AppendRecord(records, BuildReplayTaggedRecord(0x5019, &this->info.type, 4));
+  AppendRecord(records, BuildReplayTaggedRecord(0x501A, &this->info.memberCount, 4));
+  AppendRecord(records, BuildReplayTaggedRecord(0x501B, &this->info.memberLimit, 4));
+  AppendRecord(records, BuildReplayTaggedRecord(0x501C, &this->info.id, 4));
 
-  for (const auto& entry : this->memberRoles) {
-    if (entry.second == 0) {
-      const auto record = BuildReplayTaggedRecord(0x501E, entry.first.data(), static_cast<std::uint32_t>(entry.first.size()));
-      records.insert(records.end(), record.begin(), record.end());
+  for (auto it = this->memberRoles.begin(); it != this->memberRoles.end(); ++it) {
+    if (it->second == 0) {
+      AppendRecord(records, MakeChatRoomRecord(0x501E, it->first.data(), static_cast<std::uint32_t>(it->first.size())));
     }
   }
 
-  for (const auto& entry : this->memberRoles) {
-    if (entry.second != 0) {
-      const auto record = BuildReplayTaggedRecord(0x501F, entry.first.data(), static_cast<std::uint32_t>(entry.first.size()));
-      records.insert(records.end(), record.begin(), record.end());
+  for (auto it = this->memberRoles.begin(); it != this->memberRoles.end(); ++it) {
+    if (it->second != 0) {
+      AppendRecord(records, MakeChatRoomRecord(0x501F, it->first.data(), static_cast<std::uint32_t>(it->first.size())));
     }
   }
 
-  {
-    const auto record = BuildReplayTaggedRecord(0x5015, nullptr, 0);
-    records.insert(records.end(), record.begin(), record.end());
-  }
+  AppendRecord(records, BuildReplayTaggedRecord(0x5015, nullptr, 0));
   return records;
 }
 
@@ -2599,8 +2604,8 @@ void UILoginWnd::LoadLogin() {
     if (saveId != 0) {
       int shade;
       if (std::strcmp("", id) != 0 && std::strcmp(OBFUSCATE_STRING("ID", 0x83EFBFBB37EDBDBDULL).Text(), id) != 0) {
-        shade = 0;
         this->idPlaceholder = false;
+        shade = 0;
       } else {
         this->idPlaceholder = true;
         this->idEdit->SetText(OBFUSCATE_STRING("ID", 0xBF2B4B31397FF5A7ULL).Text());
@@ -2652,14 +2657,14 @@ UINoticeWnd::UINoticeWnd() : UIFrameWnd(0) {
 // FUNCTION: fn_11737
 void UIBank_NewWnd::OnCreate(int, int) {
   this->AddCloseButton("Exit", 0);
-  this->AddBitmapButton(462, 209, 77, "bank\\btn_deposit", LookupMessage(MSI_BANK_7));
-  this->AddBitmapButton(463, 209, 102, "bank\\btn_withdraw", LookupMessage(MSI_BANK_MAX));
-  this->AddBitmapButton(279, 177, 89, "bank\\btn_upper", LookupMessage(MSI_BANK_NOMSG));
-  this->AddBitmapButton(280, 177, 99, "bank\\btn_buttom", LookupMessage(MSI_BANK_0_MINI));
+  this->AddBitmapButton(462, 209, 77, "bank\\btn_deposit", LookupMessage(MSI_BANK_4));
+  this->AddBitmapButton(463, 209, 102, "bank\\btn_withdraw", LookupMessage(MSI_BANK_5));
+  this->AddBitmapButton(279, 177, 89, "bank\\btn_upper", LookupMessage(MSI_BANK_6));
+  this->AddBitmapButton(280, 177, 99, "bank\\btn_buttom", LookupMessage(MSI_BANK_7));
   this->AddBitmapButton(392, 189, 132, "bank\\btn_10mil", "+ 100,000");
   this->AddBitmapButton(391, 141, 132, "bank\\btn_100mil", "+ 1,000,000");
   this->AddBitmapButton(390, 93, 132, "bank\\btn_1000mil", "+ 10,000,000");
-  this->AddBitmapButton(389, 45, 132, "bank\\btn_max", LookupMessage(MSI_BANK_1_MINI));
+  this->AddBitmapButton(389, 45, 132, "bank\\btn_max", LookupMessage(MSI_BANK_MAX));
 
   this->m_amountEdit = new UIEditCtrl();
   this->m_amountEdit->SetSize(99, 17);
@@ -2726,15 +2731,15 @@ int UIReplayControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       g_windowMgr.Schedule(this);
       g_modeMgr.currentMode->SendMsg(MM_EXIT_REPLAY, 0, 0, 0, 0);
       Replay::Instance().speed = 1.0f;
-      return 0;
+      break;
     case ID_DECREASE_REPLAY_SPEED:
       g_modeMgr.currentMode->SendMsg(MM_DECREASE_REPLAY_SPEED, 0, 0, 0, 0);
       this->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_INCREASE_REPLAY_SPEED:
       g_modeMgr.currentMode->SendMsg(MM_INCREASE_REPLAY_SPEED, 0, 0, 0, 0);
       this->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
-      return 0;
+      break;
     }
     return 0;
   case UM_REFRESHBUTTON:
@@ -2816,17 +2821,17 @@ int UISelectReplayDataWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     this->m_list->SendMsg(nullptr, UM_SETCURITEM, a, 0, 0, 0);
     this->UpdateInfo();
     this->Invalidate();
-    return 0;
+    break;
   case UM_UPPUSH:
     this->m_list->SendMsg(nullptr, UM_UPPUSH, 0, 0, 0, 0);
     this->UpdateInfo();
     this->Invalidate();
-    return 0;
+    break;
   case UM_DOWNPUSH:
     this->m_list->SendMsg(nullptr, UM_DOWNPUSH, 0, 0, 0, 0);
     this->UpdateInfo();
     this->Invalidate();
-    return 0;
+    break;
   case UM_COMMAND:
     switch (a) {
     case ID_CANCEL:
@@ -2865,7 +2870,7 @@ int UISelectReplayDataWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
   case UM_SET_TARGET:
     this->UpdateInfo();
     this->Invalidate();
-    return 0;
+    break;
   case 89:
     this->m_serverButton->Move(234, this->m_serverButton->geometry.y);
     break;
@@ -2961,6 +2966,37 @@ bool UISelectReplayDataWnd::UpdateInfo() {
   return true;
 }
 
+// OFFSET: 0x008ABD20
+// FUNCTION: fn_45658
+void UISelectServerWnd::LoadServerSelection(const char* valueName) {
+  this->m_selectedServer = g_serviceType;
+  HKEY probe;
+  if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, g_subKey, 0, KEY_QUERY_VALUE, &probe) != ERROR_SUCCESS) {
+    return;
+  }
+  RegCloseKey(probe);
+
+  HKEY key;
+  if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, g_subKey, 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+    DWORD type = REG_DWORD;
+    DWORD size = sizeof(this->m_selectedServer);
+    RegQueryValueExA(key, valueName, nullptr, &type, reinterpret_cast<BYTE*>(&this->m_selectedServer), &size);
+    RegCloseKey(key);
+  }
+}
+
+// OFFSET: 0x008BB380
+// FUNCTION: fn_45659
+void UISelectServerWnd::SaveServerSelection(const char* valueName) {
+  this->m_selectedServer = this->m_serverList->selected;
+  HKEY key;
+  DWORD disposition = 0;
+  if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, g_subKey, 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, &disposition) == ERROR_SUCCESS) {
+    RegSetValueExA(key, valueName, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&this->m_selectedServer), sizeof(this->m_selectedServer));
+    RegCloseKey(key);
+  }
+}
+
 // OFFSET: 0x008C18C0
 // FUNCTION: fn_11816
 int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -2977,21 +3013,8 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   case UM_SET_TARGET: {
     this->m_event = a;
     this->m_valueName = reinterpret_cast<const char*>(b);
-    const char* name = this->m_valueName.c_str();
-    this->m_selectedServer = g_serviceType;
-    HKEY probe;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, g_subKey, 0, KEY_QUERY_VALUE, &probe) == ERROR_SUCCESS) {
-      RegCloseKey(probe);
-      HKEY key;
-      if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, g_subKey, 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
-        DWORD type = REG_DWORD;
-        DWORD size = 4;
-        RegQueryValueExA(key, name, nullptr, &type, reinterpret_cast<BYTE*>(&this->m_selectedServer), &size);
-        RegCloseKey(key);
-        return 0;
-      }
-    }
-    break;
+    this->LoadServerSelection(this->m_valueName.c_str());
+    return 0;
   }
   case UM_COMMAND:
     switch (a) {
@@ -3007,15 +3030,7 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
         g_windowMgr.Schedule(this);
         g_modeMgr.currentMode->SendMsg(this->m_event, this->m_serverList->selected, 0, 0, 0);
         g_soundMgr->PlayWave("버튼소리.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
-        const char* name = this->m_valueName.c_str();
-        this->m_selectedServer = this->m_serverList->selected;
-        HKEY key;
-        DWORD disposition = 0;
-        if (RegCreateKeyExA(HKEY_LOCAL_MACHINE, g_subKey, 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, &disposition) == ERROR_SUCCESS) {
-          RegSetValueExA(key, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&this->m_selectedServer), 4);
-          RegCloseKey(key);
-          return 0;
-        }
+        this->SaveServerSelection(this->m_valueName.c_str());
       }
       break;
     case ID_CANCEL:
@@ -3048,11 +3063,13 @@ void UIPetInfoWnd::Paint() {
   unsigned blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
   this->ClearSurface(RGB(red, green, blue));
-  this->DrawPanelBackground(this->DrawTitleBar(false, "", 0), 0, "");
+  const int titleHeight = this->DrawTitleBar(false, "", 0);
+  this->DrawPanelBackground(titleHeight, 0, "");
 
-  auto* leftCorner = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\sysboxs_ld.bmp")));
+  const char* cornerNames[3] = {"유저인터페이스\\sysboxs_ld.bmp", "유저인터페이스\\sysboxs_rd.bmp"};
+  auto* leftCorner = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(cornerNames[0])));
   this->DrawBitmap(0, this->geometry.height - leftCorner->image.height, leftCorner, false);
-  auto* rightCorner = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\sysboxs_rd.bmp")));
+  auto* rightCorner = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(cornerNames[1])));
   this->DrawBitmap(this->geometry.width - rightCorner->image.width, this->geometry.height - rightCorner->image.height, rightCorner, false);
 
   char title[32];
@@ -3086,25 +3103,30 @@ void UIPetInfoWnd::Paint() {
 
   const int job = g_session.petJob;
 
-  if (job != -1 && ((job > 1000 && job < 3999) || (job >= 20021 && job <= 31999))) {
-    char illust[260];
-    std::memset(illust, 0, sizeof(illust));
-    g_session.GetPetIllustName(job, g_session.petAccessory, illust);
+  if (job == -1 || !((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || (job >= JT_EXTENDED_JOB_NAME_START && job <= 31999))) {
+    return;
+  }
 
-    if (auto* image = dynamic_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(illust)))) {
-      this->DrawBitmap(5, 21, image, false);
-    }
+  char illust[260];
+  std::memset(illust, 0, sizeof(illust));
+  g_session.GetPetIllustName(job, g_session.petAccessory, illust);
 
-    char command[] = "< Command >";
-    this->FillRegion(160, 44, 110, 18, 0xFAE6E6);
-    const int width = this->TextWidth(command, 0, 0, 12, 0, 0);
-    this->DrawTextAt(206 - width / 2, 48, command, 0, 0, 12, 0, 0, 0);
-    this->DrawTextAt(100, 119, LookupMessage(MSI_PET_ACCESSARY), 0, 0, 12, 0, 0, 0);
-    this->DrawTextAt(100, 139, LookupMessage(g_session.petAccessory == 0 ? MSI_ITEM_UNEQUIPED : MSI_ITEM_EQUIPED), 0, 0, 12, 0, 0, 0);
+  if (auto* image = dynamic_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(illust)))) {
+    this->DrawBitmap(5, 21, image, false);
+  }
 
-    if (this->autoFeedAvailable == 1) {
-      this->DrawTextAt(100, 159, LookupMessage(MSI_PET_AUTO_FEEDING_OFF), 0, 0, 12, 0, 0, 0);
-    }
+  char command[] = "< Command >";
+  this->FillRegion(160, 44, 110, 18, 0xFAE6E6);
+  this->DrawTextAt(206 - this->TextWidth(command, 0, 0, 12, 0, 0) / 2, 48, command, 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(100, 119, LookupMessage(MSI_PET_ACCESSARY), 0, 0, 12, 0, 0, 0);
+  if (g_session.petAccessory == 0) {
+    this->DrawTextAt(100, 139, LookupMessage(MSI_ITEM_UNEQUIPED), 0, 0, 12, 0, 0, 0);
+  } else {
+    this->DrawTextAt(100, 139, LookupMessage(MSI_ITEM_EQUIPED), 0, 0, 12, 0, 0, 0);
+  }
+
+  if (this->autoFeedAvailable == 1) {
+    this->DrawTextAt(100, 159, LookupMessage(MSI_PET_AUTO_FEEDING), 0, 0, 12, 0, 0, 0);
   }
 }
 
@@ -3115,19 +3137,19 @@ void UIPetInfoWnd::UpdateFriendlyGauge() {
   int low;
   int high;
   if (g_session.m_petFriendly >= 0 && g_session.m_petFriendly <= 100) {
-    if (g_session.GetDisplayJob() >= 4050 && g_session.GetDisplayJob() <= 4052) {
+    if (g_session.GetDisplayJob() >= JT_GANGSI && g_session.GetDisplayJob() <= JT_COLLECTOR) {
       int message;
       if (g_session.m_petFriendly <= 20) {
         low = 0;
-        message = 1022;
+        message = MSI_VERYHATE;
         high = 100;
       } else if (g_session.m_petFriendly <= 40) {
         low = 20;
-        message = 1021;
+        message = MSI_HATE;
         high = 40;
       } else {
         low = 40;
-        message = 672;
+        message = MSI_VERY_AWKWARD;
         high = 100;
       }
       this->friendlyText = LookupMessage(message);
@@ -3179,10 +3201,7 @@ void UIMonsterInfoWnd::OnCreate(int, int) {
   this->m_message0 = ID_OK;
 
   this->actorId = g_session.m_monsterInfoActorId;
-  {
-    const std::string actorName = g_modeMgr.GetGameMode()->ActorName(g_session.m_monsterInfoActorId);
-    this->name = actorName;
-  }
+  this->name = static_cast<const std::string&>(g_modeMgr.GetGameMode()->ActorName(g_session.m_monsterInfoActorId));
   const std::size_t separator = this->name.find("#");
   if (separator != std::string::npos) {
     this->name.erase(separator, this->name.size());
@@ -3262,24 +3281,6 @@ EncryptedName<80, 0xF3CB6F7711A71B6DULL>& HangameJoinUrl::operator()() const {
 // FUNCTION: fn_11805
 int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
-  case UM_COMBOBOX_SELECTED:
-    if (sender == this->loginTypeCombo) {
-      switch (a) {
-      case 0: {
-        this->loginExtra = OBFUSCATE_TEXT("G000", 0x9FED7DA189490D5DULL);
-        break;
-      }
-      case 1: {
-        this->loginExtra = OBFUSCATE_TEXT("G007", 0xFBD599E117C547C1ULL);
-        break;
-      }
-      default: {
-        g_windowMgr.Confirm(OBFUSCATE_TEXT("unknown account class found!", 0x176F138D5DD7F365ULL), 0, false, false, 0, "Message", 280, 120, 0);
-        goto quit;
-      }
-      }
-    }
-    return 0;
   case UM_COMMAND:
     switch (a) {
     case ID_MAKEACCOUNT:
@@ -3290,7 +3291,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
           ShellExecuteA(hWnd, OBFUSCATE_TEXT_NAMED("open", 0x839B27DF8F5967B3ULL, verbName), url, nullptr, nullptr, SW_SHOWNORMAL);
           break;
         }
-        if (g_windowMgr.Confirm(LookupMessage(MSI_SELECTCHARWND_RESERVE_TO_DEL_CHAR), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_CREATE_ACCOUNT), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
           break;
         }
       }
@@ -3298,24 +3299,28 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       this->OpenWebPage();
       break;
     case ID_LOGIN: {
-      g_soundMgr->PlayWave(OBFUSCATE_TEXT_NAMED("버튼소리.wav", 0x452FEF0D7FC95565ULL, soundName), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
+      CSoundMgr* const soundMgr = g_soundMgr;
+      soundMgr->PlayWave(OBFUSCATE_TEXT_NAMED("버튼소리.wav", 0x452FEF0D7FC95565ULL, soundName), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (this->passwordEdit->Length() >= 6 && this->idEdit->Length() >= 4) {
         g_modeMgr.currentMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
         StringFormat(g_launchAccountPassword, 24, static_cast<std::size_t>(-1), "%s", this->idEdit->Text());
-        g_modeMgr.currentMode->SendMsg(LMM_PASSWORD, reinterpret_cast<int>(this->passwordEdit->Text()), 0, 0, 0);
-        g_modeMgr.currentMode->SendMsg(LMM_ID, reinterpret_cast<int>(this->idEdit->Text()), 0, 0, 0);
+        CMode* passwordMode = g_modeMgr.currentMode;
+        passwordMode->SendMsg(LMM_PASSWORD, reinterpret_cast<int>(this->passwordEdit->Text()), 0, 0, 0);
+        CMode* idMode = g_modeMgr.currentMode;
+        idMode->SendMsg(LMM_ID, reinterpret_cast<int>(this->idEdit->Text()), 0, 0, 0);
         g_modeMgr.currentMode->SendMsg(LMM_SET_LOGIN_EXTRA, reinterpret_cast<int>(this->loginExtra), 0, 0, 0);
         g_windowMgr.CloseWindow(WID_LOGINWND);
         this->SaveLogin();
       } else if (this->idEdit->Length() < 4) {
-        g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_BASIC_EXP_MSG2_EXCEPT_PREMIUM), 4).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+        const char* format = LookupMessage(MSI_MUST_ID_EXCEED_CHAR);
+        g_windowMgr.Confirm(FormatOwnedString(format, 4).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
       } else {
-        g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_SWAP_EQUIPITEM_CANNOT_ADD_ITEM), 6).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+        const char* format = LookupMessage(MSI_MUST_PASSWORD_EXCEED_CHAR);
+        g_windowMgr.Confirm(FormatOwnedString(format, 6).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
       }
       break;
     }
     case ID_CANCEL:
-      g_loginCancelRequested = 1;
       g_modeMgr.currentMode->SendMsg(LMM_GOTOSELECTACCOUNT, 0, 0, 0, 0);
       break;
     case ID_EXIT:
@@ -3361,6 +3366,24 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       break;
     }
     return 0;
+  case UM_COMBOBOX_SELECTED:
+    if (sender == this->loginTypeCombo) {
+      switch (a) {
+      case 0: {
+        this->loginExtra = OBFUSCATE_TEXT("G000", 0x9FED7DA189490D5DULL);
+        break;
+      }
+      case 1: {
+        this->loginExtra = OBFUSCATE_TEXT("G007", 0xFBD599E117C547C1ULL);
+        break;
+      }
+      default: {
+        g_windowMgr.Confirm(OBFUSCATE_TEXT("unknown account class found!", 0x176F138D5DD7F365ULL), 0, false, false, 0, "Message", 280, 120, 0);
+        goto quit;
+      }
+      }
+    }
+    return 0;
   case UM_ENABLE_CANCEL:
     return 0;
   default:
@@ -3386,18 +3409,19 @@ int UILoginOTPWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       }
       break;
 
-    case 382: {
+    case ID_OTP_CONFIRM: {
       CSoundMgr* const soundMgr = g_soundMgr;
       constexpr auto soundSourceText = OBFUSCATE_SOURCE("버튼소리.wav", 0x7321C3814F8799E1ULL);
       const auto& soundSource = soundSourceText.data;
       thread_local EncryptedName<sizeof(soundSource), 0x7321C3814F8799E1ULL> soundName(soundSource);
       soundMgr->PlayWave(soundName.Text(), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (this->authCodeEdit->Length() == 8) {
-        g_modeMgr.currentMode->SendMsg(LMM_SET_AUTH_CODE, reinterpret_cast<int>(this->authCodeEdit->Text()), 0, 0, 0);
+        CMode* mode = g_modeMgr.currentMode;
+        mode->SendMsg(LMM_SET_AUTH_CODE, reinterpret_cast<int>(this->authCodeEdit->Text()), 0, 0, 0);
         g_modeMgr.currentMode->SendMsg(LMM_SEND_LOGIN_AUTH_CODE, 0, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_LOGINOTPWND);
       } else {
-        g_windowMgr.Confirm(LookupMessage(MSI_FAIL_SERVICE_CHECKING_ERROR), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_OTP_MUST_8_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
       }
       break;
     }
@@ -3556,27 +3580,26 @@ void UIHomunInfoWnd::Paint() {
   this->DrawRightAlignedText(205, 104, text, bytes, 1, 14, 0, 0);
   bytes = std::sprintf(text, "%d / %d", g_session.homunHunger, 100);
   this->DrawRightAlignedText(200, 130, text, bytes, 1, 14, 0, 0);
-  const int intimacy = g_session.homunFriendly;
-  if (intimacy >= 0 && intimacy <= 3) {
+  if (g_session.homunFriendly >= 0 && g_session.homunFriendly <= 3) {
     std::strcpy(text, LookupMessage(MSI_VERYHATE));
-  } else if (intimacy > 3 && intimacy <= 10) {
+  } else if (g_session.homunFriendly > 3 && g_session.homunFriendly <= 10) {
     std::strcpy(text, LookupMessage(MSI_HATE));
-  } else if (intimacy > 10 && intimacy <= 100) {
+  } else if (g_session.homunFriendly > 10 && g_session.homunFriendly <= 100) {
     std::strcpy(text, LookupMessage(MSI_VERY_AWKWARD));
-  } else if (intimacy > 100 && intimacy <= 250) {
+  } else if (g_session.homunFriendly > 100 && g_session.homunFriendly <= 250) {
     std::strcpy(text, LookupMessage(MSI_AWKWARD));
-  } else if (intimacy > 250 && intimacy <= 750) {
+  } else if (g_session.homunFriendly > 250 && g_session.homunFriendly <= 750) {
     std::strcpy(text, LookupMessage(MSI_NORMAL));
-  } else if (intimacy > 750 && intimacy <= 910) {
+  } else if (g_session.homunFriendly > 750 && g_session.homunFriendly <= 910) {
     std::strcpy(text, LookupMessage(MSI_FRIENDLY));
-  } else if (intimacy > 910 && intimacy <= 1000) {
+  } else if (g_session.homunFriendly > 910 && g_session.homunFriendly <= 1000) {
     std::strcpy(text, LookupMessage(MSI_VERY_FRIENDLY));
   } else {
     std::strcpy(text, LookupMessage(MSI_UNKNOWN));
   }
   this->DrawTextAt(150, 159, text, 0, 0, 12, 0, 0, 0);
-  this->DrawWrappedFormattedText(225, 136, std::string(LookupMessage(MSI_HOMUN_SELF_FEEDING_ON)), 0, 0, 0, 0, 12, 0, 0);
-  this->DrawWrappedFormattedText(8, 180, std::string(LookupMessage(MSI_HOMUN_TARGET_NOT_EXIST_HOMUN_TARGAT)), 0, 0, 0, 0, 12, 0xFF, 0);
+  this->DrawWrappedFormattedText(225, 136, std::string(LookupMessage(MSI_HOMUN_SELF_FEEDING)), 0, 0, 0, 0, 12, 0, 0);
+  this->DrawWrappedFormattedText(8, 180, std::string(LookupMessage(MSI_HOMUN_SELF_FEEDING_EXP_INFORMATION)), 0, 0, 0, 0, 12, 0xFF, 0);
 }
 
 // OFFSET: 0x008BDD10
@@ -3597,26 +3620,27 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       char* const name = g_session.m_homunName;
       if (std::strlen(this->nameEdit->Text()) >= 24) {
         g_windowMgr.Confirm(LookupMessage(MSI_HOMUN_NAME_IN23), 0, true, false, 0, "Message", 280, 120, 0);
-      } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
-                 _mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON), 0, true, false, 0, "Message", 280, 120, 0);
-      } else {
-        char text[512];
-        std::sprintf(text, LookupMessage(MSI_BLOCK_CALL_NOTIFY), this->nameEdit->Text());
-        if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
-          if (g_forbiddenWords.Contains(this->nameEdit->Text()) != true) {
-            g_modeMgr.GetGameMode()->SendMsg(MM_MER_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
-            std::sprintf(name, this->nameEdit->Text());
-            this->Invalidate();
-            return 0;
-          }
-
-          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_SELL_IN_PRIVATE_TAB), 0, true, false, 0, "Message", 280, 120, 0);
-        }
-
-        this->nameEdit->SetText(name);
-        this->nameEdit->Invalidate();
+        return 0;
       }
+      if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
+          _mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        return 0;
+      }
+      char text[512];
+      std::sprintf(text, LookupMessage(MSI_CHANGE_HOMUN_NAME), this->nameEdit->Text());
+      if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
+        if (g_forbiddenWords.Contains(this->nameEdit->Text()) == true) {
+          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_USE_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        } else {
+          g_modeMgr.GetGameMode()->SendMsg(MM_MER_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
+          std::sprintf(name, this->nameEdit->Text());
+          this->Invalidate();
+          return 0;
+        }
+      }
+      this->nameEdit->SetText(name);
+      this->nameEdit->Invalidate();
       return 0;
     }
     case ID_CLOSE:
@@ -3652,11 +3676,11 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       }
       return 0;
     }
-    case 488: {
+    case ID_MESSAGEBOX_RESULT: {
       CGameMode* mode = g_modeMgr.GetGameMode();
       if (sender == this->feedConfirmation && b == ID_YES) {
         if (g_windowMgr.LookupWindow(WID_EXCHANGEUI)) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_EXCHANGED_FAILED)), 255, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_HOMUN_AUTO_FEEDING_BY_ITEMACTION)), 255, 0, 0, 0);
         } else {
           mode->SendMsg(MM_COMMAND_HOMUN, 1, 0, 0, 0);
         }
@@ -3707,23 +3731,25 @@ void UIPetInfoWnd::OnCreate(int, int) {
     this->AddChild(this->renameButton);
   }
 
-  const char tooltip[] = "Pet Command";
-  this->statusButton = new UINoneVisibleButton();
-  this->statusButton->SetSize(120, 18);
-  this->statusButton->Move(150, 44);
-  this->statusButton->SetId(268);
-  this->AddChild(this->statusButton);
   {
-    const std::string prefix("유저인터페이스\\basic_interface\\");
-    UIBitmapButton* button = new UIBitmapButton();
-    button->SetBitmap((prefix + "txtbox_btn_a" + ".bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + "txtbox_btn_b" + ".bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + "txtbox_btn_c" + ".bmp").c_str(), 2, 0);
-    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-    button->Move(270 - button->BitmapWidth(), 44);
-    button->SetTooltip(tooltip);
-    button->SetId(268);
-    this->AddChild(button);
+    const char tooltip[] = "Pet Command";
+    this->statusButton = new UINoneVisibleButton();
+    this->statusButton->SetSize(120, 18);
+    this->statusButton->Move(150, 44);
+    this->statusButton->SetId(ID_COMMAND_MENU);
+    this->AddChild(this->statusButton);
+    {
+      const std::string prefix("유저인터페이스\\basic_interface\\");
+      UIBitmapButton* button = new UIBitmapButton();
+      button->SetBitmap((prefix + "txtbox_btn_a" + ".bmp").c_str(), 0, 0);
+      button->SetBitmap((prefix + "txtbox_btn_b" + ".bmp").c_str(), 1, 0);
+      button->SetBitmap((prefix + "txtbox_btn_c" + ".bmp").c_str(), 2, 0);
+      button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+      button->Move(270 - button->BitmapWidth(), 44);
+      button->SetTooltip(tooltip);
+      button->SetId(ID_COMMAND_MENU);
+      this->AddChild(button);
+    }
   }
 
   this->friendlyText = LookupMessage(MSI_UNKNOWN);
@@ -3739,7 +3765,7 @@ void UIPetInfoWnd::OnCreate(int, int) {
   if (this->autoFeedAvailable == true) {
     this->autoFeedCheck = new UICheckBox();
     this->autoFeedCheck->SetSize(12, 12);
-    this->autoFeedCheck->Move(this->TextWidth(LookupMessage(MSI_PET_AUTO_FEEDING_OFF), 0, 0, 12, 0, 0) + 110, 159);
+    this->autoFeedCheck->Move(this->TextWidth(LookupMessage(MSI_PET_AUTO_FEEDING), 0, 0, 12, 0, 0) + 110, 159);
     this->autoFeedCheck->SetBitmaps("유저인터페이스\\checkbox_1.bmp", "유저인터페이스\\checkbox_0.bmp");
     this->autoFeedCheck->SetChecked(g_session.m_petAutoFeed);
     this->AddChild(this->autoFeedCheck);
@@ -3761,7 +3787,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     switch (a) {
     case 467:
       if (g_windowMgr.rodexComposeWnd) {
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_REFINING_FAIL_ITEM_DISAPPEAR)), 255, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_PET_AUTO_FEEDING_CLOSE_RODEX)), 255, 0, 0, 0);
         break;
       }
       this->feedConfirmationWnd = new UINormalMB();
@@ -3791,7 +3817,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
         g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
         return 0;
       }
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_AUTO_FEEDING_ON)), 255, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_RG_FAMILIAR)), 255, 0, 0, 0);
       break;
     }
     g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
@@ -3808,10 +3834,10 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
         g_windowMgr.Confirm(LookupMessage(MSI_PETNAME_IN23), 0, true, false, 0, "Message", 280, 120, 0);
       } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
                  _mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
       } else {
         char text[512];
-        std::sprintf(text, LookupMessage(MSI_STORE_ASSISTANT_TRADE_CNT), this->nameEdit->Text());
+        std::sprintf(text, LookupMessage(MSI_CHANGE_PETNAME), this->nameEdit->Text());
         if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
           if (g_forbiddenWords.Contains(this->nameEdit->Text()) != true) {
             g_modeMgr.GetGameMode()->SendMsg(MM_PET_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
@@ -3820,7 +3846,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
             return 0;
           }
 
-          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_SELL_IN_PRIVATE_TAB), 0, true, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_USE_NAME), 0, true, false, 0, "Message", 280, 120, 0);
         }
 
         this->nameEdit->SetText(g_session.petName);
@@ -3839,7 +3865,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
         }
       }
       return 0;
-    case 268: {
+    case ID_COMMAND_MENU: {
       UIWindow* menu = g_windowMgr.EnsureWindow(WID_COMBOBOXIDWND);
       std::string feed;
       std::string performance;
@@ -3861,15 +3887,16 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
           std::string text;
           const char* name = g_session.GetPetString(job);
           if (name == nullptr) {
-            text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_PET_EVOLUTION_FAIL_UNKNOWN), g_session.GetJobName(job, -1)));
+            text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_PET_EVOLUTION_WITH_PET_NAME), g_session.GetJobName(job, -1)));
           } else {
-            text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_PET_EVOLUTION_FAIL_UNKNOWN), name));
+            text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_PET_EVOLUTION_WITH_PET_NAME), name));
           }
           menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(text.c_str()), 471, *it, 0);
         }
       }
+      const int height = (static_cast<int>(targets.second.size()) + 4) * 16;
       menu->SendMsg(nullptr, UM_SETCURITEM, 0, 0, 0, 0);
-      menu->Resize(110, (static_cast<int>(targets.second.size()) + 4) * 16);
+      menu->Resize(110, height);
       menu->SendMsg(nullptr, UM_SET_CALLER_WID, 88, 0, 0, 0);
       int x = 160;
       int y = 44;
@@ -3877,11 +3904,11 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       menu->Move(x, y);
       return 0;
     }
-    case 488: {
+    case ID_MESSAGEBOX_RESULT: {
       CGameMode* mode = g_modeMgr.GetGameMode();
       if (sender == this->feedConfirmationWnd && b == ID_YES) {
         if (g_windowMgr.LookupWindow(WID_EXCHANGEUI)) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BARTERITEM_NAME_COUNT)), 255, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_PET_AUTO_FEEDING_BY_ITEMACTION)), 255, 0, 0, 0);
           this->feedConfirmationWnd = nullptr;
           return 0;
         }
@@ -3909,12 +3936,13 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
 // OFFSET: 0x008B6520
 // FUNCTION: fn_11751
 void UISelectServerWnd::OnCreate(int width, int height) {
+  const int listWidth = width - 24;
   this->m_serverList = new UIServerListBox();
-  this->m_serverList->Configure(12, 22, width - 24, height - 55, 0);
+  this->m_serverList->Configure(12, 22, listWidth, height - 55, 0);
   this->m_serverList->backgroundRed = 240;
   this->m_serverList->backgroundGreen = 240;
   this->m_serverList->backgroundBlue = 240;
-  this->m_serverList->SetId(184);
+  this->m_serverList->SetId(ID_OK);
   this->AddChild(this->m_serverList);
 
   const std::string prefix("유저인터페이스\\");
@@ -3956,20 +3984,19 @@ void UISelectServerWnd::OnCreate(int width, int height) {
 // FUNCTION: fn_11748
 void UIReplayControlWnd::OnCreate(int, int) {
   const std::string prefix("유저인터페이스\\replay_interface\\");
+  const char* const names[6] = {"replay_stop_", "replay_end_", "replay_speedadd_", "replay_speedmin_", "replay_start_", "replay_pause_"};
   const int ids[6] = {403, 404, 405, 406, 401, 402};
   const int positions[6][2] = {{101, 89}, {149, 89}, {53, 89}, {53, 111}, {5, 89}, {-100, -100}};
-  const char* const names[6] = {"replay_stop_", "replay_end_", "replay_speedadd_", "replay_speedmin_", "replay_start_", "replay_pause_"};
 
   for (int i = 0; i < 4; ++i) {
     this->m_buttons[i] = new UIBitmapButton();
-    UIBitmapButton* button = this->m_buttons[i];
-    button->SetBitmap((prefix + names[i] + "a.bmp").c_str(), 0, 0);
-    button->SetBitmap((prefix + names[i] + "a.bmp").c_str(), 1, 0);
-    button->SetBitmap((prefix + names[i] + "b.bmp").c_str(), 2, 0);
-    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-    button->Move(positions[i][0], positions[i][1]);
-    button->SetId(ids[i]);
-    this->AddChild(button);
+    this->m_buttons[i]->SetBitmap((prefix + names[i] + "a.bmp").c_str(), 0, 0);
+    this->m_buttons[i]->SetBitmap((prefix + names[i] + "a.bmp").c_str(), 1, 0);
+    this->m_buttons[i]->SetBitmap((prefix + names[i] + "b.bmp").c_str(), 2, 0);
+    this->m_buttons[i]->SetSize(this->m_buttons[i]->BitmapWidth(), this->m_buttons[i]->BitmapHeight());
+    this->m_buttons[i]->Move(positions[i][0], positions[i][1]);
+    this->m_buttons[i]->SetId(ids[i]);
+    this->AddChild(this->m_buttons[i]);
   }
 
   this->m_playButton = new UIReplayButton();
@@ -3990,7 +4017,7 @@ void UIReplayControlWnd::OnCreate(int, int) {
   this->m_pauseButton->SetId(ids[5]);
   this->AddChild(this->m_pauseButton);
 
-  HotkeyInfo hotkey;
+  HotkeyInfo hotkey(0, 0);
   hotkey = g_session.GetHotkeyInfo(1, 39);
   this->m_playButton->SetTooltip(hotkey.text.c_str());
   this->m_pauseButton->SetTooltip(hotkey.text.c_str());
@@ -4164,7 +4191,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     case ID_OK: {
       if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
           _mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
         this->m_nameEdit->SetText("");
         return 0;
       }
@@ -4172,12 +4199,22 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       if (this->m_nameEdit->Length() >= 4) {
         const BOOL allowed = g_forbiddenWords.Allows(this->m_nameEdit->Text());
         BOOL valid = TRUE;
-        if (g_serviceType == 1 && !ValidateCharacterName(this->m_nameEdit->Text())) {
+        if (g_serviceType == 1 && !g_session.ValidateCharacterName(this->m_nameEdit->Text())) {
           valid = FALSE;
         }
 
-        const BOOL badName = g_session.HasControlCharacter(this->m_nameEdit->Text()) || !allowed;
-        const BOOL blank = g_session.IsBlankString(this->m_nameEdit->Text());
+        BOOL badName = FALSE;
+        BOOL blank = FALSE;
+        if (g_session.HasControlCharacter(this->m_nameEdit->Text())) {
+          badName = TRUE;
+          blank = g_session.IsBlankString(this->m_nameEdit->Text());
+        } else {
+          blank = g_session.IsBlankString(this->m_nameEdit->Text());
+          if (!allowed) {
+            badName = TRUE;
+          }
+        }
+
         if (badName || !valid || blank) {
           if (badName) {
             g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
@@ -4289,12 +4326,12 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 
       this->m_info.head = static_cast<std::int16_t>(this->m_hairStyle + 1);
       int head = this->m_info.head;
-      this->m_view.actionNames[1].assign(g_session.GetHeadActName(this->m_info.job, sex, &head));
-      this->m_view.spriteNames[1].assign(g_session.GetHeadSprName(this->m_info.job, sex, &head));
+      this->m_view.actionNames[1].assign(static_cast<const std::string&>(g_session.GetHeadActName(this->m_info.job, sex, &head)));
+      this->m_view.spriteNames[1].assign(static_cast<const std::string&>(g_session.GetHeadSprName(this->m_info.job, sex, &head)));
       this->m_info.head = static_cast<std::int16_t>(head);
       this->m_view.imfName = g_session.GetBodyImfName(this->m_info.job, sex, this->m_info.head, this->m_info.bodyCostume);
       if (this->m_view.headPalette) {
-        this->m_view.headPaletteName.assign(g_session.GetHeadPalName(head, this->m_info.job, sex, this->m_view.headPalette));
+        this->m_view.headPaletteName.assign(static_cast<const std::string&>(g_session.GetHeadPalName(head, this->m_info.job, sex, this->m_view.headPalette)));
       }
       return this->m_hairStyle - previous;
     }
@@ -4319,7 +4356,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 
       this->m_view.headPalette = this->m_hairColor;
       if (this->m_view.headPalette) {
-        this->m_view.headPaletteName = g_session.GetHeadPalName(this->m_info.head, this->m_info.job, sex, this->m_view.headPalette);
+        this->m_view.headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(this->m_info.head, this->m_info.job, sex, this->m_view.headPalette));
       }
       this->m_info.headPalette = static_cast<std::int16_t>(this->m_view.headPalette);
       return this->m_hairColor - previous;
@@ -4344,7 +4381,7 @@ void UILoginWnd::OnCreate(int, int) {
 
   UIStaticText* label = new UIStaticText();
   label->SetSize(72, 22);
-  label->SetText(LookupMessage(MSI_CREATE_RAG_ACCOUNT), 0);
+  label->SetText(LookupMessage(MSI_SAVE_ID), 0);
   label->SetColor(51, 51, 51);
   label->Move(73, 87);
   label->SetFont(0, 11, 0, 0);
@@ -4358,7 +4395,7 @@ void UILoginWnd::OnCreate(int, int) {
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(13, 104);
   button->SetId(285);
-  button->SetText(LookupMessage(MSI_ENST_BLESSING2));
+  button->SetText(LookupMessage(MSI_OPENING));
   button->AddTextStyle(0, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(1, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(2, 12, 0x313131, 1, 1, -1000, -1000);
@@ -4371,7 +4408,7 @@ void UILoginWnd::OnCreate(int, int) {
   button->SetSize(button->BitmapWidth(), button->BitmapHeight() + 2);
   button->Move(87, 104);
   button->SetId(ID_MAKEACCOUNT);
-  button->SetText(LookupMessage(MSI_ADVENTURER_AGENCY_REGIST_FAILED));
+  button->SetText(LookupMessage(MSI_CREATE_RAG_ACCOUNT));
   button->AddTextStyle(0, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(1, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(2, 12, 0x313131, 1, 1, -1000, -1000);
@@ -4433,10 +4470,10 @@ void UILoginWnd::OnCreate(int, int) {
   this->loginTypeCombo->SetSize(160, 22);
   this->loginTypeCombo->Move(13, 10);
   this->AddChild(this->loginTypeCombo);
-  this->loginTypeCombo->AddOption(LookupMessage(MSI_ENTER_THE_SEARCH_WORD), 0);
-  this->loginTypeCombo->AddOption(LookupMessage(MSI_MOTP), 0);
+  this->loginTypeCombo->AddOption(LookupMessage(MSI_ACCOUNTCLASS_INTEGRATION), 0);
+  this->loginTypeCombo->AddOption(LookupMessage(MSI_ACCOUNTCLASS_RAGNAROK), 0);
   this->loginTypeCombo->Clear();
-  this->loginTypeCombo->AddOption(LookupMessage(MSI_ENTER_THE_SEARCH_WORD), 0);
+  this->loginTypeCombo->AddOption(LookupMessage(MSI_ACCOUNTCLASS_INTEGRATION), 0);
   this->loginTypeCombo->Select(0);
   this->SendMsg(this->loginTypeCombo, UM_COMBOBOX_SELECTED, 0, 0, 0, 0);
   this->idEdit->maximum = 24;

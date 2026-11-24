@@ -35,6 +35,7 @@
 #include "Client/Input/InputCharset.h"
 #include "Client/Input/Mouse.h"
 #include "UI/Replay/UIReplayListBox.h"
+#include "UI/Replay/UIReplayRECControlWnd.h"
 #include "UI/Dialogs/UINoticeWnd.h"
 #include "UI/Window/UIFrameWnd.h"
 #include "UI/Window/WindowManagerWindows.h"
@@ -66,13 +67,15 @@
 #include <windows.h>
 #include <timeapi.h>
 
-template __declspec(noinline) std::string& std::string::erase(std::size_t, std::size_t);
-
 // OFFSET: 0x008A3700
 // FUNCTION: fn_11657
 UIFrameWnd::UIFrameWnd(unsigned char cached)
     : UIWindow(cached), m_dragX(0), m_dragY(0), m_message0(600), m_message1(600) {
 }
+
+// OFFSET: 0x008A4D10
+// FUNCTION: fn_45806
+UIChatRoomWnd::~UIChatRoomWnd() = default;
 
 // OFFSET: 0x008A4E00
 // FUNCTION: fn_11677
@@ -96,6 +99,13 @@ UIPetInfoWnd::~UIPetInfoWnd() {
   if (this->feedConfirmationWnd) {
     g_windowMgr.Schedule(this->feedConfirmationWnd);
   }
+}
+
+// OFFSET: 0x008A56B0
+// FUNCTION: fn_46403
+__declspec(noinline) UIReplayRECControlWnd::~UIReplayRECControlWnd() {
+  this->recordStart = 0;
+  this->mode = 0;
 }
 
 // OFFSET: 0x005C4640
@@ -182,26 +192,25 @@ void UIFrameWnd::OnMouseMove(int x, int y) {
 
   if (!g_snapMgr.Contains(this)) {
     this->Move(this->m_originX + dx, this->m_originY + dy);
-    return;
+  } else {
+    this->MoveFromOrigin(dx, dy);
+    int ownX, ownY;
+    g_windowMgr.ConstrainSnap(this, ownX, ownY, 0);
+    int groupX = dx, groupY = dy;
+    g_snapMgr.ConstrainGroup(this, groupX, groupY);
+
+    if (std::abs(groupX) < std::abs(ownX)) {
+      groupX = ownX;
+    }
+
+    if (std::abs(groupY) < std::abs(ownY)) {
+      groupY = ownY;
+    }
+
+    this->MoveFromOrigin(dx + groupX, dy + groupY);
+    g_windowMgr.StoreSnapRectangle(this);
+    g_snapMgr.MoveConnected(this, dx + groupX, dy + groupY);
   }
-
-  this->MoveFromOrigin(dx, dy);
-  int ownX, ownY;
-  g_windowMgr.ConstrainSnap(this, ownX, ownY, 0);
-  int groupX = dx, groupY = dy;
-  g_snapMgr.ConstrainGroup(this, groupX, groupY);
-
-  if (std::abs(groupX) < std::abs(ownX)) {
-    groupX = ownX;
-  }
-
-  if (std::abs(groupY) < std::abs(ownY)) {
-    groupY = ownY;
-  }
-
-  this->MoveFromOrigin(dx + groupX, dy + groupY);
-  g_windowMgr.StoreSnapRectangle(this);
-  g_snapMgr.MoveConnected(this, dx + groupX, dy + groupY);
 }
 
 // OFFSET: 0x008BA3C0
@@ -323,6 +332,25 @@ UIBitmapButton* UIFrameWnd::AddCloseButton(const char* tooltip, int width) {
   button->SetTooltip(tooltip);
   this->AddChild(button);
 
+  return button;
+}
+
+// OFFSET: 0x008CF1B0
+// FUNCTION: fn_45662
+UIBitmapButton* UIFrameWnd::AddMaximizeButton(const char* tooltip, int width) {
+  if (width == 0) {
+    width = this->geometry.width;
+  }
+
+  UIBitmapButton* button = new UIBitmapButton();
+  button->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_out.bmp", 0, 0);
+  button->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_over.bmp", 1, 0);
+  button->SetBitmap("유저인터페이스\\renewalparty\\btn_titlebar_maximum_press.bmp", 2, 0);
+  button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+  button->Move(width - 28, 3);
+  button->SetId(ID_RESTORE_PARTY_LIST);
+  button->SetTooltip(tooltip);
+  this->AddChild(button);
   return button;
 }
 
@@ -482,7 +510,8 @@ void UIMonsterInfoWnd::OnMouseHover(int x, int y) {
   }
 
   if (this->TextWidth(name.c_str(), 0, 0, 12, 0, 0) > 100) {
-    g_modeMgr.currentMode->ShowTooltip(name.c_str(), screenX + x, screenY + y, -1, false, true);
+    CMode* mode = g_modeMgr.currentMode;
+    mode->ShowTooltip(name.c_str(), screenX + x, screenY + y, -1, false, true);
   }
 }
 
@@ -533,96 +562,129 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
 
-  int step;
   switch (a) {
   case ID_CLOSE:
     g_windowMgr.CloseWindow(WID_BANK_NEWWND);
     return 0;
-  case ID_UP:
-    step = 1;
-    break;
-  case ID_DOWN:
-    step = -1;
-    break;
+  case ID_UP: {
+    const long long amount = this->AdjustAmount(1);
+    char text[260];
+    std::memset(text, 0, sizeof(text));
+    _i64toa(amount, text, 10);
+    if (this->m_amountEdit) {
+      this->m_amountEdit->SetText(text);
+      g_windowMgr.SetFocus(this->m_amountEdit);
+    }
+    return 0;
+  }
+  case ID_DOWN: {
+    const long long amount = this->AdjustAmount(-1);
+    char text[260];
+    std::memset(text, 0, sizeof(text));
+    _i64toa(amount, text, 10);
+    if (this->m_amountEdit) {
+      this->m_amountEdit->SetText(text);
+      g_windowMgr.SetFocus(this->m_amountEdit);
+    }
+    return 0;
+  }
   case BANK_BUTTON_MAX:
     if (!this->m_amountEdit) {
       return 0;
     }
-    this->m_amountEdit->SetText(LookupMessage(MSI_BANK_1_MINI));
+    this->m_amountEdit->SetText(LookupMessage(MSI_BANK_MAX));
     g_windowMgr.SetFocus(this->m_amountEdit);
     return 0;
   case BANK_BUTTON_DEPOSIT: {
     PACKET_CZ_BANK_TRANSACTION packet;
     if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == true) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_WRONG_GUN)), 255, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_PROHIBIT)), 255, 0, 0, 0);
       return 0;
     }
     const long long amount = this->TransactionAmount(1);
-    if (amount == 0) {
+    if (0 == amount) {
       return 0;
     }
     if (g_session.m_zeny < amount) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_OVER_INT_MAX)), 255, 0, 0, 0);
-      this->m_status = LookupMessage(MSI_ITEMMOVEINFO_DROP);
-    } else if (g_session.m_bankBalance + amount > 0x7FFFFFFFLL) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEMMOVEINFO_CART)), 255, 0, 0, 0);
-      this->m_status = LookupMessage(MSI_BANK_6_MINI);
-    } else {
-      packet.amount = static_cast<int>(amount);
-      packet.id = ID_CZ_REQ_BANKING_DEPOSIT;
-      packet.aid = g_session.m_aid;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
-      this->m_status.clear();
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_DEPOSIT_NO_MONEY)), 255, 0, 0, 0);
+      this->m_status = LookupMessage(MSI_BANK_5_MINI);
+      return 0;
     }
+    if (g_session.m_bankBalance + amount > 0x7FFFFFFFLL) {
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_7_MINI)), 255, 0, 0, 0);
+      this->m_status = LookupMessage(MSI_BANK_3_MINI);
+      return 0;
+    }
+    packet.amount = static_cast<int>(amount);
+    packet.id = ID_CZ_REQ_BANKING_DEPOSIT;
+    packet.aid = g_session.m_aid;
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+    this->m_status.clear();
     return 0;
   }
   case BANK_BUTTON_WITHDRAW: {
     PACKET_CZ_BANK_TRANSACTION packet;
     if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == true) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_WRONG_GUN)), 255, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_PROHIBIT)), 255, 0, 0, 0);
       return 0;
     }
     const long long amount = this->TransactionAmount(0);
-    if (amount == 0) {
+    if (0 == amount) {
       return 0;
     }
     if (g_session.m_bankBalance < amount) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_WITHDRAW_ZERO)), 255, 0, 0, 0);
-      this->m_status = LookupMessage(MSI_ITEMMOVEINFO_STORE);
-    } else if (static_cast<unsigned int>(g_session.m_zeny + static_cast<int>(amount)) > 0x7FFFFFFFu) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_JOBPLUSEXP_VALUE)), 255, 0, 0, 0);
-      this->m_status = LookupMessage(MSI_ITEMMOVEINFO_CART);
-    } else {
-      packet.amount = static_cast<int>(amount);
-      packet.id = ID_CZ_REQ_BANKING_WITHDRAW;
-      packet.aid = g_session.m_aid;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
-      this->m_status.clear();
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_WITHDRAW_NO_MONEY)), 255, 0, 0, 0);
+      this->m_status = LookupMessage(MSI_BANK_6_MINI);
+      return 0;
+    }
+    if (static_cast<unsigned int>(g_session.m_zeny + static_cast<int>(amount)) > 0x7FFFFFFFu) {
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_OVER_INT_MAX)), 255, 0, 0, 0);
+      this->m_status = LookupMessage(MSI_BANK_7_MINI);
+      return 0;
+    }
+    packet.amount = static_cast<int>(amount);
+    packet.id = ID_CZ_REQ_BANKING_WITHDRAW;
+    packet.aid = g_session.m_aid;
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+    this->m_status.clear();
+    return 0;
+  }
+  case BANK_BUTTON_10MIL: {
+    const long long amount = this->AdjustAmount(10000000);
+    char text[260];
+    std::memset(text, 0, sizeof(text));
+    _i64toa(amount, text, 10);
+    if (this->m_amountEdit) {
+      this->m_amountEdit->SetText(text);
+      g_windowMgr.SetFocus(this->m_amountEdit);
     }
     return 0;
   }
-  case BANK_BUTTON_10MIL:
-    step = 10000000;
-    break;
-  case BANK_BUTTON_1MIL:
-    step = 1000000;
-    break;
-  case BANK_BUTTON_100K:
-    step = 100000;
-    break;
+  case BANK_BUTTON_1MIL: {
+    const long long amount = this->AdjustAmount(1000000);
+    char text[260];
+    std::memset(text, 0, sizeof(text));
+    _i64toa(amount, text, 10);
+    if (this->m_amountEdit) {
+      this->m_amountEdit->SetText(text);
+      g_windowMgr.SetFocus(this->m_amountEdit);
+    }
+    return 0;
+  }
+  case BANK_BUTTON_100K: {
+    const long long amount = this->AdjustAmount(100000);
+    char text[260];
+    std::memset(text, 0, sizeof(text));
+    _i64toa(amount, text, 10);
+    if (this->m_amountEdit) {
+      this->m_amountEdit->SetText(text);
+      g_windowMgr.SetFocus(this->m_amountEdit);
+    }
+    return 0;
+  }
   default:
     return 0;
   }
-
-  const long long amount = this->AdjustAmount(step);
-  char text[260];
-  std::memset(text, 0, sizeof(text));
-  _i64toa(amount, text, 10);
-  if (this->m_amountEdit) {
-    this->m_amountEdit->SetText(text);
-    g_windowMgr.SetFocus(this->m_amountEdit);
-  }
-  return 0;
 }
 
 // OFFSET: 0x008BDB00
@@ -668,7 +730,7 @@ UIBank_NewWnd::UIBank_NewWnd()
 // OFFSET: 0x008A35A0
 // FUNCTION: fn_11655
 UIChatRoomWnd::UIChatRoomWnd()
-    : UIFrameWnd(0), title(), roomSettingsText(), memberRoles(), menuCommands(), saved(nullptr) {
+    : UIFrameWnd(0), memberRoles(), menuCommands(), saved(nullptr) {
 }
 
 #pragma pack(push, 1)
@@ -697,22 +759,24 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     }
     this->SendMsg(nullptr, UM_RESIZE, 7, this->saved->width, this->saved->height, 0);
     this->Move(this->saved->x, this->saved->y);
-    return 0;
+    break;
   case UM_COMMAND:
     switch (a) {
     case ID_OK: {
       if (this->edit->Length() == 0) {
-        return 0;
+        break;
       }
-      if (g_navigationLinkParser->HasLink(std::string(this->edit->Text()))) {
+      NavigationLinkParser* parser = g_navigationLinkParser;
+      if (parser->HasLink(std::string(this->edit->Text()))) {
         this->edit->SetText("");
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CLOSE)), 255, 0, 0, 0);
-        return 0;
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MSG_IS_ILLEGAL_MSG)), 255, 0, 0, 0);
+        break;
       }
 
       std::string text = this->edit->Text();
       if (!this->edit->links.empty()) {
-        text = this->edit->LinkedText();
+        const std::string linked = this->edit->LinkedText();
+        text = linked;
       } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->edit->Text()), reinterpret_cast<const unsigned char*>("<"))) {
         UIItemTagOnChat* tags = this->edit->itemTags;
         if (tags != nullptr && !tags->linkedText.empty()) {
@@ -727,9 +791,9 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
         std::strcpy(buffer, this->edit->Text());
       }
 
-      if (g_serviceType == 1 && !ValidateCharacterName(buffer)) {
+      if (g_serviceType == 1 && !g_session.ValidateCharacterName(buffer)) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENGLISHONLY)), 255, 0, 0, 0);
-        return 0;
+        break;
       }
 
       bool self = false;
@@ -762,109 +826,110 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->edit->PushHistory();
       this->edit->SetText("");
       g_windowMgr.SetFocus(this->edit);
-      return 0;
+      break;
     }
     case ID_CLOSE:
       g_modeMgr.currentMode->SendMsg(MM_REQ_EXIT_ROOM, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_NAME:
       g_windowMgr.SelectWhisperName(reinterpret_cast<const char*>(b));
-      return 0;
+      break;
     default:
-      return 0;
+      break;
     }
+    break;
   case UM_MENU_SELECTED: {
     CGameMode* mode = g_modeMgr.GetGameMode();
-    switch (this->menuCommands[a].second) {
+    switch (this->menuCommands[a].value) {
     case MENUID_EXPEL: {
       if (this->memberList->selected == -1) {
-        return 0;
+        break;
       }
       const std::string name = this->memberList->lines[this->memberList->selected];
       mode->SendMsg(MM_REQ_EXPEL_MEMBER, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
-      return 0;
+      break;
     }
     case MENUID_GIVE_ROOM_POWER: {
       if (this->memberList->selected == -1) {
-        return 0;
+        break;
       }
       const std::string name = this->memberList->lines[this->memberList->selected];
       mode->SendMsg(MM_REQ_ROLE_CHANGE, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
-      return 0;
+      break;
     }
     case MENUID_CHANGE_ROOM_SETTING:
       g_windowMgr.EnsureWindow(WID_CHATROOMCHANGEWND)->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&mode->chatRoom), 0, 0, 0);
-      return 0;
+      break;
     case MENUID_QUERYINFO:
       g_windowMgr.Confirm(LookupMessage(MSI_NOTSUPPORTEDYET), 0, true, false, 0, "Message", 280, 120, 0);
-      return 0;
+      break;
     case MENUID_WRITE_CHAT_TO_FILE:
       this->SaveChatLog();
-      return 0;
+      break;
     case MENUID_ADD_TO_FRIEND_CHAR_LIST_FROM_WINDOW: {
       if (this->memberList->selected == -1) {
-        return 0;
+        break;
       }
       const std::string name = this->memberList->lines[this->memberList->selected];
       g_windowMgr.RequestAddFriend(name.c_str());
-      return 0;
+      break;
     }
     default:
-      return 0;
+      break;
     }
   }
+  break;
   case UM_MAKEMENU: {
-    this->menuCommands.clear();
+    this->menuCommands.erase(this->menuCommands.begin(), this->menuCommands.end());
     if (g_windowMgr.menuWnd != nullptr) {
       g_windowMgr.CloseWindow(WID_MENUWND);
     }
 
-    {
-      const std::string self = g_session.DecodePlayerName();
-      if (this->memberRoles.find(self) == this->memberRoles.end()) {
-        return 0;
-      }
-      const int rank = this->memberRoles[self];
-      if (rank == -1) {
-        return 0;
-      }
-
-      if (this->memberList->selected != -1) {
-        const std::string target = this->memberList->lines[this->memberList->selected];
-        if (this->memberRoles.find(target) == this->memberRoles.end() || this->memberRoles[target] == -1) {
-          return 0;
-        }
-        switch (rank) {
-        case 0:
-          if (!(target == self)) {
-            this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_BAN)), 0));
-            this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_GIVE_GIVE_ROOM_POWER)), 1));
-          }
-          this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_SEE_INFORMATION_OF_CHARACTER)), 3));
-          if (g_serviceMode != 3 && !g_windowMgr.IsFriend(target.c_str()) && !(target == self)) {
-            this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_ADD_TO_FRIEND_CHAR_LIST)), 21));
-          }
-          this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_CHANGE_ROOM_SETTING)), 2));
-          break;
-        case 1:
-          this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_SEE_INFORMATION_OF_CHARACTER)), 3));
-          if (!g_windowMgr.IsFriend(target.c_str()) && !(target == self) && g_serviceMode != 3) {
-            this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_ADD_TO_FRIEND_CHAR_LIST)), 21));
-          }
-          break;
-        }
-      } else {
-        if (rank == 0) {
-          this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_CHANGE_ROOM_SETTING)), 2));
-        }
-        this->menuCommands.push_back(std::pair<std::string, int>(std::string(LookupMessage(MSI_WRITE_CHAT_TO_FILE)), 11));
-      }
+    const std::string self = g_session.DecodePlayerName();
+    const std::map<std::string, int>::iterator found = this->memberRoles.find(self);
+    if (found == this->memberRoles.end()) {
+      break;
+    }
+    const int rank = this->memberRoles[self];
+    if (rank == -1) {
+      break;
     }
 
-    if (!this->menuCommands.empty()) {
+    if (this->memberList->selected != -1) {
+      const std::string target = this->memberList->lines[this->memberList->selected];
+      if (this->memberRoles.find(target) == this->memberRoles.end() || this->memberRoles[target] == -1) {
+        break;
+      }
+      switch (rank) {
+      case 0:
+        if (!(target == self)) {
+          this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_BAN)).c_str(), 0));
+          this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_GIVE_GIVE_ROOM_POWER)).c_str(), 1));
+        }
+        this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_SEE_INFORMATION_OF_CHARACTER)).c_str(), 3));
+        if (g_serviceMode != 3 && !g_windowMgr.IsFriend(target.c_str()) && !(target == self)) {
+          this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_ADD_TO_FRIEND_CHAR_LIST)).c_str(), 21));
+        }
+        this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_CHANGE_ROOM_SETTING)).c_str(), 2));
+        break;
+      case 1:
+        this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_SEE_INFORMATION_OF_CHARACTER)).c_str(), 3));
+        if (!g_windowMgr.IsFriend(target.c_str()) && !(target == self) && g_serviceMode != 3) {
+          this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_ADD_TO_FRIEND_CHAR_LIST)).c_str(), 21));
+        }
+        break;
+      }
+    } else {
+      if (rank == 0) {
+        this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_CHANGE_ROOM_SETTING)).c_str(), 2));
+      }
+      this->menuCommands.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_WRITE_CHAT_TO_FILE)).c_str(), 11));
+    }
+
+    if (this->menuCommands.size() != 0) {
       UIWindow* menu = g_windowMgr.EnsureWindow(WID_MENUWND);
       for (unsigned index = 0; index < this->menuCommands.size(); ++index) {
-        menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(this->menuCommands[index].first.c_str()), 0, 0, 0);
+        menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(this->menuCommands[index].text.c_str()), 0, 0, 0);
       }
       menu->SendMsg(nullptr, UM_SET_CALLER_WID, WID_CHATROOMWND, 0, 0, 0);
       menu->SendMsg(nullptr, UM_ADJUSTSIZE, 0, 0, 0, 0);
@@ -874,89 +939,85 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       if (x < 1) {
         x = 1;
       }
-      int maxX = g_renderer->viewport.width - menu->geometry.width;
-      if (x <= maxX) {
-        maxX = x;
+      if (x > g_renderer->viewport.width - menu->geometry.width) {
+        x = g_renderer->viewport.width - menu->geometry.width;
       }
       if (y < 1) {
         y = 1;
       }
-      int maxY = g_renderer->viewport.height - menu->geometry.height;
-      if (y <= maxY) {
-        maxY = y;
+      if (y > g_renderer->viewport.height - menu->geometry.height) {
+        y = g_renderer->viewport.height - menu->geometry.height;
       }
-      menu->Move(maxX, maxY);
+      menu->Move(x, y);
     }
-    return 0;
+    break;
   }
   case UM_SETINFO: {
     const ChatRoomTitleInfo* settings = reinterpret_cast<const ChatRoomTitleInfo*>(a);
-    this->title = settings->title;
-    this->roomSettingsText = settings->password;
-    this->roomStatus.roomType = settings->type;
-    this->roomStatus.memberCount = settings->memberCount;
-    this->roomStatus.memberLimit = settings->memberLimit;
-    this->roomStatus.roomId = settings->id;
+    this->info = *settings;
 
-    const std::size_t end = this->title.find('\r');
+    const std::size_t end = this->info.title.find('\r');
     if (end != std::string::npos) {
-      this->title = this->title.substr(0, end);
+      this->info.title = this->info.title.substr(0, end);
     }
 
     std::string prefix;
-    prefix = LookupMessage((this->roomStatus.roomType != 0) + 89);
+    prefix = LookupMessage((this->info.type != 0) + 89);
     char text[256];
-    std::sprintf(text, "%s%s (%d/%d)", prefix.c_str(), this->title.c_str(), this->roomStatus.memberCount, this->roomStatus.memberLimit);
-    if (g_forbiddenWords.Contains(text)) {
-      std::string masked;
+    std::sprintf(text, "%s%s (%d/%d)", prefix.c_str(), this->info.title.c_str(), this->info.memberCount, this->info.memberLimit);
+    if (g_forbiddenWords.Contains(text) == true) {
+      std::string masked("");
       g_forbiddenWords.Mask(text, &masked);
     }
     this->titleText->SetTextFitted(text);
     this->Invalidate();
-    return 0;
+    break;
   }
   case UM_ROLE_CHANGE: {
-    if (this->memberRoles.find(std::string(reinterpret_cast<const char*>(a))) != this->memberRoles.end()) {
-      this->memberRoles[std::string(reinterpret_cast<const char*>(a))] = static_cast<int>(b);
+    const std::map<std::string, int>::iterator found = this->memberRoles.find(reinterpret_cast<const char*>(a));
+    if (found != this->memberRoles.end()) {
+      this->memberRoles[reinterpret_cast<const char*>(a)] = static_cast<int>(b);
     }
     this->memberList->Clear();
     for (std::map<std::string, int>::iterator it = this->memberRoles.begin(); it != this->memberRoles.end(); ++it) {
-      this->memberList->AddText(it->first.c_str(), it->second != 0 ? 0 : 0x808000, nullptr);
+      const int color = it->second != 0 ? 0 : 0x808000;
+      this->memberList->AddText(it->first.c_str(), color, nullptr);
     }
-    return 0;
+    break;
   }
   case UM_MEMBER_EXIT: {
-    const std::map<std::string, int>::iterator found = this->memberRoles.find(std::string(reinterpret_cast<const char*>(a)));
+    const std::map<std::string, int>::iterator found = this->memberRoles.find(reinterpret_cast<const char*>(a));
     if (found == this->memberRoles.end()) {
-      return 0;
+      break;
     }
     this->memberRoles.erase(found);
     this->memberList->Clear();
     for (std::map<std::string, int>::iterator it = this->memberRoles.begin(); it != this->memberRoles.end(); ++it) {
-      this->memberList->AddText(it->first.c_str(), it->second != 0 ? 0 : 0x808000, nullptr);
+      const int color = it->second != 0 ? 0 : 0x808000;
+      this->memberList->AddText(it->first.c_str(), color, nullptr);
     }
-    return 0;
+    break;
   }
   case UM_CLEARMEMBER:
     this->memberList->Clear();
     this->memberRoles.erase(this->memberRoles.begin(), this->memberRoles.end());
-    return 0;
+    break;
   case UM_ADDMEMBER: {
-    this->memberRoles[std::string(reinterpret_cast<const char*>(a))] = static_cast<int>(b);
+    this->memberRoles[reinterpret_cast<const char*>(a)] = static_cast<int>(b);
     int color = 0;
-    if (b != 0) {
+    if (b == 0) {
+      color = 0x808000;
+    } else {
       if (g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF) && g_soundMgr->tingOnly != 0) {
         g_soundMgr->PlayWave("버튼소리.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       }
-    } else {
-      color = 0x808000;
     }
     this->memberList->AddText(reinterpret_cast<const char*>(a), color, nullptr);
-    return 0;
+    break;
   }
   case UM_ADDCHAT: {
     char* text = reinterpret_cast<char*>(a);
-    if (g_forbiddenWords.Contains(text)) {
+    if (g_forbiddenWords.Contains(text) == true) {
       std::string masked("");
       g_forbiddenWords.Mask(text, &masked);
     }
@@ -1000,8 +1061,8 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       }
     }
 
-    if (_mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>("<ITEML>")) ||
-        _mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>("</ITEML>"))) {
+    if (_mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
+        _mbsstr(reinterpret_cast<const unsigned char*>(text), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
       lines.push_back(std::string(text));
     } else {
       WrapPlainText(text, lines, wrapWidth);
@@ -1010,24 +1071,24 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     for (unsigned index = 0; index < lines.size(); ++index) {
       this->history->AddText(lines[index].c_str(), static_cast<int>(b), name);
     }
-    return 0;
+    break;
   }
   case UM_PAGEUPPUSH:
     if (this->history->verticalOverflow != 0) {
       this->history->SendMsg(nullptr, UM_SCROLLVERTPAGEUP, 0, 0, 0, 0);
     }
-    return 0;
+    break;
   case UM_PAGEDOWNPUSH:
     if (this->history->verticalOverflow != 0) {
       this->history->SendMsg(nullptr, UM_SCROLLVERTPAGEDOWN, 0, 0, 0, 0);
     }
-    return 0;
+    break;
   case UM_RESIZE: {
     if (a != 7) {
-      return 0;
+      break;
     }
-    int width = b > 512 ? 512 : b;
-    int height = c > 384 ? 384 : c;
+    int width = b <= 512 ? b : 512;
+    int height = c <= 384 ? c : 384;
     if (width < 280) {
       width = 280;
     }
@@ -1046,12 +1107,12 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->memberList->Resize(this->geometry.width * 56 / 280, this->geometry.height - 38, false);
       this->memberList->Move(this->geometry.width - this->geometry.width * 56 / 280 - 1, 17);
       this->closeButton->Move(this->geometry.width - 14, 3);
-      const std::string title = this->titleText->text;
+      const std::string title(this->titleText->tooltip.c_str());
       this->titleText->Resize(this->geometry.width - 30, 12);
       this->titleText->SetTextFitted(title.c_str());
     }
     g_windowMgr.StoreSnapRectangle(this);
-    return 0;
+    break;
   }
   case UM_REPLAY_FRAMED_DATA: {
     const unsigned char* data = reinterpret_cast<const unsigned char*>(a);
@@ -1078,7 +1139,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           std::memset(value, 0, sizeof(value));
           std::memcpy(value, data + offset, header.size);
           offset += header.size;
-          settings->title = this->title = value;
+          settings->title = this->info.title = value;
           break;
         }
         case 0x5018: {
@@ -1086,28 +1147,28 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           std::memset(value, 0, sizeof(value));
           std::memcpy(value, data + offset, header.size);
           offset += header.size;
-          settings->password = this->roomSettingsText = value;
+          settings->password = this->info.password = value;
           break;
         }
         case 0x5019:
-        std::memcpy(&this->roomStatus.roomType, data + offset, header.size);
+        std::memcpy(&this->info.type, data + offset, header.size);
           offset += header.size;
-        settings->type = this->roomStatus.roomType;
+        settings->type = this->info.type;
           break;
         case 0x501A:
-          std::memcpy(&this->roomStatus.memberCount, data + offset, header.size);
+          std::memcpy(&this->info.memberCount, data + offset, header.size);
           offset += header.size;
-          settings->memberCount = this->roomStatus.memberCount;
+          settings->memberCount = this->info.memberCount;
           break;
         case 0x501B:
-          std::memcpy(&this->roomStatus.memberLimit, data + offset, header.size);
+          std::memcpy(&this->info.memberLimit, data + offset, header.size);
           offset += header.size;
-          settings->memberLimit = this->roomStatus.memberLimit;
+          settings->memberLimit = this->info.memberLimit;
           break;
         case 0x501C:
-          std::memcpy(&this->roomStatus.roomId, data + offset, header.size);
+          std::memcpy(&this->info.id, data + offset, header.size);
           offset += header.size;
-          settings->id = this->roomStatus.roomId;
+          settings->id = this->info.id;
           this->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(settings), 0, 0, 0);
           break;
         case 0x501E: {
@@ -1133,11 +1194,12 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
         }
       }
     }
-    return 0;
+    break;
   }
   default:
     return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
+  return 0;
 }
 
 // OFFSET: 0x008A36A0
@@ -1171,3 +1233,4 @@ UILoginWnd::UILoginWnd() : UIFrameWnd(0), savedAccounts(), loginTypeCombo(0), lo
   this->unknown_00D4 = 0;
   this->backgroundWindow = nullptr;
 }
+

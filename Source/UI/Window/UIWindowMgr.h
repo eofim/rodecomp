@@ -691,7 +691,7 @@ public:
   void DeferDeletion(UIWindow* window);
   UIWindow* Top() const;
   void RestoreInput();
-  int Confirm(const char* text, int type, int defaultAccept, bool replace, int timeout, const char* caption, int width, int height, unsigned char protect);
+  int Confirm(const char* text, int type, int defaultAccept, int replace, int timeout, const char* caption, int width, int height, unsigned char protect);
   void AddMessageBox(
     const char* text, int type, int defaultAccept, int unused, int timeout, const char* caption, int width, int height, const char* icon, bool track
   );
@@ -729,7 +729,7 @@ public:
   void RefreshGuildWindows();
   void RefreshRouletteWnd();
   void EnableRouletteWnd();
-  char UpdateSnapRectangles();
+  void UpdateSnapRectangles();
   bool ProcessDialogKey(int unused, int key);
   void DestroyBackgroundSurface();
   void SubmitActiveDialog();
@@ -810,12 +810,14 @@ public:
   bool ProcessShortcutKey(int action);
   bool ProcessKeyDown(int key, int keyData, int pressed);
   void ShowWaitDBSaveWindow();
+  void LoadSkillUseLevelRegistry();
+  __declspec(noinline) void CloseWaitDBSaveWindow();
   void SendEmotionHotkey(int index);
 };
 
 extern UIWindowMgr g_windowMgr;
-extern int g_renderDiagnosticLine;
-extern const char* g_renderDiagnosticFile;
+extern volatile int g_renderDiagnosticLine;
+extern const char* volatile g_renderDiagnosticFile;
 extern const int* g_windowCloseValue;
 extern const int* g_savedWindowCloseValue;
 

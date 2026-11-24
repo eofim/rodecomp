@@ -13,7 +13,7 @@
 void CAdventurerAgencyMgr::CompleteChangeMaster(AsyncDiagnostic diagnostic, std::string response) {
   --this->pending;
 
-  if (!diagnostic.success) {
+  if (!std::get<0>(diagnostic)) {
     return;
   }
 
@@ -30,7 +30,7 @@ void CAdventurerAgencyMgr::CompleteChangeMaster(AsyncDiagnostic diagnostic, std:
     break;
   default:
     if (UIWindow* window = g_windowMgr.LookupWindow(WID_ADVENPARTYBOARDWND)) {
-      window->SendMsg(nullptr, UM_COMMAND, ID_PARTY_RELOAD_FIRST_PAGE, 0, 0, 0);
+      window->SendMsg(nullptr, UM_COMMAND, ID_REFRESH, 0, 0, 0);
     }
     break;
   }

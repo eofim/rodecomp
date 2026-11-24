@@ -4,6 +4,7 @@
 #include "Contents/Hotkeys/HotkeyInfo.h"
 #include "UI/Window/UIFrameWnd.h"
 
+#include <array>
 #include <cstdint>
 #include <map>
 
@@ -22,6 +23,7 @@ public:
   };
 
   UIHotKeyWnd();
+  __declspec(noinline) ~UIHotKeyWnd() override;
   void OnCreate(int width, int height) override;
   void OnLBtnDown(int x, int y) override;
   void OnRBtnDown(int x, int y) override;
@@ -35,6 +37,7 @@ public:
   void OnMouseHover(int x, int y) override;
   void ReloadHotkeys();
   bool AssignSelectedHotkey(int mode);
+  int ValidateSpecialHotkeyMode(int mode);
   int CheckHotkeyConflict();
 
   /* 00B4 */ int m_selectedRow;
@@ -47,7 +50,7 @@ public:
   /* 00D0 */ int m_rowHeight;
   /* 00D4 */ int m_keyColumnWidth;
   /* 00D8 */ int m_descriptionColumnWidth;
-  /* 00DC */ std::map<int, HotkeyInfo> hotkeys[4];
+  /* 00DC */ std::array<std::map<int, HotkeyInfo>, 4> hotkeys;
   /* 00FC */ UIBalloonText* m_balloon;
   /* 0100 */ UITabControl* m_tabs;
   /* 0104 */ int m_tab;

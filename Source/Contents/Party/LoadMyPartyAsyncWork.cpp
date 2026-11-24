@@ -28,7 +28,8 @@ CLoadMyPartyAsyncWork::CLoadMyPartyAsyncWork()
     : NAsyncWork(g_loadMyPartyPoolName), m_accountId(0), m_characterId(0), m_diagnostic(false, std::string(OBFUSCATE_BYTES_TEXT("unknwon", 0x2FF3C5036D070127ULL)), sourceFile, 28) {
 }
 
-// INLINED
+// OFFSET: 0x005CF4A0
+// FUNCTION: fn_46409
 CLoadMyPartyAsyncWork::~CLoadMyPartyAsyncWork() = default;
 
 // OFFSET: 0x005CF8E0
@@ -53,8 +54,8 @@ void CLoadMyPartyAsyncWork::Bind(std::uint32_t accountId, std::uint32_t characte
 // FUNCTION: fn_03690
 bool CLoadMyPartyAsyncWork::Execute() {
   char account[64] = {};
-  char character[64] = {};
   StringFormat(account, sizeof(account), _TRUNCATE, "%lu", this->m_accountId);
+  char character[64] = {};
   StringFormat(character, sizeof(character), _TRUNCATE, "%lu", this->m_characterId);
   const std::string world = CCURLMgr::GetInstance()->ToUtf8(this->m_world);
   CCURLPostHander handler(this->m_url);

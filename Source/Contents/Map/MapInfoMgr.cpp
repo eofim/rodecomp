@@ -28,6 +28,12 @@ extern "C" {
 // GLOBAL: gl_24842
 CMapInfoMgr* g_mapInfoMgr;
 
+// OFFSET: 0x006CDD80
+// FUNCTION: fn_46451
+CMapInfoMgr::CMapInfoMgr() : m_display(nullptr) {
+  this->m_initialized = true;
+}
+
 // OFFSET: 0x006CDE30
 // FUNCTION: fn_06480
 MapNameDisplay::MapNameDisplay(std::string name, std::string subName, std::string bmp) {
@@ -87,7 +93,7 @@ void CMapInfoMgr::AddMapDisplayName(std::string map, std::string name, bool show
 // OFFSET: 0x006CE8C0
 // FUNCTION: fn_06485
 void CMapInfoMgr::AddMapSignName(std::string map, std::string name, std::string subName) {
-  this->m_maps[map].m_sign = MapSignName{name, subName};
+  this->m_maps[map].m_sign = std::make_pair(name, subName);
 }
 
 // OFFSET: 0x006CEAA0
@@ -122,8 +128,8 @@ void CMapInfoMgr::ShowMapName(std::string map) {
     bmp.assign("noname", 6);
   }
 
-  std::string name = info->m_sign.m_name;
-  std::string subName = info->m_sign.m_subName;
+  std::string name = info->m_sign.first;
+  std::string subName = info->m_sign.second;
   if (name.size() == 0 && subName.size() == 0) {
     subName = this->m_emptyName;
   }
@@ -180,7 +186,7 @@ MapInfo* CMapInfoMgr::FindMapInfo(std::string map) {
 const char* CMapInfoMgr::GetSignSubName(std::string map) {
   const MapInfo* info = this->FindMapInfo(map);
   if (info != nullptr) {
-    return info->m_sign.m_subName.c_str();
+    return info->m_sign.second.c_str();
   }
 
   return this->m_emptyName.c_str();
@@ -192,23 +198,31 @@ bool CMapInfoMgr::LoadScript() {
   this->m_emptyName = LookupMessage(MSI_NOWHERE);
 
   NLuaState lua;
-  if (lua.IsValid()) {
-    luaL_openlibs(lua.GetState());
-    lua_register(lua.GetState(), "AddMapDisplayName", CMapInfoMgr::L_AddMapDisplayName);
-    lua_register(lua.GetState(), "AddMapSignName", CMapInfoMgr::L_AddMapSignName);
-    lua_register(lua.GetState(), "AddMapBackgroundBmp", CMapInfoMgr::L_AddMapBackgroundBmp);
-
-    if (luaL_loadfile(lua.GetState(), "system\\mapInfo_true.lub") == 0 && lua_pcall(lua.GetState(), 0, 0, 0) == 0) {
-      lua_getglobal(lua.GetState(), "main");
-      if (lua_pcall(lua.GetState(), 0, 2, 0) == 0) {
-        return true;
-      }
-    }
-
-    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CMapInfoMgr", MB_OK);
+  if (!lua.IsValid()) {
+    return false;
   }
 
-  return false;
+  luaL_openlibs(lua.GetState());
+  lua_register(lua.GetState(), "AddMapDisplayName", CMapInfoMgr::L_AddMapDisplayName);
+  lua_register(lua.GetState(), "AddMapSignName", CMapInfoMgr::L_AddMapSignName);
+  lua_register(lua.GetState(), "AddMapBackgroundBmp", CMapInfoMgr::L_AddMapBackgroundBmp);
+
+  if (luaL_loadfile(lua.GetState(), "system\\mapInfo_true.lub") != 0) {
+    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CMapInfoMgr", MB_OK);
+    return false;
+  }
+  if (lua_pcall(lua.GetState(), 0, 0, 0) != 0) {
+    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CMapInfoMgr", MB_OK);
+    return false;
+  }
+
+  lua_getglobal(lua.GetState(), "main");
+  if (lua_pcall(lua.GetState(), 0, 2, 0) != 0) {
+    MessageBoxA(nullptr, lua_tostring(lua.GetState(), -1), "CMapInfoMgr", MB_OK);
+    return false;
+  }
+
+  return true;
 }
 
 // OFFSET: 0x006CF290
@@ -240,9 +254,8 @@ void CMapInfoMgr::DrawMapName() {
   const float scale = static_cast<float>(display->m_height) / static_cast<float>(display->m_texture->Height());
   const int width = static_cast<int>(static_cast<float>(display->m_texture->Width()) * scale);
   display->m_texture->StretchTintedTo(
-    g_renderer->primitives, g_renderer->queues, static_cast<int>(static_cast<float>(display->m_width - width) * 0.5f),
-    static_cast<int>(static_cast<float>(g_renderer->viewport.height) * 0.12f), width, display->m_height, color, g_renderer->fog.supported != 0,
-    g_depthStart, g_depthEnd
+    static_cast<int>(static_cast<float>(display->m_width - width) * 0.5f), static_cast<int>(static_cast<float>(g_renderer->viewport.height) * 0.12f), width,
+    display->m_height, color
   );
   display->m_dc->Draw(0, static_cast<int>(static_cast<float>(g_renderer->viewport.height) * 0.12f), display->m_width, display->m_height, color);
 }
@@ -262,7 +275,8 @@ int CMapInfoMgr::L_AddMapBackgroundBmp(lua_State* state) {
       const std::string bmp = lua_tostring(state, -1);
       lua_pushboolean(state, 1);
       lua_pushstring(state, "good");
-      g_mapInfoMgr->AddMapBackgroundBmp(map, bmp);
+      CMapInfoMgr* const manager = g_mapInfoMgr;
+      manager->AddMapBackgroundBmp(map, bmp);
     }
   }
 

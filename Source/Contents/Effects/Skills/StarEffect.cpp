@@ -4,6 +4,7 @@
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Camera/Camera.h"
 #include "Contents/Effects/Core/EffectMemoryMgr.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Text/FormatString.h"
@@ -25,6 +26,16 @@ __forceinline int Random(int range) {
   return value >= 0 ? value : 0;
 }
 
+}
+
+// OFFSET: 0x00B79C80
+// FUNCTION: fn_46025
+CStarEffect::CStarEffect() : CEffect(EF_CLOUD9), unknown_00FC(0) {
+}
+
+// OFFSET: 0x00B79D20
+// FUNCTION: fn_46026
+__declspec(noinline) CStarEffect::~CStarEffect() {
 }
 
 // OFFSET: 0x00B79ED0
@@ -61,19 +72,17 @@ void CStarEffect::Open() {
 // OFFSET: 0x00B79FA0
 // FUNCTION: fn_19205
 void CStarEffect::SetupParticle(CParticle* particle) {
-  StarParticleState& state = particle->starState;
-
   particle->elapsedFrames = 0;
   particle->alpha = 0;
-  float* angle = state.angles;
+  float* angle = particle->starState.angles;
   for (int index = 0; index < 4; ++index) {
     *angle++ = static_cast<float>(Random(360));
   }
 
-  state.lifetime = static_cast<float>(Random(200) + 300);
-  state.texture = 1.0f;
-  state.baseScale = static_cast<float>(Random(20)) + 20.0f;
-  state.phase = static_cast<float>(Random(360));
+  particle->starState.lifetime = static_cast<float>(Random(200) + 300);
+  particle->starState.texture = 1.0f;
+  particle->starState.baseScale = static_cast<float>(Random(20)) + 20.0f;
+  particle->starState.phase = static_cast<float>(Random(360));
   particle->SetTexture("effect\\star01.bmp");
 
   float speedZ = static_cast<float>(Random(200) + 25);
@@ -111,13 +120,9 @@ void CStarEffect::OnProcess() {
   }
 }
 
-// OFFSET: 0x00B7A1C0
-// FUNCTION: fn_19208
-void CStarEffect::UpdateParticle(CParticle* particle) {
-  if (!particle) {
-    return;
-  }
-
+// OFFSET: 0x00B79E00
+// FUNCTION: fn_46027
+__forceinline void CStarEffect::AdvanceTexture(CParticle* particle) {
   StarParticleState& state = particle->starState;
   const int frame = particle->elapsedFrames;
   if (frame % 14 == 0) {
@@ -126,28 +131,39 @@ void CStarEffect::UpdateParticle(CParticle* particle) {
       texture = 1;
     }
     state.texture = static_cast<float>(texture);
-    const std::string name = FormatOwnedString("effect\\star%02d.bmp", texture);
-    particle->SetTexture(name.c_str());
+    particle->SetTexture(FormatOwnedString("effect\\star%02d.bmp", texture).c_str());
   }
+}
 
+// OFFSET: 0x00B7A5E0
+// FUNCTION: fn_46029
+__forceinline void CStarEffect::UpdateAlpha(CParticle* particle) {
   int alpha = particle->alpha;
   if (particle->elapsedFrames < 80) {
     alpha += 3;
   }
-  if (particle->elapsedFrames > static_cast<int>(state.lifetime)) {
+  if (particle->elapsedFrames > static_cast<int>(particle->starState.lifetime)) {
     --alpha;
     if (alpha <= 0) {
       this->SetupParticle(particle);
     }
   }
   particle->alpha = alpha;
+}
 
+// OFFSET: 0x00B7A620
+// FUNCTION: fn_46030
+__forceinline void CStarEffect::UpdatePosition(CParticle* particle) {
+  StarParticleState& state = particle->starState;
   float* angle = state.angles;
   for (int pair = 0; pair < 2; ++pair) {
     int target = static_cast<int>(angle[1]);
     int current = static_cast<int>(angle[0]);
     if (target > current) {
-      current = std::min(current + 1, 359);
+      ++current;
+      if (current > 359) {
+        current = 359;
+      }
       if (current > target) {
         target = Random(current);
       }
@@ -168,7 +184,12 @@ void CStarEffect::UpdateParticle(CParticle* particle) {
   offset.z = g_sinTable[static_cast<int>(state.angles[2])] * 0.05f + offset.z;
   particle->offset = offset;
   particle->position = vector3d{offset.x + this->position[0], offset.y, offset.z + this->position[2]};
+}
 
+// OFFSET: 0x00B7A760
+// FUNCTION: fn_46031
+__forceinline void CStarEffect::UpdateScale(CParticle* particle) {
+  StarParticleState& state = particle->starState;
   int phase = static_cast<int>(state.phase + 1.0f);
   if (phase >= 360) {
     phase -= 360;
@@ -176,7 +197,11 @@ void CStarEffect::UpdateParticle(CParticle* particle) {
   phase = phase >= 0 ? phase : 0;
   particle->scale = state.baseScale * g_sinTable[phase] * 0.05f + state.baseScale;
   state.phase = static_cast<float>(phase);
+}
 
+// OFFSET: 0x00B7A7C0
+// FUNCTION: fn_46032
+__forceinline void CStarEffect::UpdateTransform(CParticle* particle) {
   matrix rotation;
   std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
   rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
@@ -189,13 +214,33 @@ void CStarEffect::UpdateParticle(CParticle* particle) {
   particle->transform = transform;
 }
 
+// OFFSET: 0x00B7A1C0
+// FUNCTION: fn_19208
+void CStarEffect::UpdateParticle(CParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  this->AdvanceTexture(particle);
+  this->UpdateAlpha(particle);
+  this->UpdatePosition(particle);
+  this->UpdateScale(particle);
+  this->UpdateTransform(particle);
+}
+
+// OFFSET: 0x00B7A5A0
+// FUNCTION: fn_46028
+__forceinline void CStarEffect::RenderParticle(CParticle* particle) {
+  if (particle) {
+    particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
+  }
+}
+
 // OFFSET: 0x00B7A540
 // FUNCTION: fn_19209
 void CStarEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    if (particle) {
-      particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
-    }
+    this->RenderParticle(particle);
   }
 }

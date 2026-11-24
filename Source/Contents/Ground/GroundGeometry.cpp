@@ -15,6 +15,10 @@ namespace {
   };
 
   struct CellNormals {
+    // OFFSET: 0x00ABD9A0
+    // FUNCTION: fn_45866
+    CellNormals() = default;
+
     /* 0000 */ NormalVector faces[2];
     /* 0018 */ NormalVector side2;
     /* 0024 */ NormalVector side1;
@@ -49,6 +53,26 @@ namespace {
   // INLINED
   __forceinline const GroundTileRecord& TileRecord(const CGndRes& resource, int index) {
     return resource.tiles[index];
+  }
+
+  // INLINED
+  __forceinline void SetTileCoordinates(GroundQuad& tile, const GroundTileRecord& tileRecord, GroundLightmapSet& lightmapSet) {
+    const float scaleU = static_cast<float>(tile.texture->ImageWidth()) / static_cast<float>(tile.texture->TextureWidth());
+    const float scaleV = static_cast<float>(tile.texture->ImageHeight()) / static_cast<float>(tile.texture->TextureHeight());
+
+    for (int corner = 0; corner < 4; ++corner) {
+      tile.vertices[corner].u = scaleU * tileRecord.u[corner];
+      tile.vertices[corner].v = scaleV * tileRecord.v[corner];
+    }
+
+    GroundLightmap* lightmap = &lightmapSet.lightmaps[tileRecord.lightmap];
+    tile.lightmap = lightmap;
+    tile.lightmapTexture = lightmap->texture;
+
+    for (int corner = 0; corner < 4; ++corner) {
+      tile.vertices[corner].lightU = lightmap->uv[corner][0];
+      tile.vertices[corner].lightV = lightmap->uv[corner][1];
+    }
   }
 
   union VertexColor {
@@ -89,9 +113,10 @@ namespace {
   }
 }
 
-// INLINED
+// OFFSET: 0x00ABD7D0
+// FUNCTION: fn_45862
 GroundBase::GroundBase() {
-  this->waterStateA = 0;
+  this->waterTexture = nullptr;
   this->cellSize = 10.0f;
   this->waterLevel = 0.0f;
   this->waterAnimation = 3;
@@ -104,8 +129,9 @@ GroundBase::GroundBase() {
   this->loaded = 0;
 }
 
-// INLINED
-GroundBase::~GroundBase() = default;
+// OFFSET: 0x00ABDCA0
+// FUNCTION: fn_45863
+__declspec(noinline) GroundBase::~GroundBase() = default;
 
 // OFFSET: 0x00ABD640
 // FUNCTION: fn_17546
@@ -133,7 +159,7 @@ void GroundGeometry::Reset(int columns, int rows) {
   this->cells.resize(static_cast<unsigned>(columns) * static_cast<unsigned>(rows));
   this->lighting.resize(4u * static_cast<unsigned>(columns) * static_cast<unsigned>(rows), white);
   this->waterStateC = 0;
-  this->waterStateD = 0;
+  this->waterWavePhase = 0;
 }
 
 // OFFSET: 0x00AC0350
@@ -187,22 +213,7 @@ void GroundGeometry::Build(CGndRes& resource, const float* lightDirection, const
                  static_cast<float>(row - this->height / 2 + 1) * this->cellSize);
         SetPoint(tile.vertices[3].position, static_cast<float>(column - this->width / 2 + 1) * this->cellSize, cell.heights[3],
                  static_cast<float>(row - this->height / 2 + 1) * this->cellSize);
-        const float scaleU = static_cast<float>(tile.texture->ImageWidth()) / static_cast<float>(tile.texture->TextureWidth());
-        const float scaleV = static_cast<float>(tile.texture->ImageHeight()) / static_cast<float>(tile.texture->TextureHeight());
-
-        for (int corner = 0; corner < 4; ++corner) {
-          tile.vertices[corner].u = scaleU * tileRecord.u[corner];
-          tile.vertices[corner].v = scaleV * tileRecord.v[corner];
-        }
-
-        GroundLightmap* lightmap = &this->lightmapSet.lightmaps[tileRecord.lightmap];
-        tile.lightmap = lightmap;
-        tile.lightmapTexture = lightmap->texture;
-
-        for (int corner = 0; corner < 4; ++corner) {
-          tile.vertices[corner].lightU = lightmap->uv[corner][0];
-          tile.vertices[corner].lightV = lightmap->uv[corner][1];
-        }
+        SetTileCoordinates(tile, tileRecord, this->lightmapSet);
 
         for (int channel = 0; channel < 3; ++channel) {
           const unsigned value = 2u * tile.lightmap->color[channel];
@@ -238,22 +249,7 @@ void GroundGeometry::Build(CGndRes& resource, const float* lightDirection, const
                    static_cast<float>(row - this->height / 2 + 1) * this->cellSize);
           SetPoint(tile.vertices[3].position, static_cast<float>(column - this->width / 2 + 1) * this->cellSize, below.heights[1],
                    static_cast<float>(row - this->height / 2 + 1) * this->cellSize);
-          const float scaleU = static_cast<float>(tile.texture->ImageWidth()) / static_cast<float>(tile.texture->TextureWidth());
-          const float scaleV = static_cast<float>(tile.texture->ImageHeight()) / static_cast<float>(tile.texture->TextureHeight());
-
-          for (int corner = 0; corner < 4; ++corner) {
-            tile.vertices[corner].u = scaleU * tileRecord.u[corner];
-            tile.vertices[corner].v = scaleV * tileRecord.v[corner];
-          }
-
-          GroundLightmap* lightmap = &this->lightmapSet.lightmaps[tileRecord.lightmap];
-          tile.lightmap = lightmap;
-          tile.lightmapTexture = lightmap->texture;
-
-          for (int corner = 0; corner < 4; ++corner) {
-            tile.vertices[corner].lightU = lightmap->uv[corner][0];
-            tile.vertices[corner].lightV = lightmap->uv[corner][1];
-          }
+          SetTileCoordinates(tile, tileRecord, this->lightmapSet);
 
           SetPoint(cellNormals.side2.values, 0.0f, 0.0f, below.heights[0] > record.heights[2] ? -1.0f : 1.0f);
           cell.side2 = &tile;
@@ -277,22 +273,7 @@ void GroundGeometry::Build(CGndRes& resource, const float* lightDirection, const
                    static_cast<float>(row - this->height / 2 + 1) * this->cellSize);
           SetPoint(tile.vertices[3].position, static_cast<float>(column - this->width / 2 + 1) * this->cellSize, right.heights[0],
                    static_cast<float>(row - this->height / 2) * this->cellSize);
-          const float scaleU = static_cast<float>(tile.texture->ImageWidth()) / static_cast<float>(tile.texture->TextureWidth());
-          const float scaleV = static_cast<float>(tile.texture->ImageHeight()) / static_cast<float>(tile.texture->TextureHeight());
-
-          for (int corner = 0; corner < 4; ++corner) {
-            tile.vertices[corner].u = scaleU * tileRecord.u[corner];
-            tile.vertices[corner].v = scaleV * tileRecord.v[corner];
-          }
-
-          GroundLightmap* lightmap = &this->lightmapSet.lightmaps[tileRecord.lightmap];
-          tile.lightmap = lightmap;
-          tile.lightmapTexture = lightmap->texture;
-
-          for (int corner = 0; corner < 4; ++corner) {
-            tile.vertices[corner].lightU = lightmap->uv[corner][0];
-            tile.vertices[corner].lightV = lightmap->uv[corner][1];
-          }
+          SetTileCoordinates(tile, tileRecord, this->lightmapSet);
 
           cell.frame = 0xFFFFFFFFu;
           SetPoint(cellNormals.side1.values, right.heights[0] > record.heights[2] ? -1.0f : 1.0f, 0.0f, 0.0f);

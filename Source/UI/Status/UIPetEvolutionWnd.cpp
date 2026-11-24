@@ -30,10 +30,11 @@ UIPetEvolutionWnd::UIPetEvolutionWnd() : UIFrameWnd(0) {
   this->m_evolvedEggId = -1;
 }
 
+// OFFSET: 0x009AB070
+// FUNCTION: fn_45698
 // OFFSET: 0x009AB0E0
 // FUNCTION: fn_13762
-UIPetEvolutionWnd::~UIPetEvolutionWnd() {
-}
+UIPetEvolutionWnd::~UIPetEvolutionWnd() = default;
 
 // OFFSET: 0x009AB170
 // FUNCTION: fn_13763
@@ -46,7 +47,7 @@ void UIPetEvolutionWnd::OnCreate(int width, int height) {
   okButton->SetBitmap("유저인터페이스\\btn_big_ok_b.bmp", 2, 0);
   okButton->SetSize(okButton->BitmapWidth(), okButton->BitmapHeight());
   okButton->Move(this->geometry.width - (okButton->BitmapWidth() * 2 + 20), this->geometry.height - okButton->BitmapHeight() - 10);
-  okButton->SetId(184);
+  okButton->SetId(ID_OK);
   this->AddChild(okButton);
 
   UIBitmapButton* cancelButton = new UIBitmapButton();
@@ -55,7 +56,7 @@ void UIPetEvolutionWnd::OnCreate(int width, int height) {
   cancelButton->SetBitmap("유저인터페이스\\btn_big_cancel_b.bmp", 2, 0);
   cancelButton->SetSize(cancelButton->BitmapWidth(), cancelButton->BitmapHeight());
   cancelButton->Move(this->geometry.width - cancelButton->BitmapWidth() - 10, this->geometry.height - cancelButton->BitmapHeight() - 10);
-  cancelButton->SetId(185);
+  cancelButton->SetId(ID_CANCEL);
   this->AddChild(cancelButton);
 }
 
@@ -63,7 +64,7 @@ void UIPetEvolutionWnd::OnCreate(int width, int height) {
 // FUNCTION: fn_13764
 void UIPetEvolutionWnd::Paint() {
   this->ClearSurface(0xFFFFFFFF);
-  this->DrawTitleBar(true, LookupMessage(MSI_DO_YOU_WANT_TO_EVOLVE_PET), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_PET_EVOLUTION), 0);
 
   char text[260];
   std::memset(text, 0, sizeof(text));
@@ -79,7 +80,7 @@ void UIPetEvolutionWnd::Paint() {
       }
       if (illust) {
         this->FillRegion(12, 29, illust->image.width, illust->image.height, 0x9B9B9B);
-        this->DrawBitmap(10, 27, &illust->image, false);
+        this->DrawBitmap(10, 27, illust, false);
         this->DrawRectOutline(10, 27, illust->image.width, illust->image.height, 0);
       }
     }
@@ -88,7 +89,7 @@ void UIPetEvolutionWnd::Paint() {
     if (arrow) {
       this->DrawBitmap(
         static_cast<int>((this->geometry.width - arrow->image.width) * 0.5), static_cast<int>((134 - arrow->image.height) * 0.5 + 27.0),
-        &arrow->image, true
+        arrow, true
       );
     }
 
@@ -101,13 +102,13 @@ void UIPetEvolutionWnd::Paint() {
       }
       if (illust) {
         this->FillRegion(this->geometry.width - illust->image.width - 8, 29, illust->image.width, illust->image.height, 0x9B9B9B);
-        this->DrawBitmap(this->geometry.width - illust->image.width - 10, 27, &illust->image, false);
+        this->DrawBitmap(this->geometry.width - illust->image.width - 10, 27, illust, false);
         this->DrawRectOutline(this->geometry.width - illust->image.width - 10, 27, illust->image.width, illust->image.height, 0);
       }
     }
   }
 
-  this->DrawTextAt(10, 200, LookupMessage(MSI_PET_EVOLUTION_FAIL_NOTEXIST_CALLPET), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(10, 200, LookupMessage(MSI_PET_EVOLUTION_NEED_ITEM), 0, 0, 12, 0, 0, 0);
 
   int index = 0;
   for (auto it = this->m_materials.begin(); it != this->m_materials.end(); ++it, ++index) {
@@ -118,7 +119,7 @@ void UIPetEvolutionWnd::Paint() {
     );
   }
 
-  this->DrawTextAt(10, this->geometry.height - 52, LookupMessage(MSI_PET_EVOLUTION_FAIL_NOT_PETEGG), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(10, this->geometry.height - 52, LookupMessage(MSI_DO_YOU_WANT_TO_EVOLVE_PET), 0, 0, 12, 0, 0, 0);
 }
 
 namespace {
@@ -143,7 +144,7 @@ int UIPetEvolutionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       for (auto it = this->m_materials.begin(); it != this->m_materials.end(); ++it) {
         ITEM_INFO item = g_session.LookupClientItem(it->first, 1);
         if (item.quantity < it->second) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_AUTO_FEEDING)), 255, 0, 0, 0);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_RECIPE)), 255, 0, 0, 0);
           return 0;
         }
         materials.push_back(static_cast<std::uint16_t>(item.identity[1]));
@@ -151,17 +152,18 @@ int UIPetEvolutionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       }
 
       if (g_session.petAccessory != 0) {
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_TIME_LINE_DAY2)), 255, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_PET_ACC_OFF)), 255, 0, 0, 0);
         return 0;
       }
 
       int count = static_cast<int>(materials.size());
       std::uint16_t length = static_cast<std::uint16_t>(count * 2 + 8);
+      const int evolvedEggId = this->m_evolvedEggId;
       PACKET_CZ_PET_EVOLUTION packet;
       std::memset(packet.materials, 0, sizeof(packet.materials));
       packet.packetType = ID_CZ_PET_EVOLUTION;
       packet.packetLength = length;
-      packet.evolvedEggId = this->m_evolvedEggId;
+      packet.evolvedEggId = evolvedEggId;
       std::memcpy(packet.materials, materials.data(), count * 2);
       GetRagConnection().Send(static_cast<short>(length), &packet);
         g_windowMgr.CloseWindow(WID_PETEVOLUTIONWND);
@@ -175,14 +177,6 @@ int UIPetEvolutionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     }
     break;
 
-  case UM_TEXT_LBTN_UP: {
-    ITEM_INFO item;
-    item.SetItemId(argument1);
-    item.identified = 1;
-    g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
-    break;
-  }
-
   case UM_SET_PET_EVOLUTION_MATERIALS: {
     this->m_materials.clear();
     this->m_petEggId = argument1;
@@ -192,6 +186,14 @@ int UIPetEvolutionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       this->m_materials = result.second;
     }
     this->RebuildButtons();
+    break;
+  }
+
+  case UM_TEXT_LBTN_UP: {
+    ITEM_INFO item;
+    item.SetItemId(argument1);
+    item.identified = 1;
+    g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND)->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
     break;
   }
 
@@ -233,6 +235,10 @@ void UIPetEvolutionWnd::RebuildButtons() {
   }
 
   this->m_materialButtons.clear();
+  if (this->m_materials.empty()) {
+    return;
+  }
+
   int y = 230;
   for (auto it = this->m_materials.begin(); it != this->m_materials.end(); ++it) {
     ITEM_INFO item;

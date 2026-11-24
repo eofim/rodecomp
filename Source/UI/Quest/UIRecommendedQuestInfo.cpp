@@ -119,7 +119,7 @@ void CUIRecommendedQuestInfo::OnClose() {
 // OFFSET: 0x00A58BE0
 // FUNCTION: fn_16349
 void CUIRecommendedQuestInfo::OnInit() {
-  this->titleBar->SetTitle(LookupMessage(MSI_RENEW_QUEST_DETAIL_REWARD));
+  this->titleBar->SetTitle(LookupMessage(MSI_RENEW_QUEST_TITLE));
   UIWindow* window = g_windowMgr.LookupWindow(WID_RENEWQUESTUI);
   if (window) {
     this->Move(window->geometry.x + window->geometry.width, window->geometry.y);
@@ -255,26 +255,50 @@ CUIFrameWnd* CreateRecommendedQuestInfo() {
   return new CUIRecommendedQuestInfo();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x004985B0
 // FUNCTION: fn_45553
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateRecommendedQuestInfo;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10010, factory);
-  return true;
-}();
+static UIRegistration s_recommendedQuestRegistered(10010, CreateRecommendedQuestInfo);
+
+// INLINED
+static void SetCaption(CUIRecommendedQuestInfo* window, const RenewQuestRecommendedInfo& quest) {
+  window->titleText->SetText(quest.m_title);
+}
 
 // OFFSET: 0x00A58E00
 // FUNCTION: fn_16351
 void CUIRecommendedQuestInfo::SetQuest(unsigned int questId) {
   const auto& quests = g_renewQuestMgr->m_recommendedQuests;
   const auto found = quests.find(questId);
+  const unsigned int selectedQuestId = questId;
   if (found != quests.end()) {
-    this->titleText->SetText(found->second.m_title.c_str(), found->second.m_title.size());
-    this->scrollWindow->SetQuest(questId);
+    SetCaption(this, found->second);
+    this->scrollWindow->SetQuest(selectedQuestId);
   }
 }
 
 namespace RecommendedQuestInfo {
+
+// INLINED
+static void SetQuestNpc(CUIScrollWindow* window, const std::string& sprite, const std::string& map, int x, int y) {
+  if (sprite.size() == 0) {
+    window->npcSprite->Show(0);
+    return;
+  }
+
+  window->npcSprite->SetSprite(75, 145, sprite);
+  if (map.size() != 0) {
+    window->npcSprite->SetDestination(map, x, y);
+  }
+  window->npcSprite->Move(window->geometry.width - window->npcSprite->geometry.width - 40, window->geometry.height - window->npcSprite->geometry.height - 10);
+  window->npcSprite->Show(1);
+}
 
 // OFFSET: 0x00A58E80
 // FUNCTION: fn_16352
@@ -284,7 +308,7 @@ void CUIScrollWindow::SetQuest(unsigned int questId) {
   }
 
   const auto& quests = g_renewQuestMgr->m_recommendedQuests;
-  const auto found = quests.find(questId);
+  const auto& found = quests.find(questId);
   if (found != quests.end()) {
     const RenewQuestRecommendedInfo& quest = found->second;
     this->background->SetImage("유저인터페이스\\renew_questui\\" + quest.backgroundImage);
@@ -295,18 +319,9 @@ void CUIScrollWindow::SetQuest(unsigned int questId) {
       }
     }
 
-    if (quest.npcSprite.size() == 0) {
-      this->npcSprite->Show(0);
-    } else {
-      this->npcSprite->SetSprite(75, 145, quest.npcSprite);
-      if (quest.destinationMap.size() != 0) {
-        this->npcSprite->SetDestination(quest.destinationMap, quest.destinationX, quest.destinationY);
-      }
-      this->npcSprite->Move(this->geometry.width - this->npcSprite->geometry.width - 40, this->geometry.height - this->npcSprite->geometry.height - 10);
-      this->npcSprite->Show(1);
-    }
+    SetQuestNpc(this, quest.npcSprite, quest.destinationMap, quest.destinationX, quest.destinationY);
   } else {
-    std::string text = std::format("Not found Quest Info = %lu", questId);
+    std::string text = std::format("Not found Quest Info = %lu", static_cast<unsigned long>(questId));
     g_windowMgr.Confirm(text.c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
   }
 }

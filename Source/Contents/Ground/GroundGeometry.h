@@ -11,24 +11,46 @@
 class CGndRes;
 class TextureCache;
 
+union GroundCornerColor {
+  /* 0000 */ std::uint32_t argb;
+  struct {
+    /* 0000 */ unsigned char b;
+    /* 0001 */ unsigned char g;
+    /* 0002 */ unsigned char r;
+    /* 0003 */ unsigned char a;
+  };
+};
+
 struct GroundLightmap {
   /* 0000 */ unsigned char color[4];
   /* 0004 */ CTexture* texture;
   /* 0008 */ float uv[4][2];
-  /* 0028 */ std::uint32_t cornerColors[4];
+  /* 0028 */ GroundCornerColor cornerColors[4];
 };
 
 class GroundLightmapSet {
 public:
+  GroundLightmapSet();
   ~GroundLightmapSet();
   void Build(CGndRes& resource);
-  void Clear();
+  __declspec(noinline) void Clear();
 
   /* 0000 */ std::vector<GroundLightmap> lightmaps;
   /* 000C */ std::vector<CTexture*> lightmapTextures;
   /* 0018 */ int lightmapCount;
   /* 001C */ int atlasCount;
 };
+
+// OFFSET: 0x00ABD930
+// FUNCTION: fn_45877
+inline GroundLightmapSet::GroundLightmapSet() {
+}
+
+// OFFSET: 0x00ABDD20
+// FUNCTION: fn_45864
+inline GroundLightmapSet::~GroundLightmapSet() {
+  this->Clear();
+}
 
 class GroundBase {
 public:
@@ -71,10 +93,10 @@ public:
   /* 0044 */ int waterPhase;
   /* 0048 */ int waterType;
   /* 004C */ float waterHeight;
-  /* 0050 */ std::uint32_t waterStateA;
+  /* 0050 */ CTexture* waterTexture;
   /* 0054 */ std::uint32_t waterStateB;
   /* 0058 */ std::uint32_t waterStateC;
-  /* 005C */ std::uint32_t waterStateD;
+  /* 005C */ int waterWavePhase;
   /* 0060 */ int loaded;
 };
 
@@ -94,6 +116,7 @@ public:
   bool IsNewVer() override;
   void InitializeLighting() override;
   int Lighting(int column, int row, float& red, float& green, float& blue) const override;
+  void SetLighting(int column, int row, float& red, float& green, float& blue);
   void ImportWater(const CGndRes& resource) override;
   void DrawGrid(const float* matrix, int column, int row, std::uint32_t color) const override;
   void DrawCellDecal(const float* matrix, int column, int row, std::uint32_t color, CTexture& texture, const float* uv) const override;
@@ -104,12 +127,14 @@ public:
   bool CellRectangle(int column, int row, float* vertices) const;
   void DrawGridDecal(const float* matrix, int column, int row, std::uint32_t color, CTexture& texture, const float* uv) const;
   void DrawWaterCell(int column, int row, GroundCell& cell, const float* matrix, const float* ambient);
+  void DrawLegacyWaterCell(int row, int column, GroundCell& cell, const float* matrix, const float* ambient);
   __declspec(noinline) void DrawLightmapped(const float* matrix, const GroundQuad& quad, bool clip);
   __declspec(noinline) void DrawSide(const float* matrix, const GroundQuad& quad, bool clip);
   void WorldColor(vector3d position, std::uint32_t* output) const;
   void LightmapSample(int column, int row, unsigned char& alpha, unsigned char& red, unsigned char& green, unsigned char& blue) const;
   bool TerrainCellCorners(int column, int row, float* vertices) const;
   float WaterLevel(int column, int row) const;
+  __forceinline int WaterPartition(int column, int row) const;
 
   /* 0064 */ std::vector<GroundQuad> tiles;
   /* 0070 */ std::vector<std::array<float, 3>> lighting;

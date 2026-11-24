@@ -4,6 +4,7 @@
 #include "Resource/Models/ModelMesh.h"
 #include "Resource/Resource.h"
 #include "Utility/Math/AffineMatrix.h"
+#include "Utility/Math/Vector3d.h"
 
 #include <functional>
 #include <list>
@@ -16,6 +17,7 @@ class TextureCache;
 struct ResourceByteReader;
 class CFile;
 class C3dModelRes;
+struct ModelTextureTransform;
 
 struct ModelPositionKey {
   /* 0000 */ int frame;
@@ -40,9 +42,12 @@ struct ModelTextureKey {
   /* 0004 */ float value;
 };
 
-using ModelTextureChannels = std::map<int, std::vector<ModelTextureKey>>;
-
 class CFile;
+
+struct ModelTextureChannels : std::map<int, std::vector<ModelTextureKey>> {
+  void Sample(float frame, ModelTextureTransform& output);
+  void Read(CFile& file);
+};
 
 struct ModelKeyList1 : std::vector<ModelRotationKey> {
   void Read(CFile& file);
@@ -60,17 +65,25 @@ struct ModelKeyList4 : std::vector<ModelRotationKey> {
   void Read(CFile& file);
 };
 
-struct ModelTextureChannelMap : ModelTextureChannels {
-  void Read(CFile& file);
-};
+struct ModelPositionKeyList : std::vector<ModelPositionKey> {};
 
 static_assert(sizeof(ModelTextureKey) == 8);
 
+struct ModelVolumeVector {
+  ModelVolumeVector() {
+    this->values[0] = 0.0f;
+    this->values[1] = 0.0f;
+    this->values[2] = 0.0f;
+  }
+
+  /* 0000 */ float values[3];
+};
+
 struct ModelVolume {
-  /* 0000 */ float size[3];
-  /* 000C */ float position[3];
-  /* 0018 */ float rotation[3];
-  /* 0024 */ float corners[8][3];
+  /* 0000 */ ModelVolumeVector size;
+  /* 000C */ ModelVolumeVector position;
+  /* 0018 */ ModelVolumeVector rotation;
+  /* 0024 */ ModelVolumeVector corners[8];
   /* 0084 */ matrix transform;
   /* 00B4 */ matrix inverseTransform;
   /* 00E4 */ int flag;
@@ -89,7 +102,7 @@ public:
   /* 0038 */ ModelNode* parent;
   /* 003C */ std::list<ModelNode*> children;
   /* 0044 */ std::vector<class CTexture*> textures;
-  /* 0050 */ std::unique_ptr<ModelMesh> mesh;
+  /* 0050 */ ModelMesh* mesh;
   /* 0054 */ unsigned char alpha;
 };
 
@@ -102,8 +115,8 @@ public:
   /* 0064 */ float axis[3];
   /* 0070 */ float angle;
   /* 0074 */ float scale[3];
-  /* 0080 */ std::vector<ModelPositionKey> legacyPositionKeys;
-  /* 008C */ std::vector<ModelRotationKey> rotationKeys;
+  /* 0080 */ ModelPositionKeyList legacyPositionKeys;
+  /* 008C */ ModelKeyList2 rotationKeys;
 };
 
 class ModelNodeV2 : public ModelNode {
@@ -125,12 +138,14 @@ class C3dModelRes : public CRes {
   friend class ModelNode;
 public:
   C3dModelRes();
-  ~C3dModelRes() override;
+  // OFFSET: 0x007567B0
+  // FUNCTION: fn_07995
+  ~C3dModelRes() override = default;
   bool Load(const char* name) override;
   void Unload() override;
   ModelNode* FindNode(const char* name) const;
   void ForEachRootName(std::function<void(const std::string&)> callback) const;
-  void RegisterMovies(struct MoviePosition position) const;
+  void RegisterMovies(vector3d position) const;
 
   /* 0110 */ int major;
   /* 0114 */ std::list<ModelNode*> nodes;

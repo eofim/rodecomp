@@ -8,10 +8,12 @@
 #include <vector>
 
 class CParticle;
+class CEZ2STRParticle;
 
 class CJupitelThunderStormEffect : public CEffect {
 public:
   CJupitelThunderStormEffect();
+  ~CJupitelThunderStormEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -20,7 +22,7 @@ public:
   bool IsAlive() override;
 
   /* 00CC */ CParticle* particle;
-  /* 00D0 */ std::vector<CParticle*> particles;
+  /* 00D0 */ std::vector<CEZ2STRParticle*> particles;
   /* 00DC */ vector3d step;
   /* 00E8 */ int duration;
 };

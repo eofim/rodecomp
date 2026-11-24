@@ -95,10 +95,33 @@ void RenderSystemHolder::PrepareErrorDialog() {
   }
 }
 
+// OFFSET: 0x0056A640
+// FUNCTION: fn_46359
+const char* RenderSystemHolder::BackendNameFor(std::int32_t backend) {
+  switch (backend) {
+  case -1:
+    return "NotInitialized";
+  case 0:
+    return "Default";
+  case 1:
+    return "DirectX 7";
+  case 2:
+    return "DirectX 9";
+  default:
+    return "";
+  }
+}
+
 // OFFSET: 0x0056A230
 // FUNCTION: fn_02285
 std::int32_t RenderSystemHolder::Backend() const {
   return this->system ? this->system->Backend() : -1;
+}
+
+// OFFSET: 0x0056A0A0
+// FUNCTION: fn_46360
+const char* RenderSystemHolder::BackendName() const {
+  return BackendNameFor(this->Backend());
 }
 
 // OFFSET: 0x0056A240
@@ -145,19 +168,13 @@ HRESULT RenderSystemHolder::Initialize(int backend, HWND window) {
     return 0x8000000e;
   }
 
-  if (backend == 0) {
-    switch (g_session.DefaultRenderBackend()) {
-    case 1:
-      backend = 1;
-      break;
-    default:
-      backend = 2;
-      break;
-    }
+  int type = backend;
+  if (type == 0) {
+    type = PreferredBackend();
   }
 
   CRenderSystemBase* renderSystem;
-  switch (backend) {
+  switch (type) {
   case 1:
     renderSystem = new CRenderSystemDX7();
     break;
@@ -188,6 +205,12 @@ HRESULT RenderSystemHolder::TestDevice() const {
 // FUNCTION: fn_02296
 HRESULT RenderSystemHolder::Present(bool option) const {
   return this->system ? this->system->Present(option) : E_ILLEGAL_METHOD_CALL;
+}
+
+// OFFSET: 0x00548E20
+// FUNCTION: fn_46357
+CDCSurface::CDCSurface(std::uint32_t width, std::uint32_t height) {
+  this->m_surface.reset(GetRenderSystemHolder()->CreateSurface(width, height));
 }
 
 // OFFSET: 0x00548FE0
@@ -226,7 +249,7 @@ void CDCSurface::ReleaseDC(HDC dc) {
 
 // OFFSET: 0x00549320
 // FUNCTION: fn_01881
-void CDCSurface::Copy(int x, int y, int width, int height, const std::uint32_t* source, bool transparent) {
+void CDCSurface::Copy(int x, int y, int width, int height, const std::uint32_t* source, int transparent) {
   this->m_surface->Upload(x, y, width, height, source, transparent, 0);
 }
 

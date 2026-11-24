@@ -19,7 +19,8 @@ class UIBalloonText : public UIWindow {
 
 public:
   UIBalloonText();
-  ~UIBalloonText() override;
+  // INLINED
+  __forceinline ~UIBalloonText() override {}
 
   bool CanHitTest() override;
   void OnProcess() override;
@@ -29,6 +30,7 @@ public:
   void WrapText(const char* text, int width);
   void FitText();
   void SetFontHeight(int height);
+  std::string GetLine(unsigned int index);
 
 protected:
   /* 007C */ unsigned char balloonFlag;

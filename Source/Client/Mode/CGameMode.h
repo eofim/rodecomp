@@ -17,6 +17,7 @@
 #include <vector>
 
 class CView;
+struct TradeItemRecord;
 class UIBroadcastBalloon;
 class UINameBalloonText;
 class UIAchBalloonText;
@@ -94,6 +95,11 @@ struct MiniMapPing {
   /* 0008 */ int persistent;
   /* 000C */ std::uint32_t color;
   /* 0010 */ std::uint32_t tick;
+};
+
+struct MiniMapTooltip {
+  /* 0000 */ std::string text;
+  /* 0018 */ int windowId;
 };
 
 struct MinimapMarker {
@@ -222,7 +228,7 @@ public:
   /* 05CF */ unsigned char padding_05CF;
   /* 05D0 */ UITransBalloonText* statusIconTooltip;
   /* 05D4 */ std::list<unsigned long> periodicTicks;
-  /* 05DC */ std::map<int, std::string> miniMapTooltipWindows;
+  /* 05DC */ std::map<int, MiniMapTooltip> miniMapTooltipWindows;
   /* 05E4 */ std::uint32_t wheelTick;
   /* 05E8 */ std::uint32_t replayPauseTick;
   /* 05EC */ unsigned char isDragAllowed;
@@ -246,7 +252,11 @@ public:
   /* 064C */ std::unordered_map<int, int> itemPickupCounts;
   /* 066C */ unsigned char padding_066C[0x4];
 
-  std::string MapName();
+  // OFFSET: 0x005C4520
+  // FUNCTION: fn_03565
+  std::string MapName() {
+    return this->mapName;
+  }
   UIBroadcastBalloon* EnsureBroadcastBalloon();
   void HandleCameraInfo(const unsigned char* data);
   void InitializeCamera();
@@ -257,6 +267,7 @@ public:
   void UpdateLoopSounds();
   void AddSceneObject(CGameObject* object);
   void SendMousePointerPosition(float x, float y, int value);
+  void InitializeChatLog();
   void WriteChatLog(const char* text);
   bool IsEffectId990Group(int id);
   bool IsEffectId994Group(int id);
@@ -284,6 +295,7 @@ public:
   void PlayerCell(int* column, int* row) const;
   void RefreshActorJobEffects(bool playerOnly);
   int GetSkillAttackRange(int id, int level);
+  int TerrainCellType(int column, int row) const;
   int TerrainHeight() const;
   int TerrainWidth() const;
   std::string LocationText();
@@ -373,6 +385,7 @@ public:
   void ReceiveBookOpen(const unsigned char* packet);
   void ReceiveActorNameCard(const unsigned char* packet);
   void ReceiveServiceRequest(unsigned char type, int value);
+  void SetClairvoyance(unsigned char enable);
   void ReceiveAchievementUpdate(
     int score, short achievementLevel, int completed, int total, int id, unsigned char achieved, const std::uint32_t* objectives,
     __time32_t completedAt, unsigned char rewarded
@@ -389,15 +402,17 @@ public:
   void ReceiveWhisperFilterResult(const unsigned char* packet);
   bool NotifyItemResult(int result);
   void NotifyItemBounds();
+  void SpawnBlowEffect(float x, float y, float z);
   CCorpse* SpawnCorpse(float x, float y, float z, const char* action, const char* sprite, int animation, int motion, float angle);
   bool LaunchTargetEffect(int effectId, CGameActor* source, CGameActor* target, int argument);
   void UpdateNameBalloon(CGameActor* actor);
   void ShowGuildEmblem(CGameActor* actor, int guildId, int unused);
   void RemoveNotificationWindow(UIWindow* window);
   void DrawMiniMapNumber();
+  void DrawTimeAttackTitle();
   void DrawTimeAttackTimer();
   void DrawTimeAttackCountdown(std::uint32_t value, int mode);
-  CMsgEffect* SpawnCashEmotion(int aid, int packId, int emotionId, std::uint32_t duration);
+  CMsgEffect* SpawnCashEmotion(const vector3d* position, int packId, int emotionId, std::uint32_t duration);
   CMsgEffect* SpawnDamageMsgEffect(const vector3d* position, std::uint32_t color, std::uint32_t accountId);
   CMsgEffect* SpawnMsgEffect(int effectId, const vector3d* position, std::uint32_t accountId, bool visible);
   void ApplyMapFog(int enabled);
@@ -408,6 +423,7 @@ public:
   void ExecuteTalkType(int talkType, std::string* arguments);
   int ProcessMousePick(int result, ActorPickInfo* pick);
   void ReceiveSkillList(int packetType, const std::vector<SkillListEntry>& skills);
+  bool HasDifferentBalloonActor(std::uint32_t id) const;
   void ShowActorNameBalloon(std::uint32_t id);
   int ProcessGroundClick(int result);
   void ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor* actor);
@@ -425,6 +441,7 @@ public:
   std::string ActorName(std::uint32_t id);
   std::uint32_t ActorNameColor(int job, std::uint32_t aid);
   const CActorNameCard& LookupNameCard(std::uint32_t id);
+  std::vector<char> BuildLegacyActorEntryPacket(CGameActor* actor);
   std::vector<char> BuildActorEntryPacket(CGameActor* actor, std::uint16_t packetType);
   CGameActor* NewActor(int job);
   void UpdateHoverNameBalloon();
@@ -448,7 +465,7 @@ public:
   void ReceiveZoneItemRetrievalFailure(const unsigned char* packet);
   void ReceiveActorPairFreeze(const unsigned char* packet);
   void ReceiveEffectRemove(const unsigned char* packet);
-  void ReceiveActorEffect347(const unsigned char* packet);
+  void ReceiveCongratulation(const unsigned char* packet);
   void ReceiveCoupleName(const unsigned char* packet);
   void ReceiveToggle128(int enabled);
   void PlaceWindow16(unsigned int xPercent, unsigned int yPercent);
@@ -531,6 +548,7 @@ public:
   void ReceiveItem1738AddOptions(const unsigned char* packet);
   void ReceiveItem1738AddGrade(const unsigned char* packet);
   void ReceiveItem1740Add(const unsigned char* packet);
+  void ReceiveTradeItems(int count, const TradeItemRecord* records);
   void ReceiveItem1740AddOptions(const unsigned char* packet);
   void ReceiveItem1740AddGrade(const unsigned char* packet);
   void ReceiveItem1740BasicList(const unsigned char* packet);
@@ -551,9 +569,12 @@ public:
   void ReceiveMailboxAvailability(const unsigned char* packet);
   void ReceiveNpcDialogEnd(const unsigned char* packet);
   void ResetItemLists(const unsigned char* packet);
+  void StepTowardCell(const int& targetX, const int& targetY, int& x, int& y, int step);
   void StepTowardWalkableCell(const int& targetX, const int& targetY, int& x, int& y);
   void FindWalkableCellToward(float x, float z, float originX, float originZ, int& column, int& row, int distance);
   void RemoveMiniMapPing(std::uint32_t id);
+  void DrawMiniMapPings(const TextureRegion& view);
+  void DrawDragCursor();
   void DrawMiniMap();
   void DrawMiniMapMembers(const TextureRegion& view);
   void DrawMiniMapTriangle(float x, float y, float size, std::uint32_t color);
@@ -562,7 +583,7 @@ public:
   );
   void DrawMiniMapCoordinates();
   void RefreshMiniMapTooltips();
-  int UpdateMiniMapTooltip();
+  void UpdateMiniMapTooltip();
   void ReceiveGradeEnchantInfo(const unsigned char* packet);
   void ReceivePartyItemPickup(const unsigned char* packet);
   void ReceiveItemDisappear(std::uint32_t itemAid);
@@ -577,7 +598,7 @@ public:
   void ReceiveStatusChangeNotice(const unsigned char* packet);
   void ReceiveItemEffectResult(const unsigned char* packet);
   void NotifyMacroCheckRemovalResult(unsigned char result);
-  void ReceiveActorEffect228(const unsigned char* packet);
+  void ReceiveMillenniumShield(const unsigned char* packet);
   void ResendMinimapMarkers();
   void ReceiveJobTitle(unsigned char result, int job);
   void ReceiveQuestStates(int count, const unsigned char* entries);
@@ -639,7 +660,7 @@ public:
   void ReceiveGameOptionResult(int command, int result, int enabled);
   void ReceiveCharViewResult(const unsigned char* packet);
   void SpawnArrowEffect(const vector3d* source, std::uint32_t target, float speed, int job);
-  void SpawnArrowEffect64(const vector3d* source, const vector3d* target, float speed);
+  void SpawnArrowEffectToPosition(const vector3d* source, const vector3d* target, float speed);
   void UnusedArrowStub(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j);
   bool UpdateReplayPause(bool resume);
   void SendSyncRequest(bool force);
@@ -839,10 +860,10 @@ public:
   void ReceiveStorageNormalList(const unsigned char* packet);
   void ReceiveStorageNormalList2(const unsigned char* packet);
   void ReceiveItemUpgrade(std::uint16_t index, std::uint16_t refine, ItemCardSlots cards, ItemSlotOptions options);
-  void ReceiveFeedConfig(unsigned char state, unsigned char option);
-  void ReceiveFeedConfig2(unsigned char state, unsigned char option, bool petAutoFeed);
-  void ReceiveFeedConfig3(unsigned char state, unsigned char option, bool petAutoFeed, bool homunculusAutoFeed);
-  void ReceiveFeedConfig4(unsigned char state, unsigned char option, bool petAutoFeed, bool homunculusAutoFeed, int value);
+  void ReceiveFeedConfig(unsigned char state, bool option);
+  void ReceiveFeedConfig2(unsigned char state, bool option, bool petAutoFeed);
+  void ReceiveFeedConfig3(unsigned char state, bool option, bool petAutoFeed, bool homunculusAutoFeed);
+  void ReceiveFeedConfig4(unsigned char state, bool option, bool petAutoFeed, bool homunculusAutoFeed, int value);
   void ReceiveParChange(unsigned char* packet);
   void ReceiveLongParChange(const unsigned char* packet);
   void ReceiveNotifyEffect(const unsigned char* packet);

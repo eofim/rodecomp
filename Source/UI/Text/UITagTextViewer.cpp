@@ -11,7 +11,7 @@
 // OFFSET: 0x0083E1B0
 // FUNCTION: fn_10515
 UITagTextViewer::UITagTextViewer()
-    : UIScroll(), m_backgroundColor(0xFFFFFF), m_textWidth(0), m_lineSpacing(6), m_margin(3), m_topMargin(4), m_font{0, 12, 0, 0}, m_outlined(false),
+    : UIScroll(), m_backgroundColor(0xFFFFFF), m_textWidth(0), m_lineSpacing(6), m_margin(3), m_topMargin(4), m_font(0, 12, false, false), m_outlined(false),
       m_outlineColor(0xFFFFFF), m_horizontalAlign(0), m_verticalAlign(3), m_cursorY(0), m_offsetY(m_topMargin) {
 }
 
@@ -136,6 +136,7 @@ void UITagTextViewer::Resize(int width, int height) {
 int TagTextViewer::UIScroll::SendMsg(
   UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4
 ) {
+  int delta = argument1;
   switch (message) {
   case UM_UPPUSH:
     this->SendMsg(this->m_scrollBar, UM_SCROLLVERTPAGEUP, 0, 0, 0, 0);
@@ -147,7 +148,6 @@ int TagTextViewer::UIScroll::SendMsg(
   case UM_SCROLLVERTPAGEUP:
   case UM_SCROLLVERTPAGEDOWN: {
     const int previous = this->m_scrollPos;
-    int delta = argument1;
     if (message == UM_SCROLLVERTPAGEUP) {
       delta = -10;
     } else if (message == UM_SCROLLVERTPAGEDOWN) {
@@ -171,7 +171,8 @@ int UITagTextViewer::SendMsg(
   switch (message) {
   case UM_SETTEXT:
     if (argument1 != 0) {
-      this->AddText(std::string(reinterpret_cast<const char*>(argument1)));
+      std::string text(reinterpret_cast<const char*>(argument1));
+      this->AddText(text);
     }
     break;
   case UM_TEXT_LBTN_UP:
@@ -201,11 +202,11 @@ int UITagTextViewer::SendMsg(
   case UM_SCROLLVERTPAGEDOWN: {
     const int previous = this->m_scrollPos;
     if (message == UM_SCROLLVERTPAGEUP) {
-      this->m_scrollPos = previous - 30;
+      this->m_scrollPos -= 30;
     } else if (message == UM_SCROLLVERTPAGEDOWN) {
-      this->m_scrollPos = previous + 30;
+      this->m_scrollPos += 30;
     } else if (message == UM_SCROLLVERT) {
-      this->m_scrollPos = previous + static_cast<int>(argument1);
+      this->m_scrollPos += argument1;
     }
 
     if (previous != this->m_scrollPos) {
@@ -247,17 +248,16 @@ void UITagTextViewer::AddText(const std::string& text) {
 
   const int previousCursor = this->m_cursorY;
   const int spacing = previousCursor > 0 ? this->m_lineSpacing : 0;
-  this->m_cursorY = previousCursor + spacing;
+  this->m_cursorY += spacing;
 
-  const LineFontFlags flags = {this->m_font.bold != 0, this->m_font.italic != 0};
   CCreateLineInfo info(
-    this, text.c_str(), this->m_textWidth, this->m_lineSpacing, this->m_font.color, this->m_font.height, flags, this->m_outlined, this->m_outlineColor,
+    this, text.c_str(), this->m_textWidth, this->m_lineSpacing, this->m_font, this->m_outlined, this->m_outlineColor,
     false, 0xFFFFFF, this->m_horizontalAlign
   );
   this->m_cursorY += info.m_height;
 
   int offset = std::max(this->m_topMargin, 0);
-  if (this->m_topMargin + this->m_cursorY < this->geometry.height) {
+  if (this->geometry.height > this->m_topMargin + this->m_cursorY) {
     if (this->m_verticalAlign == 5) {
       offset = this->geometry.height - this->m_topMargin - this->m_cursorY;
     } else if (this->m_verticalAlign == 4) {
@@ -266,19 +266,21 @@ void UITagTextViewer::AddText(const std::string& text) {
   }
 
   for (std::map<UIWindow*, TagTextViewer::Position>::iterator it = this->m_positions.begin(); it != this->m_positions.end(); ++it) {
-    UIWindow* window = it->first;
-    window->Move(window->geometry.x, window->geometry.y - this->m_offsetY + offset);
-    it->second.y = static_cast<float>(window->geometry.y);
-    it->second.x = static_cast<float>(window->geometry.x);
+    it->first->Move(it->first->geometry.x, it->first->geometry.y - this->m_offsetY + offset);
+    const float y = static_cast<float>(it->first->geometry.y);
+    const float x = static_cast<float>(it->first->geometry.x);
+    it->second.y = y;
+    it->second.x = x;
   }
   this->m_offsetY = offset;
 
   const std::vector<std::vector<UIWindow*>> lines = info.m_lines;
-  for (std::vector<UIWindow*> line : lines) {
-    for (UIWindow* window : line) {
-      window->Move(window->geometry.x + this->m_margin, window->geometry.y + offset + previousCursor + spacing);
-      this->AddChild(window);
-      this->StorePosition(window);
+  for (auto lineIt = lines.begin(); lineIt != lines.end(); ++lineIt) {
+    std::vector<UIWindow*> line = *lineIt;
+    for (auto windowIt = line.begin(); windowIt != line.end(); ++windowIt) {
+      (*windowIt)->Move((*windowIt)->geometry.x + this->m_margin, (*windowIt)->geometry.y + offset + previousCursor + spacing);
+      this->AddChild(*windowIt);
+      this->StorePosition(*windowIt);
     }
   }
 
@@ -290,7 +292,7 @@ void UITagTextViewer::AddText(const std::string& text) {
 void UITagTextViewer::Layout() {
   std::string joined;
   for (std::vector<std::string>::iterator it = this->m_texts.begin(); it != this->m_texts.end(); ++it) {
-    joined += *it + (it + 1 != this->m_texts.end() ? "\n" : "");
+    joined += *it + (it + 1 == this->m_texts.end() ? "" : "\n");
   }
 
   this->Clear();
@@ -299,9 +301,8 @@ void UITagTextViewer::Layout() {
     this->m_textWidth = this->geometry.width - this->m_margin - 0xD;
   }
 
-  const LineFontFlags flags = {this->m_font.bold != 0, this->m_font.italic != 0};
   CCreateLineInfo info(
-    this, joined.c_str(), this->m_textWidth, this->m_lineSpacing, this->m_font.color, this->m_font.height, flags, this->m_outlined, this->m_outlineColor,
+    this, joined.c_str(), this->m_textWidth, this->m_lineSpacing, this->m_font, this->m_outlined, this->m_outlineColor,
     false, 0xFFFFFF, this->m_horizontalAlign
   );
   const std::vector<std::vector<UIWindow*>> lines = info.m_lines;
@@ -315,11 +316,12 @@ void UITagTextViewer::Layout() {
       offset = static_cast<unsigned int>(static_cast<float>(static_cast<unsigned int>(this->geometry.height - info.m_height)) * g_depthAverageHalf);
     }
   }
-  for (std::vector<UIWindow*> line : lines) {
-    for (UIWindow* window : line) {
-      window->Move(window->geometry.x + this->m_margin, window->geometry.y + offset);
-      this->AddChild(window);
-      this->StorePosition(window);
+  for (auto lineIt = lines.begin(); lineIt != lines.end(); ++lineIt) {
+    std::vector<UIWindow*> line = *lineIt;
+    for (auto windowIt = line.begin(), windowEnd = line.end(); windowIt != windowEnd; ++windowIt) {
+      (*windowIt)->Move((*windowIt)->geometry.x + this->m_margin, (*windowIt)->geometry.y + offset);
+      this->AddChild(*windowIt);
+      this->StorePosition(*windowIt);
     }
   }
 

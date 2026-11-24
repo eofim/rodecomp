@@ -31,15 +31,7 @@ namespace {
     /* 000C */ std::uint32_t version;
   };
 
-  struct PakUsedBlock {
-    PakUsedBlock(std::uint64_t blockOffset, std::uint32_t blockSize) : offset(blockOffset), size(blockSize) {
-    }
-
-    /* 0000 */ std::uint64_t offset;
-    /* 0008 */ std::uint32_t size;
-
-    auto operator<=>(const PakUsedBlock& other) const = default;
-  };
+  using PakUsedBlock = std::pair<std::uint64_t, std::uint32_t>;
 
   static_assert(sizeof(PakTableHeader) == 12);
   static_assert(sizeof(PakEntryRecord) == 21);
@@ -77,29 +69,29 @@ namespace {
   }
 }
 
-template __declspec(noinline) std::pair<std::set<PakUsedBlock>::iterator, bool> std::set<PakUsedBlock>::_Mybase::insert<false, 0>(PakUsedBlock&&);
+struct PakFileDeleter {
+  CPakFile* Destroy(unsigned int flags);
+};
 
-// OFFSET: 0x005EF3F0
-// FUNCTION: fn_04004
 // OFFSET: 0x005EF660
 // FUNCTION: fn_04009
-CPakFile::~CPakFile() = default;
+CPakFile* PakFileDeleter::Destroy(unsigned int flags) {
+  CPakFile* self = reinterpret_cast<CPakFile*>(this);
+  self->CPakFile::~CPakFile();
+  if (flags & 1) {
+    operator delete(self, sizeof(CPakFile));
+  }
+  return self;
+}
+
+template __declspec(noinline) std::pair<std::set<PakUsedBlock>::iterator, bool> std::set<PakUsedBlock>::_Mybase::insert<false, 0>(PakUsedBlock&&);
+
 
 namespace myGPack {
   // OFFSET: 0x005F7790
   // FUNCTION: fn_04046
   CReadPakFile::CReadPakFile() : m_handle(INVALID_HANDLE_VALUE), m_size(0) {
   }
-
-  // OFFSET: 0x005EF690
-  // FUNCTION: fn_04010
-  CReadPakFile::~CReadPakFile() {
-    this->Close();
-  }
-
-  // OFFSET: 0x005EF710
-  // FUNCTION: fn_04011
-  CWritePakFile::~CWritePakFile() = default;
 
   // OFFSET: 0x005EF850
   // FUNCTION: fn_04013
@@ -517,15 +509,13 @@ namespace myGPack {
 
     std::int64_t removed = 0;
 
-    if (names.size() > 0) {
-      for (auto name = names.begin(); name != names.end(); ++name) {
-        for (auto entry = this->m_entries.begin(); entry != this->m_entries.end();) {
-          if (std::strcmp(entry->name.m_name, name->c_str()) == 0) {
-            entry = this->m_entries.erase(entry);
-            ++removed;
-          } else {
-            ++entry;
-          }
+    for (auto name = names.begin(); name != names.end(); ++name) {
+      for (auto entry = this->m_entries.begin(); entry != this->m_entries.end();) {
+        if (std::strcmp(entry->name.m_name, name->c_str()) == 0) {
+          entry = this->m_entries.erase(entry);
+          ++removed;
+        } else {
+          ++entry;
         }
       }
     }
@@ -550,8 +540,8 @@ namespace myGPack {
     this->m_freeBlocks.clear();
 
     for (const PakUsedBlock& block : used) {
-      const std::uint64_t offset = block.offset;
-      const std::uint32_t size = block.size;
+      const std::uint32_t size = block.second;
+      const std::uint64_t offset = block.first;
       if (position < offset) {
         const std::uint64_t gap = offset - position;
         this->m_freeBlocks.insert({static_cast<std::uint32_t>(gap), position});
@@ -647,8 +637,7 @@ namespace myGPack {
     const std::size_t total = this->m_names.size();
 
     for (const std::string& name : this->m_names) {
-      PakName key;
-      key.Assign(name.c_str());
+      PakName key(name.c_str());
       if (!this->CopyEntry(key)) {
         return false;
       }
@@ -668,58 +657,57 @@ namespace myGPack {
       table.insert(table.end(), name, name + std::strlen(name) + 1);
 
       PakEntryRecord record;
-      record.compressedSize = entry.compressedSize;
       record.alignedSize = entry.alignedSize;
+      record.compressedSize = entry.compressedSize;
       record.originalSize = entry.originalSize;
-      record.flags = entry.flags;
       record.dataOffset = entry.dataOffset;
+      record.flags = entry.flags;
       const auto* bytes = reinterpret_cast<const std::uint8_t*>(&record);
       table.insert(table.end(), bytes, bytes + sizeof(record));
     }
 
     uLongf compressedLength = compressBound(static_cast<uLong>(table.size()));
     std::vector<std::uint8_t> compressed(compressedLength);
-    bool result;
 
     if (compress(compressed.data(), &compressedLength, table.data(), static_cast<uLong>(table.size())) != Z_OK) {
-      result = false;
-    } else {
-      std::vector<std::uint8_t> auxiliary;
+      return false;
+    }
 
-      for (auto source = this->m_sources.begin(); source != this->m_sources.end(); ++source) {
-        (*source)->ReadAuxiliary(auxiliary);
-        if (!auxiliary.empty()) {
-          break;
-        }
-      }
+    std::vector<std::uint8_t> auxiliary;
 
-      if (auxiliary.empty()) {
-        auxiliary = this->m_auxiliary;
-      }
-
-      PakTableHeader header;
-      header.auxiliarySize = static_cast<std::uint32_t>(auxiliary.size());
-      header.compressedSize = compressedLength;
-      header.originalSize = static_cast<std::uint32_t>(table.size());
-
-      const std::uint64_t offset = this->Allocate(header.auxiliarySize + compressedLength + sizeof(header));
-      result = false;
-
-      if (this->m_output.Write(offset, &header, sizeof(header)) && this->m_output.Write(offset + sizeof(header), compressed.data(), compressedLength) &&
-          this->m_output.Write(offset + compressedLength + sizeof(header), auxiliary.data(), header.auxiliarySize) &&
-          this->m_output.Write(0, "Event Horizon", 14)) {
-        PakHeaderTable information;
-        information.tableOffset = offset - kPakHeaderSize;
-        information.entryCount = static_cast<std::uint32_t>(this->m_entries.size());
-        information.version = kPakVersion;
-
-        if (this->m_output.Write(kPakHeaderTablePosition, &information, sizeof(information))) {
-          result = true;
-        }
+    for (auto source = this->m_sources.begin(); source != this->m_sources.end(); ++source) {
+      (*source)->ReadAuxiliary(auxiliary);
+      if (auxiliary.size() != 0) {
+        break;
       }
     }
 
-    return result;
+    if (auxiliary.size() == 0) {
+      auxiliary = this->m_auxiliary;
+    }
+
+    const std::uint32_t auxiliarySize = static_cast<std::uint32_t>(auxiliary.size());
+    PakTableHeader header;
+    header.auxiliarySize = auxiliarySize;
+    header.compressedSize = compressedLength;
+    header.originalSize = static_cast<std::uint32_t>(table.size());
+
+    const std::uint64_t offset = this->Allocate(auxiliarySize + compressedLength + sizeof(header));
+
+    PakHeaderTable information;
+    if (this->m_output.Write(offset, &header, sizeof(header)) && this->m_output.Write(offset + sizeof(header), compressed.data(), compressedLength) &&
+        this->m_output.Write(offset + compressedLength + sizeof(header), auxiliary.data(), auxiliarySize) &&
+        this->m_output.Write(0, "Event Horizon", 14)) {
+      information.tableOffset = offset - kPakHeaderSize;
+      information.entryCount = static_cast<std::uint32_t>(this->m_entries.size());
+      information.version = kPakVersion;
+
+      if (this->m_output.Write(kPakHeaderTablePosition, &information, sizeof(information))) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // OFFSET: 0x005F59C0

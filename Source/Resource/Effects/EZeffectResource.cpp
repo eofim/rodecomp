@@ -28,15 +28,15 @@ EZeffectClip::~EZeffectClip() {
   }
 }
 
+// OFFSET: 0x0074D7F0
+// FUNCTION: fn_45819
+EZeffectData::~EZeffectData() = default;
+
 // OFFSET: 0x0074D570
 // FUNCTION: fn_07893
 CEZeffectRes::CEZeffectRes() {
   this->loadState = 0;
 }
-
-// OFFSET: 0x0074D6F0
-// FUNCTION: fn_07895
-CEZeffectRes::~CEZeffectRes() = default;
 
 // OFFSET: 0x0074CEE0
 // FUNCTION: fn_07889

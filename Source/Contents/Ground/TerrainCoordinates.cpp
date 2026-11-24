@@ -1,9 +1,17 @@
 #include "Client/Mode/CGameMode.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Contents/World/World.h"
 #include "Resource/World/TerrainResource.h"
 #include "Utility/Math/ScalarConversion.h"
 
 #include <cmath>
+
+// OFFSET: 0x00748FD0
+// FUNCTION: fn_45837
+void C3dAttr::CellToWorld(float column, float row, float* position) const {
+  position[0] = (column - static_cast<float>(this->width / 2)) * static_cast<float>(this->cellSize);
+  position[1] = (row - static_cast<float>(this->height / 2)) * static_cast<float>(this->cellSize);
+}
 
 // OFFSET: 0x00AC8150
 // FUNCTION: fn_17666
@@ -12,23 +20,38 @@ void CWorld::CellOrigin(int column, int row, float& x, float& z) const {
   z = static_cast<float>((row - this->terrain->height / 2) * this->terrain->cellSize);
 }
 
+// OFFSET: 0x00AC81B0
+// FUNCTION: fn_46288
+void CWorld::CellToWorld(float column, float row, float& x, float& z) const {
+  const C3dAttr* terrain = this->terrain;
+  x = (column - static_cast<float>(terrain->width) * g_depthAverageHalf) * static_cast<float>(terrain->cellSize);
+  z = (row - static_cast<float>(terrain->height) * g_depthAverageHalf) * static_cast<float>(terrain->cellSize);
+}
+
+// OFFSET: 0x00AC83E0
+// FUNCTION: fn_46290
+void CWorld::WorldToCell(float x, float z, int& column, int& row) const {
+  column = static_cast<int>(x) / this->terrain->cellSize + this->terrain->width / 2;
+  row = static_cast<int>(z) / this->terrain->cellSize + this->terrain->height / 2;
+}
+
 // OFFSET: 0x00CD36E0
 // FUNCTION: fn_21270
 void CGameMode::CellCenter(int column, int row, float& x, float& z) const {
-  const float offset = static_cast<float>(this->scene->terrain->cellSize) * 8.0f * 0.0625f;
-  x = (static_cast<float>(column) - static_cast<float>(this->scene->terrain->width) * 0.5f) * static_cast<float>(this->scene->terrain->cellSize) +
-    offset;
-  z = (static_cast<float>(row) - static_cast<float>(this->scene->terrain->height) * 0.5f) * static_cast<float>(this->scene->terrain->cellSize) +
-    offset;
+  const auto terrain = [this]() { return this->scene->terrain; };
+  const float offset = static_cast<float>(terrain()->cellSize) * 8.0f * 0.0625f;
+  x = (static_cast<float>(column) - static_cast<float>(terrain()->width) * 0.5f) * static_cast<float>(terrain()->cellSize) + offset;
+  z = (static_cast<float>(row) - static_cast<float>(terrain()->height) * 0.5f) * static_cast<float>(terrain()->cellSize) + offset;
 }
 
 // OFFSET: 0x00CD3620
 // FUNCTION: fn_21269
 void CGameMode::SubcellPosition(int column, int row, int subColumn, int subRow, float& x, float& z) const {
-  x = (static_cast<float>(column) - static_cast<float>(this->scene->terrain->width) * 0.5f) * static_cast<float>(this->scene->terrain->cellSize) +
-    static_cast<float>(subColumn) * static_cast<float>(this->scene->terrain->cellSize) * 0.0625f;
-  z = (static_cast<float>(row) - static_cast<float>(this->scene->terrain->height) * 0.5f) * static_cast<float>(this->scene->terrain->cellSize) +
-    static_cast<float>(subRow) * static_cast<float>(this->scene->terrain->cellSize) * 0.0625f;
+  const auto terrain = [this]() { return this->scene->terrain; };
+  x = (static_cast<float>(column) - static_cast<float>(terrain()->width) * 0.5f) * static_cast<float>(terrain()->cellSize) +
+    static_cast<float>(subColumn) * static_cast<float>(terrain()->cellSize) * 0.0625f;
+  z = (static_cast<float>(row) - static_cast<float>(terrain()->height) * 0.5f) * static_cast<float>(terrain()->cellSize) +
+    static_cast<float>(subRow) * static_cast<float>(terrain()->cellSize) * 0.0625f;
 }
 
 // OFFSET: 0x00CD5230

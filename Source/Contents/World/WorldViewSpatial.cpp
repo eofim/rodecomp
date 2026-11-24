@@ -1,3 +1,4 @@
+#include "Contents/Camera/Camera.h"
 #include "Contents/World/WorldModelView.h"
 #include "Contents/World/WorldSpatialTree.h"
 
@@ -7,11 +8,34 @@
 // OFFSET: 0x00ADADE0
 // FUNCTION: fn_17913
 WorldViewSpatial::WorldViewSpatial() {
-  for (auto& normal : this->planes.normals) {
-    normal[0] = 0;
-    normal[1] = 0;
-    normal[2] = 0;
-  }
+}
+
+// OFFSET: 0x00ADAC70
+// FUNCTION: fn_17912
+CView::CView() {
+  this->camera.target.x = 0.0f;
+  this->camera.target.y = 0.0f;
+  this->camera.target.z = 0.0f;
+  this->camera.desiredTarget.x = 0.0f;
+  this->camera.desiredTarget.y = 0.0f;
+  this->camera.desiredTarget.z = 0.0f;
+  this->backupCurrentTarget.x = 0.0f;
+  this->backupCurrentTarget.y = 0.0f;
+  this->backupCurrentTarget.z = 0.0f;
+  this->backupDesiredTarget.x = 0.0f;
+  this->backupDesiredTarget.y = 0.0f;
+  this->backupDesiredTarget.z = 0.0f;
+  this->frame.eye.x = 0.0f;
+  this->frame.eye.y = 0.0f;
+  this->frame.eye.z = 0.0f;
+  this->frame.up.x = 0.0f;
+  this->frame.up.y = 0.0f;
+  this->frame.up.z = 0.0f;
+  this->camera.yaw = 0.0f;
+  this->shake.enabled = 0;
+  this->skyBox = nullptr;
+  this->shake.start = 0;
+  *reinterpret_cast<unsigned char*>(&this->shake.resetFlags) = 0;
 }
 
 // OFFSET: 0x00ADAF20
@@ -39,9 +63,9 @@ void WorldViewSpatial::Collect(float horizontal, float vertical, const float* ma
     out[2] = plane[0] * matrix[6] + plane[1] * matrix[7] + plane[2] * matrix[8];
     out[3] = plane[0] * matrix[9] + plane[1] * matrix[10] + plane[2] * matrix[11] + plane[3];
 
-    this->planes.normals[i][0] = out[0];
-    this->planes.normals[i][1] = out[1];
-    this->planes.normals[i][2] = out[2];
+    this->planes.normals[i].x = out[0];
+    this->planes.normals[i].y = out[1];
+    this->planes.normals[i].z = out[2];
   }
 
   this->CollectNode(&root, 0, false);
@@ -53,8 +77,8 @@ int WorldViewSpatial::ClassifyAxisAligned(const WorldSpatialTree& bounds) const 
   bool clipped = false;
 
   for (int plane = 0; plane < 6; ++plane) {
-    const float radius = (std::fabs(this->planes.normals[plane][0] * bounds.halfSize[0]) + std::fabs(this->planes.normals[plane][1] * bounds.halfSize[1])) + std::fabs(this->planes.normals[plane][2] * bounds.halfSize[2]);
-    const float distance = ((this->planes.normals[plane][0] * bounds.center[0] + this->planes.normals[plane][1] * bounds.center[1]) + this->planes.normals[plane][2] * bounds.center[2]) + this->planes.planes[plane][3];
+    const float radius = (std::fabs(this->planes.normals[plane].x * bounds.halfSize[0]) + std::fabs(this->planes.normals[plane].y * bounds.halfSize[1])) + std::fabs(this->planes.normals[plane].z * bounds.halfSize[2]);
+    const float distance = ((this->planes.normals[plane].x * bounds.center[0] + this->planes.normals[plane].y * bounds.center[1]) + this->planes.normals[plane].z * bounds.center[2]) + this->planes.planes[plane][3];
 
     if (!(distance > radius)) {
       const float negative = -radius;

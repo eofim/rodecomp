@@ -16,6 +16,7 @@
 #include "UI/Buttons/UISpriteButton.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
+#include "Contents/Skills/SkillId.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Contents/UserData/NormalItemSlots.h"
 #include "Network/Connection/Connection.h"
@@ -64,6 +65,7 @@ extern "C" {
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fmt/core.h>
 #include <format>
 #include <functional>
 #include <iterator>
@@ -78,14 +80,6 @@ CCashEmotionMgr* g_cashEmotionMgr = nullptr;
 
 extern "C" long long _Xtime_get_ticks();
 
-template __declspec(noinline) std::unordered_map<std::string, CashEmotionCommand*>::iterator
-std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::find<void>(const std::string&);
-
-template __declspec(noinline) std::pair<std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::_Nodeptr, bool>
-std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::_Try_emplace<const std::string&, CashEmotionCommand*&>(
-  const std::string&, CashEmotionCommand*&
-);
-
 class ICashEmotionAction {
 public:
   virtual ~ICashEmotionAction();
@@ -99,6 +93,7 @@ public:
   CCashEmotionAction_Play();
   ~CCashEmotionAction_Play() override;
   bool Execute(int packId, int emotionId) override;
+  void RefreshSpecialEmotions();
 
 protected:
   /* 0004 */ int m_diceEmotion;
@@ -115,6 +110,9 @@ public:
 
 class CCashEmotionAction_SelectedUnPurchasedPack : public ICashEmotionAction {
 public:
+  // INLINED
+  CCashEmotionAction_SelectedUnPurchasedPack() {
+  }
   bool Execute(int packId, int argument) override;
 };
 
@@ -158,7 +156,7 @@ protected:
 
 class UICashEmotionPack_Search_UnPurchased : public UICashEmotionPack_Search {
 public:
-  explicit UICashEmotionPack_Search_UnPurchased();
+  explicit __declspec(noinline) UICashEmotionPack_Search_UnPurchased();
   ~UICashEmotionPack_Search_UnPurchased() override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
 
@@ -269,7 +267,7 @@ public:
   void AddResults(char type, const std::vector<std::pair<int, int>>& results, int& y);
 
 protected:
-  /* 00B0 */ std::vector<UICashEmotionPack*> m_items;
+  /* 00B0 */ std::vector<UICashEmotionPack_Search*> m_items;
   /* 00BC */ ICashEmotionAction* m_action;
   /* 00C0 */ std::string m_filter;
 };
@@ -315,6 +313,13 @@ public:
   __declspec(noinline) void ResetLists();
   int SetPeriod(int packId);
   void SetTab(char tab);
+  // INLINED
+  void SelectTab(char tab) {
+    auto found = this->m_tabs.find(tab);
+    if (this->m_tabs.end() != found) {
+      this->SendMsg(found->second, UM_COMMAND, ID_RADIOBTN, 0, 0, 0);
+    }
+  }
   void StartExpirySchedule();
   __declspec(noinline) void UpdateExpiry(int packId, Timestamp* expiry);
   __declspec(noinline) void RefreshSelection();
@@ -364,6 +369,12 @@ protected:
 // OFFSET: 0x00591CA0
 // FUNCTION: fn_02839
 CCashEmotionAction_Play::CCashEmotionAction_Play() : m_diceEmotion(0), m_yutEmotion(0) {
+  this->RefreshSpecialEmotions();
+}
+
+// OFFSET: 0x00591E30
+// FUNCTION: fn_45921
+void CCashEmotionAction_Play::RefreshSpecialEmotions() {
   this->m_diceEmotion = g_cashEmotionMgr->GetSpecialEmotion(CashEmotionSpecial::Dice);
   this->m_yutEmotion = g_cashEmotionMgr->GetSpecialEmotion(CashEmotionSpecial::Yut);
 }
@@ -476,7 +487,7 @@ bool CCashEmotionAction_SelectedUnPurchasedPack::Execute(int packId, int) {
 // OFFSET: 0x00592290
 // FUNCTION: fn_02849
 CashEmotionCommand::CashEmotionCommand(const std::string& name, int packId, int emotionId) : name(name) {
-  this->Add(packId, emotionId);
+  this->Append(packId, emotionId);
 }
 
 // OFFSET: 0x005923D0
@@ -491,9 +502,9 @@ void CashEmotionCommand::Add(int packId, int emotionId) {
 
 // OFFSET: 0x00592420
 // FUNCTION: fn_02851
-__declspec(noinline) std::pair<int, int> CashEmotionCommand::Get(int index) const {
+__declspec(noinline) CashEmotionEntry CashEmotionCommand::Get(int index) const {
   if (index < 0 || static_cast<std::size_t>(index) >= this->entries.size()) {
-    return std::pair<int, int>(-1, -1);
+    return CashEmotionEntry(-1, -1);
   }
 
   return this->entries[index];
@@ -508,18 +519,24 @@ CashEmotionData::CashEmotionData(int id, int subId, const char* name, int action
 // OFFSET: 0x00592820
 // FUNCTION: fn_02860
 bool CashEmotionPackOrder::operator()(const int& left, const int& right) const {
-  const char* leftTitle = this->mgr->GetPackTitle(left);
+  const int rightId = right;
+  const int leftId = left;
+  const char* leftTitle = this->mgr->GetPackTitleInline(leftId);
   if (!leftTitle) {
     return false;
   }
 
-  const char* rightTitle = this->mgr->GetPackTitle(right);
+  const char* rightTitle = this->mgr->GetPackTitleInline(rightId);
   if (!rightTitle) {
     return true;
   }
 
   int result = _stricmp(leftTitle, rightTitle);
-  return this->ascending ? result < 0 : result > 0;
+  if (this->ascending) {
+    return result < 0;
+  }
+
+  return result > 0;
 }
 
 // OFFSET: 0x00596430
@@ -593,12 +610,14 @@ int CCashEmotionMgr::FindEmotionId(const char* name) {
   }
 
   std::string key(name);
-  auto it = this->m_emotionIds.find(key);
-  if (it != this->m_emotionIds.end()) {
-    return it->second;
-  }
+  return this->FindEmotionIdByKey(key);
+}
 
-  return -1;
+// OFFSET: 0x00599470
+// FUNCTION: fn_45926
+int CCashEmotionMgr::FindEmotionIdByKey(const std::string& name) {
+  auto it = this->m_emotionIds.find(name);
+  return it != this->m_emotionIds.end() ? it->second : -1;
 }
 
 // OFFSET: 0x00599650
@@ -645,19 +664,19 @@ void CCashEmotionMgr::HideSuggestions() {
 void CCashEmotionMgr::RefreshCommands() {
   this->ClearCommands();
 
-  const unsigned int now = _time32(nullptr) - this->serverTimeOffset - this->intendedDelay;
+  const unsigned int now = this->ToServerTime(_time32(nullptr));
   for (auto& shortcut : this->m_shortcuts) {
-    for (const std::pair<int, int>& entry : shortcut.second->entries) {
-      const int packId = entry.first;
-      const int emotionId = entry.second;
-      if (packId != this->basePackId && !this->IsOwnedPack(packId) && !this->IsPackAvailable(now, packId)) {
+    for (const CashEmotionEntry& entry : shortcut.second->entries) {
+      const int packId = entry.packId;
+      const int emotionId = entry.emotionId;
+      if (this->basePackId != packId && !this->IsOwnedPack(packId) && !this->IsPackAvailable(now, packId)) {
         continue;
       }
 
       auto it = std::as_const(this->m_commands).find(shortcut.first);
-      if (it == this->m_commands.end()) {
+      if (this->m_commands.end() == it) {
         CashEmotionCommand* command = new CashEmotionCommand(shortcut.first, packId, emotionId);
-        this->m_commands.try_emplace(shortcut.first, std::move(command));
+        this->m_commands.emplace(shortcut.first, command);
       } else {
         it->second->Add(packId, emotionId);
       }
@@ -726,28 +745,20 @@ const char* CCashEmotionMgr::GetPackName(int packId) {
 std::vector<int> CCashEmotionMgr::FindBaseEmotions(const char* filter) {
   std::vector<int> result;
 
-  auto it = this->emotionOrder.find(this->basePackId);
+  const int packId = this->basePackId;
+  auto it = this->emotionOrder.find(packId);
   if (it == this->emotionOrder.end()) {
     return result;
   }
 
-  result.reserve(it->second.size());
+  const std::vector<int>& order = it->second;
+  result.reserve(order.size());
   if (filter) {
     std::vector<int> others;
-    others.reserve(it->second.size());
+    others.reserve(order.size());
 
-    for (int emotionId : it->second) {
-      auto pack = this->m_emotionsByPack.find(this->basePackId);
-      if (pack == this->m_emotionsByPack.end()) {
-        continue;
-      }
-
-      auto emotion = pack->second.find(emotionId);
-      if (emotion == pack->second.end()) {
-        continue;
-      }
-
-      const char* name = emotion->second.name.c_str();
+    for (int emotionId : order) {
+      const char* name = this->GetBaseEmotionName(emotionId);
       if (name) {
         if (std::strstr(name, filter)) {
           result.push_back(emotionId);
@@ -758,11 +769,11 @@ std::vector<int> CCashEmotionMgr::FindBaseEmotions(const char* filter) {
     }
 
     std::sort(result.begin(), result.end(), CashEmotionPackOrder{this, true});
-    for (int emotionId : others) {
+    for (const int& emotionId : others) {
       result.push_back(emotionId);
     }
   } else {
-    std::copy(it->second.begin(), it->second.end(), std::back_inserter(result));
+    std::copy(order.begin(), order.end(), std::back_inserter(result));
   }
 
   return result;
@@ -823,6 +834,12 @@ const char* CCashEmotionMgr::GetEmotionName(int packId, int emotionId) {
   return emoIt->second.name.c_str();
 }
 
+// OFFSET: 0x00599910
+// FUNCTION: fn_45928
+const char* CCashEmotionMgr::GetBaseEmotionName(int emotionId) {
+  return this->GetEmotionName(this->basePackId, emotionId);
+}
+
 // OFFSET: 0x00599DE0
 // FUNCTION: fn_02949
 std::vector<int> CCashEmotionMgr::GetPackEmotions(int packId) {
@@ -854,13 +871,13 @@ int CCashEmotionMgr::GetEarliestExpiry() {
 
 // OFFSET: 0x0059A040
 // FUNCTION: fn_02951
-CashEmotionTable* CCashEmotionMgr::GetPackEmotionTable(int packId) {
+__declspec(noinline) CashEmotionTable* CCashEmotionMgr::GetPackEmotionTable(int packId) {
   auto it = this->m_emotionsByPack.find(packId);
-  if (it == this->m_emotionsByPack.end()) {
-    return nullptr;
+  if (this->m_emotionsByPack.end() != it) {
+    return &it->second;
   }
 
-  return &it->second;
+  return nullptr;
 }
 
 // OFFSET: 0x0059A080
@@ -887,7 +904,7 @@ const char* CCashEmotionMgr::GetPackTitle(int packId) {
 
 // OFFSET: 0x0059A110
 // FUNCTION: fn_02954
-int CCashEmotionMgr::GetPackPrice(int packId) {
+__declspec(noinline) int CCashEmotionMgr::GetPackPrice(int packId) {
   auto it = this->packs.find(packId);
   if (this->packs.end() == it) {
     return -1;
@@ -991,7 +1008,12 @@ void CCashEmotionMgr::Search(
 // OFFSET: 0x0059A7C0
 // FUNCTION: fn_02961
 void CCashEmotionMgr::AddSearchResult(std::vector<std::pair<int, int>>& results, const std::pair<int, int>& entry) {
-  auto found = std::find(results.begin(), results.end(), entry);
+  auto found = results.begin();
+  for (; found != results.end(); ++found) {
+    if (*found == entry) {
+      break;
+    }
+  }
   if (results.end() == found) {
     results.push_back(entry);
   }
@@ -1000,33 +1022,38 @@ void CCashEmotionMgr::AddSearchResult(std::vector<std::pair<int, int>>& results,
 // OFFSET: 0x0059A820
 // FUNCTION: fn_02962
 std::vector<int> CCashEmotionMgr::SortPacks(const std::vector<int>& packs, const char* filter) {
-  if (!filter || std::strlen(filter) == 0) {
-    std::vector<int> result(packs);
-    std::sort(result.begin(), result.end(), CashEmotionPackOrder{this, true});
-    return result;
-  }
+  if (filter && std::strlen(filter) != 0) {
+    const std::size_t count = packs.size();
+    std::vector<int> matched;
+    matched.reserve(count);
+    std::vector<int> others;
+    others.reserve(count);
 
-  std::vector<int> matched;
-  matched.reserve(packs.size());
-  std::vector<int> others;
-  others.reserve(packs.size());
-
-  for (int packId : packs) {
-    const char* title = this->GetPackTitle(packId);
-    if (title && std::strstr(title, filter)) {
-      matched.push_back(packId);
-    } else {
-      others.push_back(packId);
+    for (int packId : packs) {
+      const char* title = this->GetPackTitleInline(packId);
+      if (title) {
+        if (std::strstr(title, filter)) {
+          matched.push_back(packId);
+        } else {
+          others.push_back(packId);
+        }
+      } else {
+        others.push_back(packId);
+      }
     }
+
+    std::sort(matched.begin(), matched.end(), CashEmotionPackOrder{this, true});
+    std::sort(others.begin(), others.end(), CashEmotionPackOrder{this, true});
+    for (const int& packId : others) {
+      matched.push_back(packId);
+    }
+
+    return matched;
   }
 
-  std::sort(matched.begin(), matched.end(), CashEmotionPackOrder{this, true});
-  std::sort(others.begin(), others.end(), CashEmotionPackOrder{this, true});
-  for (int packId : others) {
-    matched.push_back(packId);
-  }
-
-  return matched;
+  std::vector<int> result(packs);
+  std::sort(result.begin(), result.end(), CashEmotionPackOrder{this, true});
+  return result;
 }
 
 // OFFSET: 0x0059ABC0
@@ -1090,8 +1117,7 @@ int CCashEmotionMgr::LookupSpecialEmotion(CashEmotionSpecial type) {
     int emotionId;
     {
       std::string key("ET_CHAT_PROHIBIT");
-      auto it = this->m_emotionIds.find(key);
-      emotionId = it != this->m_emotionIds.end() ? it->second : -1;
+      emotionId = this->FindEmotionIdByKey(key);
     }
     this->m_specials.emplace(type, emotionId);
     return emotionId;
@@ -1100,8 +1126,7 @@ int CCashEmotionMgr::LookupSpecialEmotion(CashEmotionSpecial type) {
     int emotionId;
     {
       std::string key("ET_YUT1");
-      auto it = this->m_emotionIds.find(key);
-      emotionId = it != this->m_emotionIds.end() ? it->second : -1;
+      emotionId = this->FindEmotionIdByKey(key);
     }
     this->m_specials.emplace(type, emotionId);
     return emotionId;
@@ -1110,8 +1135,7 @@ int CCashEmotionMgr::LookupSpecialEmotion(CashEmotionSpecial type) {
     int emotionId;
     {
       std::string key("ET_DICE1");
-      auto it = this->m_emotionIds.find(key);
-      emotionId = it != this->m_emotionIds.end() ? it->second : -1;
+      emotionId = this->FindEmotionIdByKey(key);
     }
     this->m_specials.emplace(type, emotionId);
     return emotionId;
@@ -1135,8 +1159,7 @@ int CCashEmotionMgr::LookupSpecialEmotion(CashEmotionSpecial type, const char* n
   int emotionId;
   {
     std::string key(name);
-    auto it = this->m_emotionIds.find(key);
-    emotionId = it != this->m_emotionIds.end() ? it->second : -1;
+    emotionId = this->FindEmotionIdByKey(key);
   }
 
   this->m_specials.emplace(type, emotionId);
@@ -1152,8 +1175,7 @@ void CCashEmotionMgr::AddShortcut(const std::string& name, int packId, int emoti
     return;
   }
 
-  CashEmotionCommand* shortcut = new (std::nothrow) CashEmotionCommand(name, packId, emotionId);
-  if (shortcut) {
+  if (CashEmotionCommand* shortcut = new (std::nothrow) CashEmotionCommand(name, packId, emotionId)) {
     this->m_shortcuts.try_emplace(name, shortcut);
   }
 }
@@ -1174,14 +1196,15 @@ bool CCashEmotionMgr::AddEmotion(int packId, int emotionId, const char* name, in
   CashEmotionTable table;
   auto result = table.try_emplace(emotionId, packId, emotionId, name, actionIndex, frameIndex, actId, sprId);
   if (result.second == true) {
-    inserted = this->m_emotionsByPack.emplace(packId, table).second;
+    auto added = this->m_emotionsByPack.emplace(packId, table);
+    inserted = added.second;
   }
 
   return inserted;
 }
 
 // INLINED
-static void AddSearchKey(std::unordered_map<std::string, std::pair<int, int>>& index, const char* key, int packId, int emotionId) {
+static __forceinline void AddSearchKey(std::unordered_map<std::string, std::pair<int, int>>& index, const char* key, int packId, int emotionId) {
   if (!key || std::strlen(key) == 0) {
     return;
   }
@@ -1192,12 +1215,12 @@ static void AddSearchKey(std::unordered_map<std::string, std::pair<int, int>>& i
 // OFFSET: 0x0059BC30
 // FUNCTION: fn_02971
 void CCashEmotionMgr::InsertEmotion(const int packId, const int emotionId, int actionIndex, int frameIndex, const char* actFile, const char* sprFile) {
-  const char* packName = this->GetPackTitle(packId);
+  const char* packName = this->GetPackTitleInline(packId);
   if (!packName) {
     return;
   }
 
-  const char* baseName = this->GetEmotionName(this->basePackId, emotionId);
+  const char* baseName = this->GetBaseEmotionName(emotionId);
   if (!baseName) {
     return;
   }
@@ -1226,6 +1249,30 @@ bool CCashEmotionMgr::PlaySearchedEmotion(const std::string& name) {
   return false;
 }
 
+// OFFSET: 0x0059BED0
+// FUNCTION: fn_46475
+void CCashEmotionMgr::AddEmotionOrder(int packId, int emotionId) {
+  auto it = this->emotionOrder.find(packId);
+  if (this->emotionOrder.end() != it) {
+    const auto found = std::find(it->second.begin(), it->second.end(), emotionId);
+    if (it->second.end() == found) {
+      it->second.push_back(emotionId);
+    }
+  } else {
+    std::vector<int> order;
+    order.push_back(emotionId);
+    this->emotionOrder.emplace(packId, std::move(order));
+  }
+}
+
+// OFFSET: 0x0059C020
+// FUNCTION: fn_46474
+void CCashEmotionMgr::AddPack(int packId, const char* name, int price, unsigned int startTime, unsigned int endTime, int period, int limited) {
+  if (this->packs.try_emplace(packId, name, price, startTime, endTime, period, static_cast<char>(limited)).second == true) {
+    this->packOrder.push_back(packId);
+  }
+}
+
 // OFFSET: 0x0059C0A0
 // FUNCTION: fn_02972
 void CCashEmotionMgr::SetOwnedPack(int packId, unsigned int expiry) {
@@ -1234,7 +1281,8 @@ void CCashEmotionMgr::SetOwnedPack(int packId, unsigned int expiry) {
   }
 
   std::vector<int>& owned = this->m_ownedPacks;
-  if (owned.end() == std::find(owned.begin(), owned.end(), packId)) {
+  auto found = std::find(owned.begin(), owned.end(), packId);
+  if (owned.end() == found) {
     owned.push_back(packId);
 
     auto unowned = std::find(this->m_unownedPacks.begin(), this->m_unownedPacks.end(), packId);
@@ -1245,7 +1293,7 @@ void CCashEmotionMgr::SetOwnedPack(int packId, unsigned int expiry) {
   }
 
   auto it = this->m_expiry.begin();
-  for (; this->m_expiry.end() != it; ++it) {
+  for (const auto last = this->m_expiry.end(); it != last; ++it) {
     if (it->first == packId) {
       break;
     }
@@ -1272,7 +1320,7 @@ bool CCashEmotionMgr::IsChatProhibitEmotion(int emotionId) {
     return false;
   }
 
-  return this->GetSpecialEmotion(CashEmotionSpecial::ChatProhibit) == emotionId;
+  return this->GetSpecialEmotionInline(CashEmotionSpecial::ChatProhibit) == emotionId;
 }
 
 // OFFSET: 0x0059C410
@@ -1295,9 +1343,9 @@ bool CCashEmotionMgr::IsOwnedPack(int packId) {
 // OFFSET: 0x0059C5A0
 // FUNCTION: fn_02977
 bool CCashEmotionMgr::RemoveExpiredPacks() {
-  auto* listWnd = g_windowMgr.cashEmotionListWnd;
   bool expired = false;
-  const __time32_t now = _time32(nullptr) - this->serverTimeOffset - this->intendedDelay;
+  auto* listWnd = g_windowMgr.cashEmotionListWnd;
+  const __time32_t now = this->ToServerTime(_time32(nullptr));
 
   for (auto it = this->m_expiry.begin(); it != this->m_expiry.end();) {
     if (it->second.IsBefore(now + 1)) {
@@ -1349,7 +1397,7 @@ void CCashEmotionMgr::RemoveOwnedPack(int packId, bool refresh, bool clearExpiry
 // FUNCTION: fn_02979
 CashEmotionPackRefresh CCashEmotionMgr::RefreshUnownedPacks() {
   bool changed = false;
-  const unsigned int now = _time32(nullptr) - this->serverTimeOffset - this->intendedDelay;
+  const unsigned int now = this->ToServerTime(_time32(nullptr));
 
   std::unordered_map<int, int> owned;
   for (int packId : this->m_ownedPacks) {
@@ -1375,8 +1423,17 @@ CashEmotionPackRefresh CCashEmotionMgr::RefreshUnownedPacks() {
 
     const unsigned int startTime = pack->startTime;
     const unsigned int endTime = pack->endTime;
-    if (pack->IsAvailable(now) && owned.find(packId) == owned.end()) {
+    const bool available = (startTime == 0 && endTime == 0) || (endTime == 0 && startTime <= now) || (startTime == 0 && now < endTime) ||
+                           (now >= startTime && now < endTime);
+    if (available && !owned.contains(packId)) {
       packs.push_back(packId);
+    }
+
+    if (startTime == 0 && endTime == 0) {
+      continue;
+    }
+    if (endTime == 0 && startTime <= now) {
+      continue;
     }
 
     if (startTime > now && static_cast<int>(startTime) < nextTime) {
@@ -1388,7 +1445,7 @@ CashEmotionPackRefresh CCashEmotionMgr::RefreshUnownedPacks() {
   }
 
   for (int packId : packs) {
-    if (unowned.find(packId) == unowned.end()) {
+    if (!unowned.contains(packId)) {
       changed = true;
     }
   }
@@ -1448,8 +1505,8 @@ void CCashEmotionMgr::ShowErrorMessage(const char* key, int value) {
     return;
   }
 
-  std::string text = std::vformat(format, std::make_format_args(value));
-  MessageBoxA(nullptr, text.c_str(), std::string().c_str(), MB_OK);
+  std::string text = fmt::vformat(format, fmt::make_format_args(value));
+  MessageBoxA(nullptr, text.c_str(), std::string("").c_str(), MB_OK);
 }
 
 // OFFSET: 0x0059D040
@@ -1491,7 +1548,10 @@ bool CCashEmotionMgr::UpdatePurchasedPackExpiry() {
     }
 
     listWnd->RefreshPackLists();
-    return this->m_expiry.size() != 0;
+    if (this->m_expiry.size() != 0) {
+      return true;
+    }
+    return false;
   }
 
   return false;
@@ -1500,7 +1560,13 @@ bool CCashEmotionMgr::UpdatePurchasedPackExpiry() {
 // OFFSET: 0x0059FC50
 // FUNCTION: fn_03031
 int CCashEmotionMgr::GetServerTime() {
-  return _time32(nullptr) - this->serverTimeOffset - this->intendedDelay;
+  return this->ToServerTime(_time32(nullptr));
+}
+
+// OFFSET: 0x00599630
+// FUNCTION: fn_45927
+int CCashEmotionMgr::ToServerTime(int localTime) const {
+  return localTime - this->serverTimeOffset - this->intendedDelay;
 }
 
 // OFFSET: 0x0059FC70
@@ -1519,7 +1585,7 @@ int CCashEmotionMgr::InsertEmotionGroup(lua_State* state) {
   const int emotionId = luaL_checkinteger(state, 2);
 
   CCashEmotionMgr* mgr = g_cashEmotionMgr;
-  const char* title = mgr->GetPackTitle(packId);
+  const char* title = mgr->GetPackTitleInline(packId);
   if (title) {
     mgr->AddShortcut(title, packId, emotionId);
   }
@@ -1566,10 +1632,7 @@ int CCashEmotionMgr::InsertEmotionMsgListTable(lua_State* state) {
   for (int index = 5; index < count + 5; ++index) {
     std::string name = raw ? static_cast<const std::string&>(std::string(luaL_checkstring(state, index))) : FromUtf8(luaL_checkstring(state, index), g_textCodePage);
 
-    const char* key = name.c_str();
-    if (key && std::strlen(key) != 0) {
-      g_cashEmotionMgr->m_searchIndex.try_emplace(key, packId, emotionId);
-    }
+    AddSearchKey(g_cashEmotionMgr->m_searchIndex, name.c_str(), packId, emotionId);
 
     if (name.find('/') == 0) {
       name.erase(0, 1);
@@ -1588,7 +1651,7 @@ int CCashEmotionMgr::InsertEmotionMsgListTableForCustom(lua_State* state) {
   const int emotionId = luaL_checkinteger(state, 2);
   const int baseEmotionId = luaL_checkinteger(state, 3);
 
-  const char* name = g_cashEmotionMgr->GetEmotionName(g_cashEmotionMgr->basePackId, baseEmotionId);
+  const char* name = g_cashEmotionMgr->GetBaseEmotionName(baseEmotionId);
   if (name && std::strlen(name) > 1) {
     g_cashEmotionMgr->AddShortcut(name + 1, packId, emotionId);
   }
@@ -1617,26 +1680,7 @@ int CCashEmotionMgr::InsertOrderList(lua_State* state) {
   const int packId = luaL_checkinteger(state, 1);
   const int emotionId = luaL_checkinteger(state, 2);
 
-  CCashEmotionMgr* mgr = g_cashEmotionMgr;
-  auto it = mgr->emotionOrder.find(packId);
-  if (mgr->emotionOrder.end() != it) {
-    std::vector<int>& order = it->second;
-    auto found = order.begin();
-    for (; order.end() != found; ++found) {
-      if (*found == emotionId) {
-        break;
-      }
-    }
-
-    if (order.end() == found) {
-      order.push_back(emotionId);
-    }
-  } else {
-    std::vector<int> order;
-    order.push_back(emotionId);
-    mgr->emotionOrder.emplace(packId, std::move(order));
-  }
-
+  g_cashEmotionMgr->AddEmotionOrder(packId, emotionId);
   return 1;
 }
 
@@ -1710,12 +1754,8 @@ int CCashEmotionMgr::InsertPackInfo(lua_State* state) {
     return 1;
   }
 
-  const char limited = static_cast<char>(luaL_checkinteger(state, 10));
-  CCashEmotionMgr* mgr = g_cashEmotionMgr;
-  if (mgr->packs.try_emplace(packId, name, price, startTime, endTime, period, limited).second == true) {
-    mgr->packOrder.push_back(packId);
-  }
-
+  const int limited = luaL_checkinteger(state, 10);
+  g_cashEmotionMgr->AddPack(packId, name, price, startTime, endTime, period, limited);
   return 1;
 }
 
@@ -1761,11 +1801,12 @@ __declspec(noinline) void UICashEmotionScrollWnd::UpdateScrollBars() {
 // FUNCTION: fn_09344
 void UICashEmotionListChildWnd_Abstract::OnWheel(int delta) {
   if (this->wheelScroll == 1) {
+    UIWindow* scrollBar = this->scrollBar;
     if (delta < 0) {
-      this->SendMsg(this->scrollBar, UM_SCROLLVERT, 15, 0, 0, 0);
+      this->SendMsg(scrollBar, UM_SCROLLVERT, 15, 0, 0, 0);
       return;
     }
-    this->SendMsg(this->scrollBar, UM_SCROLLVERT, -15, 0, 0, 0);
+    this->SendMsg(scrollBar, UM_SCROLLVERT, -15, 0, 0, 0);
   }
 }
 
@@ -1803,7 +1844,7 @@ UICashEmotionListChildWnd_Basic::UICashEmotionListChildWnd_Basic(int width, int 
     : UICashEmotionListChildWnd_Abstract(width, height, cached) {
   this->m_selectAction = new (std::nothrow) CCashEmotionAction_Play();
   this->m_playAction = new (std::nothrow) CCashEmotionAction_Register();
-  this->OnCreate(width, height);
+  static_cast<UIWindow*>(this)->OnCreate(width, height);
 }
 
 // OFFSET: 0x007C4100
@@ -1913,7 +1954,7 @@ int UICashEmotionListChildWnd_Basic::SendMsg(UIWindow* sender, int message, std:
 UICashEmotionListChildWnd_Purchase::UICashEmotionListChildWnd_Purchase(int width, int height)
     : UICashEmotionListChildWnd_Abstract(width, height, 0) {
   this->playAction = new (std::nothrow) CCashEmotionAction_Play();
-  this->OnCreate(width, height);
+  static_cast<UIWindow*>(this)->OnCreate(width, height);
 }
 
 // OFFSET: 0x007C4AD0
@@ -1933,10 +1974,15 @@ const char* UICashEmotionListChildWnd_Purchase::Filter() {
 // OFFSET: 0x007C4D30
 // FUNCTION: fn_09367
 __declspec(noinline) void UICashEmotionListChildWnd_Purchase::Refresh(const char* filter) {
-  this->m_filter = filter ? filter : "";
+  if (!filter) {
+    this->m_filter = "";
+  } else {
+    this->m_filter = filter;
+  }
   for (UICashEmotionPack* item : this->m_items) {
     this->RemoveChild(item, 0);
   }
+  int y = 0;
   this->scrollPosition = 0;
   this->horizontalScrollPosition = 0;
 
@@ -1945,7 +1991,6 @@ __declspec(noinline) void UICashEmotionListChildWnd_Purchase::Refresh(const char
 
   std::vector<int> packs = g_cashEmotionMgr->SortOwnedPacks(filter);
   std::string expiryFormat = g_simpleStringMgr->GetString("EMSG_EMOTION_USEABLE_EXPIRE_TIME");
-  int y = 0;
   for (int packId : packs) {
     CashEmotionPack* info = g_cashEmotionMgr->GetPack(packId);
     if (!info || !g_cashEmotionMgr->GetPackEmotionTable(packId)) {
@@ -1954,7 +1999,7 @@ __declspec(noinline) void UICashEmotionListChildWnd_Purchase::Refresh(const char
 
     UICashEmotionPack* pack;
     int height;
-    auto it = std::find_if(unused.begin(), unused.end(), [packId](UICashEmotionPack* item) { return item->packId == packId; });
+    auto it = std::find_if(unused.begin(), unused.end(), [packId](UICashEmotionPack* item) { return packId == item->packId; });
     if (it != unused.end() && (pack = *it) != nullptr) {
       unused.remove(pack);
       height = pack->geometry.height;
@@ -2033,7 +2078,7 @@ void UICashEmotionListChildWnd_Purchase::UpdateExpiry(int packId, Timestamp* exp
 UICashEmotionListChildWnd_Search::UICashEmotionListChildWnd_Search(int width, int height)
     : UICashEmotionListChildWnd_Abstract(width, height, 0) {
   this->m_action = new (std::nothrow) CCashEmotionAction_Play();
-  this->OnCreate(width, height);
+  static_cast<UIWindow*>(this)->OnCreate(width, height);
 }
 
 // OFFSET: 0x007C5720
@@ -2136,7 +2181,7 @@ int UICashEmotionListChildWnd_Search::SendMsg(UIWindow* sender, int message, std
 // FUNCTION: fn_09389
 UICashEmotionListChildWnd_UnPurchased::UICashEmotionListChildWnd_UnPurchased(int width, int height)
     : UICashEmotionListChildWnd_Abstract(width, height, 0) {
-  this->OnCreate(width, height);
+  static_cast<UIWindow*>(this)->OnCreate(width, height);
 }
 
 // OFFSET: 0x007C6520
@@ -2148,10 +2193,15 @@ const char* UICashEmotionListChildWnd_UnPurchased::Filter() {
 // OFFSET: 0x007C6540
 // FUNCTION: fn_09393
 __declspec(noinline) void UICashEmotionListChildWnd_UnPurchased::Refresh(const char* filter) {
-  this->m_filter = filter ? filter : "";
+  if (!filter) {
+    this->m_filter = "";
+  } else {
+    this->m_filter = filter;
+  }
   for (UICashEmotionPack_Unpurchase* item : this->m_items) {
     this->RemoveChild(item, 0);
   }
+  int y = 0;
   this->scrollPosition = 0;
   this->horizontalScrollPosition = 0;
 
@@ -2160,7 +2210,6 @@ __declspec(noinline) void UICashEmotionListChildWnd_UnPurchased::Refresh(const c
 
   std::string endFormat = g_simpleStringMgr->GetString("EMSG_EMOTION_SALE_END_TIME");
   std::vector<int> packs = g_cashEmotionMgr->SortUnownedPacks(filter);
-  int y = 0;
   for (int packId : packs) {
     CashEmotionPack* info = g_cashEmotionMgr->GetPack(packId);
     if (!info || !g_cashEmotionMgr->GetPackEmotionTable(packId)) {
@@ -2294,15 +2343,15 @@ void UICashEmotionListWnd::OnCreate(int width, int height) {
     const char id = static_cast<char>(index + 1);
     tab->SendMsg(this, UM_SETSTATE, id == 1, 0, 0, 0);
     this->AddChild(tab);
-    this->m_tabs.insert(std::make_pair(id, static_cast<UIWindow*>(tab)));
+    this->m_tabs.insert({id, tab});
 
     if (CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(normal.c_str())))) {
       x += bitmap->image.height;
     }
   }
 
-  this->m_backButton = this->CreateButton(36, 22, 20, 18, 189, "유저인터페이스\\cashemotion\\btn_arrowback_%s.bmp", false);
-  this->m_searchButton = this->CreateButton(221, 22, 26, 18, 190, "유저인터페이스\\cashemotion\\btn_search_%s.bmp", true);
+  this->m_backButton = this->CreateButton(36, 22, 20, 18, ID_BUTTON1, "유저인터페이스\\cashemotion\\btn_arrowback_%s.bmp", false);
+  this->m_searchButton = this->CreateButton(221, 22, 26, 18, ID_BUTTON2, "유저인터페이스\\cashemotion\\btn_search_%s.bmp", true);
   this->m_shortcutButton = this->CreateButton(252, 22, 37, 18, 191, "유저인터페이스\\cashemotion\\btn_shortui_%s.bmp", false);
   this->m_buyButton = this->CreateButton(247, 355, 42, 20, 526, "유저인터페이스\\cashemotion\\btn_buy_%s.bmp", true);
 
@@ -2338,10 +2387,7 @@ void UICashEmotionListWnd::OnCreate(int width, int height) {
     this->AddChild(this->m_searchList);
   }
 
-  auto first = this->m_tabs.find(1);
-  if (this->m_tabs.end() != first) {
-    this->SendMsg(first->second, UM_COMMAND, ID_RADIOBTN, 0, 0, 0);
-  }
+  this->SelectTab(1);
 
   this->m_period = new UIStaticText();
   this->m_period->SetSize(200, 14);
@@ -2389,10 +2435,7 @@ void UICashEmotionListWnd::ShowPack(int packId) {
     return;
   }
 
-  auto tab = this->m_tabs.find(3);
-  if (tab != this->m_tabs.end()) {
-    this->SendMsg(tab->second, UM_COMMAND, ID_RADIOBTN, 0, 0, 0);
-  }
+  this->SelectTab(3);
 
   if (this->m_searchEdit) {
     this->m_searchEdit->SetText(title);
@@ -2453,13 +2496,13 @@ int UICashEmotionListWnd::SetPeriod(int packId) {
   }
 
   const int period = g_cashEmotionMgr->GetPackPeriod(packId);
-  if (period < 1) {
-    this->m_period->Show(0);
-  } else {
-    const char* format = g_simpleStringMgr->GetString("EMSG_PERIOD_OF_USE");
-    std::string text = std::vformat(format, std::make_format_args(period / 24));
+  if (period > 0) {
+    int days = period / 24;
+    const std::string text = fmt::format(g_simpleStringMgr->GetString("EMSG_PERIOD_OF_USE"), days);
     this->m_period->SetTextFitted(text.c_str());
     this->m_period->Show(1);
+  } else {
+    this->m_period->Show(0);
   }
 
   return this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
@@ -2529,7 +2572,8 @@ int UICashEmotionListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       }
 
       char selected = 0;
-      for (auto& tab : this->m_tabs) {
+      for (auto tabIt = this->m_tabs.begin(); tabIt != this->m_tabs.end(); ++tabIt) {
+        auto& tab = *tabIt;
         if (sender == tab.second) {
           tab.second->SendMsg(nullptr, UM_SETSTATE, 1, 0, 0, 0);
           selected = tab.first;
@@ -2549,13 +2593,13 @@ int UICashEmotionListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
 
       CSkillInfo* skill;
       if (g_session.IsDoramJob(g_session.GetDisplayJob())) {
-        skill = g_session.m_skillBundle.Find(5018);
+        skill = g_session.m_skillBundle.Find(SU_BASIC_SKILL);
         if (!skill || skill->level <= 0) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(g_simpleStringMgr->GetString("EMSG_EMOTION_EXPANTION_NOT_ENOUGH_BASICSKILL_LEVEL")), 255, 0, 0, 0);
           return 0;
         }
       } else {
-        skill = g_session.m_skillBundle.Find(1);
+        skill = g_session.m_skillBundle.Find(NV_BASIC);
         if (!skill || skill->level <= 1) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(g_simpleStringMgr->GetString("EMSG_EMOTION_EXPANTION_NOT_ENOUGH_BASICSKILL_LEVEL")), 255, 0, 0, 0);
           return 0;
@@ -2584,13 +2628,13 @@ int UICashEmotionListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       }
 
       std::string text;
-      text = free ? std::vformat(format, std::make_format_args(title)) : std::vformat(format, std::make_format_args(title, price));
+      text = free ? fmt::vformat(format, fmt::make_format_args(title)) : fmt::vformat(format, fmt::make_format_args(title, price));
 
       UINormalMB* box = new UINormalMB();
       box->Create(nullptr, text.c_str(), 2, true, nullptr, 280, 128, nullptr);
       box->m_keepOpen = 1;
       g_windowMgr.AddRendered(box);
-      if (g_windowMgr.RunModal(box) == 187) {
+      if (g_windowMgr.RunModal(box) == ID_YES) {
         CashEmotionPurchasePacket packet;
         packet.id = ID_CZ_REQ_BUY_EMOTION_EXPANSION;
         packet.packId = g_cashEmotionMgr->selectedPackId;
@@ -2625,19 +2669,17 @@ void UICashEmotionListWnd::SetTab(char tab) {
     return;
   }
 
-  UICashEmotionListChildWnd_Abstract* list;
   if (tab == 1) {
-    list = this->m_basicList;
+    this->m_currentList = this->m_basicList;
   } else if (tab == 2) {
-    list = this->m_purchaseList;
+    this->m_currentList = this->m_purchaseList;
   } else if (tab == 3) {
-    list = this->m_unpurchasedList;
+    this->m_currentList = this->m_unpurchasedList;
   } else if (tab == 4) {
-    list = this->m_searchList;
+    this->m_currentList = this->m_searchList;
   } else {
-    list = nullptr;
+    this->m_currentList = nullptr;
   }
-  this->m_currentList = list;
 
   if (this->m_basicList) {
     this->m_basicList->Show(tab == 1);
@@ -2673,27 +2715,32 @@ void UICashEmotionListWnd::SetTab(char tab) {
     }
 
     this->m_searchEdit->OnFinishEdit(0);
-    this->m_searchEdit->disabled = basic;
-    this->m_searchEdit->Invalidate();
+    UIEditCtrl* edit = this->m_searchEdit;
+    edit->disabled = basic;
+    edit->Invalidate();
     if (basic) {
       this->m_searchEdit->SetText("");
     }
   }
 
-  if (this->m_backButton) {
-    this->m_backButton->SetDisabled(basic);
-    this->m_backButton->Invalidate();
+  if (UIBitmapButton* backButton = this->m_backButton) {
+    backButton->SetDisabled(basic);
+    backButton->Invalidate();
   }
 
-  if (this->m_searchButton) {
-    this->m_searchButton->SetDisabled(basic);
-    this->m_searchButton->Invalidate();
+  if (UIBitmapButton* searchButton = this->m_searchButton) {
+    searchButton->SetDisabled(basic);
+    searchButton->Invalidate();
   }
 
   if (this->m_currentList) {
     const char* filter = this->m_currentList->Filter();
     if (this->m_searchEdit) {
-      this->m_searchEdit->SetText(filter ? filter : "");
+      const char* text = "";
+      if (filter) {
+        text = filter;
+      }
+      this->m_searchEdit->SetText(text);
     }
   }
 }
@@ -2792,9 +2839,9 @@ void UICashEmotionMiniWnd::Previous() {
 void UICashEmotionMiniWnd::Refresh(int first) {
   if (this->m_pieces[0]) {
     if (this->m_selected) {
-      std::pair<int, int> entry = this->m_selected->Get(first);
-      const bool owned = g_cashEmotionMgr->BasePackId() == entry.first ? true : g_cashEmotionMgr->IsOwnedPack(entry.first);
-      this->m_pieces[0]->Set(entry.first, entry.second, false, false, !owned);
+      CashEmotionEntry entry = this->m_selected->Get(first);
+      const bool owned = g_cashEmotionMgr->BasePackId() == entry.packId ? true : g_cashEmotionMgr->IsOwnedPack(entry.packId);
+      this->m_pieces[0]->Set(entry.packId, entry.emotionId, false, false, !owned);
     } else {
       this->m_pieces[0]->Set(-1, -1, false, false, false);
     }
@@ -2802,9 +2849,9 @@ void UICashEmotionMiniWnd::Refresh(int first) {
 
   if (this->m_pieces[1]) {
     if (this->m_selected) {
-      std::pair<int, int> entry = this->m_selected->Get(first + 1);
-      const bool owned = g_cashEmotionMgr->BasePackId() == entry.first ? true : g_cashEmotionMgr->IsOwnedPack(entry.first);
-      this->m_pieces[1]->Set(entry.first, entry.second, false, false, !owned);
+      CashEmotionEntry entry = this->m_selected->Get(first + 1);
+      const bool owned = g_cashEmotionMgr->BasePackId() == entry.packId ? true : g_cashEmotionMgr->IsOwnedPack(entry.packId);
+      this->m_pieces[1]->Set(entry.packId, entry.emotionId, false, false, !owned);
     } else {
       this->m_pieces[1]->Set(-1, -1, false, false, false);
     }
@@ -2812,9 +2859,9 @@ void UICashEmotionMiniWnd::Refresh(int first) {
 
   if (this->m_pieces[2]) {
     if (this->m_selected) {
-      std::pair<int, int> entry = this->m_selected->Get(first + 2);
-      const bool owned = g_cashEmotionMgr->BasePackId() == entry.first ? true : g_cashEmotionMgr->IsOwnedPack(entry.first);
-      this->m_pieces[2]->Set(entry.first, entry.second, false, false, !owned);
+      CashEmotionEntry entry = this->m_selected->Get(first + 2);
+      const bool owned = g_cashEmotionMgr->BasePackId() == entry.packId ? true : g_cashEmotionMgr->IsOwnedPack(entry.packId);
+      this->m_pieces[2]->Set(entry.packId, entry.emotionId, false, false, !owned);
     } else {
       this->m_pieces[2]->Set(-1, -1, false, false, false);
     }
@@ -2827,8 +2874,9 @@ void UICashEmotionMiniWnd::Refresh(int first) {
 // FUNCTION: fn_09431
 void UICashEmotionMiniWnd::OnCreate(int width, int height) {
   int x = 24;
-  for (UICashEmotionPiece*& piece : this->m_pieces) {
-    piece = new (std::nothrow) UICashEmotionPiece();
+  for (UICashEmotionPiece*& slot : this->m_pieces) {
+    UICashEmotionPiece* piece = new (std::nothrow) UICashEmotionPiece();
+    slot = piece;
     if (piece) {
       piece->SetSize(42, 42);
       piece->Move(x, 1);
@@ -2935,7 +2983,7 @@ void UICashEmotionMiniWnd::SetIndex(int index) {
 int UICashEmotionMiniWnd::SendMsg(
   UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4
 ) {
-  std::pair<int, int> entry;
+  CashEmotionData* data;
 
   switch (message) {
   case UM_REFRESH:
@@ -2943,38 +2991,46 @@ int UICashEmotionMiniWnd::SendMsg(
     return 0;
 
   case UM_CASH_EMOTION_ACTIVATE:
-    entry.first = static_cast<int>(argument1);
-    entry.second = static_cast<int>(argument2);
+    data = g_cashEmotionMgr->GetEmotionData(static_cast<int>(argument1), static_cast<int>(argument2));
     break;
 
   case UM_COMMAND:
-    if (argument1 == 1) {
+    switch (argument1) {
+    case 1:
       this->Previous();
-    } else if (argument1 == 2) {
+      break;
+    case 2:
       this->Next();
+      break;
     }
     return 0;
 
   case UM_CASH_EMOTION_KEY:
-    if (argument1 == 13) {
+    switch (argument1) {
+    case 13:
       if (!this->m_selected) {
         return 0;
       }
-      entry = this->m_selected->Get(this->m_selectedIndex);
+      {
+        CashEmotionEntry entry = this->m_selected->Get(this->m_selectedIndex);
+        data = g_cashEmotionMgr->GetEmotionData(entry.packId, entry.emotionId);
+      }
       break;
-    }
-    if (argument1 == 37) {
+    case 37:
       this->Previous();
-    } else if (argument1 == 39) {
+      return 0;
+    case 39:
       this->Next();
+      return 0;
+    default:
+      return 0;
     }
-    return 0;
+    break;
 
   default:
     return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 
-  CashEmotionData* data = g_cashEmotionMgr->GetEmotionData(entry.first, entry.second);
   if (!data) {
     return 0;
   }
@@ -3019,7 +3075,7 @@ void UICashEmotionPack::ShowExpiry(__time32_t value) {
   int day = expiry.Day();
   int month = expiry.Month();
   int year = expiry.Year();
-  std::string text = std::vformat(this->m_title, std::make_format_args(year, month, day, hour, minute));
+  std::string text = fmt::format(this->m_title, year, month, day, hour, minute);
   this->m_titleText->SetTextFitted(text.c_str());
 }
 
@@ -3035,18 +3091,18 @@ void UICashEmotionPack::UpdateExpiry(Timestamp* expiry) {
   int day = expiry->Day();
   int month = expiry->Month();
   int year = expiry->Year();
-  std::string text = std::vformat(this->m_title, std::make_format_args(year, month, day, hour, minute));
+  std::string text = fmt::format(this->m_title, year, month, day, hour, minute);
   this->m_titleText->SetTextFitted(text.c_str());
 }
 
 // OFFSET: 0x007CA100
 // FUNCTION: fn_09443
-std::string UICashEmotionPack::GetPriceText(int packId) {
-  int price = g_cashEmotionMgr->GetPackPrice(packId);
+__declspec(noinline) std::string UICashEmotionPack::GetPriceText(int packId) {
+  const int price = g_cashEmotionMgr->GetPackPrice(packId);
   if (price > 0) {
     const char* format = g_simpleStringMgr->GetString("EMSG_PURCHASE_PRICE");
     if (format) {
-      return std::vformat(format, std::make_format_args(price));
+      return fmt::format(format, price);
     }
 
     return std::to_string(price);
@@ -3070,7 +3126,9 @@ int UICashEmotionPack::SetPack(int packId, bool showTooltip, bool hoverable) {
     this->packTitleText->SetTextFitted(g_cashEmotionMgr->GetPackTitle(packId));
   }
 
-  for (UICashEmotionPiece* piece : this->m_pieces) {
+  const auto pieceEnd = this->m_pieces.end();
+  for (auto pieceIt = this->m_pieces.begin(); pieceIt != pieceEnd; ++pieceIt) {
+    UICashEmotionPiece* piece = *pieceIt;
     this->RemoveChild(piece, 1);
   }
   this->m_pieces.clear();
@@ -3268,17 +3326,18 @@ void UICashEmotionPack_Purchase::ShowExpiry(__time32_t expiry) {
     return;
   }
 
-  unsigned int remaining = expiry - g_cashEmotionMgr->GetServerTime();
+  unsigned int remaining = static_cast<unsigned int>(expiry) - g_cashEmotionMgr->GetServerTime();
   if (remaining > 60) {
     unsigned int days = remaining / 86400;
     remaining -= days * 86400;
     unsigned int hours = remaining / 3600;
     remaining -= hours * 3600;
     unsigned int minutes = remaining / 60;
-    std::string text = std::vformat(this->m_title, std::make_format_args(days, hours, minutes));
+    std::string text = fmt::format(this->m_title, days, hours, minutes);
     this->m_titleText->SetTextFitted(text.c_str());
   } else {
-    this->m_titleText->SetTextFitted(g_simpleStringMgr->GetString("EMSG_PERIOD_OF_LAST_TIME"));
+    const char* text = g_simpleStringMgr->GetString("EMSG_PERIOD_OF_LAST_TIME");
+    this->m_titleText->SetTextFitted(text);
   }
 
   this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
@@ -3447,7 +3506,7 @@ int UICashEmotionPack_Search_UnPurchased::SendMsg(
 UICashEmotionPack_Unpurchase::UICashEmotionPack_Unpurchase() : UICashEmotionPack(), m_pressed(false) {
   this->m_background = Resolve("유저인터페이스\\cashemotion\\bg_list_normal.bmp");
   this->m_pressed = false;
-  this->Invalidate();
+  static_cast<UIWindow*>(this)->Invalidate();
 }
 
 // OFFSET: 0x007CB790
@@ -3539,8 +3598,8 @@ void UICashEmotionPiece::Set(int packId, int emotionId, bool showTooltip, bool h
   if (this->m_button) {
     this->m_button->SetSprite(g_cashEmotionMgr->GetSprFileName(data->actId));
     this->m_button->SetActName(g_cashEmotionMgr->GetPackName(data->sprId));
-    this->m_button->frameIndex = std::max(data->frameIndex, 0);
-    this->m_button->animationIndex = std::max(data->actionIndex, 0);
+    this->m_button->frameIndex = data->frameIndex >= 0 ? data->frameIndex : 0;
+    this->m_button->animationIndex = data->actionIndex >= 0 ? data->actionIndex : 0;
     if (showTooltip) {
       this->m_button->SetTooltip(data->name.c_str());
     } else {
@@ -3561,7 +3620,7 @@ void UICashEmotionPiece::OnCreate(int width, int height) {
   if (this->m_button) {
     this->m_button->SetSize(width, height);
     this->m_button->Move(0, 0);
-    this->m_button->SetId(189);
+    this->m_button->SetId(ID_BUTTON1);
     this->AddChild(this->m_button);
   }
 }
@@ -3628,7 +3687,7 @@ int UICashEmotionPiece::SendMsg(
 ) {
   switch (message) {
   case UM_COMMAND:
-    if (argument1 == 189 && this->parent) {
+    if (argument1 == ID_BUTTON1 && this->parent) {
       this->parent->SendMsg(this, UM_CASH_EMOTION_ACTIVATE, this->m_packId, this->m_emotionId, 0, 0);
     }
     return 0;
@@ -3666,7 +3725,7 @@ void UICashEmotionScrollBar::Paint() {
     if (this->state == 1) {
       name = "유저인터페이스\\cashemotion\\scroll_btn_up_over.bmp";
     } else {
-      name = this->state != 4 ? "유저인터페이스\\cashemotion\\scroll_btn_up_normal.bmp" : "유저인터페이스\\cashemotion\\scroll_btn_up_press.bmp";
+      name = this->state == 4 ? "유저인터페이스\\cashemotion\\scroll_btn_up_press.bmp" : "유저인터페이스\\cashemotion\\scroll_btn_up_normal.bmp";
     }
   } else {
     disabled = true;
@@ -3683,7 +3742,7 @@ void UICashEmotionScrollBar::Paint() {
   } else if (this->state == 2) {
     name = "유저인터페이스\\cashemotion\\scroll_btn_down_over.bmp";
   } else {
-    name = this->state != 5 ? "유저인터페이스\\cashemotion\\scroll_btn_down_normal.bmp" : "유저인터페이스\\cashemotion\\scroll_btn_down_press.bmp";
+    name = this->state == 5 ? "유저인터페이스\\cashemotion\\scroll_btn_down_press.bmp" : "유저인터페이스\\cashemotion\\scroll_btn_down_normal.bmp";
   }
 
   auto* down = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name)));
@@ -3752,7 +3811,8 @@ void UICashEmotionScrollWnd::AddChild(UIWindow* child) {
       continue;
     }
 
-    this->childOrigins[window] = std::make_pair(window->geometry.x, window->geometry.y);
+    const POINT origin = {window->geometry.x, window->geometry.y};
+    this->childOrigins[window] = origin;
   }
 }
 
@@ -3787,11 +3847,17 @@ __declspec(noinline) UICashEmotionSprBtn::UICashEmotionSprBtn(UIWindow* target)
 // FUNCTION: fn_09501
 void UICashEmotionSprBtn::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  if (!this->m_selected) {
-    UISpriteButton::Paint();
+  if (this->m_selected) {
+    this->PaintSelected();
     return;
   }
 
+  UISpriteButton::Paint();
+}
+
+// OFFSET: 0x007CC9C0
+// FUNCTION: fn_45574
+void UICashEmotionSprBtn::PaintSelected() {
   CDC* surface = this->geometry.surface;
   if (!surface) {
     return;
@@ -3816,12 +3882,13 @@ void UICashEmotionSprBtn::Paint() {
   const int width = this->geometry.width;
   const int height = this->geometry.height;
   SpriteAtlasRecord record{};
-  int halfWidth = 0;
   int halfHeight = 0;
-  int baseX = 0;
+  int halfWidth = 0;
   int baseY = 0;
+  int baseX = 0;
   for (unsigned index = 0; index < frame->cells.size(); ++index) {
     record = SpriteAtlasRecord{};
+    const std::uint32_t* palette = paletteRes ? paletteRes->palette : sprite->palette;
     const SpriteFrameCell* cell = &frame->Cell(index);
     if (!cell || cell->image == -1) {
       continue;
@@ -3832,7 +3899,6 @@ void UICashEmotionSprBtn::Paint() {
       continue;
     }
 
-    const std::uint32_t* palette = paletteRes ? paletteRes->palette : sprite->palette;
     CTexture* texture;
     if (cell->imageType == 0) {
       texture = g_renderer->atlas.Find(image, palette, record);
@@ -3847,18 +3913,18 @@ void UICashEmotionSprBtn::Paint() {
       continue;
     }
 
-    int x;
-    int y;
+    int x = width / 2;
+    int y = height / 2;
     if (index == 0) {
       halfWidth = image->width / 2;
-      x = width / 2 - halfWidth;
+      x -= halfWidth;
       halfHeight = image->height / 2;
-      y = height / 2 - halfHeight;
+      y -= halfHeight;
       baseX = cell->x;
       baseY = cell->y;
     } else {
-      x = width / 2 + (cell->x - baseX - halfWidth);
-      y = height / 2 + (cell->y - baseY - halfHeight);
+      x += cell->x - baseX - halfWidth;
+      y += cell->y - baseY - halfHeight;
     }
 
     const int clipX = x < 0 ? -x : 0;
@@ -3878,8 +3944,8 @@ void UICashEmotionSprBtn::Paint() {
     const int sourceX = static_cast<int>(record.u0 * 256.0f + clipX);
     const int sourceY = static_cast<int>(record.v0 * 256.0f + clipY);
     surface->DrawSurface(
-      x < 0 ? 0 : x, y < 0 ? 0 : y, texture, sourceX < 0 ? 0 : sourceX, sourceY < 0 ? 0 : sourceY, drawWidth < 0 ? 0 : drawWidth,
-      drawHeight < 0 ? 0 : drawHeight, cell->mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 1
+      x >= 0 ? x : 0, y >= 0 ? y : 0, texture, sourceX >= 0 ? sourceX : 0, sourceY >= 0 ? sourceY : 0, drawWidth >= 0 ? drawWidth : 0,
+      drawHeight >= 0 ? drawHeight : 0, cell->mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 1
     );
   }
 
@@ -3991,13 +4057,17 @@ void UIHeadsprButton::Paint() {
     return;
   }
 
-  const int sourceY = static_cast<int>(record.v0 * 256.0f);
   const int sourceX = static_cast<int>(record.u0 * 256.0f);
+  const int sourceY = static_cast<int>(record.v0 * 256.0f);
   this->geometry.surface->DrawSurface(
-    0, 0, texture, sourceX < 0 ? 0 : sourceX, sourceY < 0 ? 0 : sourceY, image->width, image->height, cell.mirrored, image->doubleWidth + 1,
+    0, 0, texture, sourceX >= 0 ? sourceX : 0, sourceY >= 0 ? sourceY : 0, image->width, image->height, cell.mirrored, image->doubleWidth + 1,
     image->doubleHeight + 1, 0
   );
 }
+
+// OFFSET: 0x00851960
+// FUNCTION: fn_45643
+UIHeadsprButton::~UIHeadsprButton() = default;
 
 // OFFSET: 0x0085D6C0
 // FUNCTION: fn_10816
@@ -4020,13 +4090,13 @@ void UISpriteButton::Paint() {
   int baseY = 0;
   for (unsigned index = 0; index < frame.cells.size(); ++index) {
     SpriteAtlasRecord record{};
+    const std::uint32_t* palette = paletteRes ? paletteRes->palette : sprite->palette;
     const SpriteFrameCell& cell = frame.Cell(index);
     if (cell.image == -1) {
       continue;
     }
 
     const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
-    const std::uint32_t* palette = paletteRes ? paletteRes->palette : sprite->palette;
     CTexture* texture;
     if (cell.imageType == 0) {
       texture = g_renderer->atlas.Find(image, palette, record);
@@ -4037,19 +4107,23 @@ void UISpriteButton::Paint() {
       texture = static_cast<CTexture*>(const_cast<void*>(image->surface));
     }
 
-    const int width = this->geometry.width;
-    const int height = this->geometry.height;
+    int width;
+    int height;
     int x;
     int y;
     if (index == 0) {
       halfWidth = image->width / 2;
+      width = this->geometry.width;
       x = width / 2 - halfWidth;
       halfHeight = image->height / 2;
+      height = this->geometry.height;
       y = height / 2 - halfHeight;
       baseX = cell.x;
       baseY = cell.y;
     } else {
+      width = this->geometry.width;
       x = width / 2 - baseX - halfWidth + cell.x;
+      height = this->geometry.height;
       y = height / 2 - baseY - halfHeight + cell.y;
     }
 
@@ -4060,7 +4134,7 @@ void UISpriteButton::Paint() {
     }
 
     const int clipX = x < 0 ? -x : 0;
-    const int left = x < 0 ? 0 : x;
+    const int left = x >= 0 ? x : 0;
     if (drawHeight + y > height) {
       drawHeight = height - y;
     }
@@ -4073,7 +4147,7 @@ void UISpriteButton::Paint() {
     if (this->geometry.surface) {
       const int top = static_cast<int>(sourceY);
       this->geometry.surface->DrawSurface(
-        left, y < 0 ? 0 : y, texture, sourceX < 0 ? 0 : sourceX, top < 0 ? 0 : top, drawWidth < 0 ? 0 : drawWidth, drawHeight < 0 ? 0 : drawHeight,
+        left, y >= 0 ? y : 0, texture, sourceX >= 0 ? sourceX : 0, top >= 0 ? top : 0, drawWidth >= 0 ? drawWidth : 0, drawHeight >= 0 ? drawHeight : 0,
         cell.mirrored, image->doubleWidth + 1, image->doubleHeight + 1, 0
       );
     }

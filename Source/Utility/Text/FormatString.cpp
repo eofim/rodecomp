@@ -51,14 +51,14 @@ namespace {
   char* ThreadSafeBuffer::GetBuffer() {
     NSyncObject lock(&this->m_criticalSection);
     const int thread = reinterpret_cast<int>(GetCurrentThread());
-    std::map<int, std::array<char, 2048>>& buffers = this->m_buffers;
+    std::array<char, 2048> buffer;
 
-    if (buffers.find(thread) == buffers.end()) {
-      std::array<char, 2048> buffer{};
-      buffers[thread] = buffer;
+    if (this->m_buffers.find(thread) == this->m_buffers.end()) {
+      buffer = {};
+      this->m_buffers[thread] = buffer;
     }
 
-    return buffers[thread].data();
+    return this->m_buffers[thread].data();
   }
 }
 
@@ -125,7 +125,7 @@ std::string IntToSignedString(int value, bool grouped, bool showPlus) {
   }
 
   if (text.at(0) == ',') {
-    text.erase(0, 1);
+    text.erase(text.begin());
   }
 
   if (negative) {

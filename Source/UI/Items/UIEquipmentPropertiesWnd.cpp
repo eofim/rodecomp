@@ -8,6 +8,7 @@
 
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/ResourceMgr.h"
 #include "Resource/Bitmap/SkinPalette.h"
@@ -28,18 +29,7 @@
 #include <string>
 #include <windows.h>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 namespace EquipmentProperties {
-class CEquipmentPropertiesMgr {
-public:
-  CEquipmentPropertiesMgr();
-  void SetWindow(UIWindow* window);
-  void GetDescriptions(const int& group, std::list<std::string>& lines);
-
-  /* 0000 */ unsigned char padding_0000[0x1FC];
-};
-
 // INLINED
 inline CEquipmentPropertiesMgr* EquipmentPropertiesMgr() {
   if (g_equipmentPropertiesMgr == nullptr) {
@@ -48,10 +38,6 @@ inline CEquipmentPropertiesMgr* EquipmentPropertiesMgr() {
   return g_equipmentPropertiesMgr;
 }
 }
-
-template void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::string>::Paint();
-template void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::string>::OnWheel(int);
-template void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::string>::ClearItems();
 
 // OFFSET: 0x00A0EBF0
 // FUNCTION: fn_15152
@@ -94,8 +80,9 @@ void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::s
     return;
   }
 
-  for (EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -112,14 +99,14 @@ void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::s
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -266,11 +253,7 @@ template <>
 void CUIListBoxEx<EquipmentPropertiesWnd::CUIItemEquipmentPropertiesLine, std::string>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
   this->scrollBar->Show(0);
-  {
-    CUIVScrollBar* bar = this->scrollBar;
-    const std::function<void(int)> onChange = [this](int position) { this->OnScroll(position); };
-    bar->onChange = onChange;
-  }
+  this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
 
@@ -295,7 +278,7 @@ void CUIEquipmentPropertiesWnd::OnCreate(int width, int height) {
   CUIStaticText* title = new CUIStaticText();
   title->SetSize(100, 18);
   title->Move(18, 0);
-  title->SetText(LookupMessage(MSI_SEND_TO_ALLY));
+  title->SetText(LookupMessage(MSI_EQUIPMENT_PROPERTIES));
   title->SetFitText(0);
   title->SetAlign(0, 6);
   {
@@ -396,11 +379,7 @@ void CUIEquipmentPropertiesWnd::OnCreate(int width, int height) {
   this->tabs = new CUITab();
   this->tabs->SetSize(18, 265);
   this->tabs->Move(3, 18);
-  {
-    CUITab* tabs = this->tabs;
-    const std::function<void(CUITabButton*)> handler = [this](CUITabButton* button) { this->OnChangeTab(button); };
-    tabs->onChange = handler;
-  }
+  this->tabs->SetOnChange([this](CUITabButton* button) { this->OnChangeTab(button); });
   this->AddChild(this->tabs);
 
   CUITabButton* allButton = new CUITabButton();
@@ -637,12 +616,21 @@ void CUIEquipmentPropertiesWnd::OnCreate(int width, int height) {
     resizer->SetImage(image);
   }
   this->resizer->SetOnResize([this](int deltaWidth, int deltaHeight) { this->Grow(deltaWidth, deltaHeight); });
-  this->resizer->minWidth = 300;
-  this->resizer->minHeight = 308;
-  this->resizer->maxWidth = 300;
-  this->resizer->maxHeight = 470;
-  this->resizer->stepX = 1;
-  this->resizer->stepY = 18;
+  {
+    CUIResizer* minimum = this->resizer;
+    minimum->minWidth = 300;
+    minimum->minHeight = 308;
+  }
+  {
+    CUIResizer* maximum = this->resizer;
+    maximum->maxWidth = 300;
+    maximum->maxHeight = 470;
+  }
+  {
+    CUIResizer* step = this->resizer;
+    step->stepX = 1;
+    step->stepY = 18;
+  }
   this->AddChild(this->resizer);
   this->tabs->Select(allButton);
 }
@@ -817,8 +805,8 @@ void CUIEquipmentPropertiesWnd::SetTab(const int& tab) {
   std::list<std::string> lines;
   EquipmentProperties::EquipmentPropertiesMgr()->GetDescriptions(static_cast<int>(this->currentTab), lines);
 
-  auto* listBox = this->list;
-  if (listBox->data != lines) {
+  if (this->list->data != lines) {
+    auto* listBox = this->list;
     listBox->data.swap(lines);
     listBox->UpdateScrollBar();
   }
@@ -867,10 +855,13 @@ CUIEquipmentPropertiesWnd* CreateEquipmentPropertiesWnd() {
   return new CUIEquipmentPropertiesWnd();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00492C70
 // FUNCTION: fn_45548
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateEquipmentPropertiesWnd;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10001, factory);
-  return true;
-}();
+static UIRegistration s_equipmentPropertiesRegistered(10001, CreateEquipmentPropertiesWnd);

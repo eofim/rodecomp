@@ -13,6 +13,11 @@
 CScatterEffect::CScatterEffect() : CEffect(-1) {
 }
 
+// OFFSET: 0x00B75D90
+// FUNCTION: fn_46040
+__declspec(noinline) CScatterEffect::~CScatterEffect() {
+}
+
 // OFFSET: 0x00B75E70
 // FUNCTION: fn_19169
 void CScatterEffect::Close() {
@@ -21,6 +26,28 @@ void CScatterEffect::Close() {
   }
 
   this->particles.clear();
+}
+
+// OFFSET: 0x00B76020
+// FUNCTION: fn_46190
+__forceinline void CScatterEffect::InitializeParticle(CSpriteParticle* particle) {
+  if (particle && this->id == 1002) {
+    this->effectLifetime = 300;
+    particle->SetSprite("이팩트\\sakura01.spr");
+    particle->SetAction("이팩트\\sakura01.act");
+    const int scaleRoll = rand() % 6;
+    particle->scale = static_cast<float>((scaleRoll >= 0 ? scaleRoll : 0) + 22) / 70.0f;
+    const int delayRoll = rand() % 3;
+    particle->frameDelay = static_cast<float>((delayRoll >= 0 ? delayRoll : 0) + 2) * 0.15f;
+    const int spinRoll = rand() % 360;
+    particle->angle = static_cast<float>(spinRoll >= 0 ? spinRoll : 0);
+    const int angleRoll = rand() % 360;
+    const int angle = angleRoll >= 0 ? angleRoll : 0;
+    particle->velocity = vector3d{0.0f, 0.0f, 0.0f};
+    particle->phaseParameter = angle;
+    particle->alpha = 250;
+    particle->destinationBlend = 6;
+  }
 }
 
 // OFFSET: 0x00B75EB0
@@ -36,25 +63,7 @@ void CScatterEffect::Open() {
     particle->columnIndex = i;
     particle->rowIndex = 0;
     particle->groupIndex = 1;
-    if (this->id == 1002) {
-      this->effectLifetime = 300;
-      particle->SetSprite("이팩트\\sakura01.spr");
-      particle->SetAction("이팩트\\sakura01.act");
-      const int scaleRoll = rand() % 6;
-      particle->scale = static_cast<float>((scaleRoll >= 0 ? scaleRoll : 0) + 22) / 70.0f;
-      const int delayRoll = rand() % 3;
-      particle->frameDelay = static_cast<float>((delayRoll >= 0 ? delayRoll : 0) + 2) * 0.15f;
-      const int spinRoll = rand() % 360;
-      particle->angle = static_cast<float>(spinRoll >= 0 ? spinRoll : 0);
-      const int angleRoll = rand() % 360;
-      const int angle = angleRoll >= 0 ? angleRoll : 0;
-      particle->velocity.x = 0.0f;
-      particle->velocity.y = 0.0f;
-      particle->velocity.z = 0.0f;
-      particle->alpha = 250;
-      particle->phaseParameter = angle;
-      particle->destinationBlend = 6;
-    }
+    this->InitializeParticle(particle);
 
     this->particles.push_back(particle);
   }
@@ -66,6 +75,27 @@ bool CScatterEffect::IsAlive() {
   return !this->IsFinished();
 }
 
+// OFFSET: 0x00B76280
+// FUNCTION: fn_46191
+__forceinline void CScatterEffect::UpdateParticle(CSpriteParticle* particle) {
+  if (particle) {
+    particle->alpha = std::ranges::max(particle->alpha - 3, 0);
+
+    const int angle = particle->phaseParameter;
+    const float rise = particle->frameDelay;
+    const float driftX = g_cosTable[angle] * 0.2f;
+    const float driftZ = g_sinTable[angle] * 0.2f;
+    particle->velocity.y += rise;
+    particle->velocity.x += driftX;
+    particle->velocity.z += driftZ;
+
+    matrix translate;
+    std::memcpy(translate.values, g_identityMatrix, sizeof(translate.values));
+    translate.MakeTranslate(particle->velocity.x + 0.0f, particle->velocity.y - 40.0f, particle->velocity.z + 0.0f);
+    particle->transform = translate;
+  }
+}
+
 // OFFSET: 0x00B76130
 // FUNCTION: fn_19172
 void CScatterEffect::OnProcess() {
@@ -75,23 +105,16 @@ void CScatterEffect::OnProcess() {
     position.x = this->position[0];
     position.y = this->position[1];
     position.z = this->position[2];
-    if (particle) {
-      particle->alpha = std::ranges::max(particle->alpha - 3, 0);
+    this->UpdateParticle(particle);
+    ++particle->elapsedFrames;
+  }
+}
 
-      const int angle = particle->phaseParameter;
-      const float rise = particle->frameDelay;
-      const float driftX = g_cosTable[angle] * 0.2f;
-      const float driftZ = g_sinTable[angle] * 0.2f;
-      particle->velocity.y += rise;
-      particle->velocity.x += driftX;
-      particle->velocity.z += driftZ;
-
-      matrix translate;
-      std::memcpy(translate.values, g_identityMatrix, sizeof(translate.values));
-      translate.MakeTranslate(particle->velocity.x + 0.0f, particle->velocity.y - 40.0f, particle->velocity.z + 0.0f);
-      particle->transform = translate;
-    }
-    ++(*it)->elapsedFrames;
+// OFFSET: 0x00B763C0
+// FUNCTION: fn_46192
+__forceinline void CScatterEffect::RenderParticle(CSpriteParticle* particle) {
+  if (particle) {
+    particle->Draw(1);
   }
 }
 
@@ -99,8 +122,6 @@ void CScatterEffect::OnProcess() {
 // FUNCTION: fn_19173
 void CScatterEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    if (*it) {
-      (*it)->Draw(1);
-    }
+    this->RenderParticle(*it);
   }
 }

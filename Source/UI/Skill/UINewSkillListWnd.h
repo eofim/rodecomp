@@ -19,6 +19,9 @@ class UIScrollBar;
 class UITabControl;
 
 struct NewSkillListValue {
+  // INLINED
+  NewSkillListValue(int id, int value) : id(id), value(value) {}
+
   /* 0000 */ int id;
   /* 0004 */ int value;
 };
@@ -43,6 +46,8 @@ public:
   std::list<CSkillInfo>& SkillList(int tab, bool live);
   bool IsExtraTab(int tab);
   CSkillInfo SkillAt(int index, bool live);
+  CSkillInfo FindSkillById(int id, bool live);
+  bool CanUseSkill(const CSkillInfo& skill) const;
   std::optional<CSkillInfo*> SkillPtr(int index, bool live);
   void InitTabs();
   void ResetLists();
@@ -51,11 +56,16 @@ public:
   void UpdateScrollBar();
   void LayoutButtons();
   int SkillIndexAt(int x, int y);
+  int AddedSkillLevel(int id);
+  bool HasSkillValue(int id);
+  int SkillValueOf(int id);
+  void SetSkillValue(int id, int value);
   bool IncreaseSkillLevel(int skillId);
   void DrawCharacter();
   void DrawSkillList();
   void DrawSkillTree();
   void ApplySkillPoints();
+  void SetSkillLevel(int skillId, int level);
 
 public:
   /* 00B4 */ UITabControl* m_tabs;

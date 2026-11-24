@@ -1,4 +1,3 @@
-#include "Render/DX9/RendererDX9.h"
 #include "Render/Primitives/RenderPrimitivePool.h"
 #include <new>
 #include "Contents/Effects/Particles/SpriteParticle.h"
@@ -43,7 +42,7 @@ namespace {
 struct PrimitivePoolAccess : RenderPrimitivePool {
   // INLINED
   inline RenderPrimitive* AcquireLocal() {
-    if (this->m_current == this->m_commands.end()) {
+    if (this->m_commands.end() == this->m_current) {
       this->m_commands.emplace_back();
       this->m_current = this->m_commands.end();
       return &this->m_commands.back();
@@ -63,6 +62,19 @@ struct PrimitivePoolAccess : RenderPrimitivePool {
 CSpriteParticle::CSpriteParticle(vector3d position, int flags)
   : CParticle(position, flags), applyActorExtent(0), applyActorLift(0), velocity({0.0f, 0.0f, 0.0f}), sprite(nullptr), action(nullptr) {
   this->Reset();
+}
+
+// OFFSET: 0x00B40CA0
+// FUNCTION: fn_45983
+__declspec(noinline) CSpriteParticle::~CSpriteParticle() {
+}
+
+// OFFSET: 0x00B40D60
+// FUNCTION: fn_45984
+__forceinline void CSpriteParticle::ScaleByActorFadePulse(float& scale) const {
+  if (CRenderObject* actor = FindRenderObject(this->actorId)) {
+    actor->ScaleByFadePulse(scale);
+  }
 }
 
 // OFFSET: 0x00B40D90
@@ -143,9 +155,7 @@ void CSpriteParticle::Draw(char mode) {
   float distance;
   g_renderer->ProjectViewport(&this->position.x, view, &screenX, &screenY, &distance);
   float scaleDistance = g_renderer->ScaleDistance(distance);
-  if (CRenderObject* renderObject = FindRenderObject(this->actorId)) {
-    renderObject->ScaleByFadePulse(scaleDistance);
-  }
+  this->ScaleByActorFadePulse(scaleDistance);
 
   const ActionFrame& frame = action->Frame(this->animation, this->frame);
   for (int i = 0; i < frame.cellCount; ++i) {
@@ -171,7 +181,11 @@ void CSpriteParticle::Draw(char mode) {
       record.v1 = static_cast<float>(heightTexture->ImageHeight()) / static_cast<float>(heightTexture->TextureHeight());
     }
 
-    this->SetQuad(this->vertices, record.v1, record.v0, (cell.mirrored & 1) == 0 ? record.u0 : record.u1, (cell.mirrored & 1) == 0 ? record.u1 : record.u0);
+    if ((cell.mirrored & 1) != 0) {
+      this->SetQuad(this->vertices, record.v1, record.v0, record.u1, record.u0);
+    } else {
+      this->SetQuad(this->vertices, record.v1, record.v0, record.u0, record.u1);
+    }
 
     RenderPrimitive* primitive = static_cast<PrimitivePoolAccess&>(g_renderer->primitives).AcquireLocal();
     std::memcpy(primitive->vertices, this->vertices, sizeof(this->vertices));
@@ -207,9 +221,10 @@ void CSpriteParticle::Draw(char mode) {
 
     vector3d cellVertices[4];
     for (int v = 0; v < 4; ++v) {
-      cellVertices[v].x = 0.0f;
-      cellVertices[v].y = 0.0f;
-      cellVertices[v].z = 0.0f;
+      volatile vector3d& vertex = cellVertices[v];
+      vertex.x = 0.0f;
+      vertex.y = 0.0f;
+      vertex.z = 0.0f;
     }
     for (int v = 0; v < 4; ++v) {
       const float vx = primitive->vertices[v].x;
@@ -237,18 +252,19 @@ void CSpriteParticle::Draw(char mode) {
 
     vector3d worldVertices[4];
     for (int v = 0; v < 4; ++v) {
-      worldVertices[v].x = 0.0f;
-      worldVertices[v].y = 0.0f;
-      worldVertices[v].z = 0.0f;
+      volatile vector3d& vertex = worldVertices[v];
+      vertex.x = 0.0f;
+      vertex.y = 0.0f;
+      vertex.z = 0.0f;
     }
     for (int v = 0; v < 4; ++v) {
       const float vx = cellVertices[v].x;
       const float vy = cellVertices[v].y;
       const float vz = cellVertices[v].z;
-      worldVertices[v].x = finalTransform.values[0] * vx + finalTransform.values[3] * vy + finalTransform.values[6] * vz + finalTransform.values[9];
-      worldVertices[v].y = finalTransform.values[1] * vx + finalTransform.values[4] * vy + finalTransform.values[7] * vz + finalTransform.values[10];
-      worldVertices[v].z = finalTransform.values[2] * vx + finalTransform.values[5] * vy + finalTransform.values[8] * vz + finalTransform.values[11];
-      g_renderer->viewport.Project(&worldVertices[v].x, view, primitive->vertices[v]);
+      worldVertices[v] = vector3d{finalTransform.values[0] * vx + finalTransform.values[3] * vy + finalTransform.values[6] * vz + finalTransform.values[9],
+                                  finalTransform.values[1] * vx + finalTransform.values[4] * vy + finalTransform.values[7] * vz + finalTransform.values[10],
+                                  finalTransform.values[2] * vx + finalTransform.values[5] * vy + finalTransform.values[8] * vz + finalTransform.values[11]};
+      g_renderer->Project(&worldVertices[v].x, view, primitive->vertices[v]);
     }
 
     if (CRenderObject* renderObject = FindRenderObject(this->actorId)) {
@@ -275,7 +291,7 @@ void CSpriteParticle::Draw(char mode) {
     }
 
     const float depthOffset = static_cast<float>(i) * spriteShadowDepthEpsilon + this->depthOffset;
-    if (depthOffset != 0.0f) {
+    if (0.0f != depthOffset) {
       for (int v = 0; v < 4; ++v) {
         primitive->vertices[v].rhw += depthOffset;
         primitive->vertices[v].z = RhwToDepth(primitive->vertices[v].rhw);
@@ -283,8 +299,12 @@ void CSpriteParticle::Draw(char mode) {
     }
 
     primitive->sourceBlend = 5;
-    primitive->destinationBlend = (this->flags != 5) ? 6 : 2;
-    static_cast<CRendererDX9*>(g_renderer)->Submit(primitive, static_cast<std::uint16_t>(this->flags));
+    int destinationBlend = 2;
+    if (this->flags != 5) {
+      destinationBlend = 6;
+    }
+    primitive->destinationBlend = destinationBlend;
+    g_renderer->Submit(primitive, this->flags);
   }
 }
 

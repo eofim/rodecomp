@@ -7,6 +7,7 @@
 #include "Contents/Effects/Particles/EZ2STREffectEx.h"
 #include "Contents/Effects/Core/Effect.h"
 #include "Contents/Effects/Core/EffectLists.h"
+#include "Contents/Skills/SkillId.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skills/SkillInfo.h"
 
@@ -135,13 +136,13 @@ void CEfstAction_CALAMITYGALE::OnEfstUpdate(int efstId, int value, int argument3
 // OFFSET: 0x007A6370
 // FUNCTION: fn_09031
 EfstActionMessage CEfstAction_CALAMITYGALE::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_WH_WIND_SIGN_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_WH_CALAMITYGALE_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x007A63A0
 // FUNCTION: fn_09032
 EfstActionMessage CEfstAction_CALAMITYGALE::GetEfstEndMessage() {
-  return {LookupMessage(MSI_THAI_PERSONALINFO_EXP2), 0xFF};
+  return {LookupMessage(MSI_WH_CALAMITYGALE_OFF), 0xFF};
 }
 
 // OFFSET: 0x007A63D0
@@ -185,9 +186,8 @@ void CSkillAction_WH_CRESCIVE_BOLT::OnSkillHit(CGameActor* source, CGameActor* t
   if (source && target) {
     EffectLists* effects = g_effectMgr;
     if (CEffect* effect = effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("crescivebolt"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
-      effect->SetAngle(
-        ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values) + 180.0f
-      );
+      const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
+      effect->SetAngle(angle + 180.0f);
       effect->SetDelay(static_cast<int>(source->attackMotion * source->render.speed * 16.0f));
     }
   }
@@ -234,23 +234,35 @@ void CSkillAction_WH_WILD_WALK::OnSkillDamage(CGameActor* source, CGameActor* ta
   if (source && target) {
     EffectLists* effects = g_effectMgr;
     if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("wild_walk_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
-      effect->SetAngle(ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values));
+      const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
+      effect->SetAngle(angle);
     }
   }
 }
 
+struct EfstActionRegistration {
+  // INLINED
+  __forceinline EfstActionRegistration(int efstId, std::function<CEfstAction*()> factory) {
+    CSkillActionMgr::GetInstance()->RegisterEfstAction(efstId, factory);
+  }
+};
+
+// OFFSET: 0x007A6EE0
+// FUNCTION: fn_45580
+template <>
+CEfstAction* NewAction<CEfstAction_CALAMITYGALE, CEfstAction>() {
+  return new CEfstAction_CALAMITYGALE;
+}
+
 // OFFSET: 0x00463230
 // FUNCTION: fn_45568
-static bool s_efstActionRegistered1252 = [](std::function<CEfstAction*()> factory) {
-  CSkillActionMgr::GetInstance()->RegisterEfstAction(1252, factory);
-  return true;
-}(NewAction<CEfstAction_CALAMITYGALE, CEfstAction>);
+static EfstActionRegistration s_efstActionRegistered1252(1252, NewAction<CEfstAction_CALAMITYGALE, CEfstAction>);
 
 // GLOBAL: gl_25951
-static SkillActionRegistrar s_skillAction5328(5328, NewAction<CSkillAction_WH_CALAMITYGALE, CSkillAction>);
+static SkillActionRegistrar s_skillActionWhCalamitygale{WH_CALAMITYGALE, NewAction<CSkillAction_WH_CALAMITYGALE, CSkillAction>};
 // GLOBAL: gl_25952
-static SkillActionRegistrar s_skillAction5334(5334, NewAction<CSkillAction_WH_CRESCIVE_BOLT, CSkillAction>);
+static SkillActionRegistrar s_skillActionWhCresciveBolt{WH_CRESCIVE_BOLT, NewAction<CSkillAction_WH_CRESCIVE_BOLT, CSkillAction>};
 // GLOBAL: gl_25953
-static SkillActionRegistrar s_skillAction5330(5330, NewAction<CSkillAction_WH_GALESTORM, CSkillAction>);
+static SkillActionRegistrar s_skillActionWhGalestorm{WH_GALESTORM, NewAction<CSkillAction_WH_GALESTORM, CSkillAction>};
 // GLOBAL: gl_25954
-static SkillActionRegistrar s_skillAction6520(6520, NewAction<CSkillAction_WH_WILD_WALK, CSkillAction>);
+static SkillActionRegistrar s_skillActionWhWildWalk{WH_WILD_WALK, NewAction<CSkillAction_WH_WILD_WALK, CSkillAction>};

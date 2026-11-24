@@ -10,6 +10,7 @@ class CParticle;
 class CCloud : public CEffect {
 public:
   CCloud();
+  ~CCloud() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -44,6 +45,11 @@ public:
   /* 0120 */ float offsetRangeX;
   /* 0124 */ float offsetRangeZ;
   /* 0128 */ unsigned char renderFlag;
+
+private:
+  void UpdateAlpha();
+  void UpdateScale();
+  void UpdateTransform();
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

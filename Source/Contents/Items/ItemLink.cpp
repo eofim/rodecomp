@@ -52,7 +52,7 @@ int UIChatHisBox::DecodeCards(std::vector<std::int32_t>& fields, const char* tex
     const char byte = text[position];
 
     if (byte >= '0') {
-      value += byte;
+      value.push_back(byte);
     } else if (byte == delimiter) {
       ++count;
       cards.push_back(this->Number(value));
@@ -101,19 +101,18 @@ void UIChatHisBox::DecodeOptions(std::vector<std::int32_t>& options, const char*
 std::string UIItemTagCtrl::ItemLinkNumberText(int value) {
   char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   int base = 62;
+  int number = value;
   std::vector<char> reversed;
 
   do {
-    reversed.push_back(digits[value % base]);
-    value /= base;
-  } while (value >= base);
+    reversed.push_back(digits[number % base]);
+    number /= base;
+  } while (number >= base);
 
-  reversed.push_back(digits[value]);
+  reversed.push_back(digits[number]);
   std::string text = "";
-  const std::size_t count = reversed.size();
-
-  for (std::size_t index = 0; index < count; ++index) {
-    text += reversed[count - 1 - index];
+  for (std::size_t index = 0; index < reversed.size(); ++index) {
+    text += reversed[reversed.size() - 1 - index];
   }
 
   return text;
@@ -131,9 +130,9 @@ void UIChatHisBox::DecodeItemLinkFields(const std::string& text, std::vector<std
 
   char* buffer = new char[size];
   strcpy_s(buffer, size, text.c_str());
-  std::string value;
-  std::vector<std::int32_t> options;
+  std::string value("");
   int optionCount = 0;
+  std::vector<std::int32_t> options;
   int cardCount = 0;
   fields.resize(260);
   fields[6] = -1;
@@ -206,7 +205,7 @@ void UIChatHisBox::DecodeItemLinkFields(const std::string& text, std::vector<std
 
 // OFFSET: 0x008933E0
 // FUNCTION: fn_11505
-bool ItemFromLinkFields(const std::vector<std::int32_t>& fields, ITEM_INFO& item) {
+bool UIChatHisBox::ItemFromLinkFields(const std::vector<std::int32_t>& fields, ITEM_INFO& item) {
   if (fields.empty()) {
     return false;
   }
@@ -246,11 +245,10 @@ bool ItemFromLinkFields(const std::vector<std::int32_t>& fields, ITEM_INFO& item
     item.optionCount = optionCount;
 
     for (int option = 1; option < optionCount + 1; ++option) {
-      const int* record = &fields[cardCount + 9 + (option - 1) * 3];
       ItemOption value;
-      value.id = static_cast<std::int16_t>(record[0]);
-      value.value = static_cast<std::int16_t>(record[2]);
-      value.parameter = static_cast<unsigned char>(record[1]);
+      value.id = static_cast<std::int16_t>(fields[cardCount + 9 + (option - 1) * 3]);
+      value.parameter = static_cast<unsigned char>(fields[cardCount + 10 + (option - 1) * 3]);
+      value.value = static_cast<std::int16_t>(fields[cardCount + 11 + (option - 1) * 3]);
       const int index = option - 1;
       item.SetOption(value, index);
     }
@@ -269,9 +267,10 @@ int ItemLinkMessageId(const std::string& text) {
 // FUNCTION: fn_10416
 int NavigationLinkParser::ItemLinkMessageId(const std::string& text) {
   char delimiters[] = "!#$%&'()*+,-/";
-  char* buffer = new char[text.size() + 1];
-  strcpy_s(buffer, text.size() + 1, text.c_str());
-  std::string value;
+  const std::size_t size = text.size() + 1;
+  char* buffer = new char[size];
+  strcpy_s(buffer, size, text.c_str());
+  std::string value("");
 
   for (std::size_t position = 6; position < text.size() + 1; ++position) {
     if (buffer[position] >= '0') {
@@ -281,7 +280,7 @@ int NavigationLinkParser::ItemLinkMessageId(const std::string& text) {
 
     for (unsigned int delimiter = 0; delimiter < sizeof(delimiters); ++delimiter) {
       if (delimiters[delimiter] == buffer[position] && !value.empty()) {
-        return DecodeNavigationNumber(value);
+        return this->DecodeNavigationNumber(value);
       }
     }
   }

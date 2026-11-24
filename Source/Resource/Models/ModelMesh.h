@@ -29,6 +29,11 @@ struct ModelFace {
   /* 0014 */ std::vector<std::uint32_t> smoothing;
 };
 
+// INLINED
+inline bool operator<(const ModelFace& a, const ModelFace& b) {
+  return a.texture < b.texture;
+}
+
 struct ModelTextureVertex {
   /* 0000 */ std::uint32_t shaded;
   /* 0004 */ float u;
@@ -52,7 +57,7 @@ struct ModelMesh {
   /* 0018 */ ShadeVector* faceNormals;
   /* 001C */ ShadeVector* vertexNormals;
   /* 0020 */ unsigned char parentMesh[4];
-  /* 0024 */ std::vector<std::uint32_t> indices[32];
+  /* 0024 */ std::vector<int> indices[32];
   /* 01A4 */ unsigned char padding_01A4[48];
 
   void CalculateNormals();

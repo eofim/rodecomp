@@ -11,6 +11,11 @@
 
 #include <string>
 
+// OFFSET: 0x00702960
+// FUNCTION: fn_46186
+__declspec(noinline) CFuumaShouakuEffect::~CFuumaShouakuEffect() {
+}
+
 // OFFSET: 0x007028C0
 // FUNCTION: fn_07007
 CFuumaShouakuEffect::CFuumaShouakuEffect()
@@ -45,21 +50,22 @@ void CFuumaShouakuEffect::Open() {
 
   const float* target = this->sourcePosition;
   const float* origin = this->position;
-  const float dy = target[1] - origin[1];
-  const float dx = target[0] - origin[0];
-  const float dz = target[2] - origin[2];
-  this->travelFrames = static_cast<int>(SquareRoot(dy * dy + dx * dx + dz * dz) * g_depthAverageHalf);
+  const vector3d direction{target[0] - origin[0], target[1] - origin[1], target[2] - origin[2]};
+  this->travelFrames = static_cast<int>(SquareRoot(direction.y * direction.y + direction.x * direction.x + direction.z * direction.z) * g_depthAverageHalf);
 
-  const float velocityX = target[0] - origin[0];
   const float velocityY = target[1] - origin[1];
+  const float velocityX = target[0] - origin[0];
   const float velocityZ = target[2] - origin[2];
   this->velocityX = velocityX;
   this->velocityY = velocityY;
   this->velocityZ = velocityZ;
   const float scale = 1.0f / SquareRoot(velocityX * velocityX + velocityY * velocityY + velocityZ * velocityZ);
-  this->velocityX = scale * this->velocityX * 2.0f;
-  this->velocityY = scale * this->velocityY * 2.0f;
-  this->velocityZ = scale * this->velocityZ * 2.0f;
+  this->velocityX = scale * this->velocityX;
+  this->velocityY = scale * this->velocityY;
+  this->velocityZ = scale * this->velocityZ;
+  this->velocityY *= 2.0f;
+  this->velocityX *= 2.0f;
+  this->velocityZ *= 2.0f;
 
   this->first->m_angle = ScreenAngle(origin, target, g_modeMgr.GetGameMode()->camera->frame.view.values);
 }
@@ -91,7 +97,12 @@ void CFuumaShouakuEffect::OnProcess() {
     }
   } else if (this->first) {
     CEZ2STRParticle* particle = this->first;
-    particle->position = {particle->position.x + this->velocityX, particle->position.y + this->velocityY, particle->position.z + this->velocityZ};
+    const float x = particle->position.x + this->velocityX;
+    const float z = particle->position.z + this->velocityZ;
+    const float y = particle->position.y + this->velocityY;
+    particle->position.x = x;
+    particle->position.z = z;
+    particle->position.y = y;
   }
 
   if (this->first) {

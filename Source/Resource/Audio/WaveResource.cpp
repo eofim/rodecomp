@@ -33,6 +33,7 @@ CWave* CWave::Create() {
 // FUNCTION: fn_08067
 bool CWave::Load(const char* name) {
   CFile file;
+  MilesSoundInfo info;
 
   if (!file.Open(name, 0, true, false)) {
     ShowErrorDialog((std::string("Wave :: Cannot find File : ") + std::string(name)).c_str(), 0);
@@ -51,12 +52,10 @@ bool CWave::Load(const char* name) {
 
   switch (type) {
   case 1:
-  default:
     this->data = raw;
     break;
 
   case 2: {
-    MilesSoundInfo info;
     this->milesAllocated = 1;
     AIL_WAV_info(raw, &info);
     AIL_decompress_ADPCM(&info, &this->data, nullptr);
@@ -68,6 +67,10 @@ bool CWave::Load(const char* name) {
     this->milesAllocated = 1;
     AIL_decompress_ASI(raw, size, name, &this->data, nullptr, nullptr);
     delete[] raw;
+    break;
+
+  default:
+    this->data = raw;
     break;
   }
 

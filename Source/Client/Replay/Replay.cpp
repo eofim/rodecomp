@@ -21,9 +21,6 @@
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Messenger/MessengerMember.h"
 
-template __declspec(noinline) void std::vector<unsigned char>::assign<const unsigned char*, 0>(const unsigned char*, const unsigned char*);
-template __declspec(noinline) void std::list<ITEM_INFO>::_Construct_range_unchecked<ITEM_INFO*>(ITEM_INFO*, ITEM_INFO*);
-
 // GLOBAL: gl_24549
 int g_replayAnimationScaling = 0;
 
@@ -227,7 +224,7 @@ Replay::Replay() : cipherIndex(0), cipherBase(0), cipherKey(0), recordingState(0
 // OFFSET: 0x00B855B0
 // FUNCTION: fn_19326
 bool Replay::WriteSection(int id, const std::vector<unsigned char>& bytes, int event) {
-  if (bytes.empty()) {
+  if (bytes.end() == bytes.begin()) {
     return false;
   }
 
@@ -357,24 +354,23 @@ bool Replay::MatchesService(int mode) const {
 int Replay::AdvanceFrame() {
   if (!g_replayAnimationScaling) {
     ++this->frame;
-    return 1;
-  }
+  } else {
+    const std::uint32_t now = timeGetTime();
 
-  const std::uint32_t now = timeGetTime();
+    if (this->state != 6) {
+      ++this->frame;
+      this->elapsed += static_cast<std::uint32_t>(static_cast<float>(now - this->previousTick) * this->speed);
 
-  if (this->state != 6) {
-    ++this->frame;
-    this->elapsed += static_cast<std::uint32_t>(static_cast<float>(now - this->previousTick) * this->speed);
-
-    if (static_cast<int>(this->elapsed) >= static_cast<int>(this->header.duration)) {
-      this->previousTick = now;
-      this->elapsed = this->header.duration;
-      this->state = 6;
-      return 0;
+      if (static_cast<int>(this->elapsed) >= static_cast<int>(this->header.duration)) {
+        this->previousTick = now;
+        this->elapsed = this->header.duration;
+        this->state = 6;
+        return 0;
+      }
     }
-  }
 
-  this->previousTick = now;
+    this->previousTick = now;
+  }
   return 1;
 }
 
@@ -390,7 +386,7 @@ void Replay::ResetPlayback() {
 
 // OFFSET: 0x00B83E40
 // FUNCTION: fn_19310
-bool Replay::Cipher(std::uint32_t bytes, void* data) {
+__declspec(noinline) bool Replay::Cipher(std::uint32_t bytes, void* data) {
   if (!data || !bytes) {
     return false;
   }
@@ -404,6 +400,28 @@ bool Replay::Cipher(std::uint32_t bytes, void* data) {
   for (int index = 0; index < count; ++index) {
     ++this->cipherIndex;
     words[index] ^= (this->cipherBase + this->cipherIndex) * this->cipherKey;
+  }
+
+  return true;
+}
+
+// INLINED
+static bool Decipher(Replay& replay, std::uint32_t bytes, void* data) {
+  if (!data || !bytes) {
+    return false;
+  }
+
+  auto* words = static_cast<std::uint32_t*>(data);
+  const std::uint32_t key = replay.header.key1 >> 3;
+  const int count = bytes / 4;
+  const std::uint32_t base = replay.header.key0 >> 5;
+  replay.cipherKey = key;
+  replay.cipherIndex = 0;
+  replay.cipherBase = base;
+
+  for (int index = 0; index < count; ++index) {
+    ++replay.cipherIndex;
+    words[index] ^= (replay.cipherBase + replay.cipherIndex) * replay.cipherKey;
   }
 
   return true;
@@ -481,8 +499,12 @@ int Replay::SpeedLevel() const {
 // OFFSET: 0x00B846D0
 // FUNCTION: fn_19319
 void Replay::ResetFile() {
-  this->header.Reset();
+  const ReplayOptions savedOptions = this->header.options;
+  std::memset(&this->header.key0, 0, offsetof(ReplayHeader, options) - offsetof(ReplayHeader, key0));
+  this->header.signature = 0x52414705;
+  this->header.closingSignature = 0x52414705;
   this->records = 0;
+  this->header.options = savedOptions;
   this->fileMode = -1;
   this->file = nullptr;
   this->fileOffset = 0;
@@ -587,19 +609,24 @@ std::uint32_t Replay::ParseMetadata(const std::vector<unsigned char>& data) {
 
         if (this->header.signature != this->header.closingSignature) {
           std::uint32_t fileOffset = this->fileOffset;
-          ReplayRecordHeader record;
-          int count = static_cast<int>(this->header.records) - 1;
+          std::uint32_t tick;
+          {
+            ReplayRecordHeader record;
+            int count = static_cast<int>(this->header.records) - 1;
 
-          if (count > 0) {
-            do {
-              std::fseek(this->file, static_cast<long>(fileOffset), SEEK_SET);
-              std::fread(&record, sizeof(record), 1, this->file);
-              fileOffset += record.bytes + sizeof(record);
-              --count;
-            } while (count != 0);
+            if (count > 0) {
+              do {
+                std::fseek(this->file, static_cast<long>(fileOffset), SEEK_SET);
+                std::fread(&record, sizeof(record), 1, this->file);
+                fileOffset += record.bytes + sizeof(record);
+                --count;
+              } while (count != 0);
+            }
+
+            tick = record.tick;
           }
 
-          this->header.duration = record.tick;
+          this->header.duration = tick;
         }
         break;
       default:
@@ -619,14 +646,14 @@ bool Replay::ReadRecord(unsigned char* buffer, std::uint16_t& id, bool force) {
     return false;
   }
 
-  ReplayRecordHeader record;
   bool result = false;
+  ReplayRecordHeader record;
   std::fseek(this->file, static_cast<long>(this->fileOffset), SEEK_SET);
   std::fread(&record, sizeof(record), 1, this->file);
 
   if (this->header.records > this->records && this->elapsed >= record.tick) {
     std::fread(buffer, record.bytes, 1, this->file);
-    this->Cipher(record.bytes, buffer);
+    Decipher(*this, record.bytes, buffer);
     std::memcpy(&id, buffer, sizeof(id));
     this->fileOffset += record.bytes + sizeof(record);
     result = true;
@@ -695,31 +722,32 @@ bool ReplayFileList::Refresh() {
   WIN32_FIND_DATAA found;
   HANDLE search = FindFirstFileA(pattern.c_str(), &found);
 
-  if (search != INVALID_HANDLE_VALUE) {
-    while (more) {
-      if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
-        const char* extension = found.cFileName + std::strlen(found.cFileName) - 4;
-        const BOOL isReplay = extension[3] == 'f' && extension[2] == 'r' && extension[1] == 'r' && extension[0] == '.';
-
-        if (isReplay) {
-          ReplayFileEntry entry = {};
-          const std::size_t length = std::strlen(found.cFileName);
-          std::memcpy(entry.name, found.cFileName, length);
-          entry.name[length] = '\0';
-          entry.index = 0;
-
-          if (length == 23) {
-            char number[6] = {};
-            std::memcpy(number, entry.name + 15, 4);
-            entry.index = std::atoi(number);
-          }
-
-          this->files.push_back(entry);
-        }
+  while (search != INVALID_HANDLE_VALUE && more) {
+    if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+      const std::size_t nameLength = std::strlen(found.cFileName);
+      BOOL isReplay = FALSE;
+      if (found.cFileName[nameLength - 1] == 'f' && found.cFileName[nameLength - 2] == 'r' && found.cFileName[nameLength - 3] == 'r') {
+        isReplay = found.cFileName[nameLength - 4] == '.';
       }
 
-      more = FindNextFileA(search, &found);
+      if (isReplay) {
+        ReplayFileEntry entry = {};
+        const std::size_t length = std::strlen(found.cFileName);
+        std::memcpy(entry.name, found.cFileName, length);
+        entry.name[length] = '\0';
+        entry.index = 0;
+
+        if (length == 23) {
+          char number[6] = {};
+          std::memcpy(number, entry.name + 15, 4);
+          entry.index = std::atoi(number);
+        }
+
+        this->files.push_back(entry);
+      }
     }
+
+    more = FindNextFileA(search, &found);
   }
 
   FindClose(search);
@@ -782,6 +810,68 @@ bool Replay::SetOptions(const void* data, int bytes) {
   return true;
 }
 
+// INLINED
+static __forceinline bool OpenReplayFile(Replay* replay, const char* path, int mode) {
+  if (!path) {
+    return false;
+  }
+
+  replay->fileMode = mode;
+
+  if (mode == 0x1F) {
+    replay->file = std::fopen(path, "wb");
+    if (!replay->file) {
+      return false;
+    }
+
+    replay->fileOffset = 0x174;
+    return true;
+  }
+
+  replay->file = std::fopen(path, "rb");
+  if (!replay->file) {
+    return false;
+  }
+
+  std::fseek(replay->file, 100, SEEK_SET);
+  std::memset(&replay->header, 0, 0xC);
+  std::fread(&replay->header, 0xC, 1, replay->file);
+
+  if (replay->header.signature == 0x52414705u || replay->header.signature == 0x51404605u) {
+    ReplaySection section;
+
+    for (int index = 0; index <= 0x1A; ++index) {
+      std::fread(&section, sizeof(section), 1, replay->file);
+
+      if (section.id < 0 || section.id > 0x1A) {
+        break;
+      }
+
+      replay->sections[section.id].id = section.id;
+      replay->sections[section.id].bytes = section.bytes;
+      replay->sections[section.id].fileOffset = section.fileOffset;
+      section.id = 0;
+      section.bytes = 0;
+      section.fileOffset = 0;
+    }
+
+    if (replay->ParseMetadata(replay->ReadSection(2)) == 0xFFFFFFFFu) {
+      std::memset(&replay->header, 0, sizeof(replay->header));
+    } else {
+      return true;
+    }
+  }
+
+  if (replay->file) {
+    std::fclose(replay->file);
+    replay->file = nullptr;
+  }
+
+  std::memset(&replay->header, 0, sizeof(replay->header));
+  std::memset(replay->sections, 0, sizeof(replay->sections));
+  return false;
+}
+
 // OFFSET: 0x00B86B50
 // FUNCTION: fn_19337
 int ReplayFileList::Open(int mode, int argument1, int argument2) {
@@ -795,74 +885,25 @@ int ReplayFileList::Open(int mode, int argument1, int argument2) {
     }
 
     std::string name("Replay\\");
-    const ReplayFileEntry& entry = this->files[this->selected];
-    name.append(entry.name, std::strlen(entry.name));
+    name += this->files[this->selected].name;
     std::memset(this->path, 0, sizeof(this->path));
     std::memcpy(this->path, name.data(), name.size());
-
-    Replay* replay = this->replay;
-    replay->fileMode = 0x20;
-    replay->file = std::fopen(this->path, "rb");
-
-    if (replay->file) {
-      std::fseek(replay->file, 100, SEEK_SET);
-      std::memset(&replay->header, 0, 0xC);
-      std::fread(&replay->header, 0xC, 1, replay->file);
-
-      if (replay->header.signature == 0x52414705u || replay->header.signature == 0x51404605u) {
-        for (int index = 0; index <= 0x1A; ++index) {
-          ReplaySection section = {};
-          std::fread(&section, sizeof(section), 1, replay->file);
-
-          if (section.id < 0 || section.id > 0x1A) {
-            break;
-          }
-
-          replay->sections[section.id].id = section.id;
-          replay->sections[section.id].bytes = section.bytes;
-          replay->sections[section.id].fileOffset = section.fileOffset;
-        }
-
-        if (replay->ParseMetadata(replay->ReadSection(2)) != 0xFFFFFFFFu) {
-          return 1;
-        }
-
-        std::memset(&replay->header, 0, sizeof(replay->header));
-      }
-
-      if (replay->file) {
-        std::fclose(replay->file);
-        replay->file = nullptr;
-      }
-
-      std::memset(&replay->header, 0, sizeof(replay->header));
-      std::memset(replay->sections, 0, sizeof(replay->sections));
+    if (!OpenReplayFile(this->replay, this->path, 0x20)) {
+      return 0;
     }
-
-    return 0;
+    return 1;
   }
 
   this->Refresh();
 
-  if (!this->pathEnabled) {
-    int index = 1;
-
-    for (std::size_t i = 0; i < this->files.size(); ++i) {
-      if (this->files[i].index == index) {
-        ++index;
-      }
-    }
-
-    std::memset(this->path, 0, sizeof(this->path));
-    std::sprintf(this->path, g_replayNewFileFormat, index);
-  } else {
+  if (this->pathEnabled) {
     if (this->rejectExistingName) {
       char name[0x104];
       std::memset(name, 0, sizeof(name));
       std::sprintf(name, g_replayExtensionFormat, this->path);
 
-      for (std::size_t i = 0; i < this->files.size(); ++i) {
-        if (std::strcmp(name, this->files[i].name) == 0) {
+      for (const ReplayFileEntry& file : this->files) {
+        if (std::strcmp(name, file.name) == 0) {
           std::memset(this->path, 0, sizeof(this->path));
           return -2;
         }
@@ -873,17 +914,21 @@ int ReplayFileList::Open(int mode, int argument1, int argument2) {
     std::memset(name, 0, sizeof(name));
     std::sprintf(name, g_replayPathFormat, this->path);
     std::memcpy(this->path, name, sizeof(this->path));
+  } else {
+    int index = 1;
+
+    for (auto fileIt = this->files.begin(); fileIt != this->files.end(); ++fileIt) {
+      const ReplayFileEntry& file = *fileIt;
+      if (file.index == index) {
+        ++index;
+      }
+    }
+
+    std::memset(this->path, 0, sizeof(this->path));
+    std::sprintf(this->path, g_replayNewFileFormat, index);
   }
 
-  this->replay->fileMode = 0x1F;
-  this->replay->file = std::fopen(this->path, "wb");
-
-  if (!this->replay->file) {
-    return 0;
-  }
-
-  this->replay->fileOffset = 0x174;
-  return 1;
+  return OpenReplayFile(this->replay, this->path, 0x1F);
 }
 
 // OFFSET: 0x00B87680
@@ -961,7 +1006,7 @@ void Replay::RestartClock() {
 std::vector<unsigned char> CSession::BuildStatusReplayPacket() {
   std::vector<unsigned char> packet(29, 0);
   auto* data = reinterpret_cast<ReplayStatusPacket*>(packet.data());
-  data->id = 0x983;
+  data->id = ID_ZC_MSG_STATE_CHANGE3;
   data->status = 0x2A1;
   data->remaining = 9999;
   data->accountId = this->m_aid;
@@ -979,18 +1024,20 @@ std::vector<unsigned char> BuildSkillInfoListPacket(std::uint16_t id, const std:
   ReplaySkillInfoListHeader* header = reinterpret_cast<ReplaySkillInfoListHeader*>(packet.data());
   header->id = id;
   header->bytes = static_cast<std::uint16_t>(bytes);
-  ReplaySkillInfo* record = reinterpret_cast<ReplaySkillInfo*>(header + 1);
-  for (const CSkillInfo& skill : skills) {
-    record->id = static_cast<std::uint16_t>(skill.id);
-    record->type = skill.type;
-    record->level = static_cast<std::int16_t>(skill.level);
-    record->spCost = static_cast<std::int16_t>(skill.spCost);
-    record->upgradable = skill.upgradable != 0;
-    record->range = static_cast<std::int16_t>(skill.range);
-    const char* name = skill.name;
-    std::memcpy(record->name, name, (std::min)(std::strlen(name), sizeof(record->name)));
-    record->name[sizeof(record->name) - 1] = 0;
-    ++record;
+  ReplaySkillInfo* records = reinterpret_cast<ReplaySkillInfo*>(header + 1);
+  int index = 0;
+  for (auto skill = skills.begin(); skill != skills.end(); ++skill) {
+    ReplaySkillInfo& record = records[index];
+    record.id = static_cast<std::uint16_t>(skill->id);
+    record.type = skill->type;
+    record.level = static_cast<std::int16_t>(skill->level);
+    record.spCost = static_cast<std::int16_t>(skill->spCost);
+    record.upgradable = skill->upgradable != 0;
+    record.range = static_cast<std::int16_t>(skill->range);
+    const char* name = skill->name;
+    std::memcpy(record.name, name, (std::min)(sizeof(record.name), std::strlen(name)));
+    record.name[sizeof(record.name) - 1] = 0;
+    ++index;
   }
   return packet;
 }

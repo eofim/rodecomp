@@ -46,21 +46,6 @@ template <class T, class D> void CUIListBoxEx<T, D>::OnCreate(int width, int hei
   this->AddChild(this->scrollBar);
 }
 
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::OnCreate(int, int);
-template void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::OnCreate(int, int);
-
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::Paint();
-template void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::Paint();
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::OnWheel(int);
-template void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::OnWheel(int);
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::OnScroll(int);
-template void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::OnScroll(int);
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::ClearItems();
-template void CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::ClearItems();
-template int CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::AddData(const EnchantUI::CEnchantItemData&, bool);
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::ClearData();
-template void CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::UpdateScrollBar();
-
 // OFFSET: 0x009F93D0
 // FUNCTION: fn_14806
 template <>
@@ -69,12 +54,12 @@ EnchantUI::CUIEnchantItem* CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CE
   item->SetSize(this->itemWidth, this->rowHeight);
   item->Show(0);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-  item->onHover = [this](CUIListItem* listItem) {
+  item->SetOnHover([this](CUIListItem* listItem) {
     for (EnchantUI::CUIEnchantItem* other : this->items) {
       other->SetHighlighted(other == listItem);
     }
-  };
-  item->onPress = [this](CUIListItem* listItem) {
+  });
+  item->SetOnPress([this](CUIListItem* listItem) {
     if (this->layoutFlag) {
       return;
     }
@@ -97,7 +82,7 @@ EnchantUI::CUIEnchantItem* CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CE
       std::advance(node, static_cast<int>(this->selected));
       this->onSelect(selectedItem, *node);
     }
-  };
+  });
   this->AddChild(item);
   return item;
 }
@@ -165,12 +150,12 @@ EnchantUI::CUITargetItem* CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::Cre
   item->SetSize(this->itemWidth, this->rowHeight);
   item->Show(0);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-  item->onHover = [this](CUIListItem* listItem) {
+  item->SetOnHover([this](CUIListItem* listItem) {
     for (EnchantUI::CUITargetItem* other : this->items) {
       other->SetHighlighted(other == listItem);
     }
-  };
-  item->onPress = [this](CUIListItem* listItem) {
+  });
+  item->SetOnPress([this](CUIListItem* listItem) {
     if (this->layoutFlag) {
       return;
     }
@@ -193,7 +178,7 @@ EnchantUI::CUITargetItem* CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::Cre
       std::advance(node, static_cast<int>(this->selected));
       this->onSelect(selectedItem, *node);
     }
-  };
+  });
   this->AddChild(item);
   return item;
 }
@@ -271,11 +256,6 @@ CUIEnchantPage::CUIEnchantPage()
 // FUNCTION: fn_14770
 CUIMainPage::CUIMainPage() : CUIControl(), firstPage(nullptr), secondPage(nullptr), tab(nullptr) {
 }
-}
-
-// OFFSET: 0x009F7380
-// FUNCTION: fn_14771
-CUITab::CUITab() : CUIControl(), current(nullptr) {
 }
 
 // OFFSET: 0x009F7420
@@ -450,13 +430,16 @@ CUIEnchantUI* CreateEnchantUI() {
   return new CUIEnchantUI();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00492010
 // FUNCTION: fn_45547
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateEnchantUI;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10006, factory);
-  return true;
-}();
+static UIRegistration s_enchantUIRegistered(10006, CreateEnchantUI);
 
 namespace EnchantUI {
 // OFFSET: 0x009FD340
@@ -802,12 +785,6 @@ void CUIUpgrade::OnCreate(int width, int height) {
 }
 }
 
-// OFFSET: 0x00A021D0
-// FUNCTION: fn_14838
-void CUIRadioButton::SetOnSelect(std::function<void(CUIRadioButton*)> callback) {
-  this->onSelect = callback;
-}
-
 namespace EnchantUI {
 // OFFSET: 0x00A02D80
 // FUNCTION: fn_14845
@@ -866,6 +843,15 @@ ITEM_INFO* CUITargetItem::GetItemInfo() {
   return this->itemIcon->GetItemInfo();
 }
 
+// INLINED
+static std::optional<EnchantOptionInfo*> FindOptionInfo(std::map<std::uint32_t, EnchantOptionInfo>& options, std::uint32_t key) {
+  auto it = options.find(key);
+  if (it == options.end()) {
+    return std::nullopt;
+  }
+  return &it->second;
+}
+
 // OFFSET: 0x00A053E0
 // FUNCTION: fn_14974
 std::optional<EnchantOptionInfo*> CUIEnchantPage::FindOption(uint32_t key) {
@@ -873,12 +859,7 @@ std::optional<EnchantOptionInfo*> CUIEnchantPage::FindOption(uint32_t key) {
     return std::nullopt;
   }
 
-  auto& options = this->enchantInfo->options;
-  auto it = options.find(key);
-  if (it == options.end()) {
-    return std::nullopt;
-  }
-  return &it->second;
+  return FindOptionInfo(this->enchantInfo->options, key);
 }
 
 // OFFSET: 0x00A05CE0
@@ -1106,7 +1087,7 @@ void CUIEnchantUI::SetEnchantGroup(uint64_t group) {
   this->textViewer->AddLine(this->enchantInfo->caution);
   for (int itemId : this->enchantInfo->targetItems) {
     const std::vector<int> indices = g_session.FindInventoryIndicesByItemId(itemId, 1);
-    for (int index : indices) {
+    for (const int& index : indices) {
       if (g_session.HasSwapEquipmentItem(index)) {
         continue;
       }
@@ -1297,11 +1278,13 @@ void CUIReset::UpdateEnchantInfo() {
   this->enchantList->ClearData();
   this->LoadEnchantList();
 }
+}
 
+namespace EnchantUI {
 // OFFSET: 0x00A06800
 // FUNCTION: fn_15004
 void CUIEnchantPage::ResetSlots() {
-  std::for_each(this->slots.begin(), this->slots.end(), [](const auto& slot) {
+  std::for_each(this->slots.begin(), this->slots.end(), [](std::pair<const int, CUISlot*> slot) {
     slot.second->Show(0);
   });
 
@@ -1385,9 +1368,10 @@ void CUIUpgradePerfect::OnSelectEnchant(CUIEnchantItem* item, const CEnchantItem
     const int baseItemId = std::atoi(this->slots[this->selectedSlot]->itemIcon->GetItemInfo()->itemId.c_str());
     auto base = (*option)->perfectUpgrades.find(baseItemId);
     if (base != (*option)->perfectUpgrades.end()) {
+      auto& enchants = base->second;
       const int itemId = std::atoi(item->itemIcon->GetItemInfo()->itemId.c_str());
-      auto it = base->second.find(itemId);
-      if (it != base->second.end()) {
+      auto it = enchants.find(itemId);
+      if (it != enchants.end()) {
         this->SetCost(it->second);
       }
     }
@@ -1407,8 +1391,8 @@ bool CUIReset::LoadEnchantList() {
     return false;
   }
 
-  const std::vector<int>& slots = this->enchantInfo->slots;
-  const bool empty = std::none_of(slots.begin(), slots.end(), [item = *this->gameItem->GetItemInfo()](int slot) {
+  const ITEM_INFO* itemInfo = this->gameItem->GetItemInfo();
+  const bool empty = std::none_of(this->enchantInfo->slots.begin(), this->enchantInfo->slots.end(), [item = *itemInfo](int slot) {
     if (slot >= 4) {
       return false;
     }
@@ -1436,22 +1420,24 @@ bool CUIEnchantPage::SetItem(const ITEM_INFO& item) {
   this->gameItem->SetItem(item);
   for (const auto& entry : this->slots) {
     CUISlot* slot = entry.second;
-    int card = 0;
     if (entry.first < 4) {
-      std::memcpy(&card, &item.cards[entry.first], sizeof(card));
+      const int card = item.cards[entry.first];
+      if (card > 0) {
+        {
+          ITEM_INFO cardInfo;
+          cardInfo.SetItemId(card);
+          cardInfo.identified = 1;
+          slot->itemIcon->SetItem(cardInfo);
+          CUIRadioButton* radioButton = slot->radioButton;
+          radioButton->tooltip = slot->itemIcon->name;
+          slot->description->Clear();
+          slot->description->AddLine(cardInfo.DisplayName(0));
+        }
+        entry.second->Show(1);
+        continue;
+      }
     }
-    if (card > 0) {
-      ITEM_INFO cardInfo;
-      cardInfo.SetItemId(card);
-      cardInfo.identified = 1;
-      slot->itemIcon->SetItem(cardInfo);
-      slot->radioButton->tooltip = slot->itemIcon->name;
-      slot->description->Clear();
-      slot->description->AddLine(cardInfo.DisplayName(0));
-      slot->Show(1);
-    } else {
-      slot->Show(0);
-    }
+    slot->Show(0);
   }
   return true;
 }
@@ -1518,12 +1504,13 @@ bool CUINormalRandom::LoadEnchantList() {
   }
 
   this->SetSlot(slot);
-  if ((*option)->enchants.size() == 0) {
+  auto& enchants = (*option)->enchants;
+  if (enchants.size() == 0) {
     return false;
   }
 
-  auto grade = (*option)->enchants.find(this->gameItem->GetItemInfo()->grade);
-  if (grade == (*option)->enchants.end()) {
+  auto grade = enchants.find(this->gameItem->GetItemInfo()->grade);
+  if (grade == enchants.end()) {
     return false;
   }
 
@@ -1552,9 +1539,10 @@ bool CUIUpgradeRandom::LoadEnchantList() {
     return false;
   }
 
+  auto& upgrades = (*option)->randomUpgrades;
   const int baseItemId = std::atoi(this->slots[this->selectedSlot]->itemIcon->GetItemInfo()->itemId.c_str());
-  auto base = (*option)->randomUpgrades.find(baseItemId);
-  if (base == (*option)->randomUpgrades.end()) {
+  auto base = upgrades.find(baseItemId);
+  if (base == upgrades.end()) {
     return false;
   }
 
@@ -1584,7 +1572,7 @@ bool CUIUpgradePerfect::LoadEnchantList() {
   }
 
   this->isUpgrade = (*option)->isUpgrade;
-  const auto& upgrades = (*option)->perfectUpgrades;
+  auto& upgrades = (*option)->perfectUpgrades;
   if (upgrades.size() == 0) {
     return false;
   }

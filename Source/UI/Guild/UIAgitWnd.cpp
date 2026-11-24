@@ -34,7 +34,7 @@ UIAgitMessageBox::UIAgitMessageBox()
 // OFFSET: 0x0095D580
 // FUNCTION: fn_13068
 void UIAgitMessageBox::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_USESKILL_FAIL_AP_INSUFFICIENT), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_GUILD_AGIT_AGIT_MESSAGE), 0);
   this->DrawPanelBackground(17, 0, "");
   this->DrawButtonBar(2, 0, 1);
 }
@@ -125,22 +125,28 @@ void UIListBoxAgitMenu::OnLBtnDown(int x, int y) {
   }
 }
 
+// OFFSET: 0x00957A50
+// FUNCTION: fn_45716
+int UIListBoxAgitMenu::LineAt(int x, int y) {
+  if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
+    return -1;
+  }
+
+  int line = y / this->lineHeight;
+  if (line < 0) {
+    line = 0;
+  }
+  if (line > 1) {
+    line = 1;
+  }
+  return line;
+}
+
 // OFFSET: 0x00960160
 // FUNCTION: fn_13096
 void UIListBoxAgitMenu::OnMouseHover(int x, int y) {
   const int previous = this->selected;
-  int line;
-  if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    line = -1;
-  } else {
-    line = y / this->lineHeight;
-
-    if (line < 0) {
-      line = 0;
-    }
-
-    line = std::min(line, 1);
-  }
+  const int line = this->LineAt(x, y);
 
   this->selected = line;
   if (previous != line) {
@@ -158,7 +164,7 @@ int UIListBoxAgitMenu::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   switch (a) {
   case 0: {
     if (g_session.GetSiegeMode() == 1) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_TOOLTIP_OF_OPTIONOFF_BTN)), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GUILD_AGIT_MOVE_FAIL_MAP)), 0xFF, 0, 0, 0);
       return 0;
     }
 
@@ -174,7 +180,7 @@ int UIListBoxAgitMenu::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       g_session.m_hotkeyScript->Call("get_agit_costzeny", "db>d", agitId, 1, &costGuildPoint);
 
       UIAgitMessageBox* box = new UIAgitMessageBox();
-      box->InitializeMessageBox((FormatString(LookupMessage(MSI_NOT_LEARN_BASIC_SKILL), agitName, costZeny, costGuildPoint)), 310, 130);
+      box->InitializeMessageBox((FormatString(LookupMessage(MSI_GUILD_AGIT_ARE_YOU_MOVE_AGIT), agitName, costZeny, costGuildPoint)), 310, 130);
 
       int x = g_renderer->viewport.centerX - box->geometry.width / 2;
       box->Move(x, (g_renderer->viewport.centerY - box->geometry.height / 2));

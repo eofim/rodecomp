@@ -5,6 +5,7 @@
 #include "Client/Input/Mouse.h"
 #include "Client/Session/Session.h"
 #include "Contents/Map/TownInfoMgr.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "File/File.h"
 #include "Contents/Actors/Pc.h"
 #include "Contents/Ground/TerrainHeight.h"
@@ -37,8 +38,6 @@
 #include <timeapi.h>
 #include <windows.h>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 namespace {
 
 // INLINED
@@ -67,7 +66,7 @@ namespace {
 struct PrimitivePoolAccess : RenderPrimitivePool {
   // INLINED
   inline RenderPrimitive* AcquireLocal() {
-    if (this->m_current == this->m_commands.end()) {
+    if (this->m_commands.end() == this->m_current) {
       this->m_commands.emplace_back();
       this->m_current = this->m_commands.end();
       return &this->m_commands.back();
@@ -101,23 +100,30 @@ void CGameMode::CloseWhisperRecord() {
   }
 }
 
+// OFFSET: 0x00CD0100
+// FUNCTION: fn_46330
+__forceinline void CGameMode::StepTowardCell(const int& targetX, const int& targetY, int& x, int& y, int step) {
+  if (targetX > x) {
+    x += step;
+  } else if (targetX < x) {
+    x -= step;
+  }
+  if (targetY > y) {
+    y += step;
+  } else if (targetY < y) {
+    y -= step;
+  }
+}
+
 // OFFSET: 0x00CCFFA0
 // FUNCTION: fn_21250
 void CGameMode::StepTowardWalkableCell(const int& targetX, const int& targetY, int& x, int& y) {
   const int startX = x;
   const int startY = y;
-  if (targetX > startX) {
-    x = startX + 1;
-  } else if (targetX < startX) {
-    x = startX - 1;
-  }
-  if (targetY > y) {
-    ++y;
-  } else if (targetY < y) {
-    --y;
-  }
+  this->StepTowardCell(targetX, targetY, x, y, 1);
 
-  if (this->scene->terrain->Walkable(x, y)) {
+  const TerrainHeightCell* cell = this->scene->terrain->CellAt(x, y);
+  if (cell != nullptr && cell->type != TERRAIN_CELL_BLOCKED && cell->type != TERRAIN_CELL_CLIFF) {
     return;
   }
 
@@ -125,7 +131,8 @@ void CGameMode::StepTowardWalkableCell(const int& targetX, const int& targetY, i
   for (int i = 0; i < 8; ++i) {
     x = startX + offsets[i][0];
     y = startY + offsets[i][1];
-    if (this->scene->terrain->Walkable(x, y)) {
+    cell = this->scene->terrain->CellAt(x, y);
+    if (cell != nullptr && cell->type != TERRAIN_CELL_BLOCKED && cell->type != TERRAIN_CELL_CLIFF) {
       return;
     }
   }
@@ -134,15 +141,16 @@ void CGameMode::StepTowardWalkableCell(const int& targetX, const int& targetY, i
 // OFFSET: 0x00CD0150
 // FUNCTION: fn_21251
 void CGameMode::FindWalkableCellToward(float x, float z, float originX, float originZ, int& column, int& row, int distance) {
-  const float deltaZ = z - originZ;
   const float deltaX = x - originX;
+  const float deltaZ = z - originZ;
   const float inverse = 1.0f / SquareRoot(deltaZ * deltaZ + deltaX * deltaX);
   const float step = static_cast<float>(distance * 5);
   this->WorldCell(inverse * deltaX * step + originX, inverse * deltaZ * step + originZ, column, row);
 
   const int startY = row;
   const int startX = column;
-  if (this->scene->terrain->Walkable(startX, startY)) {
+  const TerrainHeightCell* cell = this->scene->terrain->CellAt(startX, startY);
+  if (cell != nullptr && cell->type != TERRAIN_CELL_BLOCKED && cell->type != TERRAIN_CELL_CLIFF) {
     return;
   }
 
@@ -150,7 +158,8 @@ void CGameMode::FindWalkableCellToward(float x, float z, float originX, float or
   for (int i = 0; i < 8; ++i) {
     column = startX + offsets[i][0];
     row = startY + offsets[i][1];
-    if (this->scene->terrain->Walkable(column, row)) {
+    cell = this->scene->terrain->CellAt(column, row);
+    if (cell != nullptr && cell->type != TERRAIN_CELL_BLOCKED && cell->type != TERRAIN_CELL_CLIFF) {
       return;
     }
   }
@@ -207,6 +216,28 @@ void CGameMode::DrawMiniMapMembers(const TextureRegion& view) {
   }
 }
 
+// OFFSET: 0x00CD0840
+// FUNCTION: fn_46331
+__forceinline void CGameMode::DrawMiniMapPings(const TextureRegion& view) {
+  if (this->compassPosList.size() != 0) {
+    for (auto it = this->compassPosList.begin(); it != this->compassPosList.end();) {
+      const std::uint32_t tick = it->second.tick;
+      if (it->second.persistent == 0 && timeGetTime() > tick + 15000) {
+        it = this->compassPosList.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    for (auto it = this->compassPosList.begin(); it != this->compassPosList.end(); ++it) {
+      const std::uint32_t tick = it->second.tick;
+      const int elapsed = timeGetTime() - tick;
+      if (elapsed % 1000 < 500) {
+        this->DrawMiniMapMarker(view, it->second.x, it->second.y, 1, std::string(""), 3, it->second.color, false);
+      }
+    }
+  }
+}
+
 // OFFSET: 0x00CD0DD0
 // FUNCTION: fn_21255
 void CGameMode::DrawMiniMap() {
@@ -214,62 +245,65 @@ void CGameMode::DrawMiniMap() {
     return;
   }
 
-  const int width = this->scene->terrain->width;
-  const int height = this->scene->terrain->height;
-  const CPlayer* player = this->scene->player;
-  const float centerX = static_cast<float>(g_renderer->viewport.width - 144) + 64.0f;
-  int column;
-  int row;
-  this->WorldCell(player->render.position.x, player->render.position.z, column, row);
-
-  const float half = 1.0f / (g_windowMgr.minimapZoom * 2.0f);
-  const float u = static_cast<float>(column) / static_cast<float>(width);
-  const float v = static_cast<float>(height - row) / static_cast<float>(height);
   TextureRegion view;
-  view.left = u - half;
-  view.top = v - half;
-  view.right = u + half;
-  view.bottom = v + half;
-  if (view.left < 0.0f) {
-    view.left = 0.0f;
-    view.right = half + half;
-    if (view.right > 1.0f) {
-      view.right = 1.0f;
-    }
-  }
-  if (view.top < 0.0f) {
-    view.top = 0.0f;
-    view.bottom = half + half;
-    if (view.bottom > 1.0f) {
-      view.bottom = 1.0f;
-    }
-  }
-  if (view.right > 1.0f) {
-    view.right = 1.0f;
-    view.left = 1.0f - (half + half);
+  int reduction;
+  {
+    const float centerX = static_cast<float>(g_renderer->viewport.width - 144) + 64.0f;
+    const int width = this->scene->terrain->width;
+    const int height = this->scene->terrain->height;
+    const CPlayer* player = this->scene->player;
+    int row;
+    int column;
+    this->WorldCell(player->render.position.x, player->render.position.z, column, row);
+
+    const float half = 1.0f / (g_windowMgr.minimapZoom * 2.0f);
+    const float u = static_cast<float>(column) / static_cast<float>(width);
+    const float v = static_cast<float>(height - row) / static_cast<float>(height);
+    view.left = u - half;
+    view.top = v - half;
+    view.right = u + half;
+    view.bottom = v + half;
     if (view.left < 0.0f) {
       view.left = 0.0f;
+      view.right = half + half;
+      if (view.right > 1.0f) {
+        view.right = 1.0f;
+      }
     }
-  }
-  if (view.bottom > 1.0f) {
-    view.bottom = 1.0f;
-    view.top = 1.0f - (half + half);
     if (view.top < 0.0f) {
       view.top = 0.0f;
+      view.bottom = half + half;
+      if (view.bottom > 1.0f) {
+        view.bottom = 1.0f;
+      }
     }
+    if (view.right > 1.0f) {
+      view.right = 1.0f;
+      view.left = 1.0f - (half + half);
+      if (view.left < 0.0f) {
+        view.left = 0.0f;
+      }
+    }
+    if (view.bottom > 1.0f) {
+      view.bottom = 1.0f;
+      view.top = 1.0f - (half + half);
+      if (view.top < 0.0f) {
+        view.top = 0.0f;
+      }
+    }
+
+    reduction = g_textureReduction;
+    g_textureReduction = 1;
+    CTexture* texture = g_texMgr.Load(reinterpret_cast<const char*>(this->minimapBmpName), 0, false, true, false);
+    RECT rect;
+    rect.left = static_cast<int>(centerX - 64.0f);
+    rect.top = 16;
+    rect.right = static_cast<int>(centerX + 64.0f);
+    rect.bottom = 144;
+    this->DrawTexture(rect, 0, 0.0998f, g_windowMgr.minimapColor, texture, view);
+
+    this->DrawMiniMapMarker(view, column, row, 5, "유저인터페이스\\map\\map_arrow.bmp", 4, 0xFFFFFFFF, false);
   }
-
-  const int reduction = g_textureReduction;
-  g_textureReduction = 1;
-  CTexture* texture = g_texMgr.Load(reinterpret_cast<const char*>(this->minimapBmpName), 0, false, true, false);
-  RECT rect;
-  rect.left = static_cast<int>(centerX - 64.0f);
-  rect.top = 16;
-  rect.right = static_cast<int>(centerX + 64.0f);
-  rect.bottom = 144;
-  this->DrawTexture(rect, 0, 0.0998f, g_windowMgr.minimapColor, texture, view);
-
-  this->DrawMiniMapMarker(view, column, row, 5, "유저인터페이스\\map\\map_arrow.bmp", 4, 0xFFFFFFFF, false);
 
   for (auto it = g_miniMapEffectMarkers.begin(); it != g_miniMapEffectMarkers.end();) {
     this->DrawMiniMapMarker(view, it->second.x, it->second.y, 2, std::string(), 2, 0xFFFF0000, false);
@@ -286,7 +320,8 @@ void CGameMode::DrawMiniMap() {
 
   if (g_windowMgr.minimapMarkersVisible) {
     for (int index = 0;; ++index) {
-      const TownInfo info = g_townInfoMgr->GetTownInfo(std::string(this->mapName), index);
+      CTownInfoMgr* townInfoMgr = g_townInfoMgr;
+      const TownInfo info = townInfoMgr->GetTownInfo(std::string(this->mapName), index);
       if (info.image.size() == 0 || info.type == 8 || info.type == 9) {
         break;
       }
@@ -296,21 +331,7 @@ void CGameMode::DrawMiniMap() {
 
   this->DrawMiniMapMembers(view);
 
-  if (this->compassPosList.size() != 0) {
-    for (auto it = this->compassPosList.begin(); it != this->compassPosList.end();) {
-      if (it->second.persistent == 0 && timeGetTime() > it->second.tick + 15000) {
-        it = this->compassPosList.erase(it);
-      } else {
-        ++it;
-      }
-    }
-    for (auto it = this->compassPosList.begin(); it != this->compassPosList.end(); ++it) {
-      const int elapsed = timeGetTime() - it->second.tick;
-      if (elapsed % 1000 < 500) {
-        this->DrawMiniMapMarker(view, it->second.x, it->second.y, 1, std::string(""), 3, it->second.color, false);
-      }
-    }
-  }
+  this->DrawMiniMapPings(view);
 
   g_textureReduction = reduction;
 }
@@ -327,11 +348,12 @@ void CGameMode::DrawMiniMapTriangle(float x, float y, float size, std::uint32_t 
   vertices[0].x = x;
   vertices[0].y = y - (size + size);
   vertices[1].x = x - SquareRoot(3.0f) * size;
-  vertices[1].y = y + size;
+  y += size;
+  vertices[1].y = y;
   vertices[2].x = SquareRoot(3.0f) * size + x;
-  vertices[2].y = y + size;
+  vertices[2].y = y;
   vertices[3].x = x - SquareRoot(3.0f) * size;
-  vertices[3].y = y + size;
+  vertices[3].y = y;
 
   vertices[0].z = topZ;
   vertices[0].rhw = 0.0999f;
@@ -354,7 +376,7 @@ void CGameMode::DrawMiniMapTriangle(float x, float y, float size, std::uint32_t 
   vertices[3].v = 1.0f;
   vertices[3].diffuse = color;
 
-  g_renderer->Submit(primitive, 0x201);
+  g_renderer->Submit(primitive, RSF_ALPHA | RSF_NO_DEPTH);
 }
 
 // OFFSET: 0x00CD2BE0
@@ -371,28 +393,29 @@ void CGameMode::DrawMiniMapMarker(
   // GLOBAL: gl_24933
   static int s_lastPlayerY;
 
+  const float xF = static_cast<float>(x);
   const int width = this->scene->terrain->width;
   const int height = this->scene->terrain->height;
-  const int longest = width >= height ? width : height;
   const double originX = static_cast<double>(g_renderer->viewport.width - 144) + 64.0;
-  const double mapWidth = static_cast<float>(width) * 128.0f / static_cast<float>(longest);
-  const double mapHeight = static_cast<float>(height) * 128.0f / static_cast<float>(longest);
-  const float markerX = static_cast<float>(x);
-  const float markerY = static_cast<float>(y);
-  if (markerX < 0.0f || markerY < 0.0f) {
+  const int longest = width >= height ? width : height;
+  const float longestF = static_cast<float>(longest);
+  const double mapWidth = static_cast<float>(width) * 128.0f / longestF;
+  const double mapHeight = static_cast<float>(height) * 128.0f / longestF;
+  const float yF = static_cast<float>(y);
+  if (xF < 0.0f || yF < 0.0f) {
     return;
   }
 
-  const float marginX = (128.0f - static_cast<float>(mapWidth)) * 0.5f;
+  const double marginX = (128.0f - static_cast<float>(mapWidth)) * g_depthAverageHalf;
   const float viewWidth = view.right - view.left;
+  const double marginY = (128.0f - static_cast<float>(mapHeight)) * g_depthAverageHalf;
   const float viewLeft = view.left * 128.0f / viewWidth;
-  const float marginY = (128.0f - static_cast<float>(mapHeight)) * 0.5f;
-  const double offsetX = (static_cast<double>(static_cast<float>(x) * static_cast<float>(mapWidth) / static_cast<float>(width)) + marginX) / viewWidth;
+  const double offsetX = (xF * static_cast<float>(mapWidth) / static_cast<float>(width) + marginX) / viewWidth;
   const float viewHeight = view.bottom - view.top;
   const float viewTop = view.top * 128.0f / viewHeight;
-  const double offsetY =
-    (mapHeight - static_cast<double>(static_cast<float>(y) * static_cast<float>(mapHeight) / static_cast<float>(height)) + marginY) / viewHeight;
+  const double offsetY = (mapHeight - static_cast<double>(yF * static_cast<float>(mapHeight) / static_cast<float>(height)) + marginY) / viewHeight;
   const double left = originX - 64.0;
+  const double right = originX + 64.0;
   double drawX = (left - viewLeft) + offsetX;
   double drawY = (16.0 - viewTop) + offsetY;
 
@@ -401,9 +424,9 @@ void CGameMode::DrawMiniMapMarker(
     if (drawX - size < left) {
       direction = 1;
       drawX = size + left;
-    } else if (drawX + size > originX + 64.0) {
+    } else if (drawX + size > right) {
       direction = 2;
-      drawX = (originX + 64.0) - size;
+      drawX = right - size;
     }
     if (drawY - size < 16.0) {
       drawY = size + 16.0;
@@ -421,7 +444,7 @@ void CGameMode::DrawMiniMapMarker(
       texture = arrow;
     }
   } else if (kind != 4) {
-    if (drawX - size < left || drawX + size > originX + 64.0 || drawY - size < 16.0 || drawY + size > 144.0) {
+    if (drawX - size < left || drawX + size > right || drawY - size < 16.0 || drawY + size > 144.0) {
       return;
     }
   }
@@ -498,9 +521,9 @@ void CGameMode::DrawMiniMapMarker(
     }
   } else if (kind == 6) {
     if (texture.size() == 0) {
-      g_windowMgr.LookupWindow(WID_MINIMAPZOOMWND)->SendMsg(nullptr, UM_COMMAND, 0x1C5, color, rect.left, rect.top);
+      g_windowMgr.LookupWindow(WID_MINIMAPZOOMWND)->SendMsg(nullptr, UM_COMMAND, ID_SHOW_MINIMAP_ZOOM_BUTTON, color, rect.left, rect.top);
     } else {
-      g_windowMgr.LookupWindow(WID_MINIMAPZOOMWND)->SendMsg(nullptr, UM_COMMAND, 0x1C7, color, rect.left, rect.top);
+      g_windowMgr.LookupWindow(WID_MINIMAPZOOMWND)->SendMsg(nullptr, UM_COMMAND, ID_HIDE_MINIMAP_ZOOM_BUTTON, color, rect.left, rect.top);
       CTexture* marker = g_texMgr.Load(texture.c_str(), 0, false, true, false);
       this->DrawTexture(rect, 0, 0.0999f, 0xFFFFFFFF, marker, TextureRegion{0.0f, 0.0f, 1.0f, 1.0f});
     }
@@ -544,10 +567,10 @@ void CGameMode::DrawMiniMapCoordinates() {
   digits[2] = remaining % 10;
   digits[3] = remaining / 10;
 
-  int x = g_renderer->viewport.width - 80 + count * 25;
   const int y = g_renderer->viewport.height - 30;
-  for (int index = 0; index < count; ++index, x -= 25) {
-    this->DrawActionSprite(x, y, action, sprite, digits[index], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+  int offset = count * 25;
+  for (int index = 0; index < count; ++index, offset -= 25) {
+    this->DrawActionSprite(g_renderer->viewport.width - 80 + offset, y, action, sprite, digits[index], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
   }
 
   this->DrawActionSprite(
@@ -572,7 +595,7 @@ void CGameMode::DrawMiniMapCoordinates() {
   digits[2] = remaining % 10;
   digits[3] = remaining / 10;
 
-  x = g_renderer->viewport.width - 105;
+  int x = g_renderer->viewport.width - 105;
   const int secondY = g_renderer->viewport.height - 50;
   for (int index = 0; index < count; ++index, x -= 25) {
     this->DrawActionSprite(x, secondY, action, sprite, digits[index], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
@@ -639,6 +662,19 @@ void CGameMode::DrawMiniMapNumber() {
 
 // GLOBAL: gl_25050
 int g_timeAttackFrame;
+
+// OFFSET: 0x00CD2960
+// FUNCTION: fn_46332
+__forceinline void CGameMode::DrawTimeAttackTitle() {
+  CActRes* titleAction = static_cast<CActRes*>(ResourceMgr::Instance().Load("이팩트\\TimeAttack.act"));
+  CSprRes* titleSprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("이팩트\\TimeAttack.spr"));
+  const int frame = g_timeAttackFrame / 3;
+  if (frame < static_cast<int>(titleAction->FrameCount(0))) {
+    const int titleX = g_renderer->viewport.width / 2 - titleSprite->images[0][0]->height / 2;
+    this->DrawActionSprite(titleX, 120, titleAction, titleSprite, 0, frame, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+    ++g_timeAttackFrame;
+  }
+}
 
 // OFFSET: 0x00CD1EE0
 // FUNCTION: fn_21259
@@ -717,23 +753,19 @@ void CGameMode::DrawTimeAttackTimer() {
 
   const int center = g_renderer->viewport.width / 2;
   for (int index = 0; index < total; ++index, --startIndex) {
-    const int digit = (index + 1) % 3 == 0 ? 10 : digits[startIndex];
+    int digit;
+    if ((index + 1) % 3 != 0) {
+      digit = digits[startIndex];
+    } else {
+      digit = 10;
+    }
     this->DrawActionSprite(
     center + offset + index * 40, 40, action, sprite, digit, 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201
     );
   }
 
   if (g_session.m_timeAttackStart != 0 && timeGetTime() - g_session.m_timeAttackStart < 3000) {
-    CActRes* titleAction = static_cast<CActRes*>(ResourceMgr::Instance().Load("이팩트\\TimeAttack.act"));
-    CSprRes* titleSprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("이팩트\\TimeAttack.spr"));
-    const int frame = g_timeAttackFrame / 3;
-    if (frame < static_cast<int>(titleAction->FrameCount(0))) {
-      const int titleX = g_renderer->viewport.width / 2 - titleSprite->images[0][0]->height / 2;
-      this->DrawActionSprite(
-    titleX, 120, titleAction, titleSprite, 0, frame, 1.0f, 0.0f, 0xFFFFFFFF, 0x201
-      );
-      ++g_timeAttackFrame;
-    }
+    this->DrawTimeAttackTitle();
   }
 }
 
@@ -767,7 +799,7 @@ void CGameMode::DrawTimeAttackCountdown(std::uint32_t value, int mode) {
     case 3:
       remaining = g_session.m_timeAttackCountdown / 30;
       --g_session.m_timeAttackCountdown;
-      if (remaining == 0) {
+      if (remaining <= 0) {
         g_session.m_timeAttackVisible = 0;
       }
       break;
@@ -802,13 +834,13 @@ void CGameMode::DrawTimeAttackCountdown(std::uint32_t value, int mode) {
     hours = 0;
     days = 0;
   }
-  int count = 2;
   if (display > 9999) {
     display = 9999;
   }
   if (display < 0) {
     display = 0;
   }
+  int count = 2;
   digits[0] = display % 10;
   digits[1] = (display /= 10) % 10;
   if (minutes > 0) {
@@ -839,7 +871,12 @@ void CGameMode::DrawTimeAttackCountdown(std::uint32_t value, int mode) {
 
   const int center = g_renderer->viewport.width / 2;
   for (int index = 0; index < total; ++index, --startIndex) {
-    const int digit = (index + 1) % 3 == 0 ? 10 : digits[startIndex];
+    int digit;
+    if ((index + 1) % 3 != 0) {
+      digit = digits[startIndex];
+    } else {
+      digit = 10;
+    }
     this->DrawActionSprite(
     center + offset + index * 40, 40, action, sprite, digit, 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201
     );
@@ -854,25 +891,21 @@ char g_miniMapTooltipText[256];
 // OFFSET: 0x00CD1690
 // FUNCTION: fn_21257
 void CGameMode::RefreshMiniMapTooltips() {
-  int& tooltipId = this->miniMapTooltipId;
-  std::string& tooltipText = this->miniMapTooltipText;
-  std::map<int, std::string>& tooltipWindows = this->miniMapTooltipWindows;
-
-  if (tooltipId == -1) {
-    if (tooltipWindows.size() == 0) {
+  if (this->miniMapTooltipId == -1) {
+    if (this->miniMapTooltipWindows.size() == 0) {
       return;
     }
 
-    if (tooltipText.size() == 0) {
-      for (auto it = tooltipWindows.begin(); it != tooltipWindows.end(); ++it) {
+    if (this->miniMapTooltipText.size() == 0) {
+      for (auto it = this->miniMapTooltipWindows.begin(), end = this->miniMapTooltipWindows.end(); it != end; ++it) {
         g_windowMgr.CloseWindow(it->first);
       }
-      tooltipWindows.clear();
+      this->miniMapTooltipWindows.clear();
     } else {
-      for (auto it = tooltipWindows.begin(); it != tooltipWindows.end(); ++it) {
-        if (it->second == tooltipText) {
+      for (auto it = this->miniMapTooltipWindows.begin(), end = this->miniMapTooltipWindows.end(); it != end; ++it) {
+        if (it->second.text == this->miniMapTooltipText) {
           g_windowMgr.CloseWindow(it->first);
-          tooltipWindows.erase(it);
+          this->miniMapTooltipWindows.erase(it);
           return;
         }
       }
@@ -880,31 +913,34 @@ void CGameMode::RefreshMiniMapTooltips() {
     return;
   }
 
-  if (tooltipId == g_miniMapTooltipId && std::strcmp(g_miniMapTooltipText, tooltipText.c_str()) == 0) {
+  if (this->miniMapTooltipId == g_miniMapTooltipId && std::strcmp(g_miniMapTooltipText, this->miniMapTooltipText.c_str()) == 0) {
     return;
   }
 
-  g_miniMapTooltipId = tooltipId;
-  std::sprintf(g_miniMapTooltipText, tooltipText.c_str());
-  if (tooltipText.size() == 0) {
+  g_miniMapTooltipId = this->miniMapTooltipId;
+  std::sprintf(g_miniMapTooltipText, this->miniMapTooltipText.c_str());
+  if (this->miniMapTooltipText.size() == 0) {
     return;
   }
 
   UIWindow* window = nullptr;
   for (int windowId = 216; windowId < 225; ++windowId) {
-    if (tooltipWindows.find(windowId) == tooltipWindows.end()) {
+    if (this->miniMapTooltipWindows.find(windowId) == this->miniMapTooltipWindows.end()) {
       window = g_windowMgr.EnsureWindow(windowId);
-      tooltipWindows.insert(std::make_pair(windowId, std::string(tooltipText)));
+      MiniMapTooltip tooltip{};
+      tooltip.text = this->miniMapTooltipText;
+      tooltip.windowId = windowId;
+      this->miniMapTooltipWindows.insert({windowId, tooltip});
       break;
     }
   }
 
   int x;
   int y = 0;
-  switch (tooltipId) {
+  switch (this->miniMapTooltipId) {
     case 10:
       g_windowMgr.CycleWindowVisibilityTwice();
-      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(tooltipText.c_str()), 0, 0, 0);
+      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(this->miniMapTooltipText.c_str()), 0, 0, 0);
       window->SendMsg(nullptr, UM_SETINFO, 10, 0, 0, 0);
       x = g_renderer->viewport.centerX - window->geometry.width / 2;
       y = g_renderer->viewport.centerY - window->geometry.height / 2;
@@ -912,23 +948,23 @@ void CGameMode::RefreshMiniMapTooltips() {
     case -1:
     case 11:
       g_windowMgr.RestoreHiddenWindows();
-      tooltipWindows.clear();
-      tooltipId = -1;
+      this->miniMapTooltipWindows.clear();
+      this->miniMapTooltipId = -1;
     default:
       x = 160;
       break;
     case 12:
-      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(tooltipText.c_str()), 0, 0, 0);
+      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(this->miniMapTooltipText.c_str()), 0, 0, 0);
       x = 0;
       y = g_renderer->viewport.height - window->geometry.height;
       break;
     case 13:
-      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(tooltipText.c_str()), 0, 0, 0);
+      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(this->miniMapTooltipText.c_str()), 0, 0, 0);
       x = g_renderer->viewport.centerX - window->geometry.width / 2;
       y = g_renderer->viewport.height - window->geometry.height;
       break;
     case 14:
-      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(tooltipText.c_str()), 0, 0, 0);
+      window->SendMsg(nullptr, UM_SET_BITMAP, reinterpret_cast<std::intptr_t>(this->miniMapTooltipText.c_str()), 0, 0, 0);
       x = g_renderer->viewport.width - window->geometry.width;
       y = g_renderer->viewport.height - window->geometry.height;
       break;
@@ -939,29 +975,29 @@ void CGameMode::RefreshMiniMapTooltips() {
 
 // OFFSET: 0x00CD0B30
 // FUNCTION: fn_21254
-int CGameMode::UpdateMiniMapTooltip() {
-  int& tooltipId = this->miniMapTooltipId;
-  std::string& tooltipText = this->miniMapTooltipText;
-  int id = tooltipId;
+void CGameMode::UpdateMiniMapTooltip() {
+  int id = this->miniMapTooltipId;
   if (id > 9 || id == -1) {
     this->RefreshMiniMapTooltips();
-    if (tooltipId == -1 && g_windowMgr.illustWnd != nullptr) {
-      return g_windowMgr.CloseWindow(WID_ILLUSTWND);
+    if (this->miniMapTooltipId == -1 && g_windowMgr.illustWnd != nullptr) {
+      g_windowMgr.CloseWindow(WID_ILLUSTWND);
     }
-    return tooltipId;
+    return;
   }
 
-  if (tooltipText.size() == 0) {
-    return id;
+  if (this->miniMapTooltipText.size() == 0) {
+    return;
   }
 
+  int& tooltipId = this->miniMapTooltipId;
+  std::string& tooltipText = this->miniMapTooltipText;
   UIWindow* window = g_windowMgr.illustWnd;
   if (window == nullptr) {
     window = g_windowMgr.EnsureWindow(WID_ILLUSTWND);
     g_miniMapTooltipId = tooltipId;
   } else {
     if (id == g_miniMapTooltipId && std::strcmp(g_miniMapTooltipText, tooltipText.c_str()) == 0) {
-      return 0;
+      return;
     }
     g_miniMapTooltipId = id;
   }
@@ -1005,5 +1041,4 @@ int CGameMode::UpdateMiniMapTooltip() {
   }
 
   window->Move(x - window->geometry.width / 2, y);
-  return id;
 }

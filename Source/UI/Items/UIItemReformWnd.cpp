@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Items/UIItemReformWnd.h"
 #include "UI/Window/UIEnums.h"
@@ -66,14 +67,16 @@ UIItemReformWnd_List::UIItemReformWnd_List()
 void UIItemReformWnd_DetailMsg::SetText(const std::string& text) {
   this->Resize(257, 127);
   unsigned int height = this->geometry.height;
-  CCreateLineInfo info(this, text.c_str(), this->geometry.width - 20, 4, 0, 12, LineFontFlags{}, false, 0, false, 0xFFFFFF, 0);
+  CCreateLineInfo info(this, text.c_str(), this->geometry.width - 20, 4, LineTextStyle{0, 12, false, false}, false, 0, false, 0xFFFFFF, 0);
   std::vector<std::vector<UIWindow*>> lines = info.m_lines;
-  for (std::vector<UIWindow*> line : lines) {
-    for (UIWindow* window : line) {
+  for (auto lineIt = lines.begin(); lineIt != lines.end(); ++lineIt) {
+    std::vector<UIWindow*> line = *lineIt;
+    for (auto windowIt = line.begin(); windowIt != line.end(); ++windowIt) {
+      UIWindow* window = *windowIt;
       if (window) {
         window->Move(window->geometry.x + 12, window->geometry.y + 12);
-        this->AddChild(window);
-        height = std::max<unsigned int>(height, window->geometry.y + 12);
+        this->AddChild(*windowIt);
+        height = std::max<unsigned int>(window->geometry.y + 12, height);
       }
     }
   }
@@ -97,13 +100,13 @@ void UIItemReformWnd::OnCreate(int width, int height) {
   UIBasicButton* cancel = new UIBasicButton();
   cancel->Configure(60, LookupMessage(MSI_CANCEL));
   cancel->Move(300, 236);
-  cancel->SetId(201);
+  cancel->SetId(ID_CLOSE);
   this->AddChild(cancel);
 
   this->reformButton = new UIBasicButton();
-  this->reformButton->Configure(60, LookupMessage(MSI_ITEM_REFORM_WARNNING_CARD_MAYBE_LOST));
+  this->reformButton->Configure(60, LookupMessage(MSI_ITEM_REFORM_OK));
   this->reformButton->Move(365, 236);
-  this->reformButton->SetId(184);
+  this->reformButton->SetId(ID_OK);
   {
     UIButton* button = this->reformButton;
     button->SetDisabled(1);
@@ -152,6 +155,15 @@ void UIItemReformWnd_List::OnCreate(int width, int height) {
   this->UpdateScrollBar();
 }
 
+// INLINED
+static void DrawMaterialCount(UIItemReformWnd* window, int x, int y, unsigned int half, int owned, int required) {
+  const std::uint32_t color = owned < required ? 0x321EC8 : 0x3C3C3C;
+  const int left = x - half;
+  window->DrawTextAt(left, y, "/", 0, 0, 12, 0, 0, 0);
+  window->DrawRightAlignedText(left, y, FormatOwnedString("%d", owned).c_str(), 0, 0, 12, color, 0);
+  window->DrawTextAt(x + half, y, FormatOwnedString("%d", required).c_str(), 0, 0, 12, color, 0, 0);
+}
+
 // OFFSET: 0x005FD270
 // FUNCTION: fn_04110
 void UIItemReformWnd::Paint() {
@@ -168,10 +180,7 @@ void UIItemReformWnd::Paint() {
     const int y = index / 3 * 50 + 167;
     const int owned = g_session.GetInventoryItemCount(std::atoi(this->materials[index].itemId.c_str()));
     const int required = this->materials[index].quantity;
-    const std::uint32_t color = owned < required ? 0x321EC8 : 0x3C3C3C;
-    this->DrawTextAt(x - half, y, "/", 0, 0, 12, 0, 0, 0);
-    this->DrawRightAlignedText(x - half, y, FormatOwnedString("%d", owned).c_str(), 0, 0, 12, color, 0);
-    this->DrawTextAt(x + half, y, FormatOwnedString("%d", required).c_str(), 0, 0, 12, color, 0, 0);
+    DrawMaterialCount(this, x, y, half, owned, required);
   }
   if (this->warning.size() != 0) {
     this->DrawTextAt(8, 240, this->FitDisplayText(280, this->warning.c_str(), 0, 12, 0).c_str(), 0, 0, 12, 0xA0AFF, 0, 0);
@@ -182,7 +191,7 @@ void UIItemReformWnd::Paint() {
 // FUNCTION: fn_04111
 void UIItemReformWnd_DetailBtn::Paint() {
   this->ClearSurface(0xFFFF00FF);
-  std::string text = LookupMessage(MSI_ENCHANT_SUCCESS);
+  std::string text = LookupMessage(MSI_ITEM_REFORM_CONFIRM_DETAILS);
   const unsigned int textWidth = this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
   this->DrawCenteredText(0, 0, text.c_str(), this->geometry.width, 0, 12, 0, 0);
   this->FillRegion((this->geometry.width - textWidth) * 0.5, 12, textWidth, 1, 0);
@@ -202,9 +211,26 @@ void UIItemReformWnd_DetailMsg::Paint() {
 void UIItemReformWnd_Item::Paint() {
   this->ClearSurface(0xFFFF00FF);
   if (this->item) {
-    ResourceMgr& resources = ResourceMgr::Instance();
-    this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(resources.Load(Resolve(FormatOwnedString("유저인터페이스\\item\\%s.bmp", this->item->ResourcePath()).c_str()))), true);
+    this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\item\\%s.bmp", this->item->ResourcePath()).c_str()))), true);
   }
+}
+
+// INLINED
+static void DrawReformRow(UIItemReformWnd_List* list, unsigned int row) {
+  const unsigned int index = list->scrollPosition + row;
+  const char* image;
+  if (index == list->selectedIndex) {
+    image = "유저인터페이스\\ItemReform\\btn_reform_item_press.bmp";
+  } else {
+    image = index == list->hoverIndex ? "유저인터페이스\\ItemReform\\btn_reform_item_over.bmp" : "유저인터페이스\\ItemReform\\btn_reform_item.bmp";
+  }
+  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(image)));
+  list->DrawBitmap(0, list->itemHeight * row, bitmap, true);
+  const ITEM_INFO& item = list->items[list->scrollPosition + row];
+  list->DrawItemIcon(15, list->itemHeight * row + 4, item, 1);
+  list->DrawTextAt(42, list->itemHeight * row + 10, list->FitDisplayText(160, item.DisplayName(0).c_str(), 0, 12, 0).c_str(), 0, 0,
+    12, 0, 0, 0
+  );
 }
 
 // OFFSET: 0x005FD8A0
@@ -214,18 +240,7 @@ void UIItemReformWnd_List::Paint() {
   for (unsigned int row = 0; row < this->visibleCount; ++row) {
     const unsigned int index = this->scrollPosition + row;
     if (index < this->items.size()) {
-      const char* image;
-      if (index == this->selectedIndex) {
-        image = "유저인터페이스\\ItemReform\\btn_reform_item_press.bmp";
-      } else {
-        image = index == this->hoverIndex ? "유저인터페이스\\ItemReform\\btn_reform_item_over.bmp" : "유저인터페이스\\ItemReform\\btn_reform_item.bmp";
-      }
-      this->DrawBitmap(0, this->itemHeight * row, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(image))), true);
-      const ITEM_INFO& item = this->items[this->scrollPosition + row];
-      this->DrawItemIcon(15, this->itemHeight * row + 4, item, 1);
-      this->DrawTextAt(42, this->itemHeight * row + 10, this->FitDisplayText(160, item.DisplayName(0).c_str(), 0, 12, 0).c_str(), 0, 0,
-        12, 0, 0, 0
-      );
+      DrawReformRow(this, row);
     }
   }
 }
@@ -256,12 +271,12 @@ void UIItemReformWnd_DetailBtn::OnMouseEnter() {
 // FUNCTION: fn_04119
 void UIItemReformWnd_Item::OnMouseHover(int x, int y) {
   if (this->item) {
-    int screenY = y;
     int screenX = x;
+    int screenY = y;
     this->ToScreen(screenX, screenY);
-    const int tipX = screenX + 5;
-    const int tipY = screenY - 5;
     CMode* mode = g_modeMgr.currentMode;
+    const int tipY = screenY - 5;
+    const int tipX = screenX + 5;
     mode->ShowTooltip(this->item->DisplayName(0).c_str(), tipX, tipY, 0xFFFFFFFFu, 0, 1);
   }
 }
@@ -333,7 +348,8 @@ void UIItemReformWnd_List::UpdateScrollBar() {
   if (count > this->visibleCount) {
     this->scrollBar->Show(1);
     this->scrollBar->SetRange(count - this->visibleCount, this->visibleCount, count);
-    this->scrollPosition = std::min<unsigned int>(count - this->visibleCount, std::max<int>(this->scrollPosition, 0));
+    this->scrollPosition = std::max(0, this->scrollPosition);
+    this->scrollPosition = std::min<unsigned int>(count - this->visibleCount, this->scrollPosition);
     this->scrollBar->SetPosition(this->scrollPosition);
   } else {
     this->scrollPosition = 0;
@@ -355,8 +371,8 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
   UIItemReformWnd_Item* resultIcon = this->resultIcon;
   resultIcon->item = nullptr;
   resultIcon->Invalidate();
-  for (std::vector<UIItemReformWnd_Item*>::iterator it = this->materialIcons.begin(), end = this->materialIcons.end(); it != end; ++it) {
-    UIItemReformWnd_Item* icon = *it;
+  for (auto iconIt = this->materialIcons.begin(); iconIt != this->materialIcons.end(); ++iconIt) {
+    UIItemReformWnd_Item* icon = *iconIt;
     if (icon) {
       icon->item = nullptr;
       icon->Invalidate();
@@ -419,7 +435,7 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
     }
   }
   if (insufficient) {
-    this->warning = LookupMessage(MSI_ITEM_REFORM_WARNNING_ENCHANT_MAYBE_LOST);
+    this->warning = LookupMessage(MSI_ITEM_REFORM_WARNNING_NOT_ENOUGH_MATERIAL);
   } else {
     {
       UIButton* button = this->reformButton;
@@ -431,7 +447,7 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
   this->information = info->informationString;
   if (this->information.size() != 0) {
     this->detailButton->Enable(1);
-    this->warning = LookupMessage(MSI_ENCHANT_FAILED);
+    this->warning = LookupMessage(MSI_ITEM_REFORM_PLZ_CHECK_DETAILS);
   }
 
   baseIcon = this->baseIcon;
@@ -460,14 +476,14 @@ int UIItemReformWnd::SendMsg(
   case UM_REFRESHITEM:
     this->reformItem.SetItemId(argument1);
     if (this->list->SendMsg(this, UM_REFRESHITEM, argument1, 0, 0, 0) == -1) {
-      this->warning = LookupMessage(MSI_CANNOT_FIND_ENCHANT_ID);
+      this->warning = LookupMessage(MSI_ITEM_REFORM_NO_EXIST_TARGET_ITEM);
     }
     this->Invalidate();
     break;
   case UM_COMMAND:
     switch (argument1) {
     case ID_OK:
-      if (this->selectedItem && this->reformItem.GetItemId() != 0) {
+      if (this->selectedItem && this->reformItem.GetItemId() != ITEMID_NONE) {
         PACKET_CZ_ITEM_REFORM packet;
         packet.packetType = ID_CZ_ITEM_REFORM;
         packet.itemId = this->reformItem.GetItemId();
@@ -523,9 +539,10 @@ int UIItemReformWnd_List::SendMsg(
   }
   case UM_REFRESHITEM: {
     this->items.clear();
-    std::vector<int> baseItems = CItemReformMgr::Instance()->GetReformBaseItems(argument1);
+    const int reformItemId = static_cast<int>(argument1);
+    std::vector<int> baseItems = CItemReformMgr::Instance()->GetReformBaseItems(reformItemId);
     for (std::vector<int>::iterator base = baseItems.begin(); base != baseItems.end(); ++base) {
-      ItemReformInfo* info = CItemReformMgr::Instance()->FindReform(argument1, *base);
+      ItemReformInfo* info = CItemReformMgr::Instance()->FindReform(reformItemId, *base);
       if (!info) {
         continue;
       }
@@ -536,25 +553,25 @@ int UIItemReformWnd_List::SendMsg(
         }
         ITEM_INFO item = g_session.LookupClientItemByIdentity(*index);
         const std::uint64_t refine = item.refiningLevel;
-        if (refine < static_cast<std::uint64_t>(info->needRefineMin) || refine > static_cast<std::uint64_t>(info->needRefineMax)) {
+        if (info->needRefineMin > refine || info->needRefineMax < refine) {
           continue;
         }
         const std::uint64_t options = item.optionCount;
-        if (options < static_cast<std::uint64_t>(info->needOptionNumMin)) {
+        if (info->needOptionNumMin > options) {
           continue;
         }
-        bool emptySocket = true;
         if (info->isEmptySocket == 1) {
-          for (unsigned int slot = std::min(item.SlotCount(), 4); slot < 4; ++slot) {
+          unsigned int slot = std::min(item.SlotCount(), 4);
+          for (; slot < 4; ++slot) {
             if (static_cast<int>(slot) < 4 && static_cast<int>(item.cards[slot]) > 0) {
-              emptySocket = false;
               break;
             }
           }
+          if (slot < 4) {
+            continue;
+          }
         }
-        if (emptySocket) {
-          this->items.push_back(item);
-        }
+        this->items.push_back(item);
       }
     }
     this->UpdateScrollBar();

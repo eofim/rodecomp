@@ -27,7 +27,7 @@ static_assert(offsetof(tagRECT, bottom) == 0xC);
 
 // OFFSET: 0x00CA9580
 // FUNCTION: fn_21007
-float __stdcall CRenderObject::Heading(float x, float z, float targetX, float targetZ) {
+float CRenderObject::Heading(float x, float z, float targetX, float targetZ) {
   const float deltaX = targetX - x;
   const float deltaZ = targetZ - z;
   float angle = (static_cast<float>(std::atan2(static_cast<double>(deltaX), static_cast<double>(-deltaZ))) / 3.141592f) * 180.0f;
@@ -86,8 +86,8 @@ bool CRenderObject::PrepareSprite(
   float* topDepth, const SpriteRleImage* image, SpriteQuad* quad, tagRECT* bounds, std::uint32_t* color, int offsetX, int offsetY, int flags
 ) {
   const float depthBias = this->render.distanceScale * g_cameraScaleX;
-  const double scaleY = static_cast<double>(scale * cell.scaleY * this->render.scale);
-  const double scaleX = static_cast<double>(scale * cell.scaleX * this->render.scale);
+  const float scaleY = scale * cell.scaleY * this->render.scale;
+  const float scaleX = scale * cell.scaleX * this->render.scale;
   float top = static_cast<float>(static_cast<double>(cell.y + offsetY) * scaleY + static_cast<double>(y));
   float bottom = static_cast<float>(
     static_cast<double>((image->doubleHeight + 1) * image->height + cell.y + offsetY) * scaleY + static_cast<double>(y) + 1.0
@@ -147,18 +147,17 @@ bool CRenderObject::PrepareSprite(
     *topDepth = (static_cast<float>(unused) * g_cameraScaleY + 0.1f - g_cameraScaleY * 20.0f) +
                 static_cast<float>(static_cast<int>(this->render.depthLayer)) * g_cameraScaleY;
   } else {
-    const int depthLayer = static_cast<int>(this->render.depthLayer) + 3 + layer;
     const float height = bottom - y;
     const float rise = top - y;
     if (this->render.isLieOnGround) {
-      *bottomDepth = 1.0f / (position[2] - height * g_cotangent) + static_cast<float>(depthLayer) * g_cameraScaleY + depthBias;
-      *topDepth = 1.0f / (position[2] - rise * g_cotangent) + static_cast<float>(depthLayer) * g_cameraScaleY + depthBias;
+      *bottomDepth = 1.0f / (position[2] - height * g_cotangent) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
+      *topDepth = 1.0f / (position[2] - rise * g_cotangent) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
     } else if (static_cast<unsigned char>(flags) != 0) {
-      *bottomDepth = 1.0f / (height * 0.06f + position[2]) + static_cast<float>(depthLayer) * g_cameraScaleY + depthBias;
-      *topDepth = 1.0f / (rise * 0.06f + position[2]) + static_cast<float>(depthLayer) * g_cameraScaleY + depthBias;
+      *bottomDepth = 1.0f / (height * 0.06f + position[2]) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
+      *topDepth = 1.0f / (rise * 0.06f + position[2]) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
     } else {
-      *bottomDepth = 1.0f / (height * g_tangent + position[2]) + static_cast<float>(depthLayer) * g_cameraScaleY + depthBias;
-      *topDepth = 1.0f / (rise * g_tangent + position[2]) + static_cast<float>(depthLayer) * g_cameraScaleY + depthBias;
+      *bottomDepth = 1.0f / (height * g_tangent + position[2]) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
+      *topDepth = 1.0f / (rise * g_tangent + position[2]) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
     }
   }
 
@@ -181,25 +180,25 @@ bool CRenderObject::PrepareSprite(
     CGameMode* mode = g_modeMgr.GetGameMode();
     GroundGeometry* ground = mode->scene->ground;
     if (ground->IsNewVer()) {
-      int column = 0;
-      int row = 0;
+      int column;
+      int row;
       mode->WorldCell(this->render.position.x, this->render.position.z, column, row);
       ground->Lighting(column, row, lightRed, lightGreen, lightBlue);
     }
   }
 
-  const float alpha = static_cast<float>((this->render.color >> 24) & 0xFF);
-  const float red = static_cast<float>((this->render.color >> 16) & 0xFF) * lightRed;
-  const float green = static_cast<float>((this->render.color >> 8) & 0xFF) * lightGreen;
-  const float blue = static_cast<float>(this->render.color & 0xFF) * lightBlue;
+  const float alpha = static_cast<float>(this->render.colorChannels.alpha);
+  const float red = static_cast<float>(this->render.colorChannels.red) * lightRed;
+  const float green = static_cast<float>(this->render.colorChannels.green) * lightGreen;
+  const float blue = static_cast<float>(this->render.colorChannels.blue) * lightBlue;
   if (this->render.isSingleColor && this->render.overrideColor != 0xFFFF0000) {
     *color = this->render.overrideColor;
   } else {
     unsigned char* channels = reinterpret_cast<unsigned char*>(color);
-    channels[3] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 24) & 0xFF) * alpha) / 255.0f));
-    channels[2] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.color & 0xFF) * red) / 255.0f));
-    channels[1] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 8) & 0xFF) * green) / 255.0f));
-    channels[0] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>((cell.color >> 16) & 0xFF) * blue) / 255.0f));
+    channels[3] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.colorChannels.alpha) * alpha) / 255.0f));
+    channels[2] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.colorChannels.red) * red) / 255.0f));
+    channels[1] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.colorChannels.green) * green) / 255.0f));
+    channels[0] = static_cast<std::uint8_t>(static_cast<int>((static_cast<float>(cell.colorChannels.blue) * blue) / 255.0f));
   }
   quad->color = *color;
 
@@ -236,9 +235,7 @@ bool CRenderObject::GetTargetPos(std::uint32_t targetAid, vector3d& targetPos) c
     const vector3d& playerPos = mode->scene->player->render.position;
     const vector3d& position = this->render.position;
     const vector3d delta = {playerPos.x - position.x, playerPos.y - position.y, playerPos.z - position.z};
-    targetPos.x = position.x - delta.x;
-    targetPos.y = position.y - delta.y;
-    targetPos.z = position.z - delta.z;
+    targetPos = vector3d{position.x - delta.x, position.y - delta.y, position.z - delta.z};
   }
 
   return found;

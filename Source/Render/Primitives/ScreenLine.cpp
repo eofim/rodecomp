@@ -11,6 +11,7 @@
 #include "Contents/Map/MapSkyMgr.h"
 #include "Render/Primitives/AlphaRectangle.h"
 #include "Render/Renderer.h"
+#include "Render/Projection/RenderProjection.h"
 #include "Render/Projection/ScreenGeometry.h"
 #include "Render/Primitives/TextureQuad.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
@@ -31,17 +32,11 @@
 #include <windows.h>
 #include <timeapi.h>
 
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+// GLOBAL: gl_24530
+float ScreenLineQuarterTurn = 1.570796f;
 
-namespace {
-  __declspec(noinline) float ScreenLineSine(float angle) {
-    return static_cast<float>(std::sin(static_cast<double>(angle)));
-  }
-
-  __declspec(noinline) float ScreenLineCosine(float angle) {
-    return static_cast<float>(std::cos(static_cast<double>(angle)));
-  }
-}
+// GLOBAL: gl_24531
+float ScreenLineFullTurn = 6.283184f;
 
 // OFFSET: 0x00918380
 // FUNCTION: fn_12594
@@ -49,7 +44,7 @@ void UIRoMapWnd::DrawDashedArrow(
   float startX, float startY, float endX, float endY, int stepWidth, int thickness, CTexture* body, int headSize, CTexture* head, float progress,
   std::uint32_t color, int offset
 ) {
-  const float visibleDistance = SquareRoot((endY - startY) * (endY - startY) + (endX - startX) * (endX - startX)) * progress;
+  const float visibleDistance = SquareRoot((endX - startX) * (endX - startX) + (endY - startY) * (endY - startY)) * progress;
   const float deltaY = endY - startY;
   const float deltaX = endX - startX;
   const float inverseLength = 1.0f / SquareRoot(deltaY * deltaY + deltaX * deltaX);
@@ -57,38 +52,40 @@ void UIRoMapWnd::DrawDashedArrow(
   const float directionX = inverseLength * deltaX;
   float angle = static_cast<float>(std::acos(static_cast<double>(directionX)));
   if (directionY < 0.0f) {
-    angle = 6.283184f - angle;
+    angle = ScreenLineFullTurn - angle;
   }
-  angle += 1.570796f;
+  angle += ScreenLineQuarterTurn;
 
-  const float sine = ScreenLineSine(angle);
-  const float cosine = ScreenLineCosine(angle);
+  const float sine = ClientSin(angle);
+  const float cosine = ClientCos(angle);
   const float inverseNormal = 1.0f / SquareRoot(cosine * cosine + sine * sine);
   const float normalX = cosine * inverseNormal;
-  const float normalY = sine * inverseNormal;
+  const float normalY = inverseNormal * sine;
+  std::uint32_t segmentColor = 0x33FFFFFF;
   const float sideX = static_cast<float>(thickness) * normalX;
   const float sideY = static_cast<float>(thickness) * normalY;
-  const float stepX = static_cast<float>(stepWidth) * directionX;
-  const float stepY = static_cast<float>(stepWidth) * directionY;
   float currentX = startX - static_cast<float>(offset) * normalX;
   float currentY = startY - static_cast<float>(offset) * normalY;
+  const float stepX = static_cast<float>(stepWidth) * directionX;
+  const float stepY = static_cast<float>(stepWidth) * directionY;
   float nextX = stepX + currentX;
   float nextY = stepY + currentY;
-  std::uint32_t segmentColor = 0x33FFFFFF;
+  const float visibleEndX = directionX * visibleDistance + startX;
+  const float visibleEndY = directionY * visibleDistance + startY;
   ScreenPoint quad[4];
 
-  if (SquareRoot((nextY - startY) * (nextY - startY) + (nextX - startX) * (nextX - startX)) < visibleDistance) {
-    const float halfStepX = stepX * 0.5f;
-    const float halfStepY = stepY * 0.5f;
+  if (SquareRoot((nextX - startX) * (nextX - startX) + (nextY - startY) * (nextY - startY)) < visibleDistance) {
+    const float halfStepX = stepX * g_depthAverageHalf;
+    const float halfStepY = stepY * g_depthAverageHalf;
     float distanceToNext;
     do {
       quad[0] = {currentX, currentY};
       quad[1] = {currentX + sideX, currentY + sideY};
       quad[2] = {nextX, nextY};
       quad[3] = {nextX + sideX, nextY + sideY};
-      const float remainingX = (directionX * visibleDistance + startX) - currentX;
-      const float remainingY = (directionY * visibleDistance + startY) - currentY;
-      if (SquareRoot(remainingY * remainingY + remainingX * remainingX) < 100.0f) {
+      const float remainingX = visibleEndX - currentX;
+      const float remainingY = visibleEndY - currentY;
+      if (SquareRoot(remainingX * remainingX + remainingY * remainingY) < 100.0f) {
         DrawScreenQuad(quad[0], quad[1], quad[2], quad[3], body, segmentColor);
         segmentColor += 0x33000000;
       }
@@ -97,17 +94,17 @@ void UIRoMapWnd::DrawDashedArrow(
       currentY = halfStepY + nextY;
       nextX = currentX + stepX;
       nextY = currentY + stepY;
-      distanceToNext = SquareRoot((nextY - startY) * (nextY - startY) + (nextX - startX) * (nextX - startX));
+      distanceToNext = SquareRoot((nextX - startX) * (nextX - startX) + (nextY - startY) * (nextY - startY));
     } while (distanceToNext < visibleDistance);
   }
 
-  if (progress < 1.0f) {
-    const float tipBaseX = (sideX * 0.5f + nextX) - static_cast<float>(thickness) * directionX;
-    const float tipBaseY = (sideY * 0.5f + nextY) - static_cast<float>(thickness) * directionY;
+  if (progress < g_projectionDepthNumerator) {
+    const float tipBaseX = (sideX * g_depthAverageHalf + nextX) - static_cast<float>(thickness) * directionX;
+    const float tipBaseY = (sideY * g_depthAverageHalf + nextY) - static_cast<float>(thickness) * directionY;
     const float headX = static_cast<float>(headSize);
     const float tipX = tipBaseX + headX * normalX;
-    const float tipY = tipBaseY + headX * normalY;
     const float otherBaseX = tipBaseX - headX * normalX;
+    const float tipY = tipBaseY + headX * normalY;
     const float otherBaseY = tipBaseY - headX * normalY;
     const float doubledStepX = headX * directionX + headX * directionX;
     const float doubledStepY = headX * directionY + headX * directionY;
@@ -184,12 +181,9 @@ void UIRoMapWnd::DrawKafraIcon(float x, float y) {
   }
 
   const int tick = static_cast<int>(timeGetTime() % 4000);
-  int step = 0;
-  if (tick != 0) {
-    step = tick / (4000 / count);
-  }
-  const int last = count > step ? step : count - 1;
-  const int frame = last < 0 ? 0 : last;
+  const int step = tick == 0 ? 0 : tick / (4000 / count);
+  const int last = count <= step ? count - 1 : step;
+  const int frame = last >= 0 ? last : 0;
   const std::uint32_t* palette = sprite->palette;
 
   const SpriteFrameCell* cell = &frames[0].Cell(0);
@@ -217,6 +211,8 @@ void UIRoMapWnd::DrawKafraIcon(float x, float y) {
   }
 
   SpriteAtlasRecord record{};
+  record.u0 = 0.0f;
+  record.v0 = 0.0f;
   CTexture* texture;
   if (cell->imageType == 0) {
     texture = g_renderer->atlas.Find(image, palette, record);
@@ -231,30 +227,19 @@ void UIRoMapWnd::DrawKafraIcon(float x, float y) {
   const int halfWidth = static_cast<int>(static_cast<float>(image->width) * scale * g_depthAverageHalf);
   RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
   RenderVertex* vertices = primitive->vertices;
-  const float left = x - static_cast<float>(halfWidth);
-  const float right = static_cast<float>(halfWidth) + x;
-  const float upper = y - static_cast<float>(height) - static_cast<float>(lift);
-  const float lower = y - static_cast<float>(lift);
-  vertices[0].x = left;
-  vertices[0].y = upper;
-  vertices[1].y = upper;
-  vertices[2].x = left;
-  vertices[1].x = right;
-  vertices[3].x = right;
-  vertices[3].z = 0.8f;
-  vertices[2].z = 0.8f;
-  vertices[1].z = 0.8f;
-  vertices[0].z = 0.8f;
-  vertices[2].y = lower;
-  vertices[3].y = lower;
-  vertices[3].rhw = 1.0f;
-  vertices[2].rhw = 1.0f;
-  vertices[1].rhw = 1.0f;
-  vertices[0].rhw = 1.0f;
-  vertices[3].diffuse = 0xFFFFFFFF;
-  vertices[2].diffuse = 0xFFFFFFFF;
-  vertices[1].diffuse = 0xFFFFFFFF;
-  vertices[0].diffuse = 0xFFFFFFFF;
+  vertices[0].x = x - static_cast<float>(halfWidth);
+  vertices[0].y = y - static_cast<float>(height) - static_cast<float>(lift);
+  vertices[1].x = static_cast<float>(halfWidth) + x;
+  vertices[1].y = y - static_cast<float>(height) - static_cast<float>(lift);
+  vertices[2].x = x - static_cast<float>(halfWidth);
+  vertices[2].y = y - static_cast<float>(lift);
+  vertices[3].x = static_cast<float>(halfWidth) + x;
+  vertices[3].y = y - static_cast<float>(lift);
+  for (int index = 0; index < 4; ++index) {
+    vertices[index].z = 0.8f;
+    vertices[index].rhw = 1.0f;
+    vertices[index].diffuse = 0xFFFFFFFF;
+  }
   vertices[0].u = record.u0;
   vertices[0].v = record.v0;
   vertices[1].u = record.u1;
@@ -279,66 +264,70 @@ void UIRoMapWnd::DrawArrow(
   float x0, float y0, float x1, float y1, float startLeft, float startTop, float startRight, float startBottom, float endLeft, float endTop, float endRight,
   float endBottom, int bodyWidth, CTexture* body, int headWidth, CTexture* head, float progress, std::uint32_t color
 ) {
-  float dy = y1 - y0;
   float dx = x1 - x0;
+  float dy = y1 - y0;
   const float length = 1.0f / SquareRoot(dy * dy + dx * dx);
-  const float dirY = length * dy;
   const float dirX = length * dx;
+  const float dirY = length * dy;
   float angle = static_cast<float>(std::acos(static_cast<double>(dirX)));
   if (dirY < 0.0f) {
     angle = 6.283184f - angle;
   }
   angle += 1.570796f;
-  const float sine = ScreenLineSine(angle);
-  const float cosine = ScreenLineCosine(angle);
+  const float sine = ClientSin(angle);
+  const float cosine = ClientCos(angle);
   const float normal = 1.0f / SquareRoot(cosine * cosine + sine * sine);
   const float normalX = normal * cosine;
   const float normalY = normal * sine;
   const float offsetX = static_cast<float>(bodyWidth) * normalX;
   const float offsetY = static_cast<float>(bodyWidth) * normalY;
-  float sideX0 = offsetX + x0;
-  float sideX1 = offsetX + x1;
-  float sideY1 = offsetY + y1;
-  float sideY0 = offsetY + y0;
+  ScreenPoint sideStart = {offsetX + x0, offsetY + y0};
+  ScreenPoint sideEnd = {offsetX + x1, offsetY + y1};
+  ScreenPoint start = {x0, y0};
+  ScreenPoint end = {x1, y1};
 
-  while (x0 > startLeft && startRight > x0 && y0 > startTop && startBottom > y0) {
-    x0 += dirX;
-    y0 += dirY;
+  while (start.x > startLeft && startRight > start.x && start.y > startTop && startBottom > start.y) {
+    start.x += dirX;
+    start.y += dirY;
   }
-  while (x1 > endLeft && endRight > x1 && y1 > endTop && endBottom > y1) {
-    x1 -= dirX;
-    y1 -= dirY;
+  while (end.x > endLeft && endRight > end.x && end.y > endTop && endBottom > end.y) {
+    end.x -= dirX;
+    end.y -= dirY;
   }
-  while (sideX0 > startLeft && startRight > sideX0 && sideY0 > startTop && startBottom > sideY0) {
-    sideX0 += dirX;
-    sideY0 += dirY;
+  while (sideStart.x > startLeft && startRight > sideStart.x && sideStart.y > startTop && startBottom > sideStart.y) {
+    sideStart.x += dirX;
+    sideStart.y += dirY;
   }
-  while (sideX1 > endLeft && endRight > sideX1 && sideY1 > endTop && endBottom > sideY1) {
-    sideX1 -= dirX;
-    sideY1 -= dirY;
+  while (sideEnd.x > endLeft && endRight > sideEnd.x && sideEnd.y > endTop && endBottom > sideEnd.y) {
+    sideEnd.x -= dirX;
+    sideEnd.y -= dirY;
   }
 
-  const float midX = (x1 - x0) * progress + x0;
-  const float midY = (y1 - y0) * progress + y0;
-  float cornerX;
-  float cornerY;
-  if (progress == 1.0f) {
-    cornerX = (sideX1 - sideX0) + sideX0;
-    cornerY = (sideY1 - sideY0) + sideY0;
+  ScreenPoint mid;
+  mid.x = (end.x - start.x) * progress + start.x;
+  mid.y = (end.y - start.y) * progress + start.y;
+  ScreenPoint corner;
+  if (progress != g_projectionDepthNumerator) {
+    corner.x = mid.x + offsetX;
+    corner.y = mid.y + offsetY;
   } else {
-    cornerX = midX + offsetX;
-    cornerY = midY + offsetY;
+    corner.x = (sideEnd.x - sideStart.x) + sideStart.x;
+    corner.y = (sideEnd.y - sideStart.y) + sideStart.y;
   }
-  DrawScreenQuad({x0, y0}, {sideX0, sideY0}, {midX, midY}, {cornerX, cornerY}, body, color);
+  DrawScreenQuad(start, sideStart, mid, corner, body, color);
 
-  if (progress < 1.0f) {
+  if (progress < g_projectionDepthNumerator) {
     const float width = static_cast<float>(bodyWidth);
     const float size = static_cast<float>(headWidth);
-    const float tipX = (offsetX * g_depthAverageHalf + midX) - width * dirX;
-    const float tipY = (offsetY * g_depthAverageHalf + midY) - width * dirY;
+    ScreenPoint tip;
+    tip.x = (offsetX * g_depthAverageHalf + mid.x) - width * dirX;
+    tip.y = (offsetY * g_depthAverageHalf + mid.y) - width * dirY;
     const float halfX = size * normalX * g_depthAverageHalf;
     const float halfY = size * normalY * g_depthAverageHalf;
-    DrawScreenQuad({tipX, tipY}, {tipX - halfX, tipY - halfY}, {tipX + halfX, tipY + halfY}, {size * dirX + tipX, size * dirY + tipY}, head, color);
+    ScreenPoint left = {tip.x - halfX, tip.y - halfY};
+    ScreenPoint right = {tip.x + halfX, tip.y + halfY};
+    ScreenPoint point = {size * dirX + tip.x, size * dirY + tip.y};
+    DrawScreenQuad(tip, left, right, point, head, color);
   }
 }
 
@@ -354,42 +343,46 @@ void UIRoMapWnd::DrawSelectedMapPreview() {
 
   if (this->selectedRecord->mapIndex < 100) {
     const WorldViewRecord* record = this->selectedRecord;
-    this->DrawRoundedOutline(record->screenLeft, record->screenTop, record->screenRight - record->screenLeft, record->screenBottom - record->screenTop,
-      g_worldMapNameColor
-    );
+    const int right = record->screenRight;
+    const int left = record->screenLeft;
+    const int top = record->screenTop;
+    const int bottom = record->screenBottom;
+    this->DrawRoundedOutline(left, top, right - left, bottom - top, g_worldMapNameColor);
   }
 
   {
     const WorldViewRecord* record = this->selectedRecord;
-    this->DrawRoundedOutline(record->left, record->top, record->right - record->left, record->bottom - record->top, g_worldMapNameColor);
+    const int right = record->right;
+    const int left = record->left;
+    const int top = record->top;
+    const int bottom = record->bottom;
+    this->DrawRoundedOutline(left, top, right - left, bottom - top, g_worldMapNameColor);
+  }
+
+  {
+    WorldViewRecord* record = this->selectedRecord;
+    const WorldViewArea savedArea = record->area;
+
+    bool hasKafraService;
+    {
+      const std::string mapName = record->name;
+      hasKafraService = g_kafraServiceMapList.find(mapName) != g_kafraServiceMapList.end();
+    }
+    if (hasKafraService) {
+      WorldViewRecord* current = this->selectedRecord;
+      if (g_exceptionMiniMapPosList.find(current->name) != g_exceptionMiniMapPosList.end()) {
+        const MiniMapPosition offset = g_exceptionMiniMapPosList[current->name];
+        current->left = static_cast<int>(static_cast<float>(current->left) + offset.x);
+        current->top = static_cast<int>(static_cast<float>(current->top) + offset.y);
+        current->right = static_cast<int>(static_cast<float>(current->right) + offset.x);
+        current->bottom = static_cast<int>(static_cast<float>(current->bottom) + offset.y);
+      }
+    }
+
+    this->selectedRecord->area = savedArea;
   }
 
   WorldViewRecord* record = this->selectedRecord;
-  const int savedLeft = record->left;
-  const int savedTop = record->top;
-  const int savedRight = record->right;
-  const int savedBottom = record->bottom;
-  const int savedAreaFlags = record->areaFlags;
-
-  if (g_kafraServiceMapList.find(std::string(record->name)) != g_kafraServiceMapList.end()) {
-    WorldViewRecord* current = this->selectedRecord;
-    if (g_exceptionMiniMapPosList.find(current->name) != g_exceptionMiniMapPosList.end()) {
-      const MiniMapPosition offset = g_exceptionMiniMapPosList[current->name];
-      current->left = static_cast<int>(static_cast<float>(current->left) + offset.x);
-      current->top = static_cast<int>(static_cast<float>(current->top) + offset.y);
-      current->right = static_cast<int>(static_cast<float>(current->right) + offset.x);
-      current->bottom = static_cast<int>(static_cast<float>(current->bottom) + offset.y);
-    }
-  }
-
-  record = this->selectedRecord;
-  record->left = savedLeft;
-  record->top = savedTop;
-  record->right = savedRight;
-  record->bottom = savedBottom;
-  record->areaFlags = savedAreaFlags;
-
-  record = this->selectedRecord;
   int x = record->right + 10;
   int y = record->top + 10;
   if (x + 130 > g_renderer->viewport.width) {
@@ -401,25 +394,29 @@ void UIRoMapWnd::DrawSelectedMapPreview() {
 
   WorldViewArea* previous = this->previewArea;
   this->previewArea = new WorldViewArea{x, y, x + 130, y + 130, 1};
-  delete previous;
-
-  tagRECT area = {x, y, x + 130, y + 130};
-  this->FillSurface(0xFFFF00FF, &area);
-
-  std::string name = this->selectedRecord->name;
-  if (name.size() > 4) {
-    name.resize(name.size() - 4);
+  if (previous != nullptr) {
+    delete previous;
   }
-
-  this->DrawOutlinedText(x + 3, y + 115, name.c_str(), 0, 0xFFFFFF, 0x5C5C5C, 0, 12, 1, 0);
 
   {
-    std::string path = "유저인터페이스\\map\\";
-    path += name;
-    path += ".bmp";
-    this->previewTexture = g_texMgr.Load(path.c_str(), 0, true, true, false);
-  }
+    tagRECT area = {x, y, x + 130, y + 130};
+    this->FillSurface(0xFFFF00FF, &area);
 
-  name = g_session.GetMapDisplayName(this->selectedRecord->name.c_str());
-  this->DrawOutlinedText(x + 3, y + 3, name.c_str(), 0, 0xD2FF, 0, 0, 12, 1, 0);
+    std::string name = this->selectedRecord->name;
+    if (name.size() > 4) {
+      name.resize(name.size() - 4);
+    }
+
+    this->DrawOutlinedText(x + 3, y + 115, name.c_str(), 0, 0xFFFFFF, 0x5C5C5C, 0, 12, 1, 0);
+
+    {
+      std::string path = "유저인터페이스\\map\\";
+      path += name;
+      path += ".bmp";
+      this->previewTexture = g_texMgr.Load(path.c_str(), 0, true, true, false);
+    }
+
+    name = g_session.GetMapDisplayName(this->selectedRecord->name.c_str());
+    this->DrawOutlinedText(x + 3, y + 3, name.c_str(), 0, 0xD2FF, 0, 0, 12, 1, 0);
+  }
 }

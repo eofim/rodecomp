@@ -11,6 +11,10 @@ class CTexture;
 class LuaScript;
 
 struct WorldViewArea {
+  WorldViewArea() = default;
+  WorldViewArea(int left, int top, int right, int bottom, int areaFlags) : left(left), top(top), right(right), bottom(bottom), areaFlags(areaFlags) {
+  }
+
   /* 0000 */ int left;
   /* 0004 */ int top;
   /* 0008 */ int right;
@@ -20,6 +24,8 @@ struct WorldViewArea {
 
 class CWorldViewField {
 public:
+  CWorldViewField();
+  CWorldViewField(WorldViewArea area, const std::string& name, const std::string& fieldName, const std::string& description);
   CWorldViewField(WorldViewArea area, const char* name, const char* fieldName, const char* description);
 
   union {
@@ -39,29 +45,22 @@ public:
 
 class CWorldViewMap {
 public:
+  CWorldViewMap();
+  CWorldViewMap(int id, WorldViewArea area, const char* name, const char* displayName);
   // INLINED
-  CWorldViewMap(int id, const char* name, WorldViewArea area) {
-    if (name) {
-      this->name = name;
-      this->displayName = name;
-    }
-    this->id = id;
-    this->area = area;
+  CWorldViewMap(int id, const char* name, WorldViewArea area) : CWorldViewMap(id, area, name, name) {
   }
 
-  // INLINED
-  ~CWorldViewMap() {
-    for (std::vector<CWorldViewField*>::iterator it = this->fields.begin(); it != this->fields.end(); ++it) {
-      delete *it;
-    }
-    this->fields.clear();
-  }
+  ~CWorldViewMap();
 
+  void ClearFields();
+  CWorldViewField* FieldAt(int x, int y);
+  bool Contains(int x, int y) const;
   CWorldViewField* FindField(const char* name);
 
   /* 0000 */ std::string name;
   /* 0018 */ std::string displayName;
-  /* 0030 */ int id = 0;
+  /* 0030 */ int id;
   union {
     /* 0034 */ WorldViewArea area = {0, 0, 0, 0, 0};
     struct {
@@ -77,9 +76,12 @@ public:
 
 class CWorldViewWorld {
 public:
+  CWorldViewWorld();
   CWorldViewWorld(const char* name, const char* imageName);
   ~CWorldViewWorld();
 
+  void ClearMaps();
+  CWorldViewMap* FindMapAt(unsigned int& mapIndex, int x, int y) const;
   void AddField(int mapId, const char* name, CWorldViewField* field);
   bool LoadTexture();
   CWorldViewField* FieldAt(unsigned int& mapIndex, int x, int y);
@@ -126,25 +128,30 @@ struct WorldViewRecord {
 class CWorldViewMgr {
 public:
   CWorldViewMgr();
+  ~CWorldViewMgr();
 
   void Load(LuaScript& script);
+  void ScaleArea(int* area, int topOffset, int textureWidth, int textureHeight);
   bool ScaleToScreen();
   void LoadTextures();
   unsigned int FindWorld(int mapId);
   void ResetSelection();
   bool SelectField(const char* name);
   void Draw(int unused, int x, int y, int width, int height);
+  WorldViewRecord* FindMark(const char* name);
   bool AddMark(const char* name);
   void ClearMarks();
   WorldViewRecord* MarkAt(unsigned int index, bool currentWorldOnly);
   int* MarkAreaAt(unsigned int index, bool currentWorldOnly);
   int MarkCount();
   int SelectCurrentWorld();
+  WorldViewRecord* FindLevel(const char* name);
   bool AddLevel(const char* name, int level);
   void ClearLevels();
   int* LevelAreaAt(int& kind, unsigned int index, bool currentWorldOnly);
   int LevelCount();
   CWorldViewWorld* CurrentWorld();
+  bool IsMapDisplayNameTranslated(const char* mapName);
 
   /* 0000 */ std::vector<WorldViewRecord> marks;
   /* 000C */ std::vector<WorldViewRecord> levels;

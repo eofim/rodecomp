@@ -26,6 +26,11 @@ CTriangleShotArrow::CTriangleShotArrow() : CEffect(-1) {
   this->rotationParameter = 0;
 }
 
+// OFFSET: 0x0072EDC0
+// FUNCTION: fn_46011
+__declspec(noinline) CTriangleShotArrow::~CTriangleShotArrow() {
+}
+
 // OFFSET: 0x0072EE80
 // FUNCTION: fn_07523
 void CTriangleShotArrow::Close() {
@@ -51,7 +56,7 @@ void CTriangleShotArrow::Open() {
 
   this->speed = 1.0f;
   this->delay = 0;
-  pos.y -= 10.0f;
+  this->current.y -= 10.0f;
   vector3d target = this->sourcePositionVector;
   this->step = 0;
   target.y -= 10.0f;
@@ -59,8 +64,8 @@ void CTriangleShotArrow::Open() {
   this->direction.x = target.x - pos.x;
   this->direction.y = target.y - pos.y;
   this->direction.z = target.z - pos.z;
-  const float length = SquareRoot(this->direction.x * this->direction.x + this->direction.y * this->direction.y +
-                                  this->direction.z * this->direction.z);
+  const float length = SquareRoot(this->direction.z * this->direction.z + this->direction.y * this->direction.y +
+                                  this->direction.x * this->direction.x);
   this->direction.x *= 0.125f;
   this->direction.y *= 0.125f;
   this->direction.z *= 0.125f;
@@ -69,20 +74,22 @@ void CTriangleShotArrow::Open() {
     this->direction *= this->speed;
   }
 
-  const float dx = target.x - pos.x;
   const float dy = target.y - pos.y;
+  const float dx = target.x - pos.x;
   const float dz = target.z - pos.z;
   const float inverse = 1.0f / SquareRoot(dx * dx + dy * dy + dz * dz);
-  pos.x = inverse * dx * 4.0f + pos.x;
-  pos.y = inverse * dy * 4.0f + pos.y;
-  pos.z = inverse * dz * 4.0f + pos.z;
-  this->origin = this->current;
-  this->position[0] = pos.x;
-  this->position[1] = pos.y;
-  this->position[2] = pos.z;
+  const float x = inverse * dx * 4.0f + pos.x;
+  const float y = inverse * dy * 4.0f + pos.y;
+  const float z = inverse * dz * 4.0f + pos.z;
+  this->origin.x = pos.x = x;
+  this->origin.y = pos.y = y;
+  this->origin.z = pos.z = z;
+  this->position[0] = x;
+  this->position[1] = y;
+  this->position[2] = z;
 
   CGameMode* mode = g_modeMgr.GetGameMode();
-  const float angle = static_cast<float>(atan2(static_cast<double>(target.z - pos.z), static_cast<double>(target.x - pos.x)));
+  const float angle = static_cast<float>(atan2(static_cast<double>(target.z - this->current.z), static_cast<double>(target.x - pos.x)));
   float yaw = mode->CameraDesiredYaw() + angle / 3.141592f * 180.0f;
   if (yaw < 0.0f) {
     yaw += 360.0f;
@@ -100,6 +107,22 @@ bool CTriangleShotArrow::IsAlive() {
   return true;
 }
 
+// OFFSET: 0x0072F3B0
+// FUNCTION: fn_46012
+__forceinline void CTriangleShotArrow::UpdateArrow(CEZ2STRParticle* particle) {
+  if (particle) {
+    const float step = static_cast<float>(this->step);
+    this->current.x = step * this->direction.x + this->origin.x;
+    this->current.y = step * this->direction.y + this->origin.y;
+    this->current.z = step * this->direction.z + this->origin.z;
+    this->position[0] = this->current.x;
+    this->position[1] = this->current.y;
+    this->position[2] = this->current.z;
+    particle->position = this->current;
+    particle->Process(0.0f, 0.0f, 0.0f);
+  }
+}
+
 // OFFSET: 0x0072F2E0
 // FUNCTION: fn_07526
 void CTriangleShotArrow::OnProcess() {
@@ -108,28 +131,22 @@ void CTriangleShotArrow::OnProcess() {
     return;
   }
 
-  CEZ2STRParticle* arrow = this->arrow;
-  if (arrow) {
-    const float step = static_cast<float>(this->step);
-    this->current.x = step * this->direction.x + this->origin.x;
-    this->current.y = step * this->direction.y + this->origin.y;
-    this->current.z = step * this->direction.z + this->origin.z;
-    this->position[0] = this->current.x;
-    this->position[1] = this->current.y;
-    this->position[2] = this->current.z;
-    arrow->position = this->current;
-    arrow->Process(0.0f, 0.0f, 0.0f);
-  }
-
+  this->UpdateArrow(this->arrow);
   ++this->step;
+}
+
+// OFFSET: 0x0072F4A0
+// FUNCTION: fn_46013
+__forceinline void CTriangleShotArrow::RenderArrow(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+  }
 }
 
 // OFFSET: 0x0072F470
 // FUNCTION: fn_07527
 void CTriangleShotArrow::Render() {
-  if (this->arrow) {
-    this->arrow->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-  }
+  this->RenderArrow(this->arrow);
 }
 
 // OFFSET: 0x0072F4D0

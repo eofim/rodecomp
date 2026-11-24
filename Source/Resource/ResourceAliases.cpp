@@ -1,4 +1,3 @@
-#include "Resource/ResourceAliases.h"
 #include "Resource/ResourceMgr.h"
 #include "File/File.h"
 
@@ -6,11 +5,6 @@
 #include <cstring>
 #include <map>
 #include <string>
-
-using AliasTree = std::map<std::string, std::string>::_Mybase;
-
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char* const, const std::size_t, const char* const, const std::size_t) noexcept;
-template __declspec(noinline) std::_Tree_find_result<AliasTree::_Nodeptr> AliasTree::_Find_lower_bound<std::string>(const std::string&) const;
 
 // OFFSET: 0x00AEF500
 // FUNCTION: fn_18180
@@ -31,11 +25,6 @@ const char* ResourceMgr::Resolve(const char* name) const {
   }
 
   return entry->second.c_str();
-}
-
-// INLINED
-std::string AddResourcePrefix(const char* name, const char* prefix) {
-  return ResourceMgr::Instance().AddResourcePrefix(name, prefix);
 }
 
 // OFFSET: 0x00AEFAE0
@@ -74,11 +63,11 @@ void ResourceMgr::LoadAliases(int) {
   contents[bytes] = '\0';
   file.Close();
 
+  const char* token = contents;
   std::string name;
   std::string replacement;
   name.clear();
   replacement.clear();
-  const char* token = contents;
   for (int index = 0; index < static_cast<int>(bytes); ++index) {
     if (contents[index] == '\n' || contents[index] == '\r') {
       contents[index] = '\0';
@@ -89,7 +78,7 @@ void ResourceMgr::LoadAliases(int) {
         name = token;
       } else {
         replacement = token;
-        this->m_aliases.insert(std::pair<std::string, std::string>(name, replacement));
+        this->m_aliases.insert({name, replacement});
         name.clear();
         replacement.clear();
       }

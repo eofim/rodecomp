@@ -8,15 +8,28 @@
 #include <list>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 class CParticle;
 class CEZ2STRParticle;
 class CSpriteParticle;
 
+struct EffectOffset : vector3d {
+  // INLINED
+  EffectOffset() {
+    this->x = 0.0f;
+    this->y = 0.0f;
+    this->z = 0.0f;
+  }
+
+  using vector3d::operator=;
+};
+
 class CCrimsonArrowEffect : public CEffect {
 public:
   CCrimsonArrowEffect();
+  ~CCrimsonArrowEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -29,6 +42,7 @@ public:
 class CRootTwistEffect : public CEffect {
 public:
   CRootTwistEffect();
+  ~CRootTwistEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -42,6 +56,7 @@ public:
 class CSpriteMableEffect : public CEffect {
 public:
   CSpriteMableEffect();
+  ~CSpriteMableEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -54,6 +69,7 @@ public:
 class CStemSpearEffect : public CEffect {
 public:
   CStemSpearEffect();
+  ~CStemSpearEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -66,6 +82,7 @@ public:
 class CSvgSpiritEffect : public CEffect {
 public:
   CSvgSpiritEffect();
+  ~CSvgSpiritEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -78,6 +95,7 @@ public:
 class CTunaPartyEffect : public CEffect {
 public:
   CTunaPartyEffect();
+  ~CTunaPartyEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -90,11 +108,13 @@ public:
 class CCurseOfCubeEffect : public CEffect {
 public:
   CCurseOfCubeEffect();
+  ~CCurseOfCubeEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
   bool IsAlive() override;
   void Close() override;
+  void UpdateParticle(CEZ2STRParticle* emitter);
   virtual void SpawnStart();
   virtual void SpawnLoop();
   virtual void SpawnShock();
@@ -110,6 +130,7 @@ public:
 class CWarningPlaneEffect : public CEffect {
 public:
   CWarningPlaneEffect();
+  ~CWarningPlaneEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -131,6 +152,7 @@ public:
   void Render() override;
   bool IsAlive() override;
   void Close() override;
+  void RenderParticle(CParticle* particle);
 
   /* 00CC */ unsigned int startTime;
   /* 00D0 */ std::vector<CParticle*> emitters;
@@ -139,6 +161,7 @@ public:
 class CDancingKnifeEffect : public CEffect {
 public:
   CDancingKnifeEffect();
+  ~CDancingKnifeEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -156,6 +179,7 @@ public:
 class CEternalSlashAttackEffect : public CEffect {
 public:
   CEternalSlashAttackEffect();
+  ~CEternalSlashAttackEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -168,6 +192,7 @@ public:
 class CEternalSlashCountEffect : public CEffect {
 public:
   CEternalSlashCountEffect();
+  ~CEternalSlashCountEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -209,6 +234,7 @@ public:
 class CFootprintEffect : public CEffect {
 public:
   CFootprintEffect();
+  ~CFootprintEffect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -218,8 +244,7 @@ public:
   CParticle* SpawnFootprint();
 
   /* 00CC */ std::list<CParticle*> emitters;
-  /* 00D4 */ std::string leftTexture;
-  /* 00EC */ std::string rightTexture;
+  /* 00D4 */ std::pair<std::string, std::string> textures;
   /* 0104 */ int padding_0104;
   /* 0108 */ double stepDistance;
   /* 0110 */ unsigned char leftFoot;
@@ -242,10 +267,8 @@ public:
 
   /* 00CC */ std::list<CEZ2STRParticle*> emitters;
   /* 00D4 */ std::list<CEZ2STRParticle*> topEmitters;
-  /* 00DC */ std::string leftBottomFile;
-  /* 00F4 */ std::string rightBottomFile;
-  /* 010C */ std::string leftTopFile;
-  /* 0124 */ std::string rightTopFile;
+  /* 00DC */ std::pair<std::string, std::string> bottomFiles;
+  /* 010C */ std::pair<std::string, std::string> topFiles;
   /* 0140 */ double bottomScale;
   /* 0148 */ double topScale;
   /* 0150 */ double topHeight;
@@ -272,7 +295,7 @@ public:
   };
 
   CFromTheAbyssEffect();
-  void UpdateParticle(long long key, AbyssParticle particle);
+  void UpdateParticle(std::pair<long long, AbyssParticle> particle);
   void SetLevel(long long level);
   void OnProcess() override;
   void Open() override;
@@ -350,12 +373,12 @@ public:
   void OnProcess() override;
   void Render() override;
   bool IsAlive() override;
-  void SetColor(int red, int green, int blue) override;
+  void SetColor(short red, short green, short blue) override;
   void SetParticleTexture(std::string name) override;
   void Close() override;
   void Init();
 
-  /* 00CC */ vector3d offsets[2];
+  /* 00CC */ EffectOffset offsets[2];
   /* 00E4 */ std::vector<CParticle*> particles;
 };
 
@@ -398,7 +421,7 @@ public:
   void SetPhantomShot(long long column);
   void SetSignShot(int column);
 
-  /* 00CC */ vector3d offsets[5];
+  /* 00CC */ EffectOffset offsets[5];
   /* 0108 */ CEZ2STRParticle* emitters[3][5];
 };
 
@@ -575,8 +598,8 @@ static_assert(offsetof(CFootprintEffect, stepDistance) == 0x108);
 static_assert(offsetof(CFootprintEffect, lastPosition) == 0x114);
 static_assert(sizeof(CFootprintEffect) == 0x128);
 static_assert(sizeof(CFootprintStrEffect) == 0x178);
-static_assert(offsetof(CFootprintStrEffect, leftBottomFile) == 0xDC);
-static_assert(offsetof(CFootprintStrEffect, rightTopFile) == 0x124);
+static_assert(offsetof(CFootprintStrEffect, bottomFiles) == 0xDC);
+static_assert(offsetof(CFootprintStrEffect, topFiles) == 0x10C);
 static_assert(offsetof(CFootprintStrEffect, bottomScale) == 0x140);
 static_assert(offsetof(CFootprintStrEffect, lastPosition) == 0x16C);
 static_assert(offsetof(CFullScreenEffect, loaded) == 0xD8);

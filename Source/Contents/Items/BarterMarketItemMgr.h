@@ -26,8 +26,9 @@ struct BarterMarketItem {
 
   // OFFSET: 0x00AE73A0
   // FUNCTION: fn_18072
-  BarterMarketItem() {}
+  __declspec(noinline) BarterMarketItem() {}
   __declspec(noinline) BarterMarketItem(const BarterMarketItem& other);
+  __declspec(noinline) ~BarterMarketItem() = default;
   ITEM_INFO ToItemInfo() const;
 };
 
@@ -70,6 +71,8 @@ struct BarterChunk16 {
   /* 0004 */ int field_4 = 0;
   /* 0008 */ int amount = 0;
   /* 000C */ int field_c = 0;
+
+  ~BarterChunk16() {}
 };
 
 struct BarterMarketEntry {

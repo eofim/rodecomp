@@ -15,6 +15,10 @@ extern "C" {
 // GLOBAL: gl_24636
 CPrivateAirplaneMgr* g_privateAirplaneItems;
 
+// OFFSET: 0x006D0340
+// FUNCTION: fn_46432
+__declspec(noinline) CPrivateAirplaneMgr::~CPrivateAirplaneMgr() = default;
+
 // OFFSET: 0x006D04C0
 // FUNCTION: fn_06504
 bool CPrivateAirplaneMgr::Create() {
@@ -66,16 +70,37 @@ int CPrivateAirplaneMgr::GetNeedItem(int index) {
   return *it;
 }
 
+// OFFSET: 0x006D0720
+// FUNCTION: fn_46434
+void CPrivateAirplaneMgr::InsertNeedItem(int item) {
+  this->m_needItems.insert(item);
+}
+
+// OFFSET: 0x006D0910
+// FUNCTION: fn_46436
+bool CPrivateAirplaneMgr::IsNeedItem(int item) {
+  if (this->m_needItems.find(item) != this->m_needItems.end()) {
+    return true;
+  }
+  return false;
+}
+
 // OFFSET: 0x006D0860
 // FUNCTION: fn_06507
 bool CPrivateAirplaneMgr::IsEndableMap(std::string map) {
-  return this->m_endableMaps.find(map) != this->m_endableMaps.end();
+  if (this->m_endableMaps.find(map) != this->m_endableMaps.end()) {
+    return 1;
+  }
+  return 0;
 }
 
 // OFFSET: 0x006D0950
 // FUNCTION: fn_06508
 bool CPrivateAirplaneMgr::IsStartableMap(std::string map) {
-  return this->m_startableMaps.find(map) != this->m_startableMaps.end();
+  if (this->m_startableMaps.find(map) != this->m_startableMaps.end()) {
+    return 1;
+  }
+  return 0;
 }
 
 // OFFSET: 0x006D0A00
@@ -130,7 +155,7 @@ int CPrivateAirplaneMgr::L_InsertNeedItem(lua_State* state) {
   } else {
     const std::string name = lua_tostring(state, -1);
     const int item = static_cast<int>(lua_tonumber(state, -2));
-    g_privateAirplaneItems->m_needItems.insert(item);
+    g_privateAirplaneItems->InsertNeedItem(item);
     lua_pushboolean(state, 1);
     lua_pushstring(state, "good");
   }

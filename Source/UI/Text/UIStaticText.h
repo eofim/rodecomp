@@ -20,14 +20,18 @@ public:
   void OnRBtnUp(int x, int y) override;
   void OnWheel(int value) override;
   void SetText(const char* value, int outline);
+  void SetTextShrinkToFit(const char* value, int outlineValue);
+  void SetTextTruncated(const char* value, int outlineValue);
   void SetColor(int redValue, int greenValue, int blueValue);
   void SetTextFitted(const char* value);
   void SetTextFittedCodePage(const char* value);
   void SetTextAutoWidth(const char* value);
+  void SetTextAutoWidth(const char* value, int outlineValue);
+  void SetTextGrowToFit(const char* value, unsigned char outlineValue);
   void SetNumber(int value);
   void SetTextWithinWidth(const char* value, int outlineValue);
   void SetFont(int family, int height, unsigned char bold, unsigned char italic);
-  std::string GetText() const;
+  inline std::string GetText() const;
 
   /* 007C */ int red;
   /* 0080 */ int green;
@@ -45,6 +49,12 @@ public:
   /* 00C0 */ std::string tooltip;
 };
 
+// OFFSET: 0x007D50D0
+// FUNCTION: fn_09587
+inline std::string UIStaticText::GetText() const {
+  return this->text;
+}
+
 class UIStaticText2 : public UIStaticText {
 public:
   void Paint() override;
@@ -54,6 +64,7 @@ class UIStaticText3 : public UIStaticText {
 public:
   UIStaticText3();
   void Paint() override;
+  void SetTextCentered(const char* value, unsigned char outlineValue, int);
 
   /* 00D8 */ int textX;
 };

@@ -5,6 +5,7 @@
 #include "Utility/Math/Vector3d.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <list>
 
 class CParticle;
@@ -37,6 +38,8 @@ public:
   bool IsAlive() override;
 
   int ActiveCount();
+  __declspec(noinline) void SetCount(std::uint64_t count);
+  __declspec(noinline) void UpdateParticle(CEZ2STRParticle* particle, int index);
 
   /* 00CC */ ChargingPierceOffset offsets[10];
   /* 0144 */ CParticle* sparks[10];
@@ -55,6 +58,9 @@ public:
   bool IsAlive() override;
 
   void SetCount(int count);
+
+  __declspec(noinline) CEZ2STRParticle* CreateParticle(const vector3d* position);
+  __declspec(noinline) void RenderParticle(CEZ2STRParticle* particle);
 
   /* 00CC */ std::list<CEZ2STRParticle*> emitters;
 };

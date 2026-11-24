@@ -1,6 +1,13 @@
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Navigation/NavigationLink.h"
+#include "Utility/Text/TextTokens.h"
+
+// OFFSET: 0x0054FFA0
+// FUNCTION: fn_01965
+__declspec(noinline) unsigned char IsValidIdentChar(char value) {
+  return g_colorHexDigit[static_cast<unsigned char>(value)];
+}
 #include "Client/Mode/CMode.h"
 
 #include <algorithm>
@@ -15,7 +22,6 @@
 #include <vector>
 #include <windows.h>
 #include <shellapi.h>
-#include <shlwapi.h>
 #include <timeapi.h>
 
 #include "Client/Application/ApplicationWindow.h"
@@ -306,7 +312,7 @@ std::string NavigationLinkParser::ExpandMessages(std::string text) {
 
 // OFFSET: 0x00833160
 // FUNCTION: fn_10409
-int __stdcall DecodeNavigationNumber(std::string value) {
+int NavigationLinkParser::DecodeNavigationNumber(std::string value) {
   const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const int size = static_cast<int>(value.size()) + 1;
   int result = 0;
@@ -338,14 +344,15 @@ int __stdcall DecodeNavigationNumber(std::string value) {
 // FUNCTION: fn_10410
 std::string NavigationLinkParser::EncodeNavigationNumber(int value) {
   const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  int number = value;
   std::vector<char> characters;
   int radix = 62;
 
   do {
-    characters.push_back(digits[value % radix]);
-    value /= radix;
-  } while (value >= radix);
-  characters.push_back(digits[value]);
+    characters.push_back(digits[number % radix]);
+    number /= radix;
+  } while (number >= radix);
+  characters.push_back(digits[number]);
 
   std::string result("");
   for (std::size_t i = 0; i < characters.size(); ++i) {
@@ -359,23 +366,21 @@ std::string NavigationLinkParser::EncodeNavigationNumber(int value) {
 bool NavigationLinkParser::ParseNavigationLink(std::string value, std::string& name, int& x, int& y) {
   const auto end = value.find(g_parserNaviLinkCloseTag);
 
-  if (end == std::string::npos) {
-    return true;
-  }
+  if (end != std::string::npos) {
+    const auto coordinates = end - 4;
+    const std::string tail = value.substr(coordinates);
+    x = GetNavigationLinkParser()->DecodeNavigationNumber(tail.substr(0, 2));
+    y = GetNavigationLinkParser()->DecodeNavigationNumber(tail.substr(2, 2));
+    const std::string head = value.substr(0, coordinates);
+    const auto begin = head.find(g_parserNaviLinkTag);
 
-  const auto coordinates = end - 4;
-  const std::string tail = value.substr(coordinates);
-  x = DecodeNavigationNumber(tail.substr(0, 2));
-  y = DecodeNavigationNumber(tail.substr(2, 2));
-  const std::string head = value.substr(0, coordinates);
-  const auto begin = head.find(g_parserNaviLinkTag);
+    if (begin != std::string::npos) {
+      name = head.substr(begin + std::strlen(g_parserNaviLinkTag.c_str()));
+    }
 
-  if (begin != std::string::npos) {
-    name = head.substr(begin + std::strlen(g_parserNaviLinkTag.c_str()));
-  }
-
-  if (name.empty()) {
-    return false;
+    if (name.empty()) {
+      return false;
+    }
   }
 
   return true;
@@ -428,18 +433,19 @@ std::pair<bool, std::string> NavigationLinkParser::RemoveLineBreakTag(std::strin
 std::string NavigationLinkParser::DisplayNavigationLink(std::string value) {
   std::string text = value;
   std::string output = text;
-  const auto begin = text.find(g_naviLinkTag);
+  const auto begin = text.find(g_parserNaviLinkTag);
 
   if (begin != std::string::npos) {
     output.clear();
     const std::string head = text.substr(0, begin);
     text = text.substr(begin);
-    const auto end = text.find(g_naviLinkCloseTag);
+    const auto end = text.find(g_parserNaviLinkCloseTag);
 
     if (end != std::string::npos) {
-      const std::string rest = text.substr(end + std::strlen(g_naviLinkCloseTag.c_str()));
-      text = text.substr(0, end + std::strlen(g_naviLinkCloseTag.c_str()));
-      const std::string link = g_navigationLinkParser->FormatNavigationLink(text, true);
+      const std::string rest = text.substr(end + std::strlen(g_parserNaviLinkCloseTag.c_str()));
+      text = text.substr(0, end + std::strlen(g_parserNaviLinkCloseTag.c_str()));
+      NavigationLinkParser* parser = g_navigationLinkParser;
+      const std::string link = parser->FormatNavigationLink(text, true);
       output += head;
       output += link;
       output += rest;
@@ -525,7 +531,8 @@ void NavigationLinkParser::SplitMessageArguments(const char* text, std::vector<s
   std::size_t separator = remaining.find(',');
 
   while (separator != std::string::npos) {
-    std::string argument = remaining.substr(0, separator);
+    std::string argument("");
+    argument = remaining.substr(0, separator);
     arguments.push_back(argument);
     remaining = remaining.substr(separator + 1);
     separator = remaining.find(',');
@@ -535,6 +542,8 @@ void NavigationLinkParser::SplitMessageArguments(const char* text, std::vector<s
     arguments.push_back(remaining);
   }
 }
+
+using MessageArgumentSubstring = std::string (std::string::*)(std::size_t, std::size_t) const;
 
 // OFFSET: 0x00834C30
 // FUNCTION: fn_10418
@@ -557,7 +566,7 @@ std::string NavigationLinkParser::FormatMessageArguments(std::string value, int 
         std::size_t position = percent + 1;
 
         for (;;) {
-          strcpy_s(conversion, sizeof(conversion), std::string(result, position, 1).c_str());
+          strcpy_s(conversion, sizeof(conversion), result.substr(position, 1).c_str());
           if (conversion[0] >= 'A') {
             break;
           }
@@ -572,8 +581,9 @@ std::string NavigationLinkParser::FormatMessageArguments(std::string value, int 
 
         if (_mbsstr(reinterpret_cast<const unsigned char*>(conversion), reinterpret_cast<const unsigned char*>("s"))) {
           if (arguments[index].find("MsgStr(") != std::string::npos) {
-            arguments[index] = arguments[index].substr(7);
-            arguments[index] = arguments[index].substr(0, arguments[index].size() - 1);
+            const MessageArgumentSubstring substring = &std::string::substr;
+            arguments[index] = (arguments[index].*substring)(7, std::string::npos);
+            arguments[index] = (arguments[index].*substring)(0, arguments[index].size() - 1);
             const std::string nested = LookupMessage(std::atoi(arguments[index].c_str()));
             std::sprintf(buffer, format.c_str(), nested.c_str());
           } else {
@@ -721,7 +731,7 @@ void UIItemImage::Paint() {
 // OFFSET: 0x00836970
 // FUNCTION: fn_10433
 CCreateLineInfo::CCreateLineInfo(
-  UIWindow* parent, const char* text, int width, int lineSpacing, std::uint32_t color, int fontHeight, LineFontFlags flags, bool outlineEnabled,
+  UIWindow* parent, const char* text, int width, int lineSpacing, LineTextStyle style, bool outlineEnabled,
   int outlineColorValue, bool shadow, int shadowColorValue, unsigned char align
 )
     : m_align(align), m_newSegment(true), m_height(0) {
@@ -729,12 +739,12 @@ CCreateLineInfo::CCreateLineInfo(
     this->m_text = text;
     this->m_width = width;
     this->m_lineSpacing = lineSpacing;
-    this->m_defaultColor = color;
-    this->m_color = color;
-    this->m_defaultFontHeight = fontHeight;
-    this->m_fontHeight = fontHeight;
-    this->m_bold = flags.bold;
-    this->m_italic = flags.italic;
+    this->m_defaultColor = style.color;
+    this->m_color = style.color;
+    this->m_defaultFontHeight = style.fontHeight;
+    this->m_fontHeight = style.fontHeight;
+    this->m_bold = style.bold != 0;
+    this->m_italic = style.italic != 0;
     this->shadow = shadow;
     this->shadowColor = shadowColorValue;
     this->outline = outlineEnabled;
@@ -790,7 +800,7 @@ void CCreateLineInfo::AddWindow(UIWindow* window) {
   if (this->m_lines.empty()) {
     this->NewLine();
   }
-  this->m_lines.back().push_back(window);
+  this->m_lines.rbegin()->push_back(window);
 }
 
 // OFFSET: 0x00837BC0
@@ -862,7 +872,7 @@ int CCreateLineInfo::LayoutLink(int x, std::string text, int type, LineTextStyle
 
   std::string display = std::get<1>(info);
   if (this->m_parent) {
-    display = RemoveTextColors(display.c_str());
+    display = this->m_parent->RemoveTextColors(display.c_str());
   }
 
   const std::string linkData = std::get<2>(info);
@@ -897,7 +907,7 @@ int CCreateLineInfo::LayoutLink(int x, std::string text, int type, LineTextStyle
 
 // OFFSET: 0x00838780
 // FUNCTION: fn_10453
-int CCreateLineInfo::LayoutItemImage(int x, const std::string& text) {
+__declspec(safebuffers) int CCreateLineInfo::LayoutItemImage(int x, const std::string& text) {
   std::cmatch match;
 
   if (!std::regex_search(text.c_str(), text.c_str() + text.size(), match, std::regex("^\\^i\\[(\\d{1,7})\\]*"))) {
@@ -930,45 +940,44 @@ int CCreateLineInfo::LayoutItemImage(int x, const std::string& text) {
 // OFFSET: 0x008389A0
 // FUNCTION: fn_10454
 int CCreateLineInfo::LayoutText(int x, std::string text, LineTextStyle style) {
-  const int width = MeasureText(this->m_parent, text, style).cx;
+  int position = x;
+  const LineTextStyle measureStyle = style;
+  const int width = MeasureText(this->m_parent, text, measureStyle).cx;
   if (width > this->m_width) {
-    const std::string first = FitText(this->m_parent, text, style, this->m_width - x);
-    UIWindow* last = this->CreateTextWindow(first, style);
+    const std::string first = FitText(this->m_parent, text, measureStyle, this->m_width - position);
+    UIWindow* last = this->CreateTextWindow(first, measureStyle);
     if (last) {
       this->AddWindow(last);
     }
 
     const std::string rest = text.substr(first.size(), text.size() - first.size());
-    const std::vector<std::string> lines = SplitLines(this->m_parent, rest, style, this->m_width);
-    if (!lines.empty()) {
-      x = 0;
-    }
-
+    const std::vector<std::string> lines = SplitLines(this->m_parent, rest, measureStyle, this->m_width);
     for (auto line = lines.begin(); line != lines.end(); ++line) {
       this->NewLine();
-      last = this->CreateTextWindow(*line, style);
+      position = 0;
+      last = this->CreateTextWindow(*line, measureStyle);
       if (last) {
         this->AddWindow(last);
       }
     }
 
     if (last) {
-      x += last->geometry.width;
+      position += last->geometry.width;
     }
   } else {
-    if (this->m_width < x + width) {
+    if (position + width > this->m_width) {
       this->NewLine();
-      x = 0;
+      position = 0;
     }
 
     UIWindow* window = this->CreateTextWindow(text, style);
     if (window) {
       this->AddWindow(window);
-      x += window->geometry.width;
+      position += window->geometry.width;
     }
   }
 
-  return x;
+  return position;
 }
 
 // OFFSET: 0x00838D40
@@ -978,33 +987,34 @@ void CCreateLineInfo::BuildWindows() {
 
   for (auto segment = this->m_segments.begin(); segment != this->m_segments.end(); ++segment) {
     const std::string text = segment->text;
-    switch (segment->type) {
-    case LINE_SEGMENT_URL:
-    case LINE_SEGMENT_NAVI:
-    case LINE_SEGMENT_ITEM:
-    case LINE_SEGMENT_TIPBOX:
-    case LINE_SEGMENT_QUEST:
-      x = this->LayoutLink(x, text, segment->type, segment->style);
-      break;
-    case LINE_SEGMENT_MESSAGE: {
-      const std::string expanded = GetNavigationLinkParser()->ExpandMessages(text);
-      x = this->LayoutText(x, expanded, segment->style);
-      break;
-    }
-    case LINE_SEGMENT_EMOTION:
-      x = this->LayoutEmotion(x, text);
-      break;
-    case LINE_SEGMENT_ITEM_IMAGE:
-      x = this->LayoutItemImage(x, text);
-      break;
-    case LINE_SEGMENT_TEXT:
+    if (segment->type != LINE_SEGMENT_TEXT) {
+      switch (segment->type) {
+      case LINE_SEGMENT_URL:
+      case LINE_SEGMENT_NAVI:
+      case LINE_SEGMENT_ITEM:
+      case LINE_SEGMENT_TIPBOX:
+      case LINE_SEGMENT_QUEST:
+        x = this->LayoutLink(x, text, segment->type, segment->style);
+        break;
+      case LINE_SEGMENT_MESSAGE: {
+        const std::string expanded = GetNavigationLinkParser()->ExpandMessages(text);
+        x = this->LayoutText(x, expanded, segment->style);
+        break;
+      }
+      case LINE_SEGMENT_EMOTION:
+        x = this->LayoutEmotion(x, text);
+        break;
+      case LINE_SEGMENT_ITEM_IMAGE:
+        x = this->LayoutItemImage(x, text);
+        break;
+      }
+    } else {
       if (text.compare("\n") == 0) {
         this->NewLine();
         x = 0;
       } else {
         x = this->LayoutText(x, text, segment->style);
       }
-      break;
     }
   }
 }
@@ -1037,8 +1047,8 @@ std::size_t CCreateLineInfo::FindTag(std::string text, std::string keyword, bool
 // FUNCTION: fn_10458
 std::vector<std::string> CCreateLineInfo::SplitLines(UIWindow* window, std::string text, const LineTextStyle& style, int width) {
   std::vector<std::string> lines;
-  const int length = static_cast<int>(text.size());
   int position = 0;
+  const int length = static_cast<int>(text.size());
 
   while (position < length) {
     const std::string rest = text.substr(position, length - position);
@@ -1058,12 +1068,12 @@ std::vector<std::string> CCreateLineInfo::SplitLines(UIWindow* window, std::stri
 // OFFSET: 0x00839860
 // FUNCTION: fn_10459
 std::string CCreateLineInfo::FitText(UIWindow* window, const std::string text, const LineTextStyle& style, int width) {
-  const int length = static_cast<int>(text.size());
-  int position = 0;
   int total = 0;
+  int position = 0;
+  const int length = static_cast<int>(text.size());
 
   while (position < length) {
-    const std::string rest = text.substr(position, length - position);
+    const std::string rest = text.substr(position, text.size() - position);
     const std::string character = NextCharacter(rest);
     if (character.empty()) {
       continue;
@@ -1107,8 +1117,9 @@ std::pair<std::string, std::string> CCreateLineInfo::GetLinkTags(int type) {
 // OFFSET: 0x00839FA0
 // FUNCTION: fn_10461
 tagSIZE CCreateLineInfo::MeasureText(UIWindow* window, std::string text, const LineTextStyle& style) {
+  tagSIZE size = {};
   if (!window) {
-    return tagSIZE();
+    return size;
   }
 
   return window->TextSize(text.c_str(), text.size(), 0, style.fontHeight, style.bold, style.italic);
@@ -1137,7 +1148,10 @@ void CCreateLineInfo::ApplyFont(std::string tag) {
     const unsigned long color = std::strtol(digits, &end, 16);
     if (end > digits && end - digits == 6) {
       changed = true;
-      this->m_color = RGB((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+      const unsigned char red = static_cast<unsigned char>(color >> 16);
+      const unsigned char green = static_cast<unsigned char>(color >> 8);
+      const unsigned char blue = static_cast<unsigned char>(color);
+      this->m_color = (((blue << 8) | green) << 8) | red;
     }
   }
 
@@ -1181,8 +1195,7 @@ UITextButton* CCreateLineInfo::CreateLinkWindow(const std::string& text, const s
   button->ResizeToTextClipped(width + 1, button->geometry.height);
 
   for (auto it = parts.begin(); it != parts.end(); ++it) {
-    std::string part = *it;
-    button->m_lines.push_back(part);
+    button->AddLine(*it);
   }
 
   return button;
@@ -1212,7 +1225,7 @@ void CCreateLineInfo::NewLine() {
 // OFFSET: 0x0083AB90
 // FUNCTION: fn_10466
 void CCreateLineInfo::AddSegment(int type) {
-  LineTextSegment segment(std::string(""), LineTextStyle{this->m_color, this->m_fontHeight, this->m_bold > 0, this->m_italic > 0});
+  LineTextSegment segment("", LineTextStyle{this->m_color, this->m_fontHeight, this->m_bold > 0, this->m_italic > 0});
   segment.type = type;
   this->m_segments.push_back(segment);
   this->m_newSegment = false;
@@ -1244,9 +1257,9 @@ void ShowTextButtonItem(UITextButton* button) {
   const std::string itemId = button->GetLine(0);
   const int index = std::atoi(button->GetLine(1).c_str());
   ITEM_INFO item;
+  item.identified = 1;
   item.identity[0] = static_cast<std::uint32_t>(index);
   item.itemId = itemId;
-  item.identified = 1;
   UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMCOLLECTIONWND);
   if (window) {
     window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&item), 0, 0, 0);
@@ -1427,7 +1440,15 @@ int CCreateLineInfo::ParseItemImage(int index) {
   const bool missing = !std::regex_search(text.c_str(), text.c_str() + text.size(), match, std::regex("^\\^i(\\[\\d{1,7}\\])*"));
   if (!missing && match.size() >= 2) {
     this->AddSegment(LINE_SEGMENT_ITEM_IMAGE);
-    this->AppendText(match[0].str());
+    {
+      const std::string matched = match[0].str();
+      if (this->m_segments.empty()) {
+        this->AddSegment(LINE_SEGMENT_TEXT);
+      }
+
+      this->m_segments.back().text += matched;
+    }
+
     this->m_newSegment = true;
     return index + static_cast<int>(match[0].length());
   }
@@ -1444,7 +1465,7 @@ int CCreateLineInfo::ParseItemName(int index) {
     std::string digits;
     for (long long position = index + keyword.size(); position < this->m_text.size(); ++position) {
       const char ch = this->m_text.at(static_cast<std::size_t>(position));
-      if (!g_colorHexDigit[static_cast<unsigned char>(ch)]) {
+      if (!IsValidIdentChar(ch)) {
         break;
       }
       digits.push_back(ch);
@@ -1531,7 +1552,10 @@ static int ParseColorCode(CCreateLineInfo& info, int index) {
     return index;
   }
 
-  const std::uint32_t color = RGB((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF);
+  const unsigned char red = static_cast<unsigned char>(value >> 16);
+  const unsigned char green = static_cast<unsigned char>(value >> 8);
+  const unsigned char blue = static_cast<unsigned char>(value);
+  const std::uint32_t color = (((blue << 8) | green) << 8) | red;
   info.m_newSegment = true;
   info.m_defaultColor = color;
   info.m_color = color;
@@ -1579,7 +1603,7 @@ void CCreateLineInfo::ArrangeLines() {
     unsigned lineHeight = 0;
     for (UIWindow* window : line) {
       const unsigned height = static_cast<unsigned>(window->geometry.height);
-      if (lineHeight < height) {
+      if (height > lineHeight) {
         lineHeight = height;
       }
     }
@@ -1758,7 +1782,7 @@ void UIItemImage::OnRBtnDown(int, int) {
 // OFFSET: 0x00832000
 // FUNCTION: fn_10406
 bool NavigationLinkParser::HasUnownedItemLink(std::string text) {
-  if (!StrStrIA(text.c_str(), g_itemLinkTag.c_str())) {
+  if (!_mbsstr(reinterpret_cast<const unsigned char*>(text.c_str()), reinterpret_cast<const unsigned char*>(g_itemLinkTag.c_str()))) {
     return false;
   }
 
@@ -1766,7 +1790,7 @@ bool NavigationLinkParser::HasUnownedItemLink(std::string text) {
   int offset = 0;
 
   for (;;) {
-    std::string link;
+    std::string link("");
     if (!ExtractInnerItemLink(work, link, offset, text.c_str())) {
       return false;
     }
@@ -1785,7 +1809,7 @@ bool NavigationLinkParser::HasUnownedItemLink(std::string text) {
       continue;
     }
 
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_IQ_FIRM_FAITH_ON)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MSG_IS_ILLEGAL_TAG_MSG)), 0xFF, 0, 0, 0);
     return true;
   }
 }
@@ -1848,9 +1872,12 @@ void OpenTextButtonNavigation(UITextButton* button) {
       code -= 100;
     }
 
-    const unsigned char group = code < 10 ? hundreds : static_cast<unsigned char>(hundreds + 2);
-    const int remainder = code < 10 ? code : code - 10;
-    g_navigationManager.StartNavigation(name, mode, remainder < 1 ? group : static_cast<unsigned char>(group + 4), flag == 0, x, y, id);
+    unsigned char group = code >= 10 ? static_cast<unsigned char>(hundreds + 2) : hundreds;
+    const int remainder = code >= 10 ? code - 10 : code;
+    if (remainder >= 1) {
+      group = static_cast<unsigned char>(group + 4);
+    }
+    g_navigationManager.StartNavigation(name, mode, group, flag == 0, x, y, id);
   } else {
     g_navigationManager.StartNavigation(name, 2, 5, false, x, y, 1002);
   }

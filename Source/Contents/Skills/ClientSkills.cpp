@@ -1,5 +1,6 @@
 #include "Contents/Skills/ClientSkills.h"
 #include "Contents/Actors/GameActor.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Mode/ModeMgr.h"
@@ -22,6 +23,7 @@
 #include "UI/Window/WindowManagerWindows.h"
 #include "Utility/Text/Tokenizer.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "UI/Rodex/UIRodexComposeWnd.h"
 #include "UI/Shortcuts/UIShortCutWnd.h"
 #include "UI/Skill/UINewSkillListWnd.h"
@@ -30,15 +32,12 @@
 #include <cstdlib>
 #include <cstring>
 
-template __declspec(noinline) std::_Tree_find_result<std::map<std::int64_t, std::int64_t>::_Mybase::_Nodeptr> std::map<std::int64_t, std::int64_t>::_Mybase::_Find_lower_bound<std::int64_t>(const std::int64_t&) const;
-template __declspec(noinline) std::pair<std::map<int, SessionRecord6144>::_Mybase::_Nodeptr, bool> std::map<int, SessionRecord6144>::_Mybase::_Emplace<std::pair<const int, SessionRecord6144>>(std::pair<const int, SessionRecord6144>&&);
-
 // GLOBAL: gl_24650
 char g_decodedPlayerName[64];
 
 // OFFSET: 0x00E198F0
 // FUNCTION: fn_23844
-void InitMapTypeInfoTable() {
+void CSession::InitMapTypeInfoTable() {
   CFile file;
   if (!file.Open("MapInfoTable.scp", 0, true, false)) {
     if (g_serviceType == 0) {
@@ -246,20 +245,20 @@ __declspec(noinline) bool CSession::UpdateSkill(const CSkillInfo& value, unsigne
       target.apCost = source.apCost;
     };
 
-    CSkillInfo* grouped = this->m_skillBundle.FindGrouped(snapshot.id);
-    if (grouped) {
+    bool known = true;
+    if (CSkillInfo* grouped = this->m_skillBundle.FindGrouped(snapshot.id)) {
       update(*grouped, snapshot, true, true);
+    } else if (!snapshot.available) {
+      known = false;
+    } else if (CSkillInfo* extra = this->m_skillBundle.FindExtra(snapshot.id)) {
+      update(*extra, snapshot, true, false);
     } else if (snapshot.available) {
-      if (CSkillInfo* extra = this->m_skillBundle.FindExtra(snapshot.id)) {
-        update(*extra, snapshot, true, false);
-      } else {
-        snapshot.treePosition = UINT32_MAX;
-        snapshot.canPlanLevel = 0;
-        this->m_skillBundle.AddExtra(snapshot);
-      }
+      snapshot.treePosition = UINT32_MAX;
+      snapshot.canPlanLevel = 0;
+      this->m_skillBundle.AddExtra(snapshot);
     }
 
-    if (grouped || snapshot.available) {
+    if (known) {
       if (CSkillInfo::UsesLevel(static_cast<int>(snapshot.id)) && snapshot.level != 0) {
         const int saved = this->UseLevel(static_cast<int>(snapshot.id));
         if (saved <= 0 || saved > snapshot.level) {
@@ -275,10 +274,7 @@ __declspec(noinline) bool CSession::UpdateSkill(const CSkillInfo& value, unsigne
     std::memcpy(&existing->range, &value.range, sizeof(existing->range));
     std::memcpy(&existing->upgradable, &value.upgradable, sizeof(existing->upgradable));
 
-    if (updateType == 1) {
-      std::memcpy(&existing->type, &value.type, sizeof(existing->type));
-    }
-
+    existing->type = updateType == 1 ? value.type : existing->type;
     existing->learnedLevel = value.learnedLevel;
     existing->apCost = value.apCost;
     if (notify == 1) {
@@ -381,7 +377,7 @@ void CSession::AddAchievementId(int id) {
 // FUNCTION: fn_23744
 bool CSession::EquipAlternateCostumeItem(const ITEM_INFO& item) {
   const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
-  const int order[3] = {slots.values[2], slots.values[1], slots.values[0]};
+  const int order[3] = {std::get<0>(slots), std::get<1>(slots), std::get<2>(slots)};
 
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
@@ -468,10 +464,10 @@ void CSession::ResetAlternateCostumeItems() {
 // FUNCTION: fn_23756
 void CSession::ClearQuickSlots() {
   this->quickSlot.enabled = 0;
-  this->quickSlot.itemId = 0;
+  this->quickSlot.itemId = ITEMID_NONE;
   this->quickSlot.value = 0;
   this->alternateQuickSlot.enabled = 0;
-  this->alternateQuickSlot.itemId = 0;
+  this->alternateQuickSlot.itemId = ITEMID_NONE;
   this->alternateQuickSlot.value = 0;
 }
 
@@ -480,7 +476,7 @@ void CSession::ClearQuickSlots() {
 void CSession::ClearShortcutSlots() {
   for (int index = 0; index < 36; ++index) {
     this->m_shortcutSlots[index].enabled = 0;
-    this->m_shortcutSlots[index].itemId = 0;
+    this->m_shortcutSlots[index].itemId = ITEMID_NONE;
     this->m_shortcutSlots[index].value = 0;
   }
 }
@@ -591,17 +587,26 @@ SessionRecord6144 CSession::FindAchievementRecord(int key) const {
   return {};
 }
 
+// INLINED
+static __forceinline void SplitDate(__time32_t time, std::int16_t& year, std::int16_t& month, std::int16_t& day) {
+  time = time > 0 ? time : 0;
+
+  const std::tm local = *_localtime32(&time);
+  year = static_cast<std::int16_t>(local.tm_year + 1900);
+  month = static_cast<std::int16_t>(local.tm_mon + 1);
+  day = static_cast<std::int16_t>(local.tm_mday);
+}
+
 // OFFSET: 0x00E06FD0
 // FUNCTION: fn_23738
 void CSession::UpdateAchievementRecord(const AchievementRecordPacket& packet) {
   auto found = this->achievements.find(packet.id);
   if (found != this->achievements.end()) {
-    SessionRecord6144& record = found->second;
-    record.completed = packet.completed;
-    std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
-    record.completedAt = packet.completedAt;
-    record.rewarded = packet.rewarded;
-    record.SplitDate(packet.completedAt, record.year, record.month, record.day);
+    found->second.completed = packet.completed;
+    std::memcpy(found->second.objectives, packet.objectives, sizeof(found->second.objectives));
+    found->second.completedAt = packet.completedAt;
+    found->second.rewarded = packet.rewarded;
+    found->second.SplitDate(packet.completedAt, found->second.year, found->second.month, found->second.day);
     return;
   }
 
@@ -611,7 +616,7 @@ void CSession::UpdateAchievementRecord(const AchievementRecordPacket& packet) {
   std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
   record.completedAt = packet.completedAt;
   record.rewarded = packet.rewarded;
-  record.SplitDate(packet.completedAt, record.year, record.month, record.day);
+  ::SplitDate(packet.completedAt, record.year, record.month, record.day);
   this->achievements.insert({packet.id, record});
 }
 
@@ -667,13 +672,8 @@ int CSession::CountSelectionItems() const {
 
 // OFFSET: 0x00E09080
 // FUNCTION: fn_23775
-__declspec(noinline) void SessionRecord6144::SplitDate(__time32_t time, std::uint16_t& year, std::uint16_t& month, std::uint16_t& day) const {
-  time = time > 0 ? time : 0;
-
-  const std::tm local = *_localtime32(&time);
-  year = static_cast<std::uint16_t>(local.tm_year + 1900);
-  month = static_cast<std::uint16_t>(local.tm_mon + 1);
-  day = static_cast<std::uint16_t>(local.tm_mday);
+__declspec(noinline) void SessionRecord6144::SplitDate(__time32_t time, std::int16_t& year, std::int16_t& month, std::int16_t& day) const {
+  ::SplitDate(time, year, month, day);
 }
 
 // OFFSET: 0x00E091F0
@@ -765,7 +765,7 @@ void CSession::ResetCostumeItems() {
     this->costumeItems[index].Reset();
   }
 
-  RequestBasicInfoRefresh();
+  this->RequestBasicInfoRefresh();
 }
 
 // OFFSET: 0x00E08B40
@@ -789,11 +789,6 @@ float CSession::GetSkillFactor(int job) const {
   }
 
   return 0.82f;
-}
-
-// INLINED
-float GetSkillFactor(int job) {
-  return g_session.GetSkillFactor(job);
 }
 
 // OFFSET: 0x00E084B0
@@ -859,8 +854,8 @@ void CSession::AddProhibitionLog(std::uint32_t aid, std::uint32_t minutes) {
 
   SYSTEMTIME localTime;
   GetLocalTime(&localTime);
-  entry.date = ((localTime.wYear << 8 | localTime.wMonth) << 8) | localTime.wDay;
-  entry.time = ((localTime.wHour << 8 | localTime.wMinute) << 8) | localTime.wSecond;
+  entry.date = ((localTime.wYear << 8 | static_cast<short>(localTime.wMonth)) << 8) | static_cast<short>(localTime.wDay);
+  entry.time = ((localTime.wHour << 8 | static_cast<short>(localTime.wMinute)) << 8) | static_cast<short>(localTime.wSecond);
   this->m_prohibitionLog.push_back(entry);
 
   CFile file;
@@ -960,22 +955,11 @@ void CSession::ReturnStackedItem(int index, int count) {
   }
 }
 
-namespace EquipmentProperties {
-class CEquipmentPropertiesMgr {
-public:
-  virtual ~CEquipmentPropertiesMgr();
-  unsigned char padding_0004[0x1F8];
-
-  CEquipmentPropertiesMgr();
-  __declspec(noinline) void EquipWearable(const ITEM_INFO* item, bool notify);
-};
-}
-
 // OFFSET: 0x00E07150
 // FUNCTION: fn_23739
 bool CSession::EquipCostumeItem(const ITEM_INFO& item, const char* name) {
   const EquipSlots slots = g_session.GetEquipSlots(item.identity[3]);
-  const int order[3] = {slots.values[2], slots.values[1], slots.values[0]};
+  const int order[3] = {std::get<0>(slots), std::get<1>(slots), std::get<2>(slots)};
 
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
@@ -989,7 +973,7 @@ bool CSession::EquipCostumeItem(const ITEM_INFO& item, const char* name) {
     }
   }
 
-  RequestBasicInfoRefresh();
+  this->RequestBasicInfoRefresh();
   if (g_equipmentPropertiesMgr == nullptr) {
     g_equipmentPropertiesMgr = new (std::nothrow) EquipmentProperties::CEquipmentPropertiesMgr;
   }

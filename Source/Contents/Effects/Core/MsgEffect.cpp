@@ -107,12 +107,19 @@ bool CMsgEffect::UsesMsgEffect(int type) {
 }
 
 // INLINED
+static void MatrixMult(vector3d& result, const vector3d& v, const float* m) {
+  result.x = v.x * m[0] + v.y * m[3] + v.z * m[6] + m[9];
+  result.y = v.x * m[1] + v.y * m[4] + v.z * m[7] + m[10];
+  result.z = v.x * m[2] + v.y * m[5] + v.z * m[8] + m[11];
+}
+
+// INLINED
 static float MsgEffectElapsedFrames(CMsgEffect* effect) {
   return effect->GetElapsedFrames();
 }
 
 // INLINED
-__forceinline static void MsgEffectDrift(CMsgEffect* effect, float elapsed) {
+__forceinline static float MsgEffectDriftDirection(CMsgEffect* effect) {
   float dirX = effect->m_drift.x;
   const int skinMode = g_session.m_damageSkinMode;
   if (effect->m_drift.x == 0.0f && effect->m_owner != nullptr) {
@@ -155,18 +162,18 @@ __forceinline static void MsgEffectDrift(CMsgEffect* effect, float elapsed) {
 
       matrix rotation;
       rotation.MakeYRotation(yaw / 180.0f * 3.141592f);
-      const float y = effect->m_drift.y;
-      const float x = effect->m_drift.x;
-      const float z = effect->m_drift.z;
-      dirX = rotation.values[0] * x + rotation.values[3] * y + rotation.values[6] * z + rotation.values[9];
+      vector3d rotated;
+      MatrixMult(rotated, effect->m_drift, rotation.values);
+      dirX = rotated.x;
       effect->m_drift.x = dirX;
-      effect->m_drift.z = rotation.values[2] * x + rotation.values[5] * y + rotation.values[8] * z + rotation.values[11];
+      effect->m_drift.z = rotated.z;
     }
   }
+  return dirX;
+}
 
-  const float dirZ = effect->m_drift.z;
-  effect->render.position.x = dirX * (elapsed / 3.0f) + effect->m_velocity.x + dirX * 3.0f;
-  effect->render.position.z = dirZ * (elapsed / 3.0f) + effect->m_velocity.z + dirZ * 3.0f;
+// INLINED
+__forceinline static void MsgEffectDriftHeight(CMsgEffect* effect, float elapsed) {
   float height = effect->m_baseY + 8.0f - (2.0f - elapsed / 30.0f) * elapsed + effect->m_drift.y;
   effect->render.position.y = height;
   if (height > 0.0f) {
@@ -175,6 +182,23 @@ __forceinline static void MsgEffectDrift(CMsgEffect* effect, float elapsed) {
     height = -height;
     effect->m_drift.y = height / (height * 3.0f * 0.25f);
   }
+}
+
+// INLINED
+__forceinline static void MsgEffectDrift(CMsgEffect* effect, float elapsed) {
+  const float dirX = MsgEffectDriftDirection(effect);
+  effect->render.position.x = dirX * (elapsed / 3.0f) + effect->m_velocity.x + dirX * 3.0f;
+  effect->render.position.z = effect->m_drift.z * (elapsed / 3.0f) + effect->m_velocity.z + effect->m_drift.z * 3.0f;
+  MsgEffectDriftHeight(effect, elapsed);
+}
+
+// INLINED
+__forceinline static void MsgEffectDriftCached(CMsgEffect* effect, float elapsed) {
+  const float dirX = MsgEffectDriftDirection(effect);
+  const float dirZ = effect->m_drift.z;
+  effect->render.position.x = dirX * (elapsed / 3.0f) + effect->m_velocity.x + dirX * 3.0f;
+  effect->render.position.z = dirZ * (elapsed / 3.0f) + effect->m_velocity.z + dirZ * 3.0f;
+  MsgEffectDriftHeight(effect, elapsed);
 }
 
 // OFFSET: 0x00E4C3E0
@@ -222,7 +246,7 @@ bool CMsgEffect::OnProcess() {
     case MET_NUMBER_CRITICAL:
       elapsed = MsgEffectElapsedFrames(this);
       this->render.previousAnimation = this->render.animation;
-      MsgEffectDrift(this, elapsed);
+      MsgEffectDriftCached(this, elapsed);
       if (this->render.scale > 1.3f) {
         this->render.scale = this->m_scale - elapsed * 0.24f;
       } else if (this->render.scale < 1.3f) {
@@ -329,9 +353,9 @@ bool CMsgEffect::OnProcess() {
     case MET_BLUE_EFFECT: {
       elapsed = MsgEffectElapsedFrames(this);
       this->render.previousAnimation = this->render.animation;
+      int fade = 0;
       this->render.curMotion = 0;
       this->render.position.y = this->m_baseY - elapsed * 0.1f - 15.0f;
-      int fade = 0;
       if (elapsed > 90.0f) {
         fade = static_cast<int>((elapsed - 90.0f) * 8.0f);
       }
@@ -457,7 +481,7 @@ bool CMsgEffect::OnProcess() {
       {
         const int frame = static_cast<int>(elapsed);
         if (frame % 34 == 0) {
-          this->m_owner->SendMsg(nullptr, 0x4D, 0, 0, 0, 0, 0, 0);
+          this->m_owner->SendMsg(nullptr, AM_MAKE_BLUR_ACTOR, 0, 0, 0, 0, 0, 0);
         }
       }
       return true;
@@ -472,17 +496,14 @@ bool CMsgEffect::OnProcess() {
         }
         this->render.previousAnimation = this->Get8Dir2(this->render.angle, 1) + 8;
         this->render.position.x = this->m_velocity.x + this->render.position.x;
-        if (this->processTick > 10 && this->processTick < 25) {
-          this->initialVelocityX = this->m_velocity.x;
-          this->render.position.z = this->m_velocity.z + this->render.position.z;
-        } else {
-          this->initialVelocityX = this->m_velocity.x;
+        if (this->processTick <= 10 || this->processTick >= 25) {
           this->render.position.y = this->m_velocity.y + this->render.position.y;
-          this->render.position.z = this->m_velocity.z + this->render.position.z;
-          if (this->processTick >= 25) {
-            this->m_finished = 1;
-            this->m_velocity.y = this->m_velocity.y * -1.9f;
-          }
+        }
+        this->initialVelocityX = this->m_velocity.x;
+        this->render.position.z = this->m_velocity.z + this->render.position.z;
+        if (this->processTick >= 25) {
+          this->m_finished = 1;
+          this->m_velocity.y = this->m_velocity.y * -1.9f;
         }
         this->GetActRes();
         ++this->processTick;
@@ -567,12 +588,14 @@ bool CSkill::OnProcess() {
     }
     break;
 
-  case UNT_BENEDICTIO:
-    if (this->m_effectTimer >= EffectLifetime(0x5B) - 8u) {
+  case UNT_BENEDICTIO: {
+    const unsigned interval = EffectLifetime(0x5B) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_BENEDICTIO, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
   case UNT_SANCTUARY:
     if (!this->m_effect) {
@@ -742,8 +765,11 @@ bool CSkill::OnProcess() {
     break;
 
   case UNT_EVILLAND:
-    if (!this->m_hasEffect && g_effectMgr->Spawn(this->skillAid, EF_EVILLAND, this->render.position, 0, this->range * 2, 0, 0)) {
-      this->m_hasEffect = true;
+    if (!this->m_hasEffect) {
+      EffectLists* effects = g_effectMgr;
+      if (effects->Spawn(this->skillAid, EF_EVILLAND, this->render.position, 0, this->range * 2, 0, 0)) {
+        this->m_hasEffect = true;
+      }
     }
     break;
 
@@ -778,9 +804,12 @@ bool CSkill::OnProcess() {
     break;
 
   case UNT_CLOUD_KILL:
-    if (!this->m_hasEffect && g_effectMgr->Spawn(this->skillAid, EF_CLOUD_KILL, this->render.position, 0, -1, 0, 0)) {
-      this->m_hasEffect = true;
-      this->m_effectId = 0x438;
+    if (!this->m_hasEffect) {
+      EffectLists* effects = g_effectMgr;
+      if (effects->Spawn(this->skillAid, EF_CLOUD_KILL, this->render.position, 0, -1, 0, 0)) {
+        this->m_hasEffect = true;
+        this->m_effectId = EF_CLOUD_KILL;
+      }
     }
     break;
 
@@ -794,12 +823,14 @@ bool CSkill::OnProcess() {
     }
     break;
 
-  case UNT_FIREPILLAR_ACTIVE:
-    if (this->m_effectTimer >= EffectLifetime(0x61) - 8u) {
+  case UNT_FIREPILLAR_ACTIVE: {
+    const unsigned interval = EffectLifetime(0x61) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_FIREPILLARBOMB, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
   case UNT_FIREPILLAR_WAITING:
   case UNT_WINDATTACK:
@@ -824,8 +855,9 @@ bool CSkill::OnProcess() {
     }
     break;
 
-  case UNT_QUAGMIRE:
-    if (this->m_effectTimer >= EffectLifetime(0x5F) - 20u) {
+  case UNT_QUAGMIRE: {
+    const unsigned interval = EffectLifetime(0x5F) - 20;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       if (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF)) {
         g_effectMgr->Spawn(0, EF_QUAGMIRE_VISUAL, this->render.position, 0, -1, 0, 0);
@@ -834,108 +866,137 @@ bool CSkill::OnProcess() {
       }
     }
     break;
+  }
 
-  case UNT_WARP_ACTIVE:
-    if (this->m_effectTimer >= EffectLifetime(0x13C) - 8u) {
+  case UNT_WARP_ACTIVE: {
+    const unsigned interval = EffectLifetime(0x13C) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_READYPORTAL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_WARP_WAITING:
-    if (this->m_effectTimer >= EffectLifetime(0x13D) - 8u) {
+  case UNT_WARP_WAITING: {
+    const unsigned interval = EffectLifetime(0x13D) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_PORTAL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_DIMENSIONDOOR:
-    if (this->m_effectTimer >= EffectLifetime(0x339) - 8u) {
+  case UNT_DIMENSIONDOOR: {
+    const unsigned interval = EffectLifetime(0x339) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_FORESTLIGHT6, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_CHAOSPANIC:
-    if (this->m_effectTimer >= EffectLifetime(0x33B) - 8u) {
+  case UNT_CHAOSPANIC: {
+    const unsigned interval = EffectLifetime(0x33B) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_BOTTOM_ANI, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_MAELSTROM:
-    if (this->m_effectTimer >= EffectLifetime(0x33C) - 8u) {
+  case UNT_MAELSTROM: {
+    const unsigned interval = EffectLifetime(0x33C) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_BOTTOM_MAELSTROM, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_REVERBERATION:
-    if (this->m_effectTimer >= EffectLifetime(0x358) - 8u) {
+  case UNT_REVERBERATION: {
+    const unsigned interval = EffectLifetime(0x358) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_BOT_REVERB, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\REVERBERATION.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
+  }
 
-  case UNT_NETHERWORLD:
-    if (this->m_effectTimer >= EffectLifetime(0x35C) - 8u) {
+  case UNT_NETHERWORLD: {
+    const unsigned interval = EffectLifetime(0x35C) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_BOT_REVERB2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       g_soundMgr->PlayWave("effect\\POEMOFNETHERWORLD.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
+  }
 
-  case UNT_SEVERE_RAINSTORM:
-    if (this->m_effectTimer >= EffectLifetime(0x359) - 8u) {
+  case UNT_SEVERE_RAINSTORM: {
+    const unsigned interval = EffectLifetime(0x359) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       g_effectMgr->Spawn(0, EF_NEW_SEVERERAINSTORM, this->render.position, 0, -1, 0, 0);
       g_soundMgr->PlayWave("effect\\rainstorm.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     }
     break;
+  }
 
-  case UNT_BLOODYLUST:
-    if (this->m_effectTimer >= EffectLifetime(0x33D) - 8u) {
+  case UNT_BLOODYLUST: {
+    const unsigned interval = EffectLifetime(0x33D) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_BOTTOM_BLOODYLUST, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_CALLFAMILY:
-    if (this->m_effectTimer >= EffectLifetime(0x155) - 8u) {
+  case UNT_CALLFAMILY: {
+    const unsigned interval = EffectLifetime(0x155) - 8;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_PORTAL3, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_SAFETYWALL:
-    if (this->m_effectTimer >= EffectLifetime(0x13B) - 7u) {
+  case UNT_SAFETYWALL: {
+    const unsigned interval = EffectLifetime(0x13B) - 7;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_GLASSWALL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
   case UNT_FIREWALL:
-  case UNT_FIRE_MANTLE:
-    if (this->m_effectTimer >= EffectLifetime(0x19) - 7u) {
+  case UNT_FIRE_MANTLE: {
+    const unsigned interval = EffectLifetime(0x19) - 7;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_FIREWALL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_FIREWALK:
-    if (this->m_effectTimer >= EffectLifetime(0x398) - 7u) {
+  case UNT_FIREWALK: {
+    const unsigned interval = EffectLifetime(0x398) - 7;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_FIREWALL2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
-  case UNT_ELECTRICWALK:
-    if (this->m_effectTimer >= EffectLifetime(0x39E) - 7u) {
+  case UNT_ELECTRICWALK: {
+    const unsigned interval = EffectLifetime(0x39E) - 7;
+    if (this->m_effectTimer >= interval) {
       this->m_effectTimer = 0;
       this->LaunchEffect(EF_SHOCKWAVE2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
     break;
+  }
 
   case UNT_VACUUM_EXTREME:
     if (this->m_effectTimer >= EffectLifetime(0x399) - 1u) {
@@ -1231,7 +1292,7 @@ bool CSkill::OnProcess() {
     if (!this->m_hasEffect) {
       this->m_hasEffect = true;
       this->LaunchEffect(this->m_effectId, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      this->m_effectId = 0x520;
+      this->m_effectId = EF_NEW_FEINTBOMB;
     }
     break;
   default:
@@ -1381,21 +1442,25 @@ void CMsgEffect::FollowOwner() {
           direction.y = this->render.position.z - owner->render.position.z;
           this->render.previousAnimation = this->render.animation + 8 + dir;
           direction.Normalize();
-          float radius = dist - 0.7f;
+          const float radius = dist - 0.7f;
           if (radius <= 15.0f) {
-            radius = 14.9f;
+            direction.x *= 14.9f;
+            direction.y *= 14.9f;
+          } else {
+            direction.x *= radius;
+            direction.y *= radius;
           }
-          this->render.position.x = direction.x * radius + owner->render.position.x;
-          this->render.position.z = direction.y * radius + owner->render.position.z;
+          this->render.position.x = direction.x + owner->render.position.x;
+          this->render.position.z = direction.y + owner->render.position.z;
           const float movedX = this->render.position.x - oldPosition.x;
           const float movedZ = this->render.position.z - oldPosition.z;
           this->travelDistance += SquareRoot(movedZ * movedZ + movedX * movedX);
           if (this->m_owner->render.state == 0 && dist < 16.0f) {
             this->render.previousAnimation = this->render.animation + dir;
           }
-        } else if (owner->render.state == 4) {
+        } else if (owner->render.state == ST_DAMAGE) {
           this->render.previousAnimation = this->render.animation + 0x18 + dir;
-        } else if (owner->render.state == 3) {
+        } else if (owner->render.state == ST_DEAD) {
           this->render.previousAnimation = this->render.animation + 0x20 + dir;
         } else if (owner->render.state == 0 || dist <= 14.0f) {
           this->render.previousAnimation = this->render.animation + dir;
@@ -1439,40 +1504,41 @@ void CMsgEffect::FollowOwner() {
         const int dir = this->Get8Dir2(this->render.angle, 1);
         CRenderObject* owner = this->m_owner;
         this->render.previousAnimation = this->render.animation + dir;
-        if (this->motionInitialized == 0) {
-          if (dist <= 25.0f) {
-            this->motionInitialized = 1;
-          }
-          const vector3d oldPosition = this->render.position;
+        bool approach = false;
+        if (dist > 25.0f && this->motionInitialized == 0) {
+          approach = true;
+        } else if (dist <= 25.0f && this->motionInitialized == 0) {
+          this->motionInitialized = 1;
+          approach = true;
+        }
+        vector3d oldPosition;
+        if (approach) {
+          oldPosition = this->render.position;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
           direction.Normalize();
           this->render.position.x += (owner->render.position.x - this->render.position.x) / 25.0f;
-          this->render.position.z += (owner->render.position.z - this->render.position.z) / 25.0f;
           this->render.curMotion = 8;
-          const float movedX = this->render.position.x - oldPosition.x;
-          const float movedZ = this->render.position.z - oldPosition.z;
-          this->travelDistance += SquareRoot(movedZ * movedZ + movedX * movedX);
+          this->render.position.z += (owner->render.position.z - this->render.position.z) / 25.0f;
         } else if (dist > 12.0f && this->activeMotion == 0) {
-          const vector3d oldPosition = this->render.position;
+          oldPosition = this->render.position;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
           direction.Normalize();
           this->render.position.x += (owner->render.position.x - this->render.position.x) / dist;
           this->render.position.z += (owner->render.position.z - this->render.position.z) / dist;
-          const float movedX = this->render.position.x - oldPosition.x;
-          const float movedZ = this->render.position.z - oldPosition.z;
-          this->travelDistance += SquareRoot(movedZ * movedZ + movedX * movedX);
         } else if (dist > 3.0f) {
-          const vector3d oldPosition = this->render.position;
+          oldPosition = this->render.position;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
           direction.Normalize();
           this->render.position.x += (owner->render.position.x - this->render.position.x) / 20.0f;
           this->render.position.z += (owner->render.position.z - this->render.position.z) / 20.0f;
+        }
+        if (approach || dist > 3.0f) {
           const float movedX = this->render.position.x - oldPosition.x;
           const float movedZ = this->render.position.z - oldPosition.z;
           this->travelDistance += SquareRoot(movedZ * movedZ + movedX * movedX);
@@ -1543,21 +1609,19 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       if (this->m_type == MET_BIRD) {
         this->m_velocity.x = (position->x - this->render.position.x) / 10.0f;
         this->m_velocity.y = (position->y - this->render.position.y) / 10.0f;
+        this->m_velocity.z = (position->z - this->render.position.z) / 10.0f;
         this->activeMotion = 1;
         this->motionInitialized = 0;
-        this->m_velocity.z = (position->z - this->render.position.z) / 10.0f;
-        return;
-      }
-
-      if (this->m_type == 27 || this->m_type == 31) {
+      } else if (this->m_type == 27 || this->m_type == 31) {
         this->m_velocity.x = (position->x - this->render.position.x) / 10.0f;
         this->m_velocity.y = (position->y - this->render.position.y) / 10.0f;
+        this->m_velocity.z = (position->z - this->render.position.z) / 10.0f;
         this->activeMotion = 1;
         this->processTick = 0;
-        this->m_velocity.z = (position->z - this->render.position.z) / 10.0f;
-        return;
+      } else {
+        this->EffectActor::SendMsg(sender, message, b, c, d, e, 0, 0);
       }
-      break;
+      return;
 
     case AM_MSGMASTER_DEAD:
       this->m_owner = nullptr;
@@ -1593,8 +1657,7 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           if (sender != nullptr) {
             const CRenderObject* owner = static_cast<const CRenderObject*>(sender);
             this->render.position.x = owner->render.position.x - ClientSine(static_cast<int>(owner->render.angle)) * 5.0f;
-            owner = this->m_owner;
-            this->render.position.z = ClientCosine(static_cast<int>(owner->render.angle)) * 5.0f + owner->render.position.z;
+            this->render.position.z = ClientCosine(static_cast<int>(this->m_owner->render.angle)) * 5.0f + this->m_owner->render.position.z;
           }
           break;
 
@@ -1611,12 +1674,24 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       this->m_type = static_cast<int>(c);
       this->m_value = static_cast<int>(b);
       switch (static_cast<int>(c)) {
+        case 27:
+          this->render.flatDepth = 0;
+          this->render.depthLayer = 0;
+          this->render.shadowVisible = 1;
+          this->render.shadowScale = 2.0f;
+          break;
+
         case MET_CART:
         case 31:
           this->render.flatDepth = 0;
           this->render.depthLayer = 0;
           this->render.shadowVisible = 1;
           this->render.shadowScale = 1.0f;
+          break;
+
+        case MET_BIRD:
+          this->render.flatDepth = 0;
+          this->render.depthLayer = 0;
           break;
 
         case MET_PKEFFECT:
@@ -1634,28 +1709,12 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           this->render.flatDepth = 0;
           this->render.depthLayer = 5;
           break;
-
-        case MET_BIRD:
-          this->render.flatDepth = 0;
-          this->render.depthLayer = 0;
-          break;
-
-        case 27:
-          this->render.flatDepth = 0;
-          this->render.depthLayer = 0;
-          this->render.shadowVisible = 1;
-          this->render.shadowScale = 2.0f;
-          break;
       }
       return;
 
     case AM_SETPOS2: {
       int offset = 0;
       switch (this->m_type) {
-        case MET_MISS:
-          this->m_baseX = this->render.position.x;
-          return;
-
         case MET_NUMBER_TOTAL:
           offset = 15;
         case MET_NUMBER:
@@ -1665,12 +1724,14 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           this->SetActionName(FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
           this->render.animation = 0;
           this->render.previousAnimation = 0;
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           this->render.position.y -= static_cast<float>(offset + 12);
           this->m_baseY = this->render.position.y;
           break;
+
+        case MET_MISS:
+          this->m_baseX = this->render.position.x;
+          return;
 
         case MET_CRITICAL_EFFECT:
         case MET_LUCKY_EFFECT:
@@ -1688,9 +1749,7 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           this->SetActionName(FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
           this->render.animation = 0;
           this->render.previousAnimation = 0;
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           this->m_baseX = this->render.position.x;
           this->render.position.y -= 12.0f;
           this->m_baseY = this->render.position.y;
@@ -1736,21 +1795,21 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           break;
 
         case MET_ICEBREAKEFFECT:
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           break;
 
-        case MET_ANGELUS_EFFECT:
-        case MET_CRUSIS_EFFECT:
-          this->render.curMotion = 1;
-          this->render.visible = 0;
+        case MET_GUARD:
+          this->render.position = *position;
+          this->render.position.y -= 2.0f;
+          this->render.curMotion = 0;
+          this->render.scale = 1.0f;
+          this->m_scale = 1.0f;
+          this->render.depthLayer = static_cast<std::uint32_t>(-5);
+          this->m_baseY = this->render.position.y;
           break;
 
         case MET_MISS:
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           this->m_baseX = this->render.position.x;
           this->render.position.y -= 12.0f;
           this->render.curMotion = 0;
@@ -1762,9 +1821,7 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
 
         case MET_CRITICAL_EFFECT:
         case MET_BLUE_EFFECT:
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           this->render.position.y -= 12.0f;
           this->render.curMotion = 1;
           this->render.scale = 3.0f;
@@ -1774,32 +1831,22 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           this->render.color = 0xFFAAAAAA;
           break;
 
+        case MET_ANGELUS_EFFECT:
+        case MET_CRUSIS_EFFECT:
+          this->render.curMotion = 1;
+          this->render.visible = 0;
+          break;
+
         case 19:
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           this->render.position.y -= 12.0f;
           this->render.curMotion = 0;
           this->render.depthLayer = static_cast<std::uint32_t>(-5);
           this->m_baseY = this->render.position.y;
           break;
 
-        case MET_GUARD:
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
-          this->render.position.y -= 2.0f;
-          this->render.curMotion = 0;
-          this->render.scale = 1.0f;
-          this->m_scale = 1.0f;
-          this->render.depthLayer = static_cast<std::uint32_t>(-5);
-          this->m_baseY = this->render.position.y;
-          break;
-
         default:
-          this->render.position.x = position->x;
-          this->render.position.y = position->y;
-          this->render.position.z = position->z;
+          this->render.position = *position;
           this->render.position.y -= 20.0f;
           break;
       }

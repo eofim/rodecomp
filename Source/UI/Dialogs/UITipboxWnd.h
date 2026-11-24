@@ -37,9 +37,13 @@ struct TipBoxDot {
 class UITipboxWnd : public UIFrameWnd {
 public:
   UITipboxWnd();
+  void SaveStartupPreference() const;
+  void AdvanceDots();
   void ShowTip(int id);
   __declspec(noinline) void TrimAt(std::string& text, const char* marker);
   void UpdateAnimations();
+  void UpdateBlinkingAnimations();
+  void UpdateMovingAnimations();
   void UpdatePageText();
   bool BuildAnimations();
   void PaintAnimations();
@@ -53,8 +57,7 @@ public:
   /* 00B4 */ UIEditCtrl* searchEdit;
   /* 00B8 */ UIListBoxID* searchResults;
   /* 00BC */ UITagTextViewer* tipViewer;
-  /* 00C0 */ UIStaticText* titleText;
-  /* 00C4 */ UIStaticText* subtitleText;
+  /* 00C0 */ UIStaticText* m_titleTexts[2];
   /* 00C8 */ UIStaticText* m_pageText;
   /* 00CC */ UIStaticText* m_pageTotalText;
   /* 00D0 */ UIBitmapButton* previousButton;
@@ -66,6 +69,10 @@ public:
   /* 00F8 */ std::uint32_t m_frameTime;
   /* 00FC */ bool refreshPending;
   /* 0100 */ int showAtStartup;
+
+private:
+  enum class PageButton { Previous, Next };
+  void SetPageButtonEnabled(PageButton pageButton, int enabled);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

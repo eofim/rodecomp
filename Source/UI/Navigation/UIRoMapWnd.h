@@ -40,9 +40,12 @@ extern CWorldViewMgr g_worldViewMgr;
 class UIRoMapWnd;
 
 struct CKafraMoveMapServiceInfo {
-  virtual ~CKafraMoveMapServiceInfo() = default;
+  CKafraMoveMapServiceInfo();
+  // INLINED
+  virtual ~CKafraMoveMapServiceInfo() {}
 
   void Build(std::string mapName);
+  void SetCurrentMarker(const WorldViewRecord& record);
   __declspec(noinline) void Update(UIRoMapWnd* wnd, float elapsed);
 
   /* 0004 */ std::vector<RoMapMarker> markers;
@@ -63,6 +66,7 @@ public:
   void OnLBtnDown(int x, int y) override;
   void OnMouseMove(int x, int y) override;
   void OnLBtnUp(int x, int y) override;
+  bool PopulateFieldNames(int x, int y);
   void OnRBtnUp(int x, int y) override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
   void ClearRecords();
@@ -74,9 +78,13 @@ public:
   void DrawRecordBorders();
   __declspec(noinline) void DrawDungeonLinks();
   __declspec(noinline) void DrawMarks();
+  void DrawWorldSelection();
+  void DrawLevelAreas();
+  void DrawPreviewOverlay();
   __declspec(noinline) void DrawRecordFaces(int unused);
   void DrawRecordAreas();
   void DrawSelectedMapPreview();
+  void DrawPreviewTexture();
   void DrawKafraIcon(float x, float y);
   void DrawArrow(
     float x0, float y0, float x1, float y1, float startLeft, float startTop, float startRight, float startBottom, float endLeft, float endTop, float endRight,
@@ -91,8 +99,10 @@ public:
   void RefreshWorldMapMarks();
   void RefreshWorldMapSelection();
   void RefreshWorldMapLevels();
+  void UpdateFlyingShipRoute(CFlyingShipRouteInfo* route, float elapsed);
   void DrawWorld();
   __declspec(noinline) void RefreshPartyRecords();
+  bool AddRelatedName(std::string map, std::string name);
   __declspec(noinline) bool LocateRecord(WorldViewRecord& record);
 
 private:

@@ -26,7 +26,11 @@ int CNaviData::FindRoute(std::vector<CNavi_Link*>* route, bool direct, bool allo
     if (type == 205 && !allowWarps) {
       continue;
     }
-    if (type == 202 || type == 203) {
+    if (type != 202 && type != 203) {
+      if (link->GetLinkedInfo()->IsVisited()) {
+        continue;
+      }
+    } else {
       if (allowGates != true) {
         continue;
       }
@@ -38,9 +42,9 @@ int CNaviData::FindRoute(std::vector<CNavi_Link*>* route, bool direct, bool allo
         if (side != 1) {
           continue;
         }
+      } else {
+        continue;
       }
-    } else if (link->GetLinkedInfo()->IsVisited()) {
-      continue;
     }
     it->link->SetDepth(0);
     NaviDataEntry entry = {-1, it->link, it->cost};
@@ -102,7 +106,7 @@ int CNaviData::FindRoute(std::vector<CNavi_Link*>* route, bool direct, bool allo
           continue;
         }
 
-        if (depth == next->depth) {
+        if (depth == next->GetDepth()) {
           const int cost = it->cost + this->entries[i].cost;
           for (std::size_t j = count; j < this->entries.size(); ++j) {
             if (next == this->entries[j].link) {
@@ -117,35 +121,38 @@ int CNaviData::FindRoute(std::vector<CNavi_Link*>* route, bool direct, bool allo
           continue;
         }
 
-        if (depth < next->depth || next->depth != -1) {
+        if (depth < next->GetDepth() || next->GetDepth() != -1) {
           continue;
         }
 
         const int type = next->GetType();
-        bool accept;
-        if (type == 204) {
-          if (!allowGates) {
-            continue;
-          }
-          accept = !next->GetLinkedInfo()->IsVisited();
-        } else if (type == 205) {
-          if (!allowWarps) {
-            continue;
-          }
-          accept = !next->GetLinkedInfo()->IsVisited();
-        } else if (type == 202 || type == 203) {
+        if (type == 204 && !allowGates) {
+          continue;
+        }
+        if (type == 205 && !allowWarps) {
+          continue;
+        }
+        if (type == 202 || type == 203) {
           if (allowGates != true) {
             continue;
           }
-          accept = type == 202 ? side == 2 : side == 1;
-        } else {
-          accept = !next->GetLinkedInfo()->IsVisited();
+          if (type == 202) {
+            if (side != 2) {
+              continue;
+            }
+          } else if (type == 203) {
+            if (side != 1) {
+              continue;
+            }
+          } else {
+            continue;
+          }
+        } else if (next->GetLinkedInfo()->IsVisited()) {
+          continue;
         }
-        if (accept) {
-          next->SetDepth(depth);
-          NaviDataEntry entry = {i, next, it->cost + this->entries[i].cost};
-          this->entries.push_back(entry);
-        }
+        next->SetDepth(depth);
+        NaviDataEntry entry = {i, next, this->entries[i].cost + it->cost};
+        this->entries.push_back(entry);
       }
     }
 
@@ -171,7 +178,7 @@ done:
 // OFFSET: 0x00B8A720
 // FUNCTION: fn_19394
 void CNaviData::ResetLinkDepths() {
-  for (std::vector<CNaviInfo*>::iterator destination = this->destinations.begin(); destination != this->destinations.end(); ++destination) {
+  for (std::vector<CNaviInfo*>::iterator destination = this->destinations.begin(), last = this->destinations.end(); destination != last; ++destination) {
     std::vector<CNavi_Link*>::const_iterator end = (*destination)->LinksEnd();
     for (std::vector<CNavi_Link*>::const_iterator it = (*destination)->LinksBegin(); it != end; ++it) {
       (*it)->SetDepth(-1);

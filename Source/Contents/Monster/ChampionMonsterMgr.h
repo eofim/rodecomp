@@ -17,20 +17,16 @@ public:
     explicit lcData(float value) : m_value(value) {
     }
     // INLINED
-    virtual ~lcData() {
+    __forceinline lcData(const lcData& other) : m_value(other.m_value), m_effects(other.m_effects) {
     }
+    virtual ~lcData();
 
     /* 0004 */ float m_value;
     /* 0008 */ std::vector<int> m_effects;
   };
 
-  // INLINED
-  CChampionMonsterMgr() {
-    this->m_isValid = true;
-  }
-  // INLINED
-  virtual ~CChampionMonsterMgr() {
-  }
+  CChampionMonsterMgr();
+  virtual ~CChampionMonsterMgr();
 
   static bool Create();
   static void Destroy();
@@ -40,15 +36,7 @@ public:
   bool Load();
   int ApplyEffects(int id, CGameActor* actor, int aid);
   void AddItem(int id, float value);
-  // INLINED
-  void AddEffect(int id, int effect) {
-    if (!this->m_items.empty()) {
-      std::map<int, lcData>::iterator it = this->m_items.find(id);
-      if (it != this->m_items.end()) {
-        it->second.m_effects.push_back(effect);
-      }
-    }
-  }
+  void AddEffect(int id, int effect);
   float GetValue(int id);
   bool IsChampion(int id);
 

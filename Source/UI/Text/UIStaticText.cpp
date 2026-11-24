@@ -9,8 +9,6 @@
 #include <atlconv.h>
 #include <cstdio>
 
-template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
-
 // OFFSET: 0x00850550
 // FUNCTION: fn_10678
 __declspec(noinline) UIStaticText::UIStaticText() : UIWindow(0) {
@@ -42,6 +40,56 @@ void UIStaticText::SetText(const char* value, int outlineValue) {
   this->tooltip = value;
   this->outline = outlineValue;
   this->tooltipEnabled = 0;
+  this->Invalidate();
+}
+
+// OFFSET: 0x00867BD0
+// FUNCTION: fn_45619
+void UIStaticText::SetTextShrinkToFit(const char* value, int outlineValue) {
+  this->text = value;
+  this->tooltip = value;
+  this->outline = outlineValue;
+  this->tooltipEnabled = 0;
+
+  const int width = this->TextWidth(value, 0, 0, this->fontHeight, this->bold, this->italic) + (this->outline != 0 ? 2 : 0);
+  if (this->geometry.width < width) {
+    this->SetTextFitted(value);
+  } else {
+    this->Resize(width, this->geometry.height);
+  }
+  this->Invalidate();
+}
+
+// OFFSET: 0x008691E0
+// FUNCTION: fn_45620
+void UIStaticText::SetTextTruncated(const char* value, int outlineValue) {
+  this->text = value;
+  this->tooltip = value;
+  this->outline = outlineValue;
+  this->tooltipEnabled = 0;
+
+  const int width = this->TextWidth(value, 0, 0, this->fontHeight, this->bold, this->italic) + (this->outline != 0 ? 2 : 0);
+  if (this->geometry.width < width) {
+    this->SetTextFitted(value);
+  }
+  this->Invalidate();
+}
+
+// OFFSET: 0x00869290
+// FUNCTION: fn_45621
+void UIStaticText3::SetTextCentered(const char* value, unsigned char outlineValue, int) {
+  this->text = value;
+  this->tooltip = value;
+  this->outline = outlineValue;
+  this->tooltipEnabled = 0;
+  this->textX = 0;
+
+  const int width = this->TextWidth(this->text.c_str(), 0, 0, this->fontHeight, this->bold, this->italic) + (this->outline != 0 ? 2 : 0);
+  if (this->geometry.width < width) {
+    this->SetTextFitted(this->text.c_str());
+  } else {
+    this->textX = static_cast<int>((this->geometry.width - width) * 0.5);
+  }
   this->Invalidate();
 }
 
@@ -305,6 +353,29 @@ void UIBmpTextButton::AddTextStyle(int state, int height, std::uint32_t color, u
   }
 
   this->styles.push_back(style);
+}
+
+// OFFSET: 0x00867D70
+// FUNCTION: fn_45615
+void UIStaticText::SetTextAutoWidth(const char* value, int outlineValue) {
+  this->text = value;
+  this->tooltip = value;
+  this->outline = outlineValue;
+  this->tooltipEnabled = 0;
+
+  const int width = this->TextWidth(value, 0, 0, this->fontHeight, this->bold, this->italic) + (this->outline ? 2 : 0);
+  this->Resize(width, this->geometry.height);
+  this->Invalidate();
+}
+
+// OFFSET: 0x00867E20
+// FUNCTION: fn_45616
+void UIStaticText::SetTextGrowToFit(const char* value, unsigned char outlineValue) {
+  const int width = this->TextWidth(value, 0, 0, this->fontHeight, this->bold, 0);
+  if (this->geometry.width < width) {
+    this->Resize(width, this->geometry.height);
+  }
+  this->SetText(value, outlineValue);
 }
 
 // OFFSET: 0x00868750

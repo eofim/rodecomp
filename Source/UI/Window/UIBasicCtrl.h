@@ -4,6 +4,7 @@
 #include "Contents/Items/ItemInfo.h"
 #include "UI/Window/UIWindow.h"
 
+#include <cstdint>
 #include <string>
 
 #include "UI/Window/WindowManagerWindows.h"
@@ -11,11 +12,15 @@
 class UIBasicItemCtrl : public UIWindow {
 public:
   UIBasicItemCtrl();
+  __declspec(noinline) ~UIBasicItemCtrl() override;
+  void SetItemById(int id, unsigned char identified);
+  void SetItemByIdentity(std::uint32_t identity, unsigned char identified);
   void DragAndDrop(int argument1, int argument2, std::intptr_t argument3) override;
   void Paint() override;
   void OnLBtnDblClk(int x, int y) override;
   void OnMouseHover(int x, int y) override;
   void OnRBtnDown(int x, int y) override;
+  void DrawItemBackground(int x, int y);
   void DrawItemIcon(int x, int y, int unused, bool compact);
 
 protected:
@@ -29,6 +34,7 @@ protected:
 class UIBasicSkillCtrl : public UIWindow {
 public:
   UIBasicSkillCtrl();
+  __declspec(noinline) ~UIBasicSkillCtrl() override;
   void DragAndDrop(int argument1, int argument2, std::intptr_t argument3) override;
   void Paint() override;
   void OnLBtnDblClk(int x, int y) override;

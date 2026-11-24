@@ -56,15 +56,16 @@ namespace {
 // OFFSET: 0x00ADB7F0
 // FUNCTION: fn_17922
 int WorldViewSpatial::ClassifyOriented(const OrientedBounds& bounds) const {
+  const ModelViewPlanes& view = this->planes;
   bool clipped = false;
 
   for (int plane = 0; plane < 6; ++plane) {
-    const float* normal = this->planes.normals[plane];
-    const float second = Absolute(((normal[0] * bounds.axes[1][0] + normal[1] * bounds.axes[1][1]) + normal[2] * bounds.axes[1][2]) * bounds.halfSize[1]);
-    const float first = Absolute(((normal[0] * bounds.axes[0][0] + normal[1] * bounds.axes[0][1]) + normal[2] * bounds.axes[0][2]) * bounds.halfSize[0]);
-    const float third = Absolute(((normal[0] * bounds.axes[2][0] + normal[1] * bounds.axes[2][1]) + normal[2] * bounds.axes[2][2]) * bounds.halfSize[2]);
+    const PlaneNormal& normal = view.normals[plane];
+    const float second = Absolute(((normal.x * bounds.axes[1][0] + normal.y * bounds.axes[1][1]) + normal.z * bounds.axes[1][2]) * bounds.halfSize[1]);
+    const float first = Absolute(((normal.x * bounds.axes[0][0] + normal.y * bounds.axes[0][1]) + normal.z * bounds.axes[0][2]) * bounds.halfSize[0]);
+    const float third = Absolute(((normal.x * bounds.axes[2][0] + normal.y * bounds.axes[2][1]) + normal.z * bounds.axes[2][2]) * bounds.halfSize[2]);
     const float radius = (second + first) + third;
-    const float distance = ((normal[0] * bounds.center[0] + normal[1] * bounds.center[1]) + normal[2] * bounds.center[2]) + this->planes.planes[plane][3];
+    const float distance = ((normal.x * bounds.center[0] + normal.y * bounds.center[1]) + normal.z * bounds.center[2]) + view.planes[plane][3];
 
     if (!(distance > radius)) {
       const float negative = -radius;
@@ -85,13 +86,13 @@ int ClassifyModelView(const OrientedBounds& bounds, const ModelViewPlanes& plane
   bool clipped = false;
 
   for (unsigned plane = 0; plane < 6; ++plane) {
-    const float* normal = planes.normals[plane];
-    const float second = Absolute(((bounds.axes[1][0] * normal[0] + bounds.axes[1][1] * normal[1]) + bounds.axes[1][2] * normal[2]) * bounds.halfSize[1]);
-    const float first = Absolute(((bounds.axes[0][0] * normal[0] + bounds.axes[0][1] * normal[1]) + bounds.axes[0][2] * normal[2]) * bounds.halfSize[0]);
-    const float third = Absolute(((bounds.axes[2][0] * normal[0] + bounds.axes[2][1] * normal[1]) + bounds.axes[2][2] * normal[2]) * bounds.halfSize[2]);
+    const PlaneNormal& normal = planes.normals[plane];
+    const float second = Absolute(((bounds.axes[1][0] * normal.x + bounds.axes[1][1] * normal.y) + bounds.axes[1][2] * normal.z) * bounds.halfSize[1]);
+    const float first = Absolute(((bounds.axes[0][0] * normal.x + bounds.axes[0][1] * normal.y) + bounds.axes[0][2] * normal.z) * bounds.halfSize[0]);
+    const float third = Absolute(((bounds.axes[2][0] * normal.x + bounds.axes[2][1] * normal.y) + bounds.axes[2][2] * normal.z) * bounds.halfSize[2]);
     const float radius = (second + first) + third;
     const float distance =
-      ((bounds.center[0] * normal[0] + bounds.center[1] * normal[1]) + bounds.center[2] * normal[2]) + planes.planes[plane][3];
+      ((bounds.center[0] * normal.x + bounds.center[1] * normal.y) + bounds.center[2] * normal.z) + planes.planes[plane][3];
 
     if (!(distance > radius)) {
       const float negative = -radius;
@@ -153,6 +154,13 @@ void DrawWorldModelLeaves(
     ground.DrawLit(matrix, node->groundCells, false);
     IncludeRectangle(node->groundCells, visibleRectangle);
   }
+}
+
+// OFFSET: 0x00ADBA40
+// FUNCTION: fn_45893
+void WorldViewSpatial::ClearVisibility() {
+  this->inside.erase(this->inside.begin(), this->inside.end());
+  this->clipped.erase(this->clipped.begin(), this->clipped.end());
 }
 
 // OFFSET: 0x00ADC1E0
@@ -274,8 +282,7 @@ void CView::Render() {
   renderer->viewDirectionY *= inverseLength;
   renderer->viewDirectionZ *= inverseLength;
 
-  this->spatial.inside.erase(this->spatial.inside.begin(), this->spatial.inside.end());
-  this->spatial.clipped.erase(this->spatial.clipped.begin(), this->spatial.clipped.end());
+  this->spatial.ClearVisibility();
 
   this->scene->ground->RenderLod(reinterpret_cast<int>(matrix));
 }

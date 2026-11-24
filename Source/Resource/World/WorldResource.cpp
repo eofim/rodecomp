@@ -26,14 +26,14 @@ namespace {
 
   struct WorldLightFileRecord {
     /* 0000 */ char name[80];
-    /* 0050 */ vector3d position{};
+    /* 0050 */ vector3d position{0.0f, 0.0f, 0.0f};
     /* 005C */ unsigned char colorAndRange[16];
   };
 
   struct WorldLegacySoundFileRecord {
     /* 0000 */ char name[80];
     /* 0050 */ char file[80];
-    /* 00A0 */ vector3d position{};
+    /* 00A0 */ vector3d position{0.0f, 0.0f, 0.0f};
     /* 00AC */ float volume;
     /* 00B0 */ int width;
     /* 00B4 */ int height;
@@ -69,10 +69,6 @@ namespace {
 C3dWorldRes::C3dWorldRes() : lightDirection{0.0f, 0.0f, 0.0f}, diffuse{0.0f, 0.0f, 0.0f}, ambient{0.0f, 0.0f, 0.0f}, flag(0) {
   this->spatial = nullptr;
 }
-
-// OFFSET: 0x00763550
-// FUNCTION: fn_08077
-C3dWorldRes::~C3dWorldRes() = default;
 
 // OFFSET: 0x00761940
 // FUNCTION: fn_08071
@@ -204,12 +200,8 @@ bool C3dWorldRes::Load(const char* name) {
     this->latitude = 45;
     this->longitude = 45;
 
-    this->diffuse.x = 1.0f;
-    this->diffuse.y = 1.0f;
-    this->diffuse.z = 1.0f;
-    this->ambient.x = 0.3f;
-    this->ambient.y = 0.3f;
-    this->ambient.z = 0.3f;
+    this->diffuse = vector3d{1.0f, 1.0f, 1.0f};
+    this->ambient = vector3d{0.3f, 0.3f, 0.3f};
   }
 
   constexpr float pi = 3.141592f;
@@ -321,16 +313,14 @@ bool C3dWorldRes::Load(const char* name) {
     }
 
     case 3: {
-      WorldSoundRecord* record;
-
       if (major >= 2) {
-        record = new WorldSoundRecord;
+        auto* record = new WorldSoundRecord;
         input.Read(record, sizeof(*record));
         this->sounds.push_back(record);
       } else {
         WorldLegacySoundFileRecord wire;
         input.Read(&wire, sizeof(wire));
-        record = new WorldSoundRecord;
+        auto* record = new WorldSoundRecord;
         std::strncpy(record->name, wire.name, 79);
         std::strncpy(record->file, wire.file, 79);
         record->position[0] = wire.position.x;

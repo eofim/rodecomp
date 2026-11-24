@@ -43,16 +43,15 @@ int UIWindow::DrawButtonBarAt(int style, int x, int width, int rows) {
   CBitmapRes* middle =
     this->LoadStyledBitmap(style, "유저인터페이스\\basic_interface\\btnbar_mid%d.bmp", "유저인터페이스\\basic_interface\\btnbar_mid.bmp");
   if (middle) {
+    const auto remaining = [&]() { return width - rightWidth - leftWidth; };
+    width = remaining();
     const int middleWidth = middle->image.width;
-    width = width - rightWidth - leftWidth;
-    const int count = (width % middleWidth != 0) + width / middleWidth;
+    const int count = (width % middleWidth != 0) + width / middle->image.width;
     const int startX = leftWidth + x;
 
     for (int row = 1; row <= rows; ++row) {
-      int columnX = startX;
       for (int column = 0; column < count; ++column) {
-        this->DrawBitmap(columnX, height - row * barHeight, middle, false);
-        columnX += middleWidth;
+        this->DrawBitmap(startX + column * middleWidth, height - row * barHeight, middle, false);
       }
     }
 
@@ -65,13 +64,14 @@ int UIWindow::DrawButtonBarAt(int style, int x, int width, int rows) {
 // OFFSET: 0x008D7570
 // FUNCTION: fn_12120
 CBitmapRes* UIWindow::LoadStyledBitmap(int style, const char* format, const char* name) {
+  CBitmapRes* bitmap = nullptr;
   if (style > 0) {
     if (format && std::strlen(format) != 0) {
       std::string filename = FormatOwnedString(format, style);
-      return static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(filename.c_str())));
+      bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(filename.c_str())));
     }
   } else if (name && std::strlen(name) != 0) {
-    return static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name)));
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name)));
   }
-  return nullptr;
+  return bitmap;
 }

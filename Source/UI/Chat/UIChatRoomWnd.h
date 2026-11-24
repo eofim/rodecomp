@@ -2,7 +2,9 @@
 #define RAGNAROK_SOURCE_UI_CHAT_UICHATROOMWND_H
 
 #include "UI/Window/UIFrameWnd.h"
+#include "UI/Chat/UIChatRoomTitle.h"
 #include "Contents/UserData/NormalItemSlots.h"
+#include "UI/Party/UIMiniPartyWnd.h"
 
 #include <map>
 #include <string>
@@ -19,6 +21,7 @@ class UIStaticText;
 class UIChatRoomWnd : public UIFrameWnd {
 public:
   UIChatRoomWnd();
+  __declspec(noinline) ~UIChatRoomWnd() override;
   void Move(int x, int y) override;
   void StoreInfo() override;
   void OnCreate(int width, int height) override;
@@ -27,17 +30,7 @@ public:
   void SaveChatLog();
   std::vector<unsigned char> SerializeReplayData();
 
-  /* 00B4 */ std::string title;
-  /* 00CC */ std::string roomSettingsText;
-  /* 00E4 */ union {
-    int roomStatusValues[4];
-    struct {
-      int roomType;
-      int memberCount;
-      int memberLimit;
-      int roomId;
-    } roomStatus;
-  };
+  /* 00B4 */ ChatRoomTitleInfo info;
   /* 00F4 */ UIResizer* resizer;
   /* 00F8 */ UIChatEditCtrl* edit;
   /* 00FC */ UIChatHisBox* history;
@@ -45,7 +38,7 @@ public:
   /* 0104 */ UIBitmapButton* closeButton;
   /* 0108 */ UIStaticText* titleText;
   /* 010C */ std::map<std::string, int> memberRoles;
-  /* 0114 */ std::vector<std::pair<std::string, int>> menuCommands;
+  /* 0114 */ std::vector<MiniPartyInfoEntry> menuCommands;
   /* 0120 */ ChatRoomWndInfo* saved;
 };
 

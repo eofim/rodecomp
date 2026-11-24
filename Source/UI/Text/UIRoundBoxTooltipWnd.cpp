@@ -70,14 +70,13 @@ void UIColoringTextViewer::Paint() {
 
   const int first = this->topLine;
   const int limit = this->geometry.height / spacing + first;
-  int end = static_cast<int>(std::min<unsigned>(limit, this->lines.size()));
-  if (this->lineLimit) {
+  unsigned int end = std::min<unsigned>(limit, this->lines.size());
+  if (this->lineLimit != 0) {
     end = this->lineLimit;
   }
 
-  for (int index = first; index < end; ++index) {
-    const auto& line = this->lines[index];
-    this->DrawColoredText(3, this->lineHeight * (index - first) + 4, line.c_str(), static_cast<unsigned>(line.size()), this->color, 0, 12, false);
+  for (int index = first; index < static_cast<int>(end); ++index) {
+    this->DrawColoredText(3, this->lineHeight * (index - first) + 4, this->lines[index].c_str(), static_cast<unsigned>(this->lines[index].size()), this->color, 0, 12, false);
   }
 }
 
@@ -108,26 +107,61 @@ int UIColoringTextViewer::SendMsg(UIWindow* sender, int message, std::intptr_t a
 // OFFSET: 0x0099A5E0
 // FUNCTION: fn_13544
 int UIRoundBoxTooltipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
-  if (message == UM_COMMAND) {
+  switch (message) {
+  case UM_COMMAND:
     if (argument1 == ID_CLOSE) {
       g_windowMgr.CloseWindow(WID_ROUNDBOXTOOLTIPWND);
     }
-  } else if (message == UM_SET_ITEM_MOVE_TOOLTIP) {
+    break;
+  case UM_SET_ITEM_MOVE_TOOLTIP:
     if (argument1 != 0) {
-      std::string text;
-      std::string longest;
+      std::string text = "";
       int lines = 0;
+      std::string longest = "";
 
       this->viewer->Clear();
       const ItemMoveInfo info = FindItemMoveInfo(static_cast<int>(argument1));
 
       if (info.drop) {
-        text += LookupMessage(MSI_ITEMMOVEINFO_MAIL);
-        longest = LookupMessage(MSI_ITEMMOVEINFO_MAIL);
+        text += LookupMessage(MSI_ITEMMOVEINFO_DROP);
+        longest = LookupMessage(MSI_ITEMMOVEINFO_DROP);
         ++lines;
       }
 
       if (info.storage) {
+        if (!text.empty()) {
+          text += "\n";
+        }
+        text += LookupMessage(MSI_ITEMMOVEINFO_STORE);
+        if (std::strlen(LookupMessage(MSI_ITEMMOVEINFO_STORE)) > std::strlen(longest.c_str())) {
+          longest = LookupMessage(MSI_ITEMMOVEINFO_STORE);
+        }
+        ++lines;
+      }
+
+      if (info.cart) {
+        if (!text.empty()) {
+          text += "\n";
+        }
+        text += LookupMessage(MSI_ITEMMOVEINFO_CART);
+        if (std::strlen(LookupMessage(MSI_ITEMMOVEINFO_CART)) > std::strlen(longest.c_str())) {
+          longest = LookupMessage(MSI_ITEMMOVEINFO_CART);
+        }
+        ++lines;
+      }
+
+      if (info.mail) {
+        if (!text.empty()) {
+          text += "\n";
+        }
+        text += LookupMessage(MSI_ITEMMOVEINFO_MAIL);
+        if (std::strlen(LookupMessage(MSI_ITEMMOVEINFO_MAIL)) > std::strlen(longest.c_str())) {
+          longest = LookupMessage(MSI_ITEMMOVEINFO_MAIL);
+        }
+        ++lines;
+      }
+
+      if (info.trade) {
         if (!text.empty()) {
           text += "\n";
         }
@@ -138,18 +172,7 @@ int UIRoundBoxTooltipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         ++lines;
       }
 
-      if (info.cart) {
-        if (!text.empty()) {
-          text += "\n";
-        }
-        text += LookupMessage(MSI_ITEMMOVEINFO_AUCTION);
-        if (std::strlen(LookupMessage(MSI_ITEMMOVEINFO_AUCTION)) > std::strlen(longest.c_str())) {
-          longest = LookupMessage(MSI_ITEMMOVEINFO_AUCTION);
-        }
-        ++lines;
-      }
-
-      if (info.mail) {
+      if (info.guildStorage) {
         if (!text.empty()) {
           text += "\n";
         }
@@ -160,35 +183,13 @@ int UIRoundBoxTooltipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         ++lines;
       }
 
-      if (info.trade) {
+      if (info.sellToNpc) {
         if (!text.empty()) {
           text += "\n";
         }
         text += LookupMessage(MSI_ITEMMOVEINFO_TONPC);
         if (std::strlen(LookupMessage(MSI_ITEMMOVEINFO_TONPC)) > std::strlen(longest.c_str())) {
           longest = LookupMessage(MSI_ITEMMOVEINFO_TONPC);
-        }
-        ++lines;
-      }
-
-      if (info.guildStorage) {
-        if (!text.empty()) {
-          text += "\n";
-        }
-        text += LookupMessage(MSI_CREATE_CHARACTER);
-        if (std::strlen(LookupMessage(MSI_CREATE_CHARACTER)) > std::strlen(longest.c_str())) {
-          longest = LookupMessage(MSI_CREATE_CHARACTER);
-        }
-        ++lines;
-      }
-
-      if (info.sellToNpc) {
-        if (!text.empty()) {
-          text += "\n";
-        }
-        text += LookupMessage(MSI_UNEQUIP_ARROW3);
-        if (std::strlen(LookupMessage(MSI_UNEQUIP_ARROW3)) > std::strlen(longest.c_str())) {
-          longest = LookupMessage(MSI_UNEQUIP_ARROW3);
         }
         ++lines;
       }
@@ -200,13 +201,15 @@ int UIRoundBoxTooltipWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
 
       const int width = this->TextWidth(longest.c_str(), 0, 0, 12, 0, 0);
       this->viewer->lineLimit = lines;
-      const int height = this->TextHeight(text.c_str(), 0, 0, 12, 0, 0);
-      this->viewer->Resize(width + 15, static_cast<int>(static_cast<float>(height * lines + 10) + static_cast<float>(lines - 1) * 4.8f + 1.0f));
+      this->viewer->Resize(width + 15, static_cast<int>(
+        static_cast<float>(this->TextHeight(text.c_str(), 0, 0, 12, 0, 0) * lines + 10) +
+        static_cast<float>(lines - 1) * 4.8f + 1.0f));
       this->Resize(this->viewer->geometry.width + 2, this->viewer->geometry.height + 2);
       this->Move(g_mouse.x + 26, g_mouse.y);
       this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(text.c_str()), 0, 0, 0);
     }
-  } else {
+    break;
+  default:
     return this->UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 

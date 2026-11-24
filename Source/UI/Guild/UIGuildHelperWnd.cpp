@@ -104,15 +104,17 @@ void UIGuildHelperWnd::OnMouseMove(int x, int y) {
 void UICreateGuildWnd::Paint() {
   this->DrawPanelBackground(17, 0, "");
   this->DrawButtonBar(2, 0, 1);
-  int text;
+  const auto drawPrompt = [this](int titleId, int promptId) {
+    const char* title = LookupMessage(titleId);
+    this->DrawTitleBar(true, title, 0);
+    const char* prompt = LookupMessage(promptId);
+    this->DrawTextAt(16, 23, prompt, 0, 0, 12, 0, 0, 0);
+  };
   if (this->m_mode == 0) {
-    text = MSI_PLEASE_PUT_GUILD_NAME_IN;
+    drawPrompt(MSI_CREATE_GUILD, MIS_PUT_GUILD_NAME_IN);
   } else {
-    text = MSI_BASIC_EXP_MSG_BRZ;
+    drawPrompt(MSI_GUILD_DISBAND, MSI_PUT_DISBAND_GUILDNAME);
   }
-  this->DrawTitleBar(true, LookupMessage(text - 1), 0);
-  const char* message = LookupMessage(text);
-  this->DrawTextAt(16, 23, message, 0, 0, 12, 0, 0, 0);
 }
 
 // OFFSET: 0x0095FBE0
@@ -133,7 +135,7 @@ void UICreateGuildWnd::OnLBtnUp(int, int) {
 // OFFSET: 0x0095F420
 // FUNCTION: fn_13078
 void UIGuildTipWnd::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_PARTY_RECRUIT_REFUSE_VOLUNTEER), 0);
+  this->DrawTitleBar(true, LookupMessage(MIS_GUILD_TIP), 0);
   this->DrawPanelBackground(17, 0, "");
   this->DrawButtonBar(2, 0, 1);
 }
@@ -175,10 +177,10 @@ int UICreateGuildWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a1, s
     this->m_nameEdit->SelectAll();
 
     if (name.empty()) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SHOW_MAPNAMETITLE)), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PLEASE_PUT_GUILD_NAME_IN)), 0xFF, 0, 0, 0);
     } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_itemLinkOpening.c_str())) ||
                _mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_itemLinkClosing.c_str()))) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STYLING_SHOP_OPEN_COUPON)), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_NOT_USING_TAG_TO_NAME)), 0xFF, 0, 0, 0);
     } else if (this->m_mode == 0) {
       mode->SendMsg(MM_REQ_MAKE_GUILD, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
     } else {
@@ -296,7 +298,7 @@ void UICreateGuildWnd::OnCreate(int, int) {
     const char* names[2][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
     int ids[2] = {184, 185};
     for (unsigned int i = 0; i < 2; ++i) {
-      auto* button = new UIBitmapButton();
+      UIBitmapButton* button = new UIBitmapButton();
       button->SetBitmap((prefix + names[i][0] + ".bmp").c_str(), 0, 0);
       button->SetBitmap((prefix + names[i][1] + ".bmp").c_str(), 1, 0);
       button->SetBitmap((prefix + names[i][2] + ".bmp").c_str(), 2, 0);
@@ -308,7 +310,7 @@ void UICreateGuildWnd::OnCreate(int, int) {
   }
 
   g_windowMgr.SetFocus(this->m_nameEdit);
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x00958990
@@ -316,23 +318,21 @@ void UICreateGuildWnd::OnCreate(int, int) {
 void UIGuildHelperWnd::OnCreate(int width, int height) {
   const std::string prefix("유저인터페이스\\guild_helper\\");
   const char* names[3][3] = {{"btn_help", "btn_help_a", "btn_help_b"}, {"create_guild", "create_guild_a", "create_guild_b"}, {"btn_ok", "btn_ok_a", "btn_ok_b"}};
-  int ids[3] = {343, 448, 184};
+  const int ids[3] = {343, 448, 184};
 
-  int x = 8;
-  for (int i = 0; i < 3; ++i) {
+  for (unsigned int i = 0; i < 3; ++i) {
     this->m_button = new UIBitmapButton();
     this->m_button->SetBitmap((prefix + names[i][0] + ".bmp").c_str(), 0, 0);
     this->m_button->SetBitmap((prefix + names[i][1] + ".bmp").c_str(), 1, 0);
     this->m_button->SetBitmap((prefix + names[i][2] + ".bmp").c_str(), 2, 0);
     this->m_button->SetSize(this->m_button->BitmapWidth(), this->m_button->BitmapHeight());
-    if (i < 2) {
-      this->m_button->Move(x, height - 24);
+    if (static_cast<int>(i) < 2) {
+      this->m_button->Move(i * 62 + 8, height - 24);
     } else {
       this->m_button->Move(width - 52, height - 24);
     }
     this->m_button->SetId(ids[i]);
     this->AddChild(this->m_button);
-    x += 62;
   }
 }
 
@@ -370,22 +370,12 @@ void UIGuildLeaveReasonDescWnd::OnCreate(int, int) {
     int positions[2][2] = {{this->geometry.width - 101, this->geometry.height - 32}, {this->geometry.width - 55, this->geometry.height - 32}};
     const char* names[2][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
     int ids[2] = {184, 185};
-    std::string name;
 
     for (int i = 0; i < 2; ++i) {
-      auto* button = new UIBitmapButton();
-      name.assign(prefix);
-      name += names[i][0];
-      name += ".bmp";
-      button->SetBitmap(name.c_str(), 0, 0);
-      name.assign(prefix);
-      name += names[i][1];
-      name += ".bmp";
-      button->SetBitmap(name.c_str(), 1, 0);
-      name.assign(prefix);
-      name += names[i][2];
-      name += ".bmp";
-      button->SetBitmap(name.c_str(), 2, 0);
+      UIBitmapButton* button = new UIBitmapButton();
+      button->SetBitmap((prefix + names[i][0] + ".bmp").c_str(), 0, 0);
+      button->SetBitmap((prefix + names[i][1] + ".bmp").c_str(), 1, 0);
+      button->SetBitmap((prefix + names[i][2] + ".bmp").c_str(), 2, 0);
       button->SetSize(button->BitmapWidth(), button->BitmapHeight());
       button->Move(positions[i][0], positions[i][1]);
       button->SetId(ids[i]);
@@ -393,7 +383,7 @@ void UIGuildLeaveReasonDescWnd::OnCreate(int, int) {
     }
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x0095CCD0
@@ -406,7 +396,7 @@ void UIGuildTipWnd::OnCreate(int width, int height) {
   unsigned int green;
   unsigned int blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_textViewer->SetBackgroundColor(0xFF000000 | RGB(red, green, blue));
+  this->m_textViewer->SetBackgroundColor(RGB(red, green, blue) | 0xFF000000);
   this->AddChild(this->m_textViewer);
 
   if (!g_guildTip.m_bTryLoading) {
@@ -415,7 +405,8 @@ void UIGuildTipWnd::OnCreate(int width, int height) {
 
   if (g_guildTip.m_tipList.size() != 0) {
     std::vector<StringList> tipList = g_guildTip.GetTipList();
-    for (const auto& tip : tipList) {
+    for (auto tipIt = tipList.begin(); tipIt != tipList.end(); ++tipIt) {
+      const auto& tip = *tipIt;
       for (unsigned int i = 0; i < tip.size(); ++i) {
         this->m_textViewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(tip[i].c_str()), 50, 0, 0);
       }
@@ -429,6 +420,6 @@ void UIGuildTipWnd::OnCreate(int width, int height) {
   this->m_closeButton->SetBitmap((prefix + "btn_close_b" + ".bmp").c_str(), 2, 0);
   this->m_closeButton->SetSize(this->m_closeButton->BitmapWidth(), this->m_closeButton->BitmapHeight());
   this->m_closeButton->Move(width - 50, height - 24);
-  this->m_closeButton->SetId(201);
+  this->m_closeButton->SetId(ID_CLOSE);
   this->AddChild(this->m_closeButton);
 }

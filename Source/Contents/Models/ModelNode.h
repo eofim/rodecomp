@@ -9,10 +9,16 @@
 class C3dActor;
 
 struct ModelTextureTransform {
-  /* 0000 */ float values[5] = {0, 0, 1, 1, 0};
+  // INLINED
+  ModelTextureTransform() {
+    values[0] = 0.0f;
+    values[1] = 0.0f;
+    values[2] = 1.0f;
+    values[3] = 1.0f;
+    values[4] = 0.0f;
+  }
+  /* 0000 */ float values[5];
 };
-
-void SampleModelTexture(ModelTextureChannels& channels, float frame, ModelTextureTransform& output);
 
 class C3dNode {
 public:
@@ -28,7 +34,7 @@ public:
   void OverrideColors();
   void Prepare(const float* matrix, const float* direction, const float* diffuse, const float* ambient, int shade);
   void SampleGroundColors(const class CRenderer* renderer, const float* matrix, const class GroundGeometry& ground);
-  void AccumulateBounds(float* bounds, const float* matrix);
+  void AccumulateBounds(float* bounds, const matrix& parent);
 
   /* 0004 */ std::string name;
   /* 001C */ C3dActor* model;

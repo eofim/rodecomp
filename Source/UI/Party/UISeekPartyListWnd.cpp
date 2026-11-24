@@ -185,7 +185,7 @@ void UISeekPartyListWnd::OnCreate(int width, int height) {
     this->m_findButton->SetBitmap((path + "btn_find_b" + ".bmp").c_str(), 2, 0);
     this->m_findButton->SetSize(this->m_findButton->BitmapWidth(), this->m_findButton->BitmapHeight());
     this->m_findButton->Move(0x1E0, 0x25);
-    this->m_findButton->SetId(ID_PARTY_SEARCH);
+    this->m_findButton->SetId(ID_FIND);
     this->AddChild(this->m_findButton);
   }
 
@@ -265,23 +265,26 @@ int UISeekPartyListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     case ID_HELP:
       g_windowMgr.EnsureWindow(WID_PARTYBOOKINGHELPWND);
       return 0;
-    case ID_PARTY_SEARCH:
+    case ID_FIND:
     case SEEKPARTY_SEARCH_NEXT_PAGE: {
       PACKET_CZ_PARTY_BOOKING_REQ_SEARCH packet;
       packet.packetType = ID_CZ_PARTY_BOOKING_REQ_SEARCH;
       packet.level = static_cast<short>(std::atoi(this->m_searchEdit->Text()));
-      std::string text(this->m_searchEdit->Text());
-      for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] < '/' || text[i] > '9') {
-          g_windowMgr.Confirm(LookupMessage(MSI_PARTY_BOOKING_ERR4), 0, true, false, 0, "Message", 280, 120, 0);
-          return 0;
+      {
+        std::string text(this->m_searchEdit->Text());
+        for (std::size_t i = 0; i < text.size(); ++i) {
+          if (text[i] < '/' || text[i] > '9') {
+            g_windowMgr.Confirm(LookupMessage(MSI_PARTY_BOOKING_ERR4), 0, true, false, 0, "Message", 280, 120, 0);
+            return 0;
+          }
         }
       }
 
-      if (packet.level < 0 || packet.level > g_session.m_maxLevel) {
+      const int maxLevel = g_session.m_maxLevel;
+      if (packet.level < 0 || packet.level > maxLevel) {
         char buffer[260];
         std::memset(buffer, 0, sizeof(buffer));
-        StringFormat(buffer, sizeof(buffer), static_cast<std::size_t>(-1), LookupMessage(MSI_FAILED_TO_WRITE_MAIL), g_session.m_maxLevel);
+        StringFormat(buffer, sizeof(buffer), static_cast<std::size_t>(-1), LookupMessage(MSI_PARTY_BOOKING_ERR5R2), maxLevel);
         g_windowMgr.Confirm(buffer, 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
@@ -299,7 +302,7 @@ int UISeekPartyListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         packet.job = static_cast<short>(jobOffsets[this->m_jobCategory] - 1 + this->m_jobCategoryChanged);
       }
 
-      if (argument1 == ID_PARTY_SEARCH) {
+      if (argument1 == ID_FIND) {
         if (this->m_filterJob == packet.job && this->m_filterLevel == packet.level && this->m_filterMap == packet.mapId) {
           return 0;
         }
@@ -321,21 +324,21 @@ int UISeekPartyListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       this->m_filterMap = packet.mapId;
 
       std::string title(LookupMessage(MSI_PARTY_BOOKING_SEARCH));
-      if (packet.level > 0) {
-        title += " Level: ";
-        title += IntToString(packet.level, 0);
+      const int level = packet.level;
+      if (level > 0) {
+        if (level < 136) {
+          title = title + " Level: " + IntToString(level, 0);
+        } else {
+          title = title + " Level: " + IntToString(level, 0);
+        }
       }
 
       if (this->m_region != 0) {
-        title += " Map: ";
-        title += this->m_regionCombo->GetSelectedText();
-        title += " ";
-        title += this->m_mapCombo->GetSelectedText();
+        title = title + " Map: " + this->m_regionCombo->GetSelectedText() + " " + this->m_mapCombo->GetSelectedText();
       }
 
       if (this->m_jobCategory != 0) {
-        title += " Job: ";
-        title += this->m_jobCombo->GetSelectedText();
+        title = title + " Job: " + this->m_jobCombo->GetSelectedText();
       }
 
       this->m_title->SetTextFitted(title.c_str());
@@ -360,7 +363,7 @@ int UISeekPartyListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
           this->SendMsg(nullptr, UM_COMMAND, SEEKPARTY_SEARCH_NEXT_PAGE, 0, 0, 0);
           g_session.m_partyBooking.EraseEntry(it->first);
         } else {
-          const std::string leaderName = it->second.leaderName;
+          const std::string leaderName = entry.leaderName;
           if (leaderName != g_session.DecodePlayerName()) {
             g_windowMgr.SendNotice(UIM_MAKE_WHISPER_WINDOW, reinterpret_cast<std::intptr_t>(leaderName.c_str()), 0, 0, 0, 0);
           }
@@ -512,7 +515,7 @@ void UISeekPartyListWnd::OnLBtnDblClk(int x, int y) {
     this->Invalidate();
   }
 
-  this->SendMsg(nullptr, UM_COMMAND, 0x17d, 0, 0, 0);
+  this->SendMsg(nullptr, UM_COMMAND, ID_WHISPER_PARTY_LEADER, 0, 0, 0);
 }
 
 // OFFSET: 0x00931090
@@ -539,10 +542,13 @@ void UISeekPartyListWnd::UpdateScrollBar() {
   }
 
   const int count = g_session.m_partyBooking.m_entries.size();
+  const int visible = this->m_visibleRows;
   const int rows = count / this->m_columnCount + (count % this->m_columnCount != 0 ? 1 : 0);
 
-  const int visible = this->m_visibleRows;
-  const int range = std::max(0, rows - visible);
+  int range = rows - visible;
+  if (range < 0) {
+    range = 0;
+  }
 
   this->m_scrollable = range != 0;
   if (range != 0) {
@@ -655,16 +661,19 @@ void UISeekPartyListWnd::SelectRegion(int region) {
   this->m_mapCombo->Clear();
 
   auto it = this->m_regionMaps.find(region);
-  if (it != this->m_regionMaps.end()) {
-    std::vector<SeekPartyMapEntry> maps = it->second;
-    for (SeekPartyMapEntry entry : maps) {
-      this->m_mapCombo->AddOption(entry.name.c_str(), entry.color);
-    }
-
-    this->m_mapCombo->Select(0);
-    this->m_mapIndex = 0;
-    this->Invalidate();
+  if (it == this->m_regionMaps.end()) {
+    return;
   }
+
+  std::vector<SeekPartyMapEntry> maps = it->second;
+  for (auto entryIt = maps.begin(), entryEnd = maps.end(); entryIt != entryEnd; ++entryIt) {
+    SeekPartyMapEntry entry = *entryIt;
+    this->m_mapCombo->AddOption(entry.name.c_str(), entry.color);
+  }
+
+  this->m_mapCombo->Select(0);
+  this->m_mapIndex = 0;
+  this->Invalidate();
 }
 
 // OFFSET: 0x00945FB0
@@ -675,7 +684,8 @@ void UISeekPartyListWnd::SelectJobCategory(int category) {
   }
 
   this->m_jobCombo->Clear();
-  for (const std::string& option : this->m_jobOptions[category]) {
+  for (auto optionIt = this->m_jobOptions[category].begin(), optionEnd = this->m_jobOptions[category].end(); optionIt != optionEnd; ++optionIt) {
+    const std::string& option = *optionIt;
     this->m_jobCombo->AddOption(option, 0);
   }
 
@@ -696,4 +706,9 @@ UISeekPartyListWnd::UISeekPartyListWnd()
       unknown_01CA() {
   this->unknown_01C1 = 1;
   this->m_refreshButton = nullptr;
+}
+
+// OFFSET: 0x00914620
+// FUNCTION: fn_45683
+__declspec(noinline) UISeekPartyListWnd::~UISeekPartyListWnd() {
 }

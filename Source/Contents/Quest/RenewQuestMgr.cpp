@@ -31,9 +31,6 @@ extern "C" {
 #include <new>
 #include <utility>
 
-template __declspec(noinline) bool std::string_view::_Equal(const std::string_view) const noexcept;
-template __declspec(noinline) std::list<std::string>::const_iterator std::find<std::list<std::string>::const_iterator, std::string_view>(std::list<std::string>::const_iterator, const std::list<std::string>::const_iterator, const std::string_view&);
-
 #pragma pack(push, 1)
 struct RenewQuestReplayHeader {
   /* 0000 */ unsigned int count;
@@ -106,9 +103,9 @@ RenewQuestInfo::RenewQuestInfo()
 // OFFSET: 0x00676770
 // FUNCTION: fn_05421
 RenewQuestRecommendedInfo::RenewQuestRecommendedInfo() : backgroundImage("") {
-  for (int index = 0; index < 3; ++index) {
-    this->m_descriptions[index].clear();
-  }
+  this->m_descriptions[0].clear();
+  this->m_descriptions[1].clear();
+  this->m_descriptions[2].clear();
 }
 
 // OFFSET: 0x00675990
@@ -172,7 +169,7 @@ void CRenewQuestMgr::RemoveStatusRequest(unsigned int id) {
 // OFFSET: 0x00677D80
 // FUNCTION: fn_05438
 std::string RenewQuestOngoingInfo::GetDateString() const {
-  return 1970 < this->m_year ? std::format("{0} [{1:04}/{2:02}/{3:02} {4:02}:{5:02}]", LookupMessage(MSI_NAVIGATION_ROUTEINFO), this->m_year,
+  return 1970 < this->m_year ? std::format("{0} [{1:04}/{2:02}/{3:02} {4:02}:{5:02}]", LookupMessage(MSI_QUESTUI_CLOSINGTIME), this->m_year,
                                            this->m_month, this->m_day, this->m_hour, this->m_minute)
                               : std::string("");
 }
@@ -198,115 +195,115 @@ std::string CRenewQuestMgr::GetMonsterConditionText(unsigned int flags, int minL
 
   if (flags != 0) {
     if (flags & 0x20000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY4));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY1));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x40000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY7));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY4));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x80000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY5));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY2));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x100000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY6));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY3));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x200000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY0));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY7));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x400000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY9));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY6));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x800000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY8));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY5));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x1000000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_SCALE1));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY8));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x2000000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_SCALE0));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY0));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x4000000) {
-      std::string text(LookupMessage(MSI_NAVIGATION_SCALE2));
+      std::string text(LookupMessage(MSI_NAVIGATION_PROPERTY9));
       text.erase(text.size() - 2, text.size());
       result = result + text + separator;
     }
 
     if (flags & 0x10) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE3)) + separator;
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_SCALE0)) + separator;
     }
 
     if (flags & 0x20) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE1)) + separator;
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_SCALE1)) + separator;
     }
 
     if (flags & 0x40) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE2)) + separator;
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_SCALE2)) + separator;
     }
 
     if (flags & 0x80) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE0)) + separator;
-    }
-
-    if (flags & 0x100) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE5)) + separator;
-    }
-
-    if (flags & 0x200) {
       result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE7)) + separator;
     }
 
-    if (flags & 0x400) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE8)) + separator;
+    if (flags & 0x100) {
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE2)) + separator;
     }
 
-    if (flags & 0x800) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE6)) + separator;
-    }
-
-    if (flags & 0x1000) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE9)) + separator;
-    }
-
-    if (flags & 0x2000) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_MOVECLICK)) + separator;
-    }
-
-    if (flags & 0x4000) {
+    if (flags & 0x200) {
       result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE4)) + separator;
     }
 
+    if (flags & 0x400) {
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE5)) + separator;
+    }
+
+    if (flags & 0x800) {
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE3)) + separator;
+    }
+
+    if (flags & 0x1000) {
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE6)) + separator;
+    }
+
+    if (flags & 0x2000) {
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE8)) + separator;
+    }
+
+    if (flags & 0x4000) {
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE1)) + separator;
+    }
+
     if (flags & 0x8000) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_NPCCLICK)) + separator;
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE0)) + separator;
     }
 
     if (flags & 0x10000) {
-      result = result + std::string(LookupMessage(MSI_NAVIGATION_NPCMOVE)) + separator;
+      result = result + std::string(LookupMessage(MSI_NAVIGATION_RACE9)) + separator;
     }
   }
 
@@ -342,14 +339,14 @@ std::string RenewQuestOngoingInfo::GetHuntText(int index) const {
   std::string text;
   const short minLevel = this->m_huntMinLevel[index];
   const short maxLevel = this->m_huntMaxLevel[index];
-  if (this->m_huntMobId[index] == 31999) {
+  if (this->m_huntMobId[index] == QUEST_HUNT_CONDITIONAL_MONSTER) {
     text = static_cast<const std::string&>(g_renewQuestMgr->GetMonsterConditionText(this->m_huntConditionFlags[index], minLevel, maxLevel));
   } else {
     const char* name = this->m_huntName[index];
-    if (this->m_huntMinLevel[index] >= 0 && this->m_huntMaxLevel[index] >= 0 && (minLevel != 0 || this->m_huntMaxLevel[index] != 0)) {
-      if (minLevel == 0) {
+    if (-1 < this->m_huntMinLevel[index] && -1 < this->m_huntMaxLevel[index] && (0 != minLevel || 0 != this->m_huntMaxLevel[index])) {
+      if (0 == minLevel) {
         text = std::format("{} Lv.{}▼", name, maxLevel);
-      } else if (this->m_huntMaxLevel[index] == 0) {
+      } else if (0 == this->m_huntMaxLevel[index]) {
         text = std::format("{} Lv.{}▲", name, minLevel);
       } else {
         text = std::format("{} Lv.{}~Lv.{}", name, minLevel, maxLevel);
@@ -360,7 +357,7 @@ std::string RenewQuestOngoingInfo::GetHuntText(int index) const {
   }
 
   const short goal = this->m_huntMaxCount[index];
-  if (goal > 0) {
+  if (0 < goal) {
     const short count = this->m_huntKillCount[index];
     if (count == goal) {
       text = std::format("{} ( {} )", text, LookupMessage(MSI_COMPLETE_HUNTING_QUEST));
@@ -442,19 +439,22 @@ void CRenewQuestMgr::WriteOngoingQuests(char* buffer) {
     *reinterpret_cast<RenewQuestOngoingRecord*>(buffer + offset) = record;
     offset += sizeof(RenewQuestOngoingRecord);
 
-    for (int index = 0; index < huntCount; ++index) {
-      RenewQuestHuntRecord hunt;
-      SecureZeroMemory(&hunt, sizeof(hunt));
-      hunt.huntId = static_cast<int>(info.m_huntId[index]);
-      hunt.monsterCondition = info.m_huntConditionFlags[index];
-      hunt.monsterId = info.m_huntMobId[index];
-      hunt.minLevel = info.m_huntMinLevel[index];
-      hunt.maxLevel = info.m_huntMaxLevel[index];
-      hunt.killCount = info.m_huntKillCount[index];
-      hunt.killGoal = info.m_huntMaxCount[index];
-      strncpy_s(hunt.name, sizeof(hunt.name), info.m_huntName[index], _TRUNCATE);
-      *reinterpret_cast<RenewQuestHuntRecord*>(buffer + offset) = hunt;
-      offset += sizeof(RenewQuestHuntRecord);
+    if (huntCount > 0) {
+      RenewQuestHuntRecord* huntDestination = reinterpret_cast<RenewQuestHuntRecord*>(buffer + offset);
+      for (int index = 0; index < huntCount; ++index) {
+        RenewQuestHuntRecord hunt;
+        SecureZeroMemory(&hunt, sizeof(hunt));
+        hunt.killCount = info.m_huntKillCount[index];
+        hunt.huntId = static_cast<int>(info.m_huntId[index]);
+        hunt.maxLevel = info.m_huntMaxLevel[index];
+        hunt.minLevel = info.m_huntMinLevel[index];
+        hunt.killGoal = info.m_huntMaxCount[index];
+        hunt.monsterId = info.m_huntMobId[index];
+        hunt.monsterCondition = info.m_huntConditionFlags[index];
+        strncpy_s(hunt.name, sizeof(hunt.name), info.m_huntName[index], _TRUNCATE);
+        *huntDestination++ = hunt;
+      }
+      offset += static_cast<int>(huntCount) * sizeof(RenewQuestHuntRecord);
     }
   }
 }
@@ -614,7 +614,7 @@ int CRenewQuestMgr::L_AddQuestFilterInfo(lua_State* state) {
     }
   }
 
-  g_renewQuestMgr->m_filters.try_emplace(static_cast<int>(id), RenewQuestFilter{std::string(name.c_str(), name.size()), std::move(icons)});
+  g_renewQuestMgr->m_filters.emplace(static_cast<int>(id), RenewQuestFilter{std::string(name.c_str(), name.size()), std::move(icons)});
   return 0;
 }
 
@@ -678,12 +678,12 @@ void CRenewQuestMgr::SendQuestStatusRequest() {
   }
 
   header.packetLength = static_cast<std::int16_t>(length);
-  packet.header = header;
+  memcpy_s(&packet.header, sizeof(packet.header), &header, sizeof(header));
 
-  unsigned int* questId = packet.questIds;
+  int index = 0;
   for (const unsigned int& id : this->m_statusRequests) {
-    memcpy_s(questId, sizeof(unsigned int), &id, sizeof(unsigned int));
-    ++questId;
+    memcpy_s(&packet.questIds[index], sizeof(unsigned int), &id, sizeof(unsigned int));
+    ++index;
   }
 
   GetRagConnection().Send(length, &packet);
@@ -796,23 +796,25 @@ void CRenewQuestMgr::SetParameter(int key, int value) {
 void CRenewQuestMgr::SaveOngoingSimpleViewList() {
   std::string path = "SaveData\\OngoingSimpleViewList.lua";
   CFile file;
-  if (file.Open(path.c_str(), 0x1001, true, true)) {
-    std::string text = "OngoingSimpleViewList = {}\r\n\r\n";
-    file.Write(text.c_str(), text.size());
-    text = "OngoingSimpleViewList = \r\n{\r\n";
-    file.Write(text.c_str(), text.size());
-
-    for (auto it = this->m_ongoingQuests.begin(); it != this->m_ongoingQuests.end(); ++it) {
-      if (!it->second.m_simpleView) {
-        text = '\t' + IntToString(it->first, 0) + ",\r\n";
-        file.Write(text.c_str(), text.size());
-      }
-    }
-
-    text = "}";
-    file.Write(text.c_str(), text.size());
-    file.Close();
+  if (!file.Open(path.c_str(), 0x1001, true, true)) {
+    return;
   }
+
+  std::string text = "OngoingSimpleViewList = {}\r\n\r\n";
+  file.Write(text.c_str(), text.size());
+  text = "OngoingSimpleViewList = \r\n{\r\n";
+  file.Write(text.c_str(), text.size());
+
+  for (auto it = this->m_ongoingQuests.begin(); this->m_ongoingQuests.end() != it; ++it) {
+    if (!it->second.m_simpleView) {
+      text = '\t' + IntToString(it->first, 0) + ",\r\n";
+      file.Write(text.c_str(), text.size());
+    }
+  }
+
+  text = "}";
+  file.Write(text.c_str(), text.size());
+  file.Close();
 }
 
 // OFFSET: 0x0067C5A0
@@ -820,23 +822,25 @@ void CRenewQuestMgr::SaveOngoingSimpleViewList() {
 void CRenewQuestMgr::SaveRecommendedActiveList() {
   std::string path = "SaveData\\RecommendedActiveList.lua";
   CFile file;
-  if (file.Open(path.c_str(), 0x1001, true, true)) {
-    std::string text = "RecommendedActiveList = {}\r\n\r\n";
-    file.Write(text.c_str(), text.size());
-    text = "RecommendedActiveList = \r\n{\r\n";
-    file.Write(text.c_str(), text.size());
-
-    for (auto it = this->m_recommendedQuests.begin(); it != this->m_recommendedQuests.end(); ++it) {
-      if (!it->second.m_active) {
-        text = '\t' + IntToString(it->first, 0) + ",\r\n";
-        file.Write(text.c_str(), text.size());
-      }
-    }
-
-    text = "}";
-    file.Write(text.c_str(), text.size());
-    file.Close();
+  if (!file.Open(path.c_str(), 0x1001, true, true)) {
+    return;
   }
+
+  std::string text = "RecommendedActiveList = {}\r\n\r\n";
+  file.Write(text.c_str(), text.size());
+  text = "RecommendedActiveList = \r\n{\r\n";
+  file.Write(text.c_str(), text.size());
+
+  for (auto it = this->m_recommendedQuests.begin(); this->m_recommendedQuests.end() != it; ++it) {
+    if (!it->second.m_active) {
+      text = '\t' + IntToString(it->first, 0) + ",\r\n";
+      file.Write(text.c_str(), text.size());
+    }
+  }
+
+  text = "}";
+  file.Write(text.c_str(), text.size());
+  file.Close();
 }
 
 // OFFSET: 0x0067E370

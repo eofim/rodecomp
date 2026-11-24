@@ -28,10 +28,6 @@ public:
   void Shutdown();
   void EndSamples();
 
-  // INLINED
-  __declspec(noinline) static int Volume(const CSoundMgr* sound) {
-    return sound->Volume();
-  }
   int Volume() const;
   void Pause(int paused);
   void SetVolume(int volume);
@@ -53,7 +49,7 @@ public:
 
   /* 0004 */ HANDLE fadeThread = INVALID_HANDLE_VALUE;
   /* 0008 */ unsigned threadId = 0;
-  /* 000C */ std::uint8_t initialized = 0;
+  /* 000C */ std::uint8_t initialized;
   /* 000D */ std::uint8_t padding_000D[3];
   /* 0010 */ int tingOnly = 0;
   /* 0014 */ int secondaryEnabled = 0;

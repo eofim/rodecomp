@@ -105,12 +105,10 @@ CHalluPlant::CHalluPlant() {
   this->render.shadowVisible = 0;
   this->render.motionStartTime = timeGetTime();
   this->SetSexBit(0);
-  this->SetActorJob(1079);
+  this->SetActorJob(JT_BLUE_PLANT);
   this->isRiding = 0;
   this->SetMonsterTransformJob(-1);
-  this->render.position.x = 0.0f;
-  this->render.position.y = 0.0f;
-  this->render.position.z = 0.0f;
+  this->render.position = vector3d{0.0f, 0.0f, 0.0f};
   this->render.distanceScale = 1.0f;
   this->render.spriteOffsetX = 0;
   this->render.scale = 1.0f;
@@ -250,8 +248,8 @@ bool CSoundMaker::OnProcess() {
 
   const float deltaX = player->render.position.x - this->render.position.x;
   const float deltaZ = player->render.position.z - this->render.position.z;
-  float signX = 1.0f;
   float signZ = 1.0f;
+  float signX = 1.0f;
   if (deltaX >= 0.0f && deltaZ >= 0.0f) {
   } else if (deltaX < 0.0f && deltaZ >= 0.0f) {
     signX = -1.0f;
@@ -262,20 +260,21 @@ bool CSoundMaker::OnProcess() {
     signZ = -1.0f;
   }
 
-  const float slope = deltaZ / std::max(deltaX, 0.001f);
+  const float slope = deltaZ / std::max(0.001f, deltaX);
   float offsetX;
   float offsetZ;
-  if (!(static_cast<float>(this->height / this->width) >= std::fabs(slope))) {
-    offsetZ = static_cast<float>(this->height) * signZ * 0.5f;
-    offsetX = offsetZ / std::max(slope, 0.001f);
-  } else {
+  if (static_cast<float>(this->height / this->width) >= std::fabs(slope)) {
     offsetX = static_cast<float>(this->width) * signX * 0.5f;
     offsetZ = slope * offsetX;
+  } else {
+    offsetZ = static_cast<float>(this->height) * signZ * 0.5f;
+    offsetX = offsetZ / std::max(0.001f, slope);
   }
 
   const float x = this->render.position.x + offsetX;
   const float z = this->render.position.z + offsetZ;
-  if (player->CalcDist(x, z) - this->range > 75.0f || this->file.empty()) {
+  const float playerDistance = player->CalcDist(x, z);
+  if (playerDistance - this->range > 75.0f || this->file.empty()) {
     return true;
   }
 
@@ -935,10 +934,10 @@ void CNpc::SetSprJob(int job) {
     this->render.spriteJob = job;
     actionFormat = "NPC\\%s.act";
     spriteFormat = "NPC\\%s.spr";
-  } else if (job >= 6017 && job <= 6046) {
+  } else if (job >= JT_MER_ARCHER01 && job <= JT_MER_SWORDMAN10) {
     actionFormat = "인간족\\몸통\\%s.act";
     spriteFormat = "인간족\\몸통\\%s.spr";
-  } else if (job >= 6001 && job <= 6052) {
+  } else if (job >= JT_MER_LIF && job <= JT_MER_ELEANOR) {
     actionFormat = "homun\\%s.act";
     spriteFormat = "homun\\%s.spr";
   } else {
@@ -1001,7 +1000,7 @@ bool CCorpse::OnProcess() {
 // FUNCTION: fn_22412
 void CHalluNPC::Render(int argument) {
   const float* matrix = reinterpret_cast<const float*>(argument);
-  if (StateFlag02(this->stateFlags) || StateFlag06(this->stateFlags) || StateFlag01(this->stateFlags)) {
+  if (IsCloaking(this->stateFlags) || IsInvisible(this->stateFlags) || IsHiding(this->stateFlags)) {
     return;
   }
 
@@ -1010,7 +1009,7 @@ void CHalluNPC::Render(int argument) {
   rand();
   rand();
 
-  if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
+  if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
     if (this->render.visible) {
       if ((this->render.color & 0xFF000000) == 0xFF000000) {
         this->DrawShadow(argument, this->render.scale);
@@ -1097,12 +1096,19 @@ void CNpc::Render(int argument) {
     case JT_HIDDEN_WARP_NPC:
       return;
     default:
-      if (this->GetEffectiveJob(-1) < 6017 || this->GetEffectiveJob(-1) > 6046) {
+      if (this->GetEffectiveJob(-1) < JT_MER_ARCHER01 || this->GetEffectiveJob(-1) > JT_MER_SWORDMAN10) {
         for (const ActiveSkillEffect& effect : g_activeSkillEffects) {
-          if (effect.id == 184) {
+          if (effect.id == EFST_CLAIRVOYANCE) {
             if (this->objectType == NPC_MOB_TYPE && (!this->render.visible || !this->render.enabled)) {
               this->SetColor(-1, 0, 0, 0);
-              this->DrawSprite(argument, g_session.IsMonsterClass(this->GetEffectiveJob(-1)), 0.0f);
+              const int job = this->GetEffectiveJob(-1);
+              bool monster;
+              if ((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || static_cast<unsigned int>(job - 20021) <= 11978) {
+                monster = true;
+              } else {
+                monster = false;
+              }
+              this->DrawSprite(argument, monster, 0.0f);
               return;
             }
             break;
@@ -1176,6 +1182,11 @@ void CNpc::UpdateBubblePositions() {
   this->UpdateHpGauge();
 }
 
+// INLINED
+static std::string PaletteNameOf(CPc* source) {
+  return source->headPaletteName;
+}
+
 // OFFSET: 0x00DA1470
 // FUNCTION: fn_22357
 CHalluPC2::CHalluPC2(CPc* source) {
@@ -1204,7 +1215,7 @@ CHalluPC2::CHalluPC2(CPc* source) {
   this->render.bodyPalette = 0;
   this->headPalette = source->headPalette;
   this->stateFlags = source->GetStateFlags();
-  this->headPaletteName = std::string(source->headPaletteName);
+  this->headPaletteName = PaletteNameOf(source);
   this->LoadEquipSprites(source->GetEquipSpriteNames());
   this->LoadEquipActions(source->GetEquipActionNames());
   this->imfName = source->imfName;
@@ -1249,7 +1260,7 @@ CBlurPC::CBlurPC(CPc* source) {
   this->render.bodyPalette = 0;
   this->headPalette = source->headPalette;
   this->stateFlags = source->GetStateFlags();
-  this->headPaletteName = std::string(source->headPaletteName);
+  this->headPaletteName = PaletteNameOf(source);
   this->LoadEquipSprites(source->GetEquipSpriteNames());
   this->LoadEquipActions(source->GetEquipActionNames());
   this->imfName = source->imfName;
@@ -1293,7 +1304,7 @@ CHalluPC::CHalluPC(CPc* source) {
   this->render.bodyPalette = 0;
   this->headPalette = source->headPalette;
   this->stateFlags = source->GetStateFlags();
-  this->headPaletteName = std::string(source->headPaletteName);
+  this->headPaletteName = PaletteNameOf(source);
   this->LoadEquipSprites(source->GetEquipSpriteNames());
   this->LoadEquipActions(source->GetEquipActionNames());
   this->imfName = source->imfName;
@@ -1369,12 +1380,14 @@ bool CNpc::OnProcess() {
       this->UpdateGaugePositions();
       result = this->ProcessState();
       break;
-    case JT_EFFECTLAUNCHER:
-      if (timeGetTime() > this->effectTick + this->xSize * 1000) {
+    case JT_EFFECTLAUNCHER: {
+      const int interval = this->xSize * 1000;
+      if (timeGetTime() > this->effectTick + interval) {
         this->effectTick = timeGetTime();
         this->LaunchEffect(this->moveSpeed, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       }
       break;
+    }
     default:
       this->ProcessBodyState();
       this->UpdateStateEffects();
@@ -1447,11 +1460,11 @@ bool CNpc::OnProcess() {
   this->UpdateBubblePositions();
 
   if (g_session.homunAlive && g_session.homunEnemyGid == this->render.accountId) {
-    this->SendMsg(nullptr, 0x86, 0, 0, 0, 0, 0, 0);
+    this->SendMsg(nullptr, AM_MAKE_CURSOR_EFFECT, 0, 0, 0, 0, 0, 0);
   } else if (g_session.mercenaryAlive && g_session.mercenaryEnemyGid == this->render.accountId) {
-    this->SendMsg(nullptr, 0x86, 0, 0, 0, 0, 0, 0);
+    this->SendMsg(nullptr, AM_MAKE_CURSOR_EFFECT, 0, 0, 0, 0, 0, 0);
   } else {
-    this->SendMsg(nullptr, 0x87, 0, 0, 0, 0, 0, 0);
+    this->SendMsg(nullptr, AM_DELETE_CURSOR_EFFECT, 0, 0, 0, 0, 0, 0);
   }
 
   this->UpdateMinimapMarker();
@@ -1462,12 +1475,11 @@ bool CNpc::OnProcess() {
     case NPC_MERSOL_TYPE:
     case NPC_ELEMENTAL_TYPE:
     case NPC_ABR_TYPE:
-    case NPC_BIONIC_TYPE:
-      this->SetColor(
-        g_serviceOptions.Get(TT_HIDE_SUMMON_ON_OFF) ? 0x3A : static_cast<int>(this->render.color >> 24), static_cast<int>((this->render.color >> 16) & 0xFF),
-        static_cast<int>((this->render.color >> 8) & 0xFF), static_cast<int>(this->render.color & 0xFF)
-      );
+    case NPC_BIONIC_TYPE: {
+      const int alpha = g_serviceOptions.Get(TT_HIDE_SUMMON_ON_OFF) ? 0x3A : this->render.colorChannels.alpha;
+      this->SetColor(alpha, this->render.colorChannels.red, this->render.colorChannels.green, this->render.colorChannels.blue);
       break;
+    }
   }
 
   return result;
@@ -1477,7 +1489,7 @@ bool CNpc::OnProcess() {
 // FUNCTION: fn_22409
 void CBlurPC::Render(int argument) {
   const float* matrix = reinterpret_cast<const float*>(argument);
-  if (StateFlag02(this->stateFlags) || StateFlag06(this->stateFlags) || StateFlag01(this->stateFlags)) {
+  if (IsCloaking(this->stateFlags) || IsInvisible(this->stateFlags) || IsHiding(this->stateFlags)) {
     return;
   }
 
@@ -1518,7 +1530,7 @@ void CBlurPC::Render(int argument) {
 // FUNCTION: fn_22413
 void CHalluPC2::Render(int argument) {
   const float* matrix = reinterpret_cast<const float*>(argument);
-  if (StateFlag02(this->stateFlags) || StateFlag06(this->stateFlags) || StateFlag01(this->stateFlags)) {
+  if (IsCloaking(this->stateFlags) || IsInvisible(this->stateFlags) || IsHiding(this->stateFlags)) {
     return;
   }
 
@@ -1527,12 +1539,15 @@ void CHalluPC2::Render(int argument) {
   rand();
   rand();
 
-  if (this->render.visible && this->render.enabled) {
-    this->DrawLayers(matrix, 1, 1);
-    return;
+  if (this->render.visible) {
+    if (this->render.enabled) {
+      this->DrawLayers(matrix, 1, 1);
+    } else {
+      this->UpdateTlvertex(matrix);
+    }
+  } else {
+    this->UpdateTlvertex(matrix);
   }
-
-  this->UpdateTlvertex(matrix);
 }
 
 // OFFSET: 0x00DA4340
@@ -1548,7 +1563,7 @@ void CHalluPC::Render(int argument) {
     }
   }
 
-  if (StateFlag02(this->stateFlags) || StateFlag06(this->stateFlags) || StateFlag01(this->stateFlags)) {
+  if (IsCloaking(this->stateFlags) || IsInvisible(this->stateFlags) || IsHiding(this->stateFlags)) {
     return;
   }
 
@@ -1613,10 +1628,14 @@ void CNpc::SetState(int state, int) {
         this->xSize = 10;
         width = 10;
       }
-      this->boundsLeft = this->render.position.x - static_cast<float>(width / 2);
-      this->boundsRight = static_cast<float>(width / 2) + this->render.position.x;
-      this->boundsTop = this->render.position.z - static_cast<float>(height / 2);
-      this->boundsBottom = static_cast<float>(height / 2) + this->render.position.z;
+      const float x = this->render.position.x;
+      const float z = this->render.position.z;
+      const float halfWidth = static_cast<float>(width / 2);
+      const float halfHeight = static_cast<float>(height / 2);
+      this->boundsLeft = x - halfWidth;
+      this->boundsRight = halfWidth + x;
+      this->boundsTop = z - halfHeight;
+      this->boundsBottom = halfHeight + z;
       if (this->appearanceInitialized == 0 && this->render.enabled) {
         this->appearanceInitialized = 1;
         this->LaunchEffect(EF_WARPZONE2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
@@ -1626,8 +1645,8 @@ void CNpc::SetState(int state, int) {
     case JT_HIDDEN_WARP_NPC:
       break;
     default: {
-      CGameActor* actor = g_session.FindGameActor(this->render.accountId);
       bool isDisguised = false;
+      CGameActor* actor = g_session.FindGameActor(this->render.accountId);
       if (actor && actor->objectType == 12) {
         isDisguised = true;
       }
@@ -1649,8 +1668,8 @@ void CNpc::SetState(int state, int) {
           this->render.trackBounds = 1;
           this->SetAction(0, 4, 0);
           if (this->healthState != 0) {
+            int emotion;
             int hungerLevel = g_session.GetPetHungryState(g_session.petHunger);
-            int emotion = state;
             switch (this->healthState) {
               case 1:
                 emotion = g_session.GetPetEmotionNumber(this->GetEffectiveJob(-1), 7, hungerLevel);
@@ -1677,7 +1696,6 @@ void CNpc::SetState(int state, int) {
             }
             this->healthState = 0;
             this->render.isMotionFinished = false;
-            this->RegisterPos();
           } else {
             if (this->render.state != 0) {
               this->petEmotionStartTick = timeGetTime();
@@ -1692,14 +1710,14 @@ void CNpc::SetState(int state, int) {
               g_session.mercenaryEnemyY = 0;
               g_session.moveMercenaryEnemy = 0;
             }
-            this->RegisterPos();
           }
+          this->RegisterPos();
           break;
         case ST_MOVE:
           if (this->bodyState != 1 && this->bodyState != 2) {
             this->render.isMotionFreezed = false;
           }
-          if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
+          if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
             this->SetAction(8, 6, 0);
           } else {
             this->SetAction(8, 4, 0);
@@ -1708,17 +1726,17 @@ void CNpc::SetState(int state, int) {
           break;
         case ST_SKILL:
           switch (this->objectType) {
+            case NPC_MERSOL_TYPE:
+              this->SetAction(16, 4, 1);
+              break;
             case NPC_HO_TYPE:
             case NPC_ELEMENTAL_TYPE:
             case NPC_ABR_TYPE:
             case NPC_BIONIC_TYPE:
               this->SetAction(40, 4, 1);
               break;
-            case NPC_MERSOL_TYPE:
-              this->SetAction(16, 4, 1);
-              break;
           }
-          if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
+          if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
             this->SetAction(96, 6, 1);
           }
           break;
@@ -1734,7 +1752,7 @@ void CNpc::SetState(int state, int) {
             } else {
               this->SetAction(48, 4, 1);
             }
-          } else if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
+          } else if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
             this->SetAction(80, 3, 1);
           } else {
             this->SetAction(16, 4, 1);
@@ -1747,7 +1765,7 @@ void CNpc::SetState(int state, int) {
           if (this->render.frameSequenceActive != 0 || this->render.animationSequenceActive != 0 || this->render.timedSequenceActive != 0) {
             return;
           }
-          if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
+          if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
             this->SetAction(48, 5, 1);
             break;
           }
@@ -1770,7 +1788,7 @@ void CNpc::SetState(int state, int) {
           this->render.isLieOnGround = true;
           this->render.isMotionFreezed = false;
           this->render.trackBounds = 0;
-          if (this->GetEffectiveJob(-1) >= 6017 && this->GetEffectiveJob(-1) <= 6046) {
+          if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
             this->SetAction(64, 4, 1);
             this->UnRegisterPos();
           } else {

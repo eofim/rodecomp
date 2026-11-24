@@ -88,7 +88,10 @@ int BasicInfoWndInfo::IsValid() {
     return 0;
   }
 
-  return this->x >= 0 && this->x <= g_renderer->viewport.width - this->width && this->y >= 0 && this->y <= g_renderer->viewport.height - this->height;
+  if (this->x >= 0 && this->x <= g_renderer->viewport.width - this->width && this->y >= 0 && this->y <= g_renderer->viewport.height - this->height) {
+    return 1;
+  }
+  return 0;
 }
 
 // OFFSET: 0x009A51D0
@@ -160,6 +163,13 @@ int EquipWndInfo::IsValid() const {
 // FUNCTION: fn_13629
 int ExchangeAcceptWndInfo::IsValid() const {
   return this->width == 280 && this->height == 120 && this->x >= 0 && this->x <= g_renderer->viewport.width - 280 && this->y >= 0 && this->y <= g_renderer->viewport.height - 120;
+}
+
+// OFFSET: 0x009A54B0
+// FUNCTION: fn_13630
+int FriendOptionWndInfo::IsValid() const {
+  return this->width == 280 && this->height == 120 && this->x >= 0 && this->x <= g_renderer->viewport.width - 280 && this->y >= 0 &&
+         this->y <= g_renderer->viewport.height - 120;
 }
 
 // OFFSET: 0x009A5500
@@ -472,7 +482,7 @@ int WhisperWndInfo::IsValid() const {
 // OFFSET: 0x009A62F0
 // FUNCTION: fn_13675
 bool MacroReporterWndInfo::IsValid() const {
-  return this->width > 0 && g_renderer->viewport.width - this->x >= this->width && this->height > 0 && g_renderer->viewport.height - this->y >= this->height;
+  return this->x > 0 && g_renderer->viewport.width - this->width >= this->x && this->y > 0 && g_renderer->viewport.height - this->height >= this->y;
 }
 
 // OFFSET: 0x009A6320
@@ -748,11 +758,9 @@ void EntryQueueWndInfo::Reset() {
 // OFFSET: 0x009A6870
 // FUNCTION: fn_13704
 void MiniMapWndInfo::Reset() {
-  const int x = g_renderer->viewport.width - 536;
-
+  this->width = g_renderer->viewport.width - 536;
   this->height = 190;
-  this->width = x;
-  this->x = x;
+  this->x = this->width;
   this->y = 190;
   this->expandedWidth = 516;
   this->expandedHeight = 559;
@@ -1039,17 +1047,17 @@ void WhisperWndInfo::Reset() {
 // OFFSET: 0x009A6DC0
 // FUNCTION: fn_13735
 void MacroReporterWndInfo::Reset() {
-  this->x = 249;
-  this->y = 308;
-  this->width = g_renderer->viewport.width - 299;
-  this->height = (g_renderer->viewport.height - 308) / 2;
+  this->width = 249;
+  this->height = 308;
+  this->x = g_renderer->viewport.width - 299;
+  this->y = (g_renderer->viewport.height - 308) / 2;
 }
 
 // OFFSET: 0x009A6E00
 // FUNCTION: fn_13736
 void PreviewEquipWndInfo::Reset() {
-  this->x = static_cast<int>(static_cast<float>(g_renderer->viewport.width - 280) * g_depthAverageHalf);
-  this->y = static_cast<int>(static_cast<float>(g_renderer->viewport.height - 260) * g_depthAverageHalf);
+  this->x = static_cast<int>(static_cast<float>(g_renderer->viewport.width - 280) * 0.5f);
+  this->y = static_cast<int>(static_cast<float>(g_renderer->viewport.height - 260) * 0.5f);
 }
 
 // OFFSET: 0x009A6E90
@@ -1148,10 +1156,10 @@ void UIWindowMgr::ResetUIRectInfo() {
   this->previewEquipWndInfo.Reset();
 
   int* const swapEquipment = this->swapEquipmentPlacement;
-  swapEquipment[0] = (g_renderer->viewport.width - 280) / 2;
-  swapEquipment[1] = (g_renderer->viewport.height - 177) / 2;
   swapEquipment[2] = 280;
   swapEquipment[3] = 167;
+  swapEquipment[0] = (g_renderer->viewport.width - 280) / 2;
+  swapEquipment[1] = (g_renderer->viewport.height - 177) / 2;
 
   this->questDisplayInfo.Reset();
   this->registerPartyWndInfo.Reset();
@@ -1162,7 +1170,9 @@ void UIWindowMgr::ResetUIRectInfo() {
 // OFFSET: 0x009A7CA0
 // FUNCTION: fn_13738
 void NavigationWindowInfo::Clamp() {
-  if (this->height < 338 || this->height > 338) {
+  if (this->height < 338) {
+    this->height = 338;
+  } else if (this->height > 338) {
     this->height = 338;
   }
 

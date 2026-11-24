@@ -23,6 +23,7 @@ enum TextLinkButtonId : int {
 
 class UIString;
 class UITextButton;
+struct TextLink;
 
 class UITextViewer : public UIListBox {
   friend class UIWindow;
@@ -58,8 +59,8 @@ private:
   std::pair<int, int> LinkPosition(unsigned position, unsigned addedLines);
   void AddLinks(const char* text, unsigned addedLines, int kind);
   bool AddItemLinks(std::string text, unsigned addedLines);
-  bool AddUrlLinks(std::string text, unsigned addedLines);
-  bool AddNaviLinks(std::string text, unsigned addedLines);
+  void AddUrlLinks(std::string text, unsigned addedLines);
+  void AddNaviLinks(std::string text, unsigned addedLines);
   bool AddQuestLinks(std::string text, unsigned addedLines);
   void AddTipLinks(std::string text, unsigned addedLines);
   void SplitTextLinkArguments(std::string text, UITextButton* button);
@@ -76,11 +77,12 @@ public:
   void Refresh() override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
   void SetText(std::string text);
-  void AddLineLinks(UITextButton* const* first, UITextButton* const* last);
+  void ArrangeLinks();
+  void AddLineLinks(std::vector<UIString*>::iterator first, std::vector<UIString*>::iterator last);
   int AddWords(std::string text, int attached, int red, int green, int blue);
 
   std::vector<UIString*> extraLinks;
-  std::vector<std::vector<UITextButton*>> lineLinks;
+  std::vector<std::vector<UIString*>> lineLinks;
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

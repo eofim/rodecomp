@@ -24,17 +24,27 @@ __forceinline bool IsParticleActive(const CParticle* particle) {
 // FUNCTION: fn_07076
 void CNyanggrassEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    CParticle* particle = *it;
-    if (particle != nullptr) {
-      CGameMode* mode = g_modeMgr.GetGameMode();
-      static_cast<CEZ2STRParticle*>(particle)->DrawScreen(mode->camera->frame.view);
-    }
+    this->RenderParticle(*it);
+  }
+}
+
+// OFFSET: 0x00708900
+// FUNCTION: fn_46133
+__forceinline void CNyanggrassEffect::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle != nullptr) {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    particle->DrawScreen(mode->camera->frame.view);
   }
 }
 
 // OFFSET: 0x00708930
 // FUNCTION: fn_07077
 CCompetentia::CCompetentia() : CEffect(1851) {
+}
+
+// OFFSET: 0x007089B0
+// FUNCTION: fn_46134
+__declspec(noinline) CCompetentia::~CCompetentia() {
 }
 
 // OFFSET: 0x00708A90
@@ -52,16 +62,16 @@ void CCompetentia::Close() {
 void CCompetentia::Open() {
   for (__int64 i = 0; i < 10; ++i) {
     vector3d pos = this->positionVector;
-    const vector2d point = RandomDiscPoint(pos.x, pos.z, 50);
+    const vector2d point = RandomDiscPoint(vector2d{pos.x, pos.z}, 50);
     pos.x = point.x;
     pos.z = point.y;
     CGameMode* mode = g_modeMgr.GetGameMode();
     pos.y = mode->scene->terrain->Height(pos.x, pos.z);
 
-    CParticle* particle = CreateEZ2STRParticle(&pos, 5);
+    CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&pos, 5));
     if (particle != nullptr) {
-      static_cast<CEZ2STRParticle*>(particle)->Open("competentia\\competentia_cast_particle\\competentia_cast_particle.str");
-      static_cast<CEZ2STRParticle*>(particle)->m_loop = true;
+      particle->Open("competentia\\competentia_cast_particle\\competentia_cast_particle.str");
+      particle->m_loop = true;
       this->particles.push_back(particle);
     }
   }
@@ -80,10 +90,7 @@ bool CCompetentia::IsAlive() {
 void CCompetentia::OnProcess() {
   for (auto current = this->particles.begin(); current != this->particles.end();) {
     if (IsParticleActive(*current)) {
-      CParticle* particle = *current;
-      if (particle) {
-        static_cast<CEZ2STRParticle*>(particle)->Process(0.0f, -80.0f, 0.0f);
-      }
+      this->UpdateParticle(*current);
       ++current;
     } else {
       FreeParticle(*current);
@@ -92,15 +99,28 @@ void CCompetentia::OnProcess() {
   }
 }
 
+// OFFSET: 0x00708D80
+// FUNCTION: fn_46135
+__forceinline void CCompetentia::UpdateParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->Process(0.0f, -80.0f, 0.0f);
+  }
+}
+
 // OFFSET: 0x00708DB0
 // FUNCTION: fn_07083
 void CCompetentia::Render() {
   for (auto current = this->particles.begin(); current != this->particles.end(); ++current) {
-    CParticle* particle = *current;
-    if (particle) {
-      CGameMode* mode = g_modeMgr.GetGameMode();
-      static_cast<CEZ2STRParticle*>(particle)->DrawScreen(mode->camera->frame.view);
-    }
+    this->RenderParticle(*current);
+  }
+}
+
+// OFFSET: 0x00708E00
+// FUNCTION: fn_46136
+__forceinline void CCompetentia::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    particle->DrawScreen(mode->camera->frame.view);
   }
 }
 
@@ -108,9 +128,9 @@ void CCompetentia::Render() {
 // FUNCTION: fn_07084
 void CCompetentia::SetLifeTime(int argument) {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    CParticle* particle = *it;
+    CEZ2STRParticle* particle = *it;
     if (particle) {
-      static_cast<CEZ2STRParticle*>(particle)->m_lifeTime = argument;
+      particle->m_lifeTime = argument;
     }
   }
 }

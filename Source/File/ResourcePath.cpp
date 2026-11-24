@@ -5,8 +5,6 @@
 #include <shlwapi.h>
 #include <string>
 
-template __declspec(noinline) std::string& std::string::replace(const size_type, const size_type, const char* const, const size_type);
-
 // STRING: st_14242
 static char g_dataDirectory[] = "data\\";
 
@@ -36,15 +34,15 @@ bool ResourceExists(const char* filename, bool looseOnly) {
 // OFFSET: 0x00AE9EE0
 // FUNCTION: fn_18113
 void* PakRegistry::ReadLooseResource(const char* filename, std::uint32_t* size) {
+  DWORD read;
   HANDLE file = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file != INVALID_HANDLE_VALUE) {
     LARGE_INTEGER fileSize;
     GetFileSizeEx(file, &fileSize);
     *size = fileSize.LowPart;
-    if (size) {
+    if (size > 0) {
       void* data = VirtualAlloc(nullptr, *size, MEM_COMMIT, PAGE_READWRITE);
       if (data) {
-        DWORD read;
         ReadFile(file, data, *size, &read, nullptr);
         CloseHandle(file);
 

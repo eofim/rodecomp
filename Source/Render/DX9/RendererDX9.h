@@ -19,14 +19,14 @@ public:
   void ClearDepth(int clearColor) override;
   void ClearWorld() override;
   bool Draw() override;
-  HRESULT Present(int option) override;
+  void Present(bool option) override;
   float FPS() const override;
-  bool CaptureBackBuffer() override;
-  bool RestoreBackBuffer() override;
+  void CaptureBackBuffer() override;
+  void RestoreBackBuffer() override;
   void DrawAuxiliaryPrimitive(LightmappedCommand* primitive) override;
   void DrawLightmappedPrimitive(LightmappedPrimitive* primitive) override;
   void DrawPrimitive(RenderCommand* primitive) override;
-  bool RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture) override;
+  bool RenderToTexture(int width, int height, const std::list<RenderCommand*>& primitives, CTexture*& texture) override;
   int SaveBitmap(const char* filename, CBitmapRes* overlay) override;
   int SaveJpeg(const char* filename, CBitmapRes* overlay) override;
   void CleanupTextures() override;
@@ -37,16 +37,14 @@ public:
   void SetTextureMode(int mode);
   void DrawDepthQueue(bool sort, std::vector<DepthPrimitive>& queue);
   void DrawOpaqueQueues();
-  void DrawOpaqueQueues(RenderQueues& queues);
   void DrawGroundQueues();
   void DrawAlphaQueues();
-  void DrawAlphaQueues(RenderQueues& queues, unsigned char twoPass);
   void DrawAuxiliaryQueue();
   void DrawBaseQueue();
   void DrawQueues();
   void ApplyFog();
   bool SaveScreenshot(const char* filename, int format, CTexture* overlay, const tagRECT* rectangle);
-  void Submit(RenderCommand* command, std::uint16_t flags);
+  using CRenderer::Submit;
   void Submit(LightmappedPrimitive* command, int queue);
 
   /* 025C */ DeviceOwnerDX9* device;

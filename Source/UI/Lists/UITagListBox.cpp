@@ -74,32 +74,27 @@ void UITagListBox::Paint() {
   std::uint32_t color = 0;
 
   for (int index = 0; index < first; ++index) {
-    const std::string& line = this->lines[index];
-    const char* text = line.c_str();
-    const char* endText = text + line.size();
+    const char* text = this->lines[index].c_str();
+    const char* endText = text + this->lines[index].size();
 
     while (text < endText) {
       text = ParseColorCode(SegmentEnd(text, endText), color);
     }
   }
 
-  if (first < end) {
-    if ((this->plainTextMode & 255) == 0) {
-      for (int index = first; index < end; ++index) {
-        const std::string& line = this->lines[index];
-        const int y = (index - first) * this->lineHeight + 4;
-        this->DrawColoredText(
-          3, y, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false
-        );
-      }
-    } else {
-      for (int index = first; index < end; ++index) {
-        const std::string& line = this->lines[index];
-        const int y = (index - first) * this->lineHeight + 4;
-        this->DrawOutlinedText(
-          3, y, line.c_str(), static_cast<unsigned>(line.size()), 0, 0xFFFFFF, 0, 12, 0, 0
-        );
-      }
+  if (this->plainTextMode == 0) {
+    for (int index = first; index < end; ++index) {
+      const std::string& line = this->lines[index];
+      this->DrawColoredText(
+        3, (index - first) * this->lineHeight + 4, line.c_str(), static_cast<unsigned>(line.size()), color, 0, 12, false
+      );
+    }
+  } else {
+    for (int index = first; index < end; ++index) {
+      const std::string& line = this->lines[index];
+      this->DrawOutlinedText(
+        3, (index - first) * this->lineHeight + 4, line.c_str(), static_cast<unsigned>(line.size()), 0, 0xFFFFFF, 0, 12, 0, 0
+      );
     }
   }
 }
@@ -156,7 +151,7 @@ void UITagListBox::DecodeItemFields(const std::string& text, std::vector<int>& f
   strcpy_s(buffer, size, text.c_str());
   std::string value = "";
   int optionCount = 0;
-  std::vector<int> options;
+  std::vector<unsigned int> options;
   int cardIndex = 0;
 
   fields.resize(260);
@@ -264,13 +259,12 @@ bool UITagListBox::ItemFromFields(const std::vector<int>& fields, ITEM_INFO& ite
     const int optionCount = fields[cardCount + 8];
     item.optionCount = optionCount;
     for (int option = 1; option < optionCount + 1; ++option) {
-      const int* record = &fields[cardCount + 9 + (option - 1) * 3];
       ItemOption value;
-      value.id = static_cast<std::int16_t>(record[0]);
-      value.value = static_cast<std::int16_t>(record[2]);
-      value.parameter = static_cast<unsigned char>(record[1]);
-      const int index = option - 1;
-      item.SetOption(value, index);
+      value.id = static_cast<std::int16_t>(fields[cardCount + 9 + (option - 1) * 3]);
+      const unsigned char parameter = static_cast<unsigned char>(fields[cardCount + 10 + (option - 1) * 3]);
+      value.value = static_cast<std::int16_t>(fields[cardCount + 11 + (option - 1) * 3]);
+      value.parameter = parameter;
+      item.SetOption(value, option - 1);
     }
   }
 
@@ -280,8 +274,8 @@ bool UITagListBox::ItemFromFields(const std::vector<int>& fields, ITEM_INFO& ite
 
 // OFFSET: 0x009BACD0
 // FUNCTION: fn_13885
-void UITagListBox::DecodeValues(std::vector<int>& values, const char* text, int& position, const int& end, const char& separator, const char& alternate) {
-  std::string value;
+void UITagListBox::DecodeValues(std::vector<unsigned int>& values, const char* text, int& position, const int& end, const char& separator, const char& alternate) {
+  std::string value = "";
 
   while (++position < end + 1) {
     const char byte = text[position];
@@ -303,7 +297,7 @@ void UITagListBox::DecodeValues(std::vector<int>& values, const char* text, int&
 int UITagListBox::DecodeCards(std::vector<int>& fields, const char* text, int& position, const char& separator, const int& end, int index) {
   std::string value = "";
   int count = 1;
-  std::vector<int> cards;
+  std::vector<unsigned int> cards;
 
   while (++position < end + 1) {
     const char byte = text[position];
@@ -334,13 +328,11 @@ int UITagListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
   case UM_UPPUSH:
     if (this->verticalOverflow) {
       this->SendMsg(this->verticalBar, UM_SCROLLVERT, -1, 0, 0, 0);
-      return 0;
     }
     break;
   case UM_DOWNPUSH:
     if (this->verticalOverflow) {
       this->SendMsg(this->verticalBar, UM_SCROLLVERT, 1, 0, 0, 0);
-      return 0;
     }
     break;
   case UM_SETTEXT:
@@ -358,11 +350,11 @@ int UITagListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       UITagButton* tag = this->m_tagWindows[index];
       if (tag) {
         const int line = tag->m_value;
-        if (line < this->topLine || line >= this->geometry.height / this->lineHeight - this->bottomMargin + this->topLine) {
-          tag->Enable(0);
-        } else {
+        if (line >= this->topLine && line < this->geometry.height / this->lineHeight - this->bottomMargin + this->topLine) {
           tag->Enable(1);
           tag->Move(tag->geometry.x - this->horizontalOffset + offset, (line - this->topLine) * this->lineHeight + 3);
+        } else {
+          tag->Enable(0);
         }
       }
     }
@@ -376,6 +368,14 @@ int UITagListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
   }
 
   return 0;
+}
+
+// OFFSET: 0x009B8320
+// FUNCTION: fn_45777
+__forceinline void UITagListBox::AppendTaggedText(const char* text, int width) {
+  std::vector<STagInfoV2> tags;
+  const std::string parsed = this->ParseTaggedText(std::string(text), tags);
+  this->AppendTaggedLines(parsed, tags, width);
 }
 
 // OFFSET: 0x009B9EA0
@@ -393,7 +393,7 @@ void UITagListBox::AppendText(std::intptr_t argument1, std::intptr_t argument2, 
       this->AddLine(lines[index].c_str());
     }
 
-    this->plainTextMode = (this->plainTextMode & ~255) | 1;
+    this->plainTextMode = 1;
   } else {
     if (argument4 != 0) {
       int extra = 0;
@@ -406,12 +406,10 @@ void UITagListBox::AppendText(std::intptr_t argument1, std::intptr_t argument2, 
         this->AddLine(lines[index].c_str());
       }
     } else {
-      std::vector<STagInfoV2> tags;
-      const std::string parsed = this->ParseTaggedText(std::string(text), tags);
-      this->AppendTaggedLines(parsed, tags, lineWidth);
+      this->AppendTaggedText(text, lineWidth);
     }
 
-    this->plainTextMode &= ~255;
+    this->plainTextMode = 0;
   }
 
   this->Invalidate();
@@ -463,12 +461,11 @@ std::string infoTagOpening = "<INFO>";
 // GLOBAL: gl_25152
 std::string infoTagClosing = "</INFO>";
 
-namespace {
-// INLINED
-std::string ItemName(int id) {
+// OFFSET: 0x009B9B90
+// FUNCTION: fn_45781
+__forceinline std::string __stdcall UITagListBox::ItemName(int id) {
   ITEM_DESC description = FindItemDescription(id);
   return description.identifiedName;
-}
 }
 
 // OFFSET: 0x009B94E0
@@ -554,7 +551,7 @@ void UITagListBox::OnTagClick(std::intptr_t type, UIWindow* sender) {
     const int y = std::atoi(button->GetString(2).c_str());
     if (count > 3) {
       const int mode = std::atoi(button->GetString(3).c_str());
-      int code = std::atoi(button->GetString(4).c_str());
+      const int code = std::atoi(button->GetString(4).c_str());
       if (code == -222) {
         std::string tag = "$$DB ";
         if (mode != 3) {
@@ -566,16 +563,21 @@ void UITagListBox::OnTagClick(std::intptr_t type, UIWindow* sender) {
       } else {
         const int flag = std::atoi(button->GetString(5).c_str());
         const int id = std::atoi(button->GetString(6).c_str());
-        unsigned char hundreds = 0;
-        if (code >= 100) {
-          hundreds = 1;
-          code -= 100;
+        unsigned char group = 0;
+        int remainder = code;
+        if (remainder >= 100) {
+          group = 1;
+          remainder -= 100;
         }
 
-        const unsigned char group = code < 10 ? hundreds : static_cast<unsigned char>(hundreds + 2);
-        const int remainder = code < 10 ? code : code - 10;
-        const unsigned char kind = remainder < 1 ? group : static_cast<unsigned char>(group + 4);
-        g_navigationManager.StartNavigation(name.c_str(), mode, kind, flag == 0, x, y, id);
+        if (remainder >= 10) {
+          group += 2;
+          remainder -= 10;
+        }
+        if (remainder >= 1) {
+          group += 4;
+        }
+        g_navigationManager.StartNavigation(name.c_str(), mode, group, flag == 0, x, y, id);
       }
     } else {
       g_navigationManager.StartNavigation(name.c_str(), 2, 5, false, x, y, 1002);
@@ -633,9 +635,9 @@ std::string UITagListBox::ParseTaggedText(std::string text, std::vector<STagInfo
   return result;
 }
 
-namespace {
-// INLINED
-int WrappedLineLength(const char* text, int length, int width) {
+// OFFSET: 0x009B8480
+// FUNCTION: fn_45778
+__forceinline int UITagListBox::WrappedLineLength(const char* text, int length, int width) const {
   if (text == nullptr) {
     return -1;
   }
@@ -661,17 +663,16 @@ int WrappedLineLength(const char* text, int length, int width) {
 
   return static_cast<int>(current - text);
 }
-}
 
 // OFFSET: 0x009BB8E0
 // FUNCTION: fn_13888
 void UITagListBox::AppendTaggedLines(std::string text, std::vector<STagInfoV2>& tags, int width) {
-  const int firstLine = static_cast<int>(this->lines.size());
   const char* buffer = text.c_str();
+  const int firstLine = static_cast<int>(this->lines.size());
   std::size_t position = 0;
-  while (position < text.size()) {
+  while (text.size() > position) {
     const char* start = buffer + position;
-    int next = WrappedLineLength(start, static_cast<int>(text.size() - position), width) + static_cast<int>(position);
+    int next = this->WrappedLineLength(start, static_cast<int>(text.size() - position), width) + static_cast<int>(position);
     for (std::size_t index = 0; index < tags.size(); ++index) {
       if (next > tags[index].startOffset && next < tags[index].endOffset) {
         next = tags[index].startOffset;
@@ -679,10 +680,7 @@ void UITagListBox::AppendTaggedLines(std::string text, std::vector<STagInfoV2>& 
       }
     }
 
-    std::string line;
-    if (start != buffer + next) {
-      line.assign(start, next - position);
-    }
+    std::string line(start, buffer + next);
     this->AddLine(line.c_str());
     position = next;
   }
@@ -691,6 +689,25 @@ void UITagListBox::AppendTaggedLines(std::string text, std::vector<STagInfoV2>& 
     this->AddTagButton(*tag, static_cast<int>(this->lines.size()) - firstLine);
   }
   this->SendMsg(nullptr, UM_SCROLLVERT, 0, 0, 0, 0);
+}
+
+// OFFSET: 0x009BB7A0
+// FUNCTION: fn_45779
+__forceinline std::pair<unsigned int, int> UITagListBox::FindTagPosition(int offset, int lineCount) {
+  std::pair<unsigned int, int> position;
+  const unsigned int count = static_cast<unsigned int>(this->lines.size());
+  int bytes = 0;
+  for (unsigned int index = count - lineCount; index < count; ++index) {
+    bytes += static_cast<int>(this->lines[index].size());
+    if (bytes > offset) {
+      const int prefixLength = static_cast<int>(this->lines[index].size()) - bytes + offset;
+      const std::string stripped = StripColorTokens(std::string_view(this->lines[index].c_str(), prefixLength));
+      position.first = index;
+      position.second = this->TextWidth(stripped.substr(0, prefixLength).c_str(), 0, 0, 12, 0, 0) + 2;
+      break;
+    }
+  }
+  return position;
 }
 
 // OFFSET: 0x009B7A20
@@ -709,68 +726,55 @@ void UITagListBox::AddTagButton(STagInfoV2 tag, int lineCount) {
   button->m_hoverColor = 0x00FF7864;
   button->SetId(tag.type);
 
-  std::string data = tag.data;
-  if (!data.empty()) {
-    switch (tag.type) {
-    case LINE_SEGMENT_NAVI: {
-      std::string remaining = data;
-      std::size_t separator = remaining.find(",");
-      while (separator != std::string::npos) {
-        const std::string field = remaining.substr(0, separator);
-        button->AddString(field);
-        remaining = remaining.substr(separator + 1);
-        separator = remaining.find(",");
+  {
+    std::string data = tag.data;
+    if (!data.empty()) {
+      switch (tag.type) {
+      case LINE_SEGMENT_NAVI: {
+        std::string remaining = data;
+        std::size_t separator = remaining.find(",");
+        while (separator != std::string::npos) {
+          const std::string field = remaining.substr(0, separator);
+          button->AddString(field);
+          remaining = remaining.substr(separator + 1);
+          separator = remaining.find(",");
+        }
+        button->AddString(remaining);
+        break;
       }
-      button->AddString(remaining);
-      break;
-    }
-    case LINE_SEGMENT_ITEM: {
-      std::string remaining = data;
-      std::size_t separator = remaining.find(",");
-      while (separator != std::string::npos) {
-        const std::string field = remaining.substr(0, separator);
-        button->AddString(field);
-        remaining = remaining.substr(separator + 1);
-        separator = remaining.find(",");
+      case LINE_SEGMENT_ITEM: {
+        std::string remaining = data;
+        std::size_t separator = remaining.find(",");
+        while (separator != std::string::npos) {
+          const std::string field = remaining.substr(0, separator);
+          button->AddString(field);
+          remaining = remaining.substr(separator + 1);
+          separator = remaining.find(",");
+        }
+        button->AddString(remaining);
+        int id = 0;
+        if (!button->GetString(1).empty()) {
+          id = std::atoi(button->GetString(1).c_str());
+        }
+        button->item.identity[0] = id;
+        button->item.identified = 1;
+        button->item.refiningLevel = 0;
+        button->item.itemId = button->GetString(0);
+        break;
       }
-      button->AddString(remaining);
-      int id = 0;
-      if (!button->GetString(1).empty()) {
-        id = std::atoi(button->GetString(1).c_str());
+      case LINE_SEGMENT_ITEM_LINK: {
+        std::vector<int> fields;
+        this->DecodeItemFields(data, fields);
+        this->ItemFromFields(fields, button->item);
+        break;
       }
-      button->item.identity[0] = id;
-      button->item.identified = 1;
-      button->item.refiningLevel = 0;
-      button->item.itemId = button->GetString(0);
-      break;
-    }
-    case LINE_SEGMENT_ITEM_LINK: {
-      std::vector<int> fields;
-      this->DecodeItemFields(data, fields);
-      this->ItemFromFields(fields, button->item);
-      break;
-    }
+      }
     }
   }
 
-  int x = 0;
-  unsigned int line = 0;
-  int bytes = 0;
-  const unsigned int count = static_cast<unsigned int>(this->lines.size());
-  for (unsigned int index = count - lineCount; index < count; ++index) {
-    bytes += static_cast<int>(this->lines[index].size());
-    if (tag.startOffset < bytes) {
-      const int prefixLength = static_cast<int>(this->lines[index].size()) - bytes + tag.startOffset;
-      const std::string stripped = StripColorTokens(this->lines[index].c_str(), prefixLength);
-      const std::string prefix = stripped.substr(0, prefixLength);
-      x = this->TextWidth(prefix.c_str(), 0, 0, 12, 0, 0) + 2;
-      line = index;
-      break;
-    }
-  }
-
-  button->m_value = line;
-  button->Move(x, -100);
+  const auto position = this->FindTagPosition(tag.startOffset, lineCount);
+  button->m_value = position.first;
+  button->Move(position.second, -100);
   this->AddChild(button);
   this->m_tagWindows.push_back(button);
 }

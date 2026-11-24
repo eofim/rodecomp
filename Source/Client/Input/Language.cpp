@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <format>
+#include <fmt/core.h>
 #include <imm.h>
 
 // OFFSET: 0x00ACF2A0
@@ -55,7 +55,7 @@ void CLanguageBase::DeleteSelection() {
   this->anchor = begin;
   this->cursor = begin;
 
-  SuggestChatCommand(this->text.c_str());
+  this->SuggestChatCommand(this->text.c_str());
 }
 
 // OFFSET: 0x00ACD360
@@ -66,7 +66,7 @@ void CLanguageBase::Insert(const char* value) {
   this->anchor = this->cursor + static_cast<int>(std::strlen(value));
   this->cursor = this->anchor;
 
-  SuggestChatCommand(this->text.c_str());
+  this->SuggestChatCommand(this->text.c_str());
 }
 
 
@@ -277,7 +277,7 @@ void CLanguageBase::Character(unsigned value, LPARAM) {
   this->anchor = this->cursor + static_cast<int>(std::strlen(bytes));
   this->cursor = this->anchor;
 
-  SuggestChatCommand(this->text.c_str());
+  this->SuggestChatCommand(this->text.c_str());
 }
 
 // OFFSET: 0x00ACE880
@@ -311,15 +311,15 @@ void CLanguageBase::KeyDown(unsigned key, LPARAM) {
 
   if (HIBYTE(GetKeyState(VK_CONTROL))) {
     switch (key) {
-    case 'V':
-      this->Paste();
-      break;
     case 'X':
       this->CopySelection();
       this->DeleteSelection();
       break;
     case 'C':
       this->CopySelection();
+      break;
+    case 'V':
+      this->Paste();
       break;
     case 'A':
       this->anchor = 0;
@@ -342,18 +342,22 @@ void CLanguageBase::KeyDown(unsigned key, LPARAM) {
     this->DeleteSelection();
     break;
   case VK_LEFT:
-    if (ChatWindow() && ChatWindow()->SuggestionsVisible() && ChatWindow()->m_suggestions) {
-      ChatWindow()->m_suggestions->SendMsg(nullptr, UM_CASH_EMOTION_KEY, VK_LEFT, 0, 0, 0);
-      return;
+    if (UINewChatWnd* chat = ChatWindow()) {
+      if (chat->SuggestionsVisible() && chat->m_suggestions) {
+        chat->m_suggestions->SendMsg(nullptr, UM_CASH_EMOTION_KEY, VK_LEFT, 0, 0, 0);
+        return;
+      }
     }
 
     this->MoveBack();
     this->anchor = this->cursor;
     break;
   case VK_RIGHT:
-    if (ChatWindow() && ChatWindow()->SuggestionsVisible() && ChatWindow()->m_suggestions) {
-      ChatWindow()->m_suggestions->SendMsg(nullptr, UM_CASH_EMOTION_KEY, VK_RIGHT, 0, 0, 0);
-      return;
+    if (UINewChatWnd* chat = ChatWindow()) {
+      if (chat->SuggestionsVisible() && chat->m_suggestions) {
+        chat->m_suggestions->SendMsg(nullptr, UM_CASH_EMOTION_KEY, VK_RIGHT, 0, 0, 0);
+        return;
+      }
     }
 
     this->MoveForward();
@@ -372,7 +376,7 @@ void CLanguageBase::KeyDown(unsigned key, LPARAM) {
 
 // OFFSET: 0x00ACEEB0
 // FUNCTION: fn_45450
-void SuggestChatCommand(const char* text) {
+void CLanguageBase::SuggestChatCommand(const char* text) {
   if (text && g_windowMgr.inputSuggestionsEnabled && ChatWindow() && ChatWindow()->m_chatEdit &&
       g_windowMgr.GetHoverWindow() == ChatWindow()->m_chatEdit) {
     g_cashEmotionMgr->ProcessChatCommand(text);
@@ -400,6 +404,11 @@ UIChatHisBox2::UIChatHisBox2()
 // OFFSET: 0x0086C830
 // FUNCTION: fn_11031
 UIChatHisBox3::UIChatHisBox3() : UIChatHisBox2(), autoScroll(1), fontHeight(12) {
+}
+
+// OFFSET: 0x0086DE10
+// FUNCTION: fn_11060
+UIMemberListBox::UIMemberListBox() : UIChatHisBox2() {
 }
 
 // OFFSET: 0x007ECF50
@@ -466,22 +475,9 @@ LexiconBoundary g_lexiconBoundary;
 CLanguageTH::CLanguageTH() : lexiconLoaded(g_lexiconBoundary.Load()) {
 }
 
-// OFFSET: 0x007D99C0
-// FUNCTION: fn_09608
-UIHairStyleButton::UIHairStyleButton(int style, int sex) : UIBitmapButton(), m_style(style), m_sex(sex), m_race(0), m_preview(nullptr), m_selected(false) {
-}
-
 // OFFSET: 0x00ACD140
 // FUNCTION: fn_17755
 CLanguageBase::~CLanguageBase() = default;
-
-// OFFSET: 0x00ACD200
-// FUNCTION: fn_17757
-CLanguageArabic::~CLanguageArabic() = default;
-
-// OFFSET: 0x00ACD300
-// FUNCTION: fn_17759
-CLanguageTH::~CLanguageTH() = default;
 
 // OFFSET: 0x00ACDD20
 // FUNCTION: fn_17775
@@ -499,7 +495,7 @@ void CLanguageBase::RefreshComposition() {
   ImmReleaseContext(hWnd, context);
   this->candidate.assign(converted, size);
 
-  *std::format_to_n(converted, sizeof(converted) - 1, "{}{}", this->text, this->candidate).out = 0;
+  *fmt::format_to_n(converted, sizeof(converted) - 1, "{}{}", this->text, this->candidate).out = 0;
 
-  SuggestChatCommand(converted);
+  this->SuggestChatCommand(converted);
 }

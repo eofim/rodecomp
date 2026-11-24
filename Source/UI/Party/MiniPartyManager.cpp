@@ -19,8 +19,6 @@
 #include "UI/Login/UIWaitDBSaveWnd.h"
 #include <new>
 
-template __declspec(noinline) std::_List_node<UIWindow*, void*>* std::list<UIWindow*>::_Emplace<UIWindow* const&>(std::_List_node<UIWindow*, void*>* const, UIWindow* const&);
-
 namespace {
 // INLINED
 inline CMiniPartyWndAreaMgr* MiniPartyArea() {
@@ -60,12 +58,8 @@ void UIWindowMgr::RearrangeMiniPartyWindows() {
     top = window->geometry.height;
   }
 
-  RECT bounds;
-  bounds.left = 0;
-  bounds.top = top;
-  bounds.right = this->screenWidth;
-  bounds.bottom = height - g_miniPartyCellHeight * 3;
-  CMiniPartyWndSortArea area(bounds);
+  const int bottom = height - g_miniPartyCellHeight * 3;
+  CMiniPartyWndSortArea area(RECT{0, top, this->screenWidth, bottom});
   const std::list<int> cells = area.GetCells();
 
   auto cell = cells.begin();
@@ -73,18 +67,19 @@ void UIWindowMgr::RearrangeMiniPartyWindows() {
   for (; cell != cells.end() && entry != this->snapExcluded.end(); ++cell, ++entry) {
     const MiniPartyGridPoint position = area.GetWindowPosition(*cell);
     (*entry)->Move(position.x, position.y);
-    static_cast<UIMiniPartyWnd*>(*entry)->m_cell = *cell;
+    UIMiniPartyWnd* window = static_cast<UIMiniPartyWnd*>(*entry);
+    window->m_cell = *cell;
 
     const int index = *cell;
-    const MessengerMember member = static_cast<UIMiniPartyWnd*>(*entry)->m_member;
-    g_session.SetRecord0734Value(member.accountId, index);
+    g_session.SetRecord0734Value(static_cast<UIMiniPartyWnd*>(*entry)->GetMember().accountId, index);
   }
 }
 
 // OFFSET: 0x00A8AF20
 // FUNCTION: fn_17119
 void UIWindowMgr::AddMiniPartyWindow(UIWindow* window) {
-  this->rendered.push_back(window);
+  UIWindow* added = window;
+  this->rendered.push_back(added);
   this->snapExcluded.emplace_back(window);
   this->ArrangeMiniPartyWindows();
 }
@@ -191,7 +186,8 @@ void UIWindowMgr::RebuildMiniPartyWindows() {
 
   g_session.ClearMiniPartyRecords();
 
-  for (const SessionRecord0734& record : records) {
+  for (auto recordIt = records.begin(); recordIt != records.end(); ++recordIt) {
+    const SessionRecord0734& record = *recordIt;
     MessengerMember member = g_session.PartyByAccount(record.id);
     if (member.valid == 0) {
       continue;
@@ -205,11 +201,16 @@ void UIWindowMgr::RebuildMiniPartyWindows() {
     g_session.AddMiniPartyRecord(record.id, record.cell);
 
     UIMenuWnd* drag = this->menuWnd;
-    if (drag != nullptr && drag->m_menuId == 301 && drag->m_targetWindowId == record.cell) {
-      const int x = drag->geometry.x;
-      const int y = drag->geometry.y;
-      window->SendMsg(nullptr, UM_MAKEMENU, 0, 0, 0, 0);
-      this->menuWnd->Move(x, y);
+    if (drag != nullptr) {
+      if (drag->m_menuId != 301) {
+        continue;
+      }
+      if (drag->m_targetWindowId == record.cell) {
+        const int x = drag->geometry.x;
+        const int y = drag->geometry.y;
+        window->SendMsg(nullptr, UM_MAKEMENU, 0, 0, 0, 0);
+        this->menuWnd->Move(x, y);
+      }
     }
   }
 

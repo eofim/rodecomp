@@ -16,6 +16,31 @@ CEvilsPawEffect::CEvilsPawEffect()
     : CEffect(1039), particles(), frameDelay(5), size(50), delayCounter(5), offset{0.0f, -40.0f, 0.0f}, textures(), textureIndex(0) {
 }
 
+// OFFSET: 0x006FEB10
+// FUNCTION: fn_46141
+__declspec(noinline) CEvilsPawEffect::~CEvilsPawEffect() {
+}
+
+// OFFSET: 0x006FEC10
+// FUNCTION: fn_46142
+__forceinline void CEvilsPawEffect::AddParticle() {
+  CParticle* particle = CreateParticle(&this->positionVector, 5);
+  if (!particle) {
+    return;
+  }
+
+  particle->SetColor(255, 255, 255);
+  particle->alpha = 255;
+  particle->scale = static_cast<float>(this->size);
+  particle->offsetX = this->offset.x;
+  particle->offsetY = this->offset.y;
+  particle->offsetZ = this->offset.z;
+  particle->sourceBlend = 5;
+  particle->destinationBlend = 6;
+  particle->InitParticleQuad(particle->vertices);
+  this->particles.push_back(particle);
+}
+
 // OFFSET: 0x006FECE0
 // FUNCTION: fn_06956
 void CEvilsPawEffect::Close() {
@@ -29,19 +54,7 @@ void CEvilsPawEffect::Close() {
 // OFFSET: 0x006FED20
 // FUNCTION: fn_06957
 void CEvilsPawEffect::Open() {
-  CParticle* particle = CreateParticle(&this->positionVector, 5);
-  if (particle) {
-    particle->SetColor(255, 255, 255);
-    particle->alpha = 255;
-    particle->scale = static_cast<float>(this->size);
-    particle->offsetX = this->offset.x;
-    particle->offsetY = this->offset.y;
-    particle->offsetZ = this->offset.z;
-    particle->sourceBlend = 5;
-    particle->destinationBlend = 6;
-    particle->InitParticleQuad(particle->vertices);
-    this->particles.push_back(particle);
-  }
+  this->AddParticle();
 
   for (int set = 0; set < 2; ++set) {
     for (int frame = 0; frame < 10; ++frame) {
@@ -52,6 +65,17 @@ void CEvilsPawEffect::Open() {
   }
 }
 
+// OFFSET: 0x006FEF50
+// FUNCTION: fn_46143
+__forceinline void CEvilsPawEffect::InitializeParticle(CParticle* particle) {
+  particle->SetColor(255, 255, 255);
+  particle->alpha = 255;
+  particle->scale = static_cast<float>(this->size);
+  particle->offsetX = this->offset.x;
+  particle->offsetY = this->offset.y;
+  particle->offsetZ = this->offset.z;
+}
+
 // OFFSET: 0x006FEFC0
 // FUNCTION: fn_06958
 void CEvilsPawEffect::ResetParticles() {
@@ -59,12 +83,7 @@ void CEvilsPawEffect::ResetParticles() {
   this->delayCounter = this->frameDelay;
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
-    particle->SetColor(255, 255, 255);
-    particle->alpha = 255;
-    particle->scale = static_cast<float>(this->size);
-    particle->offsetX = this->offset.x;
-    particle->offsetY = this->offset.y;
-    particle->offsetZ = this->offset.z;
+    this->InitializeParticle(particle);
   }
 }
 
@@ -72,6 +91,11 @@ void CEvilsPawEffect::ResetParticles() {
 // FUNCTION: fn_06959
 bool CEvilsPawEffect::IsAlive() {
   return true;
+}
+
+// INLINED
+static __forceinline vector3d Sum(const vector3d& left, const vector3d& right) {
+  return vector3d{left.x + right.x, left.y + right.y, left.z + right.z};
 }
 
 // OFFSET: 0x006FF070
@@ -83,26 +107,7 @@ void CEvilsPawEffect::OnProcess() {
     position.x = this->position[0];
     position.y = this->position[1];
     position.z = this->position[2];
-    if (particle) {
-      particle->SetTexture(this->textures[this->textureIndex].c_str());
-
-      matrix rotation;
-      std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
-      rotation.MakeZRotation(3.141592f);
-      const CView* view = g_modeMgr.GetGameMode()->camera;
-      rotation.AppendXRotation(view->camera.pitch / 180.0f * 3.141592f);
-
-      const float size = particle->scale;
-      matrix scale;
-      std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
-      scale.SetScale(size, size, 1.0f);
-
-      matrix result;
-      result.Compose(scale, rotation);
-      particle->transform = result;
-
-      particle->position = vector3d{this->position[0] + this->offset.x, this->position[1] + this->offset.y, this->position[2] + this->offset.z};
-    }
+    this->UpdateParticle(particle);
     ++particle->elapsedFrames;
   }
 
@@ -115,13 +120,44 @@ void CEvilsPawEffect::OnProcess() {
   }
 }
 
+// OFFSET: 0x006FF270
+// FUNCTION: fn_46144
+void CEvilsPawEffect::UpdateParticle(CParticle* particle) {
+  if (!particle) {
+    return;
+  }
+
+  particle->SetTexture(this->textures[this->textureIndex].c_str());
+
+  matrix rotation;
+  std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
+  rotation.MakeZRotation(3.141592f);
+  const CView* view = g_modeMgr.GetGameMode()->camera;
+  rotation.AppendXRotation(view->camera.pitch / 180.0f * 3.141592f);
+
+  const float size = particle->scale;
+  matrix scale;
+  std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
+  scale.SetScale(size, size, 1.0f);
+
+  matrix result;
+  result.Compose(scale, rotation);
+  particle->transform = result;
+  particle->position = Sum(this->positionVector, this->offset);
+}
+
 // OFFSET: 0x006FF3E0
 // FUNCTION: fn_06961
 void CEvilsPawEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    CParticle* particle = *it;
-    if (particle) {
-      particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
-    }
+    this->RenderParticle(*it);
+  }
+}
+
+// OFFSET: 0x006FF440
+// FUNCTION: fn_46284
+__forceinline void CEvilsPawEffect::RenderParticle(CParticle* particle) {
+  if (particle) {
+    particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
   }
 }

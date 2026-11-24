@@ -5,7 +5,15 @@
 #include "UI/Window/UIBitmapTab.h"
 #include "Utility/Text/FormatString.h"
 
-template __declspec(noinline) void std::vector<BitmapTabEntry>::clear() noexcept;
+// INLINED
+static void DrawTabBitmap(UIWindow* window, int& y, const char* format, int suffix) {
+  const std::string name = FormatOwnedString(format, suffix);
+  CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
+  if (bitmap) {
+    window->DrawBitmap(0, y, bitmap, false);
+    y += bitmap->image.height;
+  }
+}
 
 // OFFSET: 0x0085BBC0
 // FUNCTION: fn_10797
@@ -13,13 +21,22 @@ void UIBitmapTab::Paint() {
   int y = 0;
 
   for (unsigned index = 0; index < this->tabs.size(); ++index) {
-    const std::string name = FormatOwnedString(this->tabs[index].name.c_str(), 'a' + (this->geometry.state == index));
-    CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
-    if (bitmap) {
-      this->DrawBitmap(0, y, bitmap, false);
-      y += bitmap->image.height;
+    DrawTabBitmap(this, y, this->tabs[index].name.c_str(), 'a' + (this->geometry.state == index));
+  }
+}
+
+// OFFSET: 0x00858CC0
+// FUNCTION: fn_45631
+int UIBitmapTab::TabAt(int, int y) {
+  int bottom = 0;
+  for (unsigned index = 0; index < this->tabs.size(); ++index) {
+    bottom += this->tabs[index].height;
+    if (y < bottom) {
+      return static_cast<int>(index);
     }
   }
+
+  return -1;
 }
 
 // OFFSET: 0x0085EA90
@@ -69,7 +86,7 @@ int UIBitmapTab::SendMsg(UIWindow*, int message, std::intptr_t argument1, std::i
       const std::string name = FormatOwnedString(tabName, 'a');
       CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(name.c_str())));
       if (bitmap) {
-        this->tabs.push_back(BitmapTabEntry{bitmap->image.height, tabName});
+        this->tabs.push_back(BitmapTabEntry(bitmap->image.height, tabName));
       }
     }
     break;

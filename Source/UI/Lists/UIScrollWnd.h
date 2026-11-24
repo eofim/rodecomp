@@ -5,6 +5,7 @@
 
 #include <map>
 #include <utility>
+#include <windows.h>
 
 class CTexture;
 class UIScrollBar;
@@ -22,11 +23,16 @@ public:
 
   RenderPrimitive* BuildPrimitive(int x, int y, int sourceX, int sourceY, int width, int height, CTexture* texture, std::uint32_t color);
   void Clear();
+  void InitializeScrollWindow(int width, int height);
+  void DestroyScrollBars();
+  void ShowHorizontalScrollBar(int visible, bool redraw);
+  void ShowVerticalScrollBar(int visible, bool redraw);
   __declspec(noinline) void RemoveChild(UIWindow* child, unsigned char destroy);
   void AddScrollChild(UIWindow* child);
   void MoveScrollChild(UIWindow* child, int x, int y);
 
   bool Update(int redraw) override;
+  bool UpdateUncached(int redraw);
   bool UpdateCached(int redraw);
   bool UpdateChild(UIWindow* child, int redraw);
 
@@ -42,7 +48,7 @@ public:
   /* 00A0 */ int scrollPosition;
   /* 00A4 */ unsigned char horizontalScrollable;
   /* 00A5 */ unsigned char wheelScroll;
-  /* 00A8 */ std::map<UIWindow*, std::pair<int, int>> childOrigins;
+  /* 00A8 */ std::map<UIWindow*, POINT> childOrigins;
 };
 
 #endif

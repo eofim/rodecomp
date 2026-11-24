@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Network/Packets/PacketId.h"
 #include "Render/Text/FontCache.h"
 #include "UI/Window/UIEnums.h"
 #include "Render/Text/TextContext.h"
@@ -38,11 +39,6 @@
 #include <cstdlib>
 #include <malloc.h>
 #include <string>
-
-template __declspec(noinline) std::vector<ChangeMaterialEntry>::vector(const std::vector<ChangeMaterialEntry>&);
-template __declspec(noinline) std::vector<ChangeMaterialProduct>::vector(const std::vector<ChangeMaterialProduct>&);
-template __declspec(noinline) std::vector<MaterialReq>::vector(const std::vector<MaterialReq>&);
-template __declspec(noinline) std::vector<MaterialResult>::vector(const std::vector<MaterialResult>&);
 
 #pragma pack(push, 1)
 struct ChangeMaterialPacket {
@@ -206,9 +202,9 @@ void UIChangeMaterialWnd_List::OnMouseMove(int x, int y) {
 // FUNCTION: fn_03887
 void UIChangeMaterialWnd::OnProcess() {
   const std::string text = this->searchEdit->Text();
-  if (text.compare(LookupMessage(MSI_BO_RESEARCHREPORT_OFF)) != 0) {
+  if (text.compare(LookupMessage(MSI_CHANGE_MATERIAL_SEARCHTEXT)) != 0) {
     if (text.empty()) {
-      this->searchEdit->SetText(LookupMessage(MSI_BO_RESEARCHREPORT_OFF));
+      this->searchEdit->SetText(LookupMessage(MSI_CHANGE_MATERIAL_SEARCHTEXT));
       this->searchEdit->TextColor(0xb1u, 0xb1u, 0xb1u, 0xffffffffu);
     } else {
       this->searchEdit->TextColor(0, 0, 0, 0xffffffffu);
@@ -277,14 +273,16 @@ void UIChangeMaterialWnd_List::ApplyFilter(std::string text) {
   std::transform(filter.begin(), filter.end(), filter.begin(), [](unsigned char c) { return static_cast<char>(tolower(c)); });
 
   int index = 0;
-  for (const MaterialListEntry& entry : this->m_entries) {
+  for (auto entryIt = this->m_entries.begin(); entryIt != this->m_entries.end(); ++entryIt, ++index) {
+    const MaterialListEntry& entry = *entryIt;
     std::string name = ItemDisplayName(entry.results.front().id);
     std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(tolower(c)); });
 
-    if (name.find(filter) != std::string::npos) {
-      this->m_items.push_back(index);
+    if (name.find(filter) == std::string::npos) {
+      continue;
     }
-    ++index;
+
+    this->m_items.push_back(index);
   }
 
   this->UpdateScrollBar();
@@ -296,36 +294,36 @@ void UIChangeMaterialWnd_List::ApplyFilter(std::string text) {
 void UIChangeMaterialWnd_List::RefreshVisibleEntries() {
   this->m_entries.clear();
 
-  std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess> library = g_changeMaterialMgr->m_library;
-  for (const auto& item : library) {
-    std::vector<ChangeMaterialRecipe> recipes = item.second.m_recipes;
-    for (const ChangeMaterialRecipe& recipe : recipes) {
-      MaterialListEntry entry = {};
-      if (recipe.materials.empty() || recipe.products.empty()) {
+  std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess> library = g_changeMaterialMgr->GetLibrary();
+  for (auto item = library.begin(); item != library.end(); ++item) {
+    std::vector<ChangeMaterialRecipe> recipes = item->second.m_recipes;
+    for (auto recipe = recipes.begin(); recipe != recipes.end(); ++recipe) {
+      MaterialListEntry entry;
+      if (recipe->materials.empty() || recipe->products.empty()) {
         continue;
       }
 
-      entry.materials.resize(recipe.materials.size());
+      entry.materials.resize(recipe->materials.size());
       auto material = entry.materials.begin();
-      for (auto source = recipe.materials.begin(); source != recipe.materials.end(); ++source, ++material) {
-        material->id = source->itemId;
-        material->quantity = source->count;
+      for (const ChangeMaterialEntry& source : recipe->materials) {
+        material->id = source.itemId;
+        material->quantity = source.count;
+        ++material;
       }
 
-      entry.results.resize(recipe.products.size());
+      entry.results.resize(recipe->products.size());
       auto result = entry.results.begin();
-      for (auto source = recipe.products.begin(); source != recipe.products.end(); ++source, ++result) {
-        result->id = source->itemId;
-        result->quantity = source->count;
-        result->amount = source->rate;
+      for (const ChangeMaterialProduct& source : recipe->products) {
+        result->id = source.itemId;
+        result->quantity = source.count;
+        result->amount = source.rate;
+        ++result;
       }
 
       bool available = true;
       for (auto required = entry.materials.begin(); required != entry.materials.end(); ++required) {
         const ITEM_INFO item = g_session.LookupClientItem(required->id, 1);
-        if (item.quantity < required->quantity) {
-          available = false;
-        }
+        available &= item.quantity >= required->quantity;
       }
 
       entry.state = available;
@@ -336,7 +334,7 @@ void UIChangeMaterialWnd_List::RefreshVisibleEntries() {
     }
   }
 
-  this->ApplyFilter(std::string());
+  this->ApplyFilter(std::string(""));
   this->SetSelectedIndex(0);
 }
 
@@ -351,7 +349,7 @@ void UIChangeMaterialWnd::SendChangeMaterial() {
     return;
   }
 
-  packet->type = 0x7E4;
+  packet->type = ID_CZ_ITEMLISTWIN_RES;
   packet->length = static_cast<std::int16_t>(length);
   packet->action = 0;
   packet->source = 1;
@@ -410,7 +408,7 @@ int UIChangeMaterialWnd::SendMsg(
     case ID_SEARCH:
       this->itemList->SendMsg(nullptr, UM_COMMAND, ID_SEARCH, reinterpret_cast<std::intptr_t>(this->searchEdit->Text()), 0, 0);
       break;
-    case ID_PARTY_RELOAD_FIRST_PAGE:
+    case ID_REFRESH:
       this->itemList->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
       break;
     default:
@@ -441,7 +439,7 @@ int UIChangeMaterialWnd::SendMsg(
         }
         this->m_resultAmount = total > 1000 ? total : 1000;
         this->m_resultText = static_cast<const std::string&>(FormatOwnedString(
-          LookupMessage(MSI_IQ_POWERFUL_FAITH_ON), ItemDisplayName(entry->results.front().id).c_str(), entry->results.front().quantity,
+          LookupMessage(MSI_CHANGE_MATERIAL_MESSAGE), ItemDisplayName(entry->results.front().id).c_str(), entry->results.front().quantity,
           entry->results.back().quantity
         ));
       } else {
@@ -449,8 +447,9 @@ int UIChangeMaterialWnd::SendMsg(
         this->m_resultText = "";
       }
 
-      this->m_button->SetDisabled(entry->state != 1);
-      this->m_button->Invalidate();
+      UIButton* button = this->m_button;
+      button->SetDisabled(entry->state != 1);
+      button->Invalidate();
       this->Invalidate();
     }
     break;
@@ -486,22 +485,22 @@ int UIChangeMaterialWnd_List::SendMsg(
   case UM_SCROLLVERTPAGEUP:
   case UM_SCROLLVERTPAGEDOWN: {
     const int previous = this->m_scrollOffset;
-    int delta = static_cast<int>(argument1);
     if (message == UM_SCROLLVERTPAGEUP) {
-      delta = -1;
+      this->m_scrollOffset = previous - 1;
     } else if (message == UM_SCROLLVERTPAGEDOWN) {
-      delta = 1;
+      this->m_scrollOffset = previous + 1;
+    } else {
+      this->m_scrollOffset = previous + static_cast<int>(argument1);
     }
-    this->m_scrollOffset = previous + delta;
     if (previous != this->m_scrollOffset) {
       this->UpdateScrollBar();
     }
     return this->m_scrollOffset - previous;
   }
   case UM_COMMAND:
-    if (argument1 == 0x141 && argument2 != 0) {
+    if (argument1 == ID_SEARCH && argument2 != 0) {
       std::string filter(reinterpret_cast<const char*>(argument2));
-      if (filter.compare(LookupMessage(MSI_BO_RESEARCHREPORT_OFF)) == 0) {
+      if (filter.compare(LookupMessage(MSI_CHANGE_MATERIAL_SEARCHTEXT)) == 0) {
         filter = "";
       }
       this->ApplyFilter(filter);
@@ -564,9 +563,8 @@ void UIChangeMaterialWnd::Paint() {
   this->DrawItemAndQuantity(this->m_resultX, this->m_resultY, this->m_resultItem, 1, 0);
 
   {
-    const std::string amount = FormatOwnedString(LookupMessage(MSI_IQ_POWERFUL_FAITH_OFF), this->m_resultAmount / 10);
-    const int width = this->TextWidth(amount.c_str(), 0, 0x1D, 0x17, 1, 0);
-    this->DrawOutlinedText(0x4F + (0xC8 - width) / 2, 0x64, amount.c_str(), 0, 0x5082DC, 0x643C00, 0x1D, 0x17, 1, 0);
+    const std::string amount = FormatOwnedString(LookupMessage(MSI_CHANGE_MATERIAL_SUCCESS_RATE), this->m_resultAmount / 10);
+    this->DrawOutlinedText(0x4F + (0xC8 - this->TextWidth(amount.c_str(), 0, 0x1D, 0x17, 1, 0)) / 2, 0x64, amount.c_str(), 0, 0x5082DC, 0x643C00, 0x1D, 0x17, 1, 0);
   }
 
   if (!this->m_resultText.empty()) {
@@ -580,8 +578,8 @@ void UIChangeMaterialWnd_List::Paint() {
   this->ClearSurface(0xFFFF00FF);
 
   for (int row = 0; row < this->m_pageSize; ++row) {
+    const MaterialListEntry* entry = this->GetEntry(row + this->m_scrollOffset);
     const int index = row + this->m_scrollOffset;
-    const MaterialListEntry* entry = this->GetEntry(index);
     if (entry) {
       const char* bitmap;
       if (index == this->m_selectedIndex) {
@@ -717,7 +715,7 @@ void UIChangeMaterialWnd::OnCreate(int width, int height) {
   this->searchEdit->Move(313, 262);
   this->searchEdit->maximum = 20;
   this->searchEdit->preserveInput = 1;
-  this->searchEdit->SetText(LookupMessage(MSI_BO_RESEARCHREPORT_OFF));
+  this->searchEdit->SetText(LookupMessage(MSI_CHANGE_MATERIAL_SEARCHTEXT));
   this->searchEdit->TextColor(0xB1u, 0xB1u, 0xB1u, 0xFFFFFFFFu);
   this->searchEdit->Background(255, 236, 207);
   this->searchEdit->topPadding = -1;
@@ -729,7 +727,7 @@ void UIChangeMaterialWnd::OnCreate(int width, int height) {
   search->SetBitmap("유저인터페이스\\ChangeMaterial\\btn_search_press.bmp", 2, 0);
   search->SetBitmap("유저인터페이스\\ChangeMaterial\\btn_search_disable.bmp", 3, 0);
   search->SetSize(search->BitmapWidth(), search->BitmapHeight());
-  SetButtonText(search, LookupMessage(MSI_BO_BIONIC_PHARMACY_OK));
+  SetButtonText(search, LookupMessage(MSI_SEARCH));
   search->Move(432, 259);
   search->SetId(ID_SEARCH);
   this->AddChild(search);
@@ -741,13 +739,13 @@ void UIChangeMaterialWnd::OnCreate(int width, int height) {
   refresh->SetBitmap("유저인터페이스\\ChangeMaterial\\btn_refresh_disable.bmp", 3, 0);
   refresh->SetSize(refresh->BitmapWidth(), refresh->BitmapHeight());
   refresh->Move(476, 259);
-  refresh->SetId(ID_PARTY_RELOAD_FIRST_PAGE);
+  refresh->SetId(ID_REFRESH);
   this->AddChild(refresh);
 
   this->m_sortBox = new UIChangeMaterialWnd_CheckBox();
   this->m_sortBox->SetSize(74, 14);
   this->m_sortBox->SetBitmaps("유저인터페이스\\ChangeMaterial\\btn_sort_up.bmp", "유저인터페이스\\ChangeMaterial\\btn_sort_down.bmp");
-  this->m_sortBox->SetLabels(LookupMessage(MSI_MSG_IS_ILLEGAL_TAG_MSG), LookupMessage(MSI_BO_RESEARCHREPORT_ON));
+  this->m_sortBox->SetLabels(LookupMessage(MSI_CHANGE_MATERIAL_SORT), LookupMessage(MSI_CHANGE_MATERIAL_INVSORT));
   this->m_sortBox->Move(316, 24);
   this->m_sortBox->SetId(ID_SORT_ITEMS);
   this->m_sortBox->SetChecked(1);
@@ -764,7 +762,7 @@ void UIChangeMaterialWnd::OnCreate(int width, int height) {
   this->AddChild(this->m_button);
 
   UIBasicButton* cancel = new UIBasicButton();
-  cancel->Configure(42, LookupMessage(MSI_ZENY_LOTTO_BUY_10));
+  cancel->Configure(42, LookupMessage(MSI_CLOSE));
   const int cancelY = height - cancel->geometry.height - 12;
   cancel->Move(width - cancel->geometry.width - 55, cancelY);
   cancel->SetId(ID_CLOSE);
@@ -809,7 +807,8 @@ void UIChangeMaterialWnd_CheckBox::Paint() {
 // OFFSET: 0x005E0A20
 // FUNCTION: fn_03866
 bool MaterialNameLess::operator()(unsigned int first, unsigned int second) const {
-  const std::string left = first < this->entries.size() ? ItemDisplayName(this->entries[first].results[0].id) : std::string();
-  const std::string right = second < this->entries.size() ? ItemDisplayName(this->entries[second].results[0].id) : std::string();
+  const std::string left = first < this->entries.size() ? ItemDisplayName(this->entries[first].results[0].id) : "";
+  const unsigned int rightIndex = second;
+  const std::string right = rightIndex < this->entries.size() ? ItemDisplayName(this->entries[rightIndex].results[0].id) : "";
   return left < right;
 }

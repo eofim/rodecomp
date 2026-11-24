@@ -12,6 +12,36 @@
 #include "Utility/Math/AffineMatrix.h"
 #include "Contents/Actors/GameActor.h"
 
+// GLOBAL: gl_25993
+float g_fireflyGroundOffset = 20.0f;
+
+// GLOBAL: gl_26005
+float g_fireflyArcStep33 = 33.0f;
+
+// GLOBAL: gl_26006
+float g_fireflyArcStep46 = 46.0f;
+
+// GLOBAL: gl_26007
+float g_fireflyArcStep59 = 59.0f;
+
+// GLOBAL: gl_26008
+float g_fireflyArcStep71 = 71.0f;
+
+// GLOBAL: gl_26009
+float g_fireflyArcStep84 = 84.0f;
+
+// GLOBAL: gl_26010
+float g_fireflyArcLength = 100.0f;
+
+// GLOBAL: gl_25995
+float g_fireflyModeFive = 5.0f;
+
+// GLOBAL: gl_25998
+float g_fireflyModeThirteen = 13.0f;
+
+// GLOBAL: gl_25997
+float g_fireflyModeTwelve = 12.0f;
+
 // INLINED
 static __forceinline void ZeroVector(vector3d& v) {
   v.x = 0.0f;
@@ -56,15 +86,15 @@ void CEffectPrim::RenderGroundArcGlow(matrix& wtm) {
         angle = this->state.slots[ec].rotStart;
       }
 
-      const float rise = this->state.slots[ec].height[i];
       const float radius = g_sinTable[this->state.slots[ec].rotStart] + this->state.slots[ec].distance;
-      const float riseX = rise * g_cosTable[this->state.slots[ec].riseAngle];
-      curB.x = radius * g_cosTable[angle];
+      const float cosine = g_cosTable[angle];
+      const float sine = g_sinTable[angle];
+      curB.x = radius * cosine;
       curB.y = 0.0f;
-      curB.z = radius * g_sinTable[angle];
-      curT.x = riseX * g_cosTable[angle] + curB.x;
-      curT.y = -(rise * g_sinTable[this->state.slots[ec].riseAngle]);
-      curT.z = riseX * g_sinTable[angle] + curB.z;
+      curB.z = radius * sine;
+      curT.x = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * cosine + curB.x;
+      curT.y = -(this->state.slots[ec].height[i] * g_sinTable[this->state.slots[ec].riseAngle]);
+      curT.z = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * sine + curB.z;
 
       if (i > 0) {
         int texture;
@@ -126,8 +156,8 @@ void CEffectPrim::RenderGroundArcGlow(matrix& wtm) {
       if (i >= 21) {
         i = 20;
       }
-      prevT = curT;
       prevB = curB;
+      prevT = curT;
     }
   }
 }
@@ -159,14 +189,14 @@ void CEffectPrim::RenderGroundArc(matrix& wtm) {
         angle = this->state.slots[ec].rotStart;
       }
 
-      const float rise = this->state.slots[ec].height[i];
-      const float riseX = rise * g_cosTable[this->state.slots[ec].riseAngle];
-      curB.x = this->state.slots[ec].distance * g_cosTable[angle];
+      const float cosine = g_cosTable[angle];
+      const float sine = g_sinTable[angle];
+      curB.x = this->state.slots[ec].distance * cosine;
       curB.y = 5.0f;
-      curB.z = this->state.slots[ec].distance * g_sinTable[angle];
-      curT.x = riseX * g_cosTable[angle] + curB.x;
-      curT.z = riseX * g_sinTable[angle] + curB.z;
-      curT.y = 5.0f - rise * g_sinTable[this->state.slots[ec].riseAngle];
+      curB.z = this->state.slots[ec].distance * sine;
+      curT.x = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * cosine + curB.x;
+      curT.z = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * sine + curB.z;
+      curT.y = g_fireflyModeFive - this->state.slots[ec].height[i] * g_sinTable[this->state.slots[ec].riseAngle];
 
       if (i > 0) {
         this->RenderTeiRect(
@@ -179,8 +209,8 @@ void CEffectPrim::RenderGroundArc(matrix& wtm) {
       if (i >= 21) {
         i = 20;
       }
-      prevT = curT;
       prevB = curB;
+      prevT = curT;
     }
   }
 }
@@ -212,14 +242,14 @@ void CEffectPrim::RenderGroundArc2(matrix& wtm) {
         angle = this->state.slots[ec].rotStart;
       }
 
-      const float rise = this->state.slots[ec].height[i];
-      const float riseX = rise * g_cosTable[this->state.slots[ec].riseAngle];
-      curB.x = this->state.slots[ec].distance * g_cosTable[angle];
+      const float cosine = g_cosTable[angle];
+      const float sine = g_sinTable[angle];
+      curB.x = this->state.slots[ec].distance * cosine;
       curB.y = 5.0f;
-      curB.z = this->state.slots[ec].distance * g_sinTable[angle];
-      curT.x = riseX * g_cosTable[angle] + curB.x;
-      curT.z = riseX * g_sinTable[angle] + curB.z;
-      curT.y = 5.0f - rise * g_sinTable[this->state.slots[ec].riseAngle];
+      curB.z = this->state.slots[ec].distance * sine;
+      curT.x = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * cosine + curB.x;
+      curT.z = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * sine + curB.z;
+      curT.y = g_fireflyModeFive - this->state.slots[ec].height[i] * g_sinTable[this->state.slots[ec].riseAngle];
 
       if (i > 0) {
         this->RenderTeiRect(
@@ -232,8 +262,8 @@ void CEffectPrim::RenderGroundArc2(matrix& wtm) {
       if (i >= 21) {
         i = 20;
       }
-      prevT = curT;
       prevB = curB;
+      prevT = curT;
     }
   }
 }
@@ -275,17 +305,17 @@ void CEffectPrim::RenderGroundArcStep(matrix& wtm) {
         curB.y = 0.0f;
       }
 
-      const float rise = this->state.slots[ec].height[i];
-      const float riseX = rise * g_cosTable[this->state.slots[ec].riseAngle];
-      float riseY = rise * g_sinTable[this->state.slots[ec].riseAngle];
+      const float riseX = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle];
+      const float riseY = this->state.slots[ec].height[i] * g_sinTable[this->state.slots[ec].riseAngle];
       curT.x = riseX * g_cosTable[angle] + curB.x;
       curT.z = riseX * g_sinTable[angle] + curB.z;
       if (this->state.slots[ec].maxHeight == 6.001f) {
-        riseY += 2.0f;
+        curT.y = -(2.0f + riseY);
       } else if (this->state.slots[ec].maxHeight == 24.001f) {
-        riseY += 1.0f;
+        curT.y = -(1.0f + riseY);
+      } else {
+        curT.y = -riseY;
       }
-      curT.y = -riseY;
 
       if (i > 0) {
         this->RenderTeiRect(
@@ -313,10 +343,8 @@ __declspec(safebuffers) void CEffectPrim::RenderSegmentSprites(matrix& wtm) {
   for (int ec = 0; ec < 4; ++ec) {
     for (int seg = 0; seg < this->state.numSegment; ++seg) {
       const EffectPrimitiveRecord& record = this->state.records[seg];
-      vector3d position;
-      position.x = record.position.x + this->state.slots[ec].vecBNow.x;
-      position.y = record.position.y + this->state.slots[ec].vecBNow.y;
-      position.z = record.position.z + this->state.slots[ec].vecBNow.z;
+      vector3d position = record.position;
+      position += this->state.slots[ec].vecBNow;
       const float depth = position.y * wtm.values[5] + position.x * wtm.values[2] + position.z * wtm.values[8] + wtm.values[11];
 
       float screenX;
@@ -364,12 +392,14 @@ __declspec(safebuffers) void CEffectPrim::RenderSegmentSprites(matrix& wtm) {
         short alpha = static_cast<short>((cell.color >> 24) * 0.85f);
         quad.bottomRhw = 1.0f / ((bottom - screenY) * g_tangent + depth) + 0.0001f;
         quad.topRhw = 1.0f / ((top - screenY) * g_tangent + depth) + 0.0001f;
-        if ((this->state.pattern & 0x200) == 0) {
+        if ((this->state.pattern & 0x200) != 0) {
+          if (this->state.slots[ec].flag1[0] == 0) {
+            quad.color = (((((alpha << 8) + cell.colorChannels.red) << 8) + cell.colorChannels.green) << 8) + cell.colorChannels.blue;
+          } else if (this->state.slots[ec].flag1[0] == 1) {
+            quad.color = (alpha << 24) + 0x3737FF;
+          }
+        } else {
           quad.color = record.color;
-        } else if (this->state.slots[ec].flag1[0] == 0) {
-          quad.color = (((((alpha << 8) + (cell.color & 0xFF)) << 8) + (cell.color >> 8 & 0xFF)) << 8) + (cell.color >> 16 & 0xFF);
-        } else if (this->state.slots[ec].flag1[0] == 1) {
-          quad.color = (alpha << 24) + 0x3737FF;
         }
         quad.angle = static_cast<float>(cell.rotation) + this->state.roll;
         quad.image = image;
@@ -382,12 +412,14 @@ __declspec(safebuffers) void CEffectPrim::RenderSegmentSprites(matrix& wtm) {
         alpha = static_cast<short>((cell.color >> 24) * g_depthAverageHalf);
         quad.bottomRhw = 1.0f / ((bottom - screenY) * g_tangent + depth) + 0.0002f;
         quad.topRhw = 1.0f / ((top - screenY) * g_tangent + depth) + 0.0002f;
-        if ((this->state.pattern & 0x200) == 0) {
+        if ((this->state.pattern & 0x200) != 0) {
+          if (this->state.slots[ec].flag1[0] == 0) {
+            quad.color = (((alpha << 8) + cell.colorChannels.red) << 16) + 0x3737;
+          } else if (this->state.slots[ec].flag1[0] == 1) {
+            quad.color = (alpha << 24) + 0x3737FF;
+          }
+        } else {
           quad.color = record.color;
-        } else if (this->state.slots[ec].flag1[0] == 0) {
-          quad.color = (((alpha << 8) + (cell.color & 0xFF)) << 16) + 0x3737;
-        } else if (this->state.slots[ec].flag1[0] == 1) {
-          quad.color = (alpha << 24) + 0x3737FF;
         }
         quad.angle = static_cast<float>(cell.rotation) + this->state.roll;
         quad.image = image;
@@ -408,23 +440,31 @@ void CEffectPrim::RenderGroundSquare(matrix& wtm) {
     }
 
     int angle = this->state.slots[ec].rotStart;
+    float cosA = g_cosTable[angle];
+    float sinA = g_sinTable[angle];
     const double radius = (g_sinTable[this->state.slots[ec].riseAngle] + 1.0f) * (this->state.slots[ec].distance * 0.1f) + this->state.slots[ec].distance * 0.8;
 
-    this->state.slots[ec].vecBPre.x = static_cast<float>(g_cosTable[angle] * radius);
-    this->state.slots[ec].vecBPre.z = static_cast<float>(g_sinTable[angle] * radius);
+    this->state.slots[ec].vecBPre.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecBPre.z = static_cast<float>(sinA * radius);
     this->state.slots[ec].vecBPre.y = this->state.slots[ec].height[0];
     angle += angle < 270 ? 90 : -270;
+    cosA = g_cosTable[angle];
+    sinA = g_sinTable[angle];
     this->state.slots[ec].vecBNow.y = this->state.slots[ec].height[0];
-    this->state.slots[ec].vecBNow.x = static_cast<float>(g_cosTable[angle] * radius);
-    this->state.slots[ec].vecBNow.z = static_cast<float>(g_sinTable[angle] * radius);
+    this->state.slots[ec].vecBNow.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecBNow.z = static_cast<float>(sinA * radius);
     angle += angle + 90 < 360 ? 90 : -270;
+    cosA = g_cosTable[angle];
+    sinA = g_sinTable[angle];
     this->state.slots[ec].vecTNow.y = this->state.slots[ec].height[0];
-    this->state.slots[ec].vecTNow.x = static_cast<float>(g_cosTable[angle] * radius);
-    this->state.slots[ec].vecTNow.z = static_cast<float>(g_sinTable[angle] * radius);
+    this->state.slots[ec].vecTNow.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecTNow.z = static_cast<float>(sinA * radius);
     angle += angle + 90 < 360 ? 90 : -270;
+    cosA = g_cosTable[angle];
+    sinA = g_sinTable[angle];
     this->state.slots[ec].vecTPre.y = this->state.slots[ec].height[0];
-    this->state.slots[ec].vecTPre.x = static_cast<float>(g_cosTable[angle] * radius);
-    this->state.slots[ec].vecTPre.z = static_cast<float>(g_sinTable[angle] * radius);
+    this->state.slots[ec].vecTPre.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecTPre.z = static_cast<float>(sinA * radius);
 
     this->RenderTeiRect(
       &rpCnt, this->state.slots[ec].alphaB, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, this->state.slots[ec].height[2] == 1.0f,
@@ -439,42 +479,48 @@ void CEffectPrim::RenderGroundSquareBlend(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    EffectPrimitiveSlot& slot = this->state.slots[ec];
-
-    if (slot.life != 1) {
+    if (this->state.slots[ec].life != 1) {
       continue;
     }
 
-    int angle = slot.rotStart;
-    const double radius = (g_sinTable[slot.riseAngle] + 1.0f) * (slot.distance * 0.1f) + slot.distance * 0.8;
+    const int angle = this->state.slots[ec].rotStart;
+    float cosA = g_cosTable[angle];
+    float sinA = g_sinTable[angle];
+    const double radius = (g_sinTable[this->state.slots[ec].riseAngle] + 1.0f) * (this->state.slots[ec].distance * 0.1f) + this->state.slots[ec].distance * 0.8;
 
-    slot.vecBPre.x = static_cast<float>(g_cosTable[angle] * radius);
-    slot.vecBPre.z = static_cast<float>(g_sinTable[angle] * radius);
-    slot.vecBPre.y = slot.height[0];
-    angle += angle < 270 ? 90 : -270;
-    slot.vecBNow.y = slot.height[0];
-    slot.vecBNow.x = static_cast<float>(g_cosTable[angle] * radius);
-    slot.vecBNow.z = static_cast<float>(g_sinTable[angle] * radius);
-    angle += angle + 90 < 360 ? 90 : -270;
-    slot.vecTNow.y = slot.height[0];
-    slot.vecTNow.x = static_cast<float>(g_cosTable[angle] * radius);
-    slot.vecTNow.z = static_cast<float>(g_sinTable[angle] * radius);
-    angle += angle + 90 < 360 ? 90 : -270;
-    slot.vecTPre.y = slot.height[0];
-    slot.vecTPre.x = static_cast<float>(g_cosTable[angle] * radius);
-    slot.vecTPre.z = static_cast<float>(g_sinTable[angle] * radius);
+    this->state.slots[ec].vecBPre.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecBPre.z = static_cast<float>(sinA * radius);
+    this->state.slots[ec].vecBPre.y = this->state.slots[ec].height[0];
+    const int angle2 = angle + (angle < 270 ? 90 : -270);
+    cosA = g_cosTable[angle2];
+    sinA = g_sinTable[angle2];
+    this->state.slots[ec].vecBNow.y = this->state.slots[ec].height[0];
+    this->state.slots[ec].vecBNow.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecBNow.z = static_cast<float>(sinA * radius);
+    const int angle3 = angle2 + (angle2 + 90 < 360 ? 90 : -270);
+    cosA = g_cosTable[angle3];
+    sinA = g_sinTable[angle3];
+    this->state.slots[ec].vecTNow.y = this->state.slots[ec].height[0];
+    this->state.slots[ec].vecTNow.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecTNow.z = static_cast<float>(sinA * radius);
+    const int angle4 = angle3 + (angle3 + 90 < 360 ? 90 : -270);
+    cosA = g_cosTable[angle4];
+    sinA = g_sinTable[angle4];
+    this->state.slots[ec].vecTPre.y = this->state.slots[ec].height[0];
+    this->state.slots[ec].vecTPre.x = static_cast<float>(cosA * radius);
+    this->state.slots[ec].vecTPre.z = static_cast<float>(sinA * radius);
 
-    short alpha = static_cast<short>(slot.process % 256 * 2);
+    short alpha = static_cast<short>(this->state.slots[ec].process % 256 * 2);
     if (alpha > 255) {
       alpha = 511 - alpha;
     }
 
     this->RenderTeiRect(
-      &rpCnt, alpha, slot.vecBPre, slot.vecBNow, slot.vecTNow, slot.vecTPre, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f,
+      &rpCnt, alpha, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, 1, 0, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f,
       1.0f, 0
     );
     this->RenderTeiRect(
-      &rpCnt, 255 - alpha, slot.vecBPre, slot.vecBNow, slot.vecTNow, slot.vecTPre, wtm, 1, 1, 0, 255, 255, 255, 0.0f, 1.0f,
+      &rpCnt, 255 - alpha, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, 1, 1, 0, 255, 255, 255, 0.0f, 1.0f,
       0.0f, 1.0f, 0
     );
   }
@@ -839,8 +885,8 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       }
       const int high = angle + 15;
       const int low = angle - 15;
-      const int backRightAngle = high - 180 < 0 ? high - 180 + 360 : high - 180;
-      const int backLeftAngle = low + 180 < 360 ? low + 180 : low + 180 - 360;
+      const int backRightAngle = high < 180 ? high + 180 : high - 180;
+      const int backLeftAngle = low + 180 >= 360 ? low + 180 - 360 : low + 180;
       const float base = this->state.slots[ec].height[0];
       vector3d left;
       left.z = size * g_sinTable[leftAngle];
@@ -864,60 +910,60 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       float remain = dist;
       int dir = this->state.slots[ec].riseAngle;
       vector3d bend0{};
-      if (dist > 20.0f) {
-        remain = dist - 20.0f;
-        bend0.x = g_cosTable[dir] * 20.0f;
-        bend0.z = g_sinTable[dir] * 20.0f;
+      if (dist > g_fireflyGroundOffset) {
+        remain = dist - g_fireflyGroundOffset;
+        bend0.x = g_cosTable[dir] * g_fireflyGroundOffset;
+        bend0.z = g_sinTable[dir] * g_fireflyGroundOffset;
       }
       vector3d bend1{};
-      if (dist > 33.0f) {
+      if (dist > g_fireflyArcStep33) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 33.0f;
-        bend1.x = g_cosTable[dir] * 13.0f;
-        bend1.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep33;
+        bend1.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend1.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend2{};
-      if (dist > 46.0f) {
+      if (dist > g_fireflyArcStep46) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 46.0f;
-        bend2.x = g_cosTable[dir] * 13.0f;
-        bend2.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep46;
+        bend2.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend2.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend3{};
-      if (dist > 59.0f) {
+      if (dist > g_fireflyArcStep59) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 59.0f;
-        bend3.x = g_cosTable[dir] * 13.0f;
-        bend3.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep59;
+        bend3.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend3.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend4{};
-      if (dist > 71.0f) {
+      if (dist > g_fireflyArcStep71) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 71.0f;
-        bend4.x = g_cosTable[dir] * 12.0f;
-        bend4.z = g_sinTable[dir] * 12.0f;
+        remain = dist - g_fireflyArcStep71;
+        bend4.x = g_cosTable[dir] * g_fireflyModeTwelve;
+        bend4.z = g_sinTable[dir] * g_fireflyModeTwelve;
       }
       vector3d bend5{};
-      if (dist > 84.0f) {
+      if (dist > g_fireflyArcStep84) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 84.0f;
-        bend5.x = g_cosTable[dir] * 13.0f;
-        bend5.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep84;
+        bend5.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend5.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       if (dist > 20.0f) {
         dir += 5;
@@ -943,7 +989,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       vec4.y = backLeft.y + bend0.y + bend1.y + bend2.y + bend3.y + bend4.y + bend5.y + tail.y;
       vec4.z = backLeft.z + bend0.z + bend1.z + bend2.z + bend3.z + bend4.z + bend5.z + tail.z;
 
-      if (dist > 100.0f) {
+      if (dist > g_fireflyArcLength) {
         break;
       }
 
@@ -991,8 +1037,8 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       }
       const int high = angle + 25;
       const int low = angle - 25;
-      const int backRightAngle = high - 180 < 0 ? high - 180 + 360 : high - 180;
-      const int backLeftAngle = low + 180 < 360 ? low + 180 : low + 180 - 360;
+      const int backRightAngle = high < 180 ? high + 180 : high - 180;
+      const int backLeftAngle = low + 180 >= 360 ? low + 180 - 360 : low + 180;
       const float base = this->state.slots[ec].height[0];
       vector3d left;
       left.z = size * g_sinTable[leftAngle];
@@ -1016,60 +1062,60 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       float remain = dist;
       int dir = this->state.slots[ec].riseAngle;
       vector3d bend0{};
-      if (dist > 20.0f) {
-        remain = dist - 20.0f;
-        bend0.x = g_cosTable[dir] * 20.0f;
-        bend0.z = g_sinTable[dir] * 20.0f;
+      if (dist > g_fireflyGroundOffset) {
+        remain = dist - g_fireflyGroundOffset;
+        bend0.x = g_cosTable[dir] * g_fireflyGroundOffset;
+        bend0.z = g_sinTable[dir] * g_fireflyGroundOffset;
       }
       vector3d bend1{};
-      if (dist > 33.0f) {
+      if (dist > g_fireflyArcStep33) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 33.0f;
-        bend1.x = g_cosTable[dir] * 13.0f;
-        bend1.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep33;
+        bend1.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend1.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend2{};
-      if (dist > 46.0f) {
+      if (dist > g_fireflyArcStep46) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 46.0f;
-        bend2.x = g_cosTable[dir] * 13.0f;
-        bend2.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep46;
+        bend2.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend2.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend3{};
-      if (dist > 59.0f) {
+      if (dist > g_fireflyArcStep59) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 59.0f;
-        bend3.x = g_cosTable[dir] * 13.0f;
-        bend3.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep59;
+        bend3.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend3.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend4{};
-      if (dist > 71.0f) {
+      if (dist > g_fireflyArcStep71) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 71.0f;
-        bend4.x = g_cosTable[dir] * 12.0f;
-        bend4.z = g_sinTable[dir] * 12.0f;
+        remain = dist - g_fireflyArcStep71;
+        bend4.x = g_cosTable[dir] * g_fireflyModeTwelve;
+        bend4.z = g_sinTable[dir] * g_fireflyModeTwelve;
       }
       vector3d bend5{};
-      if (dist > 84.0f) {
+      if (dist > g_fireflyArcStep84) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
         }
-        remain = dist - 84.0f;
-        bend5.x = g_cosTable[dir] * 13.0f;
-        bend5.z = g_sinTable[dir] * 13.0f;
+        remain = dist - g_fireflyArcStep84;
+        bend5.x = g_cosTable[dir] * g_fireflyModeThirteen;
+        bend5.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       if (dist > 20.0f) {
         dir += 5;
@@ -1095,7 +1141,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       vec4.y = backLeft.y + bend0.y + bend1.y + bend2.y + bend3.y + bend4.y + bend5.y + tail.y;
       vec4.z = backLeft.z + bend0.z + bend1.z + bend2.z + bend3.z + bend4.z + bend5.z + tail.z;
 
-      if (dist > 100.0f) {
+      if (dist > g_fireflyArcLength) {
         break;
       }
 
@@ -1271,7 +1317,7 @@ __declspec(safebuffers) void CEffectPrim::RenderPillarSquares(matrix& wtm) {
   vec2.y = 0.0f;
   vec3.y = 0.0f;
   vec4.y = 0.0f;
-  radius = slot.distance * g_sinTable[static_cast<int>(slot.height[8])] * 0.05f + slot.distance * g_depthAverageHalf;
+  radius = slot.distance * g_sinTable[static_cast<int>(slot.height[8])] * 0.05f + slot.distance * 0.5f;
   vec1.x = radius * g_cosTable[0];
   vec1.z = radius * g_sinTable[0];
   vec2.x = radius * g_cosTable[90];
@@ -1297,33 +1343,28 @@ __declspec(safebuffers) void CEffectPrim::RenderPillarSquares(matrix& wtm) {
   this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 0, 0, 0, 155, 155, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 
   for (int ec = 0; ec < 4; ++ec) {
-    EffectPrimitiveSlot& pillar = this->state.slots[ec];
-    const int angle = pillar.rotStart;
-    const float height = pillar.height[12] * g_depthAverageHalf;
+    const int angle = this->state.slots[ec].rotStart;
     const int opposite = angle + (angle < 180 ? 180 : -180);
+    const float height = this->state.slots[ec].height[12] * 0.5f;
 
-    pillar.vecTPre.y = height;
-    pillar.vecTPre.z = g_sinTable[angle] * height + g_cosTable[angle] * 0.0f;
-    pillar.vecTPre.x = g_cosTable[angle] * height - g_sinTable[angle] * 0.0f;
-    pillar.vecTNow.y = height;
-    pillar.vecTNow.x = g_cosTable[opposite] * height - g_sinTable[opposite] * 0.0f;
-    pillar.vecTNow.z = g_sinTable[opposite] * height + g_cosTable[opposite] * 0.0f;
+    const float cosA = g_cosTable[angle];
+    const float sinA = g_sinTable[angle];
+    this->state.slots[ec].vecTPre.y = height;
+    this->state.slots[ec].vecTPre.z = sinA * height + cosA * 0.0f;
+    this->state.slots[ec].vecTPre.x = cosA * height - sinA * 0.0f;
+    const float cosB = g_cosTable[opposite];
+    const float sinB = g_sinTable[opposite];
+    this->state.slots[ec].vecTNow.y = height;
+    this->state.slots[ec].vecTNow.x = cosB * height - sinB * 0.0f;
+    this->state.slots[ec].vecTNow.z = sinB * height + cosB * 0.0f;
 
-    pillar.vecTPre.x = pillar.vecTPre.x + slot.vecBNow.x;
-    pillar.vecTPre.y = slot.vecBNow.y + pillar.vecTPre.y;
-    pillar.vecTPre.z = slot.vecBNow.z + pillar.vecTPre.z;
-    pillar.vecTNow.x = slot.vecBNow.x + pillar.vecTNow.x;
-    pillar.vecTNow.y = slot.vecBNow.y + pillar.vecTNow.y;
-    pillar.vecTNow.z = slot.vecBNow.z + pillar.vecTNow.z;
+    this->state.slots[ec].vecTPre += slot.vecBNow;
+    this->state.slots[ec].vecTNow += slot.vecBNow;
 
-    vector3d lowNow;
-    lowNow.x = pillar.vecTNow.x;
-    lowNow.y = pillar.vecTNow.y - pillar.height[12];
-    lowNow.z = pillar.vecTNow.z;
-    vector3d lowPre;
-    lowPre.x = pillar.vecTPre.x;
-    lowPre.y = pillar.vecTPre.y - pillar.height[12];
-    lowPre.z = pillar.vecTPre.z;
+    vec2 = this->state.slots[ec].vecTNow;
+    vec1 = this->state.slots[ec].vecTPre;
+    vec2.y -= this->state.slots[ec].height[12];
+    vec1.y -= this->state.slots[ec].height[12];
 
     unsigned char shade;
     if (ec == 0) {
@@ -1334,9 +1375,9 @@ __declspec(safebuffers) void CEffectPrim::RenderPillarSquares(matrix& wtm) {
       shade = ec == 2 ? 75 : 5;
     }
 
-    if (pillar.height[12] > 0.0f) {
+    if (this->state.slots[ec].height[12] > 0.0f) {
       this->RenderTeiRect(
-        &rpCnt, pillar.riseAngle, pillar.vecTPre, pillar.vecTNow, lowNow, lowPre, wtm, 0, 1, 0, shade, shade, 255, 0.0f, 1.0f, 0.0f,
+        &rpCnt, this->state.slots[ec].riseAngle, this->state.slots[ec].vecTPre, this->state.slots[ec].vecTNow, vec2, vec1, wtm, 0, 1, 0, shade, shade, 255, 0.0f, 1.0f, 0.0f,
         1.0f, 0
       );
     }
@@ -1366,10 +1407,7 @@ void CEffectPrim::RenderBladeFins(matrix& wtm) {
     outer.y = -6.0f;
     inner.y = -6.0f;
 
-    int angle = this->state.slots[ec].riseAngle - 25;
-    if (angle < 0) {
-      angle += 360;
-    }
+    int angle = this->state.slots[ec].riseAngle < 25 ? this->state.slots[ec].riseAngle + 335 : this->state.slots[ec].riseAngle - 25;
     inner.x = this->state.slots[ec].height[0] * g_cosTable[angle];
     inner.z = this->state.slots[ec].height[0] * g_sinTable[angle];
     angle -= 90;
@@ -1631,7 +1669,8 @@ void CEffectPrim::RenderPolygonFrames(matrix& wtm) {
 __declspec(safebuffers) void CEffectPrim::RenderSegmentSpriteGlow(matrix& wtm) {
   CSprRes* sprite = this->GetSprite();
   CActRes* action = this->GetActRes();
-  const short alpha = static_cast<short>(this->state.alpha);
+  const int opacity = static_cast<int>(this->state.alpha);
+  const std::int16_t alpha = static_cast<std::int16_t>(opacity);
 
   for (int ec = 0; ec < 4; ++ec) {
     if (this->state.slots[ec].life <= 0 || !(this->state.alpha > 0.0f)) {
@@ -1639,16 +1678,37 @@ __declspec(safebuffers) void CEffectPrim::RenderSegmentSpriteGlow(matrix& wtm) {
     }
 
     for (int seg = 0; seg < this->state.numSegment; ++seg) {
-      EffectPrimitiveRecord& record = this->state.records[seg];
-      const float depth = record.position.y * wtm.values[5] + record.position.x * wtm.values[2] + record.position.z * wtm.values[8] + wtm.values[11];
+      const vector3d& position = this->state.records[seg].position;
+      float xDepth = position.x;
+      float yDepth = position.y;
+      yDepth *= wtm.values[5];
+      xDepth *= wtm.values[2];
+      const float depth = yDepth + xDepth + position.z * wtm.values[8] + wtm.values[11];
 
       float screenX;
       float screenY;
       float reciprocalDepth;
-      g_renderer->ProjectViewport(&record.position.x, wtm.values, &screenX, &screenY, &reciprocalDepth);
+      g_renderer->ProjectViewport(&position.x, wtm.values, &screenX, &screenY, &reciprocalDepth);
       const float distanceScale = g_renderer->ScaleDistance(reciprocalDepth);
 
       const ActionFrame& frame = action->Frame(this->render.previousAnimation, this->render.curMotion);
+      const auto drawGlow = [&](const RenderBounds& bounds, const SpriteFrameCell& cell, const SpriteRleImage* image, std::uint32_t color) {
+        SpriteQuad glow;
+        float topY = bounds.top;
+        glow.top = topY - 1.0f;
+        glow.bottom = bounds.bottom + 1.0f;
+        glow.left = bounds.left - 1.0f;
+        glow.right = bounds.right + 1.0f;
+        const float centerY = screenY;
+        topY -= centerY;
+        glow.bottomRhw = 1.0f / ((bounds.bottom - centerY) * g_tangent + depth) + 0.0001f;
+        glow.image = image;
+        glow.topRhw = 1.0f / (topY * g_tangent + depth) + 0.0001f;
+        glow.color = color;
+        glow.angle = static_cast<float>(cell.rotation) + this->state.roll;
+        this->DrawQuad(glow, sprite->palette, 5, 0.0f, 0.0f, 0);
+      };
+
       for (int index = 0; index < frame.cellCount; ++index) {
         const SpriteFrameCell& cell = frame.Cell(index);
         if (cell.image == -1) {
@@ -1656,58 +1716,57 @@ __declspec(safebuffers) void CEffectPrim::RenderSegmentSpriteGlow(matrix& wtm) {
         }
 
         const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
-        const double scale = record.scale;
-        const float top = static_cast<float>(cell.y * scale * cell.scaleY * distanceScale + screenY);
-        const float bottom = static_cast<float>(((static_cast<short>(image->doubleHeight) + 1) * image->height + cell.y) * scale * cell.scaleY * distanceScale + screenY);
-        if (top >= static_cast<float>(g_renderer->viewport.height) || bottom <= 0.0f) {
+        const double distance = distanceScale;
+        const float scale = this->state.records[seg].scale;
+        const double scaledTop = static_cast<double>(cell.y) * scale * cell.scaleY;
+        RenderBounds bounds;
+        bounds.top = static_cast<float>(scaledTop * distance + screenY);
+        const int imageHeight = (image->doubleHeight + 1) * image->height;
+        const auto cellBottom = static_cast<std::int32_t>(static_cast<std::uint32_t>(cell.y) + imageHeight);
+        const double scaledBottom = static_cast<double>(cellBottom) * scale * cell.scaleY;
+        bounds.bottom = static_cast<float>(scaledBottom * distance + screenY);
+        if (bounds.top >= static_cast<float>(g_renderer->viewport.height) || bounds.bottom <= 0.0f) {
           continue;
         }
 
-        float left;
-        float right;
+        const double horizontalScale = scale;
+        const double scaleX = cell.scaleX;
         if ((cell.mirrored & 1) != 0) {
-          left = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cell.x) * scale * cell.scaleX * distanceScale + screenX);
-          right = static_cast<float>(cell.x * scale * cell.scaleX * distanceScale + screenX);
-          if (right >= static_cast<float>(g_renderer->viewport.width) || left <= 0.0f) {
+          const auto cellRight = static_cast<std::int32_t>((image->doubleWidth + 1) * image->width + static_cast<std::uint32_t>(cell.x));
+          bounds.left = static_cast<float>(cellRight * horizontalScale * scaleX * distance + screenX);
+          bounds.right = static_cast<float>(cell.x * horizontalScale * scaleX * distance + screenX);
+          if (bounds.right >= static_cast<float>(g_renderer->viewport.width) || bounds.left <= 0.0f) {
             continue;
           }
         } else {
-          left = static_cast<float>(cell.x * scale * cell.scaleX * distanceScale + screenX);
-          right = static_cast<float>(((static_cast<short>(image->doubleWidth) + 1) * image->width + cell.x) * scale * cell.scaleX * distanceScale + screenX);
-          if (left >= static_cast<float>(g_renderer->viewport.width) || right <= 0.0f) {
+          bounds.left = static_cast<float>(cell.x * horizontalScale * scaleX * distance + screenX);
+          const auto cellRight = static_cast<std::int32_t>((image->doubleWidth + 1) * image->width + static_cast<std::uint32_t>(cell.x));
+          bounds.right = static_cast<float>(cellRight * horizontalScale * scaleX * distance + screenX);
+          if (bounds.left >= static_cast<float>(g_renderer->viewport.width) || bounds.right <= 0.0f) {
             continue;
           }
         }
 
         SpriteQuad quad;
-        quad.top = top;
-        quad.left = left;
-        quad.bottom = bottom;
-        quad.right = right;
-        quad.bottomRhw = 1.0f / ((bottom - screenY) * g_tangent + depth);
-        quad.topRhw = 1.0f / ((top - screenY) * g_tangent + depth);
+        quad.top = bounds.top;
+        quad.bottom = bounds.bottom;
+        quad.left = bounds.left;
+        quad.right = bounds.right;
+        quad.image = image;
+        quad.bottomRhw = 1.0f / ((bounds.bottom - screenY) * g_tangent + depth);
+        quad.topRhw = 1.0f / ((bounds.top - screenY) * g_tangent + depth);
         quad.angle = static_cast<float>(cell.rotation) + this->state.roll;
 
-        unsigned char red = static_cast<unsigned char>(cell.color);
-        unsigned char green = static_cast<unsigned char>(cell.color >> 8);
-        unsigned char blue = static_cast<unsigned char>(cell.color >> 16);
-        quad.image = image;
+        unsigned char red = cell.colorChannels.red;
+        unsigned char green = cell.colorChannels.green;
+        unsigned char blue = cell.colorChannels.blue;
         this->GetColorOverride(&red, &green, &blue);
-        const std::uint32_t color = (((((alpha << 8) + red) << 8) + green) << 8) + blue;
+        const std::uint32_t alphaChannel = alpha;
+        const std::uint32_t color = (((((alphaChannel << 8) + red) << 8) + green) << 8) + blue;
         quad.color = color;
-        this->DrawQuad(quad, sprite->palette, this->state.slots[ec].flag1[2] == 1 ? 5 : 0x101, 0.0f, 0.0f, 0);
+        this->DrawQuad(quad, sprite->palette, this->state.slots[ec].flag1[2] != 1 ? 0x101 : 5, 0.0f, 0.0f, 0);
 
-        SpriteQuad glow;
-        glow.top = top - 1.0f;
-        glow.bottom = bottom + 1.0f;
-        glow.left = left - 1.0f;
-        glow.right = right + 1.0f;
-        glow.image = image;
-        glow.bottomRhw = 1.0f / ((bottom - screenY) * g_tangent + depth) + 0.0001f;
-        glow.topRhw = 1.0f / ((top - screenY) * g_tangent + depth) + 0.0001f;
-        glow.color = color;
-        glow.angle = static_cast<float>(cell.rotation) + this->state.roll;
-        this->DrawQuad(glow, sprite->palette, 5, 0.0f, 0.0f, 0);
+        drawGlow(bounds, cell, image, color);
       }
     }
   }
@@ -1727,17 +1786,17 @@ __declspec(safebuffers) void CEffectPrim::RenderTaperedQuad(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    const EffectPrimitiveSlot& slot = this->state.slots[ec];
-
-    if (slot.life != 1 || slot.alphaB <= 0) {
+    if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
       continue;
     }
 
-    const float dist = slot.distance;
-    const int angle = slot.fullDisplayAngle;
-    const float inner = dist - slot.rotStart * dist / 50.0f;
+    const float dist = this->state.slots[ec].distance;
+    const int angle = this->state.slots[ec].fullDisplayAngle;
+    const float inner = dist - this->state.slots[ec].rotStart * dist / 50.0f;
+    const float cosA = g_cosTable[angle];
+    const float sinA = g_sinTable[angle];
     int angle1 = angle - 90;
-    if (angle1 < 0) {
+    if (0 > angle1) {
       angle1 += 360;
     }
     int angle2 = angle1 - 180;
@@ -1745,38 +1804,33 @@ __declspec(safebuffers) void CEffectPrim::RenderTaperedQuad(matrix& wtm) {
       angle2 += 360;
     }
 
-    vec1.x = dist * g_cosTable[angle1] * 0.5f + g_cosTable[angle] * inner;
+    vec1.x = dist * g_cosTable[angle1] * 0.5f + cosA * inner;
     vec1.y = 0.0f;
-    vec1.z = dist * g_sinTable[angle1] * 0.5f + g_sinTable[angle] * inner;
-    vec2.x = dist * g_cosTable[angle2] * 0.5f + g_cosTable[angle] * inner;
+    vec1.z = dist * g_sinTable[angle1] * 0.5f + sinA * inner;
+    vec2.x = dist * g_cosTable[angle2] * 0.5f + cosA * inner;
     vec2.y = 0.0f;
-    vec2.z = dist * g_sinTable[angle2] * 0.5f + g_sinTable[angle] * inner;
+    vec2.z = dist * g_sinTable[angle2] * 0.5f + sinA * inner;
 
-    const int angle4 = angle + (angle >= 90 ? -90 : 270);
+    int angle4 = angle - 90;
+    if (angle < 90) {
+      angle4 = angle + 270;
+    }
     int angle3 = angle4 - 180;
     if (angle3 < 0) {
       angle3 += 360;
     }
-    vec4.x = dist * g_cosTable[angle4] * 0.5f + g_cosTable[angle] * dist;
+    vec4.x = dist * g_cosTable[angle4] * 0.5f + cosA * dist;
     vec4.y = 0.0f;
-    vec4.z = dist * g_sinTable[angle4] * 0.5f + g_sinTable[angle] * dist;
-    vec3.x = dist * g_cosTable[angle3] * 0.5f + g_cosTable[angle] * dist;
+    vec4.z = dist * g_sinTable[angle4] * 0.5f + sinA * dist;
+    vec3.x = dist * g_cosTable[angle3] * 0.5f + cosA * dist;
     vec3.y = 0.0f;
-    vec3.z = dist * g_sinTable[angle3] * 0.5f + g_sinTable[angle] * dist;
+    vec3.z = dist * g_sinTable[angle3] * 0.5f + sinA * dist;
     this->Tei_TowardScreen(vec1, vec2, vec3, vec4, this->state.slots[0].alphaT, this->state.slots[1].alphaT);
 
-    vec1.x = slot.vecBNow.x + vec1.x;
-    vec1.y = slot.vecBNow.y + vec1.y;
-    vec1.z = slot.vecBNow.z + vec1.z;
-    vec2.x = slot.vecBNow.x + vec2.x;
-    vec2.y = slot.vecBNow.y + vec2.y;
-    vec2.z = slot.vecBNow.z + vec2.z;
-    vec3.x = slot.vecBNow.x + vec3.x;
-    vec3.y = slot.vecBNow.y + vec3.y;
-    vec3.z = slot.vecBNow.z + vec3.z;
-    vec4.x = slot.vecBNow.x + vec4.x;
-    vec4.y = slot.vecBNow.y + vec4.y;
-    vec4.z = slot.vecBNow.z + vec4.z;
-    this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 0, slot.flag1[0], 1, 100, 100, 255, 0.0f, 1.0f, 0.0f, 1.0f, 1);
+    vec1 += this->state.slots[ec].vecBNow;
+    vec2 += this->state.slots[ec].vecBNow;
+    vec3 += this->state.slots[ec].vecBNow;
+    vec4 += this->state.slots[ec].vecBNow;
+    this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 0, this->state.slots[ec].flag1[0], 1, 100, 100, 255, 0.0f, 1.0f, 0.0f, 1.0f, 1);
   }
 }

@@ -1,15 +1,20 @@
 #include "Resource/World/TerrainResource.h"
 
 #include "Client/Application/ErrorDialog.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Utility/Math/ScalarConversion.h"
 
 // OFFSET: 0x00748C80
 // FUNCTION: fn_07836
 std::uint32_t C3dAttr::CellType(float x, float z) const {
+  const float half = g_depthAverageHalf;
   const float size = static_cast<float>(this->cellSize);
-  const int column = static_cast<int>(((static_cast<float>(this->width) * size) * 0.5f + x) / size);
+  const auto coordinate = [half, size](int extent, float position) {
+    return static_cast<int>((static_cast<float>(extent) * size * half + position) / size);
+  };
+  const int column = coordinate(this->width, x);
   if (column >= 0) {
-    const int row = static_cast<int>(((static_cast<float>(this->height) * size) * 0.5f + z) / size);
+    const int row = coordinate(this->height, z);
     if (row >= 0 && column < this->width && row < this->height) {
       return this->CellAt(column, row)->type;
     }
@@ -81,5 +86,5 @@ void C3dAttr::HeightBounds(const int* rectangle, float& minimum, float& maximum)
 // FUNCTION: fn_07841
 bool C3dAttr::Walkable(int column, int row) const {
   const TerrainHeightCell* cell = this->CellAt(column, row);
-  return cell && cell->type != 1 && cell->type != 5;
+  return cell && cell->type != TERRAIN_CELL_BLOCKED && cell->type != TERRAIN_CELL_CLIFF;
 }

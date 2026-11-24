@@ -14,11 +14,25 @@
 
 namespace {
 // INLINED
+void SetParticleIndices(CParticle& particle, int group, int column, int row) {
+  particle.columnIndex = column;
+  particle.rowIndex = row;
+  particle.groupIndex = group;
+}
+
+// INLINED
 __forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
   if (0.0f == particle->life) {
     return true;
   }
   return particle->life * 60.0f > static_cast<float>(particle->elapsedFrames);
+}
+
+// INLINED
+__forceinline vector3d TransformPoint(const matrix& transform, const vector3d point) {
+  return vector3d{point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9],
+                  point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10],
+                  point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11]};
 }
 }
 
@@ -49,6 +63,11 @@ static const std::array<std::string, 4> s_talismanLoopEffects = {
 // OFFSET: 0x0072DE70
 // FUNCTION: fn_07499
 CTalismanMarkEffect::CTalismanMarkEffect() : CEffect(-1) {
+}
+
+// OFFSET: 0x0072DEF0
+// FUNCTION: fn_46033
+__declspec(noinline) CTalismanMarkEffect::~CTalismanMarkEffect() {
 }
 
 // OFFSET: 0x0072DFD0
@@ -106,9 +125,7 @@ void CTalismanMarkEffect::Open() {
     }
 
     particle->effectId = this->id;
-    particle->columnIndex = i;
-    particle->rowIndex = 0;
-    particle->groupIndex = 1;
+    SetParticleIndices(*particle, 1, i, 0);
     particle->InitParticleQuad(particle->vertices);
     particle->m_actorId = this->actor;
     particle->Load(s_talismanStartEffects.at(i));
@@ -127,7 +144,7 @@ void CTalismanMarkEffect::OnProcess() {
       continue;
     }
 
-    switch (static_cast<signed char>(particle->animationState)) {
+    switch (particle->animationState) {
     case 0:
       if (IsParticleActive(particle)) {
         break;
@@ -194,12 +211,12 @@ void CTalismanMarkEffect::UpdateParticle(CEZ2STRParticle* particle) {
   }
 
   const vector3d center = this->positionVector;
-  const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
-  const float viewX = center.x * view[0] + center.y * view[3] + center.z * view[6] + view[9];
-  const float viewY = center.x * view[1] + center.y * view[4] + center.z * view[7] + view[10];
-  const float viewZ = center.x * view[2] + center.y * view[5] + center.z * view[8] + view[11];
+  const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+  const vector3d viewPos = {center.x * view.values[0] + center.y * view.values[3] + center.z * view.values[6] + view.values[9],
+                            center.x * view.values[1] + center.y * view.values[4] + center.z * view.values[7] + view.values[10],
+                            center.x * view.values[2] + center.y * view.values[5] + center.z * view.values[8] + view.values[11]};
 
-  const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
+  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
   int angle = particle->phaseParameter;
   if (particle->animationState == 1) {
     angle = (angle + 1) % 360;
@@ -209,25 +226,23 @@ void CTalismanMarkEffect::UpdateParticle(CEZ2STRParticle* particle) {
   const float radians = static_cast<float>(angle) / 180.0f * 3.141592f;
   const float offsetY = ClientSin(radians) * 8.5f - 20.0f;
   const float offsetX = ClientCos(radians) * 8.5f;
-  const float x = offsetX + viewX;
-  const float y = offsetY + viewY;
-  const float z = viewZ + 0.0f;
-  const float worldX = y * inverse[3] + x * inverse[0] + z * inverse[6] + inverse[9];
-  const float worldY = y * inverse[4] + x * inverse[1] + z * inverse[7] + inverse[10];
-  const float worldZ = y * inverse[5] + x * inverse[2] + z * inverse[8] + inverse[11];
-  particle->position.x = worldX;
-  particle->position.y = worldY;
-  particle->position.z = worldZ;
+  const vector3d local = {offsetX + viewPos.x, offsetY + viewPos.y, viewPos.z + 0.0f};
+  particle->position = TransformPoint(inverse, local);
   particle->Process(0.0f, 0.0f, 0.0f);
+}
+
+// OFFSET: 0x0072E640
+// FUNCTION: fn_46282
+__forceinline void __stdcall CTalismanMarkEffect::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+  }
 }
 
 // OFFSET: 0x0072E5F0
 // FUNCTION: fn_07507
 void CTalismanMarkEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    CEZ2STRParticle* particle = *it;
-    if (particle) {
-      particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    RenderParticle(*it);
   }
 }

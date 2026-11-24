@@ -18,8 +18,6 @@
 #include "Script/LuaScript.h"
 #include "UI/Window/UIWindow.h"
 
-template __declspec(noinline) std::string::~basic_string() noexcept;
-
 // OFFSET: 0x007E3860
 // FUNCTION: fn_09724
 FuncDrawWNDChar::FuncDrawWNDChar(
@@ -28,8 +26,11 @@ FuncDrawWNDChar::FuncDrawWNDChar(
 )
     : m_window(window), m_x(x), m_y(y), m_sex(sex), m_job(job), m_hairColor(hairColor), m_body(body), m_head(head), m_bottomAccessory(bottomAccessory),
       m_topAccessory(topAccessory), m_midAccessory(midAccessory), m_robe(robe), m_flags(flags), m_shield(shield), m_bodyStyle(bodyStyle),
-      m_headPalette(headPalette), m_action(action), m_motion(motion), m_time(time), m_helmRobe(false), m_drawOnTop(false), m_resources(), bodyPaletteName(),
-      headPaletteName(), m_layers(), hideHeadLayer(0), offsetX(0), offsetY(0), customRendering(0) {
+      m_headPalette(headPalette), m_action(action), m_motion(motion), m_time(time), m_resources(), bodyPaletteName(),
+      headPaletteName(), m_layers(), customRendering(0) {
+  this->hideHeadLayer = 0;
+  this->offsetX = 0;
+  this->offsetY = 0;
   g_session.m_hotkeyScript->CallTable(std::string("TB_Layer_Priority", 17), std::string("IsHelmRobe", 10), "d>b", this->m_robe, &this->m_helmRobe);
   this->m_drawOnTop = this->DrawOnTop();
   this->m_layers[5] = this->m_bottomAccessory;
@@ -43,14 +44,11 @@ FuncDrawWNDChar::FuncDrawWNDChar(
 void FuncDrawWNDChar::Draw(bool option) {
   std::list<int> layers = this->DrawOrder();
   this->LoadResources(layers);
-  for (int layer : layers) {
-    if (this->m_resources.find(layer) == this->m_resources.end()) {
-      continue;
-    }
-
-    std::pair<CSprRes*, CActRes*> resources = this->m_resources[layer];
-    CSprRes* sprite = resources.first;
-    CActRes* act = resources.second;
+  for (std::list<int>::iterator it = layers.begin(); it != layers.end(); ++it) {
+    int layer = *it;
+    std::pair<CSprRes*, CActRes*> resource = this->Resource(layer);
+    CSprRes* sprite = resource.first;
+    CActRes* act = resource.second;
     if (!sprite || !act) {
       continue;
     }
@@ -96,9 +94,8 @@ void FuncDrawWNDChar::Draw(bool option) {
         case 4:
         case 5:
         case 6: {
-          if (!this->hideHeadLayer && this->m_resources.find(2) != this->m_resources.end() && this->m_resources[2].second) {
-            CActRes* bodyAct = this->m_resources.find(2) != this->m_resources.end() ? this->m_resources[2].second : nullptr;
-            this->BodyAnchorOffset(&bodyAct->Frame(this->m_action, this->m_motion), option);
+          if (!this->hideHeadLayer && this->Resource(2).second) {
+            this->BodyAnchorOffset(&this->Resource(2).second->Frame(this->m_action, this->m_motion), option);
           }
 
           FuncDrawOffset anchor = this->LayerAnchorOffset(layer, &frame, act);
@@ -106,40 +103,46 @@ void FuncDrawWNDChar::Draw(bool option) {
           offset.y += anchor.y;
           break;
         }
-        case 0:
-        case 7: {
-          int baseMotion = this->m_motion;
-          int syncedMotion = this->m_motion;
-          CActRes* layerAct = this->m_resources.find(layer) != this->m_resources.end() ? this->m_resources[layer].second : nullptr;
-          int action = this->m_action;
-          if ((action >= 0 && action < 8) || static_cast<unsigned>(action - 16) <= 7) {
-            baseMotion = 0;
-          }
+        default:
+          if (layer == 0 || layer == 7) {
+            int baseMotion = this->m_motion;
+            int syncedMotion = this->m_motion;
+            CActRes* layerAct = this->Resource(layer).second;
+            int action = this->m_action;
+            if ((action >= 0 && action < 8) || static_cast<unsigned>(action - 16) <= 7) {
+              baseMotion = 0;
+            }
 
-          CActRes* bodyAct = this->m_resources.find(1) != this->m_resources.end() ? this->m_resources[1].second : nullptr;
-          g_session.GetSyncedFrame(bodyAct, layerAct, action, baseMotion, this->m_time, &syncedMotion);
-          frame = &layerAct->Frame(this->m_action, syncedMotion);
+            g_session.GetSyncedFrame(this->Resource(1).second, layerAct, action, baseMotion, this->m_time, &syncedMotion);
+            frame = &layerAct->Frame(this->m_action, syncedMotion);
+          }
           break;
-        }
       }
     }
 
     const std::uint32_t* palette = sprite->palette;
-    if (layer == 1) {
-      if (this->m_bodyStyle > 0) {
-        palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->bodyPaletteName))->palette;
-      }
-    } else if (layer == 2 && this->m_headPalette > 0) {
-      palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->headPaletteName))->palette;
+    switch (layer - 1) {
+      case 0:
+        if (this->m_bodyStyle > 0) {
+          palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->bodyPaletteName))->palette;
+        }
+        break;
+      case 1:
+        if (this->m_headPalette > 0) {
+          palette = static_cast<CPaletteRes*>(ResourceMgr::Instance().Load(this->headPaletteName))->palette;
+        }
+        break;
     }
 
     const SpriteFrameCell& cell = frame->Cell(this->IsSpecialLayer(layer));
+    SpriteAtlasRecord record{};
+    record.u0 = 0.0f;
+    record.v0 = 0.0f;
     if (option == true) {
       if (cell.image == -1) {
         continue;
       }
 
-      SpriteAtlasRecord record{};
       const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
       if (cell.imageType == 0 && !g_renderer->atlas.Find(image, palette, record)) {
         g_renderer->atlas.Insert(image, palette, record);
@@ -158,7 +161,6 @@ void FuncDrawWNDChar::Draw(bool option) {
         continue;
       }
 
-      SpriteAtlasRecord record{};
       const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
       CTexture* texture;
       if (cell.imageType == 0) {
@@ -172,8 +174,12 @@ void FuncDrawWNDChar::Draw(bool option) {
 
       int x = this->m_x + cell.x + offset.x;
       int y = cell.y + this->m_y + offset.y;
-      int clip = y < 0 ? y : 0;
-      int top = y < 0 ? 0 : y;
+      int clip = y;
+      int top = 0;
+      if (y >= 0) {
+        clip = 0;
+        top = y;
+      }
       if (clip <= top) {
         this->m_window->geometry.surface->DrawSurface(
           x, top, texture, static_cast<int>(record.u0 * 256.0f), static_cast<int>(record.v0 * 256.0f - static_cast<float>(clip)), image->width,
@@ -195,9 +201,10 @@ std::list<int> FuncDrawWNDChar::DrawOrder() {
 
   std::map<int, int> order;
   for (int layer = 0; layer < 8; ++layer) {
+    int priority;
     switch (layer) {
       case 0:
-        if (this->m_robe <= 0 || this->m_drawOnTop) {
+        if (this->m_robe <= 0 || this->m_drawOnTop == true) {
           break;
         }
         [[fallthrough]];
@@ -216,14 +223,18 @@ std::list<int> FuncDrawWNDChar::DrawOrder() {
       case 4:
       case 5:
         if (this->m_layers[layer] > 0) {
-          int priority = -1;
+          priority = -1;
           g_session.m_hotkeyScript->Call("GetLayerPriority", "ddd>d", 0, defaultPriorities[layer], this->m_layers[layer], &priority);
           order[priority] = layer;
         }
         break;
       case 7:
         if (this->m_robe > 0 && this->m_drawOnTop) {
-          order[g_session.IsTopLayerRobe(this->m_robe) == true ? 400 : 2] = layer;
+          if (g_session.IsTopLayerRobe(this->m_robe) == true) {
+            order[400] = layer;
+          } else {
+            order[2] = layer;
+          }
         }
         break;
     }
@@ -231,7 +242,8 @@ std::list<int> FuncDrawWNDChar::DrawOrder() {
 
   std::list<int> layers;
   if (this->m_drawOnTop) {
-    for (std::map<int, int>::reverse_iterator it = order.rbegin(); it != order.rend(); ++it) {
+    const std::map<int, int>::reverse_iterator end = order.rend();
+    for (std::map<int, int>::reverse_iterator it = order.rbegin(); it != end; ++it) {
       const auto [priority, layer] = *it;
       if (priority < 0) {
         layers.push_back(layer);
@@ -289,7 +301,7 @@ FuncDrawOffset FuncDrawWNDChar::BodyAnchorOffset(const ActionFrame* frame, bool 
   FuncDrawOffset offset;
 
   int layer = 1;
-  CActRes* act = this->m_resources.find(layer) != this->m_resources.end() ? this->m_resources[layer].second : nullptr;
+  CActRes* act = this->m_resources.end() != this->m_resources.find(layer) ? this->m_resources[layer].second : nullptr;
   const ActionFrame& base = act->Frame(this->m_action, this->m_motion);
   if (frame->anchorCount > 0 && base.anchorCount > 0) {
     const ActionAnchor* frameAnchor = frame->anchors.data();
@@ -299,18 +311,22 @@ FuncDrawOffset FuncDrawWNDChar::BodyAnchorOffset(const ActionFrame* frame, bool 
         if (keepScale == true) {
           offset.x += baseAnchor->x - frameAnchor->x;
           offset.y += baseAnchor->y - frameAnchor->y;
+          this->offsetY = offset.y;
+          this->offsetX = offset.x;
         } else {
           offset.x = static_cast<int>(static_cast<float>(baseAnchor->x) / base.Cell(0).scaleX - static_cast<float>(frameAnchor->x) + static_cast<float>(offset.x));
           float baseY = static_cast<float>(base.anchors.data()->y);
-          offset.y = static_cast<int>(baseY / base.Cell(0).scaleY - static_cast<float>(frame->anchors.data()->y) + static_cast<float>(offset.y));
+          const ActionAnchor* currentAnchor = frame->anchors.data();
+          offset.y = static_cast<int>(baseY / base.Cell(0).scaleY - static_cast<float>(currentAnchor->y) + static_cast<float>(offset.y));
+          this->offsetY = offset.y;
+          this->offsetX = offset.x;
         }
       } else {
         offset.x = baseAnchor->x - frameAnchor->x;
         offset.y = baseAnchor->y - frameAnchor->y;
+        this->offsetY = offset.y;
+        this->offsetX = offset.x;
       }
-
-      this->offsetY = offset.y;
-      this->offsetX = offset.x;
     }
   }
 
@@ -324,9 +340,7 @@ FuncDrawOffset FuncDrawWNDChar::LayerAnchorOffset(int layer, const ActionFrame**
   const ActionFrame* current = *frame;
   FuncDrawOffset offset;
 
-  const auto resourcesEnd = this->m_resources.end();
-  int bodyLayer = 2;
-  CActRes* bodyAct = this->m_resources.find(bodyLayer) != resourcesEnd ? this->m_resources[bodyLayer].second : nullptr;
+  CActRes* bodyAct = this->Resource(2).second;
   const ActionFrame& base = bodyAct->Frame(this->m_action, this->m_motion);
   int syncedMotion = 0;
   const ActionFrame* synced = g_session.GetSyncedFrame(bodyAct, act, this->m_action, this->m_motion, this->m_time, &syncedMotion);
@@ -345,20 +359,23 @@ FuncDrawOffset FuncDrawWNDChar::LayerAnchorOffset(int layer, const ActionFrame**
   }
 
   offset.x += this->offsetX;
-  int ridingOffset;
   if (IsIgnoredRidingState(this->m_layers[layer], this->m_job, this->m_action - this->m_action % 8, this->m_flags) == true) {
-    ridingOffset = SpriteRidingOffset(&base, this->m_action, this->m_motion, this->m_job, this->m_sex, this->m_body);
+    offset.y += SpriteRidingOffset(&base, this->m_action, this->m_motion, this->m_job, this->m_sex, this->m_body);
   } else {
-    ridingOffset = this->offsetY;
+    offset.y += this->offsetY;
   }
 
-  offset.y += ridingOffset;
   if (layer == 4) {
-    short accessory = this->m_topAccessory;
-    if (accessory == 181 || accessory == 197) {
+    switch (this->m_topAccessory) {
+    case 181:
+    case 197:
       offset.y -= 7;
-    } else if (accessory == 200 && g_session.GetCurrentSex() == 0) {
-      offset.y -= 4;
+      break;
+    case 200:
+      if (g_session.GetCurrentSex() == 0) {
+        offset.y -= 4;
+      }
+      break;
     }
   }
 
@@ -368,9 +385,12 @@ FuncDrawOffset FuncDrawWNDChar::LayerAnchorOffset(int layer, const ActionFrame**
 // OFFSET: 0x007E5A30
 // FUNCTION: fn_09733
 void FuncDrawWNDChar::LoadResources(const std::list<int>& layers) {
-  for (int layer : layers) {
+  for (auto it = layers.begin(); it != layers.end(); ++it) {
+    const int& layer = *it;
     std::string sprName;
     std::string actName;
+    __declspec(align(8)) volatile __int64 aligned = 0;
+    (void)aligned;
     switch (layer) {
       case 1: {
         int job = this->m_flags == 1 ? g_session.GetRidingJob(this->m_job) : this->m_job;
@@ -406,7 +426,7 @@ void FuncDrawWNDChar::LoadResources(const std::list<int>& layers) {
     CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(sprName));
     CActRes* act = static_cast<CActRes*>(ResourceMgr::Instance().Load(actName));
     if (sprite && act) {
-      std::pair<CSprRes*, CActRes*>& entry = this->m_resources[layer];
+      std::pair<CSprRes*, CActRes*>& entry = this->m_resources.try_emplace(layer).first->second;
       entry.first = sprite;
       entry.second = act;
     }

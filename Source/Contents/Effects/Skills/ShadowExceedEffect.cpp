@@ -12,6 +12,7 @@
 #include "Contents/World/World.h"
 #include "Utility/Math/AffineMatrix.h"
 
+#include <algorithm>
 #include <string>
 
 namespace {
@@ -24,18 +25,21 @@ __forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
 }
 
 // INLINED
-__forceinline vector3d TransformPoint(const matrix& transform, const vector3d& point) {
-  vector3d result;
-  result.x = point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9];
-  result.y = point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10];
-  result.z = point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11];
-  return result;
+__forceinline vector3d TransformPoint(const matrix& transform, const vector3d point) {
+  return vector3d{point.x * transform.values[0] + point.y * transform.values[3] + point.z * transform.values[6] + transform.values[9],
+                  point.x * transform.values[1] + point.y * transform.values[4] + point.z * transform.values[7] + transform.values[10],
+                  point.x * transform.values[2] + point.y * transform.values[5] + point.z * transform.values[8] + transform.values[11]};
 }
 }
 
 // OFFSET: 0x00727CF0
 // FUNCTION: fn_07427
 CShadowExceed::CShadowExceed() : CEffect(1867), finishSpawned(0) {
+}
+
+// OFFSET: 0x00727D80
+// FUNCTION: fn_46094
+__declspec(noinline) CShadowExceed::~CShadowExceed() {
 }
 
 // OFFSET: 0x00727E60
@@ -89,15 +93,16 @@ void CShadowExceed::Open() {
     this->emitters.push_back(bottom);
   }
 
-  const float offsetY = ClientCosine(static_cast<int>(actor->render.angle)) * -3.5f - 7.3f;
+  const float cosine = ClientCosine(static_cast<int>(actor->render.angle)) * -3.5f;
   const float offsetX = 0.3f - ClientSine(static_cast<int>(actor->render.angle)) * 5.0f;
-  for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    if (*it) {
-      (*it)->offsetX = offsetX;
-      (*it)->offsetY = offsetY;
-      (*it)->offsetZ = 0.0f;
+  const float offsetY = cosine - 7.3f;
+  std::for_each(this->emitters.begin(), this->emitters.end(), [offsetX, offsetY](CEZ2STRParticle* emitter) {
+    if (emitter) {
+      emitter->offsetX = offsetX;
+      emitter->offsetY = offsetY;
+      emitter->offsetZ = 0.0f;
     }
-  }
+  });
 
   this->AddEvent(0, "effect\\SHC_SHADOW_EXCEED.wav", 0, 0);
 }
@@ -112,22 +117,11 @@ bool CShadowExceed::IsAlive() {
 // FUNCTION: fn_07435
 void CShadowExceed::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
-    CEZ2STRParticle* emitter = *it;
     if (IsParticleActive(*it) == true) {
-      if (emitter) {
-        const vector3d position = this->positionVector;
-        const matrix view = g_modeMgr.GetGameMode()->camera->frame.view;
-        const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
-        vector3d viewPos = TransformPoint(view, position);
-        viewPos.x += emitter->offsetX;
-        viewPos.y += emitter->offsetY;
-        viewPos.z += emitter->offsetZ;
-        emitter->position = TransformPoint(inverse, viewPos);
-        emitter->Process(0.0f, 0.0f, 0.0f);
-      }
+      this->UpdateEmitter(*it);
       ++it;
     } else {
-      FreeParticle(emitter);
+      FreeParticle(*it);
       it = this->emitters.erase(it);
     }
   }
@@ -144,12 +138,36 @@ void CShadowExceed::OnProcess() {
   }
 }
 
+// OFFSET: 0x00729030
+// FUNCTION: fn_46095
+__forceinline void CShadowExceed::UpdateEmitter(CEZ2STRParticle* emitter) {
+  if (!emitter) {
+    return;
+  }
+
+  const vector3d position = this->positionVector;
+  const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+  vector3d viewPos = TransformPoint(view, position);
+  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
+  viewPos.x += emitter->offsetX;
+  viewPos.y += emitter->offsetY;
+  viewPos.z += emitter->offsetZ;
+  emitter->position = TransformPoint(inverse, viewPos);
+  emitter->Process(0.0f, 0.0f, 0.0f);
+}
+
 // OFFSET: 0x00729230
 // FUNCTION: fn_07437
 void CShadowExceed::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    if (*it) {
-      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    this->RenderEmitter(*it);
+  }
+}
+
+// OFFSET: 0x00729310
+// FUNCTION: fn_46096
+__forceinline void CShadowExceed::RenderEmitter(CEZ2STRParticle* emitter) {
+  if (emitter) {
+    emitter->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }

@@ -5,6 +5,11 @@
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
 
+// INLINED
+static bool ContainsCell(const RECT& bounds, const MiniPartyGridPoint& position) {
+  return bounds.left <= position.x && position.x + g_miniPartyCellWidth <= bounds.right && bounds.top <= position.y && position.y + g_miniPartyCellHeight <= bounds.bottom;
+}
+
 // OFFSET: 0x00737680
 // FUNCTION: fn_07650
 __forceinline CMiniPartyWndSortArea::CMiniPartyWndSortArea(const RECT& bounds) {
@@ -13,15 +18,19 @@ __forceinline CMiniPartyWndSortArea::CMiniPartyWndSortArea(const RECT& bounds) {
   this->rows = (this->area.bottom - this->area.top) / g_miniPartyCellHeight;
 
   const RECT target = bounds;
-
   for (int index = 0; index < this->columns * this->rows; ++index) {
-    const int x = this->area.left + g_miniPartyCellWidth * (index / this->rows);
-    const int y = this->area.top + g_miniPartyCellHeight * (index % this->rows);
-
-    if (target.left <= x && x + g_miniPartyCellWidth <= target.right && target.top <= y && y + g_miniPartyCellHeight <= target.bottom) {
+    MiniPartyGridPoint position;
+    position.x = this->area.left + g_miniPartyCellWidth * (index / this->rows);
+    position.y = this->area.top + g_miniPartyCellHeight * (index % this->rows);
+    if (ContainsCell(target, position)) {
       this->cells.push_back(index);
     }
   }
+}
+
+// OFFSET: 0x007379A0
+// FUNCTION: fn_07653
+__declspec(noinline) CMiniPartyWndSortArea::~CMiniPartyWndSortArea() {
 }
 
 // OFFSET: 0x00737830
@@ -44,22 +53,17 @@ UIWindow* UIWindowMgr::FindSnapExcludedWindow(int cell) {
 // FUNCTION: fn_07657
 int CMiniPartyWndAreaMgr::FindFreeCell() {
   CMiniPartyWndSortArea area(g_windowMgr.GetMiniPartyUsableArea());
-  const std::list<int> cells = area.GetCells();
+  const std::list<int>& cells = area.GetCells();
 
-  for (std::vector<int>::iterator it = this->available.begin(); it != this->available.end(); ++it) {
-    const std::list<int>::const_iterator found = std::find(cells.begin(), cells.end(), *it);
-
-    if (found == cells.end()) {
-      continue;
-    }
-
-    const UIWindow* const window = g_windowMgr.FindSnapExcludedWindow(*it);
-    if (window == nullptr) {
-      return *it;
+  const auto end = this->available.end();
+  auto it = this->available.begin();
+  for (; it != end; ++it) {
+    if (std::find(cells.begin(), cells.end(), *it) != cells.end() && g_windowMgr.FindSnapExcludedWindow(*it) == nullptr) {
+      break;
     }
   }
 
-  return -1;
+  return it != end ? *it : -1;
 }
 
 // OFFSET: 0x00737D40

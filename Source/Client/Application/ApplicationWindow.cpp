@@ -27,18 +27,6 @@
 // GLOBAL: gl_24399
 HWND hWnd;
 
-#pragma optimize("y", on)
-// OFFSET: 0x03DE9F37
-// FUNCTION: fn_45411
-HWND __stdcall CreateApplicationWindow(
-  DWORD extendedStyle, const char* className, const char*, volatile DWORD style, int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance,
-  void* parameter
-) {
-  DWORD windowStyle = style | WS_SYSMENU;
-  return CreateWindowExA(extendedStyle, className, "Ragnarok 2026", windowStyle, x, y, width, height, parent, menu, instance, parameter);
-}
-#pragma optimize("y", off)
-
 // OFFSET: 0x00E57DD0
 // FUNCTION: fn_24360
 BOOL ClipApplicationCursor() {
@@ -68,14 +56,16 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     if (g_serverLanguage->candidateCount != 0) {
       std::string candidates[9];
       int info[4];
-      info[0] = g_serverLanguage->selection % 9;
-      const int first = g_serverLanguage->selection - info[0];
+      const int selection = g_serverLanguage->selection;
+      const int total = g_serverLanguage->candidateCount;
+      info[0] = selection % 9;
+      const int first = selection - info[0];
       int last = first + 9;
-      if (g_serverLanguage->candidateCount < last) {
-        last = g_serverLanguage->candidateCount;
+      if (total < last) {
+        last = total;
       }
-      info[1] = (g_serverLanguage->selection + 8) / 9;
-      info[2] = (g_serverLanguage->candidateCount + 8) / 9;
+      info[1] = (selection + 8) / 9;
+      info[2] = (total + 8) / 9;
       const int count = last - first;
       info[3] = count;
       for (int i = 0; i < count; ++i) {

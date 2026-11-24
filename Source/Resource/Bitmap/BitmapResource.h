@@ -21,12 +21,20 @@ class CBitmapRes : public CRes {
 public:
   CBitmapRes();
   CBitmapRes(const char* extension, const char* prefix);
-  ~CBitmapRes() override;
+#ifdef BITMAPRESOURCE_NOINLINE_DTOR
+// OFFSET: 0x0074A3B0
+// FUNCTION: fn_45840
+  __declspec(noinline) ~CBitmapRes() override = default;
+#else
+  ~CBitmapRes() override = default;
+#endif
   CBitmapRes* Create() override;
   bool Load(const char* name) override;
+  bool LoadAlphaBitmap(const char* name);
   void Unload() override;
   virtual bool Decode(const char* name, const void* data, int bytes, bool iconOnly);
   bool CreateAuxiliary(int mode);
+  void CreateBlank(int width, int height);
   std::uint32_t Pixel(int x, int y) const;
   void ClearAuxiliary();
   bool DecodeBitmap(const void* data, int bytes, bool iconOnly);

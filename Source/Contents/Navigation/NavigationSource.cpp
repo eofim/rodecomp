@@ -14,19 +14,14 @@
 #include <windows.h>
 #include <shlwapi.h>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
-template __declspec(noinline) std::vector<char>::vector(const std::size_t, const char&, const std::allocator<char>&);
-template __declspec(noinline) void std::vector<PathCell>::push_back(const PathCell&);
-template __declspec(noinline) void std::_Destroy_range<std::allocator<NaviRouteLine>>(NaviRouteLine*, NaviRouteLine* const, std::allocator<NaviRouteLine>&) noexcept;
-
 // GLOBAL: gl_24627
 CNavigationManager g_navigationManager;
 
 // OFFSET: 0x00B96980
 // FUNCTION: fn_19588
 NavigationTarget CNavigationManager::GetCurrentTarget() const {
-  return this->currentTarget;
+  NavigationTarget target = this->currentTarget;
+  return target;
 }
 
 // OFFSET: 0x00B96A10
@@ -47,7 +42,8 @@ std::string CNavigationManager::GetCurrentTargetName() const {
 // OFFSET: 0x00B96AE0
 // FUNCTION: fn_19590
 NavigationTarget CNavigationManager::GetSavedTarget() const {
-  return this->savedTarget;
+  NavigationTarget target = this->savedTarget;
+  return target;
 }
 
 // OFFSET: 0x00B96B70
@@ -152,7 +148,13 @@ void NaviDataEntry::Reset() {
 // OFFSET: 0x00B88530
 // FUNCTION: fn_19371
 CNaviData::~CNaviData() {
-  this->Clear();
+  this->info = nullptr;
+  this->cellX = 0;
+  this->cellY = 0;
+  this->range = 50000;
+  this->startLinks.clear();
+  this->endLinks.clear();
+  this->entries.clear();
 
   for (std::vector<CNavi_Link*>::iterator it = this->objects.begin(); it != this->objects.end(); ++it) {
     if (*it != nullptr) {
@@ -161,14 +163,15 @@ CNaviData::~CNaviData() {
     *it = nullptr;
   }
   this->objects.clear();
+  auto& destinations = this->destinations;
 
-  for (std::vector<CNaviInfo*>::iterator it = this->destinations.begin(); it != this->destinations.end(); ++it) {
+  for (std::vector<CNaviInfo*>::iterator it = destinations.begin(); it != destinations.end(); ++it) {
     if (*it != nullptr) {
       delete *it;
     }
     *it = nullptr;
   }
-  this->destinations.clear();
+  destinations.clear();
 }
 
 // OFFSET: 0x00B8CC10
@@ -231,17 +234,6 @@ CNavigationManager::CNavigationManager() {
   this->drawDestination = false;
 }
 
-// OFFSET: 0x00B92950
-// FUNCTION: fn_19552
-NaviRouteLine::NaviRouteLine(int kind, int x, int y, const char* text, int color, int shadowColor) : x(0), y(0) {
-  this->kind = kind;
-  this->x = x;
-  this->y = y;
-  this->text = text;
-  this->color = color;
-  this->shadowColor = shadowColor;
-}
-
 // OFFSET: 0x00B92CA0
 // FUNCTION: fn_45448
 CNavigationManager::~CNavigationManager() {
@@ -292,7 +284,7 @@ void CNavigationManager::Reset(bool clearAll) {
   this->nodes.clear();
   this->routeFlag = false;
   this->selectedNode = -1;
-  this->movementRoute.segment = 0;
+  this->movementRoute.ResetSegment();
   this->drawRoute = false;
   this->ground = nullptr;
   this->viewMode = 0;
@@ -408,25 +400,27 @@ __forceinline NaviCell CNavigationManager::ParseCell(const char* text) {
   if (x >= 0 && x <= 500 && y >= 0 && y <= 500) {
     cell.x = x;
     cell.y = y;
+    return cell;
   } else {
     cell.x = -1;
     cell.y = -1;
+    return cell;
   }
-  return cell;
 }
 
 // OFFSET: 0x00B93BA0
 // FUNCTION: fn_19565
 NavigationTarget CNavigationManager::ReadTarget(const char* data, int size) {
   NavigationTarget target;
-  target.type = reinterpret_cast<const NaviTargetRecord*>(data)->type;
+  std::memcpy(&target.type, data, sizeof(target.type));
   std::vector<char> buffer(size - 3, '\0');
   if (target.type == 1 || target.type == 0) {
     std::memcpy(buffer.data(), data + 4, size - 4);
-    target.object = this->FindObject(buffer.data());
-    if (target.object == nullptr) {
+    void* object = this->FindObject(buffer.data());
+    if (object == nullptr) {
       return NavigationTarget(0, nullptr);
     }
+    target.object = object;
   } else {
     target.object = this->ReadTargetObject(data + 4);
   }
@@ -521,8 +515,7 @@ __declspec(noinline) std::vector<char> CNavigationManager::WriteObject(CNavi_Obj
 
     reinterpret_cast<NaviObjectRecord*>(buffer.data())->type = type;
     reinterpret_cast<NaviObjectRecord*>(buffer.data())->index = index;
-    reinterpret_cast<NaviObjectRecord*>(buffer.data())->cellX = cell.x;
-    reinterpret_cast<NaviObjectRecord*>(buffer.data())->cellY = cell.y;
+    std::memcpy(&reinterpret_cast<NaviObjectRecord*>(buffer.data())->cellX, &cell, sizeof(cell));
 
     std::int16_t length = static_cast<std::int16_t>(name.size());
     reinterpret_cast<NaviObjectRecord*>(buffer.data())->nameLength = length;
@@ -645,8 +638,8 @@ void CNaviInfo::SearchMap(const std::vector<std::string>& keywords, std::vector<
   }
 
   bool matched = true;
-  for (const std::wstring& keyword : wideKeywords) {
-    matched &= StrStrIW(wideText.c_str(), keyword.c_str()) != nullptr;
+  for (std::vector<std::wstring>::iterator it = wideKeywords.begin(); it != wideKeywords.end(); ++it) {
+    matched &= StrStrIW(wideText.c_str(), it->c_str()) != nullptr;
   }
   if (!matched) {
     return;
@@ -657,22 +650,13 @@ void CNaviInfo::SearchMap(const std::vector<std::string>& keywords, std::vector<
   out.push_back(target);
 
   target.type = 3;
-  for (CNavi_Object* mob : this->mobs) {
+  for (std::vector<CNavi_Object*>::iterator it = this->mobs.begin(); it != this->mobs.end(); ++it) {
     target.x = -1000;
     target.y = -1000;
-    target.name = mob->GetName();
-    target.object = mob;
+    target.name = (*it)->GetName();
+    target.object = *it;
     out.push_back(target);
   }
-}
-
-// OFFSET: 0x00B92A70
-// FUNCTION: fn_19554
-NavigationTarget::NavigationTarget(int type, void* object) {
-  this->type = type;
-  this->object = object;
-  this->x = -1;
-  this->y = -1;
 }
 
 // OFFSET: 0x00B93DE0
@@ -689,7 +673,7 @@ CNavi_Link* CNavigationManager::ReadObject(const char* record) {
   const int cellY = header->cellY;
 
   std::size_t offset = 0x12;
-  int length = header->nameLength;
+  std::int16_t length = header->nameLength;
   std::string name(record + offset, record + offset + length);
   offset += length;
 
@@ -710,16 +694,18 @@ CNavi_Link* CNavigationManager::ReadObject(const char* record) {
   std::string linkedMap(record + offset, record + offset + length);
 
   CNaviInfo* info = this->FindObject(map.c_str());
-  if (info == nullptr) {
-    return nullptr;
+  if (info != nullptr) {
+    CNaviInfo* linkedInfo = this->FindObject(linkedMap.c_str());
+    if (linkedInfo != nullptr) {
+      CNavi_Link* link = info->FindMatchingLink(
+        CNavi_Link(type, index, name.c_str(), title.c_str(), cellX, cellY, info, linkedInfo, linkedCellX, linkedCellY)
+      );
+      if (link != nullptr) {
+        return link;
+      }
+    }
   }
-  CNaviInfo* linkedInfo = this->FindObject(linkedMap.c_str());
-  if (linkedInfo == nullptr) {
-    return nullptr;
-  }
-  return info->FindMatchingLink(
-    CNavi_Link(type, index, name.c_str(), title.c_str(), cellX, cellY, info, linkedInfo, linkedCellX, linkedCellY)
-  );
+  return nullptr;
 }
 
 // OFFSET: 0x00B950B0
@@ -730,7 +716,7 @@ void CNavigationManager::ClearSavedTarget() {
   this->routeResult = 0;
   this->nodes.clear();
   this->selectedNode = -1;
-  this->movementRoute.segment = 0;
+  this->movementRoute.ResetSegment();
   this->drawRoute = false;
   this->ground = nullptr;
   this->cells.clear();
@@ -747,7 +733,22 @@ void CNavigationManager::ClearCurrentObject() {
 // OFFSET: 0x00B95280
 // FUNCTION: fn_19573
 int CNavigationManager::RouteFromPlayer() {
-  CNaviInfo* info = this->FindObject(g_session.m_navigationPlayerMap);
+  NaviCell player;
+  NaviCell start;
+  int result;
+  NaviCell destination;
+  NaviCell cell;
+  CNaviInfo* info;
+  NaviCell cell2;
+  NaviCell linked;
+  NaviCell cellX;
+  NaviCell cellY;
+  NaviCell cellX2;
+  NaviCell cellY2;
+  NaviCell cellX3;
+  NaviCell cellY3;
+
+  info = this->FindObject(g_session.m_navigationPlayerMap);
   if (info == nullptr) {
     const std::string resolved = ResourceMgr::Instance().ResolveMapName(g_session.m_navigationPlayerMap);
     info = this->FindObject(resolved.c_str());
@@ -759,11 +760,10 @@ int CNavigationManager::RouteFromPlayer() {
     }
   }
 
-  int result = -96;
+  result = -96;
   this->drawRoute = false;
   this->routeFlag = false;
   this->drawDestination = false;
-  NaviCell player;
   player.x = 0;
   player.y = 0;
   if (CGameMode* mode = g_modeMgr.GetGameMode()) {
@@ -781,7 +781,6 @@ int CNavigationManager::RouteFromPlayer() {
       return code;
     }
 
-    NaviCell cell;
     if (player.x == this->data.GetCell(&cell)->x && player.y == this->data.GetCell(&cell)->y) {
       this->movementRoute.points.clear();
       PathCell point = {player.x, player.y, 0, 0};
@@ -790,7 +789,6 @@ int CNavigationManager::RouteFromPlayer() {
       return 11;
     }
 
-    NaviCell destination;
     if (this->BuildRoute(player.x, player.y, this->data.GetCell(&destination)->x, this->data.GetCell(&cell)->y, true)) {
       this->nodes.clear();
       this->routeResult = std::abs(player.x - this->data.GetCell(&destination)->x) + std::abs(player.y - this->data.GetCell(&cell)->y);
@@ -814,28 +812,29 @@ int CNavigationManager::RouteFromPlayer() {
     }
   }
 
-  const NaviCell start = player;
+  start = player;
   if (this->nodes.empty() || info == nullptr) {
     return result;
   }
 
   CGameMode* mode = g_modeMgr.GetGameMode();
-  if (mode && mode->scene && mode->scene->terrain) {
-    this->ground = mode->scene->ground;
-    this->pathFinder.attr = mode->scene->terrain;
+  if (mode && mode->scene) {
+    C3dAttr* terrain = mode->scene->terrain;
+    if (terrain) {
+      this->ground = mode->scene->ground;
+      this->pathFinder.SetAttr(terrain);
+    }
   }
 
   {
-    std::vector<unsigned int> candidates;
+    std::vector<int> candidates;
     for (int index = static_cast<int>(this->nodes.size()) - 1; index > 0; --index) {
       if (this->nodes[index]->GetInfo() != info) {
         continue;
       }
 
-      const NaviCell linked = this->nodes[index - 1]->GetLinkedCell();
+      linked = this->nodes[index - 1]->GetLinkedCell();
       if (linked.x == start.x && linked.y == start.y) {
-        NaviCell cellX;
-        NaviCell cellY;
         if (this->BuildRoute(start.x, start.y, this->nodes[index]->GetCell(&cellX)->x, this->nodes[index]->GetCell(&cellY)->y, true)) {
           this->selectedNode = index;
           this->SelectTarget(index);
@@ -849,11 +848,9 @@ int CNavigationManager::RouteFromPlayer() {
 
     if (this->nodes[0]->GetInfo() == info) {
       this->movementRoute.points.clear();
-      NaviCell cellX;
-      NaviCell cellY;
-      if (start.x == this->nodes[0]->GetCell(&cellX)->x && start.y == this->nodes[0]->GetCell(&cellY)->y) {
+      if (start.x == this->nodes[0]->GetCell(&cell)->x && start.y == this->nodes[0]->GetCell(&cell2)->y) {
         this->movementRoute.points.push_back({start.x, start.y, 0, 0});
-      } else if (!this->BuildRoute(start.x, start.y, this->nodes[0]->GetCell(&cellX)->x, this->nodes[0]->GetCell(&cellY)->y, true)) {
+      } else if (!this->BuildRoute(start.x, start.y, this->nodes[0]->GetCell(&cellX2)->x, this->nodes[0]->GetCell(&cellY2)->y, true)) {
         goto search;
       }
       this->selectedNode = 0;
@@ -864,9 +861,7 @@ int CNavigationManager::RouteFromPlayer() {
 
   search:
     for (int index = 0; index < static_cast<int>(candidates.size()); ++index) {
-      NaviCell cellX;
-      NaviCell cellY;
-      if (this->BuildRoute(start.x, start.y, this->nodes[candidates[index]]->GetCell(&cellX)->x, this->nodes[candidates[index]]->GetCell(&cellY)->y, true)) {
+      if (this->BuildRoute(start.x, start.y, this->nodes[candidates[index]]->GetCell(&cellX3)->x, this->nodes[candidates[index]]->GetCell(&cellY3)->y, true)) {
         this->selectedNode = candidates[index];
         this->SelectTarget(candidates[index]);
         this->drawRoute = true;
@@ -925,13 +920,15 @@ bool CNavigationManager::GetMobInfo(
   if (exists) {
     *sprite = path;
   } else {
-    const std::string npcSprite = FormatOwnedString("npc\\%s", g_session.GetJobName(mob->GetIndex(), -1));
-    *sprite = npcSprite;
+    *sprite = static_cast<const std::string&>(FormatOwnedString("npc\\%s", g_session.GetJobName(mob->GetIndex(), -1)));
   }
 
-  NaviCell cell;
-  *cellX = mob->GetCell(&cell)->x;
-  const int packed = mob->GetCell(&cell)->y;
+  int packed;
+  {
+    NaviCell cell;
+    *cellX = mob->GetCell(&cell)->x;
+    packed = mob->GetCell(&cell)->y;
+  }
   const unsigned int elementValue = static_cast<unsigned char>(packed >> 16);
   *elementLevel = elementValue / 20;
   *element = elementValue % 10;
@@ -1026,10 +1023,10 @@ int CNavigationManager::GetRouteResult() const {
 // OFFSET: 0x00B96220
 // FUNCTION: fn_19583
 NavigationTarget CNavigationManager::GetState(int index) const {
-  if (index >= 0 && this->states.size() > static_cast<unsigned int>(index)) {
-    return this->states[index];
+  if (index < 0 || this->states.size() <= static_cast<unsigned int>(index)) {
+    return NavigationTarget();
   }
-  return NavigationTarget();
+  return this->states[index];
 }
 
 // OFFSET: 0x00B96340
@@ -1039,19 +1036,22 @@ std::string CNavigationManager::StateMapName(int index, int* distance) {
   if (index < 0 || this->states.size() <= static_cast<unsigned int>(index)) {
     return name;
   }
-  if (this->states[index].object != nullptr) {
+  const NavigationTarget& state = this->states[index];
+  if (state.object != nullptr) {
     CNaviInfo* info = nullptr;
-    int type = this->states[index].type;
+    int type = state.type;
     if (type == 0 || type == 1) {
-      info = static_cast<CNaviInfo*>(this->states[index].object);
+      info = static_cast<CNaviInfo*>(state.object);
     } else if (type == 2 || type == 3 || type == 6) {
-      info = static_cast<CNavi_Object*>(this->states[index].object)->GetInfo();
+      info = static_cast<CNavi_Object*>(state.object)->GetInfo();
     }
     if (info != nullptr) {
       name.assign(info->GetName());
     }
   }
-  *distance = this->states[index].type == 3 ? static_cast<CNavi_Object*>(this->states[index].object)->GetFlag() : (this->states[index].type == 2 ? 10000 : 0);
+  const NavigationTarget& current = this->states[index];
+  int stateType = current.type;
+  *distance = stateType == 3 ? static_cast<CNavi_Object*>(current.object)->GetFlag() : (stateType == 2 ? 10000 : 0);
   return name;
 }
 

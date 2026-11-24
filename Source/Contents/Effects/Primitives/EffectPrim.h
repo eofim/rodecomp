@@ -12,10 +12,11 @@ struct CRagEffect;
 
 struct CEffectPrim : CRenderObject {
   CEffectPrim();
+  ~CEffectPrim() override;
   bool OnProcess() override;
   void Render(int argument) override;
   void DrawEffectPrimitive15(matrix& wtm);
-  void HandleMasterMessage(CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g);
+  virtual void HandleMasterMessage(CGameObject* sender, int message, int a, int b, int c, int d, int e, int f, int g);
 
   bool MoveEffectPrimitive();
   bool Prim3DCasting4();
@@ -251,8 +252,9 @@ struct CEffectPrim : CRenderObject {
   void RenderGroundSprite(matrix& wtm);
   void RenderSegmentSpriteTrail(matrix& wtm);
 
-  void Initialize(CRagEffect& master, int type, float x, float y, float z);
+  void Initialize(CRagEffect& master, int type, vector3d deltaPos);
   void GetColorOverride(unsigned char* red, unsigned char* green, unsigned char* blue);
+  void Get_Angle(float x, float y, std::int16_t* angle);
 
   /* 0138 */ EffectPrimitiveState state;
 };
@@ -263,5 +265,11 @@ static_assert(offsetof(CEffectPrim, state) == 0x138);
 #endif
 
 extern int g_overrideColor;
+extern float g_effectIconOuterRadius;
+extern float g_effectIconRadius;
+extern float g_heightSpeedSign;
+extern float g_fireflyGroundOffset;
+extern float g_masterReachDistance;
+extern float g_fireflyArcLength;
 
 #endif

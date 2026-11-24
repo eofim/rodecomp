@@ -387,10 +387,27 @@ struct DustExplosionSpawner {
 };
 
 // INLINED
-template <class Action>
-__forceinline Action* CreateAction(const std::map<int, std::function<Action*()>>& factories, int id) {
-  const auto found = factories.find(id);
-  return factories.end() != found ? found->second() : nullptr;
+static __forceinline int ClampedRandom(int range) {
+  const int value = std::rand() % range;
+  return value >= 0 ? value : 0;
+}
+
+// INLINED
+__forceinline CSkillAction* CreateSkillAction(CSkillActionMgr* mgr, int skillId) {
+  const auto found = mgr->m_skillActions.find(skillId);
+  return mgr->m_skillActions.end() != found ? found->second() : nullptr;
+}
+
+// INLINED
+__forceinline CEfstAction* CreateEfstAction(CSkillActionMgr* mgr, int efstId) {
+  const auto found = mgr->m_efstActions.find(efstId);
+  return mgr->m_efstActions.end() != found ? found->second() : nullptr;
+}
+
+// INLINED
+__forceinline CSkillObjectAction* CreateSkillObjectAction(CSkillActionMgr* mgr, int skillId) {
+  const auto found = mgr->m_skillObjectActions.find(skillId);
+  return mgr->m_skillObjectActions.end() != found ? found->second() : nullptr;
 }
 
 // GLOBAL: gl_24640
@@ -443,8 +460,8 @@ CSkillInfo::~CSkillInfo() = default;
 
 // OFFSET: 0x00774710
 // FUNCTION: fn_08325
-bool CSkillInfo::IsValid() const {
-  return this->available != 0 && this->level != 0;
+bool CSkillInfo::IsValid(const CSkillInfo& skill) {
+  return skill.available != 0 && skill.level != 0;
 }
 
 // OFFSET: 0x00776540
@@ -557,7 +574,7 @@ bool UIShortCutWnd::MatchesShortcut(const CSkillInfo& skill, const NormalItemSlo
   }
 
   const auto requested = slot->value;
-  return requested != 0 && (skill.id != slot->itemId || skill.level >= requested);
+  return 0 != requested && (skill.id != slot->itemId || skill.level >= requested);
 }
 
 // OFFSET: 0x00773550
@@ -840,7 +857,7 @@ bool IsSupportSkill(int skillId) {
 // OFFSET: 0x0077B4A0
 // FUNCTION: fn_08413
 bool CSkillActionMgr::IsSupportAction(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1037,13 +1054,13 @@ CSkillAction* NewAction<CSkillAction_RA_UNLIMIT, CSkillAction>() {
 // OFFSET: 0x007764E0
 // FUNCTION: fn_08346
 EfstActionMessage CEfstAction_SHADOW_WEAPON::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_HUNTING_QUEST_INFO_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_SHC_ENCHANTING_SHADOW_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00776510
 // FUNCTION: fn_08347
 EfstActionMessage CEfstAction_SHADOW_WEAPON::GetEfstEndMessage() {
-  return {LookupMessage(MSI_TARGET_AP_MAX), 0xFF};
+  return {LookupMessage(MSI_SHC_ENCHANTING_SHADOW_OFF), 0xFF};
 }
 
 // OFFSET: 0x00777910
@@ -1082,13 +1099,13 @@ void CEfstAction_SHADOW_EXCEED::OnEfstUpdate(int efstId, int value, int argument
 // OFFSET: 0x00777F00
 // FUNCTION: fn_08368
 EfstActionMessage CEfstAction_SHADOW_EXCEED::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_SHC_POTENT_VENOM_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_SHC_SHADOW_EXCEED_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00777F30
 // FUNCTION: fn_08369
 EfstActionMessage CEfstAction_SHADOW_EXCEED::GetEfstEndMessage() {
-  return {LookupMessage(MSI_SHC_ENCHANTING_SHADOW_ON), 0xFF};
+  return {LookupMessage(MSI_SHC_SHADOW_EXCEED_OFF), 0xFF};
 }
 
 // OFFSET: 0x00778140
@@ -1112,7 +1129,7 @@ bool CSkillAction_ABC_ABYSS_FLAME_ATK::KeepSkillAttackMotion(int argument) {
 // OFFSET: 0x0077ACC0
 // FUNCTION: fn_08404
 std::pair<bool, int> CSkillActionMgr::GetSkillCastMotion(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   return !action ? std::pair<bool, int>(false, 8) : std::pair<bool, int>(true, action->GetSkillCastMotion());
 }
 
@@ -1124,18 +1141,16 @@ vector3d CellWorldPosition(int column, int row) {
     return vector3d{0.0f, 0.0f, 0.0f};
   }
 
-  float z = 0.0f;
-  float y = 0.0f;
-  float x = 0.0f;
-  g_modeMgr.GetGameMode()->scene->CellOrigin(column, row, x, z);
-  y = g_modeMgr.GetGameMode()->scene->terrain->Height(x, z);
-  return vector3d{x + 2.5f, y + 0.0f, z + 2.5f};
+  vector3d position = {0.0f, 0.0f, 0.0f};
+  g_modeMgr.GetGameMode()->scene->CellOrigin(column, row, position.x, position.z);
+  position.y = g_modeMgr.GetGameMode()->scene->terrain->Height(position.x, position.z);
+  return vector3d{position.x + 2.5f, position.y + 0.0f, position.z + 2.5f};
 }
 
 // OFFSET: 0x0077AEA0
 // FUNCTION: fn_08406
 EfstActionMessage CSkillActionMgr::GetEfstBeginMessage(int efstId) {
-  std::unique_ptr<CEfstAction> action(CreateAction(this->m_efstActions, efstId));
+  std::unique_ptr<CEfstAction> action(CreateEfstAction(this, efstId));
   if (!action) {
     return {nullptr, 0xFFFF00};
   }
@@ -1146,7 +1161,7 @@ EfstActionMessage CSkillActionMgr::GetEfstBeginMessage(int efstId) {
 // OFFSET: 0x0077AF80
 // FUNCTION: fn_08407
 EfstActionMessage CSkillActionMgr::GetEfstEndMessage(int efstId) {
-  std::unique_ptr<CEfstAction> action(CreateAction(this->m_efstActions, efstId));
+  std::unique_ptr<CEfstAction> action(CreateEfstAction(this, efstId));
   if (!action) {
     return {nullptr, 0xFF};
   }
@@ -1157,7 +1172,7 @@ EfstActionMessage CSkillActionMgr::GetEfstEndMessage(int efstId) {
 // OFFSET: 0x0077B060
 // FUNCTION: fn_08408
 int CSkillActionMgr::GetSkillScopeType(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return 0;
   }
@@ -1168,14 +1183,14 @@ int CSkillActionMgr::GetSkillScopeType(int skillId) {
 // OFFSET: 0x0077B210
 // FUNCTION: fn_08409
 std::pair<bool, int> CSkillActionMgr::GetSkillAttackMotion(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   return !action ? std::pair<bool, int>(false, 7) : std::pair<bool, int>(true, action->GetSkillAttackMotion());
 }
 
 // OFFSET: 0x0077B2E0
 // FUNCTION: fn_08410
 bool CSkillActionMgr::KeepSkillAttackMotion(int skillId, int skillMessageType) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1186,7 +1201,7 @@ bool CSkillActionMgr::KeepSkillAttackMotion(int skillId, int skillMessageType) {
 // OFFSET: 0x0077B3A0
 // FUNCTION: fn_08411
 bool CSkillActionMgr::IsSkillWithoutMotion(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1357,10 +1372,11 @@ void CSkillAction_ABC_CHASING_BREAK::OnSkillEffect(int level, CGameActor* source
   }
 
   for (int angle = 0; angle < 360; angle += 45) {
-    CEffect* effect = g_effectMgr->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chasing_break"), 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+    EffectLists* effects = g_effectMgr;
+    CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chasing_break"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     if (effect) {
       effect->SetAngle(static_cast<float>(angle));
-      effect->SetDelay(std::max(0, std::rand() % 150));
+      effect->SetDelay(ClampedRandom(150));
       effect->SetScale(0.15f);
       effect->EnableGroundRender();
     }
@@ -1393,8 +1409,10 @@ void CSkillAction_ABC_CHASING_SHOT::OnSkillEffect(int level, CGameActor* source,
     effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&target->render.position), 0, 0, 0, 0);
   }
 
+  const vector3d offset{0.0f, 0.0f, 0.0f};
   for (int angle = 0; angle < 360; angle += 45) {
-    CEffect* effect = g_effectMgr->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chasing_shot_single"), 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+    EffectLists* effects = g_effectMgr;
+    CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chasing_shot_single"), offset, 0, -1, 0, 0);
     if (effect) {
       effect->SetAngle(static_cast<float>(angle));
       effect->SetScale(0.15f);
@@ -1688,7 +1706,7 @@ void CSkillAction_IQ_BLAZING_FLAME_BLAST::OnSkillEffect(int level, CGameActor* s
 // OFFSET: 0x0077B560
 // FUNCTION: fn_08414
 bool CSkillActionMgr::SuppressAttackSkillArrow(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1699,7 +1717,7 @@ bool CSkillActionMgr::SuppressAttackSkillArrow(int skillId) {
 // OFFSET: 0x0077B620
 // FUNCTION: fn_08415
 bool CSkillActionMgr::SuppressSupportSkillArrow(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1710,7 +1728,7 @@ bool CSkillActionMgr::SuppressSupportSkillArrow(int skillId) {
 // OFFSET: 0x0077B6E0
 // FUNCTION: fn_08416
 bool CSkillActionMgr::UseGroundSkillLastFrame(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1721,7 +1739,7 @@ bool CSkillActionMgr::UseGroundSkillLastFrame(int skillId) {
 // OFFSET: 0x0077B7A0
 // FUNCTION: fn_08417
 bool CSkillActionMgr::KeepSkillAttackSpeed(int skillId) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1732,7 +1750,7 @@ bool CSkillActionMgr::KeepSkillAttackSpeed(int skillId) {
 // OFFSET: 0x0077B860
 // FUNCTION: fn_08418
 bool CSkillActionMgr::OnSkillDamage(int skillId, CGameActor* source, CGameActor* target, int hitIndex) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1744,7 +1762,7 @@ bool CSkillActionMgr::OnSkillDamage(int skillId, CGameActor* source, CGameActor*
 // OFFSET: 0x0077B920
 // FUNCTION: fn_08419
 bool CSkillActionMgr::OnEfstBegin(int efstId, int value1, int value2, int value3, CRenderObject* actor, bool flag) {
-  std::unique_ptr<CEfstAction> action(CreateAction(this->m_efstActions, efstId));
+  std::unique_ptr<CEfstAction> action(CreateEfstAction(this, efstId));
   if (!action) {
     return false;
   }
@@ -1756,7 +1774,7 @@ bool CSkillActionMgr::OnEfstBegin(int efstId, int value1, int value2, int value3
 // OFFSET: 0x0077B9F0
 // FUNCTION: fn_08420
 bool CSkillActionMgr::OnSkillCast(int skillId, int level, CGameActor* source) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1768,7 +1786,7 @@ bool CSkillActionMgr::OnSkillCast(int skillId, int level, CGameActor* source) {
 // OFFSET: 0x0077BAB0
 // FUNCTION: fn_08421
 bool CSkillActionMgr::OnTargetSkillCast(int skillId, CGameActor* source, CGameActor* target, int delay) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1780,20 +1798,19 @@ bool CSkillActionMgr::OnTargetSkillCast(int skillId, CGameActor* source, CGameAc
 // OFFSET: 0x0077BB70
 // FUNCTION: fn_08422
 bool CSkillActionMgr::OnGroundSkillCast(int skillId, int castDelay, CGameActor* target, short column, short row) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
 
-  const vector3d position = CellWorldPosition(column, row);
-  action->OnGroundSkillCast(castDelay, target, std::bit_cast<int>(position.x), std::bit_cast<int>(position.y), std::bit_cast<int>(position.z));
+  action->OnGroundSkillCast(castDelay, target, CellWorldPosition(column, row));
   return true;
 }
 
 // OFFSET: 0x0077BC60
 // FUNCTION: fn_08423
 bool CSkillActionMgr::OnEfstEnd(int efstId, int value1, int value2, int value3, CRenderObject* actor) {
-  std::unique_ptr<CEfstAction> action(CreateAction(this->m_efstActions, efstId));
+  std::unique_ptr<CEfstAction> action(CreateEfstAction(this, efstId));
   if (!action) {
     return false;
   }
@@ -1805,7 +1822,7 @@ bool CSkillActionMgr::OnEfstEnd(int efstId, int value1, int value2, int value3, 
 // OFFSET: 0x0077BD20
 // FUNCTION: fn_08424
 bool CSkillActionMgr::OnGroundSkillEffect(int skillId, int column, int row, int level, int actor) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1817,7 +1834,7 @@ bool CSkillActionMgr::OnGroundSkillEffect(int skillId, int column, int row, int 
 // OFFSET: 0x0077BE10
 // FUNCTION: fn_08425
 bool CSkillActionMgr::OnSkillHit(int skillId, CGameActor* source, CGameActor* target, CRenderObject* targetSkill) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1829,7 +1846,7 @@ bool CSkillActionMgr::OnSkillHit(int skillId, CGameActor* source, CGameActor* ta
 // OFFSET: 0x0077BED0
 // FUNCTION: fn_08426
 bool CSkillActionMgr::OnEfstUpdate(int efstId, int value, int statusValue2, int statusValue3, CRenderObject* actor) {
-  std::unique_ptr<CEfstAction> action(CreateAction(this->m_efstActions, efstId));
+  std::unique_ptr<CEfstAction> action(CreateEfstAction(this, efstId));
   if (!action) {
     return false;
   }
@@ -1841,7 +1858,7 @@ bool CSkillActionMgr::OnEfstUpdate(int efstId, int value, int statusValue2, int 
 // OFFSET: 0x0077BF90
 // FUNCTION: fn_08427
 bool CSkillActionMgr::OnSkillObjectRemove(int skillId, CRenderObject* object) {
-  std::unique_ptr<CSkillObjectAction> action(CreateAction(this->m_skillObjectActions, skillId));
+  std::unique_ptr<CSkillObjectAction> action(CreateSkillObjectAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1853,7 +1870,7 @@ bool CSkillActionMgr::OnSkillObjectRemove(int skillId, CRenderObject* object) {
 // OFFSET: 0x0077C050
 // FUNCTION: fn_08428
 bool CSkillActionMgr::OnSkillObjectCreate(int skillId, int level, CRenderObject* object, CGameActor* source) {
-  std::unique_ptr<CSkillObjectAction> action(CreateAction(this->m_skillObjectActions, skillId));
+  std::unique_ptr<CSkillObjectAction> action(CreateSkillObjectAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -1865,7 +1882,7 @@ bool CSkillActionMgr::OnSkillObjectCreate(int skillId, int level, CRenderObject*
 // OFFSET: 0x0077C110
 // FUNCTION: fn_08429
 bool CSkillActionMgr::OnSkillEffect(int skillId, int level, CGameActor* source, CGameActor* target) {
-  std::unique_ptr<CSkillAction> action(CreateAction(this->m_skillActions, skillId));
+  std::unique_ptr<CSkillAction> action(CreateSkillAction(this, skillId));
   if (!action) {
     return false;
   }
@@ -2008,6 +2025,16 @@ void CSkillAction_BO_DUST_EXPLOSION::OnSkillDamage(CGameActor* source, CGameActo
   }
 }
 
+// INLINED
+static int RandomInRange(int low, int high) {
+  if (high == 0) {
+    return 0;
+  }
+
+  const int value = std::rand() % high;
+  return value >= low ? value : low;
+}
+
 // OFFSET: 0x0077DC70
 // FUNCTION: fn_08449
 CEffect* DustExplosionSpawner::operator()(int quadrant, const vector3d& position) const {
@@ -2018,10 +2045,7 @@ CEffect* DustExplosionSpawner::operator()(int quadrant, const vector3d& position
 
   const int start = quadrant * 90;
   const int end = start + 90;
-  int angle = 0;
-  if (end != 0) {
-    angle = std::max(std::rand() % end, start);
-  }
+  int angle = RandomInRange(start, end);
   const float offsetX = ClientSin((static_cast<float>(angle) / 180.0f) * 3.141592f) * static_cast<float>(distance);
 
   distance = std::rand() % 20;
@@ -2029,17 +2053,13 @@ CEffect* DustExplosionSpawner::operator()(int quadrant, const vector3d& position
     distance = 10;
   }
 
-  angle = 0;
-  if (end != 0) {
-    angle = std::max(std::rand() % end, start);
-  }
+  angle = RandomInRange(start, end);
   const float offsetZ = ClientCos((static_cast<float>(angle) / 180.0f) * 3.141592f) * static_cast<float>(distance);
 
-  const float x = offsetX + position.x;
-  const float y = position.y + 0.0f;
-  const float z = offsetZ + position.z;
+  const auto at = [&](float dx, float dz) { return vector3d{dx + position.x, position.y + 0.0f, dz + position.z}; };
+  const vector3d spawnPosition = at(offsetX, offsetZ);
   EffectLists* effects = g_effectMgr;
-  return effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("dust_explosion"), vector3d{x, y, z}, 0, -1, 0, 0);
+  return effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("dust_explosion"), spawnPosition, 0, -1, 0, 0);
 }
 
 // OFFSET: 0x0077DED0
@@ -2085,7 +2105,7 @@ void CEfstAction_VIGOR::OnEfstUpdate(int efstId, int value, int argument3, int a
 // OFFSET: 0x0077E370
 // FUNCTION: fn_08454
 EfstActionMessage CEfstAction_VIGOR::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_GUARD_STANCE_ON), 0xFF};
+  return {LookupMessage(MSI_DK_VIGOR_OFF), 0xFF};
 }
 
 // OFFSET: 0x0077E3B0
@@ -2119,7 +2139,7 @@ void CEfstAction_SERVANTWEAPON::OnEfstEnd(int efstId, int argument2, int argumen
 // OFFSET: 0x0077E7E0
 // FUNCTION: fn_08459
 EfstActionMessage CEfstAction_SERVANTWEAPON::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_ATTACK_STANCE_ON), 0xFF};
+  return {LookupMessage(MSI_DK_SERVANTWEAPON_OFF), 0xFF};
 }
 
 // OFFSET: 0x0077E810
@@ -2202,32 +2222,29 @@ void CSkillAction_DK_SERVANT_W_PHANTOM::OnSkillHit(CGameActor* source, CGameActo
     return;
   }
 
-  const int duration = static_cast<int>(source ? source->render.speed * 100.0f + 100.0f : 500.0f);
+  const int duration = static_cast<int>(!source ? 500.0f : source->render.speed * 100.0f + 100.0f);
   EffectLists* effects = g_effectMgr;
   CEffect* sign = effects->Find(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_sign"));
-  const vector3d offset = {0.0f, 0.0f, 0.0f};
-  CEffect* effect;
-  effects = g_effectMgr;
   if (sign) {
-    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_phantom_down"), offset.x, offset.y, offset.z, 0, -1, 0, 0);
     effects = g_effectMgr;
-    effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servantweapon_hit_bottom"), offset.x, offset.y, offset.z, 0, -1, 0, 0);
-    if (effect) {
+    effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_phantom_down"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effects = g_effectMgr;
+    if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servantweapon_hit_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
       effect->SetDelay(duration);
     }
     effects = g_effectMgr;
-    effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servantweapon_hit"), offset.x, offset.y, offset.z, 0, -1, 0, 0);
+    if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servantweapon_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
+      effect->SetDelay(duration);
+    }
   } else {
-    effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_phantom_sub_bottom"), offset.x, offset.y, offset.z, 0, -1, 0, 0);
-    if (effect) {
+    effects = g_effectMgr;
+    if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_phantom_sub_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
       effect->SetDelay(duration);
     }
     effects = g_effectMgr;
-    effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_phantom_sub"), offset.x, offset.y, offset.z, 0, -1, 0, 0);
-  }
-
-  if (effect) {
-    effect->SetDelay(duration);
+    if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_phantom_sub"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
+      effect->SetDelay(duration);
+    }
   }
 }
 
@@ -2253,10 +2270,11 @@ void CSkillAction_DK_SERVANT_W_DEMOL::OnSkillHit(CGameActor* source, CGameActor*
   if (target) {
     const int roll = std::rand() % 2;
     const int side = roll >= 0 ? roll : 0;
-    EffectLists* effects = g_effectMgr;
     if (side == 0) {
+      EffectLists* effects = g_effectMgr;
       effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_demolition_leftdown"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     } else {
+      EffectLists* effects = g_effectMgr;
       effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("servant_demolition_rightdown"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     }
   }
@@ -2414,7 +2432,8 @@ void CSkillAction_DK_DRAGONIC_BREATH::OnSkillHit(CGameActor* source, CGameActor*
 
   for (int i = 0; i < 4; ++i) {
     const vector3d position = target->render.position;
-    CEffect* effect = g_effectMgr->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("dragonic_breath_hit"), position, 0, -1, 0, 0);
+    EffectLists* effects = g_effectMgr;
+    CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("dragonic_breath_hit"), position, 0, -1, 0, 0);
     if (!effect) {
       break;
     }
@@ -2423,9 +2442,7 @@ void CSkillAction_DK_DRAGONIC_BREATH::OnSkillHit(CGameActor* source, CGameActor*
     const int second = std::rand() % 10;
     const int jitterX = second >= 0 ? second : 0;
     const int jitterY = first >= 0 ? first : 0;
-    effect->position[0] = static_cast<float>((i % 2) * 10 - jitterX) + target->render.position.x;
-    effect->position[2] = target->render.position.z + 0.0f;
-    effect->position[1] = static_cast<float>((i % 4) / 2 * 10 - jitterY) + target->render.position.y;
+    effect->positionVector = vector3d{static_cast<float>((i % 2) * 10 - jitterX) + target->render.position.x, static_cast<float>((i % 4) / 2 * 10 - jitterY) + target->render.position.y, target->render.position.z + 0.0f};
   }
 }
 
@@ -2451,17 +2468,18 @@ void CSkillAction_DK_CHARGINGPIERCE::OnSkillEffect(int level, CGameActor* source
 // OFFSET: 0x00781070
 // FUNCTION: fn_08489
 EfstActionMessage CEfstAction_CHARGINGPIERCE::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_ATTACK_STANCE_OFF), 0xFF};
+  return {LookupMessage(MSI_DK_CHARGINGPIERCE_OFF), 0xFF};
 }
 
 // OFFSET: 0x007810A0
 // FUNCTION: fn_08490
 void CEfstAction_CHARGINGPIERCE_COUNT::OnEfstBegin(int efstId, int value, int argument3, int argument4, CRenderObject* actor, bool argument6) {
   if (argument3) {
-    this->OnEfstEnd(efstId, value, argument3, 0, actor);
-    if (CRenderObject* target = g_modeMgr.GetGameMode()->scene->GetGameActorByAidIncludeMe(argument3)) {
+    const int targetId = argument3;
+    this->OnEfstEnd(efstId, value, targetId, 0, actor);
+    if (CRenderObject* target = g_modeMgr.GetGameMode()->scene->GetGameActorByAidIncludeMe(targetId)) {
       EffectLists* effects = g_effectMgr;
-      effects->Spawn(argument3, CEZ2STREffectMgr::GetInstance()->EffectId("chargingpierce_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effects->Spawn(targetId, CEZ2STREffectMgr::GetInstance()->EffectId("chargingpierce_hit"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
       const CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
       g_soundMgr->PlayWave(
         "effect\\DK_CHARGINGPIERCE3.wav", target->render.position.x - player->render.position.x, 0.0f, target->render.position.z - player->render.position.z, 250, 40, 1.0f,
@@ -2469,7 +2487,8 @@ void CEfstAction_CHARGINGPIERCE_COUNT::OnEfstBegin(int efstId, int value, int ar
       );
     }
   } else if (actor) {
-    if (CEffect* effect = g_effectMgr->Spawn(actor->render.accountId, EF_DK_CHARGINGPIERCE, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
+    EffectLists* effects = g_effectMgr;
+    if (CEffect* effect = effects->Spawn(actor->render.accountId, EF_DK_CHARGINGPIERCE, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
       static_cast<CChargingPierceNewEffect*>(effect)->SetCount(value);
     }
   }
@@ -2691,7 +2710,7 @@ public:
   int GetSkillAttackMotion() override;
   bool KeepSkillAttackMotion(int argument) override;
   void OnSkillCast(int level, CGameActor* source) override;
-  void OnGroundSkillCast(int level, CGameActor* source, int argument3, int argument4, int argument5) override;
+  void OnGroundSkillCast(int level, CGameActor* source, vector3d position) override;
   int GetSkillScopeType() override;
 };
 
@@ -2781,8 +2800,10 @@ void CSkillAction_NPC_LIGHTNING_JUDGEMENT::OnSkillEffect(int level, CGameActor* 
   if (source) {
     EffectLists* effects = g_effectMgr;
     effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("spark_blaster_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-    const vector3d& listener = g_modeMgr.GetGameMode()->scene->player->render.position;
-    const vector3d position = {target->render.position.x - listener.x, 0.0f, target->render.position.z - listener.z};
+    const auto relativePosition = [&](const vector3d& listener) {
+      return vector3d{target->render.position.x - listener.x, 0.0f, target->render.position.z - listener.z};
+    };
+    const vector3d position = relativePosition(g_modeMgr.GetGameMode()->scene->player->render.position);
     g_soundMgr->PlayWave("effect\\NPC_LIGHTNING_JUDGEMENT.wav", position.x, position.y, position.z, 250, 40, 1.0f, 0);
   }
 }
@@ -2791,7 +2812,7 @@ void CSkillAction_NPC_LIGHTNING_JUDGEMENT::OnSkillEffect(int level, CGameActor* 
 // FUNCTION: fn_08507
 void CSkillAction_NPC_LIGHTNING_JUDGEMENT::OnSkillDamage(CGameActor* source, CGameActor* target, int hitIndex) {
   if (target) {
-    g_effectMgr->Spawn(target->render.accountId, 0x4E8, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    g_effectMgr->Spawn(target->render.accountId, EF_UNK_1256, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -2922,7 +2943,7 @@ void CEfstAction_BLOCK_SEAL::OnEfstBegin(int efstId, int value, int argument3, i
     effects->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("npc_block_seal_loop_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     effects = g_effectMgr;
     effects->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("npc_block_seal_loop"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-    g_effectMgr->Spawn(actor->render.accountId, 0x960, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    g_effectMgr->Spawn(actor->render.accountId, EF_UNK_2400, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   }
 }
 
@@ -3064,17 +3085,22 @@ void CSkillAction_HN_METEOR_STORM_BUSTER::OnSkillCast(int level, CGameActor* sou
   }
 }
 
+// INLINED
+static CEffect* SpawnAt(EffectLists* effects, int id, const vector3d& position) {
+  return effects->Spawn(0, id, position, 0, -1, 0, 0);
+}
+
 // OFFSET: 0x00783CD0
 // FUNCTION: fn_08539
 void CSkillAction_HN_METEOR_STORM_BUSTER::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
   EffectLists* effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster_meteor_bottom"), position, 0, -1, 0, 0);
+  SpawnAt(effects, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster_meteor_bottom"), position);
   effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster_meteor"), position, 0, -1, 0, 0);
+  SpawnAt(effects, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster_meteor"), position);
   effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster_bottom"), position, 0, -1, 0, 0);
+  SpawnAt(effects, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster_bottom"), position);
   effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster"), position, 0, -1, 0, 0);
+  SpawnAt(effects, CEZ2STREffectMgr::GetInstance()->EffectId("meteor_storm_buster"), position);
 }
 
 // OFFSET: 0x00784100
@@ -3141,10 +3167,10 @@ void CSkillAction_HN_JACK_FROST_NOVA::OnSkillCast(int level, CGameActor* source)
 
 // OFFSET: 0x007842D0
 // FUNCTION: fn_08548
-void CSkillAction_HN_JACK_FROST_NOVA::OnGroundSkillCast(int level, CGameActor* source, int argument3, int argument4, int argument5) {
+void CSkillAction_HN_JACK_FROST_NOVA::OnGroundSkillCast(int level, CGameActor* source, vector3d position) {
   CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode) {
-    g_modeMgr.GetGameMode()->LaunchDummyEffect(reinterpret_cast<const vector3d*>(&argument3), 0x5A8, level / 24, 0);
+    g_modeMgr.GetGameMode()->LaunchDummyEffect(&position, 0x5A8, level / 24, 0);
   }
 }
 
@@ -3215,13 +3241,17 @@ void CSkillAction_HN_HELLS_DRIVE::OnSkillEffect(int level, CGameActor* source, C
   std::vector<int> columns = shuffledIndices(count);
   std::vector<int> rows = shuffledIndices(count);
   for (int index = 0; index < count; ++index) {
-    float offsetZ = 0.0f;
-    if (!rows.empty()) {
+    float offsetZ;
+    if (rows.empty()) {
+      offsetZ = 0.0f;
+    } else {
       offsetZ = static_cast<float>((rows.front() - count / 2) * 5.0);
       rows.erase(rows.begin());
     }
-    float offsetX = 0.0f;
-    if (!columns.empty()) {
+    float offsetX;
+    if (columns.empty()) {
+      offsetX = 0.0f;
+    } else {
       offsetX = static_cast<float>((columns.front() - count / 2) * 5.0);
       columns.erase(columns.begin());
     }
@@ -3232,20 +3262,19 @@ void CSkillAction_HN_HELLS_DRIVE::OnSkillEffect(int level, CGameActor* source, C
         )) {
       const vector3d position = {offsetX + source->render.position.x, source->render.position.y + 0.0f, offsetZ + source->render.position.z};
       effect->position[0] = position.x;
-      effect->position[2] = position.z;
       effect->position[1] = position.y;
+      effect->position[2] = position.z;
       effect->SetDelay(index * 32);
     }
 
     effects = g_effectMgr;
-    const int variant = std::rand() % 3;
     if (CEffect* effect = effects->Spawn(
-          0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hells_drive_%02d", variant >= 0 ? variant : 0)), source->render.position, 0, -1, 0, 0
+          0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hells_drive_%02d", RandomInRange(0, 3))), source->render.position, 0, -1, 0, 0
         )) {
       const vector3d position = {offsetX + source->render.position.x, source->render.position.y + 0.0f, offsetZ + source->render.position.z};
       effect->position[0] = position.x;
-      effect->position[2] = position.z;
       effect->position[1] = position.y;
+      effect->position[2] = position.z;
       effect->SetDelay(index * 32);
     }
   }
@@ -3434,17 +3463,17 @@ CSkillObjectActionRegistration::CSkillObjectActionRegistration(int skillId, std:
 }
 
 // GLOBAL: gl_25720
-static EfstActionRegistrar s_efstAction1421(1421, NewAction<CEfstAction_ChangeSizeMonster, CEfstAction>);
+static EfstActionRegistrar s_efstActionChangeSizeMonster{EFST_CHANGE_SIZE_MONSTER, NewAction<CEfstAction_ChangeSizeMonster, CEfstAction>};
 // GLOBAL: gl_25721
-static EfstActionRegistrar s_efstAction1420(1420, NewAction<CEfstAction_ChangeSizeNPC, CEfstAction>);
+static EfstActionRegistrar s_efstActionChangeSizeNPC{EFST_CHANGE_SIZE, NewAction<CEfstAction_ChangeSizeNPC, CEfstAction>};
 // GLOBAL: gl_25722
-static EfstActionRegistrar s_efstAction1559(1559, NewAction<CEfstAction_GenderChange, CEfstAction>);
+static EfstActionRegistrar s_efstActionGenderChange(1559, NewAction<CEfstAction_GenderChange, CEfstAction>);
 // GLOBAL: gl_25723
-static EfstActionRegistrar s_efstAction1422(1422, NewAction<CEfstAction_ShowEffect1, CEfstAction>);
+static EfstActionRegistrar s_efstActionShowEffect1{EFST_SHOW_EFFECT1, NewAction<CEfstAction_ShowEffect1, CEfstAction>};
 // GLOBAL: gl_25724
-static EfstActionRegistrar s_efstAction1423(1423, NewAction<CEfstAction_ShowEffect2, CEfstAction>);
+static EfstActionRegistrar s_efstActionShowEffect2{EFST_SHOW_EFFECT2, NewAction<CEfstAction_ShowEffect2, CEfstAction>};
 // GLOBAL: gl_25725
-static EfstActionRegistrar s_efstAction1424(1424, NewAction<CEfstAction_ShowEffect3, CEfstAction>);
+static EfstActionRegistrar s_efstActionShowEffect3{EFST_SHOW_EFFECT3, NewAction<CEfstAction_ShowEffect3, CEfstAction>};
 
 struct EfstActionRegistration {
   // INLINED
@@ -3468,141 +3497,141 @@ static EfstActionRegistration s_efstActionRegistered722(722, NewAction<CEfstActi
 static SkillActionRegistration s_skillActionRegistered5002(5002, NewAction<CSkillAction_RA_UNLIMIT, CSkillAction>);
 
 // GLOBAL: gl_25726
-static SkillActionRegistrar s_skillAction6516(6516, NewAction<CSkillAction_AG_ENERGY_CONVERSION, CSkillAction>);
+static SkillActionRegistrar s_skillActionAgEnergyConversion{AG_ENERGY_CONVERSION, NewAction<CSkillAction_AG_ENERGY_CONVERSION, CSkillAction>};
 // GLOBAL: gl_25727
-static SkillActionRegistrar s_skillAction6518(6518, NewAction<CSkillAction_CD_DIVINUS_FLOS, CSkillAction>);
+static SkillActionRegistrar s_skillActionCdDivinusFlos{CD_DIVINUS_FLOS, NewAction<CSkillAction_CD_DIVINUS_FLOS, CSkillAction>};
 // GLOBAL: gl_25728
-static EfstActionRegistrar s_efstAction1193(1193, NewAction<CEfstAction_DANCING_KNIFE, CEfstAction>);
+static EfstActionRegistrar s_efstActionDancingKnife{EFST_DANCING_KNIFE, NewAction<CEfstAction_DANCING_KNIFE, CEfstAction>};
 // GLOBAL: gl_25729
-static EfstActionRegistrar s_efstAction1192(1192, NewAction<CEfstAction_SHADOW_EXCEED, CEfstAction>);
+static EfstActionRegistrar s_efstActionShadowExceed{EFST_SHADOW_EXCEED, NewAction<CEfstAction_SHADOW_EXCEED, CEfstAction>};
 // GLOBAL: gl_25730
-static EfstActionRegistrar s_efstAction1226(1226, NewAction<CEfstAction_SHADOW_WEAPON, CEfstAction>);
+static EfstActionRegistrar s_efstActionShadowWeapon{EFST_SHADOW_WEAPON, NewAction<CEfstAction_SHADOW_WEAPON, CEfstAction>};
 // GLOBAL: gl_25731
-static SkillActionRegistrar s_skillAction6511(6511, NewAction<CSkillAction_SHC_CROSS_SLASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionShcCrossSlash{SHC_CROSS_SLASH, NewAction<CSkillAction_SHC_CROSS_SLASH, CSkillAction>};
 // GLOBAL: gl_25732
-static SkillActionRegistrar s_skillAction5286(5286, NewAction<CSkillAction_SHC_DANCING_KNIFE, CSkillAction>);
+static SkillActionRegistrar s_skillActionShcDancingKnife{SHC_DANCING_KNIFE, NewAction<CSkillAction_SHC_DANCING_KNIFE, CSkillAction>};
 // GLOBAL: gl_25733
-static SkillActionRegistrar s_skillAction5293(5293, NewAction<CSkillAction_SHC_ENCHANTING_SHADOW, CSkillAction>);
+static SkillActionRegistrar s_skillActionShcEnchantingShadow{SHC_ENCHANTING_SHADOW, NewAction<CSkillAction_SHC_ENCHANTING_SHADOW, CSkillAction>};
 // GLOBAL: gl_25734
-static SkillActionRegistrar s_skillAction5292(5292, NewAction<CSkillAction_SHC_IMPACT_CRATER, CSkillAction>);
+static SkillActionRegistrar s_skillActionShcImpactCrater{SHC_IMPACT_CRATER, NewAction<CSkillAction_SHC_IMPACT_CRATER, CSkillAction>};
 // GLOBAL: gl_25735
-static SkillActionRegistrar s_skillAction5285(5285, NewAction<CSkillAction_SHC_SHADOW_EXCEED, CSkillAction>);
+static SkillActionRegistrar s_skillActionShcShadowExceed{SHC_SHADOW_EXCEED, NewAction<CSkillAction_SHC_SHADOW_EXCEED, CSkillAction>};
 // GLOBAL: gl_25736
-static SkillActionRegistrar s_skillAction5291(5291, NewAction<CSkillAction_SHC_SHADOW_STAB, CSkillAction>);
+static SkillActionRegistrar s_skillActionShcShadowStab{SHC_SHADOW_STAB, NewAction<CSkillAction_SHC_SHADOW_STAB, CSkillAction>};
 // GLOBAL: gl_25738
-static SkillActionRegistrar s_skillAction6515(6515, NewAction<CSkillAction_ABC_ABYSS_FLAME, CSkillAction>);
+static SkillActionRegistrar s_skillActionAbcAbyssFlame{ABC_ABYSS_FLAME, NewAction<CSkillAction_ABC_ABYSS_FLAME, CSkillAction>};
 // GLOBAL: gl_25739
-static SkillActionRegistrar s_skillAction6522(6522, NewAction<CSkillAction_ABC_ABYSS_FLAME_ATK, CSkillAction>);
+static SkillActionRegistrar s_skillActionAbcAbyssFlameAtk{ABC_ABYSS_FLAME_ATK, NewAction<CSkillAction_ABC_ABYSS_FLAME_ATK, CSkillAction>};
 // GLOBAL: gl_25740
-static SkillActionRegistrar s_skillAction6513(6513, NewAction<CSkillAction_ABC_CHASING_BREAK, CSkillAction>);
+static SkillActionRegistrar s_skillActionAbcChasingBreak{ABC_CHASING_BREAK, NewAction<CSkillAction_ABC_CHASING_BREAK, CSkillAction>};
 // GLOBAL: gl_25741
-static SkillActionRegistrar s_skillAction6514(6514, NewAction<CSkillAction_ABC_CHASING_SHOT, CSkillAction>);
+static SkillActionRegistrar s_skillActionAbcChasingShot{ABC_CHASING_SHOT, NewAction<CSkillAction_ABC_CHASING_SHOT, CSkillAction>};
 // GLOBAL: gl_25742
-static SkillActionRegistrar s_skillAction6512(6512, NewAction<CSkillAction_ABC_HIT_AND_SLIDING, CSkillAction>);
+static SkillActionRegistrar s_skillActionAbcHitAndSliding{ABC_HIT_AND_SLIDING, NewAction<CSkillAction_ABC_HIT_AND_SLIDING, CSkillAction>};
 // GLOBAL: gl_25743
-static SkillActionRegistrar s_skillAction6517(6517, NewAction<CSkillAction_EM_PSYCHIC_STREAM, CSkillAction>);
+static SkillActionRegistrar s_skillActionEmPsychicStream{EM_PSYCHIC_STREAM, NewAction<CSkillAction_EM_PSYCHIC_STREAM, CSkillAction>};
 // GLOBAL: gl_25744
-static SkillActionRegistrar s_skillAction6519(6519, NewAction<CSkillAction_IQ_BLAZING_FLAME_BLAST, CSkillAction>);
+static SkillActionRegistrar s_skillActionIqBlazingFlameBlast{IQ_BLAZING_FLAME_BLAST, NewAction<CSkillAction_IQ_BLAZING_FLAME_BLAST, CSkillAction>};
 
 // OFFSET: 0x00457500
 // FUNCTION: fn_45564
 static EfstActionRegistration s_efstActionRegistered1665(1665, NewAction<CEfstAction_MYSTERY_POWDER, CEfstAction>);
 
 // GLOBAL: gl_25745
-static SkillActionRegistrar s_skillAction6510(6510, NewAction<CSkillAction_BO_DUST_EXPLOSION, CSkillAction>);
+static SkillActionRegistrar s_skillActionBoDustExplosion{BO_DUST_EXPLOSION, NewAction<CSkillAction_BO_DUST_EXPLOSION, CSkillAction>};
 // GLOBAL: gl_25746
-static SkillActionRegistrar s_skillAction6005(6005, NewAction<CSkillAction_BO_EXPLOSIVE_POWDER, CSkillAction>);
+static SkillActionRegistrar s_skillActionBoExplosivePowder{BO_EXPLOSIVE_POWDER, NewAction<CSkillAction_BO_EXPLOSIVE_POWDER, CSkillAction>};
 // GLOBAL: gl_25747
-static SkillActionRegistrar s_skillAction6006(6006, NewAction<CSkillAction_BO_MAYHEMIC_THORNS, CSkillAction>);
+static SkillActionRegistrar s_skillActionBoMayhemicThorns{BO_MAYHEMIC_THORNS, NewAction<CSkillAction_BO_MAYHEMIC_THORNS, CSkillAction>};
 // GLOBAL: gl_25748
-static SkillActionRegistrar s_skillAction6509(6509, NewAction<CSkillAction_BO_MYSTERY_POWDER, CSkillAction>);
+static SkillActionRegistrar s_skillActionBoMysteryPowder{BO_MYSTERY_POWDER, NewAction<CSkillAction_BO_MYSTERY_POWDER, CSkillAction>};
 // GLOBAL: gl_25749
-static EfstActionRegistrar s_efstAction1174(1174, NewAction<CEfstAction_CHARGINGPIERCE, CEfstAction>);
+static EfstActionRegistrar s_efstActionChargingpierce{EFST_CHARGINGPIERCE, NewAction<CEfstAction_CHARGINGPIERCE, CEfstAction>};
 // GLOBAL: gl_25750
-static EfstActionRegistrar s_efstAction1175(1175, NewAction<CEfstAction_CHARGINGPIERCE_COUNT, CEfstAction>);
+static EfstActionRegistrar s_efstActionChargingpierceCount{EFST_CHARGINGPIERCE_COUNT, NewAction<CEfstAction_CHARGINGPIERCE_COUNT, CEfstAction>};
 // GLOBAL: gl_25751
-static EfstActionRegistrar s_efstAction1172(1172, NewAction<CEfstAction_SERVANTWEAPON, CEfstAction>);
+static EfstActionRegistrar s_efstActionServantweapon{EFST_SERVANTWEAPON, NewAction<CEfstAction_SERVANTWEAPON, CEfstAction>};
 // GLOBAL: gl_25752
-static EfstActionRegistrar s_efstAction1173(1173, NewAction<CEfstAction_SERVANT_SIGN, CEfstAction>);
+static EfstActionRegistrar s_efstActionServantSign{EFST_SERVANT_SIGN, NewAction<CEfstAction_SERVANT_SIGN, CEfstAction>};
 // GLOBAL: gl_25753
-static EfstActionRegistrar s_efstAction1178(1178, NewAction<CEfstAction_VIGOR, CEfstAction>);
+static EfstActionRegistrar s_efstActionVigor{EFST_VIGOR, NewAction<CEfstAction_VIGOR, CEfstAction>};
 // GLOBAL: gl_25754
-static SkillActionRegistrar s_skillAction5206(5206, NewAction<CSkillAction_DK_CHARGINGPIERCE, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkChargingpierce{DK_CHARGINGPIERCE, NewAction<CSkillAction_DK_CHARGINGPIERCE, CSkillAction>};
 // GLOBAL: gl_25755
-static SkillActionRegistrar s_skillAction6001(6001, NewAction<CSkillAction_DK_DRAGONIC_BREATH, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkDragonicBreath{DK_DRAGONIC_BREATH, NewAction<CSkillAction_DK_DRAGONIC_BREATH, CSkillAction>};
 // GLOBAL: gl_25756
-static SkillActionRegistrar s_skillAction6502(6502, NewAction<CSkillAction_DK_DRAGONIC_PIERCE, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkDragonicPierce{DK_DRAGONIC_PIERCE, NewAction<CSkillAction_DK_DRAGONIC_PIERCE, CSkillAction>};
 // GLOBAL: gl_25757
-static SkillActionRegistrar s_skillAction5208(5208, NewAction<CSkillAction_DK_HACKANDSLASHER, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkHackandslasher{DK_HACKANDSLASHER, NewAction<CSkillAction_DK_HACKANDSLASHER, CSkillAction>};
 // GLOBAL: gl_25758
-static SkillActionRegistrar s_skillAction5209(5209, NewAction<CSkillAction_DK_HACKANDSLASHER_ATK, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkHackandslasherAtk{DK_HACKANDSLASHER_ATK, NewAction<CSkillAction_DK_HACKANDSLASHER_ATK, CSkillAction>};
 // GLOBAL: gl_25759
-static SkillActionRegistrar s_skillAction5211(5211, NewAction<CSkillAction_DK_MADNESS_CRUSHER, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkMadnessCrusher{DK_MADNESS_CRUSHER, NewAction<CSkillAction_DK_MADNESS_CRUSHER, CSkillAction>};
 // GLOBAL: gl_25760
-static SkillActionRegistrar s_skillAction5202(5202, NewAction<CSkillAction_DK_SERVANTWEAPON_ATK, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkServantweaponAtk{DK_SERVANTWEAPON_ATK, NewAction<CSkillAction_DK_SERVANTWEAPON_ATK, CSkillAction>};
 // GLOBAL: gl_25761
-static SkillActionRegistrar s_skillAction5205(5205, NewAction<CSkillAction_DK_SERVANT_W_DEMOL, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkServantWDemol{DK_SERVANT_W_DEMOL, NewAction<CSkillAction_DK_SERVANT_W_DEMOL, CSkillAction>};
 // GLOBAL: gl_25762
-static SkillActionRegistrar s_skillAction5204(5204, NewAction<CSkillAction_DK_SERVANT_W_PHANTOM, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkServantWPhantom{DK_SERVANT_W_PHANTOM, NewAction<CSkillAction_DK_SERVANT_W_PHANTOM, CSkillAction>};
 // GLOBAL: gl_25763
-static SkillActionRegistrar s_skillAction5203(5203, NewAction<CSkillAction_DK_SERVANT_W_SIGN, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkServantWSign{DK_SERVANT_W_SIGN, NewAction<CSkillAction_DK_SERVANT_W_SIGN, CSkillAction>};
 // GLOBAL: gl_25764
-static SkillActionRegistrar s_skillAction5213(5213, NewAction<CSkillAction_DK_STORMSLASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkStormslash{DK_STORMSLASH, NewAction<CSkillAction_DK_STORMSLASH, CSkillAction>};
 // GLOBAL: gl_25765
-static SkillActionRegistrar s_skillAction5212(5212, NewAction<CSkillAction_DK_VIGOR, CSkillAction>);
+static SkillActionRegistrar s_skillActionDkVigor{DK_VIGOR, NewAction<CSkillAction_DK_VIGOR, CSkillAction>};
 // GLOBAL: gl_25766
-static EfstActionRegistrar s_efstAction1454(1454, NewAction<CEfstAction_BLOCK_SEAL, CEfstAction>);
+static EfstActionRegistrar s_efstActionBlockSeal{EFST_BLOCK_SEAL, NewAction<CEfstAction_BLOCK_SEAL, CEfstAction>};
 // GLOBAL: gl_25767
-static EfstActionRegistrar s_efstAction1455(1455, NewAction<CEfstAction_FROST_STORM, CEfstAction>);
+static EfstActionRegistrar s_efstActionFrostStorm{EFST_FROST_STORM, NewAction<CEfstAction_FROST_STORM, CEfstAction>};
 // GLOBAL: gl_25768
-static EfstActionRegistrar s_efstAction1456(1456, NewAction<CEfstAction_GROGGY, CEfstAction>);
+static EfstActionRegistrar s_efstActionGroggy{EFST_GROGGY, NewAction<CEfstAction_GROGGY, CEfstAction>};
 // GLOBAL: gl_25769
-static EfstActionRegistrar s_efstAction1453(1453, NewAction<CEfstAction_TARGET_MARKER, CEfstAction>);
+static EfstActionRegistrar s_efstActionTargetMarker{EFST_TARGET_MARKER, NewAction<CEfstAction_TARGET_MARKER, CEfstAction>};
 // GLOBAL: gl_25770
-static SkillActionRegistrar s_skillAction786(786, NewAction<CSkillAction_NPC_AIMED_SHOWER, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcAimedShower{NPC_AIMED_SHOWER, NewAction<CSkillAction_NPC_AIMED_SHOWER, CSkillAction>};
 // GLOBAL: gl_25771
-static SkillActionRegistrar s_skillAction787(787, NewAction<CSkillAction_NPC_BLAZING_ERUPTION, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcBlazingEruption{NPC_BLAZING_ERUPTION, NewAction<CSkillAction_NPC_BLAZING_ERUPTION, CSkillAction>};
 // GLOBAL: gl_25772
-static SkillActionRegistrar s_skillAction789(789, NewAction<CSkillAction_NPC_BLOCK_EXPLOSION, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcBlockExplosion{NPC_BLOCK_EXPLOSION, NewAction<CSkillAction_NPC_BLOCK_EXPLOSION, CSkillAction>};
 // GLOBAL: gl_25773
-static SkillActionRegistrar s_skillAction788(788, NewAction<CSkillAction_NPC_BLOCK_SEAL, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcBlockSeal{NPC_BLOCK_SEAL, NewAction<CSkillAction_NPC_BLOCK_SEAL, CSkillAction>};
 // GLOBAL: gl_25774
-static SkillActionRegistrar s_skillAction790(790, NewAction<CSkillAction_NPC_FROST_FIELD, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcFrostField{NPC_FROST_FIELD, NewAction<CSkillAction_NPC_FROST_FIELD, CSkillAction>};
 // GLOBAL: gl_25775
-static SkillActionRegistrar s_skillAction791(791, NewAction<CSkillAction_NPC_LIGHTNING_JUDGEMENT, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcLightningJudgement{NPC_LIGHTNING_JUDGEMENT, NewAction<CSkillAction_NPC_LIGHTNING_JUDGEMENT, CSkillAction>};
 // GLOBAL: gl_25776
-static SkillActionRegistrar s_skillAction793(793, NewAction<CSkillAction_NPC_RESET_EFST, CSkillAction>);
+static SkillActionRegistrar s_skillActionNpcResetEfst{NPC_RESET_EFST, NewAction<CSkillAction_NPC_RESET_EFST, CSkillAction>};
 // GLOBAL: gl_25777
-static EfstActionRegistrar s_efstAction1383(1383, NewAction<CEfstAction_BREAKINGLIMIT, CEfstAction>);
+static EfstActionRegistrar s_efstActionBreakinglimit{EFST_BREAKINGLIMIT, NewAction<CEfstAction_BREAKINGLIMIT, CEfstAction>};
 // GLOBAL: gl_25778
-static EfstActionRegistrar s_efstAction1384(1384, NewAction<CEfstAction_RULEBREAK, CEfstAction>);
+static EfstActionRegistrar s_efstActionRulebreak{EFST_RULEBREAK, NewAction<CEfstAction_RULEBREAK, CEfstAction>};
 // GLOBAL: gl_25779
 static CSkillObjectActionRegistration s_skillObjectAction296(296, NewAction<CSkillObjectAction_HN_GROUND_GRAVITATION, CSkillObjectAction>);
 // GLOBAL: gl_25780
 static CSkillObjectActionRegistration s_skillObjectAction295(295, NewAction<CSkillObjectAction_HN_JACK_FROST_NOVA, CSkillObjectAction>);
 // GLOBAL: gl_25781
-static SkillActionRegistrar s_skillAction5461(5461, NewAction<CSkillAction_HN_BREAKINGLIMIT, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnBreakinglimit{HN_BREAKINGLIMIT, NewAction<CSkillAction_HN_BREAKINGLIMIT, CSkillAction>};
 // GLOBAL: gl_25782
-static SkillActionRegistrar s_skillAction5451(5451, NewAction<CSkillAction_HN_DOUBLEBOWLINGBASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnDoublebowlingbash{HN_DOUBLEBOWLINGBASH, NewAction<CSkillAction_HN_DOUBLEBOWLINGBASH, CSkillAction>};
 // GLOBAL: gl_25783
-static SkillActionRegistrar s_skillAction5459(5459, NewAction<CSkillAction_HN_GROUND_GRAVITATION, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnGroundGravitation{HN_GROUND_GRAVITATION, NewAction<CSkillAction_HN_GROUND_GRAVITATION, CSkillAction>};
 // GLOBAL: gl_25784
-static SkillActionRegistrar s_skillAction5458(5458, NewAction<CSkillAction_HN_HELLS_DRIVE, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnHellsDrive{HN_HELLS_DRIVE, NewAction<CSkillAction_HN_HELLS_DRIVE, CSkillAction>};
 // GLOBAL: gl_25785
-static SkillActionRegistrar s_skillAction5457(5457, NewAction<CSkillAction_HN_JACK_FROST_NOVA, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnJackFrostNova{HN_JACK_FROST_NOVA, NewAction<CSkillAction_HN_JACK_FROST_NOVA, CSkillAction>};
 // GLOBAL: gl_25786
-static SkillActionRegistrar s_skillAction5456(5456, NewAction<CSkillAction_HN_JUPITEL_THUNDER_STORM, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnJupitelThunderStorm{HN_JUPITEL_THUNDER_STORM, NewAction<CSkillAction_HN_JUPITEL_THUNDER_STORM, CSkillAction>};
 // GLOBAL: gl_25787
-static SkillActionRegistrar s_skillAction5452(5452, NewAction<CSkillAction_HN_MEGA_SONIC_BLOW, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnMegaSonicBlow{HN_MEGA_SONIC_BLOW, NewAction<CSkillAction_HN_MEGA_SONIC_BLOW, CSkillAction>};
 // GLOBAL: gl_25788
-static SkillActionRegistrar s_skillAction5455(5455, NewAction<CSkillAction_HN_METEOR_STORM_BUSTER, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnMeteorStormBuster{HN_METEOR_STORM_BUSTER, NewAction<CSkillAction_HN_METEOR_STORM_BUSTER, CSkillAction>};
 // GLOBAL: gl_25789
-static SkillActionRegistrar s_skillAction5460(5460, NewAction<CSkillAction_HN_NAPALM_VULCAN_STRIKE, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnNapalmVulcanStrike{HN_NAPALM_VULCAN_STRIKE, NewAction<CSkillAction_HN_NAPALM_VULCAN_STRIKE, CSkillAction>};
 // GLOBAL: gl_25790
-static SkillActionRegistrar s_skillAction5505(5505, NewAction<CSkillAction_HN_OVERCOMING_CRISIS, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnOvercomingCrisis{HN_OVERCOMING_CRISIS, NewAction<CSkillAction_HN_OVERCOMING_CRISIS, CSkillAction>};
 // GLOBAL: gl_25791
-static SkillActionRegistrar s_skillAction5462(5462, NewAction<CSkillAction_HN_RULEBREAK, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnRulebreak{HN_RULEBREAK, NewAction<CSkillAction_HN_RULEBREAK, CSkillAction>};
 // GLOBAL: gl_25792
-static SkillActionRegistrar s_skillAction5453(5453, NewAction<CSkillAction_HN_SHIELD_CHAIN_RUSH, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnShieldChainRush{HN_SHIELD_CHAIN_RUSH, NewAction<CSkillAction_HN_SHIELD_CHAIN_RUSH, CSkillAction>};
 // GLOBAL: gl_25793
-static SkillActionRegistrar s_skillAction5454(5454, NewAction<CSkillAction_HN_SPIRAL_PIERCE_MAX, CSkillAction>);
+static SkillActionRegistrar s_skillActionHnSpiralPierceMax{HN_SPIRAL_PIERCE_MAX, NewAction<CSkillAction_HN_SPIRAL_PIERCE_MAX, CSkillAction>};

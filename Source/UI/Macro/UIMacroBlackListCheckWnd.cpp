@@ -63,7 +63,7 @@ void UIMacroBlackListCheckWnd::OnCreate(int width, int height) {
   this->okButton->SetBitmap("유저인터페이스\\btn_big_ok_b.bmp", 3, 0);
   this->okButton->SetSize(this->okButton->BitmapWidth(), this->okButton->BitmapHeight());
   this->okButton->Move(110, 284);
-  this->okButton->SetId(184);
+  this->okButton->SetId(ID_OK);
   this->okButton->Enable(1);
   this->AddChild(this->okButton);
 
@@ -107,13 +107,13 @@ void UIMacroBlackListCheckWnd::OnCreate(int width, int height) {
 // OFFSET: 0x007EC1E0
 // FUNCTION: fn_09795
 void UIMacroBlackListCheckWnd::Paint() {
-  const int titleHeight = this->UIWindow::DrawTitleBar(true, LookupMessage(MSI_MENU_UAEURLWND), this->geometry.width + 1);
+  const int titleHeight = this->UIWindow::DrawTitleBar(true, LookupMessage(MSI_MENU_MACROWND), this->geometry.width + 1);
   this->DrawPanelBackground(titleHeight, 0x21C, "유저인터페이스\\basic_interface\\blacklist_check_bg.bmp");
   this->DrawButtonBar(2, this->geometry.width + 1, 1);
 
-  this->DrawAlignedText(7, 0x24, FormatOwnedString(LookupMessage(MSI_WEDDING_RING_ITEM_NAME_FORMAT)).c_str(), 0x20E, 6, 0, 0, 0, 0xC, 1, 0);
-  this->DrawAlignedText(7, 0x159, FormatOwnedString(LookupMessage(MSI_ACCOUNT_LIMITED_TOOL_RESULT_NEWFORMAT), this->resultState).c_str(), 0x20E, 6, 0x3939FF, 0, 0, 0xC, 1, 0);
-  this->DrawAlignedText(0x4F, 0xF6, FormatOwnedString(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_NEXT_NEWDATE), this->resultState).c_str(), 0xA2, 6, 0, 0, 0, 0xC, 0, 0);
+  this->DrawAlignedText(7, 0x24, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_NOTICE1)).c_str(), 0x20E, 6, 0, 0, 0, 0xC, 1, 0);
+  this->DrawAlignedText(7, 0x159, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_NOTICE2), this->resultState).c_str(), 0x20E, 6, 0x3939FF, 0, 0, 0xC, 1, 0);
+  this->DrawAlignedText(0x4F, 0xF6, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_ANSWER_INPUT), this->resultState).c_str(), 0xA2, 6, 0, 0, 0, 0xC, 0, 0);
 
   std::string stars;
   for (int i = 0; i < this->inputLength; ++i) {
@@ -121,7 +121,6 @@ void UIMacroBlackListCheckWnd::Paint() {
   }
   this->DrawAlignedText(0x86, 0x109, stars.c_str(), 0x32, 6, 0x4949FF, 0, 0, 0xC, 0, 0);
 
-  int x = 0;
   for (int i = 0; i < this->codeLength; ++i) {
     int base = 0x46;
     if (this->codeLength == 4) {
@@ -130,8 +129,7 @@ void UIMacroBlackListCheckWnd::Paint() {
       base = 0x5D;
     }
 
-    this->DrawAlignedText(x + base, this->charColors[i], this->code + i, 0, 0, 0, 0, 0, this->charSizes[i], this->charFlags[i], 0);
-    x += 0x17;
+    this->DrawAlignedText(base + i * 0x17, this->charColors[i], this->code + i, 0, 0, 0, 0, 0, this->charSizes[i], this->charFlags[i], 0);
   }
 
 
@@ -140,11 +138,11 @@ void UIMacroBlackListCheckWnd::Paint() {
   const unsigned remainingMin = remainingSec / 60u;
   if (remainingSec < 60u) {
     this->DrawAlignedText(
-      0x4F, 0xA4, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_ANSWER_INPUT), 0, static_cast<int>(remainingMin), static_cast<int>(remainingSec)).c_str(), 0xA2, 6, 0xFF, 0, 0,
+      0x4F, 0xA4, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_REMAIN_TIME), 0, static_cast<int>(remainingMin), static_cast<int>(remainingSec)).c_str(), 0xA2, 6, 0xFF, 0, 0,
       0xD, 1, 0
     );
   } else {
-    this->DrawAlignedText(0x4F, 0xA4, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_ANSWER_INPUT), 0, 0, 0).c_str(), 0xA2, 6, 0xFF, 0, 0, 0xD, 1, 0);
+    this->DrawAlignedText(0x4F, 0xA4, FormatOwnedString(LookupMessage(MSI_MACRO_BLACKLIST_USER_CHCEK_REMAIN_TIME), 0, 0, 0).c_str(), 0xA2, 6, 0xFF, 0, 0, 0xD, 1, 0);
   }
 }
 

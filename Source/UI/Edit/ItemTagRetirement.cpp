@@ -1,6 +1,7 @@
 #include "Client/Input/InputCharset.h"
 #include "Client/Input/Language.h"
 #include "Contents/Items/ItemInfo.h"
+#include "Contents/Items/ItemLink.h"
 #include "Contents/Items/ItemNaming.h"
 #include "UI/Buttons/UIItemTagButton.h"
 #include "UI/Chat/UINewChatWnd.h"
@@ -10,6 +11,7 @@
 #include "UI/Edit/UIItemTagCtrl.h"
 #include "UI/Rodex/UIRodexComposeWnd.h"
 #include "UI/Text/UITextViewer.h"
+#include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Utility/Text/FormatString.h"
@@ -44,6 +46,13 @@ void UIItemTagOnChat::RemoveTagChild(UIWindow* child) {
   if (hoverWindow != nullptr && std::find(hoverWindow->m_children.begin(), hoverWindow->m_children.end(), child) != hoverWindow->m_children.end()) {
     hoverWindow->RemoveChild(child, 1);
   }
+}
+
+// OFFSET: 0x0086D5F0
+// FUNCTION: fn_11049
+UIItemTagButton::UIItemTagButton() {
+  this->textY = 1;
+  this->tipId = 0;
 }
 
 // OFFSET: 0x0086D670
@@ -95,7 +104,8 @@ bool UIItemTagOnChat::CanInsertTag(const std::string& name, int width) {
   UIEditCtrl* edit = static_cast<UIEditCtrl*>(g_windowMgr.GetHoverWindow());
   this->taggedText = edit->text;
   const std::string text = this->taggedText += tag;
-  return text.size() <= static_cast<unsigned int>(edit->maximum);
+  const unsigned int maximum = static_cast<unsigned int>(edit->maximum);
+  return text.size() <= maximum;
 }
 
 // OFFSET: 0x00879A10
@@ -217,12 +227,12 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
 
   button->Configure(label.c_str(), color, 0, 12, 0, 0);
   button->SetTooltip(tag.c_str());
-  button->SetId(0x1D0);
+  button->SetId(ID_ITEM_TAG);
   button->Move(0, 0);
   button->item = item;
   this->AddTagButton(button);
 
-  std::string link;
+  std::string link = "";
   char delimiters[] = "!#$%&'()*+,-/";
   if (this->ItemLinkNumberText(item.identity[2]).size() <= 5) {
     for (unsigned int index = 0; index < 5 - this->ItemLinkNumberText(item.identity[2]).size(); ++index) {
@@ -236,13 +246,13 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
   link += this->ItemLinkNumberText(std::atoi(item.itemId.c_str()));
 
   if (item.refiningLevel != 0) {
-    link += delimiters[3];
+    link.push_back(delimiters[3]);
     link += this->ItemLinkNumberText(item.refiningLevel);
   }
 
-  link += delimiters[4];
+  link.push_back(delimiters[4]);
   link += this->ItemLinkNumberText(item.sprite);
-  link += delimiters[5];
+  link.push_back(delimiters[5]);
   link += this->ItemLinkNumberText(item.grade);
 
   const std::uint32_t* cards = item.cards;
@@ -252,18 +262,19 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
   }
 
   for (int index = 0; index < 4; ++index) {
-    if (cards[index] != 0) {
+    if (item.cards[index] != 0) {
       slots = 4;
     }
   }
 
-  for (int index = 0; index < slots; ++index) {
+  for (int index = 0; index < slots; ++index, ++cards) {
     link += delimiters[7];
-    link += this->ItemLinkNumberText(index < 4 ? cards[index] : 0);
+    link += this->ItemLinkNumberText(index < 4 ? *cards : 0);
   }
 
   const ItemOptionRecord* options = item.options;
-  for (int index = 0; index < item.optionCount; ++index) {
+  const int optionCount = item.optionCount;
+  for (int index = 0; index < optionCount; ++index) {
     link += delimiters[9];
     link += this->ItemLinkNumberText(options[index].id);
     link += delimiters[10];
@@ -290,6 +301,32 @@ void UIItemTagCtrl::SetTaggedText(const std::string& text, int width) {
   this->tagWidth = width;
 }
 
+// OFFSET: 0x008809A0
+// FUNCTION: fn_45601
+unsigned int UIItemTagCtrl::GetVisibleTagPrefix(std::string& visible, const std::string& text) {
+  unsigned int firstVisible = 0;
+  UIWindow* hover = g_windowMgr.GetHoverWindow();
+  if (hover == nullptr) {
+    return 0;
+  }
+
+  switch (hover->geometry.id) {
+  case ID_WHISPER_EDIT:
+  case ID_NPC_TEXT_EDIT:
+  case ID_CHAT_EDIT:
+  case ID_CHATROOM_EDIT:
+    firstVisible = static_cast<UIEditCtrl*>(hover)->firstVisible;
+    break;
+  }
+
+  if (text.size() < firstVisible) {
+    return firstVisible;
+  }
+
+  visible = text.substr(firstVisible);
+  return firstVisible;
+}
+
 // OFFSET: 0x00879BC0
 // FUNCTION: fn_11220
 bool UIItemTagOnMegaPhone::CanInsertTag(const std::string& name, int width) {
@@ -305,11 +342,13 @@ bool UIItemTagOnMegaPhone::CanInsertTag(const std::string& name, int width) {
   unsigned bytes = 0;
   this->textWidth = g_windowMgr.npcTextEditDialogWnd->MeasureText(tag, bytes);
 
-  UIEditCtrl* edit = g_windowMgr.npcTextEditDialogWnd->edit;
-  const unsigned int maximum = edit->maximum;
-  this->taggedText = edit->text;
-  const std::string text = this->taggedText += tag;
-  return text.size() <= maximum;
+  {
+    UIEditCtrl* edit = g_windowMgr.npcTextEditDialogWnd->edit;
+    const unsigned int maximum = edit->maximum;
+    this->taggedText = edit->text;
+    const std::string text = this->taggedText += tag;
+    return text.size() <= maximum;
+  }
 }
 
 // OFFSET: 0x008962C0
@@ -320,7 +359,7 @@ void UIItemTagCtrl::UpdateItemTags() {
     this->previousTagCount = static_cast<int>(this->tags.size());
   }
 
-  std::string prefix;
+  std::string prefix = "";
   std::string remaining = this->taggedText;
   if (!this->tags.empty()) {
     for (auto entry = this->tags.begin(); entry != this->tags.end();) {
@@ -328,7 +367,8 @@ void UIItemTagCtrl::UpdateItemTags() {
         break;
       }
 
-      const std::string fitted = this->FitTextToWidth(entry->name, this->tagWidth / 2);
+      auto current = entry;
+      const std::string fitted = this->FitTextToWidth(current->name, this->tagWidth / 2);
       std::string display = "<";
       display += fitted;
       display += ">";
@@ -344,10 +384,10 @@ void UIItemTagCtrl::UpdateItemTags() {
         UIWindow* hover = g_windowMgr.GetHoverWindow();
         if (hover != nullptr) {
           switch (hover->geometry.id) {
-          case 0x1EA:
-          case 0x1EC:
-          case 0x1ED:
-          case 0x1EE:
+          case ID_WHISPER_EDIT:
+          case ID_NPC_TEXT_EDIT:
+          case ID_CHAT_EDIT:
+          case ID_CHATROOM_EDIT:
             firstVisible = static_cast<UIEditCtrl*>(hover)->firstVisible;
             break;
           }
@@ -356,12 +396,16 @@ void UIItemTagCtrl::UpdateItemTags() {
             visible = prefix.substr(firstVisible);
           }
 
-          if (firstVisible != 0 && prefix.size() <= firstVisible) {
+          x = 0;
+          if (firstVisible != 0) {
             x = 1000;
+            if (prefix.size() > firstVisible) {
+              x = 0;
+            }
           }
         }
 
-        this->PlaceTagButton(entry->child, visible, x, 0);
+        this->PlaceTagButton(current->child, visible, x, 0);
 
         const int bytes = static_cast<int>(std::strlen(fitted.c_str()));
         if (!g_windowMgr.rodexComposeWnd || g_windowMgr.rodexComposeWnd->m_contents == g_windowMgr.GetHoverWindow()) {
@@ -369,20 +413,24 @@ void UIItemTagCtrl::UpdateItemTags() {
           const int start = static_cast<int>(prefix.size());
           const int end = start + bytes + 2;
           if (cursor > start && cursor < end) {
-            const int target = start + bytes / 2 + 1 > cursor ? end : start;
-            g_serverLanguage->Select(target, target);
+            const int position = cursor < start + bytes / 2 + 1 ? end : start;
+            g_serverLanguage->Select(position, position);
           }
         }
 
         this->linkedText += head;
-        this->linkedText += itemLinkTagOpening;
-        this->linkedText += entry->link;
-        this->linkedText += itemLinkTagClosing;
+        this->linkedText += g_itemLinkTagBegin;
+        this->linkedText += current->link;
+        this->linkedText += g_itemLinkTagEnd;
         remaining = remaining.substr(found + display.size());
         prefix += display;
+        entry = ++current;
+        if (entry == this->tags.end()) {
+          break;
+        }
+      } else {
+        entry = ++current;
       }
-
-      ++entry;
     }
   }
 

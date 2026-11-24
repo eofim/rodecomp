@@ -10,12 +10,18 @@
 #include <timeapi.h>
 
 // INLINED
-static __forceinline vector3d TransformPoint(const matrix& transform, const vector3d& point) {
-  vector3d result;
-  result.x = point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9];
-  result.y = point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10];
-  result.z = point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11];
-  return result;
+static __forceinline vector3d TransformPoint(const matrix& transform, const vector3d point) {
+  return vector3d{point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9],
+                  point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10],
+                  point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11]};
+}
+
+// INLINED
+static __forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
+  if (0.0f == particle->life) {
+    return true;
+  }
+  return static_cast<float>(particle->elapsedFrames) < particle->life * 60.0f;
 }
 
 // INLINED
@@ -43,6 +49,26 @@ CBlastForge::CBlastForge() : CEffect(-1), openToggle(0), startTime(timeGetTime()
   this->loopBottomParticle = nullptr;
   this->blastParticle = nullptr;
   this->blastBottomParticle = nullptr;
+}
+
+// OFFSET: 0x006F7400
+// FUNCTION: fn_46145
+__declspec(noinline) CBlastForge::~CBlastForge() {
+}
+
+// OFFSET: 0x006F74C0
+// FUNCTION: fn_46146
+__forceinline void CBlastForge::CreateLoopParticles() {
+  this->openToggle = (this->openToggle == 0);
+  this->loopParticle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
+  this->loopBottomParticle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
+
+  if (this->loopParticle && this->loopBottomParticle) {
+    this->loopParticle->Open("blast_forge\\blast_forge\\blast_forge_5s.str");
+    this->loopBottomParticle->Open("blast_forge\\blast_forge\\blast_forge_5s_bottom.str");
+    this->loopParticle->m_loop = true;
+    this->loopBottomParticle->m_loop = true;
+  }
 }
 
 // OFFSET: 0x006F7660
@@ -83,17 +109,7 @@ void CBlastForge::Close() {
 // FUNCTION: fn_06862
 void CBlastForge::Open() {
   this->retained = 1;
-  this->openToggle = (this->openToggle == 0);
-  this->loopParticle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-  this->loopBottomParticle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 13));
-
-  if (this->loopParticle && this->loopBottomParticle) {
-    this->loopParticle->Open("blast_forge\\blast_forge\\blast_forge_5s.str");
-    this->loopBottomParticle->Open("blast_forge\\blast_forge\\blast_forge_5s_bottom.str");
-    this->loopParticle->m_loop = true;
-    this->loopBottomParticle->m_loop = true;
-  }
-
+  this->CreateLoopParticles();
   this->RestartBlastParticles();
 }
 
@@ -106,33 +122,48 @@ bool CBlastForge::IsAlive() {
 // OFFSET: 0x006F7A30
 // FUNCTION: fn_06864
 void CBlastForge::OnProcess() {
-  if (this->loopParticle) {
-    PlaceParticle(this->loopParticle, this->position);
-  }
-  if (this->loopBottomParticle) {
-    PlaceParticle(this->loopBottomParticle, this->position);
+  this->UpdateParticle(this->loopParticle);
+  this->UpdateParticle(this->loopBottomParticle);
+  this->ProcessBlastParticles();
+}
+
+// OFFSET: 0x006F7D20
+// FUNCTION: fn_46147
+__forceinline void CBlastForge::UpdateParticle(CEZ2STRParticle* particle) {
+  if (!particle) {
+    return;
   }
 
-  this->ProcessBlastParticles();
+  particle->position.x = this->positionVector.x;
+  particle->position.y = this->positionVector.y;
+  particle->position.z = this->positionVector.z;
+
+  const vector3d pos = particle->position;
+  const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
+  vector3d viewPos = TransformPoint(view, pos);
+  viewPos.y -= 8.0f;
+  particle->position = TransformPoint(inverse, viewPos);
+  particle->Process(0.0f, 0.0f, 0.0f);
 }
 
 // OFFSET: 0x006F7EA0
 // FUNCTION: fn_06865
 void CBlastForge::Render() {
   if (!this->blastParticle) {
-    if (this->loopParticle) {
-      this->loopParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
-    if (this->loopBottomParticle) {
-      this->loopBottomParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    this->RenderParticle(this->loopParticle);
+    this->RenderParticle(this->loopBottomParticle);
   }
 
-  if (this->blastParticle) {
-    this->blastParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-  }
-  if (this->blastBottomParticle) {
-    this->blastBottomParticle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+  this->RenderParticle(this->blastParticle);
+  this->RenderParticle(this->blastBottomParticle);
+}
+
+// OFFSET: 0x006F7F50
+// FUNCTION: fn_46148
+__forceinline void CBlastForge::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }
 
@@ -140,11 +171,9 @@ void CBlastForge::Render() {
 // FUNCTION: fn_06866
 void CBlastForge::ProcessBlastParticles() {
   if (this->blastParticle && this->blastBottomParticle) {
-    if (this->blastParticle->life == 0.0f || static_cast<float>(this->blastParticle->elapsedFrames) < this->blastParticle->life * 60.0f) {
-      PlaceParticle(this->blastParticle, this->position);
-      if (this->blastBottomParticle) {
-        PlaceParticle(this->blastBottomParticle, this->position);
-      }
+    if (IsParticleActive(this->blastParticle) == true) {
+      this->UpdateParticle(this->blastParticle);
+      this->UpdateParticle(this->blastBottomParticle);
     } else {
       FreeParticle(this->blastParticle);
       FreeParticle(this->blastBottomParticle);

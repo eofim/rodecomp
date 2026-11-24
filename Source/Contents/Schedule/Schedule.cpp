@@ -1,7 +1,7 @@
 #include "Contents/Schedule/Schedule.h"
 
 // GLOBAL: gl_24850
-std::uniform_int_distribution<int> g_scheduleIntervalDistribution;
+static std::uniform_int_distribution<int> g_scheduleIntervalDistribution(30, 300);
 
 // GLOBAL: gl_24851
 std::mt19937 g_scheduleRandomEngine;
@@ -23,14 +23,20 @@ CSchedule::CSchedule(const std::uint64_t& timestamp, const std::int64_t& interva
 // FUNCTION: fn_19726
 CSchedulerIDAlocator::~CSchedulerIDAlocator() = default;
 
+// INLINED
+static bool IsEmptyInterval(std::int64_t interval) {
+  return 0 == interval || interval <= 0;
+}
+
 // OFFSET: 0x00BA8990
 // FUNCTION: fn_19727
 bool CSchedule::CheckTime(const std::uint64_t& now) {
-  if (this->interval == 0 || this->interval <= 0) {
+  if (IsEmptyInterval(this->interval)) {
     return false;
   }
-  const std::int64_t target = this->timestamp + static_cast<std::uint64_t>(this->interval) * 10000;
-  return (static_cast<std::int64_t>(now) <=> target) > 0;
+  const std::int64_t current = now;
+  const std::uint64_t target = this->timestamp + this->interval * 10000;
+  return (current <=> static_cast<std::int64_t>(target)) > 0;
 }
 
 // OFFSET: 0x00BA8A20

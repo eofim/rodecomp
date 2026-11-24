@@ -7,7 +7,18 @@
 
 #include <cstdlib>
 #include <strstream>
-#include <string_view>
+#include <cstring>
+
+struct RmaNameTag {
+  std::uint32_t first;
+  std::uint32_t second;
+};
+
+struct RmaActionTag {
+  std::uint32_t first;
+  std::uint16_t second;
+  std::uint8_t third;
+};
 
 // OFFSET: 0x007461C0
 // FUNCTION: fn_07770
@@ -39,8 +50,6 @@ bool CRmaRes::Load(const char* name) {
   file.Close();
   buffer[size] = '\0';
 
-  const char rsxNameTag[] = {'#', 'r', 's', 'x', 'n', 'a', 'm', 'e', '\0'};
-  const char actionTag[] = {'#', 'a', 'c', 't', 'i', 'o', 'n', '\0'};
   std::istrstream stream(buffer);
   int model = -1;
   while (stream) {
@@ -49,11 +58,21 @@ bool CRmaRes::Load(const char* name) {
       continue;
     }
 
-    if (tokenizer[0] == std::string_view(rsxNameTag, 8)) {
+    if (const auto& token = tokenizer[0];
+        [&] {
+          const auto size = token.size();
+          const auto* tag = reinterpret_cast<const RmaNameTag*>(token.data());
+          return size == 8 && tag->first == 0x78737223u && tag->second == 0x656d616eu;
+        }()) {
       ++model;
       this->models.resize(model + 1);
       this->models[model] = tokenizer[1];
-    } else if (tokenizer[0] == std::string_view(actionTag, 7)) {
+    } else if (const auto& actionToken = tokenizer[0];
+               [](const std::string& token) {
+                 const auto size = token.size();
+                 const auto* tag = reinterpret_cast<const RmaActionTag*>(token.data());
+                 return size == 7 && tag->first == 0x74636123u && tag->second == 0x6f69 && tag->third == 0x6e;
+               }(actionToken)) {
       const unsigned int action = std::atoi(tokenizer[1].c_str());
       if (action >= this->actions.size()) {
         this->actions.resize(action + 1);
@@ -101,6 +120,65 @@ void CRmaRes::Unload() {
   this->actions.erase(this->actions.begin(), this->actions.end());
   this->models.erase(this->models.begin(), this->models.end());
   this->actionModels.erase(this->actionModels.begin(), this->actionModels.end());
+}
+
+// OFFSET: 0x007470C0
+// FUNCTION: fn_45821
+int CRmaRes::EndFrame(int action) {
+  return this->actions[action].endFrame;
+}
+
+// OFFSET: 0x00747130
+// FUNCTION: fn_45822
+int CRmaRes::GetFirstFrame(int action) {
+  const auto& frames = this->actions[action].frames;
+  if (static_cast<int>(frames.size()) > 0) {
+    return frames.front();
+  }
+
+  return -1;
+}
+
+// OFFSET: 0x007473A0
+// FUNCTION: fn_45823
+int CRmaRes::GetDelay(int action) {
+  return this->actions[action].delay;
+}
+
+// OFFSET: 0x007473C0
+// FUNCTION: fn_45824
+std::string* CRmaRes::GetModel(int action) {
+  return &this->models[this->actionModels[action]];
+}
+
+// OFFSET: 0x007473E0
+// FUNCTION: fn_45825
+int CRmaRes::GetStartFrame(int action) {
+  return this->actions[action].startFrame;
+}
+
+// OFFSET: 0x00747400
+// FUNCTION: fn_45826
+int CRmaRes::HasFrame(int action, int frame) {
+  const auto& frames = this->actions[action].frames;
+  const int count = static_cast<int>(frames.size());
+  for (int index = 0; index < count; ++index) {
+    if (frame == frames[index]) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+// OFFSET: 0x00747450
+// FUNCTION: fn_45827
+int CRmaRes::IsValidAction(int action) {
+  if (action < this->actions.size() && action >= 0 && this->actions[action].startFrame != -1) {
+    return 1;
+  }
+
+  return 0;
 }
 
 // INLINED

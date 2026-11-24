@@ -35,11 +35,12 @@ namespace {
   bool ValidHex(unsigned char value) {
     return g_colorHexDigit[value] != 0;
   }
+}
 
-  // INLINED
-  unsigned InlineCharset(const char* marker) {
-    return 16 * g_inlineCharsetDigits[static_cast<unsigned char>(marker[1])] + g_inlineCharsetDigits[static_cast<unsigned char>(marker[2])];
-  }
+// OFFSET: 0x0054FFB0
+// FUNCTION: fn_45914
+unsigned InlineCharset(const char* marker) {
+  return 16 * g_inlineCharsetDigits[static_cast<unsigned char>(marker[1])] + g_inlineCharsetDigits[static_cast<unsigned char>(marker[2])];
 }
 
 // OFFSET: 0x0054D4B0
@@ -70,15 +71,14 @@ void TextContext::SetFont(int family, int height, unsigned char bold, unsigned c
       if (g_serviceType == ServiceIndonesia) {
         family = 8;
         height = (height + 2);
-      } else {
+      } else if (g_serviceType == ServiceRussia) {
+        family = 9;
         height = (height + 3);
-        if (g_serviceType == ServiceRussia) {
-          family = 9;
-        } else {
-          family = 1;
-          if (g_serverLanguage && 31 == g_serverLanguage->alternateLanguage) {
-            family = 6;
-          }
+      } else {
+        family = 1;
+        height = (height + 3);
+        if (g_serverLanguage && g_serverLanguage->alternateLanguage == 31) {
+          family = 6;
         }
       }
       break;
@@ -315,12 +315,16 @@ void TextContext::DrawPair(int x, int y, const char* text, int bytes) {
 void TextContext::Draw(int x, int y, const char* text, int bytes) {
   if (g_inlineCharset) {
     const char* current = text;
+    int left = x;
     int scanned = 0, remaining = bytes;
 
-    while (scanned < bytes) {
-      scanned = (scanned + Marker(text + scanned, remaining));
+    if (bytes <= 0) {
+      return;
+    }
+    do {
+      scanned += Marker(text + scanned, remaining);
       if (scanned >= bytes) {
-        this->DrawPair(x, y, current, scanned);
+        this->DrawPair(left, y, current, scanned);
         return;
       }
 
@@ -328,20 +332,16 @@ void TextContext::Draw(int x, int y, const char* text, int bytes) {
         return;
       }
 
-      const int segment = (Marker(text + scanned + 3, remaining - 3) + 3);
-      this->DrawPair(x, y, current, segment);
-      const int first = Marker(current, segment);
-      int width = this->MeasurePart(current, first, this->m_charset).cx;
-
-      if (first < segment) {
-        width = (width + this->MeasurePart(current + first + 3, segment - first - 3, InlineCharset(current + first)).cx);
-      }
+      const int segment = Marker(text + scanned + 3, remaining - 3) + 3;
+      this->DrawPair(left, y, current, segment);
+      SIZE size;
+      this->Measure(current, segment, &size);
 
       current += segment;
-      scanned = (scanned + segment);
-      x = (x + width);
+      scanned += segment;
+      left += size.cx;
       remaining -= segment;
-    }
+    } while (scanned < bytes);
   } else {
     this->DrawPair(x, y, text, bytes);
   }

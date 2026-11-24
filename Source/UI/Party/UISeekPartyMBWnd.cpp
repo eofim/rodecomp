@@ -98,7 +98,8 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       } else {
         char text[260];
         std::memset(text, 0, sizeof(text));
-        StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), LookupMessage(MSI_FAILED_TO_WRITE_MAIL), maximum);
+        const char* format = LookupMessage(MSI_PARTY_BOOKING_ERR5R2);
+        StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), format, maximum);
         g_windowMgr.Confirm(text, 0, true, false, 0, "Message", 280, 120, 0);
       }
       break;
@@ -138,8 +139,7 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       auto found = this->m_subTypes.find(key);
       if (found != this->m_subTypes.end()) {
         const std::vector<std::pair<std::string, int>> entries = found->second;
-        for (auto it = entries.begin(); it != entries.end(); ++it) {
-          const std::pair<std::string, int> entry = *it;
+        for (const std::pair<std::string, int> entry : entries) {
           this->m_subTypeCombo->AddOption(entry.first.c_str(), entry.second);
         }
       }
@@ -181,7 +181,7 @@ void UISeekPartyMBWnd::CreateJobChecks() {
     check->SetHidden(true);
     check->m_disabled = 1;
     this->AddChild(check);
-    this->m_jobChecks[0].emplace(static_cast<unsigned short>(job), check);
+    this->m_jobChecks[0].insert(std::pair<const unsigned short, UICheckBox*>(job, check));
   }
 
   for (int category = 1; category < 8; ++category) {
@@ -198,7 +198,7 @@ void UISeekPartyMBWnd::CreateJobChecks() {
       check->SetHidden(true);
       check->m_disabled = 1;
       this->AddChild(check);
-      this->m_jobChecks[category].emplace(static_cast<unsigned short>(starts[category] + i), check);
+      this->m_jobChecks[category].insert(std::pair<const unsigned short, UICheckBox*>(starts[category] + i, check));
       ++message;
     }
   }
@@ -322,7 +322,7 @@ void UISeekPartyMBWnd::OnCreate(int width, int height) {
     this->confirmButton->SetBitmap((path + "btn_ok_b" + ".bmp").c_str(), 2, 0);
     this->confirmButton->SetSize(this->confirmButton->BitmapWidth(), this->confirmButton->BitmapHeight());
     this->confirmButton->Move(this->geometry.width - 0x5D, this->geometry.height - 0x18);
-    this->confirmButton->SetId(0xB8);
+    this->confirmButton->SetId(ID_OK);
     this->AddChild(this->confirmButton);
   }
 
@@ -334,7 +334,7 @@ void UISeekPartyMBWnd::OnCreate(int width, int height) {
     this->cancelButton->SetBitmap((path + "btn_cancel_b" + ".bmp").c_str(), 2, 0);
     this->cancelButton->SetSize(this->cancelButton->BitmapWidth(), this->cancelButton->BitmapHeight());
     this->cancelButton->Move(this->geometry.width - 0x2E, this->geometry.height - 0x18);
-    this->cancelButton->SetId(0xB9);
+    this->cancelButton->SetId(ID_CANCEL);
     this->AddChild(this->cancelButton);
   }
 
@@ -430,7 +430,7 @@ void UISeekPartyMBWnd::LoadRegionMaps() {
         maps.push_back(std::pair<std::string, int>(option.name, option.color));
       }
     }
-    this->m_subTypes.insert(std::pair<int, std::vector<std::pair<std::string, int>>>(region, maps));
+    this->m_subTypes.insert(std::pair<const int, std::vector<std::pair<std::string, int>>>(region, maps));
   }
 
   this->m_typeCombo->Select(0);

@@ -11,6 +11,8 @@
 void CSession::InitJobNameTable() {
   this->m_jobNameTable.resize(32003, "Poring");
 
+  const char* name;
+
   std::list<int> jobs;
   for (int id = JT_NOVICE; id < JT_MAX_BASIC; ++id) {
     jobs.push_back(id);
@@ -21,27 +23,28 @@ void CSession::InitJobNameTable() {
   for (int id = JT_RUNE_KNIGHT_2ND; id < JT_SECOND_JOB_END; ++id) {
     jobs.push_back(id);
   }
-  for (int id = JT_DRUID; id < JT_2004_JOB_LAST; ++id) {
+  for (int id = JT_DRUID; id <= JT_ALITEA_RIDING; ++id) {
     jobs.push_back(id);
   }
 
-  const char* name = nullptr;
+  name = nullptr;
   for (std::list<int>::iterator job = jobs.begin(); job != jobs.end(); ++job) {
-    const int id = *job;
-    if (this->m_hotkeyScript->Call("ReqPCJobName", "d>s", id, &name) && std::strlen(name) != 0) {
+    int id = *job;
+    LuaScript* script = this->m_hotkeyScript;
+    if (script->Call("ReqPCJobName", "d>s", id, &name) && std::strlen(name) != 0) {
       this->m_jobNameTable[id] = name;
     }
 
-    if (this->m_hotkeyScript->Call("ReqPCJobNameMan", "d>s", id, &name) && std::strlen(name) != 0) {
+    if (script->Call("ReqPCJobNameMan", "d>s", id, &name) && std::strlen(name) != 0) {
       this->m_jobNameTableMan[id] = name;
     }
 
-    if (this->m_hotkeyScript->Call("ReqPCJobNameWoman", "d>s", id, &name) && std::strlen(name) != 0) {
+    if (script->Call("ReqPCJobNameWoman", "d>s", id, &name) && std::strlen(name) != 0) {
       this->m_jobNameTableWoman[id] = name;
     }
   }
 
-  for (int id = JT_WARPNPC; id < JT_SAFETYWALL; ++id) {
+  for (int id = JT_WARPNPC; id <= JT_4_M_TELEPORTER; ++id) {
     g_session.m_hotkeyScript->Call("ReqJobName", "d>s", id, &this->m_jobNameTable[id]);
   }
   for (int id = JT_NEW_NPC_START; id < JT_MON_BEGIN; ++id) {
@@ -57,12 +60,22 @@ void CSession::InitJobNameTable() {
     g_session.m_hotkeyScript->Call("ReqJobName", "d>s", id, &this->m_jobNameTable[id]);
   }
 
-  const char* const homunculi[] = {"LIF",   "AMISTR",   "FILIR",   "VANILMIRTH",   "LIF2",   "AMISTR2",   "FILIR2",   "VANILMIRTH2",
-                                   "LIF_H", "AMISTR_H", "FILIR_H", "VANILMIRTH_H", "LIF_H2", "AMISTR_H2", "FILIR_H2", "VANILMIRTH_H2"};
-
-  for (unsigned index = 0; index < 16; ++index) {
-    this->m_jobNameTable[JT_MER_LIF + index] = homunculi[index];
-  }
+  this->m_jobNameTable[JT_MER_LIF + 0] = "LIF";
+  this->m_jobNameTable[JT_MER_LIF + 1] = "AMISTR";
+  this->m_jobNameTable[JT_MER_LIF + 2] = "FILIR";
+  this->m_jobNameTable[JT_MER_LIF + 3] = "VANILMIRTH";
+  this->m_jobNameTable[JT_MER_LIF + 4] = "LIF2";
+  this->m_jobNameTable[JT_MER_LIF + 5] = "AMISTR2";
+  this->m_jobNameTable[JT_MER_LIF + 6] = "FILIR2";
+  this->m_jobNameTable[JT_MER_LIF + 7] = "VANILMIRTH2";
+  this->m_jobNameTable[JT_MER_LIF + 8] = "LIF_H";
+  this->m_jobNameTable[JT_MER_LIF + 9] = "AMISTR_H";
+  this->m_jobNameTable[JT_MER_LIF + 10] = "FILIR_H";
+  this->m_jobNameTable[JT_MER_LIF + 11] = "VANILMIRTH_H";
+  this->m_jobNameTable[JT_MER_LIF + 12] = "LIF_H2";
+  this->m_jobNameTable[JT_MER_LIF + 13] = "AMISTR_H2";
+  this->m_jobNameTable[JT_MER_LIF + 14] = "FILIR_H2";
+  this->m_jobNameTable[JT_MER_LIF + 15] = "VANILMIRTH_H2";
 
   this->m_jobNameTable[JT_MER_EIRA] = "MER_EIRA";
   this->m_jobNameTable[JT_MER_DIETER] = "MER_DIETER";

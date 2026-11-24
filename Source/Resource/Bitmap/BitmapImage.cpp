@@ -26,7 +26,7 @@ namespace {
 
   // INLINED
   template <typename Count>
-  __forceinline const unsigned char* ReadPalette(RGBQUAD* palette, unsigned char* first, unsigned char* second, const unsigned char* source, Count count) {
+  __forceinline void ReadPalette(RGBQUAD* palette, unsigned char* first, unsigned char* second, const unsigned char*& source, Count count) {
     std::memcpy(first, source, count * 2);
     source += count * 2;
     std::memcpy(second, source, count * 2);
@@ -40,8 +40,6 @@ namespace {
       palette[i].rgbRed = second[offset + 1];
       offset += 2;
     }
-
-    return source;
   }
 
   // INLINED
@@ -74,8 +72,7 @@ bool CBitmapRes::CreateAuxiliary(int mode) {
   std::memset(this->image.auxiliary, 255, 4u * this->image.width * this->image.height);
   for (int y = 0; y < this->image.height; ++y) {
     for (int x = 0; x < this->image.width; ++x) {
-      const int index = this->image.width * y + x;
-      const std::uint32_t value = this->image.pixels[index];
+      const std::uint32_t value = this->image.pixels[this->image.width * y + x];
       unsigned red = (value >> 16) & 255;
       unsigned green = (value >> 8) & 255;
       const unsigned alpha = value >> 24;
@@ -97,7 +94,7 @@ bool CBitmapRes::CreateAuxiliary(int mode) {
           blue = 200;
         }
       }
-      static_cast<std::uint32_t*>(this->image.auxiliary)[index] = Color(alpha, red, green, blue);
+      static_cast<std::uint32_t*>(this->image.auxiliary)[this->image.width * y + x] = Color(alpha, red, green, blue);
     }
   }
   return true;
@@ -173,9 +170,9 @@ bool CBitmapRes::DecodeBitmap(const void* input, int, bool iconOnly) {
       unsigned char second[512];
 
       if (count != 0) {
-        source = ReadPalette(palette, first, second, source, count);
+        ReadPalette(palette, first, second, source, count);
       } else {
-        source = ReadPalette(palette, first, second, source, 256);
+        ReadPalette(palette, first, second, source, 256);
       }
 
       DecodeIndexedRows(this->image, rgb, source, palette, row);

@@ -13,6 +13,13 @@
 
 namespace {
 // INLINED
+void SetParticleIndices(CParticle& particle, int group, int column, int row) {
+  particle.columnIndex = column;
+  particle.rowIndex = row;
+  particle.groupIndex = group;
+}
+
+// INLINED
 __forceinline int RandomSpan(int range) {
   if (range == 0) {
     return 0;
@@ -26,6 +33,102 @@ __forceinline int RandomSpan(int range) {
 // OFFSET: 0x00708E70
 // FUNCTION: fn_07085
 CPowderingEffect::CPowderingEffect() : CEffect(-1), particleGridSize(0) {
+}
+
+// OFFSET: 0x00708FB0
+// FUNCTION: fn_46153
+__declspec(noinline) CPowderingEffect::~CPowderingEffect() {
+}
+
+// OFFSET: 0x007090B0
+// FUNCTION: fn_46154
+void CPowderingEffect::CreateSpriteParticles() {
+  for (int i = 0; i < this->particleGridSize * this->particleGridSize; ++i) {
+    CSpriteParticle* particle = static_cast<CSpriteParticle*>(
+      CreateSpriteParticle(&this->positionVector, 1)
+    );
+    if (!particle) {
+      continue;
+    }
+
+    particle->effectId = this->id;
+    SetParticleIndices(*particle, 1, i, 0);
+
+    particle->SetSprite("이팩트\\particle2.spr");
+    particle->SetAction("이팩트\\particle2.act");
+
+    this->InitSpriteParticle(particle);
+    particle->InitParticleQuad(particle->vertices);
+    this->spriteParticles.push_back(particle);
+  }
+}
+
+// OFFSET: 0x00709170
+// FUNCTION: fn_46155
+void CPowderingEffect::CreateSmokeParticles() {
+  for (int i = 0; i < this->particleGridSize * this->particleGridSize; ++i) {
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
+    if (!particle) {
+      continue;
+    }
+
+    particle->effectId = this->id;
+    int* indices = &particle->groupIndex;
+    indices[1] = i;
+    indices[2] = 0;
+    indices[0] = 1;
+
+    particle->SetTexture("smoke2.bmp");
+
+    const int offsetX = RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1;
+    const int offsetZ = RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1;
+
+    const vector3d offset = {static_cast<float>(offsetX), 0.0f, static_cast<float>(offsetZ)};
+    particle->offsetY = offset.y;
+    particle->offsetX = offset.x;
+    particle->offsetZ = offset.z;
+
+    this->InitSmokeParticle(particle);
+    particle->InitParticleQuad(particle->vertices);
+    this->smokeParticles.push_back(particle);
+  }
+}
+
+// OFFSET: 0x00709B40
+// FUNCTION: fn_46156
+__forceinline void CPowderingEffect::UpdateParticle(CParticle* particle) {
+  if (!particle || particle->animationState == 2) {
+    return;
+  }
+
+  CSpriteParticle* spriteParticle = static_cast<CSpriteParticle*>(particle);
+  int alpha = particle->alpha;
+  if (particle->animationState == 0) {
+    alpha += RandomSpan(30);
+    if (alpha >= 255) {
+      alpha = 254;
+      particle->animationState = 1;
+    }
+  } else if (particle->animationState == 1) {
+    alpha -= RandomSpan(30);
+    if (alpha < 0) {
+      if (!this->ActorExists()) {
+        alpha = 0;
+        particle->animationState = 2;
+      } else {
+        particle->animationState = 0;
+        this->InitSpriteParticle(particle);
+        return;
+      }
+    }
+  }
+
+  particle->alpha = alpha;
+  vector3d velocity = spriteParticle->velocity;
+  velocity.y += static_cast<float>(RandomSpan(10)) * 0.01f;
+  spriteParticle->velocity = velocity;
+  particle->position = {velocity.x + this->position[0], velocity.y + this->position[1], velocity.z + this->position[2]};
+  ++particle->elapsedFrames;
 }
 
 // OFFSET: 0x007092C0
@@ -108,15 +211,15 @@ void CPowderingEffect::Open() {
 void CPowderingEffect::InitSpriteParticle(CParticle* particle) {
   CSpriteParticle* spriteParticle = static_cast<CSpriteParticle*>(particle);
 
-  const int r1Final = RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1;
+  const float xVal = static_cast<float>(RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1);
 
   const float yVal = static_cast<float>(RandomSpan(7) + 7);
 
-  const int r2Final = RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1;
+  const float zVal = static_cast<float>(RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1);
 
+  spriteParticle->velocity.x = xVal;
   spriteParticle->velocity.y = -yVal;
-  spriteParticle->velocity.x = static_cast<float>(r1Final);
-  spriteParticle->velocity.z = static_cast<float>(r2Final);
+  spriteParticle->velocity.z = zVal;
 
   const int r3 = RandomSpan(3) + 1;
 
@@ -179,95 +282,83 @@ bool CPowderingEffect::IsAlive() {
   return false;
 }
 
+// OFFSET: 0x00709C80
+// FUNCTION: fn_46270
+__forceinline void CPowderingEffect::UpdateSmokeParticle(CParticle* particle) {
+  if (!particle || particle->animationState == 2) {
+    return;
+  }
+
+  const int targetAlpha = particle->effectParameter;
+  const float scale = particle->speedParameter + particle->scale;
+  int alpha = particle->alpha;
+  const int step = targetAlpha / particle->angleParameter;
+
+  if (particle->animationState == 0) {
+    alpha += step;
+    if (targetAlpha <= alpha) {
+      alpha = targetAlpha;
+      particle->animationState = 1;
+    }
+  } else if (particle->animationState == 1) {
+    alpha -= step;
+    if (alpha < 0) {
+      if (!this->ActorExists()) {
+        alpha = 0;
+        particle->animationState = 2;
+      } else {
+        particle->animationState = 0;
+        this->InitSmokeParticle(particle);
+        return;
+      }
+    }
+  }
+
+  particle->alpha = alpha;
+  particle->scale = scale;
+
+  matrix scaleMat;
+  scaleMat.SetScale(scale, scale, 1.0f);
+
+  CGameMode* mode = g_modeMgr.GetGameMode();
+  matrix rotation;
+  rotation.MakeXRotation(mode->camera->camera.pitch / 180.0f * 3.141592f);
+
+  matrix result;
+  result.Compose(scaleMat, rotation);
+  particle->transform = result;
+
+  vector3d position = {this->position[0] + 0.0f, this->position[1] - 10.0f, this->position[2] + 0.0f};
+  position += particle->offset;
+  particle->position = position;
+  ++particle->elapsedFrames;
+}
+
 // OFFSET: 0x00709800
 // FUNCTION: fn_07094
 void CPowderingEffect::OnProcess() {
   for (auto it = this->smokeParticles.begin(); it != this->smokeParticles.end(); ++it) {
-    CParticle* particle = *it;
-    if (!particle || particle->animationState == 2) {
-      continue;
-    }
-
-    const int targetAlpha = particle->effectParameter;
-    const float scale = particle->speedParameter + particle->scale;
-    int alpha = particle->alpha;
-    const int step = targetAlpha / particle->angleParameter;
-
-    if (particle->animationState == 0) {
-      alpha += step;
-      if (targetAlpha <= alpha) {
-        alpha = targetAlpha;
-        particle->animationState = 1;
-      }
-    } else if (particle->animationState == 1) {
-      alpha -= step;
-      if (alpha < 0) {
-        if (!this->ActorExists()) {
-          alpha = 0;
-          particle->animationState = 2;
-        } else {
-          particle->animationState = 0;
-          this->InitSmokeParticle(particle);
-          continue;
-        }
-      }
-    }
-
-    particle->alpha = alpha;
-    particle->scale = scale;
-
-    matrix scaleMat;
-    scaleMat.SetScale(scale, scale, 1.0f);
-
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    matrix rotation;
-    rotation.MakeXRotation(mode->camera->camera.pitch / 180.0f * 3.141592f);
-
-    matrix result;
-    result.Compose(scaleMat, rotation);
-    particle->transform = result;
-
-    particle->position = {
-      this->position[0] + 0.0f + particle->offsetX,
-      this->position[1] - 10.0f + particle->offsetY,
-      this->position[2] + 0.0f + particle->offsetZ
-    };
-    ++particle->elapsedFrames;
+    this->UpdateSmokeParticle(*it);
   }
 
   for (auto it = this->spriteParticles.begin(); it != this->spriteParticles.end(); ++it) {
-    CSpriteParticle* particle = *it;
-    if (!particle || particle->animationState == 2) {
-      continue;
-    }
+    this->UpdateParticle(*it);
+  }
+}
 
-    int alpha = particle->alpha;
-    if (particle->animationState == 0) {
-      alpha += RandomSpan(30);
-      if (alpha >= 255) {
-        alpha = 254;
-        particle->animationState = 1;
-      }
-    } else if (particle->animationState == 1) {
-      alpha -= RandomSpan(30);
-      if (alpha < 0) {
-        if (!this->ActorExists()) {
-          alpha = 0;
-          particle->animationState = 2;
-        } else {
-          particle->animationState = 0;
-          this->InitSpriteParticle(particle);
-          continue;
-        }
-      }
-    }
+// OFFSET: 0x00709F00
+// FUNCTION: fn_46272
+__forceinline void CPowderingEffect::RenderSmokeParticle(CParticle* particle) {
+  if (particle && particle->animationState != 2) {
+    particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
+  }
+}
 
-    vector3d velocity = particle->velocity;
-    particle->alpha = alpha;
-    velocity.y += static_cast<float>(RandomSpan(10)) * 0.01f;
-    particle->velocity = velocity;
-    particle->position = {velocity.x + this->position[0], velocity.y + this->position[1], velocity.z + this->position[2]};
-    ++particle->elapsedFrames;
+// OFFSET: 0x00709ED0
+// FUNCTION: fn_46271
+__forceinline void CPowderingEffect::RenderSpriteParticle(CSpriteParticle* particle) {
+  if (particle && particle->animationState != 2) {
+    particle->Draw(1);
   }
 }
 
@@ -275,16 +366,10 @@ void CPowderingEffect::OnProcess() {
 // FUNCTION: fn_07095
 void CPowderingEffect::Render() {
   for (auto it = this->smokeParticles.begin(); it != this->smokeParticles.end(); ++it) {
-    CParticle* particle = *it;
-    if (particle && particle->animationState != 2) {
-      particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
-    }
+    this->RenderSmokeParticle(*it);
   }
 
   for (auto it = this->spriteParticles.begin(); it != this->spriteParticles.end(); ++it) {
-    CSpriteParticle* particle = *it;
-    if (particle && particle->animationState != 2) {
-      particle->Draw(1);
-    }
+    this->RenderSpriteParticle(*it);
   }
 }

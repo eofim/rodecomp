@@ -10,6 +10,7 @@ class CParticle;
 
 class CGlassWall : public CEffect {
 public:
+  CGlassWall();
   ~CGlassWall() override;
   void Open() override;
   void OnProcess() override;
@@ -21,6 +22,14 @@ public:
 
   /* 00CC */ std::vector<CParticle*> particles;
   /* 00D8 */ CEffect* effect;
+
+private:
+  void OpenScreenEffect();
+  void CloseScreenEffect();
+  void UpdateScreenEffect();
+  void UpdatePanel(CParticle* particle);
+  void RenderScreenEffect();
+  void RenderPanel(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

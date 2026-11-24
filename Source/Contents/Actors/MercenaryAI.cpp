@@ -2,6 +2,7 @@
 #include "UI/Window/UIEnums.h"
 #include "Contents/Actors/MercenaryAI.h"
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Jobs/JobId.h"
 #include "Network/Packets/NoticeEnums.h"
 
 #include "Client/Mode/CGameMode.h"
@@ -54,12 +55,12 @@ static_assert(sizeof(ActionRequestPacket) == 11);
 
 // INLINED
 bool IsHomunAid(std::uint32_t aid) {
-  return aid != 0xFFFFFFFF && aid == g_session.m_homunAid;
+  return aid != INVALID_AID && aid == g_session.m_homunAid;
 }
 
 // INLINED
 bool IsMercenaryAid(std::uint32_t aid) {
-  return aid != 0xFFFFFFFF && aid == g_session.m_mercenaryAid;
+  return aid != INVALID_AID && aid == g_session.m_mercenaryAid;
 }
 
 // INLINED
@@ -159,11 +160,11 @@ int CMercenaryAI::Process(std::uint32_t aid) {
   char message[1024];
 
   CGameActor* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
-  if (actor->render.state == 2 || actor->render.state == 7) {
+  if (actor->render.state == ST_ATTACK || actor->render.state == ST_SKILL) {
     if (!actor->render.isMotionFinished) {
       return 0;
     }
-    actor->SetState(0, 1);
+    actor->SetState(ST_STAND, 1);
   }
 
   if (this->actionStarted == 0) {
@@ -177,7 +178,7 @@ int CMercenaryAI::Process(std::uint32_t aid) {
     if (actionState != 0 && this->kind == 0) {
       this->actionStarted = GetTickCount();
       if (actionState == 29) {
-        if (g_session.m_homunJob >= 6048 && g_session.m_homunJob <= 6052) {
+        if (g_session.m_homunJob >= JT_MER_EIRA && g_session.m_homunJob <= JT_MER_ELEANOR) {
           actor->SetAction(0x30, 4, 0);
         } else {
           actor->SetAction(0x38, 4, 0);
@@ -187,7 +188,7 @@ int CMercenaryAI::Process(std::uint32_t aid) {
       return 0;
     }
   } else if (GetTickCount() - this->actionStarted > this->actionDuration) {
-    actor->SetState(0, 1);
+    actor->SetState(ST_STAND, 1);
     if (this->kind == 0) {
       g_session.m_homunActionState = 0;
     } else if (this->kind == 1) {
@@ -265,12 +266,12 @@ void CMercenaryAI::RegisterFunctions() {
 // OFFSET: 0x00D9EAF0
 // FUNCTION: fn_22335
 int AiHomunAttack(lua_State* state) {
-  if (g_session.GetOption(17) > 0) {
+  if (static_cast<int>(g_session.m_options.Get(17)) > 0) {
     return 0;
   }
 
-  std::uint32_t aid = static_cast<std::uint32_t>(lua_tonumber(state, 1));
-  std::uint32_t target = static_cast<std::uint32_t>(lua_tonumber(state, 2));
+  std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
+  std::uint32_t target = static_cast<std::uint32_t>(luaL_checknumber(state, 2));
   if (!g_session.IsHomunAid(aid)) {
     return 0;
   }
@@ -284,7 +285,7 @@ int AiHomunAttack(lua_State* state) {
   if (!actor || !targetActor) {
     return 0;
   }
-  if (StateFlag06(targetActor->GetStateFlags()) || StateFlag01(targetActor->GetStateFlags()) || StateFlag02(targetActor->GetStateFlags())) {
+  if (IsInvisible(targetActor->GetStateFlags()) || IsHiding(targetActor->GetStateFlags()) || IsCloaking(targetActor->GetStateFlags())) {
     return 0;
   }
 
@@ -321,7 +322,7 @@ int AiMercenaryAttack(lua_State* state) {
   if (!actor || !targetActor) {
     return 0;
   }
-  if (StateFlag06(targetActor->GetStateFlags()) || StateFlag01(targetActor->GetStateFlags()) || StateFlag02(targetActor->GetStateFlags())) {
+  if (IsInvisible(targetActor->GetStateFlags()) || IsHiding(targetActor->GetStateFlags()) || IsCloaking(targetActor->GetStateFlags())) {
     return 0;
   }
 
@@ -389,89 +390,88 @@ int AiHomunGetV(lua_State* state) {
     return 1;
 
   case V_POSITION:
-  case V_POSITION_APPLY_SKILLATTACKRANGE:
-    if (actor) {
-      if (aid == g_session.m_aid || !(StateFlag06(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag02(actor->GetStateFlags()))) {
-        int cellX, cellY;
-        mode->WorldCell(actor->render.position.x, actor->render.position.z, cellX, cellY);
+  case V_POSITION_APPLY_SKILLATTACKRANGE: {
+    if (!actor) {
+      lua_pushnumber(state, -1.0);
+      lua_pushnumber(state, -1.0);
+      return 2;
+    }
 
-        int skillId = 0;
-        int skillLevel = 0;
-        if (property == 13) {
-          skillId = static_cast<int>(luaL_checknumber(state, 3));
-          skillLevel = static_cast<int>(luaL_checknumber(state, 4));
+    if (aid != g_session.m_aid && (IsInvisible(actor->GetStateFlags()) || IsHiding(actor->GetStateFlags()) || IsCloaking(actor->GetStateFlags()))) {
+      lua_pushnumber(state, -1.0);
+      lua_pushnumber(state, -1.0);
+      return 2;
+    }
+
+    int cellX, cellY;
+    mode->WorldCell(actor->render.position.x, actor->render.position.z, cellX, cellY);
+
+    int skillId = 0;
+    int skillLevel = 0;
+    if (property == 13) {
+      skillId = static_cast<int>(luaL_checknumber(state, 3));
+      skillLevel = static_cast<int>(luaL_checknumber(state, 4));
+    }
+
+    std::uint32_t homunAid = g_session.m_homunAid;
+    if (actor->render.accountId != g_session.m_aid && !g_session.IsCompanionAid(actor->render.accountId)) {
+      CGameActor* targetActor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(homunAid);
+      if (targetActor) {
+        int targetX, targetY;
+        g_modeMgr.GetGameMode()->WorldCell(targetActor->render.position.x, targetActor->render.position.z, targetX, targetY);
+
+        int range = 0;
+        if (skillId != 0) {
+          range = g_modeMgr.GetGameMode()->GetSkillAttackRange(skillId, skillLevel);
         }
 
-        std::uint32_t homunAid = g_session.m_homunAid;
-        if (actor->render.accountId != g_session.m_aid && !g_session.IsCompanionAid(actor->render.accountId)) {
-          CGameActor* targetActor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(homunAid);
-          if (targetActor) {
-            int targetX, targetY;
-            g_modeMgr.GetGameMode()->WorldCell(targetActor->render.position.x, targetActor->render.position.z, targetX, targetY);
+        int clamped = ClampTargetAttackRange(g_session.m_homunAid, range);
+        if (clamped > 0) {
+          const float dx = static_cast<float>(targetX - cellX);
+          const float dy = static_cast<float>(cellY - targetY);
+          const float angle = std::acos((1.0f / SquareRoot(dy * dy + dx * dx)) * dx);
+          cellX = static_cast<int>(static_cast<float>(cellX) + ClientCos(angle) * static_cast<float>(clamped));
+          const float sine = -ClientSin(angle);
+          const float offsetY = sine * static_cast<float>(clamped);
+          cellY = static_cast<int>(static_cast<float>(cellY) + offsetY);
 
-            int range = 0;
-            if (skillId != 0) {
-              range = g_modeMgr.GetGameMode()->GetSkillAttackRange(skillId, skillLevel);
-            }
-
-            int clamped = ClampTargetAttackRange(g_session.m_homunAid, range);
-            if (clamped > 0) {
-              const float dx = static_cast<float>(targetX - cellX);
-              const float dy = static_cast<float>(cellY - targetY);
-              const float angle = std::acos((1.0f / SquareRoot(dy * dy + dx * dx)) * dx);
-              cellX = static_cast<int>(static_cast<float>(cellX) + ClientCos(angle) * static_cast<float>(clamped));
-              const float sine = ClientSin(angle);
-              cellY = static_cast<int>(static_cast<float>(cellY) + -sine * static_cast<float>(clamped));
-
-              if (!g_modeMgr.GetGameMode()->IsValidCell(cellX, cellY)) {
-                if (!g_modeMgr.GetGameMode()->GetClosestValidCell(&cellX, &cellY)) {
-                  cellX = targetX;
-                  cellY = targetY;
-                }
-              }
+          if (!g_modeMgr.GetGameMode()->IsValidCell(cellX, cellY)) {
+            if (!g_modeMgr.GetGameMode()->GetClosestValidCell(&cellX, &cellY)) {
+              cellX = targetX;
+              cellY = targetY;
             }
           }
         }
-
-        lua_pushnumber(state, cellX);
-        lua_pushnumber(state, cellY);
-        return 2;
       }
     }
 
-    lua_pushnumber(state, -1.0);
-    lua_pushnumber(state, -1.0);
+    lua_pushnumber(state, cellX);
+    lua_pushnumber(state, cellY);
     return 2;
+  }
 
   case V_TYPE:
     return 1;
 
   case V_MOTION:
-    if (!actor) {
-      lua_pushnumber(state, -1.0);
-      return 1;
-    } else {
-      lua_pushnumber(state, static_cast<double>(actor->render.state));
-      return 1;
-    }
+    lua_pushnumber(state, !actor ? -1.0 : static_cast<double>(actor->render.state));
+    return 1;
 
-  case V_ATTACKRANGE: {
-    int range = g_session.m_homunAttackRange;
-    if (!actor || range == 0) {
+  case V_ATTACKRANGE:
+    if (!actor || g_session.m_homunAttackRange == 0) {
       lua_pushnumber(state, -1.0);
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(range));
+      lua_pushnumber(state, static_cast<double>(g_session.m_homunAttackRange));
       return 1;
     }
-  }
 
   case V_TARGET:
     if (!actor) {
       lua_pushnumber(state, -1.0);
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(actor->hitTargetAid));
+      lua_pushnumber(state, static_cast<int>(actor->hitTargetAid));
       return 1;
     }
 
@@ -480,9 +480,7 @@ int AiHomunGetV(lua_State* state) {
     std::uint32_t skillId = static_cast<std::uint32_t>(luaL_checknumber(state, 3));
     CSkillInfo skill = g_session.LookupHomunSkill(skillId);
     double result;
-    if (!skill.available) {
-      result = 1.0;
-    } else {
+    if (skill.available) {
       int range = skill.range;
       if (property == 14) {
         int level = static_cast<int>(luaL_checknumber(state, 4));
@@ -490,6 +488,8 @@ int AiHomunGetV(lua_State* state) {
       }
       std::uint32_t homunAid = g_session.m_homunAid;
       result = static_cast<double>(ClampTargetAttackRange(homunAid, range));
+    } else {
+      result = 1.0;
     }
     lua_pushnumber(state, result);
     return 1;
@@ -508,11 +508,11 @@ int AiHomunGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.hp));
       return 1;
-    } else if (!g_session.IsHomunAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsHomunAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_homunHp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_homunHp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -520,11 +520,11 @@ int AiHomunGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.m_sp));
       return 1;
-    } else if (!g_session.IsHomunAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsHomunAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_homunSp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_homunSp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -532,11 +532,11 @@ int AiHomunGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.maxHp));
       return 1;
-    } else if (!g_session.IsHomunAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsHomunAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_homunMaxHp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_homunMaxHp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -544,11 +544,11 @@ int AiHomunGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.m_maxSp));
       return 1;
-    } else if (!g_session.IsHomunAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsHomunAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.homunMaxSp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.homunMaxSp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -577,90 +577,89 @@ int AiMercenaryGetV(lua_State* state) {
     return 1;
 
   case V_POSITION:
-  case V_POSITION_APPLY_SKILLATTACKRANGE:
-    if (actor) {
-      if (aid == g_session.m_aid || !(StateFlag06(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag02(actor->GetStateFlags()))) {
-        int cellX, cellY;
-        mode->WorldCell(actor->render.position.x, actor->render.position.z, cellX, cellY);
+  case V_POSITION_APPLY_SKILLATTACKRANGE: {
+    if (!actor) {
+      lua_pushnumber(state, -1.0);
+      lua_pushnumber(state, -1.0);
+      return 2;
+    }
 
-        int skillId = 0;
-        int skillLevel = 0;
-        if (property == 13) {
-          skillId = static_cast<int>(luaL_checknumber(state, 3));
-          skillLevel = static_cast<int>(luaL_checknumber(state, 4));
+    if (aid != g_session.m_aid && (IsInvisible(actor->GetStateFlags()) || IsHiding(actor->GetStateFlags()) || IsCloaking(actor->GetStateFlags()))) {
+      lua_pushnumber(state, -1.0);
+      lua_pushnumber(state, -1.0);
+      return 2;
+    }
+
+    int cellX, cellY;
+    mode->WorldCell(actor->render.position.x, actor->render.position.z, cellX, cellY);
+
+    int skillId = 0;
+    int skillLevel = 0;
+    if (property == 13) {
+      skillId = static_cast<int>(luaL_checknumber(state, 3));
+      skillLevel = static_cast<int>(luaL_checknumber(state, 4));
+    }
+
+    std::uint32_t mercAid = g_session.m_mercenaryAid;
+    if (actor->render.accountId != g_session.m_aid && !g_session.IsCompanionAid(actor->render.accountId)) {
+      CGameActor* targetActor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(mercAid);
+      if (targetActor) {
+        int targetX, targetY;
+        g_modeMgr.GetGameMode()->WorldCell(targetActor->render.position.x, targetActor->render.position.z, targetX, targetY);
+
+        int range = 0;
+        if (skillId != 0) {
+          range = g_modeMgr.GetGameMode()->GetSkillAttackRange(skillId, skillLevel);
         }
 
-        std::uint32_t mercAid = g_session.m_mercenaryAid;
-        if (actor->render.accountId != g_session.m_aid && !g_session.IsCompanionAid(actor->render.accountId)) {
-          CGameActor* targetActor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(mercAid);
-          if (targetActor) {
-            int targetX, targetY;
-            g_modeMgr.GetGameMode()->WorldCell(targetActor->render.position.x, targetActor->render.position.z, targetX, targetY);
+        int clamped = ClampTargetAttackRange(g_session.m_homunAid, range);
+        if (clamped > 0) {
+          const float dx = static_cast<float>(targetX - cellX);
+          const float dy = static_cast<float>(cellY - targetY);
+          const float dist = SquareRoot(dy * dy + dx * dx);
+          const float angle = std::acos((1.0f / dist) * dx);
+          cellX = static_cast<int>(static_cast<float>(cellX) + ClientCos(angle) * static_cast<float>(clamped));
+          const float sine = -ClientSin(angle);
+          const float offsetY = sine * static_cast<float>(clamped);
+          cellY = static_cast<int>(static_cast<float>(cellY) + offsetY);
 
-            int range = 0;
-            if (skillId != 0) {
-              range = g_modeMgr.GetGameMode()->GetSkillAttackRange(skillId, skillLevel);
-            }
-
-            int clamped = ClampTargetAttackRange(g_session.m_homunAid, range);
-            if (clamped > 0) {
-              const float dx = static_cast<float>(targetX - cellX);
-              const float dy = static_cast<float>(cellY - targetY);
-              const float dist = SquareRoot(dy * dy + dx * dx);
-              const float angle = std::acos((1.0f / dist) * dx);
-              cellX = static_cast<int>(static_cast<float>(cellX) + ClientCos(angle) * static_cast<float>(clamped));
-              const float sine = ClientSin(angle);
-              cellY = static_cast<int>(static_cast<float>(cellY) + -sine * static_cast<float>(clamped));
-
-              if (!g_modeMgr.GetGameMode()->IsValidCell(cellX, cellY)) {
-                if (!g_modeMgr.GetGameMode()->GetClosestValidCell(&cellX, &cellY)) {
-                  cellX = targetX;
-                  cellY = targetY;
-                }
-              }
+          if (!g_modeMgr.GetGameMode()->IsValidCell(cellX, cellY)) {
+            if (!g_modeMgr.GetGameMode()->GetClosestValidCell(&cellX, &cellY)) {
+              cellX = targetX;
+              cellY = targetY;
             }
           }
         }
-
-        lua_pushnumber(state, cellX);
-        lua_pushnumber(state, cellY);
-        return 2;
       }
     }
 
-    lua_pushnumber(state, -1.0);
-    lua_pushnumber(state, -1.0);
+    lua_pushnumber(state, cellX);
+    lua_pushnumber(state, cellY);
     return 2;
+  }
 
   case V_TYPE:
     return 1;
 
   case V_MOTION:
-    if (!actor) {
-      lua_pushnumber(state, -1.0);
-      return 1;
-    } else {
-      lua_pushnumber(state, static_cast<double>(actor->render.state));
-      return 1;
-    }
+    lua_pushnumber(state, !actor ? -1.0 : static_cast<double>(actor->render.state));
+    return 1;
 
-  case V_ATTACKRANGE: {
-    int range = g_session.m_mercenaryAttackRange;
-    if (!actor || range == 0) {
+  case V_ATTACKRANGE:
+    if (!actor || g_session.m_mercenaryAttackRange == 0) {
       lua_pushnumber(state, -1.0);
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(range));
+      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryAttackRange));
       return 1;
     }
-  }
 
   case V_TARGET:
-    if (!actor || actor->render.state == 3) {
+    if (!actor || actor->render.state == ST_DEAD) {
       lua_pushnumber(state, -1.0);
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(actor->hitTargetAid));
+      lua_pushnumber(state, static_cast<int>(actor->hitTargetAid));
       return 1;
     }
 
@@ -669,9 +668,7 @@ int AiMercenaryGetV(lua_State* state) {
     std::uint32_t skillId = static_cast<std::uint32_t>(luaL_checknumber(state, 3));
     CSkillInfo skill = g_session.LookupMercSkill(skillId);
     double result;
-    if (!skill.available) {
-      result = 1.0;
-    } else {
+    if (skill.available) {
       int range = skill.range;
       if (property == 14) {
         int level = static_cast<int>(luaL_checknumber(state, 4));
@@ -679,6 +676,8 @@ int AiMercenaryGetV(lua_State* state) {
       }
       std::uint32_t mercAid = g_session.m_mercenaryAid;
       result = static_cast<double>(ClampTargetAttackRange(mercAid, range));
+    } else {
+      result = 1.0;
     }
     lua_pushnumber(state, result);
     return 1;
@@ -702,11 +701,11 @@ int AiMercenaryGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.hp));
       return 1;
-    } else if (!g_session.IsMercenaryAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsMercenaryAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryHp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryHp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -714,11 +713,11 @@ int AiMercenaryGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.m_sp));
       return 1;
-    } else if (!g_session.IsMercenaryAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsMercenaryAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_mercenarySp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_mercenarySp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -726,11 +725,11 @@ int AiMercenaryGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.maxHp));
       return 1;
-    } else if (!g_session.IsMercenaryAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsMercenaryAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryMaxHp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryMaxHp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -738,11 +737,11 @@ int AiMercenaryGetV(lua_State* state) {
     if (aid == g_session.m_aid) {
       lua_pushnumber(state, static_cast<double>(g_session.m_maxSp));
       return 1;
-    } else if (!g_session.IsMercenaryAid(aid)) {
-      lua_pushnumber(state, -1.0);
+    } else if (g_session.IsMercenaryAid(aid)) {
+      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryMaxSp));
       return 1;
     } else {
-      lua_pushnumber(state, static_cast<double>(g_session.m_mercenaryMaxSp));
+      lua_pushnumber(state, -1.0);
       return 1;
     }
 
@@ -796,12 +795,14 @@ int AiTraceAI(lua_State* state) {
   }
   std::strcat(path, "\\TraceAI.txt");
 
-  char* buffer = const_cast<char*>(text);
+  char* buffer;
   if (file.Open(path, 0, true, false)) {
     size = file.GetSize();
     buffer = new char[size];
     file.Read(buffer, size);
     file.Close();
+  } else {
+    buffer = const_cast<char*>(text);
   }
 
   file.Open(path, 0x1001, true, false);
@@ -810,7 +811,13 @@ int AiTraceAI(lua_State* state) {
   }
 
   char stamp[256];
-  sprintf(stamp, "%d/%d/%d - %d:%d:%d", date >> 16, (date >> 8) & 0xFF, date & 0xFF, (time >> 16) & 0xFF, (time >> 8) & 0xFF, time & 0xFF);
+  const int year = date >> 16;
+  const int month = (date >> 8) & 0xFF;
+  const int day = date & 0xFF;
+  const int hour = (time >> 16) & 0xFF;
+  const int minute = (time >> 8) & 0xFF;
+  const int second = time & 0xFF;
+  sprintf(stamp, "%d/%d/%d - %d:%d:%d", year, month, day, hour, minute, second);
   file.Write(stamp, std::strlen(stamp));
   file.Write(text, std::strlen(text));
   file.Write("\r\n", 2);
@@ -864,7 +871,7 @@ static_assert(sizeof(MoveNpcPacket) == 9);
 // OFFSET: 0x00D9EEF0
 // FUNCTION: fn_22338
 int AiGetMsg(lua_State* state) {
-  std::uint32_t aid = static_cast<std::uint32_t>(lua_tonumber(state, 1));
+  std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
   int index;
   if (g_session.IsHomunAid(aid)) {
     index = 0;
@@ -915,7 +922,7 @@ int AiGetMsg(lua_State* state) {
 // OFFSET: 0x00D9F0B0
 // FUNCTION: fn_22339
 int AiGetResMsg(lua_State* state) {
-  std::uint32_t aid = static_cast<std::uint32_t>(lua_tonumber(state, 1));
+  std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
   int index;
   if (g_session.IsHomunAid(aid)) {
     index = 0;
@@ -966,13 +973,14 @@ int AiGetResMsg(lua_State* state) {
 // OFFSET: 0x00D9FF50
 // FUNCTION: fn_22343
 int AiIsMonster(lua_State* state) {
-  std::uint32_t aid = static_cast<std::uint32_t>(lua_tonumber(state, 1));
+  std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
   CGameMode* mode = g_modeMgr.GetGameMode();
   CGameActor* actor = mode->scene->GetGameActorByAID(aid);
   double result = 0.0;
   if (actor) {
     int job = actor->GetEffectiveJob(-1);
-    if (((job > 1000 && job < 3999) || static_cast<unsigned>(job - 20021) <= 11978) && actor->objectType != 7) {
+    bool checkState = false;
+    if (((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || static_cast<unsigned>(job - 20021) <= 11978) && actor->objectType != 7) {
       switch (actor->objectType) {
       case NPC_MERSOL_TYPE:
       case NPC_ELEMENTAL_TYPE:
@@ -981,11 +989,7 @@ int AiIsMonster(lua_State* state) {
         result = 0.0;
         break;
       default:
-        if (StateFlag06(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag02(actor->GetStateFlags())) {
-          result = 0.0;
-        } else {
-          result = 1.0;
-        }
+        checkState = true;
         break;
       }
     } else if (g_session.IsPlayerJobId(job)) {
@@ -999,11 +1003,15 @@ int AiIsMonster(lua_State* state) {
         ally = 1;
       }
       if (!ally) {
-        if (StateFlag06(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag02(actor->GetStateFlags())) {
-          result = 0.0;
-        } else {
-          result = 1.0;
-        }
+        checkState = true;
+      }
+    }
+
+    if (checkState) {
+      if (IsInvisible(actor->GetStateFlags()) || IsHiding(actor->GetStateFlags()) || IsCloaking(actor->GetStateFlags())) {
+        result = 0.0;
+      } else {
+        result = 1.0;
       }
     }
   }
@@ -1015,9 +1023,9 @@ int AiIsMonster(lua_State* state) {
 // OFFSET: 0x00DA00D0
 // FUNCTION: fn_22344
 int AiMove(lua_State* state) {
-  std::uint32_t aid = static_cast<std::uint32_t>(lua_tonumber(state, 1));
-  int x = static_cast<int>(lua_tonumber(state, 2));
-  int y = static_cast<int>(lua_tonumber(state, 3));
+  std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
+  int x = static_cast<int>(luaL_checknumber(state, 2));
+  int y = static_cast<int>(luaL_checknumber(state, 3));
 
   if (!g_session.IsHomunAid(aid) && !g_session.IsMercenaryAid(aid)) {
     return 0;
@@ -1035,29 +1043,21 @@ int AiMove(lua_State* state) {
     }
   }
 
-  int actorX = 0, actorY = 0;
+  int actorX, actorY;
+  MoveNpcPacket packet;
   mode->WorldCell(actor->render.position.x, actor->render.position.z, actorX, actorY);
 
-  if (std::abs(x - actorX) + std::abs(y - actorY) < 25) {
-#pragma pack(push, 1)
-    struct MoveNpcPacket {
-      /* 0000 */ std::int16_t opcode;
-      /* 0002 */ std::uint32_t aid;
-      /* 0006 */ unsigned char dest[3];
-    };
-#pragma pack(pop)
-    static_assert(sizeof(MoveNpcPacket) == 9);
-
-    MoveNpcPacket packet;
-    packet.opcode = ID_CZ_REQUEST_MOVENPC;
-    packet.aid = aid;
-    packet.dest[0] = static_cast<unsigned char>(x >> 2);
-    packet.dest[1] = static_cast<unsigned char>(((y >> 4) & 0x3F) | (x << 6));
-    packet.dest[2] = static_cast<unsigned char>(y << 4);
-
-    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.opcode), &packet);
+  if (std::abs(x - actorX) + std::abs(y - actorY) > 24) {
+    return 0;
   }
 
+  packet.opcode = ID_CZ_REQUEST_MOVENPC;
+  packet.aid = aid;
+  packet.dest[0] = static_cast<unsigned char>(x >> 2);
+  packet.dest[1] = static_cast<unsigned char>(((y >> 4) & 0x3F) | (x << 6));
+  packet.dest[2] = static_cast<unsigned char>(y << 4);
+
+  GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.opcode), &packet);
   return 0;
 }
 
@@ -1133,7 +1133,7 @@ int AiSkillObject(lua_State* state) {
   } else {
     targetActor = mode->scene->GetGameActorByAID(target);
     if (targetActor) {
-      if (StateFlag06(targetActor->GetStateFlags()) || StateFlag01(targetActor->GetStateFlags()) || StateFlag02(targetActor->GetStateFlags())) {
+      if (IsInvisible(targetActor->GetStateFlags()) || IsHiding(targetActor->GetStateFlags()) || IsCloaking(targetActor->GetStateFlags())) {
         return 0;
       }
     }

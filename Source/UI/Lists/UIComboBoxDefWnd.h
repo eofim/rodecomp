@@ -53,7 +53,9 @@ public:
   void Paint() override;
   void OnLBtnDblClk(int x, int y) override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
+  void AddOption(std::string text);
   void Clear();
+  void Select(int index);
   /* 007C */ UIBitmapButton* button;
   /* 0080 */ UIStaticText* label;
 

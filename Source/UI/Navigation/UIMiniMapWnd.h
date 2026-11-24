@@ -28,7 +28,13 @@ public:
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
   void AddTownMarks();
   int LoadMemos();
+  int SaveMemos();
+  void FitMapToWindow();
+  int MapToWindowX(float x, int halfWidth) const;
+  int MapToWindowY(float y, int halfHeight) const;
   void UpdatePlayerHead();
+  void UpdateTownButtons();
+  void UpdateQuestButtons();
 
   /* 00B4 */ MiniMapWndInfo* m_saved;
   /* 00B8 */ float scale;

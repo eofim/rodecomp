@@ -25,9 +25,8 @@ void CWorld::InitializeSpatial() {
     C3dActor* model = *it;
 
     for (int i = 0; i < 4; ++i) {
-      WorldSpatialTree* child = this->spatial.children[i];
-      if (model->oriented.Intersects(child->minimum)) {
-        child->InsertModel(*model, 1);
+      if (IntersectsBounds(model->oriented, this->spatial.children[i]->minimum)) {
+        this->spatial.children[i]->InsertModel(model, 1);
       }
     }
   }
@@ -61,10 +60,10 @@ void PublishWorldModels(WorldSpatialTree& root, C3dActor* const* models, int& pu
   const int end = published + ready;
 
   while (published < end) {
-    C3dActor& model = *models[published];
+    C3dActor* model = models[published];
 
     for (WorldSpatialTree* child : root.children) {
-      if (model.oriented.Intersects(child->minimum)) {
+      if (IntersectsBounds(model->oriented, child->minimum)) {
         child->InsertModel(model, 1);
       }
     }

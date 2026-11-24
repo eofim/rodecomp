@@ -107,10 +107,6 @@ UINewSelectCharWnd::UINewSelectCharWnd() : UIFrameWnd(0) {
 
 UINewSelectCharWnd::~UINewSelectCharWnd() = default;
 
-// OFFSET: 0x007D4520
-// FUNCTION: fn_09578
-CharSlotInfo::CharSlotInfo() noexcept = default;
-
 // OFFSET: 0x007D4840
 // FUNCTION: fn_09582
 FuncDrawWNDChar::~FuncDrawWNDChar() = default;
@@ -122,12 +118,6 @@ CharSlotInfo::~CharSlotInfo() = default;
 // OFFSET: 0x007D5000
 // FUNCTION: fn_09586
 void Nullsub243() {
-}
-
-// OFFSET: 0x007D50D0
-// FUNCTION: fn_09587
-__declspec(noinline) std::string UIStaticText::GetText() const {
-  return this->text;
 }
 
 // OFFSET: 0x007D5130
@@ -207,7 +197,7 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
   this->m_textButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
   this->m_textButton->SetSize(this->m_textButton->BitmapWidth(), this->m_textButton->BitmapHeight());
   this->m_textButton->Move(0x33E, 0x15F);
-  this->m_textButton->SetText(LookupMessage(MSI_MAKECHARWND_HAIR_COLOR));
+  this->m_textButton->SetText(LookupMessage(MSI_SELECTCHARWND_NOTICE));
   this->m_textButton->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
   this->m_textButton->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
   this->m_textButton->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
@@ -215,71 +205,68 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
   this->m_textButton->Enable(0);
   this->AddChild(this->m_textButton);
 
-  UIBmpTextButton* startButton = new UIBmpTextButton();
-  this->m_windowC0 = startButton;
-  startButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 0, 0);
-  startButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_over.bmp", 1, 0);
-  startButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
-  startButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 3, 0);
-  startButton->SetSize(startButton->BitmapWidth(), startButton->BitmapHeight());
-  startButton->Move(0x33E, 0x142);
-  startButton->SetText(LookupMessage(MSI_SELECTCHARWND_DELETE));
-  startButton->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
-  startButton->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
-  startButton->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
-  startButton->AddTextStyle(3, 0xC, 0x909090, 0, 0, -1000, -1000);
-  startButton->SetId(SELECTCHAR_BUTTON_DELETE);
-  this->AddChild(startButton);
+  this->m_windowC0 = new UIBmpTextButton();
+  this->m_windowC0->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 0, 0);
+  this->m_windowC0->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_over.bmp", 1, 0);
+  this->m_windowC0->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
+  this->m_windowC0->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 3, 0);
+  this->m_windowC0->SetSize(this->m_windowC0->BitmapWidth(), this->m_windowC0->BitmapHeight());
+  this->m_windowC0->Move(0x33E, 0x142);
+  this->m_windowC0->SetText(LookupMessage(MSI_SELECTCHARWND_RESERVE_TO_DEL_CHAR));
+  this->m_windowC0->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_windowC0->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_windowC0->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_windowC0->AddTextStyle(3, 0xC, 0x909090, 0, 0, -1000, -1000);
+  this->m_windowC0->SetId(SELECTCHAR_BUTTON_DELETE);
+  this->AddChild(this->m_windowC0);
   if (this->m_slotStatus[this->m_slotsPerPage * this->m_page + this->m_pageSlot] == 1) {
-    startButton->SetDisabled(1);
-    startButton->Invalidate();
+    auto* button = this->m_windowC0;
+    button->SetDisabled(1);
+    button->Invalidate();
   }
 
-  UIBmpTextButton* cancelDeleteButton = new UIBmpTextButton();
-  this->m_windowC4 = cancelDeleteButton;
-  cancelDeleteButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 0, 0);
-  cancelDeleteButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_over.bmp", 1, 0);
-  cancelDeleteButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
-  cancelDeleteButton->SetSize(cancelDeleteButton->BitmapWidth(), cancelDeleteButton->BitmapHeight());
-  cancelDeleteButton->Move(0x33E, 0x142);
-  cancelDeleteButton->SetText(LookupMessage(MSI_SELECTCHARWND_CHARACTER_LIST));
-  cancelDeleteButton->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
-  cancelDeleteButton->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
-  cancelDeleteButton->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
-  cancelDeleteButton->SetId(SELECTCHAR_BUTTON_CANCEL_DELETE);
-  cancelDeleteButton->Enable(0);
-  this->AddChild(cancelDeleteButton);
+  this->m_windowC4 = new UIBmpTextButton();
+  this->m_windowC4->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 0, 0);
+  this->m_windowC4->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_over.bmp", 1, 0);
+  this->m_windowC4->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
+  this->m_windowC4->SetSize(this->m_windowC4->BitmapWidth(), this->m_windowC4->BitmapHeight());
+  this->m_windowC4->Move(0x33E, 0x142);
+  this->m_windowC4->SetText(LookupMessage(MSI_SELECTCHARWND_CANCEL_TO_RESERVE_CHAR));
+  this->m_windowC4->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_windowC4->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_windowC4->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_windowC4->SetId(SELECTCHAR_BUTTON_CANCEL_DELETE);
+  this->m_windowC4->Enable(0);
+  this->AddChild(this->m_windowC4);
 
-  UIBmpTextButton* gameStartButton = new UIBmpTextButton();
-  this->m_windowFC = gameStartButton;
-  gameStartButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_off.bmp", 0, 0);
-  gameStartButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_over.bmp", 1, 0);
-  gameStartButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_press.bmp", 2, 0);
-  gameStartButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_off.bmp", 3, 0);
-  gameStartButton->SetSize(gameStartButton->BitmapWidth(), gameStartButton->BitmapHeight());
-  gameStartButton->Move(0x330, 0x197);
-  gameStartButton->SetId(ID_OK);
-  gameStartButton->SetText(LookupMessage(MSI_SELECTCHARWND_NOTICE));
-  gameStartButton->AddTextStyle(0, 0x12, 0xFFFFFF, 1, 1, -1000, 0x39);
-  gameStartButton->AddTextStyle(1, 0x12, 0xFFFFFF, 1, 1, -1000, 0x39);
-  gameStartButton->AddTextStyle(2, 0x12, 0xFFFFFF, 1, 1, -1000, 0x39);
-  gameStartButton->AddTextStyle(3, 0x12, 0x7F74DC, 1, 0, -1000, 0x39);
-  this->AddChild(gameStartButton);
+  this->m_windowFC = new UIBmpTextButton();
+  this->m_windowFC->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_off.bmp", 0, 0);
+  this->m_windowFC->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_over.bmp", 1, 0);
+  this->m_windowFC->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_press.bmp", 2, 0);
+  this->m_windowFC->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_off.bmp", 3, 0);
+  this->m_windowFC->SetSize(this->m_windowFC->BitmapWidth(), this->m_windowFC->BitmapHeight());
+  this->m_windowFC->Move(0x330, 0x197);
+  this->m_windowFC->SetId(ID_OK);
+  this->m_windowFC->SetText(LookupMessage(MSI_SELECTCHARWND_START_GAME));
+  this->m_windowFC->AddTextStyle(0, 0x12, 0xFFFFFF, 1, 1, -1000, 0x39);
+  this->m_windowFC->AddTextStyle(1, 0x12, 0xFFFFFF, 1, 1, -1000, 0x39);
+  this->m_windowFC->AddTextStyle(2, 0x12, 0xFFFFFF, 1, 1, -1000, 0x39);
+  this->m_windowFC->AddTextStyle(3, 0x12, 0x7F74DC, 1, 0, -1000, 0x39);
+  this->AddChild(this->m_windowFC);
 
-  UIBmpTextButton* deleteButton = new UIBmpTextButton();
-  this->m_window100 = deleteButton;
-  deleteButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 0, 0);
-  deleteButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_over.bmp", 1, 0);
-  deleteButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
-  deleteButton->SetSize(deleteButton->BitmapWidth(), deleteButton->BitmapHeight());
-  deleteButton->Move(0x33E, 0x15F);
-  deleteButton->SetText(LookupMessage(MSI_MAKECHARWND_CREATE));
-  deleteButton->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
-  deleteButton->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
-  deleteButton->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
-  deleteButton->SetId(ID_DELETE);
-  deleteButton->Enable(0);
-  this->AddChild(deleteButton);
+  this->m_window100 = new UIBmpTextButton();
+  this->m_window100->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_normal.bmp", 0, 0);
+  this->m_window100->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_over.bmp", 1, 0);
+  this->m_window100->SetBitmap("유저인터페이스\\select_character_ver3\\bt_info_press.bmp", 2, 0);
+  this->m_window100->SetSize(this->m_window100->BitmapWidth(), this->m_window100->BitmapHeight());
+  this->m_window100->Move(0x33E, 0x15F);
+  this->m_window100->SetText(LookupMessage(MSI_SELECTCHARWND_DELETE));
+  this->m_window100->AddTextStyle(0, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_window100->AddTextStyle(1, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_window100->AddTextStyle(2, 0xC, 0x313131, 0, 1, -1000, -1000);
+  this->m_window100->SetId(ID_DELETE);
+  this->m_window100->Enable(0);
+  this->AddChild(this->m_window100);
 
   this->m_button416 = new UIBitmapButton();
   this->m_button416->SetBitmap("유저인터페이스\\btn_make.bmp", 0, 0);
@@ -304,51 +291,39 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
   this->m_button417->Enable(0);
 
   this->m_prevPageButton = new UIBitmapButton();
-  const char* prevNormal;
-  const char* prevOver;
-  const char* prevPress;
   if (this->m_page == 0) {
-    prevPress = "유저인터페이스\\select_character_ver3\\bt_left_off.bmp";
-    prevOver = prevPress;
-    prevNormal = prevPress;
+    this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_off.bmp", 0, 0);
+    this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_off.bmp", 1, 0);
+    this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_off.bmp", 2, 0);
   } else {
-    prevPress = "유저인터페이스\\select_character_ver3\\bt_left_press.bmp";
-    prevOver = "유저인터페이스\\select_character_ver3\\bt_left_over.bmp";
-    prevNormal = "유저인터페이스\\select_character_ver3\\bt_left_on.bmp";
+    this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_on.bmp", 0, 0);
+    this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_over.bmp", 1, 0);
+    this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_press.bmp", 2, 0);
   }
-  this->m_prevPageButton->SetBitmap(prevNormal, 0, 0);
-  this->m_prevPageButton->SetBitmap(prevOver, 1, 0);
-  this->m_prevPageButton->SetBitmap(prevPress, 2, 0);
   this->m_prevPageButton->SetSize(this->m_prevPageButton->BitmapWidth(), this->m_prevPageButton->BitmapHeight());
   this->m_prevPageButton->Move(0x33E, 0x22E);
   this->m_prevPageButton->SetId(ID_PREV_PAGE);
   this->AddChild(this->m_prevPageButton);
 
   this->m_nextPageButton = new UIBitmapButton();
-  const char* nextNormal;
-  const char* nextOver;
-  const char* nextPress;
-  if (this->m_page < this->m_pageCount - 1) {
-    nextPress = "유저인터페이스\\select_character_ver3\\bt_right_press.bmp";
-    nextOver = "유저인터페이스\\select_character_ver3\\bt_right_over.bmp";
-    nextNormal = "유저인터페이스\\select_character_ver3\\bt_right_on.bmp";
+  if (this->m_page >= this->m_pageCount - 1) {
+    this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_off.bmp", 0, 0);
+    this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_off.bmp", 1, 0);
+    this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_off.bmp", 2, 0);
   } else {
-    nextPress = "유저인터페이스\\select_character_ver3\\bt_right_off.bmp";
-    nextOver = nextPress;
-    nextNormal = nextPress;
+    this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_on.bmp", 0, 0);
+    this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_over.bmp", 1, 0);
+    this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_press.bmp", 2, 0);
   }
-  this->m_nextPageButton->SetBitmap(nextNormal, 0, 0);
-  this->m_nextPageButton->SetBitmap(nextOver, 1, 0);
-  this->m_nextPageButton->SetBitmap(nextPress, 2, 0);
   this->m_nextPageButton->SetSize(this->m_nextPageButton->BitmapWidth(), this->m_nextPageButton->BitmapHeight());
   this->m_nextPageButton->Move(0x3AB, 0x22E);
   this->m_nextPageButton->SetId(ID_NEXT_PAGE);
   this->AddChild(this->m_nextPageButton);
 
   UIStaticText* pageTitle = new UIStaticText();
-  const int titleWidth = this->TextWidth(LookupMessage(MSI_MAKECHARWND_HAIR_STYLE), 0, 0, 0xC, 1, 0);
-  pageTitle->SetSize(titleWidth, this->TextHeight(LookupMessage(MSI_MAKECHARWND_HAIR_STYLE), 0, 0, 0xC, 1, 0));
-  pageTitle->SetText(LookupMessage(MSI_MAKECHARWND_HAIR_STYLE), 0);
+  const int titleWidth = this->TextWidth(LookupMessage(MSI_SELECTCHARWND_CHARACTER_LIST), 0, 0, 0xC, 1, 0);
+  pageTitle->SetSize(titleWidth, this->TextHeight(LookupMessage(MSI_SELECTCHARWND_CHARACTER_LIST), 0, 0, 0xC, 1, 0));
+  pageTitle->SetText(LookupMessage(MSI_SELECTCHARWND_CHARACTER_LIST), 0);
   pageTitle->SetColor(0x57, 0x66, 0x91);
   pageTitle->Move(0x380 - titleWidth / 2, 0x21A);
   this->AddChild(pageTitle);
@@ -366,7 +341,7 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
 
   for (int index = 0; index < 12; ++index) {
     this->m_slotButtons[index] = new UIStaticText();
-    static_cast<UIStaticText*>(this->m_slotButtons[index])->SetFont(0, 0xB, 0, 0);
+    this->m_slotButtons[index]->SetFont(0, 0xB, 0, 0);
     this->m_slotButtons[index]->SetSize(0x6B, 0xF);
     if (index == 11) {
       this->m_slotButtons[index]->Move(0x364, 0x74);
@@ -389,7 +364,7 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
     if (g_session.IsListedId(character->job, character->sex) == 1) {
       char message[260];
       std::memset(message, 0, sizeof(message));
-      std::sprintf(message, LookupMessage(MSI_REFUSE_OVER_USERLIMIT), index, 0x9C41);
+      std::sprintf(message, LookupMessage(MSI_CHARACTERERROR_JOB), index, 0x9C41);
       g_windowMgr.Confirm(message, 0, true, false, 0, "Message", 0x118, 0x78, 0);
       g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
       break;
@@ -404,81 +379,44 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
     this->m_slotStatus[slot] = 0;
     const int page = slot / this->m_slotsPerPage;
     const int column = page != 0 ? index % (page * this->m_slotsPerPage) : slot;
-    CharSlotInfo& slotInfo = this->m_charSlotInfos[slot];
-    slotInfo.x = (column % 5) * 0x9D + 0x5A;
-    slotInfo.y = (column / 5) * 0xC3 + 0x9E;
-    slotInfo.job = character->job;
-    slotInfo.robe = character->robe;
+    this->m_charSlotInfos[slot].x = (column % 5) * 0x9D + 0x5A;
+    this->m_charSlotInfos[slot].y = (column / 5) * 0xC3 + 0x9E;
+    this->m_charSlotInfos[slot].job = character->job;
+    this->m_charSlotInfos[slot].robe = character->robe;
     if (character->deleteDate > 0) {
-      slotInfo.actionBase = 0x10;
-      slotInfo.action = 0x10;
+      this->m_charSlotInfos[slot].actionBase = 0x10;
+      this->m_charSlotInfos[slot].action = 0x10;
     } else {
-      slotInfo.actionBase = 0;
-      slotInfo.action = 0;
+      this->m_charSlotInfos[slot].actionBase = 0;
+      this->m_charSlotInfos[slot].action = 0;
     }
-    slotInfo.frame = 0;
+    this->m_charSlotInfos[slot].frame = 0;
 
-    {
-      const std::string name = g_session.GetBodyActionResourceName(character->job, character->sex, character->bodyCostume, 0);
-      slotInfo.actionNames[0] = name;
-    }
-    {
-      const std::string name = g_session.GetBodySprName(character->job, character->sex, character->bodyCostume, 0);
-      slotInfo.spriteNames[0] = name;
-    }
+    this->m_charSlotInfos[slot].actionNames[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(character->job, character->sex, character->bodyCostume, 0));
+    this->m_charSlotInfos[slot].spriteNames[0] = static_cast<const std::string&>(g_session.GetBodySprName(character->job, character->sex, character->bodyCostume, 0));
     int head = character->head;
-    {
-      const std::string name = g_session.GetHeadActName(character->job, character->sex, &head);
-      slotInfo.actionNames[1] = name;
-    }
-    {
-      const std::string name = g_session.GetHeadSprName(character->job, character->sex, &head);
-      slotInfo.spriteNames[1] = name;
-    }
-    {
-      const std::string name = g_session.GetAccessoryActName(character->job, character->sex, head, character->accessory3);
-      slotInfo.actionNames[2] = name;
-    }
-    {
-      const std::string name = g_session.GetAccessorySprName(character->job, character->sex, head, character->accessory3);
-      slotInfo.spriteNames[2] = name;
-    }
+    this->m_charSlotInfos[slot].actionNames[1] = static_cast<const std::string&>(g_session.GetHeadActName(character->job, character->sex, &head));
+    this->m_charSlotInfos[slot].spriteNames[1] = static_cast<const std::string&>(g_session.GetHeadSprName(character->job, character->sex, &head));
+    this->m_charSlotInfos[slot].actionNames[2] = static_cast<const std::string&>(g_session.GetAccessoryActName(character->job, character->sex, head, character->accessory3));
+    this->m_charSlotInfos[slot].spriteNames[2] = static_cast<const std::string&>(g_session.GetAccessorySprName(character->job, character->sex, head, character->accessory3));
     character->head = static_cast<std::int16_t>(head);
-    {
-      const std::string name = g_session.GetAccessoryActName(character->job, character->sex, head, character->accessory2);
-      slotInfo.actionNames[3] = name;
-    }
-    {
-      const std::string name = g_session.GetAccessorySprName(character->job, character->sex, head, character->accessory2);
-      slotInfo.spriteNames[3] = name;
-    }
+    this->m_charSlotInfos[slot].actionNames[3] = static_cast<const std::string&>(g_session.GetAccessoryActName(character->job, character->sex, head, character->accessory2));
+    this->m_charSlotInfos[slot].spriteNames[3] = static_cast<const std::string&>(g_session.GetAccessorySprName(character->job, character->sex, head, character->accessory2));
     this->m_slotShorts[slot] = character->accessory2;
-    {
-      const std::string name = g_session.GetAccessoryActName(character->job, character->sex, head, character->accessory);
-      slotInfo.actionNames[4] = name;
-    }
-    {
-      const std::string name = g_session.GetAccessorySprName(character->job, character->sex, head, character->accessory);
-      slotInfo.spriteNames[4] = name;
+    this->m_charSlotInfos[slot].actionNames[4] = static_cast<const std::string&>(g_session.GetAccessoryActName(character->job, character->sex, head, character->accessory));
+    this->m_charSlotInfos[slot].spriteNames[4] = static_cast<const std::string&>(g_session.GetAccessorySprName(character->job, character->sex, head, character->accessory));
+
+    this->m_charSlotInfos[slot].bodyPalette = g_session.GetBodyStyle(character->job, character->bodyStyle, character->bodyCostume);
+    if (this->m_charSlotInfos[slot].bodyPalette != 0) {
+      this->m_charSlotInfos[slot].bodyPaletteName = static_cast<const std::string&>(g_session.GetBodyPalName(character->job, character->sex, this->m_charSlotInfos[slot].bodyPalette, character->bodyCostume, 0, 0));
     }
 
-    slotInfo.bodyPalette = g_session.GetBodyStyle(character->job, character->bodyStyle, character->bodyCostume);
-    if (slotInfo.bodyPalette != 0) {
-      {
-        const std::string name = g_session.GetBodyPalName(character->job, character->sex, slotInfo.bodyPalette, character->bodyCostume, 0, 0);
-        slotInfo.bodyPaletteName = name;
-      }
+    this->m_charSlotInfos[slot].headPalette = character->headPalette;
+    if (this->m_charSlotInfos[slot].headPalette != 0) {
+      this->m_charSlotInfos[slot].headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(head, character->job, character->sex, this->m_charSlotInfos[slot].headPalette));
     }
 
-    slotInfo.headPalette = character->headPalette;
-    if (slotInfo.headPalette != 0) {
-      {
-        const std::string name = g_session.GetHeadPalName(head, character->job, character->sex, slotInfo.headPalette);
-        slotInfo.headPaletteName = name;
-      }
-    }
-
-    slotInfo.imfName = g_session.GetBodyImfName(character->job, character->sex, character->head, character->bodyCostume);
+    this->m_charSlotInfos[slot].imfName = g_session.GetBodyImfName(character->job, character->sex, character->head, character->bodyCostume);
   }
 
   for (int index = 0; index < this->m_totalSlots; ++index) {
@@ -505,7 +443,7 @@ void UINewSelectCharWnd::OnCreate(int width, int height) {
   }
 
   this->UpdateCharacterInfo();
-  this->m_message0 = 0xB8;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x007D7330
@@ -539,8 +477,11 @@ void UINewSelectCharWnd::Paint() {
         .Draw(true);
     }
 
+    int buttonIndex = slot;
     const int page = slot / this->m_slotsPerPage;
-    const int buttonIndex = page != 0 ? slot % (page * this->m_slotsPerPage) : slot;
+    if (page != 0) {
+      buttonIndex %= page * this->m_slotsPerPage;
+    }
     if (buttonIndex < this->m_slotsPerPage) {
       if (slot >= this->m_totalSlots) {
         continue;
@@ -575,11 +516,13 @@ void UINewSelectCharWnd::Paint() {
   if (selected && selected->deleteDate > 0) {
     Timestamp deleteDate(selected->deleteDate);
     if (deleteDate.IsBeforeNow() == 1) {
-      this->m_window100->SetDisabled(0);
-      this->m_window100->Invalidate();
+      auto* const window = this->m_window100;
+      window->SetDisabled(0);
+      window->Invalidate();
     } else {
-      this->m_window100->SetDisabled(1);
-      this->m_window100->Invalidate();
+      auto* const window = this->m_window100;
+      window->SetDisabled(1);
+      window->Invalidate();
     }
   }
 }
@@ -635,10 +578,10 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         }
 
         g_session.SetPlayerNameKey(reinterpret_cast<const unsigned char*>(info->name));
-        if (info->sex == 'c') {
-          g_session.SetFlag(static_cast<char>(g_session.m_sex));
+        if (info->sex != 'c') {
+          g_session.SetFlag(info->sex);
         } else {
-          g_session.SetFlag(static_cast<char>(info->sex));
+          g_session.SetFlag(g_session.m_sex);
         }
         this->m_navigationBlocked = true;
         const BlockedCharacter* blocked = g_session.m_blockedCharacters;
@@ -654,7 +597,7 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         }
 
         g_soundMgr->PlayWave("버튼소리.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
-        g_modeMgr.currentMode->SendMsg(MM_COMMAND, 0x2712, 0, 0, 0);
+        g_modeMgr.currentMode->SendMsg(MM_COMMAND, LMM_TRANSFERCHARACTER, 0, 0, 0);
         this->m_gameStartPending = true;
         if (this->m_windowFC != nullptr) {
           this->m_windowFC->SetBitmap("유저인터페이스\\select_character_ver3\\bt_gameStart_on.bmp", 0, 0);
@@ -669,7 +612,7 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     case ID_MAKE:
       if (this->m_pageSlot != argument2) {
         this->m_pageSlot = argument2;
-        this->SendMsg(this->m_slotButtons2[argument2], UM_COMMAND, ID_SLOT, 0, 0, 0);
+        this->SendMsg(this->m_slotButtons2[this->m_pageSlot], UM_COMMAND, ID_SLOT, 0, 0, 0);
       }
       if (this->m_slotStatus[static_cast<unsigned char>(g_selectedSlotIndex)] == 1 && static_cast<unsigned char>(g_selectedSlotIndex) < g_session.m_producibleSlotCount &&
           g_windowMgr.EnsureWindow(WID_NEWMAKECHARWND) != nullptr) {
@@ -727,10 +670,10 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     case ID_CANCEL:
       g_accountLinkedUserDataMgr->Save();
       if (g_session.m_loginModeFlag == 1) {
-        if (g_windowMgr.Confirm(LookupMessage(MSI_ENST_ANGELUS2), 2, true, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_WANT_TO_BACK_LOGINWND), 2, true, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
           g_modeMgr.currentMode->SendMsg(LMM_GOTO_LOGIN, 0, 0, 0, 0);
         }
-      } else if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+      } else if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
         g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
       }
@@ -742,18 +685,17 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
 
       for (int index = 0; index < this->m_slotsPerPage; ++index) {
         UIWindow* button = this->m_slotButtons2[index];
-        if (sender != button) {
+        if (sender == button) {
+          this->m_pageSlot = index;
+          g_selectedSlotIndex = static_cast<unsigned char>(this->m_page * this->m_slotsPerPage + index);
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+          if (argument2 != 0xE2 && this->m_slotStatus[static_cast<unsigned char>(g_selectedSlotIndex)] != 0 &&
+              static_cast<UISlotBmpButton*>(this->m_slotButtons2[index])->m_displayMode == 0) {
+            this->SendMsg(nullptr, UM_COMMAND, ID_MAKE, this->m_pageSlot, 0, 0);
+            break;
+          }
+        } else {
           button->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
-          continue;
-        }
-
-        this->m_pageSlot = index;
-        g_selectedSlotIndex = static_cast<unsigned char>(this->m_page * this->m_slotsPerPage + index);
-        this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
-        if (argument2 != 0xE2 && this->m_slotStatus[static_cast<unsigned char>(g_selectedSlotIndex)] != 0 &&
-            static_cast<UISlotBmpButton*>(this->m_slotButtons2[index])->m_displayMode == 0) {
-          this->SendMsg(nullptr, UM_COMMAND, ID_MAKE, this->m_pageSlot, 0, 0);
-          break;
         }
       }
 
@@ -763,19 +705,16 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
           reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, static_cast<unsigned char>(g_selectedSlotIndex), 0, 0, 0));
         const int selected = static_cast<unsigned char>(g_selectedSlotIndex);
         if (this->m_slotMoveSource != selected && selected < this->m_maxCharacters) {
-          if (info == nullptr) {
-            if (this->m_slotMoveSource != -1) {
-              g_modeMgr.GetLoginMode()->ShowNotice(0x2E, false);
-            }
-          } else {
+          if (info != nullptr) {
             if (info->slotChangeCount > 0) {
               shown = g_modeMgr.GetLoginMode()->ShowNotice(0x2D, false);
             }
-            if (info->nameChangeCount > 0) {
-              g_modeMgr.GetLoginMode()->ShowNotice(0x2F, shown);
-            }
+          } else if (this->m_slotMoveSource != -1) {
+            g_modeMgr.GetLoginMode()->ShowNotice(0x2E, false);
           }
-        } else if (info != nullptr && info->nameChangeCount > 0) {
+        }
+
+        if (info != nullptr && info->nameChangeCount > 0) {
           g_modeMgr.GetLoginMode()->ShowNotice(0x2F, shown);
         }
       }
@@ -852,7 +791,7 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       this->m_slotMoveSource = static_cast<unsigned char>(g_selectedSlotIndex);
       break;
     case SELECTCHAR_BUTTON_SLOT_MOVE_CONFIRM: {
-      const unsigned char selected = static_cast<unsigned char>(g_selectedSlotIndex);
+      const int selected = static_cast<unsigned char>(g_selectedSlotIndex);
       if (g_windowMgr.Confirm(LookupMessage(MSI_CHANGE_CHARACTER_SLOT), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
         const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, this->m_slotMoveSource, 0, 0, 0));
         if (info != nullptr) {
@@ -873,21 +812,15 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       }
 
       --this->m_page;
-      const char* prevNormal;
-      const char* prevOver;
-      const char* prevPress;
       if (this->m_page == 0) {
-        prevPress = "유저인터페이스\\select_character_ver3\\bt_left_off.bmp";
-        prevOver = prevPress;
-        prevNormal = prevPress;
+        this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_off.bmp", 0, 0);
+        this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_off.bmp", 1, 0);
+        this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_off.bmp", 2, 0);
       } else {
-        prevPress = "유저인터페이스\\select_character_ver3\\bt_left_press.bmp";
-        prevOver = "유저인터페이스\\select_character_ver3\\bt_left_over.bmp";
-        prevNormal = "유저인터페이스\\select_character_ver3\\bt_left_on.bmp";
+        this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_on.bmp", 0, 0);
+        this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_over.bmp", 1, 0);
+        this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_press.bmp", 2, 0);
       }
-      this->m_prevPageButton->SetBitmap(prevNormal, 0, 0);
-      this->m_prevPageButton->SetBitmap(prevOver, 1, 0);
-      this->m_prevPageButton->SetBitmap(prevPress, 2, 0);
       this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_on.bmp", 0, 0);
       this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_over.bmp", 1, 0);
       this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_press.bmp", 2, 0);
@@ -902,22 +835,25 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
           continue;
         }
 
-        const int column = this->m_page != 0 ? index % (this->m_page * this->m_slotsPerPage) : index;
-        UISlotBmpButton* button = static_cast<UISlotBmpButton*>(this->m_slotButtons2[column]);
+        int column = index;
+        if (this->m_page != 0) {
+          column = index % (this->m_page * this->m_slotsPerPage);
+        }
         if (this->m_slotStatus[index] == 1) {
-          button->SetSlot(-1, index);
+          static_cast<UISlotBmpButton*>(this->m_slotButtons2[column])->SetSlot(-1, index);
           this->m_characterWindows[column]->SetText("", 0);
-          if (index < static_cast<unsigned>(g_session.m_producibleSlotCount)) {
-            button->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 0, 0, 0, 0);
-          } else {
+          UISlotBmpButton* button = static_cast<UISlotBmpButton*>(this->m_slotButtons2[column]);
+          if (index >= static_cast<unsigned>(g_session.m_producibleSlotCount)) {
             button->SetDisabled(1);
             button->Invalidate();
+          } else {
+            button->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 0, 0, 0, 0);
           }
           continue;
         }
 
-        button->SetSlot(index, -1);
-        button->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 1, 0, 0, 0);
+        static_cast<UISlotBmpButton*>(this->m_slotButtons2[column])->SetSlot(index, -1);
+        this->m_slotButtons2[column]->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 1, 0, 0, 0);
         const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
         if (info != nullptr) {
           this->m_characterWindows[column]->SetTextFitted(info->name);
@@ -939,21 +875,15 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       }
 
       ++this->m_page;
-      const char* nextNormal;
-      const char* nextOver;
-      const char* nextPress;
-      if (this->m_page < this->m_pageCount - 1) {
-        nextPress = "유저인터페이스\\select_character_ver3\\bt_right_press.bmp";
-        nextOver = "유저인터페이스\\select_character_ver3\\bt_right_over.bmp";
-        nextNormal = "유저인터페이스\\select_character_ver3\\bt_right_on.bmp";
+      if (this->m_page >= this->m_pageCount - 1) {
+        this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_off.bmp", 0, 0);
+        this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_off.bmp", 1, 0);
+        this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_off.bmp", 2, 0);
       } else {
-        nextPress = "유저인터페이스\\select_character_ver3\\bt_right_off.bmp";
-        nextOver = nextPress;
-        nextNormal = nextPress;
+        this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_on.bmp", 0, 0);
+        this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_over.bmp", 1, 0);
+        this->m_nextPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_right_press.bmp", 2, 0);
       }
-      this->m_nextPageButton->SetBitmap(nextNormal, 0, 0);
-      this->m_nextPageButton->SetBitmap(nextOver, 1, 0);
-      this->m_nextPageButton->SetBitmap(nextPress, 2, 0);
       this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_on.bmp", 0, 0);
       this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_over.bmp", 1, 0);
       this->m_prevPageButton->SetBitmap("유저인터페이스\\select_character_ver3\\bt_left_press.bmp", 2, 0);
@@ -968,22 +898,25 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
           continue;
         }
 
-        const int column = this->m_page != 0 ? index % (this->m_page * this->m_slotsPerPage) : index;
-        UISlotBmpButton* button = static_cast<UISlotBmpButton*>(this->m_slotButtons2[column]);
+        int column = index;
+        if (this->m_page != 0) {
+          column = index % (this->m_page * this->m_slotsPerPage);
+        }
         if (this->m_slotStatus[index] == 1) {
-          button->SetSlot(-1, index);
+          static_cast<UISlotBmpButton*>(this->m_slotButtons2[column])->SetSlot(-1, index);
           this->m_characterWindows[column]->SetText("", 0);
-          if (index < static_cast<unsigned>(g_session.m_producibleSlotCount)) {
-            button->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 0, 0, 0, 0);
-          } else {
+          UISlotBmpButton* button = static_cast<UISlotBmpButton*>(this->m_slotButtons2[column]);
+          if (index >= static_cast<unsigned>(g_session.m_producibleSlotCount)) {
             button->SetDisabled(1);
             button->Invalidate();
+          } else {
+            button->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 0, 0, 0, 0);
           }
           continue;
         }
 
-        button->SetSlot(index, -1);
-        button->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 1, 0, 0, 0);
+        static_cast<UISlotBmpButton*>(this->m_slotButtons2[column])->SetSlot(index, -1);
+        this->m_slotButtons2[column]->SendMsg(nullptr, UM_SET_CHARACTER_SLOT_STYLE, 1, 0, 0, 0);
         const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
         if (info != nullptr) {
           this->m_characterWindows[column]->SetTextFitted(info->name);
@@ -1026,7 +959,11 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         this->m_pageSlot = this->m_slotsPerPage - 1;
       }
       for (int index = 0; index < this->m_slotsPerPage; ++index) {
-        this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, index == this->m_pageSlot, 0, 0, 0);
+        if (index == this->m_pageSlot) {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+        } else {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+        }
       }
       g_selectedSlotIndex = static_cast<unsigned char>(this->m_page * this->m_slotsPerPage + this->m_pageSlot);
       this->UpdateCharacterInfo();
@@ -1054,7 +991,11 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         this->m_pageSlot %= this->m_slotsPerPage * this->m_page;
       }
       for (int index = 0; index < this->m_slotsPerPage; ++index) {
-        this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, index == this->m_pageSlot, 0, 0, 0);
+        if (index == this->m_pageSlot) {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+        } else {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+        }
       }
       g_selectedSlotIndex = static_cast<unsigned char>(this->m_page * this->m_slotsPerPage + this->m_pageSlot);
       this->UpdateCharacterInfo();
@@ -1080,7 +1021,11 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         this->m_pageSlot += this->m_slotsPerPage;
       }
       for (int index = 0; index < this->m_slotsPerPage; ++index) {
-        this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, index == this->m_pageSlot, 0, 0, 0);
+        if (index == this->m_pageSlot) {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+        } else {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+        }
       }
       g_selectedSlotIndex = static_cast<unsigned char>(this->m_page * this->m_slotsPerPage + this->m_pageSlot);
       this->UpdateCharacterInfo();
@@ -1108,7 +1053,11 @@ int UINewSelectCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         this->m_pageSlot %= this->m_slotsPerPage * this->m_page;
       }
       for (int index = 0; index < this->m_slotsPerPage; ++index) {
-        this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, index == this->m_pageSlot, 0, 0, 0);
+        if (index == this->m_pageSlot) {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+        } else {
+          this->m_slotButtons2[index]->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+        }
       }
       g_selectedSlotIndex = static_cast<unsigned char>(this->m_page * this->m_slotsPerPage + this->m_pageSlot);
       this->UpdateCharacterInfo();
@@ -1208,26 +1157,27 @@ void UINewSelectCharWnd::UpdateCharacterInfo() {
 
   const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, current, 0, 0, 0));
   if (info) {
-    static_cast<UIStaticText*>(this->m_slotButtons[0])->SetTextFitted(g_session.GetJobName(info->job, info->sex));
-    static_cast<UIStaticText*>(this->m_slotButtons[1])->SetTextFitted(FormatOwnedString("%d", info->level).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[2])->SetTextFitted(FormatOwnedString("%lld", info->exp).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[3])->SetTextFitted(FormatOwnedString("%lld", info->hp).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[4])->SetTextFitted(FormatOwnedString("%lld", info->sp).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[5])->SetTextFitted(FormatOwnedString("%d", info->stats[0]).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[6])->SetTextFitted(FormatOwnedString("%d", info->stats[1]).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[7])->SetTextFitted(FormatOwnedString("%d", info->stats[2]).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[8])->SetTextFitted(FormatOwnedString("%d", info->stats[3]).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[9])->SetTextFitted(FormatOwnedString("%d", info->stats[4]).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[10])->SetTextFitted(FormatOwnedString("%d", info->stats[5]).c_str());
-    static_cast<UIStaticText*>(this->m_slotButtons[11])->SetTextFitted(g_session.GetMapDisplayName(info->mapName));
+    this->m_slotButtons[0]->SetTextFitted(g_session.GetJobName(info->job, info->sex));
+    this->m_slotButtons[1]->SetTextFitted(FormatOwnedString("%d", info->level).c_str());
+    this->m_slotButtons[2]->SetTextFitted(FormatOwnedString("%lld", info->exp).c_str());
+    this->m_slotButtons[3]->SetTextFitted(FormatOwnedString("%lld", info->hp).c_str());
+    this->m_slotButtons[4]->SetTextFitted(FormatOwnedString("%lld", info->sp).c_str());
+    this->m_slotButtons[5]->SetTextFitted(FormatOwnedString("%d", info->stats[0]).c_str());
+    this->m_slotButtons[6]->SetTextFitted(FormatOwnedString("%d", info->stats[1]).c_str());
+    this->m_slotButtons[7]->SetTextFitted(FormatOwnedString("%d", info->stats[2]).c_str());
+    this->m_slotButtons[8]->SetTextFitted(FormatOwnedString("%d", info->stats[3]).c_str());
+    this->m_slotButtons[9]->SetTextFitted(FormatOwnedString("%d", info->stats[4]).c_str());
+    this->m_slotButtons[10]->SetTextFitted(FormatOwnedString("%d", info->stats[5]).c_str());
+    this->m_slotButtons[11]->SetTextFitted(g_session.GetMapDisplayName(info->mapName));
   } else {
     for (int index = 0; index < 12; ++index) {
-      static_cast<UIStaticText*>(this->m_slotButtons[index])->SetText("", 0);
+      this->m_slotButtons[index]->SetText("", 0);
     }
   }
 
+  const bool disabled = this->m_slotStatus[current] == 1;
   auto* button = this->m_windowFC;
-  if (this->m_slotStatus[current] == 1) {
+  if (disabled) {
     button->SetDisabled(1);
     button->Invalidate();
   } else {

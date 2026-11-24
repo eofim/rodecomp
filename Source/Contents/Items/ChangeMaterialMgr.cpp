@@ -129,7 +129,7 @@ ChangeMaterialResult CChangeMaterialMgr::InsertRecipe(std::vector<ChangeMaterial
   std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess>::iterator it = this->m_library.find(key);
   if (it == this->m_library.end()) {
     std::pair<std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess>::iterator, bool> inserted =
-        this->m_library.insert(std::map<MaterialKey, ChangeMaterialRecipeList, MaterialKeyLess>::value_type(key, ChangeMaterialRecipeList()));
+        this->m_library.insert(std::make_pair(key, ChangeMaterialRecipeList()));
     if (!inserted.second) {
       return ChangeMaterialResult(false, "error m_Library.insert()");
     }
@@ -280,7 +280,8 @@ int CChangeMaterialMgr::LuaInsertRecipe(lua_State* L) {
   }
   lua_pop(L, 1);
 
-  g_changeMaterialMgr->InsertRecipe(materials, products, static_cast<int>(type));
+  CChangeMaterialMgr* manager = g_changeMaterialMgr;
+  manager->InsertRecipe(materials, products, static_cast<int>(type));
 
   lua_pushboolean(L, 1);
   lua_pushstring(L, ChangeMaterialFormat("good").c_str());

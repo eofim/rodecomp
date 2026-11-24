@@ -10,8 +10,6 @@
 #include <windows.h>
 #include <timeapi.h>
 
-template __declspec(noinline) void std::deque<std::uint32_t>::pop_front() noexcept;
-
 #pragma pack(push, 1)
 struct PACKET_CZ_REQNAME_BYGID2 {
   /* 0000 */ std::int16_t packetType;
@@ -41,7 +39,7 @@ std::string CPlayerNameDictionary::Lookup(std::uint32_t id) {
     return entry->second.name;
   }
 
-  if (std::find(this->m_pending.begin(), this->m_pending.end(), id) == this->m_pending.end()) {
+  if (this->m_pending.end() == std::find(this->m_pending.begin(), this->m_pending.end(), id)) {
     this->m_pending.push_back(id);
   }
 
@@ -56,7 +54,7 @@ inline CPlayerNameDictionary::Entry::Entry(std::string value) : name(value), tic
 // FUNCTION: fn_04258
 void CPlayerNameDictionary::Set(std::uint32_t id, std::string name) {
   this->m_names[id] = Entry(name);
-  const auto request = std::find_if(this->m_requests.begin(), this->m_requests.end(), [&](const Request& value) { return value.id == id; });
+  const auto request = std::find_if(this->m_requests.begin(), this->m_requests.end(), [&](const Request& value) { return id == value.id; });
   if (request != this->m_requests.end()) {
     this->m_requests.erase(request);
   }
@@ -91,9 +89,9 @@ void CPlayerNameDictionary::Update() {
   while (!this->m_pending.empty()) {
     const std::uint32_t id = this->m_pending.front();
     const auto cached = this->m_names.find(id);
-    if (cached == this->m_names.end() || cached->second.IsExpired()) {
-      const auto outstanding = std::find_if(this->m_requests.begin(), this->m_requests.end(), [&](const Request& request) { return request.id == id; });
-      if (outstanding == this->m_requests.end()) {
+    if (this->m_names.end() == cached || cached->second.IsExpired()) {
+      const auto outstanding = std::find_if(this->m_requests.begin(), this->m_requests.end(), [&](const Request& request) { return id == request.id; });
+      if (this->m_requests.end() == outstanding) {
         this->m_pending.pop_front();
 
         if (id != 0) {

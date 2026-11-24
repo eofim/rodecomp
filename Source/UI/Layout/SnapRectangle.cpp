@@ -8,14 +8,29 @@
 
 namespace {
   // INLINED
-  bool Overlaps(int a, int b, int c, int d) {
-    return (c >= a && c <= b) || (d >= a && d <= b) || (a >= c && a <= d) || (b >= c && b <= d);
+  bool SnapLeadingEdge(int edge, int value, int& offset) {
+    if (value < edge - 10 || value > edge + 10) {
+      return false;
+    }
+    offset = edge - value;
+    return true;
   }
 
   // INLINED
-  bool Near(int value, int edge) {
-    return value >= (edge - 10) && value <= (edge + 10);
+  bool SnapTrailingEdge(int edge, int value, int& offset) {
+    if (value > edge + 10 || value < edge - 10) {
+      return false;
+    }
+    offset = edge - value;
+    return true;
   }
+}
+
+// OFFSET: 0x009B50C0
+// FUNCTION: fn_45773
+__forceinline bool SnapRectangle::Overlaps(int firstBegin, int firstEnd, int secondBegin, int secondEnd) const {
+  return (secondBegin >= firstBegin && secondBegin <= firstEnd) || (secondEnd >= firstBegin && secondEnd <= firstEnd) ||
+         (firstBegin >= secondBegin && firstBegin <= secondEnd) || (firstEnd >= secondBegin && firstEnd <= secondEnd);
 }
 
 // OFFSET: 0x009B5250
@@ -51,60 +66,23 @@ void SnapRectangle::ReverseEdges() {
 void SnapRectangle::Snap(const SnapRectangle& other, int& dx, int& dy) const {
   dx = 0;
   dy = 0;
-  if (Overlaps(this->left.begin, this->left.end, other.right.begin, other.right.end)) {
-    int edge = this->left.position;
-    int value = other.right.position;
-    bool close = Near(value, edge);
-
-    if (!close) {
-      edge = this->right.position;
-      value = other.left.position;
-      close = Near(value, edge);
-    }
-
-    if (close) {
-      dx = (edge - value);
-      edge = this->top.position;
-      value = other.top.position;
-      close = Near(value, edge);
-
-      if (!close) {
-        edge = this->bottom.position;
-        value = other.bottom.position;
-        close = Near(value, edge);
-      }
-
-      if (close) {
-        dy = (edge - value);
+  if (this->Overlaps(this->left.begin, this->left.end, other.right.begin, other.right.end)) {
+    if (SnapLeadingEdge(this->left.position, other.right.position, dx) || SnapTrailingEdge(this->right.position, other.left.position, dx)) {
+      if (!SnapLeadingEdge(this->top.position, other.top.position, dy)) {
+        SnapTrailingEdge(this->bottom.position, other.bottom.position, dy);
       }
     }
   }
 
-  if (Overlaps(this->top.begin, this->top.end, other.bottom.begin, other.bottom.end)) {
-    int edge = this->top.position;
-    int value = other.bottom.position;
-    bool close = Near(value, edge);
-
-    if (!close) {
-      edge = this->bottom.position;
-      value = other.top.position;
-      close = Near(value, edge);
-    }
-
-    if (close) {
-      dy = (edge - value);
-      edge = this->left.position;
-      value = other.left.position;
-      close = Near(value, edge);
-
-      if (!close) {
-        edge = this->right.position;
-        value = other.right.position;
-        close = Near(value, edge);
+  if (this->Overlaps(this->top.begin, this->top.end, other.bottom.begin, other.bottom.end)) {
+    if (SnapLeadingEdge(this->top.position, other.bottom.position, dy) || SnapTrailingEdge(this->bottom.position, other.top.position, dy)) {
+      if (SnapLeadingEdge(this->left.position, other.left.position, dx)) {
+        return;
       }
-
-      if (close) {
-        dx = (edge - value);
+      const int right = this->right.position;
+      const int otherRight = other.right.position;
+      if (otherRight <= right + 10 && otherRight >= right - 10) {
+        dx = right - otherRight;
       }
     }
   }

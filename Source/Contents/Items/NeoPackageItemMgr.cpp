@@ -16,28 +16,6 @@ NEO_PACKAGEITEM::CNeoPackageItemMgr* Singleton<NEO_PACKAGEITEM::CNeoPackageItemM
 template <>
 NEO_PACKAGEITEM::CPaidPackageItemMgr* Singleton<NEO_PACKAGEITEM::CPaidPackageItemMgr>::s_instance = nullptr;
 
-// OFFSET: 0x00E5D020
-// FUNCTION: fn_24376
-template <>
-NEO_PACKAGEITEM::CNeoPackageItemMgr* Singleton<NEO_PACKAGEITEM::CNeoPackageItemMgr>::GetInstance() {
-  if (!s_instance) {
-    s_instance = new (std::nothrow) NEO_PACKAGEITEM::CNeoPackageItemMgr;
-  }
-
-  return s_instance;
-}
-
-// OFFSET: 0x00E5D090
-// FUNCTION: fn_24377
-template <>
-NEO_PACKAGEITEM::CPaidPackageItemMgr* Singleton<NEO_PACKAGEITEM::CPaidPackageItemMgr>::GetInstance() {
-  if (!s_instance) {
-    s_instance = new (std::nothrow) NEO_PACKAGEITEM::CPaidPackageItemMgr;
-  }
-
-  return s_instance;
-}
-
 namespace NEO_PACKAGEITEM {
 
 // OFFSET: 0x006D1600
@@ -54,9 +32,19 @@ void CNeoPackageItemMgr::Init() {
 // FUNCTION: fn_06523
 void CNeoPackageItemMgr::InsertPackage(int packageId, int groupId, int itemId, const std::string& name, int probability) {
   std::map<int, PackageGroup>& groups = this->m_packages[packageId];
-  PackageGroup& group = groups.try_emplace(groupId, PackageGroup{}).first->second;
-  group.totalProbability += probability;
-  group.items.emplace_back(itemId, name, probability);
+  auto group = groups.try_emplace(groupId, PackageGroup{}).first;
+  group->second.totalProbability += probability;
+  group->second.items.emplace_back(itemId, name, probability);
+}
+
+// INLINED
+static std::optional<std::map<int, PackageGroup>*> FindGroups(std::map<int, std::map<int, PackageGroup>>& packages, int packageId) {
+  std::map<int, std::map<int, PackageGroup>>::iterator package = packages.find(packageId);
+  if (package != packages.end()) {
+    return &package->second;
+  }
+
+  return std::nullopt;
 }
 
 // OFFSET: 0x006D2140
@@ -67,12 +55,7 @@ __declspec(noinline) std::optional<std::map<int, PackageGroup>*> CNeoPackageItem
     packageId = itemId;
   }
 
-  std::map<int, std::map<int, PackageGroup>>::iterator package = this->m_packages.find(packageId);
-  if (package != this->m_packages.end()) {
-    return &package->second;
-  }
-
-  return std::nullopt;
+  return FindGroups(this->m_packages, packageId);
 }
 
 // OFFSET: 0x006D21B0
@@ -163,11 +146,16 @@ int CNeoPackageItemMgr::LuaInsertPackage(lua_State* state) {
   }
 
   const int packageId = static_cast<int>(lua_tonumber(state, 1));
-  const int groupId = static_cast<int>(lua_tonumber(state, 2));
-  const int itemId = static_cast<int>(lua_tonumber(state, 3));
+  const double groupId = lua_tonumber(state, 2);
+  const double itemId = lua_tonumber(state, 3);
   const std::string name = lua_tostring(state, 4);
   const int probability = static_cast<int>(lua_tonumber(state, 5));
-  CNeoPackageItemMgr::GetInstance()->InsertPackage(packageId, groupId, itemId, name, probability);
+  if (!CNeoPackageItemMgr::s_instance) {
+    CNeoPackageItemMgr::s_instance = new (std::nothrow) CNeoPackageItemMgr;
+  }
+
+  CNeoPackageItemMgr* packageItemMgr = CNeoPackageItemMgr::s_instance;
+  packageItemMgr->InsertPackage(packageId, static_cast<int>(groupId), static_cast<int>(itemId), name, probability);
   lua_pushboolean(state, 1);
   lua_pushstring(state, "good");
   return 2;
@@ -195,17 +183,16 @@ inline CSelectPackageItemMgr* SelectPackageItemMgr() {
 // OFFSET: 0x006D2E30
 // FUNCTION: fn_06536
 void CPaidPackageItemMgr::AddItem(int itemId) {
-  if (this->m_items.find(itemId) != this->m_items.end()) {
+  if (this->m_items.end() != this->m_items.find(itemId)) {
     return;
   }
 
   std::optional<std::map<int, PackageGroup>*> package = CNeoPackageItemMgr::GetInstance()->FindPackage(itemId);
   if (package) {
     this->m_items.insert(itemId);
-    for (std::map<int, PackageGroup>::iterator group = (*package)->begin(); group != (*package)->end(); ++group) {
-      for (std::list<PackageEntry>::iterator entry = group->second.items.begin(); entry != group->second.items.end();
-           ++entry) {
-        this->AddItem(entry->itemId);
+    for (std::pair<const int, PackageGroup>& group : **package) {
+      for (PackageEntry& entry : group.second.items) {
+        this->AddItem(entry.itemId);
       }
     }
   }
@@ -217,12 +204,13 @@ void CPaidPackageItemMgr::AddItem(int itemId) {
   }
 
   this->m_items.insert(itemId);
-  for (std::map<int, SelectPackageTab>::iterator tab = selectPackage->second.begin(); tab != selectPackage->second.end();
-       ++tab) {
-    std::optional<std::vector<ITEM_INFO>*> items = SelectPackageItemMgr()->FindItems(itemId, tab->first);
+  const auto tabEnd = selectPackage->second.end();
+  for (auto tabIt = selectPackage->second.begin(); tabIt != tabEnd; ++tabIt) {
+    std::pair<const int, SelectPackageTab>& tab = *tabIt;
+    std::optional<std::vector<ITEM_INFO>*> items = SelectPackageItemMgr()->FindItems(itemId, tab.first);
     if (items) {
-      for (std::vector<ITEM_INFO>::iterator item = (*items)->begin(); item != (*items)->end(); ++item) {
-        this->AddItem(std::atoi(item->itemId.c_str()));
+      for (ITEM_INFO& item : **items) {
+        this->AddItem(std::atoi(item.itemId.c_str()));
       }
     }
   }

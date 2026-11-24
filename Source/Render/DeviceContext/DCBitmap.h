@@ -2,8 +2,10 @@
 #define RAGNAROK_SOURCE_RENDER_DEVICECONTEXT_DCBITMAP_H
 
 #include "Render/Textures/BitmapPixels.h"
-#include "Render/Textures/BitmapTextureCache.h"
 #include "Render/DeviceContext/DeviceContext.h"
+#include "Render/Textures/Texture.h"
+
+#include <list>
 
 class CDCBitmap : public CDC {
 public:
@@ -12,7 +14,7 @@ public:
   void Grow(std::uint32_t width, std::uint32_t height) override;
   bool GetDC(HDC* output) override;
   void ReleaseDC(HDC dc) override;
-  void Copy(int x, int y, int width, int height, const std::uint32_t* source, bool transparent) override;
+  void Copy(int x, int y, int width, int height, const std::uint32_t* source, int transparent) override;
   void ScaleCopy(int x, int y, int sourceWidth, int sourceHeight, int width, int height, const std::uint32_t* source, int option) override;
   void CopyRegion(
     int x, int y, int sourceLeft, int sourceTop, int sourceRight, int sourceBottom, const std::uint32_t* source, int sourceWidth, int sourceHeight,
@@ -42,15 +44,26 @@ public:
   void UpdateCache();
   HGDIOBJ Create(int width, int height);
   void ApplyPixelFilter(int filter, unsigned int* red, unsigned int* green, unsigned int* blue);
+  void FilterPixel1555(int filter, int pixel, unsigned int* red, unsigned int* green, unsigned int* blue);
+  void FilterPixel4444(int filter, int pixel, unsigned int* red, unsigned int* green, unsigned int* blue);
   void SetAlpha(unsigned char maxLuminance);
   // INLINED
   void SetAlpha(bool alpha) {
-    this->m_cache.m_alpha = alpha;
+    this->m_alpha = alpha;
+  }
+  // INLINED
+  void ClearTextures() {
+    for (std::list<CTexture*>::iterator it = this->m_textures.begin(); it != this->m_textures.end(); ++it) {
+      delete *it;
+    }
+
+    this->m_textures.clear();
   }
 
 protected:
   /* 0004 */ BitmapPixels m_bitmap;
-  /* 0020 */ BitmapTextureCache m_cache;
+  /* 0020 */ std::list<CTexture*> m_textures;
+  /* 0028 */ bool m_alpha;
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

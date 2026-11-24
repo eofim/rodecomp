@@ -3,24 +3,6 @@
 #include "Contents/Map/MapSkyMgr.h"
 #include "Utility/Math/AffineMatrix.h"
 
-struct ZeroVector3d : vector3d {
-  // INLINED
-  ZeroVector3d() {
-    this->x = 0.0f;
-    this->y = 0.0f;
-    this->z = 0.0f;
-  }
-
-  using vector3d::operator=;
-
-  // INLINED
-  void Set(float x, float y, float z) {
-    this->x = x;
-    this->y = y;
-    this->z = z;
-  }
-};
-
 // OFFSET: 0x00BF4630
 // FUNCTION: fn_19995
 void CEffectPrim::RenderFoldingRibbon(matrix& wtm) {
@@ -198,18 +180,18 @@ void CEffectPrim::RenderStandingPanels(matrix& wtm) {
     dist = this->state.slots[ec].distance;
     cs = g_cosTable[this->state.slots[ec].rotStart];
     sn = g_sinTable[this->state.slots[ec].rotStart];
-    vec1.x = cs * (dist * 0.47f) - sn * -1.0f;
+    vec1.x = cs * (dist * 0.47f) - sn * g_heightSpeedSign;
     vec1.y = dist * -0.0f;
-    vec1.z = sn * (dist * 0.47f) + cs * -1.0f;
-    vec2.x = cs * (dist * -0.47f) - sn * -1.0f;
+    vec1.z = sn * (dist * 0.47f) + cs * g_heightSpeedSign;
+    vec2.x = cs * (dist * -0.47f) - sn * g_heightSpeedSign;
     vec2.y = dist * -0.0f;
-    vec2.z = sn * (dist * -0.47f) + cs * -1.0f;
-    vec3.x = cs * (dist * -0.47f) - sn * -1.0f;
+    vec2.z = sn * (dist * -0.47f) + cs * g_heightSpeedSign;
+    vec3.x = cs * (dist * -0.47f) - sn * g_heightSpeedSign;
     vec3.y = dist * -0.6f;
-    vec3.z = sn * (dist * -0.47f) + cs * -1.0f;
-    vec4.x = cs * (dist * 0.47f) - sn * -1.0f;
+    vec3.z = sn * (dist * -0.47f) + cs * g_heightSpeedSign;
+    vec4.x = cs * (dist * 0.47f) - sn * g_heightSpeedSign;
     vec4.y = dist * -0.6f;
-    vec4.z = sn * (dist * 0.47f) + cs * -1.0f;
+    vec4.z = sn * (dist * 0.47f) + cs * g_heightSpeedSign;
     this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, vec1, vec2, vec3, vec4, wtm, 1, static_cast<char>(this->state.slots[ec].process % 27) + 60, 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0);
   }
 }
@@ -285,7 +267,7 @@ void CEffectPrim::RenderHoverSquares(matrix& wtm) {
     vec4.z = slot.vecBPre.z + z4;
     int alpha = 50;
     if (vec1.y < -4.0f) {
-      alpha = static_cast<int>((vec1.y + 4.0f) * 15.0f + 50.0f);
+      alpha = static_cast<int>((vec1.y + g_effectIconRadius) * 15.0f + 50.0f);
     }
     if (vec1.y > -0.5f) {
       alpha = static_cast<int>(vec1.y * -100.0f);
@@ -308,7 +290,7 @@ void CEffectPrim::RenderHoverSquares(matrix& wtm) {
     vec4.z = slot.vecBNow.z + z4;
     alpha = 50;
     if (vec1.y < -4.0f) {
-      alpha = static_cast<int>((vec1.y + 4.0f) * 15.0f + 50.0f);
+      alpha = static_cast<int>((vec1.y + g_effectIconRadius) * 15.0f + 50.0f);
     }
     if (vec1.y > -0.5f) {
       alpha = static_cast<int>(vec1.y * -100.0f);
@@ -331,7 +313,7 @@ void CEffectPrim::RenderHoverSquares(matrix& wtm) {
     vec4.z = slot.vecTPre.z + z4;
     alpha = 50;
     if (vec1.y < -4.0f) {
-      alpha = static_cast<int>((vec1.y + 4.0f) * 15.0f + 50.0f);
+      alpha = static_cast<int>((vec1.y + g_effectIconRadius) * 15.0f + 50.0f);
     }
     if (vec1.y > -0.5f) {
       alpha = static_cast<int>(vec1.y * -100.0f);
@@ -354,7 +336,7 @@ void CEffectPrim::RenderHoverSquares(matrix& wtm) {
     vec4.z = slot.vecTNow.z + z4;
     alpha = 50;
     if (vec1.y < -4.0f) {
-      alpha = static_cast<int>((vec1.y + 4.0f) * 15.0f + 50.0f);
+      alpha = static_cast<int>((vec1.y + g_effectIconRadius) * 15.0f + 50.0f);
     }
     if (vec1.y > -0.5f) {
       alpha = static_cast<int>(vec1.y * -100.0f);

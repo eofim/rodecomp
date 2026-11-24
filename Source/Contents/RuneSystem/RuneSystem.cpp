@@ -2,6 +2,7 @@
 #include "Client/Application/ApplicationWindow.h"
 #include "Client/Session/Session.h"
 #include "Contents/Items/ItemInfo.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "Network/Connection/Connection.h"
 #include "Network/Packets/PacketId.h"
 #include "Network/Packets/PacketLengths.h"
@@ -21,15 +22,6 @@ extern "C" {
 #include <new>
 #include <string>
 #include <windows.h>
-
-namespace EquipmentProperties {
-class CEquipmentPropertiesMgr {
-public:
-  static CEquipmentPropertiesMgr* GetInstance();
-  void RemoveExpansion(const int& kind, const int& itemId);
-  void AddExpansion(const int& kind, const int& itemId, bool notify);
-};
-}
 
 // GLOBAL: gl_24845
 CRuneSystemMgr* g_runeSystemMgr;
@@ -361,17 +353,9 @@ int CTagData::GetRuneCount(int type) const {
 int CRuneSystemMgr::GetGradeValue(RuneSetData* runeSet) {
   if (runeSet) {
     const auto found = this->m_gradeTypes.find(runeSet->m_gradeType);
-    if (found != this->m_gradeTypes.end()) {
-      const unsigned int grade = runeSet->m_grade;
-      if (found->second.size() > grade) {
-        int failValue = 0;
-        const auto fail = this->m_gradeFailTypes.find(runeSet->m_gradeFailType);
-        if (fail != this->m_gradeFailTypes.end() && fail->second.size() > grade) {
-          failValue = fail->second[grade];
-        }
-
-        return runeSet->m_gradeLevel * failValue + found->second[grade];
-      }
+    if (this->m_gradeTypes.end() != found && found->second.size() > static_cast<unsigned int>(runeSet->m_grade)) {
+      const std::vector<int>& grades = found->second;
+      return runeSet->m_gradeLevel * this->GetGradeFailValue(runeSet) + grades[runeSet->m_grade];
     }
   }
 
@@ -393,15 +377,13 @@ RuneData* CRuneSystemMgr::FindRune(int tagId, int type, std::int64_t id, unsigne
 // FUNCTION: fn_08138
 RuneData* CTagData::FindRune(int type, std::int64_t id, unsigned int* index) {
   if (type == 0 || type == 1) {
-    std::vector<RuneData*>& runes = this->m_runes[type];
-    const unsigned int count = static_cast<unsigned int>(runes.size());
-    for (unsigned int i = 0; i < count; ++i) {
-      if (runes[i] && id == runes[i]->m_id) {
+    for (unsigned int i = 0; i < this->m_runes[type].size(); ++i) {
+      if (this->m_runes[type][i] && id == this->m_runes[type][i]->m_id) {
         if (index) {
           *index = i;
         }
 
-        return runes[i];
+        return this->m_runes[type][i];
       }
     }
   }
@@ -620,10 +602,16 @@ void CRuneSystemMgr::LoadDefaultTag() {
 // FUNCTION: fn_08150
 bool RuneSetData::IsRewardStep(int step) const {
   if (step == 0) {
-    return this->m_rewardStep == 0;
+    if (this->m_rewardStep == 0) {
+      return true;
+    }
+    return false;
   }
 
-  return this->m_rewardStep == this->FindLastReward(step + 1);
+  if (this->m_rewardStep == this->FindLastReward(step + 1)) {
+    return true;
+  }
+  return false;
 }
 
 // OFFSET: 0x00767FF0
@@ -727,7 +715,9 @@ int CRuneSystemMgr::UpdateOwnedDecomItems() {
   this->m_ownedDecomItems.clear();
   for (int i = 0; i < g_session.GetNumInventoryItems(); ++i) {
     ITEM_INFO item = g_session.GetInventoryItemAt(i);
-    if (this->m_itemDecoms.find(std::atoi(item.itemId.c_str())) != this->m_itemDecoms.end()) {
+    const auto decom = this->m_itemDecoms.find(std::atoi(item.itemId.c_str()));
+    const std::pair<int, int>* types = this->m_itemDecoms.end() == decom ? nullptr : &decom->second;
+    if (types) {
       this->m_ownedDecomItems.push_back(std::atoi(item.itemId.c_str()));
     }
   }
@@ -843,12 +833,94 @@ bool CRuneSystemMgr::SetRewardStep(int tagId, std::int64_t id, int step) {
   return true;
 }
 
+// INLINED
+inline RuneSetData* CRuneSystemMgr::GetRuneSet(int tagId, int runeSetId) {
+  return static_cast<RuneSetData*>(this->FindRune(tagId, 0, runeSetId, nullptr));
+}
+
+// INLINED
+inline void CRuneSystemMgr::InsertGradeType(int gradeId, int index, int value) {
+  std::map<int, std::vector<int>>& types = this->m_gradeTypes;
+  if (types[gradeId].size() < 15) {
+    types[gradeId].resize(15, 0);
+  }
+
+  if (index < 15) {
+    types[gradeId][index] = value;
+  }
+}
+
+// INLINED
+inline void CRuneSystemMgr::InsertGradeFailType(int gradeId, int index, int value) {
+  std::map<int, std::vector<int>>& types = this->m_gradeFailTypes;
+  if (types[gradeId].size() < 15) {
+    types[gradeId].resize(15, 0);
+  }
+
+  if (index < 15) {
+    types[gradeId][index] = value;
+  }
+}
+
+// INLINED
+inline void CRuneSystemMgr::InsertItemList(int listId, int itemId, int count) {
+  this->m_itemLists[listId].emplace_back(itemId, count);
+}
+
+// INLINED
+inline void CRuneSystemMgr::InsertRuneDescription(int tagId, int runeSetId, int index, std::string description) {
+  RuneSetData* runeSet = static_cast<RuneSetData*>(this->FindRune(tagId, 0, runeSetId, nullptr));
+  if (runeSet) {
+    if (index >= 0 && index <= 5) {
+      runeSet->m_descriptions[index].push_back(description);
+    } else {
+      MessageBoxA(hWnd, FormatOwnedString("AddRune_Description 인댁스 오류 %d", index).c_str(), "LuaLoad", MB_OK);
+    }
+  }
+}
+
+// INLINED
+inline void CRuneSystemMgr::InsertRuneGrade(int tagId, int runeSetId, int grade, int count) {
+  RuneSetData* runeSet = static_cast<RuneSetData*>(this->FindRune(tagId, 0, runeSetId, nullptr));
+  if (runeSet) {
+    if (grade < 15) {
+      runeSet->m_gradeList[grade] = count;
+    }
+  }
+}
+
+// INLINED
+inline void CRuneSystemMgr::InsertRuneSlot(int tagId, int runeSetId, int runeId) {
+  RuneSetData* runeSet = static_cast<RuneSetData*>(this->FindRune(tagId, 0, runeSetId, nullptr));
+  if (runeSet) {
+    RuneData* rune = this->FindRune(tagId, 1, runeId, nullptr);
+    runeSet->m_slots.push_back(rune);
+  }
+}
+
+// INLINED
+inline void CRuneSystemMgr::SetRuneName(int tagId, int type, int runeId, const std::string& name) {
+  RuneData* rune = this->FindRune(tagId, type, runeId, nullptr);
+  if (rune) {
+    rune->m_name = name;
+  }
+}
+
+// INLINED
+inline void CRuneSystemMgr::SetRuneUpGrade(int tagId, int runeSetId, int gradeType, int gradeFailType) {
+  RuneSetData* runeSet = static_cast<RuneSetData*>(this->FindRune(tagId, 0, runeSetId, nullptr));
+  if (runeSet) {
+    runeSet->m_gradeType = gradeType;
+    runeSet->m_gradeFailType = gradeFailType;
+  }
+}
+
 // OFFSET: 0x00769240
 // FUNCTION: fn_08173
 int AddGradeType(lua_State* state) {
   const int gradeId = static_cast<int>(lua_tonumber(state, -3));
-  const int valueIndex = static_cast<int>(lua_tonumber(state, -2));
-  const double value = lua_tonumber(state, -1);
+  int valueIndex = static_cast<int>(lua_tonumber(state, -2));
+  const int value = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -3)) {
     lua_pushboolean(state, 0);
@@ -864,19 +936,12 @@ int AddGradeType(lua_State* state) {
 
   if (!lua_isnumber(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("gradetable GradeID:%d ValData %d", gradeId, static_cast<int>(value)).c_str());
+    lua_pushstring(state, FormatOwnedString("gradetable GradeID:%d ValData %d", gradeId, value).c_str());
     return 2;
   }
 
-  const int index = valueIndex - 1;
-  std::map<int, std::vector<int>>& gradeTypes = g_runeSystemMgr->m_gradeTypes;
-  if (gradeTypes[static_cast<int>(gradeId)].size() < 15) {
-    gradeTypes[static_cast<int>(gradeId)].resize(15, 0);
-  }
-
-  if (index < 15) {
-    gradeTypes[static_cast<int>(gradeId)][index] = static_cast<int>(value);
-  }
+  CRuneSystemMgr* mgr = g_runeSystemMgr;
+  mgr->InsertGradeType(gradeId, --valueIndex, value);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -887,8 +952,8 @@ int AddGradeType(lua_State* state) {
 // FUNCTION: fn_08174
 int AddGradeTypeFail(lua_State* state) {
   const int gradeId = static_cast<int>(lua_tonumber(state, -3));
-  const int valueIndex = static_cast<int>(lua_tonumber(state, -2));
-  const double value = lua_tonumber(state, -1);
+  int valueIndex = static_cast<int>(lua_tonumber(state, -2));
+  const int value = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -3)) {
     lua_pushboolean(state, 0);
@@ -904,19 +969,12 @@ int AddGradeTypeFail(lua_State* state) {
 
   if (!lua_isnumber(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("gradetable GradeID:%d ValData %d", gradeId, static_cast<int>(value)).c_str());
+    lua_pushstring(state, FormatOwnedString("gradetable GradeID:%d ValData %d", gradeId, value).c_str());
     return 2;
   }
 
-  const int index = valueIndex - 1;
-  std::map<int, std::vector<int>>& gradeFailTypes = g_runeSystemMgr->m_gradeFailTypes;
-  if (gradeFailTypes[static_cast<int>(gradeId)].size() < 15) {
-    gradeFailTypes[static_cast<int>(gradeId)].resize(15, 0);
-  }
-
-  if (index < 15) {
-    gradeFailTypes[static_cast<int>(gradeId)][index] = static_cast<int>(value);
-  }
+  CRuneSystemMgr* mgr = g_runeSystemMgr;
+  mgr->InsertGradeFailType(gradeId, --valueIndex, value);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -927,9 +985,9 @@ int AddGradeTypeFail(lua_State* state) {
 // FUNCTION: fn_08175
 int AddItemListTableType(lua_State* state) {
   const int listId = static_cast<int>(lua_tonumber(state, -4));
-  const double listIndex = lua_tonumber(state, -3);
+  const int listIndex = static_cast<int>(lua_tonumber(state, -3));
   const int itemValue = static_cast<int>(lua_tonumber(state, -2));
-  const double countValue = lua_tonumber(state, -1);
+  const int countValue = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -4)) {
     lua_pushboolean(state, 0);
@@ -939,7 +997,7 @@ int AddItemListTableType(lua_State* state) {
 
   if (!lua_isnumber(state, -3)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("ListIndex:%d", static_cast<int>(listIndex)).c_str());
+    lua_pushstring(state, FormatOwnedString("ListIndex:%d", listIndex).c_str());
     return 2;
   }
 
@@ -951,13 +1009,11 @@ int AddItemListTableType(lua_State* state) {
 
   if (!lua_isnumber(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("ListID:%d Num%d", listId, static_cast<int>(countValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("ListID:%d Num%d", listId, countValue).c_str());
     return 2;
   }
 
-  int itemId = itemValue;
-  int count = static_cast<int>(countValue);
-  g_runeSystemMgr->m_itemLists[static_cast<int>(listId)].emplace_back(itemId, count);
+  g_runeSystemMgr->InsertItemList(listId, itemValue, countValue);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -967,21 +1023,21 @@ int AddItemListTableType(lua_State* state) {
 // OFFSET: 0x007698F0
 // FUNCTION: fn_08176
 int AddRuneData(lua_State* state) {
-  const double tagValue = lua_tonumber(state, -5);
-  const double typeValue = lua_tonumber(state, -4);
+  const int tagValue = static_cast<int>(lua_tonumber(state, -5));
+  const int typeValue = static_cast<int>(lua_tonumber(state, -4));
   const int runeSetId = static_cast<int>(lua_tonumber(state, -3));
   const std::string resName(lua_tostring(state, -2));
   const int activeType = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -5)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("Tag:%d", static_cast<int>(tagValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("Tag:%d", tagValue).c_str());
     return 2;
   }
 
   if (!lua_isnumber(state, -4)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("RuneType:%d", static_cast<int>(typeValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("RuneType:%d", typeValue).c_str());
     return 2;
   }
 
@@ -1003,7 +1059,7 @@ int AddRuneData(lua_State* state) {
     return 2;
   }
 
-  g_runeSystemMgr->AddRune(static_cast<int>(tagValue), static_cast<int>(typeValue) - 1, runeSetId, resName, activeType);
+  g_runeSystemMgr->AddRune(tagValue, typeValue - 1, runeSetId, resName, activeType);
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
   return 2;
@@ -1027,9 +1083,9 @@ int AddRuneSetReward(lua_State* state) {
     return 2;
   }
 
-  RuneData* rune = g_runeSystemMgr->FindRune(tagId, 0, runeSetId, nullptr);
-  RuneSetReward* reward = rune ? &static_cast<RuneSetData*>(rune)->m_reward : nullptr;
-  if (!reward) {
+  RuneSetData* runeSet = g_runeSystemMgr->GetRuneSet(tagId, runeSetId);
+  RuneSetReward* reward = &runeSet->m_reward;
+  if (!runeSet || !reward) {
     lua_pushboolean(state, 0);
     lua_pushstring(state, std::format("ErrData TagID:{}RuneSetID:{}", tagId, runeSetId).c_str());
     return 2;
@@ -1056,7 +1112,7 @@ int AddRuneSetReward(lua_State* state) {
 int AddRuneDescription(lua_State* state) {
   const int tagId = static_cast<int>(lua_tonumber(state, -4));
   const int runeSetId = static_cast<int>(lua_tonumber(state, -3));
-  const double indexValue = lua_tonumber(state, -2);
+  const int indexValue = static_cast<int>(lua_tonumber(state, -2));
   const std::string description(lua_tostring(state, -1));
 
   if (!lua_isnumber(state, -4)) {
@@ -1073,7 +1129,7 @@ int AddRuneDescription(lua_State* state) {
 
   if (!lua_isnumber(state, -2)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("Description ID:%d itemID:%d", runeSetId, static_cast<int>(indexValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("Description ID:%d itemID:%d", runeSetId, indexValue).c_str());
     return 2;
   }
 
@@ -1083,16 +1139,8 @@ int AddRuneDescription(lua_State* state) {
     return 2;
   }
 
-  const std::string text = description;
-  RuneData* rune = g_runeSystemMgr->FindRune(tagId, 0, runeSetId, nullptr);
-  if (rune) {
-    const unsigned int index = static_cast<int>(indexValue) - 1;
-    if (index < 6) {
-      static_cast<RuneSetData*>(rune)->m_descriptions[index].push_back(text);
-    } else {
-      MessageBoxA(hWnd, FormatOwnedString("AddRune_Description 인댁스 오류 %d", index).c_str(), "LuaLoad", MB_OK);
-    }
-  }
+  CRuneSystemMgr* mgr = g_runeSystemMgr;
+  mgr->InsertRuneDescription(tagId, runeSetId, indexValue - 1, description);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -1104,8 +1152,8 @@ int AddRuneDescription(lua_State* state) {
 int AddRuneGradeList(lua_State* state) {
   const int tagId = static_cast<int>(lua_tonumber(state, -4));
   const int runeSetId = static_cast<int>(lua_tonumber(state, -3));
-  const double gradeValue = lua_tonumber(state, -2);
-  const double countValue = lua_tonumber(state, -1);
+  const int gradeValue = static_cast<int>(lua_tonumber(state, -2));
+  const int countValue = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -4)) {
     lua_pushboolean(state, 0);
@@ -1121,23 +1169,17 @@ int AddRuneGradeList(lua_State* state) {
 
   if (!lua_isnumber(state, -2)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("GradeList ID:%d itemID:%d", runeSetId, static_cast<int>(gradeValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("GradeList ID:%d itemID:%d", runeSetId, gradeValue).c_str());
     return 2;
   }
 
   if (!lua_isnumber(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("GradeList ID:%d itemNum:%d]", runeSetId, static_cast<int>(countValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("GradeList ID:%d itemNum:%d]", runeSetId, countValue).c_str());
     return 2;
   }
 
-  RuneData* rune = g_runeSystemMgr->FindRune(tagId, 0, runeSetId, nullptr);
-  if (rune) {
-    const int grade = static_cast<int>(gradeValue) - 1;
-    if (grade < 15) {
-      static_cast<RuneSetData*>(rune)->m_gradeList[grade] = static_cast<int>(countValue);
-    }
-  }
+  g_runeSystemMgr->InsertRuneGrade(tagId, runeSetId, gradeValue - 1, countValue);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -1149,7 +1191,7 @@ int AddRuneGradeList(lua_State* state) {
 int AddRuneSlotCollectionList(lua_State* state) {
   const int tagId = static_cast<int>(lua_tonumber(state, -3));
   const int runeSetId = static_cast<int>(lua_tonumber(state, -2));
-  const double runeValue = lua_tonumber(state, -1);
+  const int runeValue = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -3)) {
     lua_pushboolean(state, 0);
@@ -1165,18 +1207,11 @@ int AddRuneSlotCollectionList(lua_State* state) {
 
   if (!lua_isnumber(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("SlotCollectionList ID:%d RuneID%d", runeSetId, static_cast<int>(runeValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("SlotCollectionList ID:%d RuneID%d", runeSetId, runeValue).c_str());
     return 2;
   }
 
-  CTagData* tag = g_runeSystemMgr->GetTag(tagId);
-  if (tag) {
-    RuneData* runeSet = tag->FindRune(0, runeSetId, nullptr);
-    if (runeSet) {
-      RuneData* rune = g_runeSystemMgr->FindRune(tagId, 1, static_cast<int>(runeValue), nullptr);
-      static_cast<RuneSetData*>(runeSet)->m_slots.push_back(rune);
-    }
-  }
+  g_runeSystemMgr->InsertRuneSlot(tagId, runeSetId, runeValue);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -1258,11 +1293,16 @@ int AddItemDecom(lua_State* state) {
   return 2;
 }
 
+// INLINED
+static void AddDecomTypeItem(int type, int itemId, int minCount, int maxCount, int percent) {
+  g_runeSystemMgr->m_decomTypes[type].emplace_back(itemId, minCount, maxCount, percent);
+}
+
 // OFFSET: 0x0076AC70
 // FUNCTION: fn_08184
 int AddItemDecomType(lua_State* state) {
-  const double typeValue = lua_tonumber(state, -6);
-  const double subTypeValue = lua_tonumber(state, -5);
+  const int typeValue = static_cast<int>(lua_tonumber(state, -6));
+  const int subTypeValue = static_cast<int>(lua_tonumber(state, -5));
   int itemId = static_cast<int>(lua_tonumber(state, -4));
   int minCount = static_cast<int>(lua_tonumber(state, -3));
   int maxCount = static_cast<int>(lua_tonumber(state, -2));
@@ -1270,13 +1310,13 @@ int AddItemDecomType(lua_State* state) {
 
   if (!lua_isnumber(state, -6)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("DecomTypeID:%d", static_cast<int>(typeValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("DecomTypeID:%d", typeValue).c_str());
     return 2;
   }
 
   if (!lua_isnumber(state, -5)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("DecomTypeID:%d", static_cast<int>(subTypeValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("DecomTypeID:%d", subTypeValue).c_str());
     return 2;
   }
 
@@ -1304,7 +1344,7 @@ int AddItemDecomType(lua_State* state) {
     return 2;
   }
 
-  g_runeSystemMgr->m_decomTypes[static_cast<int>(typeValue)].emplace_back(itemId, minCount, maxCount, percent);
+  AddDecomTypeItem(typeValue, itemId, minCount, maxCount, percent);
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
   return 2;
@@ -1314,7 +1354,7 @@ int AddItemDecomType(lua_State* state) {
 // FUNCTION: fn_08185
 int SetRuneDisplayName(lua_State* state) {
   const int tagId = static_cast<int>(lua_tonumber(state, -4));
-  const double typeValue = lua_tonumber(state, -3) - 1.0;
+  const int typeValue = static_cast<int>(lua_tonumber(state, -3) - 1.0);
   const int runeId = static_cast<int>(lua_tonumber(state, -2));
   const std::string name(lua_tostring(state, -1));
 
@@ -1326,7 +1366,7 @@ int SetRuneDisplayName(lua_State* state) {
 
   if (!lua_isnumber(state, -3)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("SetRune_DisplayName Type:%d", static_cast<int>(typeValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("SetRune_DisplayName Type:%d", typeValue).c_str());
     return 2;
   }
 
@@ -1342,13 +1382,7 @@ int SetRuneDisplayName(lua_State* state) {
     return 2;
   }
 
-  CTagData* tag = g_runeSystemMgr->GetTag(tagId);
-  if (tag) {
-    RuneData* rune = tag->FindRune(static_cast<int>(typeValue), runeId, nullptr);
-    if (rune) {
-      rune->m_name = name;
-    }
-  }
+  g_runeSystemMgr->SetRuneName(tagId, typeValue, runeId, name);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -1360,8 +1394,8 @@ int SetRuneDisplayName(lua_State* state) {
 int SetRuneUpGradeTable(lua_State* state) {
   const int tagId = static_cast<int>(lua_tonumber(state, -4));
   const int runeSetId = static_cast<int>(lua_tonumber(state, -3));
-  const double gradeType = lua_tonumber(state, -2);
-  const double gradeFailType = lua_tonumber(state, -1);
+  const int gradeType = static_cast<int>(lua_tonumber(state, -2));
+  const int gradeFailType = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isnumber(state, -4)) {
     lua_pushboolean(state, 0);
@@ -1377,22 +1411,17 @@ int SetRuneUpGradeTable(lua_State* state) {
 
   if (!lua_isnumber(state, -2)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("RuneSetID:%d RuneGradeType%d", runeSetId, static_cast<int>(gradeType)).c_str());
+    lua_pushstring(state, FormatOwnedString("RuneSetID:%d RuneGradeType%d", runeSetId, gradeType).c_str());
     return 2;
   }
 
   if (!lua_isnumber(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("RuneSetID:%d RuneGradeFailType%d", runeSetId, static_cast<int>(gradeFailType)).c_str());
+    lua_pushstring(state, FormatOwnedString("RuneSetID:%d RuneGradeFailType%d", runeSetId, gradeFailType).c_str());
     return 2;
   }
 
-  RuneData* rune = g_runeSystemMgr->FindRune(tagId, 0, runeSetId, nullptr);
-  if (rune) {
-    RuneSetData* runeSet = static_cast<RuneSetData*>(rune);
-    runeSet->m_gradeType = static_cast<int>(gradeType);
-    runeSet->m_gradeFailType = static_cast<int>(gradeFailType);
-  }
+  g_runeSystemMgr->SetRuneUpGrade(tagId, runeSetId, gradeType, gradeFailType);
 
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
@@ -1402,15 +1431,15 @@ int SetRuneUpGradeTable(lua_State* state) {
 // OFFSET: 0x0076B4B0
 // FUNCTION: fn_08187
 int SetRuneSystemInfo(lua_State* state) {
-  const double tagValue = lua_tonumber(state, -1);
+  const int tagValue = static_cast<int>(lua_tonumber(state, -1));
 
   if (!lua_isstring(state, -1)) {
     lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatOwnedString("defult Select Tag:%d", static_cast<int>(tagValue)).c_str());
+    lua_pushstring(state, FormatOwnedString("defult Select Tag:%d", tagValue).c_str());
     return 2;
   }
 
-  g_runeSystemMgr->SetSelectTag(static_cast<int>(tagValue));
+  g_runeSystemMgr->SetSelectTag(tagValue);
   lua_pushboolean(state, 1);
   lua_pushstring(state, FormatOwnedString("good").c_str());
   return 2;

@@ -3,6 +3,7 @@
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "File/File.h"
 #include "File/ResourcePath.h"
+#include "UI/Text/TextWrapping.h"
 
 #include <cstdio>
 
@@ -70,11 +71,11 @@ int CTipOfTheDay::Load() {
   for (int i = 0; i < fileSize; ++i) {
     if (fileBuf[i] == 10) {
       fileBuf[i] = 0;
-      tmpList.push_back(baseBuf);
+      AppendLine(tmpList, baseBuf);
       baseBuf = fileBuf + i + 1;
     } else if (fileBuf[i] == '#') {
       fileBuf[i] = 0;
-      tmpList.push_back(baseBuf);
+      AppendLine(tmpList, baseBuf);
       this->m_tipList.push_back(tmpList);
       tmpList.clear();
       baseBuf = fileBuf + i + 1;
@@ -86,16 +87,6 @@ int CTipOfTheDay::Load() {
   }
 
   return 1;
-}
-
-// OFFSET: 0x00909CF0
-// FUNCTION: fn_12400
-int CTipOfTheDay::Size() {
-  if (this->m_bTryLoading == false) {
-    this->Load();
-  }
-
-  return static_cast<int>(this->m_tipList.size());
 }
 
 // OFFSET: 0x00AE7710

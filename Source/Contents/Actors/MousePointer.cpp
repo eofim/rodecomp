@@ -25,7 +25,15 @@ bool CMousePointer::OnProcess() {
 // OFFSET: 0x00CBF860
 // FUNCTION: fn_21114
 void CMousePointer::SendMsg(CGameObject*, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t, std::int64_t, std::int64_t, std::int64_t) {
-  if (message == 1) {
+  if (message != 1) {
+    if (message == 2) {
+      if (b != 0) {
+        this->m_remainingFrames = static_cast<int>(b);
+      } else {
+        this->render.visible = 0;
+      }
+    }
+  } else {
     const float* const position = reinterpret_cast<const float*>(static_cast<std::intptr_t>(b));
     this->render.position.x = position[0];
     this->render.position.z = position[1];
@@ -38,38 +46,6 @@ void CMousePointer::SendMsg(CGameObject*, std::int64_t message, std::int64_t b, 
     } else {
       this->render.color = 0xFFFFFFFF;
     }
-  } else if (message == 2) {
-    if (b != 0) {
-      this->m_remainingFrames = static_cast<int>(b);
-    } else {
-      this->render.visible = 0;
-    }
   }
 }
 
-// OFFSET: 0x00CA8630
-// FUNCTION: fn_20990
-CMousePointer::CMousePointer() {
-  this->m_remainingFrames = 0;
-  this->render.flatDepth = 1;
-  this->render.visible = 0;
-  this->render.motionStartTime = timeGetTime();
-
-  if (this->render.sprite) {
-    this->render.sprite->Unlock();
-  }
-  this->render.sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("cursors.spr"));
-  if (this->render.sprite) {
-    this->render.sprite->Lock();
-  }
-
-  if (this->render.action) {
-    this->render.action->Unlock();
-  }
-  this->render.action = static_cast<CActRes*>(ResourceMgr::Instance().Load("cursors.act"));
-  if (this->render.action) {
-    this->render.action->Lock();
-  }
-
-  this->SetAction(3, 2, 0);
-}

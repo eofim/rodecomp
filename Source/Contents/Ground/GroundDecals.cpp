@@ -16,33 +16,41 @@ float g_groundGridUV[8] = {0, 0, 1, 0, 0, 1, 1, 1};
 // OFFSET: 0x00AC0A90
 // FUNCTION: fn_17569
 bool GroundGeometry::CellRectangle(int column, int row, float* vertices) const {
-  if (column < 0 || (column >> 1) >= this->width || row < 0 || (row >> 1) >= this->height) {
+  if (column < 0) {
     return false;
   }
-
   const int cellColumn = column >> 1;
+  if (cellColumn >= this->width) {
+    return false;
+  }
+  if (row < 0) {
+    return false;
+  }
   const int cellRow = row >> 1;
+  if (cellRow >= this->height) {
+    return false;
+  }
 
   const float x0 = static_cast<float>(cellColumn - this->width / 2) * this->cellSize;
   const float z0 = static_cast<float>(cellRow - this->height / 2) * this->cellSize;
   vertices[1] = 0.0f;
   vertices[0] = x0;
   vertices[2] = z0;
-  const float x1 = static_cast<float>(cellColumn - this->width / 2 + 1) * this->cellSize;
   const float z1 = static_cast<float>(cellRow - this->height / 2) * this->cellSize;
+  const float x1 = static_cast<float>(cellColumn - this->width / 2 + 1) * this->cellSize;
   vertices[4] = 0.0f;
-  vertices[3] = x1;
   vertices[5] = z1;
-  const float x2 = static_cast<float>(cellColumn - this->width / 2) * this->cellSize;
+  vertices[3] = x1;
   const float z2 = static_cast<float>(cellRow - this->height / 2 + 1) * this->cellSize;
+  const float x2 = static_cast<float>(cellColumn - this->width / 2) * this->cellSize;
   vertices[7] = 0.0f;
-  vertices[6] = x2;
   vertices[8] = z2;
-  const float x3 = static_cast<float>(cellColumn - this->width / 2 + 1) * this->cellSize;
+  vertices[6] = x2;
   const float z3 = static_cast<float>(cellRow - this->height / 2 + 1) * this->cellSize;
+  const float x3 = static_cast<float>(cellColumn - this->width / 2 + 1) * this->cellSize;
   vertices[10] = 0.0f;
-  vertices[9] = x3;
   vertices[11] = z3;
+  vertices[9] = x3;
 
   const TerrainHeightCell* cell = this->terrain->CellAt(column, row);
 
@@ -63,41 +71,44 @@ namespace {
     const GroundGeometry& ground, const float* matrix, int column, int row, std::uint32_t color, CTexture& texture, const float* uv,
     float bias
   ) {
-    float vertices[4][3];
+    struct Point {
+      // INLINED
+      Point() : x(0), y(0), z(0) {
+      }
 
-    for (auto& vertex : vertices) {
-      vertex[0] = 0.0f;
-      vertex[1] = 0.0f;
-      vertex[2] = 0.0f;
-    }
+      float x;
+      float y;
+      float z;
+    };
+    Point vertices[4];
 
-    if (!ground.CellRectangle(column, row, vertices[0])) {
+    if (!ground.CellRectangle(column, row, &vertices[0].x)) {
       return;
     }
 
     for (int index = 0; index < 4; ++index) {
-      float* vertex = vertices[index];
+      Point& vertex = vertices[index];
       if (column & 1) {
-        if (vertices[1][0] > vertex[0]) {
-          vertex[0] = (vertices[1][0] - vertex[0]) * 0.5f + vertex[0];
+        if (vertices[1].x > vertex.x) {
+          vertex.x = (vertices[1].x - vertex.x) * 0.5f + vertex.x;
         }
-      } else if (vertex[0] > vertices[0][0]) {
-        vertex[0] = vertex[0] - (vertex[0] - vertices[0][0]) * 0.5f;
+      } else if (vertex.x > vertices[0].x) {
+        vertex.x = vertex.x - (vertex.x - vertices[0].x) * 0.5f;
       }
 
       if (row & 1) {
-        if (vertices[2][2] > vertex[2]) {
-          vertex[2] = (vertices[2][2] - vertex[2]) * 0.5f + vertex[2];
+        if (vertices[2].z > vertex.z) {
+          vertex.z = (vertices[2].z - vertex.z) * 0.5f + vertex.z;
         }
-      } else if (vertex[2] > vertices[0][2]) {
-        vertex[2] = vertex[2] - (vertex[2] - vertices[0][2]) * 0.5f;
+      } else if (vertex.z > vertices[0].z) {
+        vertex.z = vertex.z - (vertex.z - vertices[0].z) * 0.5f;
       }
     }
 
     RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
 
-    for (unsigned corner = 0; corner < 4; ++corner) {
-      g_renderer->viewport.Project(vertices[corner], matrix, primitive->vertices[corner]);
+    for (int corner = 0; corner < 4; ++corner) {
+      g_renderer->Project(&vertices[corner].x, matrix, primitive->vertices[corner]);
       primitive->vertices[corner].z = primitive->vertices[corner].z - bias;
     }
 
@@ -193,26 +204,26 @@ void GroundGeometry::DrawTerrainOverlay(
 
   const float x = static_cast<float>(cellColumn - halfWidth) * this->cellSize + ((column & 1) ? halfSize : 0.0f);
   const float z = static_cast<float>(cellRow - halfHeight) * this->cellSize + (rowParity == 1 ? halfSize : 0.0f);
-  const float left = x - margin;
-  const float right = (x + halfSize) + margin;
-  const float top = z - margin;
-  const float bottom = (z + halfSize) + margin;
-  vertices[0].x = left;
-  vertices[0].y = cell->heights[0];
-  vertices[0].z = top;
-  vertices[1].x = right;
-  vertices[1].y = cell->heights[1];
-  vertices[1].z = top;
-  vertices[2].x = left;
-  vertices[2].y = cell->heights[2];
-  vertices[2].z = bottom;
-  vertices[3].x = right;
-  vertices[3].y = cell->heights[3];
-  vertices[3].z = bottom;
+  const float height0 = cell->heights[0];
+  vertices[0].x = x - margin;
+  vertices[0].y = height0;
+  vertices[0].z = z - margin;
+  const float height1 = cell->heights[1];
+  vertices[1].x = (x + halfSize) + margin;
+  vertices[1].y = height1;
+  vertices[1].z = z - margin;
+  const float height2 = cell->heights[2];
+  vertices[2].x = x - margin;
+  vertices[2].y = height2;
+  vertices[2].z = (z + halfSize) + margin;
+  const float height3 = cell->heights[3];
+  vertices[3].x = (x + halfSize) + margin;
+  vertices[3].y = height3;
+  vertices[3].z = (z + halfSize) + margin;
   RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
 
   for (int corner = 0; corner < 4; ++corner) {
-    g_renderer->viewport.Project(&vertices[corner].x, matrix, primitive->vertices[corner]);
+    g_renderer->Project(&vertices[corner].x, matrix, primitive->vertices[corner]);
   }
 
   primitive->vertices[0].u = 0.0f;

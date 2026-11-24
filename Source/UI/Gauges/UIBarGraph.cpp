@@ -10,7 +10,10 @@
 #include <string>
 #include <windows.h>
 
-template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
+// OFFSET: 0x0086C2B0
+// FUNCTION: fn_45614
+UIBarGraph::UIBarGraph() : UIWindow(0), m_value(0) {
+}
 
 // OFFSET: 0x0086C190
 // FUNCTION: fn_11022
@@ -39,9 +42,25 @@ UIBarGraphHomun::UIBarGraphHomun() : UIWindow(0) {
 UIBarGraphPlayer::UIBarGraphPlayer() : UIWindow(0) {
 }
 
+// OFFSET: 0x0086FFF0
+// FUNCTION: fn_45786
+UIBarGraph::~UIBarGraph() = default;
+
+// OFFSET: 0x0086FF40
+// FUNCTION: fn_45785
+__declspec(noinline) UIBarGraph2::~UIBarGraph2() = default;
+
 // OFFSET: 0x0086FFA0
 // FUNCTION: fn_11097
 __declspec(noinline) UIBarGraph3::~UIBarGraph3() = default;
+
+// OFFSET: 0x008A4CC0
+// FUNCTION: fn_45788
+__declspec(noinline) UIBarGraph4::~UIBarGraph4() = default;
+
+// OFFSET: 0x00870040
+// FUNCTION: fn_45787
+__declspec(noinline) UIBarGraphHomun::~UIBarGraphHomun() = default;
 
 // OFFSET: 0x008700F0
 // FUNCTION: fn_11098

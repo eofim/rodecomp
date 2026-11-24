@@ -2,11 +2,10 @@
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Edit/UIEditCtrl.h"
 #include "UI/Window/InputFocus.h"
+#include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
 
 #include <string>
-
-template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
 
 // OFFSET: 0x008E1210
 // FUNCTION: fn_12174
@@ -25,7 +24,7 @@ void UIGraffiStrboxWnd::OnCreate(int, int) {
   int positions[2][2] = {{189, 96}, {234, 96}};
 
   for (int index = 0; index < 2; ++index) {
-    auto* button = new UIBitmapButton();
+    UIBitmapButton* button = new UIBitmapButton();
     button->SetBitmap((prefix + names[index][0] + ".bmp").c_str(), 0, 0);
     button->SetBitmap((prefix + names[index][1] + ".bmp").c_str(), 1, 0);
     button->SetBitmap((prefix + names[index][2] + ".bmp").c_str(), 2, 0);
@@ -35,7 +34,7 @@ void UIGraffiStrboxWnd::OnCreate(int, int) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x008C7C50

@@ -6,34 +6,6 @@
 
 #include <cstring>
 
-namespace {
-  // INLINED
-  int Family(std::uint16_t mode) {
-    int family = 0;
-    if (mode == 1) {
-      family = 21;
-    } else if (mode == 2) {
-      family = 20;
-    } else if (mode == 3) {
-      family = 22;
-    } else if (mode == 4) {
-      family = 23;
-    } else if (mode == 5) {
-      family = 24;
-    } else if (mode == 6) {
-      family = 25;
-    } else if (mode == 7) {
-      family = 26;
-    } else if (mode == 8) {
-      family = 27;
-    } else if (mode == 9) {
-      family = 28;
-    }
-
-    return family;
-  }
-}
-
 // OFFSET: 0x00850810
 // FUNCTION: fn_10680
 UITransBalloonText::UITransBalloonText() : UIBalloonText(), m_borderColor(6052956) {
@@ -42,6 +14,40 @@ UITransBalloonText::UITransBalloonText() : UIBalloonText(), m_borderColor(605295
 // OFFSET: 0x0084E8D0
 // FUNCTION: fn_10647
 UIAchBalloonText::UIAchBalloonText() : UITransBalloonText(), m_fontFamily(0) {
+}
+
+// OFFSET: 0x00865D10
+// FUNCTION: fn_45627
+void UIAchBalloonText::SetFontFamily(int mode) {
+  switch (mode) {
+  case 1:
+    this->m_fontFamily = 21;
+    return;
+  case 2:
+    this->m_fontFamily = 20;
+    return;
+  case 3:
+    this->m_fontFamily = 22;
+    return;
+  case 4:
+    this->m_fontFamily = 23;
+    return;
+  case 5:
+    this->m_fontFamily = 24;
+    return;
+  case 6:
+    this->m_fontFamily = 25;
+    return;
+  case 7:
+    this->m_fontFamily = 26;
+    return;
+  case 8:
+    this->m_fontFamily = 27;
+    return;
+  case 9:
+    this->m_fontFamily = 28;
+    return;
+  }
 }
 
 // OFFSET: 0x00851F40
@@ -143,10 +149,30 @@ void UITransBalloonText::Paint() {
   std::uint32_t color = this->m_textColor;
   int y = 4;
   int height = this->m_fontHeight;
-  if (this->m_fontMode != 0) {
+  int family = 0;
+  const std::int16_t mode = this->m_fontMode;
+  if (mode != 0) {
     height = 12;
   }
-  const int family = Family(this->m_fontMode);
+  if (mode == 1) {
+    family = 21;
+  } else if (mode == 2) {
+    family = 20;
+  } else if (mode == 3) {
+    family = 22;
+  } else if (mode == 4) {
+    family = 23;
+  } else if (mode == 5) {
+    family = 24;
+  } else if (mode == 6) {
+    family = 25;
+  } else if (mode == 7) {
+    family = 26;
+  } else if (mode == 8) {
+    family = 27;
+  } else if (mode == 9) {
+    family = 28;
+  }
 
   for (std::size_t index = 0; index < this->m_lines.size(); ++index) {
     color = index < this->m_lineColors.size() && this->m_lineColors[index] != 0 ? this->m_lineColors[index] : this->m_textColor;
@@ -179,19 +205,20 @@ void UIAchBalloonText::Paint() {
 
   const int count = static_cast<int>(this->m_lines.size());
   const std::string& first = this->m_lines.front();
-  const int lineHeight =
+  const int textHeight =
     this->TextHeight(first.c_str(), static_cast<unsigned>(first.size()), this->m_fontFamily, this->m_fontHeight, 1, 0
-    ) +
-    4;
-  const int top = (this->geometry.height - lineHeight * count + 4) / 2;
+    );
+  const int top = (this->geometry.height - (textHeight + 4) * count + 4) / 2;
 
   for (int index = 0; index < count; ++index) {
     const std::string& line = this->m_lines[index];
     const int width = this->TextWidth(line.c_str(), static_cast<unsigned>(line.size()), this->m_fontFamily, this->m_fontHeight, 1, 0
     );
-    int y = top;
-    if (index != 0) {
-      y = top - 4 + lineHeight * index;
+    int y;
+    if (index == 0) {
+      y = top;
+    } else {
+      y = top - 4 + (textHeight + 4) * index;
     }
     this->DrawShadowedText(
       (this->geometry.width - width) / 2, y, this->m_lines[index].c_str(), 0, this->m_textColor, this->m_outlineColor, this->m_fontFamily, this->m_fontHeight, 1

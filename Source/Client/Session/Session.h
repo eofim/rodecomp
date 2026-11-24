@@ -27,6 +27,7 @@
 #include <new>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -40,9 +41,7 @@ struct HotkeyInfo;
 struct ActionFrame;
 struct vector3d;
 
-struct EquipSlots {
-  /* 0000 */ int values[3];
-};
+using EquipSlots = std::tuple<int, int, int>;
 
 struct BlockedCharacter {
   /* 0000 */ std::uint32_t gid;
@@ -50,18 +49,30 @@ struct BlockedCharacter {
 };
 
 struct GuildStorageLogEntry {
-  /* 0000 */ int logId = 0;
-  /* 0004 */ int quantity = 0;
-  /* 0008 */ unsigned char operation = 0;
-  /* 0009 */ char characterName[24] = {};
-  /* 0021 */ char timestamp[24] = {};
+  // INLINED
+  GuildStorageLogEntry() : logId(0), quantity(0), operation(0), identified(0), itemType(0), refineLevel(0), category(0), grade(0) {
+    SecureZeroMemory(this->characterName, sizeof(this->characterName));
+    SecureZeroMemory(this->timestamp, sizeof(this->timestamp));
+    SecureZeroMemory(this->cards, sizeof(this->cards));
+  }
+
+  // INLINED
+  bool operator()(const GuildStorageLogEntry& left, const GuildStorageLogEntry& right) const {
+    return std::strcmp(left.timestamp, right.timestamp) > 0;
+  }
+
+  /* 0000 */ int logId;
+  /* 0004 */ int quantity;
+  /* 0008 */ unsigned char operation;
+  /* 0009 */ char characterName[24];
+  /* 0021 */ char timestamp[24];
   /* 003C */ std::string itemName;
-  /* 0054 */ unsigned char identified = 0;
-  /* 0058 */ int itemType = 0;
-  /* 005C */ int refineLevel = 0;
-  /* 0060 */ unsigned char cards[16] = {};
-  /* 0070 */ unsigned char category = 0;
-  /* 0072 */ std::int16_t grade = 0;
+  /* 0054 */ unsigned char identified;
+  /* 0058 */ int itemType;
+  /* 005C */ int refineLevel;
+  /* 0060 */ unsigned char cards[16];
+  /* 0070 */ unsigned char category;
+  /* 0072 */ std::int16_t grade;
 };
 
 struct SessionRecord6144 {
@@ -71,11 +82,11 @@ struct SessionRecord6144 {
   /* 002C */ int completedAt = 0;
   /* 0030 */ std::uint8_t rewarded = 0;
   /* 0031 */ std::uint8_t padding_0031;
-  /* 0032 */ std::uint16_t year;
-  /* 0034 */ std::uint16_t month;
-  /* 0036 */ std::uint16_t day;
+  /* 0032 */ std::int16_t year;
+  /* 0034 */ std::int16_t month;
+  /* 0036 */ std::int16_t day;
 
-  void SplitDate(__time32_t time, std::uint16_t& year, std::uint16_t& month, std::uint16_t& day) const;
+  void SplitDate(__time32_t time, std::int16_t& year, std::int16_t& month, std::int16_t& day) const;
 };
 
 #pragma pack(push, 1)
@@ -100,13 +111,17 @@ struct MapPosEntry {
   /* 0010 */ int valid;
 };
 
-struct SessionRecord6178Entry {
-  // INLINED
-  SessionRecord6178Entry(const std::string& text, bool completed) : text(text), completed(completed) {
-  }
+struct MapObjectLightEntry {
+  /* 0000 */ const char* name;
+  /* 0004 */ bool enabled;
+};
 
+static_assert(sizeof(MapObjectLightEntry) == 8);
+static_assert(offsetof(MapObjectLightEntry, enabled) == 4);
+
+struct SessionRecord6178Entry {
   /* 0000 */ std::string text;
-  /* 0018 */ bool completed;
+  /* 0018 */ bool completed = false;
 };
 
 struct SessionRecord6178 {
@@ -115,6 +130,8 @@ struct SessionRecord6178 {
   /* 0004 */ int id = -1;
   /* 0008 */ std::string title;
   /* 0020 */ std::vector<SessionRecord6178Entry> objectives;
+
+  SessionRecord6178& operator=(const SessionRecord6178&) = default;
 };
 
 struct RobeAlpha {
@@ -143,6 +160,9 @@ struct SessionRecord0734 {
 };
 
 struct SessionShop {
+  // INLINED
+  SessionShop() : flag(0) {}
+
   /* 0000 */ unsigned char flag;
   /* 0004 */ std::vector<std::map<int, std::pair<int, int>>> items;
 };
@@ -155,7 +175,7 @@ struct SessionParameterNameLess {
 
 struct SearchStoreResult {
   SearchStoreResult() : item() {}
-  SearchStoreResult(const SearchStoreResult& other) {
+  __declspec(noinline) SearchStoreResult(const SearchStoreResult& other) {
     this->storeId = other.storeId;
     this->accountId = other.accountId;
     std::memcpy(this->storeName, other.storeName, sizeof(this->storeName));
@@ -189,22 +209,9 @@ struct SubChatWndInfo {
   /* 003C */ int width;
   /* 0040 */ int height;
 
+  SubChatWndInfo();
   SubChatWndInfo& operator=(const SubChatWndInfo& other);
 };
-
-// OFFSET: 0x00914AD0
-// FUNCTION: fn_12545
-inline SubChatWndInfo& SubChatWndInfo::operator=(const SubChatWndInfo& other) {
-  this->name = other.name;
-  for (int index = 0; index < 25; ++index) {
-    this->options[index] = other.options[index];
-  }
-  this->x = other.x;
-  this->y = other.y;
-  this->width = other.width;
-  this->height = other.height;
-  return *this;
-}
 
 struct SessionEntry00A4 {
   /* 0000 */ std::string name;
@@ -461,7 +468,7 @@ public:
   /* 5268 */ std::vector<std::string> m_jobHitWaves;
   /* 5274 */ std::vector<std::string> m_weaponHitWaves;
   /* 5280 */ std::list<int> padding_5280;
-  /* 5288 */ unsigned char padding_5288[0x0C];
+  /* 5288 */ std::vector<MapObjectLightEntry> m_mapObjectLights;
   /* 5294 */ std::vector<const char*> m_bodyJobNames;
   /* 52A0 */ std::vector<const char*> m_sexNames;
   /* 52AC */ std::vector<const char*> m_weaponNames;
@@ -710,7 +717,7 @@ public:
   /* 7ECD */ unsigned char padding_7ECD[3];
   /* 7ED0 */ int minimumNameLength;
   /* 7ED4 */ std::uint32_t nameValidationTick;
-  /* 7ED8 */ int m_swapEquipmentMode = 0;
+  /* 7ED8 */ int m_swapEquipmentMode;
   /* 7EDC */ bool m_showMenuIcon;
   /* 7EDD */ unsigned char padding_7EDD[3];
   /* 7EE0 */ std::map<int, RobeAlpha> m_robeAlpha;
@@ -797,7 +804,10 @@ public:
 
   void ItemBitmapPath(const char* name, char* output);
   int GetOption(int id) const;
-  void SetOption(int id, int value, int extra);
+  void SetOption(int id, std::int64_t value);
+  bool IsScreenShakeActive();
+  bool ValidateCharacterName(const char* name);
+  bool ResetHotkeySlots();
   std::uint32_t GetServerTime();
   std::uint32_t AddPingSample(std::uint32_t sample);
   std::uint32_t SetServerTime(std::uint32_t serverTime);
@@ -824,6 +834,7 @@ public:
   void SetPartyLeader(std::uint32_t accountId, int leader);
   int RotateShortcut(int index, int bank) const;
   void AssignShortcut(unsigned char type, std::uint32_t id, int level, int slot, int bank);
+  int FindNormalItemSlot(std::uint32_t id) const;
   void AssignItemShortcut(std::uint32_t id, int slot);
   void ClearAdditionalShortcutSkills();
   bool IsPetAccessory(int itemId);
@@ -834,6 +845,9 @@ public:
   bool AddShopName(std::string name, int shopId);
   int SetPlayerSkillMode(int value);
   void SetElementalGid(int value);
+  int GetElementalSize() const;
+  void RequestBasicInfoRefresh();
+  void PreloadCommonSprites();
   void UnflagInventoryItem(int id);
   void UnflagMerchantShopItem(int id);
   void UnflagCartItem(int id);
@@ -846,8 +860,8 @@ public:
   bool IsNavigationAllowed() const;
   void LoadRobeAlpha();
   void LoadDamageSkinSettings();
-  bool LoadExceptionMinimapNameTable();
-  bool LoadMapNameTable();
+  BOOL LoadExceptionMinimapNameTable();
+  BOOL LoadMapNameTable();
   bool LoadMapPosTable();
   BOOL ScaleMapPositions();
   bool LoadFogParameters();
@@ -899,7 +913,7 @@ public:
   void PlaySkillEffect(int skillId, int level, CGameActor* source, CGameActor* target);
   bool PlaySkillTargetEffect(int skillId, int level, CGameActor* source, CGameActor* target);
   bool PlaySkillGroundEffect(int skillId, vector3d position);
-  int IsState291To303(int state) const;
+  int IsAbracadabraSpecialSkill(int state) const;
   int IsType0Or4(int type) const;
   int IsMonsterActor(CGameActor* actor) const;
   int IsLocalPlayerAid(std::uint32_t aid) const;
@@ -914,8 +928,8 @@ public:
   bool IsSuperNoviceJob(int job) const;
   bool IsSuperNoviceClass(int job) const;
   void ApplySaveDataOptions();
-  int SetHotkeyEntry(char enabled, int id, int value, int slot);
-  int SetFlag(char value);
+  void SetHotkeyEntry(char enabled, int id, int value, int slot);
+  int SetFlag(int value);
   void SetPlayerNameKey(const unsigned char* key);
   // INLINED
   NormalItemSlot& SkillHotkey(int index) {
@@ -975,6 +989,7 @@ public:
   ITEM_INFO GetEquippedItemAt(int index) const;
   ITEM_INFO GetSwapEquippedItem(int index) const;
   ITEM_INFO GetSwapCostumeItem(int index) const;
+  int GetWeightPercent() const;
   ITEM_INFO FindItemByIdentity(std::uint32_t identity, int location);
   unsigned char IsAllyActor(std::uint32_t aid, int job);
   const char* GetDamageSkinAuxiliaryName() const;
@@ -1010,7 +1025,7 @@ public:
   int IsGuildMemberAccount(std::uint32_t accountId) const;
   int IsGuildMemberCharacter(std::uint32_t characterId) const;
   bool IsGuildMemberCharacter(int characterId, char* name) const;
-  bool IsGuildMemberName(const char* name) const;
+  int IsGuildMemberName(const char* name) const;
   bool IsIndoorMapName(const char* name) const;
   bool IsKnownName(std::string name) const;
   long long GetMerchantHopeToSellItemTotalPrice() const;
@@ -1054,6 +1069,7 @@ public:
   void NotifyMercSkillWindows();
   int GetPetActionNumber(int hungerLevel, int friendlyLevel, int action);
   void InitPetActionTable();
+  void InitMapTypeInfoTable();
   void InitSkillEffectIds();
   int GetPetFriendlyState(int friendly);
   void GetPetFriendlyStateString(int friendly, char* buffer);
@@ -1175,9 +1191,11 @@ public:
   const char* GetWeaponClassName(int item);
   std::string GetWeaponActName(int job, int sex, int weapon, int weaponItem, int costume);
   std::string GetWeaponSprName(int job, int sex, int weapon, int weaponItem, int costume);
+  std::string GetJobTitleString(int job);
   std::string GetWeaponEffectActName(int job, int sex, int weapon, int weaponItem, int effect, int costume);
   std::string GetWeaponEffectSprName(int job, int sex, int weapon, int weaponItem, int effect, int costume);
   void CollectCardItems();
+  ITEM_INFO GetCardItemAt(std::size_t index) const;
   std::uint32_t ReadReplayCharacter(const std::vector<unsigned char>& data);
   std::uint32_t ReadReplayStats(const std::vector<unsigned char>& data);
   std::uint32_t ReadReplayCompanions(const std::vector<unsigned char>& data);
@@ -1227,9 +1245,10 @@ public:
   float GetNpcLocationRadius(int job, bool riding);
   void ClearStoreSearchResults();
   int GetRidingJob(int job);
+  int GetJobMountType(int job);
   void InitNpcLocationRadius();
   int GetSpriteJob(int job, int costumeJob, bool spriteIndex);
-  bool HasRequiredItems() const;
+  int HasRequiredItems() const;
   bool IsSlotItemIdentity(std::uint32_t id) const;
   bool HasInventoryItem(std::uint32_t id) const;
   bool HasItemId(int itemId) const;
@@ -1261,8 +1280,8 @@ public:
   std::string GetAccessorySprName(int job, int sex, int head, int accessory);
   std::string GetShieldActName(int job, int sex, int shield, int costumeJob);
   std::string GetShieldSprName(int job, int sex, int shield, int costumeJob);
-  std::string GetRobeActName(int job, int unused, int sex, int robe, bool riding, int costumeJob);
-  std::string GetRobeSprName(int job, int unused, int sex, int robe, bool riding, int costumeJob);
+  std::string GetRobeActName(int job, int unused, int sex, int robe, unsigned char riding, int costumeJob);
+  std::string GetRobeSprName(int job, int unused, int sex, int robe, unsigned char riding, int costumeJob);
   std::string GetRobeName(unsigned int robe);
   std::string GetBodyPalName(int job, int sex, int palette, int costumeJob, int costume, int unused);
   std::string GetBodySprName(int job, int sex, int costumeJob, int costume);
@@ -1431,6 +1450,8 @@ static_assert(offsetof(CSession, m_whisperRecord) == 0x5554);
 static_assert(offsetof(CSession, m_noSubChatWnds) == 0x73C);
 static_assert(offsetof(CSession, m_subChatWnds) == 0x744);
 static_assert(offsetof(CSession, m_prohibitionLog) == 0x754);
+static_assert(offsetof(CSession, m_mapObjectLights) == 0x5288);
+static_assert(offsetof(CSession, m_bodyJobNames) == 0x5294);
 static_assert(offsetof(CSession, m_mapPositions) == 0x5310);
 static_assert(offsetof(CSession, m_mapPosListCount) == 0x5328);
 static_assert(offsetof(SessionRecord6144, registered) == 0x0);

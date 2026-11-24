@@ -54,6 +54,18 @@ std::string CreateUniqueFileName(const std::string& filename) {
   return result;
 }
 
+// INLINED
+static __forceinline bool GetDoubleValue(JsonCppLoader* loader, const jsoncons::json& node, const std::string& key, double* out) {
+  const jsoncons::json value = loader->GetValue(key, node, jsoncons::json_type::double_value);
+  if (value.is_null() == true) {
+    loader->Fail("key 에 해당하는 데이터를 찾지 못했습니다. (keyName : %s)", key.c_str());
+    return false;
+  }
+
+  *out = value.as<double>();
+  return true;
+}
+
 // OFFSET: 0x0050C2A0
 // FUNCTION: fn_00896
 bool JsonCppLoader::GetEZ2STREffect(std::map<std::string, EZ2STREffectRecord>* out) {
@@ -62,45 +74,20 @@ bool JsonCppLoader::GetEZ2STREffect(std::map<std::string, EZ2STREffectRecord>* o
     return false;
   }
 
-  const JsonValue* effects = nullptr;
-  if (const JsonObject* root = this->document.ObjectRange()) {
-    for (const JsonMember& entry : *root) {
-      if (entry.first == "EZ2STREffect") {
-        effects = &entry.second;
-        break;
-      }
-    }
-  }
-
-  if (effects == nullptr) {
+  const jsoncons::json& document = this->document;
+  const auto end = document.object_range().end();
+  if (end == document.find("EZ2STREffect")) {
     this->Fail("키에 해당하는 데이터가 없습니다. (key : %s)", "EZ2STREffect");
     return false;
   }
 
-  const JsonObject* members = effects->ObjectRange();
-  const JsonObject none;
-  for (const JsonMember& member : members ? *members : none) {
-    const std::string name = member.first;
-    const JsonValue node = member.second;
+  for (const auto& member : this->document["EZ2STREffect"].object_range()) {
+    const std::string name = member.key();
+    const jsoncons::json node = member.value();
     EZ2STREffectRecord record;
     this->GetStringValue(node, "FilePath", &record.name);
-
-    JsonValue x;
-    this->GetValue(x, "PosX", node, JsonValue::DOUBLE_VALUE);
-    if (x.IsNull()) {
-      this->Fail("key 에 해당하는 데이터를 찾지 못했습니다. (keyName : %s)", "PosX");
-    } else {
-      record.offsetX = x.AsDouble();
-    }
-
-    JsonValue y;
-    this->GetValue(y, "PosY", node, JsonValue::DOUBLE_VALUE);
-    if (y.IsNull()) {
-      this->Fail("key 에 해당하는 데이터를 찾지 못했습니다. (keyName : %s)", "PosY");
-    } else {
-      record.offsetY = y.AsDouble();
-    }
-
+    GetDoubleValue(this, node, "PosX", &record.offsetX);
+    GetDoubleValue(this, node, "PosY", &record.offsetY);
     this->GetBoolValue(node, "IsInfinite", &record.infinite);
     this->GetBoolValue(node, "IsFloor", &record.floor);
     this->GetBoolValue(node, "IsAboveUI", &record.aboveUi);
@@ -110,7 +97,7 @@ bool JsonCppLoader::GetEZ2STREffect(std::map<std::string, EZ2STREffectRecord>* o
     this->GetIntValue(node, "StartDelayTime", &record.delays[1]);
     this->GetBoolValue(node, "IsToGround", &record.toGround);
 
-    if (!out->insert(std::make_pair(name, record)).second) {
+    if (!out->insert(std::pair<std::string, EZ2STREffectRecord>(name, record)).second) {
       this->Fail("중복키가 입력되었습니다. (key : %s)", name.c_str());
       return false;
     }

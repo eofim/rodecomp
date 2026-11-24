@@ -16,8 +16,7 @@ void UITransMenuWnd::Paint() {
     std::uint32_t color = this->m_items[i].enabled ? 0xFFFFFF : 0x646464;
     if (i == this->m_selected) {
       color = 0x282828;
-      const int half = this->m_margin / 2;
-      this->FillRegion(0, (i - 1) * half + cellHeight * i + this->m_margin, this->geometry.width, cellHeight + half, 0xC8C8C8);
+      this->FillRegion(0, (i - 1) * (this->m_margin / 2) + cellHeight * i + this->m_margin, this->geometry.width, cellHeight + this->m_margin / 2, 0xC8C8C8);
     }
 
     const int margin = this->m_margin;
@@ -38,19 +37,23 @@ void UITransMenuWnd::OnLBtnDown(int x, int y) {
   }
 }
 
+// OFFSET: 0x00949A40
+// FUNCTION: fn_45703
+__forceinline int UITransMenuWnd::ItemIndexAt(const int& x, const int& y) const {
+  const int margin = this->m_margin;
+  if (margin <= y && (this->m_lineHeight + margin / 2) * this->m_items.size() + margin >= static_cast<unsigned>(y)) {
+    const int cellHeight = (this->geometry.height - 2 * margin) / this->m_items.size();
+    return (y - margin) / cellHeight;
+  }
+
+  return -1;
+}
+
 // OFFSET: 0x0094F050
 // FUNCTION: fn_12930
 void UITransMenuWnd::OnMouseMove(int x, int y) {
-  const int margin = this->m_margin;
   const int previous = this->m_selected;
-  int selected;
-  if (margin <= y && (this->m_lineHeight + margin / 2) * this->m_items.size() + margin >= static_cast<unsigned>(y)) {
-    const int cellHeight = (this->geometry.height - 2 * margin) / this->m_items.size();
-    selected = (y - margin) / cellHeight;
-  } else {
-    selected = -1;
-  }
-
+  const int selected = this->ItemIndexAt(x, y);
   this->m_selected = selected;
   if (previous != selected && selected != -1) {
     this->Invalidate();

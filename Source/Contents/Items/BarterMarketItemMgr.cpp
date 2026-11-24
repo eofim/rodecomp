@@ -17,8 +17,6 @@
 #include <utility>
 #include <vector>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 struct BarterTreeNode {
   /* 0000 */ BarterTreeNode* left;
   /* 0004 */ BarterTreeNode* parent;
@@ -65,8 +63,9 @@ CBarterMarketItemMgr::CBarterMarketItemMgr()
   this->initialized = true;
 }
 
-// INLINED
-CBarterMarketItemMgr::~CBarterMarketItemMgr()
+// OFFSET: 0x005D75D0
+// FUNCTION: fn_46450
+__declspec(noinline) CBarterMarketItemMgr::~CBarterMarketItemMgr()
 {
 }
 
@@ -86,7 +85,6 @@ void CBarterMarketItemMgr::RefreshTotals()
   }
 }
 
-#pragma inline_depth(0)
 // OFFSET: 0x005D7990
 // FUNCTION: fn_03724
 void CBarterMarketItemMgr::Clear()
@@ -95,7 +93,6 @@ void CBarterMarketItemMgr::Clear()
   this->items.clear();
   this->totals.clear();
 }
-#pragma inline_depth()
 
 // OFFSET: 0x005D79B0
 // FUNCTION: fn_03725
@@ -137,19 +134,18 @@ void CBarterMarketItemMgr::AddItem(const BarterMarketItem& item)
   } else {
     this->allItems.push_back(item);
   }
-  for (std::list<BarterMarketItem>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
-    if (it->id == item.id) {
-      if (!it->flag_38) {
-        it->value -= item.value;
-        if (it->value <= 0) {
-          this->items.erase(it);
-          UIWindow* window = g_windowMgr.LookupWindow(WID_BARTERMARKETWND);
-          if (window != NULL) {
-            window->SendMsg(NULL, UM_REFRESHITEM, 0, 0, 0, 0);
-          }
-        }
+  const auto itemsEnd = this->items.end();
+  std::list<BarterMarketItem>::iterator it = std::find_if(this->items.begin(), itemsEnd, [&item](const BarterMarketItem& entry) {
+    return entry.id == item.id;
+  });
+  if (it != itemsEnd && !it->flag_38) {
+    it->value -= item.value;
+    if (it->value <= 0) {
+      this->items.erase(it);
+      UIWindow* window = g_windowMgr.LookupWindow(WID_BARTERMARKETWND);
+      if (window != NULL) {
+        window->SendMsg(NULL, UM_REFRESHITEM, 0, 0, 0, 0);
       }
-      break;
     }
   }
   this->RefreshTotals();
@@ -192,7 +188,10 @@ bool CBarterMarketItemMgr::HasItemByName(std::string name)
   std::list<BarterMarketItem>::iterator found = std::find_if(this->allItems.begin(), this->allItems.end(), [name](const BarterMarketItem& item) {
     return item.name == name;
   });
-  return found != this->allItems.end();
+  if (found != this->allItems.end()) {
+    return true;
+  }
+  return false;
 }
 
 // OFFSET: 0x005D6F60
@@ -346,11 +345,14 @@ int CBarterMarketItemMgr::GetAllItemValueById(int id)
 int CBarterMarketItemMgr::GetAllItemValueByName(std::string name)
 {
   int total = 0;
-  std::for_each(this->allItems.begin(), this->allItems.end(), [&total, &name](const BarterMarketItem& item) {
+  const auto addValue = [&total, &name](const BarterMarketItem& item) {
     if (item.name == name) {
       total += item.value;
     }
-  });
+  };
+  for (const BarterMarketItem& item : this->allItems) {
+    addValue(item);
+  }
   return total;
 }
 
@@ -387,14 +389,16 @@ float CBarterMarketItemMgr::GetTotalAmount()
 // GLOBAL: gl_24815
 CExpandedBarterMarketItemMgr* g_expandedBarterMarketItemMgr;
 
-// INLINED
+// OFFSET: 0x005D8EB0
+// FUNCTION: fn_46453
 CExpandedBarterMarketItemMgr::CExpandedBarterMarketItemMgr() : total(0)
 {
   this->initialized = true;
 }
 
-// INLINED
-CExpandedBarterMarketItemMgr::~CExpandedBarterMarketItemMgr()
+// OFFSET: 0x005D9590
+// FUNCTION: fn_46454
+__declspec(noinline) CExpandedBarterMarketItemMgr::~CExpandedBarterMarketItemMgr()
 {
 }
 
@@ -431,7 +435,7 @@ void CExpandedBarterMarketItemMgr::DestroyInstance()
 void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
 {
   for (std::vector<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it) {
-    if (it->id == entry.id) {
+    if (entry.id == it->id) {
       it->value -= entry.value;
       if (it->value <= 0) {
         this->entries.erase(it);
@@ -439,9 +443,12 @@ void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
       break;
     }
   }
-  std::vector<BarterMarketEntry>::iterator found = std::find_if(this->items.begin(), this->items.end(), [&entry](const BarterMarketEntry& item) {
-    return item.id == entry.id;
-  });
+  std::vector<BarterMarketEntry>::iterator found = this->items.begin();
+  for (; found != this->items.end(); ++found) {
+    if (entry.id == found->id) {
+      break;
+    }
+  }
   if (found != this->items.end()) {
     if (!found->flag_30) {
       found->value += entry.value;
@@ -451,7 +458,7 @@ void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
   }
   for (std::vector<BarterChunk16>::const_iterator it = entry.chunks.begin(); it != entry.chunks.end(); ++it) {
     int count = entry.value;
-    BarterChunk16 chunk = *it;
+    alignas(16) BarterChunk16 chunk = *it;
     for (std::vector<BarterChunk16>::iterator target = this->chunks.begin(); target != this->chunks.end(); ++target) {
       if (target->field_0 == chunk.field_0 && target->field_4 == chunk.field_4) {
         target->amount -= chunk.amount * count;
@@ -472,13 +479,16 @@ void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
 // FUNCTION: fn_03762
 void CExpandedBarterMarketItemMgr::AddEntry(const BarterMarketEntry& entry)
 {
-  std::vector<BarterMarketEntry>::iterator found = std::find_if(this->entries.begin(), this->entries.end(), [&entry](const BarterMarketEntry& item) {
-    return item.id == entry.id;
-  });
-  if (found != this->entries.end()) {
-    found->value += entry.value;
-  } else {
+  std::vector<BarterMarketEntry>::iterator found = this->entries.begin();
+  for (; found != this->entries.end(); ++found) {
+    if (found->id == entry.id) {
+      break;
+    }
+  }
+  if (found == this->entries.end()) {
     this->entries.push_back(entry);
+  } else {
+    found->value += entry.value;
   }
   for (std::vector<BarterMarketEntry>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
     if (it->id == entry.id && !it->flag_30) {
@@ -492,18 +502,20 @@ void CExpandedBarterMarketItemMgr::AddEntry(const BarterMarketEntry& entry)
   for (std::vector<BarterChunk16>::const_iterator it = entry.chunks.begin(); it != entry.chunks.end(); ++it) {
     int count = entry.value;
     BarterChunk16 chunk = *it;
-    std::vector<BarterChunk16>::iterator target = std::find_if(this->chunks.begin(), this->chunks.end(), [&chunk](const BarterChunk16& other) {
-      return other.field_0 == chunk.field_0 && other.field_4 == chunk.field_4;
-    });
-    if (target != this->chunks.end()) {
-      target->amount += chunk.amount * count;
-    } else {
-      BarterChunk16 added;
-      added.field_0 = chunk.field_0;
-      added.field_4 = chunk.field_4;
-      added.amount = chunk.amount * count;
-      added.field_c = chunk.field_c;
-      this->chunks.push_back(added);
+    for (std::vector<BarterChunk16>::iterator target = this->chunks.begin();; ++target) {
+      if (target == this->chunks.end()) {
+        alignas(16) BarterChunk16 added;
+        added.field_0 = chunk.field_0;
+        added.field_4 = chunk.field_4;
+        added.amount = chunk.amount * count;
+        added.field_c = chunk.field_c;
+        this->chunks.push_back(added);
+        break;
+      }
+      if (target->field_0 == chunk.field_0 && target->field_4 == chunk.field_4) {
+        target->amount += chunk.amount * count;
+        break;
+      }
     }
   }
   this->total = 0;
@@ -671,18 +683,25 @@ struct BarterEntryPair {
 void SortMedianOfThree(BarterEntryPair* first, BarterEntryPair* mid, BarterEntryPair* last)
 {
   if (mid->id < first->id) {
-    BarterEntryPair saved = *mid;
+    BarterEntryPair saved;
+    saved.id = mid->id;
+    saved.value = mid->value;
     *mid = *first;
     *first = saved;
   }
-  if (last->id < mid->id) {
-    BarterEntryPair saved = *last;
+  int lastId = last->id;
+  if (lastId < mid->id) {
+    BarterEntryPair saved;
+    saved.id = last->id;
+    saved.value = last->value;
     *last = *mid;
     *mid = saved;
-    if (mid->id < first->id) {
-      saved = *mid;
+    if (lastId < first->id) {
+      BarterEntryPair saved2;
+      saved2.id = lastId;
+      saved2.value = mid->value;
       *mid = *first;
-      *first = saved;
+      *first = saved2;
     }
   }
 }
@@ -719,12 +738,14 @@ BarterChunk16* BarterChunkVector::Umove(BarterChunk16* first, BarterChunk16* las
 // FUNCTION: fn_03786
 BarterChunk16* BarterChunkVector::MoveChunks16(BarterChunk16* first, BarterChunk16* last, BarterChunk16* dest)
 {
-  while (first != last) {
-    *dest = *first;
-    ++first;
-    ++dest;
+  BarterChunk16* src = first;
+  BarterChunk16* dst = dest;
+  while (src != last) {
+    *dst = *src;
+    ++src;
+    ++dst;
   }
-  return first;
+  return src;
 }
 
 struct BarterTriple {
@@ -737,14 +758,18 @@ struct BarterTriple {
 // FUNCTION: fn_03802
 BarterTriple* CopyTriples(BarterTriple* first, BarterTriple* last, BarterTriple* dest)
 {
-  while (first != last) {
-    dest->first = first->first;
-    dest->second = first->second;
-    dest->third = first->third;
-    ++first;
-    ++dest;
+  BarterTriple* src = first;
+  BarterTriple* dst = dest;
+  while (src != last) {
+    const int secondValue = src->second;
+    const int firstValue = src->first;
+    dst->first = firstValue;
+    dst->second = secondValue;
+    dst->third = src->third;
+    ++src;
+    ++dst;
   }
-  return dest;
+  return dst;
 }
 
 struct BarterChunkAllocator {
@@ -809,18 +834,19 @@ struct BarterKeyTree {
 // FUNCTION: fn_03797
 BarterKeyLookup BarterKeyTree::FindLowerBound(const std::vector<int>& key)
 {
-  BarterKeyLookup result;
   BarterKeyNode* node = this->head->parent;
+  BarterKeyLookup result;
   result.node = node;
   result.direction = 0;
   result.bound = this->head;
   while (node->isnil == 0) {
     result.node = node;
+    int i = 0;
     int nodeCount = (int)node->key.size();
     int keyCount = (int)key.size();
-    int count = nodeCount < keyCount ? keyCount : nodeCount;
+    int count = std::max(nodeCount, keyCount);
     int relation = 0;
-    for (int i = 0; i < count; ++i) {
+    for (; i < count; ++i) {
       int left = i < nodeCount ? node->key[i] : 0;
       int right = i < keyCount ? key[i] : 0;
       if (left < right) {
@@ -866,24 +892,30 @@ bool CExpandedBarterMarketItemMgr::HasRequiredItems()
   for (std::vector<BarterChunk16>::iterator chunk = this->chunks.begin(); chunk != this->chunks.end(); ++chunk) {
     int required = chunk->amount;
     std::multimap<int, ITEM_INFO>::iterator it = this->itemInfos.begin();
-    for (;;) {
-      if (it == this->itemInfos.end()) {
-        return false;
-      }
+    bool found = false;
+    while (it != this->itemInfos.end()) {
       if (std::atoi(it->second.itemId.c_str()) == chunk->field_0 && (chunk->field_4 <= 0 || it->second.refiningLevel >= chunk->field_4)) {
-        if (it->second.quantity > required) {
-          it->second.quantity -= required;
+        const int available = it->second.quantity;
+        if (available > required) {
+          it->second.quantity = available - required;
+          found = true;
           break;
         }
-        if (it->second.quantity == required) {
-          this->itemInfos.erase(it);
+        if (available == required) {
+          const std::multimap<int, ITEM_INFO>::const_iterator used = it;
+          this->itemInfos.erase(used);
+          found = true;
           break;
         }
-        required -= it->second.quantity;
+        required -= available;
         it = this->itemInfos.erase(it);
       } else {
         ++it;
       }
+    }
+
+    if (!found) {
+      return false;
     }
   }
   return true;

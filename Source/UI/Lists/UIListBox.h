@@ -28,6 +28,7 @@ public:
   virtual void AddLine(const char* text);
   virtual void Clear();
   virtual void Refresh();
+  void SetScrollPosition(int value);
   __declspec(noinline) int LineAt(int x, int y) const;
   int LineCount() const;
   bool CopyText(char* buffer, int length);
@@ -47,7 +48,7 @@ public:
   /* 00B0 */ UIScrollBar* horizontalBar;
   /* 00B4 */ int transparent;
   /* 00B8 */ int lineHeight;
-  /* 00BC */ int plainTextMode;
+  /* 00BC */ unsigned char plainTextMode;
   /* 00C0 */ std::uint32_t selectionColor;
   /* 00C4 */ unsigned char selectable;
   /* 00C8 */ std::uint32_t textColor;
@@ -68,6 +69,7 @@ class UIListBox2 : public UIListBox {
 public:
   UIListBox2();
   void Paint() override;
+  void SetFont(int family, int height, unsigned char bold, unsigned char italic);
 
   /* 00D4 */ int fontFamily;
   /* 00D8 */ int fontHeight;

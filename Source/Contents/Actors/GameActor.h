@@ -52,6 +52,8 @@ struct ActorSkillInfo {
 };
 
 struct ActorDamageMessage {
+  ActorDamageMessage() {}
+
   /* 0000 */ std::uint32_t targetAid;
   /* 0004 */ int action;
   /* 0008 */ int damage;
@@ -244,8 +246,10 @@ public:
   void SetHealthState(int value);
   void SetSexBit(int value);
   void ApplySavedShapeShift();
+  __forceinline void RefreshBodyPaletteName();
   void ApplyNatureProtection();
   void UpdateMaxLevelAura();
+  __forceinline void BeginVanish();
   void SetActorJob(int job);
   void RenderMercenary(const float* matrix, int job);
   void ProcessBodyState();
@@ -300,14 +304,16 @@ public:
   int GetGaugeCurrent();
   int GetGaugeMaximum();
   void ResetTransformJobs();
+  int IsBladeStopped() const;
   bool HasPendingDamage();
+  bool IsInDeathState() const;
   bool UpdateMaximumValue(std::int64_t value);
   int IsPlayerClass(int job);
   bool UpdateFadeOut();
+  int MountedJob(int job, std::uint32_t flags);
 };
 
 int ShapeShiftJob(int form, int job);
-int __stdcall MountedJob(int job, std::uint32_t flags);
 void __stdcall CreateHallucinationPc(int job, int sex, int head, const vector3d* position, int alpha, int weapon, int shield, int bodyPalette);
 
 extern int g_maxMoveSpeed;

@@ -2,10 +2,6 @@
 
 #include "Contents/Actors/RenderObject.h"
 
-// OFFSET: 0x00CA8EE0
-// FUNCTION: fn_20997
-CInstantVar::~CInstantVar() = default;
-
 // OFFSET: 0x00D559B0
 // FUNCTION: fn_21952
 void CInstantVar::Set(int key, std::int64_t value) {
@@ -14,6 +10,6 @@ void CInstantVar::Set(int key, std::int64_t value) {
 
 // OFFSET: 0x00612020
 // FUNCTION: fn_04340
-std::int64_t CRenderObject::GetInstant(int key) const {
-  return this->render.instant.Get(key);
+int CRenderObject::GetInstant(int key) const {
+  return static_cast<int>(this->render.instant.Get(key));
 }

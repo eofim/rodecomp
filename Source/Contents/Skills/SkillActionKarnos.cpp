@@ -1,6 +1,7 @@
 #include "Client/Mode/CGameMode.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Actors/ActorEnums.h"
+#include "Resource/MSGSTRINGID.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/GameActor.h"
 #include "Contents/Camera/Camera.h"
@@ -12,6 +13,7 @@
 #include "Contents/Effects/Core/EffectLists.h"
 #include "Contents/Effects/Core/RagEffect.h"
 #include "Contents/Effects/Skills/WhirlwindEffect.h"
+#include "Contents/Skills/SkillId.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Utility/Cipher/XorBytes.h"
@@ -184,6 +186,13 @@ public:
   void OnSkillObjectRemove(CRenderObject* object) override;
 };
 
+// OFFSET: 0x005B6910
+// FUNCTION: fn_45575
+template <>
+CSkillObjectAction* NewAction<CSkillObjectAction_KR_ICE_PILLAR, CSkillObjectAction>() {
+  return new CSkillObjectAction_KR_ICE_PILLAR;
+}
+
 class CSkillAction_KR_FEATHER_SPRINKLE : public CSkillAction_DamageWereRaptorForm {
 public:
   int GetSkillAttackMotion() override;
@@ -305,7 +314,10 @@ void CSkillAction_KR_CLAW_WAVE::OnSkillCast(int level, CGameActor* source) {
 // FUNCTION: fn_03347
 void CSkillAction_KR_CLAW_WAVE::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
   EffectLists* effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("claw_wave", 0x17359BF953C367B3ULL, effectName)), position.x, position.y, position.z, 0, -1, 0, 0);
+  CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+  const std::string name = OBFUSCATE_TEXT_NAMED("claw_wave", 0x17359BF953C367B3ULL, effectName);
+  const int effectId = manager->EffectId(name);
+  effects->Spawn(0, effectId, position, 0, -1, 0, 0);
 }
 
 // OFFSET: 0x005B0EA0
@@ -337,11 +349,21 @@ int CSkillAction_KR_EARTH_STAMP::GetSkillAttackMotion() {
 // OFFSET: 0x005B1250
 // FUNCTION: fn_03351
 void CSkillAction_KR_EARTH_STAMP::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
-  EffectLists* effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("earth_stamp", 0x3FAF85D995034FD7ULL, effectName)), position.x, position.y, position.z, 0, -1, 0, 0);
+  {
+    EffectLists* effects = g_effectMgr;
+    CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+    const std::string name = OBFUSCATE_TEXT_NAMED("earth_stamp", 0x3FAF85D995034FD7ULL, effectName);
+    const int effectId = manager->EffectId(name);
+    effects->Spawn(0, effectId, position, 0, -1, 0, 0);
+  }
 
-  effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("earth_stamp_bottom", 0x490FFB43A12F0DB9ULL, bottomName)), position.x, position.y, position.z, 0, -1, 0, 0);
+  {
+    EffectLists* effects = g_effectMgr;
+    CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+    const std::string name = OBFUSCATE_TEXT_NAMED("earth_stamp_bottom", 0x490FFB43A12F0DB9ULL, bottomName);
+    const int effectId = manager->EffectId(name);
+    effects->Spawn(0, effectId, position, 0, -1, 0, 0);
+  }
 }
 
 // OFFSET: 0x005B1590
@@ -464,11 +486,12 @@ void CSkillAction_KR_THUNDERING_ORB::OnGroundSkillEffect(vector3d position, int 
     return;
   }
 
-  if (CEffect* orb = g_effectMgr->Spawn(target->render.accountId, 0x989, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
+  EffectLists* effects = g_effectMgr;
+  if (CEffect* orb = effects->Spawn(target->render.accountId, EF_UNK_2441, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     static_cast<CBezierArcThrowEffect*>(orb)->SetTarget(position);
   }
 
-  EffectLists* effects = g_effectMgr;
+  effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("thundering_orb_g", 0x2D394DBD0F332733ULL, effectName)), position, 0, -1, 0, 0)) {
     effect->SetDelay(300);
   }
@@ -487,11 +510,12 @@ void CSkillAction_KR_THUNDERING_ORB_S::OnGroundSkillEffect(vector3d position, in
     return;
   }
 
-  if (CEffect* orb = g_effectMgr->Spawn(target->render.accountId, 0x989, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
+  EffectLists* effects = g_effectMgr;
+  if (CEffect* orb = effects->Spawn(target->render.accountId, EF_UNK_2441, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     static_cast<CBezierArcThrowEffect*>(orb)->SetTarget(position);
   }
 
-  EffectLists* effects = g_effectMgr;
+  effects = g_effectMgr;
   if (CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT_NAMED("thundering_orb_y", 0x69FD1D9733D3CFC1ULL, effectName)), position, 0, -1, 0, 0)) {
     effect->SetDelay(300);
   }
@@ -556,10 +580,10 @@ void CSkillObjectAction_KR_ICE_PILLAR::OnSkillObjectRemove(CRenderObject* object
     return;
   }
 
-  if (CEffect* effect = g_effectMgr->Find(object->render.accountId, 0x9A8)) {
+  if (CEffect* effect = g_effectMgr->Find(object->render.accountId, EF_UNK_2472)) {
     static_cast<EffectResourceSwitcher*>(effect)->Start();
   }
-  if (CEffect* effect = g_effectMgr->Find(object->render.accountId, 0x9A9)) {
+  if (CEffect* effect = g_effectMgr->Find(object->render.accountId, EF_UNK_2473)) {
     static_cast<EffectResourceSwitcher*>(effect)->Start();
   }
 }
@@ -644,6 +668,14 @@ void CSkillAction_KR_SHARPEN_HAIL::OnSkillEffect(int level, CGameActor* source, 
   const int shotEffect = CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("sharpen_hail_shot", 0x7FCD77F9C7CBD14DULL));
   const int bottomEffect = CEZ2STREffectMgr::GetInstance()->EffectId(OBFUSCATE_TEXT("sharpen_hail_shot_bottom", 0xD1538513DF975701ULL));
 
+  const auto aroundTarget = [&](int offsetX, int offsetY) {
+    return vector3d{
+      target->render.position.x + static_cast<float>(offsetX * 4),
+      target->render.position.y + static_cast<float>(offsetY * 4),
+      target->render.position.z + 0.0f,
+    };
+  };
+
   for (int delay = 0; delay < 1000; delay += 200) {
     int count = rand() % 8;
     if (count < 5) {
@@ -672,11 +704,7 @@ void CSkillAction_KR_SHARPEN_HAIL::OnSkillEffect(int level, CGameActor* source, 
         offsetY = -offsetY;
       }
 
-      const vector3d position{
-        target->render.position.x + static_cast<float>(offsetX * 4),
-        target->render.position.y + static_cast<float>(offsetY * 4),
-        target->render.position.z + 0.0f,
-      };
+      const vector3d position = aroundTarget(offsetX, offsetY);
 
       CEffect* shot = g_effectMgr->Spawn(0, shotEffect, position, 0, -1, 0, 0);
       if (shot) {
@@ -720,13 +748,13 @@ void CSkillAction_KR_IRON_HOWLING::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x005B51F0
 // FUNCTION: fn_03385
 EfstActionMessage CEfstAction_IRON_HOWLING::GetEfstBeginMessage() {
-  return {LookupMessage(4662), 0xFFFF00};
+  return {LookupMessage(MSI_KR_IRON_HOWLING_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x005B5220
 // FUNCTION: fn_03386
 EfstActionMessage CEfstAction_IRON_HOWLING::GetEfstEndMessage() {
-  return {LookupMessage(4663), 0xFF};
+  return {LookupMessage(MSI_KR_IRON_HOWLING_OFF), 0xFF};
 }
 
 // OFFSET: 0x005B5250
@@ -788,13 +816,13 @@ void CSkillAction_KR_WIND_VEIL::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x005B58F0
 // FUNCTION: fn_03394
 EfstActionMessage CEfstAction_WIND_VEIL::GetEfstBeginMessage() {
-  return {LookupMessage(4664), 0xFFFF00};
+  return {LookupMessage(MSI_KR_WIND_VEIL_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x005B5920
 // FUNCTION: fn_03395
 EfstActionMessage CEfstAction_WIND_VEIL::GetEfstEndMessage() {
-  return {LookupMessage(4665), 0xFF};
+  return {LookupMessage(MSI_KR_WIND_VEIL_OFF), 0xFF};
 }
 
 // OFFSET: 0x005B5950
@@ -847,7 +875,7 @@ void CEfstAction_CHOP_CHOP::OnEfstEnd(int efstId, int argument2, int argument3, 
   while (CEffect* effect = g_effectMgr->Find(actor->render.accountId, EF_KR_CHOP_CHOP)) {
     g_effectMgr->Retire(effect, 1);
   }
-  while (CEffect* effect = g_effectMgr->Find(actor->render.accountId, 0x98C)) {
+  while (CEffect* effect = g_effectMgr->Find(actor->render.accountId, EF_UNK_2444)) {
     g_effectMgr->Retire(effect, 1);
   }
   for (;;) {
@@ -864,7 +892,8 @@ void CEfstAction_CHOP_CHOP::OnEfstEnd(int efstId, int argument2, int argument3, 
 // FUNCTION: fn_03403
 void CWhirlwindEffect::Init(EffectActor* parent, int id, vector3d deltaPos) {
   if (parent && !parent->HasId(0x98C)) {
-    parent->render.instant.Values()[25] = static_cast<std::int64_t>(parent->render.angle * 1000.0f);
+    const std::int64_t angle = static_cast<std::int64_t>(parent->render.angle * 1000.0f);
+    parent->render.instant.Values()[25] = angle;
   }
 
   this->CRagEffect::Init(parent, id, deltaPos);
@@ -880,7 +909,7 @@ bool CWhirlwindEffect::OnProcess() {
   this->render.position = this->state.parent->render.position;
 
   const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-  const int remaining = std::max(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(this->endTime - now).count()), 0);
+  const int remaining = std::max(std::chrono::duration_cast<std::chrono::duration<int, std::milli>>(this->endTime - now).count(), 0);
   this->state.parent->render.angle = static_cast<float>(MulDiv(remaining % this->duration, 360, this->duration));
   if (now < this->endTime) {
     return true;
@@ -983,65 +1012,69 @@ void CSkillAction_SKID_KR_CHOP_CHOP::OnSkillEffect(int level, CGameActor* source
     effect->SetAngle(static_cast<float>(std::ranges::max(rand() % 360, 0)));
   }
 
-  if (CRagEffect* effect = source->LaunchEffect(0x98C, vector3d{0.0f, 0.0f, 0.0f}, 0.0f)) {
+  if (CRagEffect* effect = source->LaunchEffect(EF_UNK_2444, vector3d{0.0f, 0.0f, 0.0f}, 0.0f)) {
     static_cast<CWhirlwindEffect*>(effect)->SetLifetime(1000);
     static_cast<CWhirlwindEffect*>(effect)->SetDuration(500);
   }
 }
 
 // GLOBAL: gl_25660
-static EfstActionRegistrar s_efstAction1721(1721, NewAction<CEfstAction_CHOP_CHOP, CEfstAction>);
+static EfstActionRegistrar s_efstActionChopChop{EFST_TASK_CHOP_CHOP, NewAction<CEfstAction_CHOP_CHOP, CEfstAction>};
 // GLOBAL: gl_25661
-static EfstActionRegistrar s_efstAction1692(1692, NewAction<CEfstAction_IRON_HOWLING, CEfstAction>);
+static EfstActionRegistrar s_efstActionIronHowling{EFST_IRON_HOWLING, NewAction<CEfstAction_IRON_HOWLING, CEfstAction>};
 // GLOBAL: gl_25662
-static EfstActionRegistrar s_efstAction1693(1693, NewAction<CEfstAction_WIND_VEIL, CEfstAction>);
+static EfstActionRegistrar s_efstActionWindVeil{EFST_WIND_VEIL, NewAction<CEfstAction_WIND_VEIL, CEfstAction>};
+
+struct SkillObjectActionRegistration {
+  // INLINED
+  __forceinline SkillObjectActionRegistration(int skillId, std::function<CSkillObjectAction*()> factory) {
+    CSkillActionMgr::GetInstance()->RegisterSkillObjectAction(skillId, factory);
+  }
+};
 
 // OFFSET: 0x0040E870
 // FUNCTION: fn_45561
-static bool s_skillObjectActionRegistered313 = [](std::function<CSkillObjectAction*()> factory) {
-  CSkillActionMgr::GetInstance()->RegisterSkillObjectAction(313, factory);
-  return true;
-}(NewAction<CSkillObjectAction_KR_ICE_PILLAR, CSkillObjectAction>);
+static SkillObjectActionRegistration s_skillObjectActionRegistered313(313, NewAction<CSkillObjectAction_KR_ICE_PILLAR, CSkillObjectAction>);
 
 // GLOBAL: gl_25663
-static SkillActionRegistrar s_skillAction6551(6551, NewAction<CSkillAction_KR_CLAW_WAVE, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrClawWave{KR_CLAW_WAVE, NewAction<CSkillAction_KR_CLAW_WAVE, CSkillAction>};
 // GLOBAL: gl_25664
-static SkillActionRegistrar s_skillAction6550(6550, NewAction<CSkillAction_KR_DOUBLE_SLASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrDoubleSlash{KR_DOUBLE_SLASH, NewAction<CSkillAction_KR_DOUBLE_SLASH, CSkillAction>};
 // GLOBAL: gl_25665
-static SkillActionRegistrar s_skillAction6569(6569, NewAction<CSkillAction_KR_EARTH_DRILL, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrEarthDrill{KR_EARTH_DRILL, NewAction<CSkillAction_KR_EARTH_DRILL, CSkillAction>};
 // GLOBAL: gl_25666
-static SkillActionRegistrar s_skillAction6570(6570, NewAction<CSkillAction_KR_EARTH_STAMP, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrEarthStamp{KR_EARTH_STAMP, NewAction<CSkillAction_KR_EARTH_STAMP, CSkillAction>};
 // GLOBAL: gl_25667
-static SkillActionRegistrar s_skillAction6558(6558, NewAction<CSkillAction_KR_FEATHER_SPRINKLE, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrFeatherSprinkle{KR_FEATHER_SPRINKLE, NewAction<CSkillAction_KR_FEATHER_SPRINKLE, CSkillAction>};
 // GLOBAL: gl_25668
-static SkillActionRegistrar s_skillAction6574(6574, NewAction<CSkillAction_KR_GROUND_BLOOM, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrGroundBloom{KR_GROUND_BLOOM, NewAction<CSkillAction_KR_GROUND_BLOOM, CSkillAction>};
 // GLOBAL: gl_25669
-static SkillActionRegistrar s_skillAction6561(6561, NewAction<CSkillAction_KR_ICE_PILLAR, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrIcePillar{KR_ICE_PILLAR, NewAction<CSkillAction_KR_ICE_PILLAR, CSkillAction>};
 // GLOBAL: gl_25670
-static SkillActionRegistrar s_skillAction6562(6562, NewAction<CSkillAction_KR_ICE_SPLASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrIceSplash{KR_ICE_SPLASH, NewAction<CSkillAction_KR_ICE_SPLASH, CSkillAction>};
 // GLOBAL: gl_25671
-static SkillActionRegistrar s_skillAction6553(6553, NewAction<CSkillAction_KR_IRON_HOWLING, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrIronHowling{KR_IRON_HOWLING, NewAction<CSkillAction_KR_IRON_HOWLING, CSkillAction>};
 // GLOBAL: gl_25672
-static SkillActionRegistrar s_skillAction6549(6549, NewAction<CSkillAction_KR_NASTY_SLASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrNastySlash{KR_NASTY_SLASH, NewAction<CSkillAction_KR_NASTY_SLASH, CSkillAction>};
 // GLOBAL: gl_25673
-static SkillActionRegistrar s_skillAction6555(6555, NewAction<CSkillAction_KR_SHARPEN_GUST, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrSharpenGust{KR_SHARPEN_GUST, NewAction<CSkillAction_KR_SHARPEN_GUST, CSkillAction>};
 // GLOBAL: gl_25674
-static SkillActionRegistrar s_skillAction6556(6556, NewAction<CSkillAction_KR_SHARPEN_HAIL, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrSharpenHail{KR_SHARPEN_HAIL, NewAction<CSkillAction_KR_SHARPEN_HAIL, CSkillAction>};
 // GLOBAL: gl_25675
-static SkillActionRegistrar s_skillAction6567(6567, NewAction<CSkillAction_KR_THUNDERING_CALL, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrThunderingCall{KR_THUNDERING_CALL, NewAction<CSkillAction_KR_THUNDERING_CALL, CSkillAction>};
 // GLOBAL: gl_25676
-static SkillActionRegistrar s_skillAction6568(6568, NewAction<CSkillAction_KR_THUNDERING_CALL_S, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrThunderingCallS{KR_THUNDERING_CALL_S, NewAction<CSkillAction_KR_THUNDERING_CALL_S, CSkillAction>};
 // GLOBAL: gl_25677
-static SkillActionRegistrar s_skillAction6563(6563, NewAction<CSkillAction_KR_THUNDERING_FOCUS, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrThunderingFocus{KR_THUNDERING_FOCUS, NewAction<CSkillAction_KR_THUNDERING_FOCUS, CSkillAction>};
 // GLOBAL: gl_25678
-static SkillActionRegistrar s_skillAction6564(6564, NewAction<CSkillAction_KR_THUNDERING_FOCUS_S, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrThunderingFocusS{KR_THUNDERING_FOCUS_S, NewAction<CSkillAction_KR_THUNDERING_FOCUS_S, CSkillAction>};
 // GLOBAL: gl_25679
-static SkillActionRegistrar s_skillAction6565(6565, NewAction<CSkillAction_KR_THUNDERING_ORB, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrThunderingOrb{KR_THUNDERING_ORB, NewAction<CSkillAction_KR_THUNDERING_ORB, CSkillAction>};
 // GLOBAL: gl_25680
-static SkillActionRegistrar s_skillAction6566(6566, NewAction<CSkillAction_KR_THUNDERING_ORB_S, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrThunderingOrbS{KR_THUNDERING_ORB_S, NewAction<CSkillAction_KR_THUNDERING_ORB_S, CSkillAction>};
 // GLOBAL: gl_25681
-static SkillActionRegistrar s_skillAction6557(6557, NewAction<CSkillAction_KR_TYPHOON_WING, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrTyphoonWing{KR_TYPHOON_WING, NewAction<CSkillAction_KR_TYPHOON_WING, CSkillAction>};
 // GLOBAL: gl_25682
-static SkillActionRegistrar s_skillAction6559(6559, NewAction<CSkillAction_KR_WIND_VEIL, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrWindVeil{KR_WIND_VEIL, NewAction<CSkillAction_KR_WIND_VEIL, CSkillAction>};
 // GLOBAL: gl_25683
-static SkillActionRegistrar s_skillAction6552(6552, NewAction<CSkillAction_SKID_KR_CHOP_CHOP, CSkillAction>);
+static SkillActionRegistrar s_skillActionKrChopChop{KR_CHOP_CHOP, NewAction<CSkillAction_SKID_KR_CHOP_CHOP, CSkillAction>};

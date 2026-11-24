@@ -13,6 +13,10 @@ std::string g_emptyString;
 UITagButton::UITagButton() : UITextButton(), item(), m_strings() {
 }
 
+// OFFSET: 0x009B5370
+// FUNCTION: fn_45780
+__declspec(noinline) UITagButton::~UITagButton() = default;
+
 // OFFSET: 0x009B54A0
 // FUNCTION: fn_13844
 void UITagButton::OnLBtnUp(int x, int y) {
@@ -22,7 +26,7 @@ void UITagButton::OnLBtnUp(int x, int y) {
 
   if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
     if (g_windowMgr.GetHoverWindow() && this->item.identified) {
-      g_windowMgr.GetHoverWindow()->SendMsg(nullptr, 148, reinterpret_cast<std::intptr_t>(&this->item), 0, 0, 0);
+      g_windowMgr.GetHoverWindow()->SendMsg(nullptr, UM_INSERT_ITEM_TAG, reinterpret_cast<std::intptr_t>(&this->item), 0, 0, 0);
     }
 
     return;

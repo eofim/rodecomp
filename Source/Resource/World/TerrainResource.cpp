@@ -23,6 +23,15 @@ C3dAttr* C3dAttr::Create() {
   return new C3dAttr;
 }
 
+// OFFSET: 0x00748BC0
+// FUNCTION: fn_45836
+void C3dAttr::Resize(int columns, int rows) {
+  this->Unload();
+  this->m_cells.resize(static_cast<std::uint32_t>(columns) * static_cast<std::uint32_t>(rows));
+  this->width = columns;
+  this->height = rows;
+}
+
 // OFFSET: 0x007484E0
 // FUNCTION: fn_07829
 bool C3dAttr::Load(const char* name) {
@@ -34,7 +43,7 @@ bool C3dAttr::Load(const char* name) {
   magic[4] = 0;
 
   if (std::strcmp(magic, signature) != 0) {
-    ShowErrorDialog("Block Attr ", 0);
+    ShowErrorDialog("Block Attr 이 지원되지 않는 옛버젼의 GAT 파일입니다. 새 버젼의 RPGSTUDIO 에서 교정하세요", 0);
     return false;
   }
 
@@ -43,15 +52,15 @@ bool C3dAttr::Load(const char* name) {
   file.Read(&major, 1);
   file.Read(&minor, 1);
 
-  if (major == 1 && minor <= 3) {
+  if (major != 1 || minor > 3) {
+    ShowErrorDialog("C3dAttr::Unsupported Version", 0);
+    return true;
+  } else {
     int columns;
     int rows;
     file.Read(&columns, sizeof(columns));
     file.Read(&rows, sizeof(rows));
-    this->Unload();
-    this->m_cells.resize(static_cast<std::uint32_t>(columns) * static_cast<std::uint32_t>(rows));
-    this->width = columns;
-    this->height = rows;
+    this->Resize(columns, rows);
     file.Read(this->m_cells.data(), rows * columns * sizeof(TerrainHeightCell));
 
     if (major > 1 || (major == 1 && minor >= 3)) {
@@ -63,11 +72,8 @@ bool C3dAttr::Load(const char* name) {
     }
 
     file.Close();
-  } else {
-    ShowErrorDialog("C3dAttr::Unsupported Version", 0);
+    return true;
   }
-
-  return true;
 }
 
 // OFFSET: 0x00748840

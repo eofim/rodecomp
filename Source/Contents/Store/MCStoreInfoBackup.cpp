@@ -5,6 +5,7 @@
 #include "Client/Session/Session.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Utility/Async/AsyncDiagnostic.h"
+#include "Linkage/Source/Contents/Emblems/EmblemDataDownloadAsyncWork.cpp.h"
 
 #include "Resource/MSGSTRINGID.h"
 #include <algorithm>
@@ -14,7 +15,7 @@
 
 // OFFSET: 0x00605BF0
 // FUNCTION: fn_04226
-CMCStoreInfoBackup::CMCStoreInfoBackup() : loaded(false), pendingSaves(0), saveUrl(""), loadUrl(""), title(""), type(0) {
+CMCStoreInfoBackup::CMCStoreInfoBackup() : loaded(false), pendingSaves(0), saveUrl(0, '\0'), loadUrl(0, '\0'), title(0, '\0'), type(0) {
   this->enabled = true;
 }
 
@@ -35,25 +36,24 @@ int CMCStoreInfoBackup::Restore(unsigned char wholeItem, int maximum) {
   int examined = 0;
   auto saved = this->items.begin();
 
-  while (saved != this->items.end() && maximum > examined) {
+  for (; saved != this->items.end() && maximum > examined; ++examined) {
     std::pair<bool, ITEM_INFO> found = lists.FindMerchantMyShopItem(*saved, wholeItem);
 
     if (!found.first) {
       saved = this->items.erase(saved);
-    } else {
-      if (wholeItem == 0) {
-        found.second.quantity = std::min(found.second.quantity, saved->quantity);
-      }
-
-      if (found.second.identity[1] != 0) {
-        lists.AddMerchantPurchaseSavedItem(found.second, wholeItem, 0);
-        lists.RemoveMerchantMyShopItem(found.second, wholeItem, 0);
-      }
-
-      ++saved;
+      continue;
     }
 
-    ++examined;
+    if (wholeItem == 0 && found.second.quantity > saved->quantity) {
+      found.second.quantity = saved->quantity;
+    }
+
+    if (found.second.identity[1] != 0) {
+      lists.AddMerchantPurchaseSavedItem(found.second, wholeItem, 0);
+      lists.RemoveMerchantMyShopItem(found.second, wholeItem, 0);
+    }
+
+    ++saved;
   }
 
   return examined;
@@ -90,7 +90,7 @@ void CMCStoreInfoBackup::Reset() {
 void CMCStoreInfoBackup::CompleteLoad(
   AsyncDiagnostic diagnostic, std::uint32_t, std::uint32_t, std::string, std::string response
 ) {
-  if (!diagnostic.success) {
+  if (!std::get<0>(diagnostic)) {
     return;
   }
 
@@ -117,7 +117,7 @@ void CMCStoreInfoBackup::CompleteLoad(
 void CMCStoreInfoBackup::CompleteSave(AsyncDiagnostic diagnostic, std::string response) {
   --this->pendingSaves;
 
-  if (!diagnostic.success) {
+  if (!std::get<0>(diagnostic)) {
     return;
   }
 
@@ -135,9 +135,9 @@ void CMCStoreInfoBackup::CompleteSave(AsyncDiagnostic diagnostic, std::string re
   g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
 
   if (this->type == 0) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_EQUIP_FAIL_DURING_BARTER)), 0xFFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SAVE_SELL_STORE_ITEMLIST)), 0xFFFF, 0, 0, 0);
   } else if (this->type == 1) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BARTER_ITEMLIST)), 0xFFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SAVE_BUY_STORE_ITEMLIST)), 0xFFFF, 0, 0, 0);
   }
 }
 
@@ -167,7 +167,8 @@ void CMCStoreInfoBackup::Save(int type) {
     root["data"] = data;
     Json::StyledWriter writer;
     const std::string response = writer.write(root);
-    g_asyncWorkMgr->SaveStore(g_session.m_aid, g_session.m_gid, std::string(g_session.m_accountName.c_str()), this->SaveUrl(),
+    CAsyncWorkMgr* mgr = g_asyncWorkMgr;
+    mgr->SaveStore(g_session.m_aid, g_session.m_gid, std::string(g_session.m_accountName.c_str()), this->SaveUrl(),
                               std::string(g_session.m_webAuthToken, 16), response, this->type);
 
     ++this->pendingSaves;

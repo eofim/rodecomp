@@ -11,7 +11,7 @@
 
 // OFFSET: 0x0055B000
 // FUNCTION: fn_02087
-HRESULT CRendererDX7::Present(int option) {
+void CRendererDX7::Present(bool option) {
   ++this->frame;
   const unsigned elapsed = GetTickCount() - this->time;
 
@@ -25,7 +25,7 @@ HRESULT CRendererDX7::Present(int option) {
 
   DeviceOwnerDX7* owner = g_deviceOwnerDX7;
   if (owner && owner->RestoreLostSurfaces() == TRUE) {
-    return S_OK;
+    return;
   }
 
   if (this->LockBackBuffer()) {
@@ -34,7 +34,7 @@ HRESULT CRendererDX7::Present(int option) {
 
   owner = g_deviceOwnerDX7;
   if (owner) {
-    const HRESULT result = owner->Present(option != 0);
+    const HRESULT result = owner->Present(option);
     if (FAILED(result) && result == DDERR_SURFACELOST) {
       owner = g_deviceOwnerDX7;
       if (owner) {
@@ -42,7 +42,6 @@ HRESULT CRendererDX7::Present(int option) {
       }
     }
   }
-  return S_OK;
 }
 
 // OFFSET: 0x0055D0F0
@@ -66,8 +65,8 @@ void CRendererDX7::CleanupTextures() {
 
   char text[128];
   std::sprintf(text, "%.01f fps", static_cast<double>(measured));
-  const int x = this->viewport.width - 40;
   const int y = this->viewport.height - 14;
+  const int x = this->viewport.width - 40;
   CDCSurface drawing(GetRenderSystemHolder()->BackBufferSurface());
   TextContext context(drawing);
   context.SetFont(0, 12, 0, 0);

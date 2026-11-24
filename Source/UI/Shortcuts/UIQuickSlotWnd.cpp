@@ -1,5 +1,7 @@
 #include "UI/Window/WindowId.h"
 #include "Client/Mode/ModeMessage.h"
+#include "Contents/CombatTypes.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/Shortcuts/UIQuickSlotWnd.h"
 #include "UI/Window/UIEnums.h"
 
@@ -41,16 +43,12 @@ void UIQuickSlotWnd::OnLBtnDown(int x, int y) {
     return;
   }
 
-  if (g_replayAnimationScaling != 0 || static_cast<unsigned int>(y) > 23) {
+  if (g_replayAnimationScaling != 0) {
     return;
   }
 
-  if (x > 58 && x < this->geometry.width) {
-    return;
-  }
-
-  const int index = (x - 4) / 29;
-  if (x > index * 29 + 30 || index == -1) {
+  const int index = this->SlotAt(x, y);
+  if (index == -1) {
     return;
   }
 
@@ -59,14 +57,14 @@ void UIQuickSlotWnd::OnLBtnDown(int x, int y) {
     CSkillInfo skill = g_session.LookupSkill(entry.id);
     if (skill.available && skill.level) {
       if (CGameMode* mode = g_modeMgr.GetGameMode()) {
-        mode->BeginDragSkill(16, skill.id, skill.name, entry.count, index);
+        mode->BeginDragSkill(DRAG_QUICKSLOT, skill.id, skill.name, entry.count, index);
       }
     }
   } else if (entry.id != 0) {
     ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(entry.id), 1);
     if (item.identity[1] > 0) {
       CGameMode* mode = g_modeMgr.GetGameMode();
-      mode->BeginDragItem(16, item, item.quantity, -1);
+      mode->BeginDragItem(DRAG_QUICKSLOT, item, item.quantity, -1);
     }
   }
 }
@@ -74,15 +72,7 @@ void UIQuickSlotWnd::OnLBtnDown(int x, int y) {
 // OFFSET: 0x00931920
 // FUNCTION: fn_12709
 void UIQuickSlotWnd::OnMouseHover(int x, int y) {
-  int index;
-  if (static_cast<unsigned int>(y) <= 23 && (x <= 58 || x >= this->geometry.width)) {
-    index = (x - 4) / 29;
-    if (x > index * 29 + 30) {
-      index = -1;
-    }
-  } else {
-    index = -1;
-  }
+  const int index = this->SlotAt(x, y);
 
   if (index != this->m_selected) {
     this->m_selected = index;
@@ -98,21 +88,23 @@ void UIQuickSlotWnd::OnMouseHover(int x, int y) {
   this->ToScreen(screenX, screenY);
   std::string text;
   const std::uint32_t id = this->m_entries[this->m_selected].id;
-  if (id == 0) {
-    text.clear();
-  } else if (this->m_entries[this->m_selected].skill) {
-    CSkillInfo skill = g_session.LookupSkill(id);
-    const int level = this->m_entries[this->m_selected].count;
-    const int sp = skill.UseSpAmount(level);
-    const int ap = skill.UseApAmount(level);
-    if (SkillUsesPercentSp(static_cast<int>(skill.id))) {
-      text = SkillUseTextPercent(skill.DisplayName(), level, sp, ap);
+  if (id != 0) {
+    if (this->m_entries[this->m_selected].skill) {
+      CSkillInfo skill = g_session.LookupSkill(id);
+      const int level = this->m_entries[this->m_selected].count;
+      const int sp = skill.UseSpAmount(level);
+      const int ap = skill.UseApAmount(level);
+      if (g_session.SkillUsesPercentSp(static_cast<int>(skill.id))) {
+        text = SkillUseTextPercent(skill.DisplayName(), level, sp, ap);
+      } else {
+        text = SkillUseTextFlat(skill.DisplayName(), level, sp, ap);
+      }
     } else {
-      text = SkillUseTextFlat(skill.DisplayName(), level, sp, ap);
+      ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(id), 1);
+      text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity));
     }
   } else {
-    ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(id), 1);
-    text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity));
+    text.clear();
   }
 
   if (!text.empty()) {
@@ -127,16 +119,8 @@ void UIQuickSlotWnd::OnRBtnDown(int x, int y) {
     return;
   }
 
-  if (static_cast<unsigned int>(y) > 23) {
-    return;
-  }
-
-  if (x > 58 && x < this->geometry.width) {
-    return;
-  }
-
-  const int index = (x - 4) / 29;
-  if (x > index * 29 + 30 || index == -1) {
+  const int index = this->SlotAt(x, y);
+  if (index == -1) {
     return;
   }
 
@@ -155,17 +139,18 @@ void UIQuickSlotWnd::OnRBtnDown(int x, int y) {
     int originX = 0;
     int originY = 0;
     this->ToScreen(originX, originY);
-    const int targetX = originX + x;
-    int adjustment = 0;
-    if (static_cast<unsigned int>(g_configuredScreenWidth - targetX) < static_cast<unsigned int>(detail->geometry.width)) {
-      adjustment = detail->geometry.width - g_configuredScreenWidth + targetX;
+    unsigned adjustment = 0;
+    const unsigned screenWidth = g_configuredScreenWidth;
+    const unsigned screenHeight = g_configuredScreenHeight;
+    const unsigned targetX = static_cast<unsigned>(x) + originX;
+    if (screenWidth - targetX < static_cast<unsigned>(detail->geometry.width)) {
+      adjustment = detail->geometry.width - (screenWidth - targetX);
     }
 
-    const int rowY = 33 * (y / 33);
-    if (static_cast<float>(originY) > static_cast<float>(static_cast<unsigned int>(g_configuredScreenHeight)) * g_depthAverageHalf) {
-      detail->Move(originX - adjustment + x, rowY - detail->geometry.height + originY);
+    if (originY > screenHeight * 0.5f) {
+      detail->Move(originX - adjustment + x, static_cast<unsigned>(y / 33) * 33 - detail->geometry.height + originY);
     } else {
-      detail->Move(originX - adjustment + x, originY + 33 + rowY);
+      detail->Move(originX - adjustment + x, originY + 33u + static_cast<unsigned>(y / 33) * 33);
     }
   } else if (id != 0) {
     ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(id), 1);
@@ -191,69 +176,6 @@ UIQuickSlotWnd::UIQuickSlotWnd()
 // FUNCTION: fn_12752
 int UIQuickSlotWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
   switch (message) {
-  case UM_REFRESHITEM: {
-    const NormalItemSlot* saved = &g_session.quickSlot;
-    for (int index = 0; index < 2; ++index) {
-      const NormalItemSlot source = saved[index];
-      QuickSlotEntry& entry = this->m_entries[index];
-      entry.id = 0;
-      entry.skill = 0;
-      entry.count = 0;
-      if (source.itemId == 0) {
-        continue;
-      }
-
-      if (source.enabled != 0) {
-        CSkillInfo skill = g_session.m_skillBundle.Lookup(source.itemId);
-        if (skill.available == 0) {
-          std::list<ShortcutCooldownRecord>& records = g_session.m_requestTimers;
-          const auto record = std::find_if(records.begin(), records.end(), [&](const ShortcutCooldownRecord& value) { return value.id == source.itemId; });
-          if (record != records.end()) {
-            const auto state = std::find_if(record->alternate.begin(), record->alternate.end(), [&](const CooldownState& value) { return value.slot == index; });
-            if (state != record->alternate.end()) {
-              record->alternate.erase(state);
-            }
-          }
-        }
-        if (skill.available == 0) {
-          skill = g_session.LookupHomunSkill(source.itemId);
-        }
-        if (skill.available == 0) {
-          skill = g_session.LookupMercSkill(source.itemId);
-        }
-        if (skill.available == 0) {
-          skill = g_session.LookupAdditionalSkill(source.itemId);
-        }
-
-        if (skill.available != 0 && skill.level != 0) {
-          entry.id = skill.id;
-          entry.skill = 1;
-          if (g_session.UseLevel(static_cast<int>(skill.id)) == 0) {
-            entry.count = static_cast<std::int16_t>(skill.level);
-          } else {
-            entry.count = source.value;
-          }
-        }
-      } else {
-        ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(source.itemId), 1);
-        if (item.identity[1] > 0 && item.identified != 0) {
-          entry.id = source.itemId;
-        }
-      }
-    }
-    this->Invalidate();
-    return 0;
-  }
-
-  case UM_SETINFO:
-    this->m_saved = reinterpret_cast<QuickSlotWndInfo*>(argument1);
-    if (!this->m_saved->IsValid()) {
-      this->m_saved->Reset();
-    }
-    this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-    this->Move(this->m_saved->x, this->m_saved->y);
-    return 0;
-
   case UM_USE_SHORTEN_ITEM: {
     const QuickSlotEntry entry = this->m_entries[argument1];
     if (entry.skill == 0) {
@@ -272,7 +194,7 @@ int UIQuickSlotWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
           break;
         case UM_UPPUSH:
           if (g_session.m_manner >= 0) {
-            if (g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_CONFIRM_TO_OPEN_CASH_ITEM), item.DisplayName(0).c_str()).c_str(), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+            if (g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_CONFIRM_TO_OPEN_CASH_ITEM), item.DisplayName(0).c_str()).c_str(), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
               mode->SendMsg(MM_USEITEM, item.identity[1], 0, 0, 0);
             }
           }
@@ -281,7 +203,7 @@ int UIQuickSlotWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
         case UM_OPENCHATWND:
         case UM_LOADINGPERCENT:
         case UM_DOWNPUSH:
-          if (item.identity[3] == 0x8000) {
+          if (item.identity[3] == EQP_AMMO) {
             mode->SendMsg(MM_TAKE_OFF_EQUIP, 0xF, 0, 0, 0);
             mode->SendMsg(MM_WEAR_EQUIP_ARROW, item.identity[1], item.identity[2], 0, 0);
           }
@@ -302,6 +224,71 @@ int UIQuickSlotWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
     }
     return 0;
   }
+
+  case UM_REFRESHITEM: {
+    const NormalItemSlot* saved = &g_session.quickSlot;
+    for (int index = 0; index < 2; ++index) {
+      const std::uint32_t itemId = saved[index].itemId;
+      const std::uint8_t enabled = saved[index].enabled;
+      const int value = saved[index].value;
+      this->m_entries[index].id = 0;
+      this->m_entries[index].skill = 0;
+      this->m_entries[index].count = 0;
+      if (itemId == ITEMID_NONE) {
+        continue;
+      }
+
+      if (enabled != 0) {
+        CSkillInfo skill = g_session.m_skillBundle.Lookup(itemId);
+        if (skill.available == 0) {
+          std::list<ShortcutCooldownRecord>& records = g_session.m_requestTimers;
+          const auto record = std::find_if(records.begin(), records.end(), [&](const ShortcutCooldownRecord& value) { return value.id == itemId; });
+          if (record != records.end()) {
+            const auto state = std::find_if(record->alternate.begin(), record->alternate.end(), [&](const CooldownState& value) { return value.slot == index; });
+            if (state != record->alternate.end()) {
+              record->alternate.erase(state);
+            }
+          }
+        }
+        if (skill.available == 0) {
+          skill = g_session.LookupHomunSkill(itemId);
+        }
+        if (skill.available == 0) {
+          skill = g_session.LookupMercSkill(itemId);
+        }
+        if (skill.available == 0) {
+          skill = g_session.LookupAdditionalSkill(itemId);
+        }
+
+        if (skill.available != 0 && skill.level != 0) {
+          const int skillId = skill.id;
+          this->m_entries[index].id = skillId;
+          this->m_entries[index].skill = 1;
+          int count = value;
+          if (g_session.UseLevel(skillId) == 0) {
+            count = skill.level;
+          }
+          this->m_entries[index].count = static_cast<std::int16_t>(count);
+        }
+      } else {
+        ITEM_INFO item = g_session.LookupClientItem(static_cast<int>(itemId), 1);
+        if (item.identity[1] > 0 && item.identified != 0) {
+          this->m_entries[index].id = itemId;
+        }
+      }
+    }
+    this->Invalidate();
+    return 0;
+  }
+
+  case UM_SETINFO:
+    this->m_saved = reinterpret_cast<QuickSlotWndInfo*>(argument1);
+    if (!this->m_saved->IsValid()) {
+      this->m_saved->Reset();
+    }
+    this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+    this->Move(this->m_saved->x, this->m_saved->y);
+    return 0;
   }
   return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
 }

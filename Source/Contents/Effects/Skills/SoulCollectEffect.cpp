@@ -5,6 +5,7 @@
 #include "Contents/Camera/Camera.h"
 #include "Contents/Effects/Core/EffectMemoryMgr.h"
 #include "Contents/Effects/Particles/Particle.h"
+#include "Render/Projection/RenderProjection.h"
 #include "Render/Textures/Texture.h"
 #include "Utility/Math/AffineMatrix.h"
 
@@ -31,6 +32,32 @@ void CSoulCollectEffect::Close() {
   this->particles.clear();
 }
 
+// OFFSET: 0x0072A3F0
+// FUNCTION: fn_46276
+__forceinline void CSoulCollectEffect::AddParticlePair() {
+  for (int layer = 0; layer < 2; ++layer) {
+    CParticle* particle = CreateParticle(&this->positionVector, 5);
+    if (!particle) {
+      continue;
+    }
+
+    const int column = static_cast<int>(this->particles.size() / 2);
+    particle->SetTexture("effect\\soul_collect\\soul_collect.bmp");
+    particle->effectId = this->id;
+    particle->columnIndex = column;
+    particle->rowIndex = layer;
+    particle->groupIndex = 1;
+    particle->alpha = 0;
+    if (layer == 0) {
+      particle->depthOffset = 0.00001f;
+    } else if (layer == 1) {
+      particle->depthOffset = 0.00002f;
+    }
+    particle->InitParticleQuad(particle->vertices);
+    this->particles.push_back(particle);
+  }
+}
+
 // OFFSET: 0x0072A5F0
 // FUNCTION: fn_07460
 void CSoulCollectEffect::Open() {
@@ -42,34 +69,16 @@ void CSoulCollectEffect::Open() {
   const int current = static_cast<int>(this->particles.size() / 2);
   if (current < count) {
     for (int index = 0; index < this->effectLevel - current; ++index) {
-      for (int layer = 0; layer < 2; ++layer) {
-        CParticle* particle = CreateParticle(&this->positionVector, 5);
-        if (!particle) {
-          continue;
-        }
-
-        const int column = static_cast<int>(this->particles.size() / 2);
-        particle->SetTexture("effect\\soul_collect\\soul_collect.bmp");
-        particle->effectId = this->id;
-        particle->columnIndex = column;
-        particle->rowIndex = layer;
-        particle->groupIndex = 1;
-        particle->alpha = 0;
-        if (layer == 0) {
-          particle->depthOffset = 0.00001f;
-        } else if (layer == 1) {
-          particle->depthOffset = 0.00002f;
-        }
-        particle->InitParticleQuad(particle->vertices);
-        this->particles.push_back(particle);
-      }
+      this->AddParticlePair();
     }
   } else if (current > count) {
     for (int index = 0; index < current - this->effectLevel; ++index) {
       if (this->particles.size() != 0) {
         for (int layer = 0; layer < 2; ++layer) {
-          FreeParticle(this->particles.back());
-          this->particles.pop_back();
+          auto last = this->particles.end();
+          --last;
+          FreeParticle(*last);
+          this->particles.erase(last);
         }
       }
     }
@@ -80,6 +89,19 @@ void CSoulCollectEffect::Open() {
 // FUNCTION: fn_07462
 bool CSoulCollectEffect::IsAlive() {
   return this->ActorExists();
+}
+
+// OFFSET: 0x0072AF00
+// FUNCTION: fn_46277
+void CSoulCollectEffect::RenderParticle(CParticle* particle) {
+  if (particle && particle->alpha > 0) {
+    const float left = g_textureOffsetX / particle->texture->TextureWidth();
+    const float right = (particle->texture->Width() + g_textureOffsetX) / particle->texture->TextureWidth();
+    const float top = g_textureOffsetY / particle->texture->TextureHeight();
+    const float bottom = (particle->texture->Height() + g_textureOffsetY) / particle->texture->TextureHeight();
+
+    particle->Render(false, top, bottom, left, right, false, true);
+  }
 }
 
 // OFFSET: 0x0072A800
@@ -140,37 +162,25 @@ void CSoulCollectEffect::OnProcess() {
 
       const int step = 360 / std::min(5u, pairs);
       const float angle = (static_cast<float>(step * (index - group * 5)) + rotation) / 180.0f * 3.141592f;
-      const float cosine = ClientCos(angle) * 10.0f;
-      const float sine = ClientSin(angle) * 10.0f;
-      const float y = this->position[1] - 10.0f;
-      const float z = cosine + this->position[2];
-      const float x = sine + this->position[0];
-      particle->position.y = y;
-      particle->position.z = z;
-      particle->position.x = x;
+      const float cosine = ClientCos(angle) * g_projectionDepthOffset;
+      const float sine = ClientSin(angle) * g_projectionDepthOffset;
+      particle->position = vector3d{sine + this->position[0], this->position[1] - g_projectionDepthOffset, cosine + this->position[2]};
     } else {
       particle->alpha = 0;
     }
   }
 
-  rotation += 0.5f;
-  if (rotation > 360.0f) {
-    rotation -= 360.0f;
+  float next = rotation + 0.5f;
+  if (next > 360.0f) {
+    next -= 360.0f;
   }
+  rotation = next;
 }
 
 // OFFSET: 0x0072AD90
 // FUNCTION: fn_07464
 void CSoulCollectEffect::Render() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
-    CParticle* particle = *it;
-    if (particle && particle->alpha > 0) {
-      const float left = g_textureOffsetX / particle->texture->TextureWidth();
-      const float right = (particle->texture->Width() + g_textureOffsetX) / particle->texture->TextureWidth();
-      const float top = g_textureOffsetY / particle->texture->TextureHeight();
-      const float bottom = (particle->texture->Height() + g_textureOffsetY) / particle->texture->TextureHeight();
-
-      particle->Render(false, top, bottom, left, right, false, true);
-    }
+    this->RenderParticle(*it);
   }
 }

@@ -36,90 +36,70 @@ void UIWhisperWnd::DrawTransBox() {
   DrawAlphaRectangle(x + 1, y + 1, this->geometry.width - 2, 17, 0x449EB6E4);
 }
 
+// INLINED
+template <typename... Args>
+void DrawFormattedBitmap(UIWindow* window, int x, int y, bool flag, const char* format, Args... args) {
+  window->DrawBitmap(
+    x, y, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString(format, args...).c_str()))), flag
+  );
+}
+
+// INLINED
+static void DrawIcon(UIWindow* window, int x, int y, const std::vector<std::string>& names, int index) {
+  window->DrawBitmap(
+    x, y, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("%s.bmp", names[index].c_str()).c_str()))), true
+  );
+}
+
 // OFFSET: 0x008D0F30
 // FUNCTION: fn_12092
 void UIEquipWnd::DrawDamageSkinPage() {
-  this->DrawBitmap(
-    0, this->m_contentTop + 14,
-    static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\ShowDamage\\bg_damage.bmp"))),
-    false
-  );
-  int slot = 0;
-  for (int x = 6; x < 0x116; x += 0x44) {
+  CBitmapRes* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\ShowDamage\\bg_damage.bmp")));
+  this->DrawBitmap(0, this->m_contentTop + 14, background, false);
+  for (int slot = 0; slot < 4; ++slot) {
     int index = this->m_firstSlot + slot;
     if (index >= g_session.damageSkinCount) {
       break;
     }
     if (g_session.m_damageSkinIndex == index) {
-      this->DrawBitmap(
-        x, 0x3A,
-        static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-          Resolve(FormatOwnedString("유저인터페이스\\showdamage\\btn_damage_pick.bmp").c_str())
-        )),
-        true
-      );
+      DrawFormattedBitmap(this, slot * 0x44 + 6, 0x3A, true, "유저인터페이스\\showdamage\\btn_damage_pick.bmp");
     } else if (this->m_hoverSlot == index) {
-      this->DrawBitmap(
-        x, 0x3A,
-        static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-          Resolve(FormatOwnedString("유저인터페이스\\showdamage\\btn_damage_press.bmp").c_str())
-        )),
-        true
-      );
+      DrawFormattedBitmap(this, slot * 0x44 + 6, 0x3A, true, "유저인터페이스\\showdamage\\btn_damage_press.bmp");
     } else {
-      this->DrawBitmap(
-        x, 0x3A,
-        static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-          Resolve(FormatOwnedString("유저인터페이스\\showdamage\\btn_damage.bmp").c_str())
-        )),
-        true
-      );
+      DrawFormattedBitmap(this, slot * 0x44 + 6, 0x3A, true, "유저인터페이스\\showdamage\\btn_damage.bmp");
     }
     if (g_session.m_damageSkinIndex == index) {
-      this->DrawCenteredText(x + 1, 0x45, this->m_damageSkinNames[index].c_str(), 0x40, 0, 14, 0xBABABA, 1);
-      this->DrawCenteredText(x, 0x44, this->m_damageSkinNames[index].c_str(), 0x40, 0, 14, 0x323232, 1);
+      this->DrawCenteredText(slot * 0x44 + 7, 0x45, this->m_damageSkinNames[index].c_str(), 0x40, 0, 14, 0xBABABA, 1);
+      this->DrawCenteredText(slot * 0x44 + 6, 0x44, this->m_damageSkinNames[index].c_str(), 0x40, 0, 14, 0x323232, 1);
     } else {
-      this->DrawCenteredText(x + 1, 0x45, this->m_damageSkinNames[index].c_str(), 0x40, 0, 12, 0xBABABA, 0);
-      this->DrawCenteredText(x, 0x44, this->m_damageSkinNames[index].c_str(), 0x40, 0, 12, 0x323232, 0);
+      this->DrawCenteredText(slot * 0x44 + 7, 0x45, this->m_damageSkinNames[index].c_str(), 0x40, 0, 12, 0xBABABA, 0);
+      this->DrawCenteredText(slot * 0x44 + 6, 0x44, this->m_damageSkinNames[index].c_str(), 0x40, 0, 12, 0x323232, 0);
     }
-    this->DrawBitmap(
-      x + 14, 0x5A,
-      static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(
-        Resolve(FormatOwnedString("%s.bmp", this->m_damageSkinIcons[index].c_str()).c_str())
-      )),
-      true
-    );
-    ++slot;
+    DrawIcon(this, slot * 0x44 + 20, 0x5A, this->m_damageSkinIcons, index);
   }
-}
-
-namespace {
-  struct ItemNameTextInfo {
-    int x;
-    int y;
-    int height;
-    int family;
-  };
 }
 
 // OFFSET: 0x008D13E0
 // FUNCTION: fn_12093
 int UIFrameWnd::DrawFittedItemName(int x, int y, const ITEM_INFO* item, std::uint32_t color, int, int, char option) {
-  std::vector<char*> breaks;
+  std::vector<const char*> breaks;
   char buffer[256];
   std::memset(buffer, 0, sizeof(buffer));
   char* highlight = nullptr;
   int remaining = sizeof(buffer);
-  char* cursor = buffer;
   int highlightColor;
-  this->BuildItemName(item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 0, option);
+  {
+    char* cursor = buffer;
+    this->BuildItemName(item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 0, option);
+  }
 
-  char* text = buffer;
+  const char* text = buffer;
   int offset = 0;
-  for (auto it = breaks.begin(); it != breaks.end(); ++it) {
+  auto it = breaks.begin();
+  while (it != breaks.end()) {
     std::string fitted = this->FitTextToWidth(std::string(text), this->geometry.width - x - 10);
     bool truncated;
-    char* end;
+    const char* end;
     if (std::strcmp(fitted.c_str(), text) != 0) {
       truncated = true;
       strcpy_s(buffer, sizeof(buffer), fitted.c_str());
@@ -129,9 +109,10 @@ int UIFrameWnd::DrawFittedItemName(int x, int y, const ITEM_INFO* item, std::uin
       truncated = false;
     }
 
+    const bool highlighted = text == highlight;
     int bytes = static_cast<int>(end - text);
     if (bytes != 0) {
-      if (text == highlight) {
+      if (highlighted) {
         this->DrawShadowedText(offset + x, y, text, bytes, static_cast<std::uint32_t>(highlightColor), 0xE0E0E0, 0, 12, 0);
       } else if (item->damaged) {
         this->DrawShadowedText(offset + x, y, text, bytes, color, 0x5050FA, 0, 12, 0);
@@ -149,6 +130,7 @@ int UIFrameWnd::DrawFittedItemName(int x, int y, const ITEM_INFO* item, std::uin
         break;
       }
     }
+    ++it;
   }
   return offset;
 }
@@ -156,10 +138,20 @@ int UIFrameWnd::DrawFittedItemName(int x, int y, const ITEM_INFO* item, std::uin
 // OFFSET: 0x008D17C0
 // FUNCTION: fn_12094
 int UIFrameWnd::DrawItemName(int x, int y, int width, const ITEM_INFO* item, int, int family, int height) {
+  struct ItemNameTextInfo {
+    // INLINED
+    ItemNameTextInfo(int x, int y, int height, int family) : x(x), y(y), height(height), family(family) {}
+
+    int x;
+    int y;
+    int height;
+    int family;
+  };
+
   char buffer[256] = {};
   char* highlight = nullptr;
   char* cursor = buffer;
-  std::vector<char*> breaks;
+  std::vector<const char*> breaks;
   int remaining = sizeof(buffer);
   int highlightColor;
   this->BuildItemName(item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
@@ -170,7 +162,7 @@ int UIFrameWnd::DrawItemName(int x, int y, int width, const ITEM_INFO* item, int
   }
   color = (color >> 16 & 0xFF) | ((color & 0xFF) << 16) | (color & 0x0000FF00);
 
-  const ItemNameTextInfo info = {x, y, height, family};
+  const ItemNameTextInfo info(x, y, height, family);
   this->DrawItemNameText(&info, buffer, highlight, color, static_cast<std::uint32_t>(highlightColor), width, &breaks);
   return x;
 }
@@ -181,7 +173,7 @@ int UIFrameWnd::DrawWrappedItemName(int x, int y, int width, const ITEM_INFO* it
   char buffer[256] = {};
   char* highlight = nullptr;
   char* cursor = buffer;
-  std::vector<char*> breaks;
+  std::vector<const char*> breaks;
   int remaining = sizeof(buffer);
   int highlightColor;
   this->BuildItemName(item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);

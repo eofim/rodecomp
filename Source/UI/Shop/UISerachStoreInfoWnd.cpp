@@ -1,4 +1,5 @@
 #include "UI/Window/WindowId.h"
+#include "Contents/Actors/ActorEnums.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Shop/UISerachStoreInfoWnd.h"
 #include "UI/Window/UIEnums.h"
@@ -45,6 +46,10 @@ struct SearchStoreQueryPacket {
 
 static_assert(offsetof(SearchStoreQueryPacket, ids) == 0xF);
 
+// OFFSET: 0x00914840
+// FUNCTION: fn_45693
+UISerachStoreInfoWnd::~UISerachStoreInfoWnd() = default;
+
 // OFFSET: 0x009121F0
 // FUNCTION: fn_12527
 UISerachStoreInfoWnd::UISerachStoreInfoWnd()
@@ -64,12 +69,11 @@ ITEM_INFO UISerachStoreInfoWnd::ItemAt(int x, int y) {
   if (x > 5 && x < this->geometry.width - 10 && y > 100 && y < (this->m_rowHeight + 10) * 10) {
     const int row = (y - 100) / this->m_rowHeight;
     this->m_hoverRow = row;
-    const unsigned int index = row + (this->m_page - 1) * 10;
-    if (index >= g_session.storeSearchResults.size()) {
+    if (static_cast<unsigned int>(row + (this->m_page - 1) * 10) >= g_session.storeSearchResults.size()) {
       return item;
     }
 
-    std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + index;
+    std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + (row + (this->m_page - 1) * 10);
     if (it != g_session.storeSearchResults.end()) {
       item = it->item;
     }
@@ -157,7 +161,7 @@ void UISerachStoreInfoWnd::OnCreate(int width, int height) {
     this->m_findButton->SetBitmap((path + "btn_find_b" + ".bmp").c_str(), 2, 0);
     this->m_findButton->SetSize(this->m_findButton->BitmapWidth(), this->m_findButton->BitmapHeight());
     this->m_findButton->Move(this->geometry.width - 0x2D, 0x38);
-    this->m_findButton->SetId(ID_PARTY_SEARCH);
+    this->m_findButton->SetId(ID_FIND);
     this->AddChild(this->m_findButton);
   }
 
@@ -211,7 +215,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
       g_session.storeSearchX = -1;
       g_session.storeSearchY = -1;
-      g_session.storeSearchOwnerAid = 0xFFFFFFFF;
+      g_session.storeSearchOwnerAid = INVALID_AID;
       g_session.storeSearchResults.clear();
       g_windowMgr.CloseWindow(WID_SEARCH_STORE_INFO);
       break;
@@ -227,7 +231,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         }
       }
       break;
-    case ID_PARTY_SEARCH: {
+    case ID_FIND: {
       this->m_searchPending = 1;
       UIBitmapButton* findButton = this->m_findButton;
       findButton->SetDisabled(1);
@@ -241,12 +245,12 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       if (this->m_searchPending != 0) {
         std::list<int> itemIds;
         std::list<int> cardIds;
-        itemIds = SearchItemIds(itemName, 0, this->m_matchOption);
+        itemIds = static_cast<const std::list<int>&>(SearchItemIds(itemName, 0, this->m_matchOption));
         if (itemIds.size() == 0) {
           this->m_searchPending = 0;
           this->m_statusText = LookupMessage(MSI_SSI_FAILED_ITEM_DOES_NOT_EXIST);
         } else if (cardName.size() != 0) {
-          cardIds = SearchItemIds(cardName, 1, this->m_matchOption);
+          cardIds = static_cast<const std::list<int>&>(SearchItemIds(cardName, 1, this->m_matchOption));
           if (cardIds.size() == 0) {
             this->m_searchPending = 0;
             this->m_statusText = LookupMessage(MSI_SSI_FAILED_NAME_OF_CARD_DOES_NOT_EXIST);
@@ -260,8 +264,8 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
             return 0;
           }
 
-          const int minPrice = std::atoi(this->m_edits[2]->Text());
-          const int maxPrice = std::atoi(this->m_edits[3]->Text());
+          int minPrice = std::atoi(this->m_edits[2]->Text());
+          int maxPrice = std::atoi(this->m_edits[3]->Text());
           const int maxLength = static_cast<int>(std::strlen(this->m_edits[3]->Text()));
           if (minPrice > maxPrice && maxLength > 0) {
             this->m_searchPending = 0;
@@ -283,28 +287,29 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
           }
           if (this->m_searchPending != 0) {
             const short length = static_cast<short>(count * 4 + 15);
-            const int maximum = std::atoi(this->m_edits[3]->Text());
-            const int minimum = std::atoi(this->m_edits[2]->Text());
+            maxPrice = std::atoi(this->m_edits[3]->Text());
+            minPrice = std::atoi(this->m_edits[2]->Text());
             const unsigned char searchType = static_cast<unsigned char>(this->m_searchType);
-            if (length > 0x800) {
+            if (0x800 < length) {
               this->m_searchPending = 0;
-            } else if (this->m_searchPending != 0) {
+            }
+            if (this->m_searchPending != 0) {
               char buffer[0x800];
               SearchStoreQueryPacket* packet = reinterpret_cast<SearchStoreQueryPacket*>(buffer);
-              packet->maxPrice = maximum;
               packet->packetType = ID_CZ_SEARCH_STORE_INFO;
               packet->packetLength = length;
               packet->searchType = searchType;
-              packet->minPrice = minimum;
+              packet->maxPrice = maxPrice;
+              packet->minPrice = minPrice;
               packet->itemCount = static_cast<unsigned char>(itemIds.size());
               packet->cardCount = static_cast<unsigned char>(cardIds.size());
-              int* id = packet->ids;
+              int index = 0;
               for (std::list<int>::iterator it = itemIds.begin(); it != itemIds.end(); ++it) {
-                *id++ = *it;
+                packet->ids[index++] = *it;
               }
-              id = packet->ids + itemIds.size();
+              index = itemIds.size();
               for (std::list<int>::iterator it = cardIds.begin(); it != cardIds.end(); ++it) {
-                *id++ = *it;
+                packet->ids[index++] = *it;
               }
               GetRagConnection().Send(static_cast<short>(count * 4 + 15), buffer);
             }
@@ -348,7 +353,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
       case SSI_FAILED_SSILIST_CLICK_TO_OPEN_STORE:
         g_session.storeSearchX = -1;
         g_session.storeSearchY = -1;
-        g_session.storeSearchOwnerAid = 0xFFFFFFFF;
+        g_session.storeSearchOwnerAid = INVALID_AID;
         g_windowMgr.Confirm(LookupMessage(MSI_FAIL_OPEN_STORE), 0, true, false, 0, "Message", 280, 120, 0);
         return 0;
       }
@@ -421,14 +426,14 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
     return;
   }
 
-  const unsigned int index = this->m_hoverRow + (this->m_page - 1) * 10;
+  const unsigned int index = this->m_hoverRow + 10 * this->m_page - 10;
   std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + index;
   if (it == g_session.storeSearchResults.end()) {
     return;
   }
 
   if (g_session.m_storeSearchPage != 0 &&
-      g_windowMgr.Confirm(LookupMessage(MSI_OPEN_SEARCH_STORE), 2, true, false, 0, "Message", 0x118, 0x78, 0) != 0xBB) {
+      g_windowMgr.Confirm(LookupMessage(MSI_OPEN_SEARCH_STORE), 2, true, false, 0, "Message", 0x118, 0x78, 0) != ID_YES) {
     return;
   }
 
@@ -436,7 +441,7 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
 
   g_session.storeSearchX = -1;
   g_session.storeSearchY = -1;
-  g_session.storeSearchOwnerAid = 0xFFFFFFFF;
+  g_session.storeSearchOwnerAid = INVALID_AID;
 
   SearchStoreClickPacket packet;
   packet.packetType = ID_CZ_SSILIST_ITEM_CLICK;

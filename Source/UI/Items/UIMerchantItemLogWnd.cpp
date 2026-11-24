@@ -38,6 +38,16 @@ UIMerchantItemLogWnd::UIMerchantItemLogWnd(int mode) : UIItemBaseWnd() {
   this->mode = mode;
 }
 
+// OFFSET: 0x0099E340
+// FUNCTION: fn_45769
+UIMerchantItemLogWnd::lcData::~lcData() = default;
+
+// OFFSET: 0x0099E260
+// FUNCTION: fn_45768
+__declspec(noinline) UIMerchantItemLogWnd::~UIMerchantItemLogWnd() {
+  this->items.erase(this->items.begin(), this->items.end());
+}
+
 // OFFSET: 0x0099E510
 // FUNCTION: fn_13575
 void UIMerchantItemLogWnd::OnCreate(int width, int height) {
@@ -67,7 +77,7 @@ void UIMerchantItemLogWnd::OnCreate(int width, int height) {
   this->buttons[0]->SetBitmap("유저인터페이스\\btn_close_b.bmp", 2, 0);
   this->buttons[0]->SetSize(this->buttons[0]->BitmapWidth(), this->buttons[0]->BitmapHeight());
   this->buttons[0]->Move(this->geometry.width - 61, this->geometry.height - 24);
-  this->buttons[0]->SetId(201);
+  this->buttons[0]->SetId(ID_CLOSE);
   this->AddChild(this->buttons[0]);
 
   this->columns = 1;
@@ -83,39 +93,38 @@ void UIMerchantItemLogWnd::Paint() {
     return;
   }
 
-  unsigned red, green, blue;
-  g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  {
+    unsigned red, green, blue;
+    g_skinInfo.PaletteChannels(2, 2, red, green, blue);
+    this->FillRegion(0, 17, this->geometry.width, this->geometry.height - 38, RGB(red, green, blue));
+  }
 
   int rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  int y = 17;
-  for (int i = 0; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* left = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_left.bmp")));
-    this->DrawBitmap(0, y, left, false);
+    this->DrawBitmap(0, i * 8 + 17, left, false);
   }
 
   rows = (this->geometry.height - 38) / 8 + ((this->geometry.height - 38) % 8 != 0);
-  y = 17;
-  for (int i = 0; i < rows; ++i, y += 8) {
+  for (int i = 0; i < rows; ++i) {
     auto* right = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\itemwin_right.bmp")));
-    this->DrawBitmap(this->geometry.width - right->image.width, y, right, false);
+    this->DrawBitmap(this->geometry.width - right->image.width, i * 8 + 17, right, false);
   }
 
   int slots = (this->geometry.height - 38) / 32;
-  y = 17;
-  for (int i = 0; i < slots; ++i, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int i = 0; i < slots; ++i) {
+    this->DrawItemSlotFrame(40, i * 32 + 17);
   }
 
   auto it = this->items.begin();
   auto log = this->logs.begin();
 
-  for (int index = 0, visible = 0; visible < this->visibleRows; ++index, ++it, ++log) {
-    if (index < this->scroll) {
+  for (int index = 0, visible = 0; visible + 1 <= this->visibleRows; ++it, ++log) {
+    if (index++ < this->scroll) {
       continue;
     }
 
-    if (this->items.size() < static_cast<unsigned>(index + 1)) {
+    if (this->items.size() < static_cast<unsigned>(index)) {
       break;
     }
 
@@ -168,21 +177,23 @@ void UIMerchantItemLogWnd::Paint() {
 void UIMerchantItemLogWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
   if (item.identity[1] > 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipY = row * 32 + 1;
+    int tooltipX = column * 32 + 40;
     this->ToScreen(tooltipX, tooltipY);
 
     CMode* gameMode = g_modeMgr.currentMode;
     if (item.identified == 1 && item.optionCount != 0) {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
-      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_FAIL_NEED_EQUIPPED_GUN_GATLING), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
+      int screenX = tooltipX;
+      gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA5), item.DisplayName(0).c_str(), item.optionCount, item.quantity).c_str(), screenX, screenY,
                  color, 0, 1);
     } else {
       std::uint32_t color = g_session.GetItemNameColor(item);
-      int screenX = tooltipX;
       int screenY = tooltipY;
+      int screenX = tooltipX;
       gameMode->ShowTooltip(FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity).c_str(), screenX, screenY,
                  color, 0, 1);
     }
@@ -221,7 +232,7 @@ void UIMerchantItemLogWnd::OnRBtnDown(int x, int y) {
 int UIMerchantItemLogWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
   switch (message) {
   case UM_COMMAND:
-    if (a == 201) {
+    if (a == ID_CLOSE) {
       if (this->mode == 0) {
         g_windowMgr.CloseWindow(WID_MERCHANTITEMLOGWND_MODE_0);
       } else {
@@ -255,11 +266,12 @@ int UIMerchantItemLogWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     ITEM_INFO item(*reinterpret_cast<const ITEM_INFO*>(a));
     this->items.push_back(item);
 
+    const int characterId = static_cast<int>(b);
     lcData data;
-    data.name = LookupPlayerName(b);
+    data.name = LookupPlayerName(characterId);
     data.time = c;
     data.itemName = item.DisplayName(0);
-    data.characterId = b;
+    data.characterId = characterId;
     this->logs.push_back(data);
     this->Invalidate();
     this->UpdateScrollBar();

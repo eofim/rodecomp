@@ -38,38 +38,42 @@ UIBitmapButton* UIEmotionWnd::AddCloseButton(const char* tooltip, int width) {
   button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_on.bmp", 2, 0);
   button->SetSize(button->BitmapWidth(), button->BitmapHeight());
   button->Move(width - 14, 3);
-  button->SetId(201);
+  button->SetId(ID_CLOSE);
   button->SetTooltip(tooltip);
   this->AddChild(button);
 
   return button;
 }
 
+// OFFSET: 0x00A8A0C0
+// FUNCTION: fn_45790
+__declspec(noinline) UIEmotionWnd::~UIEmotionWnd() = default;
+
 // OFFSET: 0x008A2980
 // FUNCTION: fn_11644
 void UIEmotionWnd::OnCreate(int, int) {
-  int y = 23;
   auto* emotions = &g_session.m_emotionHotkeys;
   char buffer[16];
+  int number = 0;
+  UIStaticText** labels = this->m_labels;
 
-  for (int i = 0; i < 10; ++i) {
-    this->m_edits[i] = new UIEditCtrl2();
-    this->m_edits[i]->SetSize(270, 16);
-    this->m_edits[i]->Move(83, y - 3);
-    this->m_edits[i]->maximum = 50;
-    this->m_edits[i]->Background(232, 232, 232);
-    this->m_edits[i]->SetText(emotions->current[i].c_str());
-    this->AddChild(this->m_edits[i]);
+  for (int index = 0; index < 10; ++index) {
+    const int y = index * 21 + 23;
+    this->m_edits[index] = new UIEditCtrl2();
+    this->m_edits[index]->SetSize(270, 16);
+    this->m_edits[index]->Move(83, y - 3);
+    this->m_edits[index]->maximum = 50;
+    this->m_edits[index]->Background(232, 232, 232);
+    this->m_edits[index]->SetText(emotions->current[index].c_str());
+    this->AddChild(this->m_edits[index]);
 
-    std::sprintf(buffer, "Alt + %d", i + 1);
+    std::sprintf(buffer, "Alt + %d", ++number);
 
-    this->m_labels[i] = new UIStaticText();
-    this->m_labels[i]->SetSize(70, 16);
-    this->m_labels[i]->Move(20, y);
-    this->m_labels[i]->SetText(buffer, 0);
-    this->AddChild(this->m_labels[i]);
-
-    y += 21;
+    this->m_labels[index] = new UIStaticText();
+    this->m_labels[index]->SetSize(70, 16);
+    this->m_labels[index]->Move(20, y);
+    this->m_labels[index]->SetText(buffer, 0);
+    this->AddChild(this->m_labels[index]);
   }
 
   this->m_labels[9]->SetText("Alt + 0", 0);
@@ -83,7 +87,7 @@ void UIEmotionWnd::OnCreate(int, int) {
     this->viewButton->SetBitmap((path + "btn_view_b" + ".bmp").c_str(), 2, 0);
     this->viewButton->SetSize(this->viewButton->BitmapWidth(), this->viewButton->BitmapHeight());
     this->viewButton->Move(this->geometry.width - 50, this->geometry.height - 25);
-    this->viewButton->SetId(283);
+    this->viewButton->SetId(ID_OPEN_EMOTIONLIST);
     this->AddChild(this->viewButton);
   }
 
@@ -93,7 +97,7 @@ void UIEmotionWnd::OnCreate(int, int) {
   for (int i = 0; i < 10; ++i) {
     HotkeyInfo info = g_session.GetHotkeyInfo(2, i);
     if (!info.description.empty()) {
-      this->m_labels[i]->SetText(info.text.c_str(), 0);
+      labels[i]->SetText(info.text.c_str(), 0);
     }
   }
 }

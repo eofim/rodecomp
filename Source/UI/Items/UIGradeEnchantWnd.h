@@ -5,6 +5,7 @@
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Window/UIFrameWnd.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -27,6 +28,11 @@ struct GradeEnchantInfo {
   /* 0004 */ std::int32_t blessingStepAmount;
   /* 0008 */ std::int32_t maxBlessingSteps;
   /* 000C */ std::int32_t bonusPerStep;
+};
+
+struct GradeEnchantOption {
+  /* 0000 */ std::int32_t option;
+  /* 0004 */ std::int32_t count;
 };
 
 #if defined(_WIN32) && !defined(_WIN64)
@@ -98,14 +104,18 @@ public:
   /* 00E8 */ int hoverMaterial;
   /* 00EC */ std::vector<GradeEnchantMaterial> materials;
   /* 00F8 */ GradeEnchantInfo info;
-  /* 0108 */ int enchantOption;
-  /* 010C */ int enchantOptionCount;
+  /* 0108 */ GradeEnchantOption enchantOption;
   /* 0110 */ unsigned char protect;
+  /* 0111 */ unsigned char unknown_0111;
   /* 0114 */ int blessingAmount;
   /* 0118 */ int baseSuccessRate;
   /* 011C */ std::vector<int> messageIds;
   /* 0128 */ ITEM_INFO item;
   /* 0220 */ unsigned char requestPending;
 };
+
+#if defined(_WIN32) && !defined(_WIN64)
+static_assert(offsetof(UIGradeEnchantWnd, unknown_0111) == 0x111);
+#endif
 
 #endif

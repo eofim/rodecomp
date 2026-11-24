@@ -12,6 +12,7 @@ class CParticle;
 class CStormKickEffect : public CEffect {
 public:
   CStormKickEffect();
+  ~CStormKickEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -26,6 +27,15 @@ public:
   /* 00CC */ EffectPoint lastPoints[2];
   /* 00E4 */ std::vector<CParticle*> storms;
   /* 00F0 */ std::vector<CParticle*> clouds;
+
+private:
+  void RenderCloud(CParticle* particle);
+  void SetEffectLifetime();
+  void SetStormColor(CParticle* particle, int effectId);
+  void RotateActor();
+  void AdvanceStorm(CParticle* particle);
+  void AdvanceCloud(CParticle* particle);
+  void RenderStorm(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

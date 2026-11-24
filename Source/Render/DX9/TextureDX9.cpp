@@ -114,8 +114,9 @@ CTextureDX9::CTextureDX9(DeviceOwnerDX9& owner, IDirect3DTexture9* texture) : CT
   }
 }
 
-// INLINED
-CTextureDX9::~CTextureDX9() {
+// OFFSET: 0x00572810
+// FUNCTION: fn_46356
+__declspec(noinline) CTextureDX9::~CTextureDX9() {
   if (this->m_surface) {
     this->m_surface->Release();
     this->m_surface = nullptr;
@@ -170,21 +171,26 @@ bool CTextureDX9::Create(int width, int height, int format) {
   const UINT* adjusted = this->m_owner->AdjustTextureDimensions(size, width, height);
   this->m_textureWidth = adjusted[0];
   this->m_textureHeight = adjusted[1];
+  width = this->m_textureWidth;
+  height = this->m_textureHeight;
   this->m_format = format;
   UINT levels;
 
   if (this->m_allowDynamic && this->m_owner->dynamicTextures) {
-    this->m_dynamic = this->m_owner->CanAutoGenerateMipmaps(nativeFormat);
-    if (this->m_dynamic) {
-      usage = renderTarget ? D3DUSAGE_AUTOGENMIPMAP : D3DUSAGE_DYNAMIC | D3DUSAGE_AUTOGENMIPMAP;
-    }
+    const bool dynamic = this->m_owner->CanAutoGenerateMipmaps(nativeFormat);
+    width = this->m_textureWidth;
+    height = this->m_textureHeight;
     levels = 0;
+    this->m_dynamic = dynamic;
+    if (dynamic) {
+      usage |= D3DUSAGE_AUTOGENMIPMAP;
+    }
   } else {
     this->m_dynamic = false;
     levels = 1;
   }
 
-  if (FAILED(device->CreateTexture(this->m_textureWidth, this->m_textureHeight, levels, usage, nativeFormat, D3DPOOL_DEFAULT, &this->m_texture, nullptr)) ||
+  if (FAILED(device->CreateTexture(width, height, levels, usage, nativeFormat, D3DPOOL_DEFAULT, &this->m_texture, nullptr)) ||
       FAILED(this->m_texture->GetSurfaceLevel(0, &this->m_surface)) || FAILED(this->m_surface->GetDesc(&this->m_description))) {
     return false;
   }
@@ -332,94 +338,104 @@ void CTextureDX9::ClearSurface(IDirect3DSurface9* surface, std::uint32_t color) 
 // OFFSET: 0x00573240
 // FUNCTION: fn_02490
 bool CTextureDX9::UploadSurface(
-  IDirect3DSurface9* surface, int x, int y, int width, int height, const std::uint32_t* pixels, std::uint8_t blackTransparent, int sourceWidth
+  IDirect3DSurface9* surface, int x, int y, int width, int height, const std::uint32_t* pixels, int option, int sourceWidth
 ) {
   D3DSURFACE_DESC description;
   if (FAILED(surface->GetDesc(&description))) {
     return false;
   }
 
-  const int stride = sourceWidth ? sourceWidth : width;
-  int stepX = 1, stepY = 1;
-  const int extentX = x + width;
-  const int extentY = y + height;
+  if (!sourceWidth) {
+    sourceWidth = width;
+  }
 
-  while (static_cast<UINT>(extentX / stepX) > this->m_width) {
+  int stepX = 1;
+  while (static_cast<UINT>((x + width) / stepX) > this->m_width) {
     ++stepX;
   }
 
-  while (static_cast<UINT>(extentY / stepY) > this->m_height) {
+  int stepY = 1;
+  while (static_cast<UINT>((y + height) / stepY) > this->m_height) {
     ++stepY;
   }
 
-  const int left = x / stepX, top = y / stepY;
-  const int w = width / stepX, h = height / stepY;
-  if (!w || !h) {
+  x /= stepX;
+  y /= stepY;
+  width /= stepX;
+  height /= stepY;
+  if (!width || !height) {
     return false;
   }
 
-  const RECT rectangle{left, top, left + w, top + h};
+  const RECT rectangle{x, y, x + width, y + height};
   D3DLOCKED_RECT locked;
   if (FAILED(surface->LockRect(&locked, &rectangle, 0))) {
     return false;
   }
 
   switch (description.Format) {
-  case D3DFMT_A1R5G5B5:
-    for (int row = 0; row < h; ++row) {
-      auto* output = static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch;
-      const std::uint32_t* input = pixels + row * stepY * stride;
-
-      for (int column = 0; column < w; ++column) {
-        std::uint16_t converted = Convert16(input[column * stepX], D3DFMT_A1R5G5B5);
-        const std::uint16_t rgb = converted & 0x7FFF;
-        if (rgb == 0x7C1F) {
-          converted = 0;
-        } else if (blackTransparent && !rgb) {
-          converted = 0;
-        }
-
-        std::memcpy(output + column * sizeof(converted), &converted, sizeof(converted));
-      }
+  case D3DFMT_A1R5G5B5: {
+    int row = 0;
+    if (row >= height) {
+      break;
     }
-    break;
-  case D3DFMT_A4R4G4B4:
-    for (int row = 0; row < h; ++row) {
-      auto* output = static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch;
-      const std::uint32_t* input = pixels + row * stepY * stride;
-
-      for (int column = 0; column < w; ++column) {
-        std::uint16_t converted = Convert16(input[column * stepX], D3DFMT_A4R4G4B4);
-        const std::uint16_t rgb = converted & 0x0FFF;
-        if (rgb == 0xF0F) {
-          converted = 0;
-        } else if (blackTransparent && !rgb) {
-          converted = 0;
+    const std::uint32_t* sourceRow = pixels;
+    const std::uint8_t transparent = static_cast<std::uint8_t>(option);
+    do {
+      std::uint16_t* output = reinterpret_cast<std::uint16_t*>(static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch);
+      for (int column = 0, source = 0; column < width; ++column, source += stepX) {
+        const std::uint16_t color = Convert16(sourceRow[source], D3DFMT_A1R5G5B5);
+        if ((color & 0x7FFF) == 0x7C1F) {
+          output[column] = 0;
+        } else if (transparent && (color & 0x7FFF) == 0) {
+          output[column] = 0;
+        } else {
+          output[column] = color;
         }
-
-        std::memcpy(output + column * sizeof(converted), &converted, sizeof(converted));
       }
-    }
+      ++row;
+      sourceRow += sourceWidth * stepY;
+    } while (row < height);
     break;
+  }
+  case D3DFMT_A4R4G4B4: {
+    int row = 0;
+    if (row >= height) {
+      break;
+    }
+    const int rowCount = height;
+    const std::uint32_t* sourceRow = pixels;
+    const std::uint8_t transparent = static_cast<std::uint8_t>(option);
+    do {
+      std::uint16_t* output = reinterpret_cast<std::uint16_t*>(static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch);
+      for (int column = 0, source = 0; column < width; ++column, source += stepX) {
+        const std::uint16_t color = Convert16(sourceRow[source], D3DFMT_A4R4G4B4);
+        if ((color & 0x0FFF) == 0x0F0F) {
+          output[column] = 0;
+        } else if (transparent && (color & 0x0FFF) == 0) {
+          output[column] = 0;
+        } else {
+          output[column] = color;
+        }
+      }
+      ++row;
+      sourceRow += sourceWidth * stepY;
+    } while (row < rowCount);
+    break;
+  }
   case D3DFMT_R5G6B5:
-    for (int row = 0; row < h; ++row) {
-      auto* output = static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch;
-      const std::uint32_t* input = pixels + row * stepY * stride;
-
-      for (int column = 0; column < w; ++column) {
-        const std::uint16_t converted = Convert16(input[column * stepX], D3DFMT_R5G6B5);
-        std::memcpy(output + column * sizeof(converted), &converted, sizeof(converted));
+    for (int row = 0; row < height; ++row, pixels += sourceWidth * stepY) {
+      std::uint16_t* output = reinterpret_cast<std::uint16_t*>(static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch);
+      for (int column = 0, source = 0; column < width; ++column, source += stepX) {
+        output[column] = Convert16(pixels[source], D3DFMT_R5G6B5);
       }
     }
     break;
   case D3DFMT_A8R8G8B8:
-    for (int row = 0; row < h; ++row) {
-      auto* output = static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch;
-      const std::uint32_t* input = pixels + row * stepY * stride;
-
-      for (int column = 0; column < w; ++column) {
-        const std::uint32_t color = input[column * stepX];
-        std::memcpy(output + column * sizeof(color), &color, sizeof(color));
+    for (int row = 0; row < height; ++row, pixels += sourceWidth * stepY) {
+      std::uint32_t* output = reinterpret_cast<std::uint32_t*>(static_cast<unsigned char*>(locked.pBits) + row * locked.Pitch);
+      for (int column = 0, source = 0; column < width; ++column, source += stepX) {
+        output[column] = pixels[source];
       }
     }
     break;
@@ -449,8 +465,9 @@ void CTextureDX9::Upload(int x, int y, int width, int height, const std::uint32_
   CComPtr<IDirect3DSurface9> surface;
 
   if (this->m_renderTarget) {
+    const UINT levels = !this->m_owner->dynamicTextures;
     if (FAILED(device->CreateTexture(
-          this->m_textureWidth, this->m_textureHeight, !this->m_owner->dynamicTextures, 0, this->m_description.Format, D3DPOOL_SYSTEMMEM,
+          this->m_textureWidth, this->m_textureHeight, levels, 0, this->m_description.Format, D3DPOOL_SYSTEMMEM,
           &temporary, nullptr
         ))) {
       return;
@@ -523,18 +540,6 @@ bool CTextureDX9::CopyTexture(CTexture* source, int sourceX, int sourceY, int so
 
   this->Filter();
   return true;
-}
-
-void CTextureDX9::Draw(int x, int y, int width, int height, std::uint32_t color) {
-  this->DrawTo(
-    g_renderer->primitives, g_renderer->queues, x, y, width, height, color, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd
-  );
-}
-
-void CTextureDX9::Stretch(int x, int y, int width, int height) {
-  this->StretchTo(
-    g_renderer->primitives, g_renderer->queues, x, y, width, height, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd
-  );
 }
 
 // OFFSET: 0x0056CEE0

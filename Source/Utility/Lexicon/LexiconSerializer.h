@@ -21,16 +21,8 @@ struct LexiconHeader {
 };
 
 struct LexiconSerializer {
-  // INLINED
-  LexiconSerializer() : root(nullptr), wordCount(0), nodeCount(0), serializedSize(0), buffer(nullptr), header{} {
-  }
-  // INLINED
-  ~LexiconSerializer() {
-    if (this->buffer != nullptr) {
-      delete this->buffer;
-    }
-    this->Destroy(this->root);
-  }
+  LexiconSerializer();
+  ~LexiconSerializer();
 
   /* 0000 */ LexiconNode* root;
   /* 0004 */ int wordCount;
@@ -42,6 +34,8 @@ struct LexiconSerializer {
   bool Load(const char* path);
   bool Insert(const unsigned char* word, int length);
   void Destroy(LexiconNode* node);
+  unsigned char UnbranchedLength(const LexiconNode* node) const;
+  int SiblingCount(const LexiconNode* node) const;
   std::uint32_t Serialize(LexiconNode* node, std::uint32_t offset, unsigned char terminal);
 };
 

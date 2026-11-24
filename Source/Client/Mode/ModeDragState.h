@@ -12,6 +12,40 @@ struct ITEM_INFO;
 struct BarterMarketItem;
 struct BarterMarketEntry;
 
+enum DragSource : int {
+  DRAG_NONE = 0,
+  DRAG_ITEM_INVENTORY = 1,
+  DRAG_ITEM_EQUIP = 2,
+  DRAG_ITEM_NPC_SHOP = 3,
+  DRAG_ITEM_PURCHASE_CART = 4,
+  DRAG_ITEM_SELL = 5,
+  DRAG_ITEM_STORAGE = 6,
+  DRAG_SHORTCUT = 7,
+  DRAG_SKILL = 8,
+  DRAG_ITEM_MERCHANT_INVENTORY = 9,
+  DRAG_VENDING_PURCHASE_LIST = 10,
+  DRAG_VENDING_SHOP_LIST = 11,
+  DRAG_VENDING_ITEM_SHOP = 12,
+  DRAG_VENDING_ITEM_PURCHASE = 13,
+  DRAG_METAL_PROCESS = 14,
+  DRAG_RODEX_COMPOSE = 15,
+  DRAG_QUICKSLOT = 16,
+  DRAG_SWAP_EQUIP = 17,
+  DRAG_SWAP_EQUIP_COSTUME = 18,
+  DRAG_BUYINGSTORE_PURCHASE_LIST = 19,
+  DRAG_BUYINGSTORE_SHOP_LIST = 20,
+  DRAG_BUYINGSTORE_ITEM_PURCHASE = 21,
+  DRAG_PURCHASE_MIRROR_LIST = 22,
+  DRAG_ITEM_EQUIP_COSTUME = 24,
+  DRAG_LAPINE_BOX = 26,
+  DRAG_LAPINE_INGREDIENT = 27,
+  DRAG_REFINING = 28,
+  DRAG_MESSENGER_MEMBER = 29,
+  DRAG_BARTER_MARKET = 31,
+  DRAG_EXPANDED_BARTER = 32,
+  DRAG_GRADE_ENCHANT = 33,
+};
+
 struct ModeDragState {
   /* 0308 */ int source;
   /* 030C */ std::uint32_t id;
@@ -38,7 +72,6 @@ struct ModeDragState {
   /* 03C0 */ std::int64_t viewId;
 
   void Clear();
-  void BeginItem(WindowManagerWindows& windows, int source, const ITEM_INFO& item, int quantity, int slot);
   void BeginSkill(WindowManagerWindows& windows, ResourceMgr& resources, int source, std::uint32_t id, const char* name, int level, int slot);
   void BeginBarterItem(int source, const BarterMarketItem& item, int quantity, int slot);
   void BeginBarterEntry(int source, const BarterMarketEntry& entry, int quantity, int slot);

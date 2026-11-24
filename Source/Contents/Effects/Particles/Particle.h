@@ -18,6 +18,10 @@ struct vector2d {
   vector2d() : x(0), y(0) {
   }
 
+  // INLINED
+  vector2d(float x, float y) : x(x), y(y) {
+  }
+
   vector2d& Normalize();
 
   /* 0000 */ float x;
@@ -84,7 +88,7 @@ public:
     /* 0054 */ StarParticleState starState;
     /* 0054 */ float animationValues[21];
   };
-  /* 00A8 */ unsigned char animationState;
+  /* 00A8 */ signed char animationState;
   /* 00A9 */ signed char frameIndex;
   /* 00AA */ unsigned char padding_00AA[0x16];
   /* 00C0 */ float speedParameter;
@@ -124,6 +128,8 @@ public:
 
   void Clear();
   std::string ResolvePath(const std::string& name);
+  matrix& GetScreenRotation(matrix& result);
+  bool HasScreenRotation();
   void Open(std::string name);
   void Restart();
   void Load(const std::string& name);
@@ -163,7 +169,7 @@ public:
   /* 3FB8 */ int m_windowId;
   /* 3FBC */ bool m_attachToWindow;
   /* 3FBD */ bool m_visible;
-  /* 3FC0 */ vector3d m_windowOffset = {};
+  /* 3FC0 */ vector3d m_windowOffset = {0, 0, 0};
   /* 3FCC */ bool m_followActor;
   /* 3FD0 */ std::uint32_t m_actorId;
   /* 3FD4 */ float m_groundHeight = 0;
@@ -180,7 +186,7 @@ public:
 };
 
 float RandomRange(float minimum, float maximum);
-vector2d RandomDiscPoint(float x, float y, long long radius);
+vector2d RandomDiscPoint(vector2d center, long long radius);
 std::string EmitterKey(std::string effect, std::string emitter);
 std::string EmitterInfoKey(std::string effect);
 void SubmitParticlePrimitive(RenderCommand* primitive, int flags);

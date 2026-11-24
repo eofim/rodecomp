@@ -63,7 +63,16 @@ struct NaviDataEntry {
 };
 
 struct NaviRouteLine {
-  NaviRouteLine(int kind, int x, int y, const char* text, int color, int shadowColor);
+  // OFFSET: 0x00B92950
+  // FUNCTION: fn_19552
+  NaviRouteLine(int kind, int x, int y, const char* text, int color, int shadowColor) : x(0), y(0) {
+    this->kind = kind;
+    this->x = x;
+    this->y = y;
+    this->text = text;
+    this->color = color;
+    this->shadowColor = shadowColor;
+  }
 
   // OFFSET: 0x00B92F10
   // FUNCTION: fn_19558
@@ -79,33 +88,33 @@ struct NaviRouteLine {
   /* 0028 */ int shadowColor;
 };
 
+struct NaviNpcLook {
+  /* 0000 */ int job;
+  /* 0004 */ int sex;
+  /* 0008 */ int bodyPalette;
+  /* 000C */ int head;
+  /* 0010 */ int headPalette;
+  /* 0014 */ int accessory0;
+  /* 0018 */ int accessory1;
+  /* 001C */ int accessory2;
+  /* 0020 */ int robe;
+
+  NaviNpcLook();
+};
+
 // VTABLE: vt_01777
 class CNavi_Object {
 public:
   /* 0004 */ int id;
   /* 0008 */ int type;
-  union {
-    /* 000C */ int index;
-    struct {
-      /* 000C */ std::uint16_t shortIndex;
-      /* 000E */ std::uint16_t flag;
-    };
-  };
+  /* 000C */ int index;
   /* 0010 */ std::string name;
   /* 0028 */ std::string title;
   /* 0040 */ CNaviInfo* info;
   /* 0044 */ int cellX;
   /* 0048 */ int cellY;
   /* 004C */ std::vector<NaviLink> links;
-  /* 0058 */ int job;
-  /* 005C */ int sex;
-  /* 0060 */ int bodyPalette;
-  /* 0064 */ int head;
-  /* 0068 */ int headPalette;
-  /* 006C */ int accessory0;
-  /* 0070 */ int accessory1;
-  /* 0074 */ int accessory2;
-  /* 0078 */ int robe;
+  /* 0058 */ NaviNpcLook look;
 
   __declspec(noinline) CNavi_Object();
   __declspec(noinline) CNavi_Object(int type, int index, const char* name, const char* title, int cellX, int cellY, CNaviInfo* info);
@@ -126,7 +135,7 @@ public:
   virtual void AddLink(const NaviLink& link);
   virtual void EraseLink(std::vector<NaviLink>::iterator& it);
   virtual void ClearLinks();
-  virtual CNavi_Link* FindLinkAt(int x, int y);
+  virtual CNavi_Link* FindLinkAt(std::pair<int, int> target);
   virtual CNavi_Link* FindLinkTo(int x, int y);
 
   bool HasId(const unsigned int& id) const;
@@ -147,6 +156,7 @@ public:
   const char* GetLinkedName() const;
   NaviCell GetLinkedCell() const;
   void SetDepth(int depth);
+  int GetDepth() const;
   std::vector<NaviLink>::iterator LinkedBegin();
   std::vector<NaviLink>::iterator LinkedEnd();
   void AddLinkedLink(const NaviLink& link);
@@ -171,7 +181,7 @@ public:
   void AddLink(const NaviLink& link) override;
   void EraseLink(std::vector<NaviLink>::iterator& it) override;
   void ClearLinks() override;
-  CNavi_Link* FindLinkAt(int x, int y) override;
+  CNavi_Link* FindLinkAt(std::pair<int, int> target) override;
   CNavi_Link* FindLinkTo(int x, int y) override;
 };
 
@@ -269,9 +279,35 @@ public:
   /* 005C */ std::vector<CNavi_Link*> links;
 };
 
+struct NavigationTargetLook {
+  /* 0000 */ int job;
+  /* 0004 */ int sex;
+  /* 0008 */ int bodyPalette;
+  /* 000C */ int head;
+  /* 0010 */ int headPalette;
+  /* 0014 */ int accessory0;
+  /* 0018 */ int accessory1;
+  /* 001C */ int accessory2;
+  /* 0020 */ int robe;
+
+  ~NavigationTargetLook();
+};
+
 struct NavigationTarget {
-  NavigationTarget() : type(-1), object(nullptr), x(-1), y(-1) {}
-  NavigationTarget(int type, void* object);
+  NavigationTarget() {
+    this->type = -1;
+    this->object = nullptr;
+    this->x = -1;
+    this->y = -1;
+  }
+  // OFFSET: 0x00B92A70
+  // FUNCTION: fn_19554
+  NavigationTarget(int type, void* object) {
+    this->type = type;
+    this->object = object;
+    this->x = -1;
+    this->y = -1;
+  }
 
   // INLINED
   NavigationTarget(int type, void* object, int x, int y, std::string name) {
@@ -322,6 +358,7 @@ public:
   bool Search(std::string query, int type, std::vector<NavigationTarget>& out);
   int ParseSearchKind(std::vector<std::string>& tokens);
   CNavi_Object* FindMobByTitle(std::string title);
+  int DestinationCount() const;
   int ObjectCount() const;
 
   /* 0000 */ std::vector<CNaviInfo*> destinations;
@@ -454,8 +491,8 @@ public:
   /* 1280 */ int routeSide;
   /* 1284 */ int previewType;
   /* 1288 */ CTexture* previewTexture;
-  /* 128C */ int previewX;
-  /* 1290 */ int previewY;
+  /* 128C */ int previewX = 0;
+  /* 1290 */ int previewY = 0;
   /* 1294 */ std::vector<NaviCell> cells;
   /* 12A0 */ CActRes* previewAction;
   /* 12A4 */ CSprRes* previewSprite;

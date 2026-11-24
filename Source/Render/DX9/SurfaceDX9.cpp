@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <memory>
 
 namespace {
   // OFFSET: 0x00570970
@@ -73,9 +74,10 @@ __declspec(noinline) std::uint16_t PackColorA1R5G5B5(std::uint32_t color) {
 
 // OFFSET: 0x00570720
 // FUNCTION: fn_02427
-CSurfaceDX9::CSurfaceDX9(DeviceOwnerDX9& owner, int width, int height)
-    : m_owner(&owner), m_width(AlignDimension(width)), m_height(AlignDimension(height)), m_surface(nullptr) {
-  owner.device->CreateOffscreenPlainSurface(this->m_width, this->m_height, owner.backBufferDescription.Format, D3DPOOL_DEFAULT, &this->m_surface, nullptr);
+CSurfaceDX9::CSurfaceDX9(DeviceOwnerDX9& owner, int width, int height) : m_owner(&owner), m_surface(nullptr) {
+  this->m_width = AlignDimension(width);
+  this->m_height = AlignDimension(height);
+  owner.device->CreateOffscreenPlainSurface(this->m_width, this->m_height, owner.backBufferDescription.Format, D3DPOOL_DEFAULT, std::addressof(this->m_surface), nullptr);
 }
 
 // OFFSET: 0x005707D0
@@ -94,7 +96,9 @@ CSurfaceDX9::CSurfaceDX9(DeviceOwnerDX9* owner, IDirect3DSurface9* surface) : m_
   }
 }
 
-CSurfaceDX9::~CSurfaceDX9() {
+// OFFSET: 0x00570880
+// FUNCTION: fn_46362
+__declspec(noinline) CSurfaceDX9::~CSurfaceDX9() {
   if (this->m_surface) {
     this->m_surface->Release();
     this->m_surface = nullptr;

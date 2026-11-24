@@ -1,4 +1,5 @@
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Skills/SkillId.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Client/Mode/CGameMode.h"
@@ -251,7 +252,8 @@ void CSkillAction_MT_POWERFUL_SWING::OnSkillEffect(int level, CGameActor* source
     EffectLists* effects = g_effectMgr;
     CEffect* effect = effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("powerful_swing_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     if (effect) {
-      effect->SetAngle(ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values) + 180.0f);
+      const float angle = ScreenAngle(&source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values);
+      effect->SetAngle(angle + 180.0f);
     }
   }
   EffectLists* effects = g_effectMgr;
@@ -295,16 +297,16 @@ void CEfstAction_GRADUAL_GRAVITY::OnEfstUpdate(int efstId, int value, int argume
 }
 
 // GLOBAL: gl_25815
-static SkillActionRegistrar s_skillAction6508(6508, NewAction<CSkillAction_MT_ENERGY_CANNONADE, CSkillAction>);
+static SkillActionRegistrar s_skillActionMtEnergyCannonade{MT_ENERGY_CANNONADE, NewAction<CSkillAction_MT_ENERGY_CANNONADE, CSkillAction>};
 // GLOBAL: gl_25816
-static SkillActionRegistrar s_skillAction6004(6004, NewAction<CSkillAction_MT_MIGHTY_SMASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionMtMightySmash{MT_MIGHTY_SMASH, NewAction<CSkillAction_MT_MIGHTY_SMASH, CSkillAction>};
 // GLOBAL: gl_25817
-static SkillActionRegistrar s_skillAction6507(6507, NewAction<CSkillAction_MT_POWERFUL_SWING, CSkillAction>);
+static SkillActionRegistrar s_skillActionMtPowerfulSwing{MT_POWERFUL_SWING, NewAction<CSkillAction_MT_POWERFUL_SWING, CSkillAction>};
 // GLOBAL: gl_25818
-static SkillActionRegistrar s_skillAction6506(6506, NewAction<CSkillAction_MT_RUSH_STRIKE, CSkillAction>);
+static SkillActionRegistrar s_skillActionMtRushStrike{MT_RUSH_STRIKE, NewAction<CSkillAction_MT_RUSH_STRIKE, CSkillAction>};
 // GLOBAL: gl_25819
-static SkillActionRegistrar s_skillAction6002(6002, NewAction<CSkillAction_MT_SPARK_BLASTER, CSkillAction>);
+static SkillActionRegistrar s_skillActionMtSparkBlaster{MT_SPARK_BLASTER, NewAction<CSkillAction_MT_SPARK_BLASTER, CSkillAction>};
 // GLOBAL: gl_25820
-static SkillActionRegistrar s_skillAction6003(6003, NewAction<CSkillAction_MT_TRIPLE_LASER, CSkillAction>);
+static SkillActionRegistrar s_skillActionMtTripleLaser{MT_TRIPLE_LASER, NewAction<CSkillAction_MT_TRIPLE_LASER, CSkillAction>};
 // GLOBAL: gl_25821
-static EfstActionRegistrar s_efstAction1014(1014, NewAction<CEfstAction_GRADUAL_GRAVITY, CEfstAction>);
+static EfstActionRegistrar s_efstActionGradualGravity{EFST_GRADUAL_GRAVITY, NewAction<CEfstAction_GRADUAL_GRAVITY, CEfstAction>};

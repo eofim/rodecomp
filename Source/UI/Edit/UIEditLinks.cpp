@@ -121,7 +121,7 @@ void UIEditCtrl::MoveCursorToEnd() {
 
 // OFFSET: 0x008550E0
 // FUNCTION: fn_10750
-void UIEditCtrl::SnapLinkSelection(const std::string& prefix, const int& bytes) {
+__declspec(noinline) void UIEditCtrl::SnapLinkSelection(const std::string& prefix, const int& bytes) {
   if (g_windowMgr.rodexComposeWnd && g_windowMgr.rodexComposeWnd->m_contents != g_windowMgr.GetHoverWindow()) {
     return;
   }
@@ -147,8 +147,9 @@ void UIEditCtrl::UpdateLinks() {
   }
 
   bool hasLink = false;
-
-  for (UIWindow* window : this->links) {
+  for (auto it = this->links.begin(); it != this->links.end();) {
+    UIWindow* window = *it;
+    ++it;
     if (window->geometry.id == 438) {
       hasLink = true;
     }
@@ -159,7 +160,7 @@ void UIEditCtrl::UpdateLinks() {
   }
 
   this->linkedText.clear();
-  std::string prefix;
+  std::string prefix = "";
   std::string remaining = this->text;
 
   for (auto entry = this->links.begin(); entry != this->links.end(); ++entry) {
@@ -168,10 +169,12 @@ void UIEditCtrl::UpdateLinks() {
       break;
     }
 
+    NavigationLinkParser* const parser = g_navigationLinkParser;
     auto* button = static_cast<UINaviLinkButton*>(*entry);
-    const std::string name = g_navigationLinkParser->FormatNavigationLink(button->Link(), false);
+    const std::string name = parser->FormatNavigationLink(button->Link(), false);
     const std::string fitted = this->FitTextToWidth(name, this->geometry.width / 2);
-    std::string display = "<" + fitted;
+    std::string display = "<";
+    display.append(fitted.c_str(), fitted.size());
     display += ">";
     const int found = static_cast<int>(remaining.find(display));
 
@@ -180,13 +183,15 @@ void UIEditCtrl::UpdateLinks() {
       prefix += head;
       std::string visible = head;
 
-      if (prefix.size() - 1 < static_cast<unsigned>(this->firstVisible)) {
+      const int visibleOffset = this->firstVisible;
+      if (prefix.size() - 1 < static_cast<unsigned>(visibleOffset)) {
         visible = prefix.substr(prefix.size() - 1);
       } else {
-        visible = prefix.substr(this->firstVisible);
+        visible = prefix.substr(visibleOffset);
       }
 
-      if (this->firstVisible != 0 && prefix.size() <= static_cast<unsigned>(this->firstVisible)) {
+      const int firstVisible = this->firstVisible;
+      if (firstVisible != 0 && prefix.size() <= static_cast<unsigned>(firstVisible)) {
         (*entry)->Move(1000, this->textY - 1);
       } else {
         (*entry)->Move(this->TextWidth(visible.c_str(), 0, 0, 12, 0, 0) + 2, this->textY - 1);
@@ -197,6 +202,11 @@ void UIEditCtrl::UpdateLinks() {
       this->linkedText += button->Link();
       remaining = remaining.substr(found + display.size());
       prefix += display;
+      if (++entry == this->links.end()) {
+        break;
+      }
+    } else {
+      ++entry;
     }
   }
 

@@ -12,6 +12,7 @@ class CParticle;
 class CLevel99Orb1Effect : public CEffect {
 public:
   CLevel99Orb1Effect();
+  __declspec(noinline) ~CLevel99Orb1Effect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
@@ -20,6 +21,12 @@ public:
 
   /* 00CC */ EffectPoint offsets[16];
   /* 018C */ std::vector<CParticle*> particles;
+
+private:
+  __declspec(noinline) void UpdateParticle(CParticle* particle);
+  // INLINED
+  __forceinline void UpdateParticleForProcess(CParticle* particle);
+  __forceinline void RenderParticle(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

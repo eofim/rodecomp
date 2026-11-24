@@ -1,4 +1,5 @@
 #include "Render/Primitives/DepthAlpha.h"
+#include "Render/Primitives/LightmappedBuffer.h"
 #include "Render/Primitives/LightmappedPrimitive.h"
 #include "Render/Renderer.h"
 
@@ -22,31 +23,26 @@ ModelRenderCommand::ModelRenderCommand() : RenderCommand(0) {
   this->texture = nullptr;
   this->indices = nullptr;
   this->indexCount = 0;
-  this->depthFlags = 1;
+  this->depthTest = 1;
+  this->commandMode = 0;
   this->sourceBlend = 0;
   this->destinationBlend = 0;
   this->textureMode = 0;
   this->primitiveType = D3DPT_TRIANGLELIST;
 }
 
-struct LightmappedBuffer {
-  /* 0000 */ void* vertices;
-  /* 0004 */ int count;
-  /* 0008 */ void* indices;
-  void Clear();
-};
-
-#if defined(_WIN32) && !defined(_WIN64)
-static_assert(offsetof(LightmappedBuffer, indices) == 0x8);
-#endif
+// INLINED
+template <class T>
+inline void ReleaseArray(T*& buffer) {
+  delete[] buffer;
+  buffer = nullptr;
+}
 
 // OFFSET: 0x00569310
 // FUNCTION: fn_02254
 void LightmappedBuffer::Clear() {
-  delete[] static_cast<char*>(this->vertices);
-  this->vertices = nullptr;
-  delete[] static_cast<char*>(this->indices);
-  this->indices = nullptr;
+  ReleaseArray(this->vertices);
+  ReleaseArray(this->indices);
 }
 
 // OFFSET: 0x00569020
@@ -70,6 +66,13 @@ LightmappedPrimitive::LightmappedPrimitive(const LightmappedPrimitive& other) : 
   std::memcpy(this->quad, other.quad, sizeof(this->quad));
 }
 
+// OFFSET: 0x00569340
+// FUNCTION: fn_45594
+LightmappedPrimitive& LightmappedPrimitive::operator=(const LightmappedPrimitive& other) {
+  std::memcpy(this->quad, other.quad, sizeof(this->quad));
+  return *this;
+}
+
 // OFFSET: 0x00569480
 // FUNCTION: fn_02258
 void LightmappedPrimitive::DrawLightmapped(int unused) {
@@ -80,4 +83,12 @@ void LightmappedPrimitive::DrawLightmapped(int unused) {
 // FUNCTION: fn_02259
 void LightmappedCommand::DrawAuxiliary(int unused) {
   g_renderer->DrawAuxiliaryPrimitive(this);
+}
+
+// OFFSET: 0x005694E0
+// FUNCTION: fn_02261
+void LightmappedPrimitive::ApplyDepthAlpha() {
+  for (int index = 0; index < this->vertexCount; ++index) {
+    this->vertices[index].specular = DepthAlpha(this->vertices[index].rhw);
+  }
 }

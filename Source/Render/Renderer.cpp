@@ -14,10 +14,18 @@
 #include "Resource/Sprites/ActionResource.h"
 #include "Resource/Sprites/SpriteResource.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstdlib>
 #include <cstring>
 #include <windows.h>
+
+// GLOBAL: gl_24883
+char s_hourlyBannerState;
+// GLOBAL: gl_24884
+short s_screenShakeStep;
+// GLOBAL: gl_24885
+int s_hourlyBannerAlpha;
 
 // OFFSET: 0x00544A60
 // FUNCTION: fn_01820
@@ -72,92 +80,100 @@ void CRenderer::DrawBattleFieldIcon() {
   CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load("이팩트\\RankFont.act"));
   CSprRes* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load("이팩트\\RankFont.spr"));
 
+  int score = g_session.m_score1;
+  if (score < 0) {
+    score = 0;
+  }
+
+  int count = 1;
+  if (score > 9) {
+    count = 2;
+  }
+
   int digits[2];
-  int score = g_session.m_score1 >= 0 ? g_session.m_score1 : 0;
-  int count = (score > 9) + 1;
   digits[0] = score % 10;
-  digits[1] = (score /= 10) % 10;
-  if (width < 2) {
-    int x = this->viewport.width - 207;
-    for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode()->DrawActionSprite(x, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
-      x -= 32;
-    }
-  } else {
-    int x = this->viewport.width - 175;
-    for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode()->DrawActionSprite(x, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
-      x -= 32;
+  score /= 10;
+  digits[1] = score % 10;
+
+  int x = this->viewport.width - 150;
+  for (int i = 0; i < count; ++i) {
+    if (width > 1) {
+      g_modeMgr.GetGameMode()->DrawActionSprite(x - i * 32 - 25, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+    } else {
+      g_modeMgr.GetGameMode()->DrawActionSprite(x - i * 32 - 25 - 32, 50, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
     }
   }
 
-  score = g_session.m_score2 >= 0 ? g_session.m_score2 : 0;
-  count = (score > 9) + 1;
+  score = g_session.m_score2;
+  if (score < 0) {
+    score = 0;
+  }
+
+  count = 1;
+  if (score > 9) {
+    count = 2;
+  }
+
   digits[0] = score % 10;
-  digits[1] = (score /= 10) % 10;
-  if (width > 1) {
-    int x = this->viewport.width - 175;
-    for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode()->DrawActionSprite(x, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
-      x -= 32;
+  score /= 10;
+  digits[1] = score % 10;
+
+  x = this->viewport.width - 150;
+  for (int i = 0; i < count; ++i) {
+    if (width > 1) {
+      g_modeMgr.GetGameMode()->DrawActionSprite(x - i * 32 - 25, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
+    } else {
+      g_modeMgr.GetGameMode()->DrawActionSprite(x - i * 32 - 25 - 32, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
     }
-  } else {
-    int x = this->viewport.width - 207;
-    for (int i = 0; i < count; ++i) {
-      g_modeMgr.GetGameMode()->DrawActionSprite(x, 108, action, sprite, digits[i], 0, 1.0f, 0.0f, 0xFFFFFFFF, 0x201);
-      x -= 32;
+  }
+}
+
+// OFFSET: 0x0055A7E0
+// FUNCTION: fn_46353
+void CRenderer::DrawHourlyBanner() {
+  SYSTEMTIME now;
+  GetLocalTime(&now);
+  if (now.wMinute == 0 && now.wSecond == 0 && s_hourlyBannerState == 0) {
+    s_hourlyBannerState = 1;
+    s_hourlyBannerAlpha = 0;
+  } else if (now.wMinute == 0 && now.wSecond >= 10 && s_hourlyBannerState == 1) {
+    s_hourlyBannerState = 2;
+  } else if (s_hourlyBannerState < 1) {
+    return;
+  }
+
+  CTexture* texture = g_texMgr.Load("유저인터페이스\\", 0, false, true, false);
+  if (texture != nullptr) {
+    RECT rect;
+    rect.bottom = texture->Height() + 45;
+    const int width = this->viewport.width;
+    rect.left = width - texture->Width() - 140;
+    rect.top = 45;
+    rect.right = width - 140;
+    int alpha = s_hourlyBannerAlpha;
+    if (s_hourlyBannerState == 1) {
+      if (alpha < 220) {
+        s_hourlyBannerAlpha = ++alpha;
+      }
+    } else if (alpha > 0) {
+      s_hourlyBannerAlpha = --alpha;
+    } else {
+      s_hourlyBannerState = 0;
     }
+
+    const std::uint32_t color = (alpha << 24) + 0xFFFFFF;
+    const TextureRegion region = {0.0f, 0.0f, 1.0f, 1.0f};
+    g_modeMgr.GetGameMode()->DrawTexture(rect, 0, 0.0999f, color, texture, region);
   }
 }
 
 // OFFSET: 0x0055E840
 // FUNCTION: fn_02112
 void CRenderer::DrawOverlays() {
-  // GLOBAL: gl_24883
-  static char s_bannerState;
-  // GLOBAL: gl_24885
-  static int s_bannerAlpha;
-  // GLOBAL: gl_24884
-  static short s_shakeStep;
-
   if (g_serviceType == 0) {
-    SYSTEMTIME now;
-    GetLocalTime(&now);
-    if (now.wMinute == 0 && now.wSecond == 0 && s_bannerState == 0) {
-      s_bannerState = 1;
-      s_bannerAlpha = 0;
-    } else if (now.wMinute == 0 && now.wSecond >= 10 && s_bannerState == 1) {
-      s_bannerState = 2;
-    } else if (s_bannerState < 1) {
-      goto timer;
-    }
-
-    {
-      CTexture* texture = g_texMgr.Load("유저인터페이스\\", 0, false, true, false);
-      if (texture != nullptr) {
-        RECT rect;
-        rect.bottom = texture->Height() + 45;
-        rect.left = this->viewport.width - texture->Width() - 140;
-        rect.top = 45;
-        rect.right = this->viewport.width - 140;
-        if (s_bannerState == 1) {
-          if (s_bannerAlpha < 220) {
-            ++s_bannerAlpha;
-          }
-        } else if (s_bannerAlpha > 0) {
-          --s_bannerAlpha;
-        } else {
-          s_bannerState = 0;
-        }
-
-        const std::uint32_t color = (s_bannerAlpha << 24) + 0xFFFFFF;
-        const TextureRegion region = {0.0f, 0.0f, 1.0f, 1.0f};
-        g_modeMgr.GetGameMode()->DrawTexture(rect, 0, 0.0999f, color, texture, region);
-      }
-    }
+    this->DrawHourlyBanner();
   }
 
-timer:
   if (g_session.showTimer != 0) {
     const int scale = this->viewport.height / 700;
     CActRes* action = static_cast<CActRes*>(ResourceMgr::Instance().Load("이팩트\\TimeFont.act"));
@@ -175,13 +191,13 @@ timer:
   }
 
   char* line = static_cast<char*>(std::malloc(this->backBuffer.pitch));
-  if (s_shakeStep < 2) {
-    s_shakeStep = 2;
+  if (s_screenShakeStep < 2) {
+    s_screenShakeStep = 2;
   }
 
   for (int y = this->viewport.height - 1; y >= 0; --y) {
     char* row = static_cast<char*>(this->backBuffer.pixels) + this->backBuffer.pitch * y;
-    const unsigned char period = s_shakeStep > 10 ? 20 - s_shakeStep : s_shakeStep;
+    const unsigned char period = s_screenShakeStep > 10 ? 20 - s_screenShakeStep : s_screenShakeStep;
     if (y == this->viewport.height - 1) {
       std::memcpy(line, row, this->backBuffer.pitch);
     }
@@ -198,12 +214,14 @@ timer:
     }
   }
 
-  s_shakeStep += 2;
-  if (s_shakeStep < 2) {
-    s_shakeStep = 2;
-  } else if (s_shakeStep > 16) {
-    g_screenShakeDuration = g_screenShakeDuration - 1 < 0 ? 0 : g_screenShakeDuration - 1;
-    s_shakeStep = 2;
+  s_screenShakeStep += 2;
+  if (s_screenShakeStep < 2) {
+    s_screenShakeStep = 2;
+  } else if (s_screenShakeStep > 16) {
+    if (--g_screenShakeDuration < 0) {
+      g_screenShakeDuration = 0;
+    }
+    s_screenShakeStep = 2;
   }
 
   std::free(line);
@@ -224,14 +242,9 @@ CRenderer::CRenderer() : viewDirectionX(0), viewDirectionY(0), viewDirectionZ(0)
   this->fog.enabled = 0;
   this->fog.dirty = 1;
   this->fog.supported = 0;
-  this->queues.Reserve(1000);
+  this->ReserveQueues(1000);
 }
 
 // OFFSET: 0x00562090
 // FUNCTION: fn_02175
 CRenderer::~CRenderer() = default;
-
-// INLINED
-RenderPrimitive* RenderPrimitivePool::Acquire() {
-  return g_renderer->AcquirePrimitive();
-}

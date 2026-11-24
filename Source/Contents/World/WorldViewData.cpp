@@ -22,16 +22,68 @@ static bool AreaContains(int left, int top, int right, int bottom, int x, int y)
 }
 
 // INLINED
-static __forceinline WorldViewRecord* FindRecord(std::vector<WorldViewRecord>& records, const char* name) {
-  const std::string key(name);
-  for (std::vector<WorldViewRecord>::iterator it = records.begin(); it != records.end(); ++it) {
-    if (it->name == key) {
-      return &*it;
+static CWorldViewMap* MapAt(const CWorldViewWorld* world, unsigned int mapIndex) {
+  return world->maps[mapIndex];
+}
+
+// OFFSET: 0x00612DF0
+// FUNCTION: fn_46304
+__forceinline CWorldViewMap::CWorldViewMap(int mapId, WorldViewArea bounds, const char* mapName, const char* mapDisplayName) {
+  if (mapName) {
+    this->name = mapName;
+  }
+  if (mapDisplayName) {
+    this->displayName = mapDisplayName;
+  }
+  this->id = mapId;
+  this->area = bounds;
+}
+
+// OFFSET: 0x00612F10
+// FUNCTION: fn_46305
+CWorldViewMap::CWorldViewMap() {
+  this->id = 0;
+}
+
+// OFFSET: 0x00613490
+// FUNCTION: fn_46306
+CWorldViewMap::~CWorldViewMap() {
+  for (std::vector<CWorldViewField*>::iterator it = this->fields.begin(); it != this->fields.end(); ++it) {
+    delete *it;
+  }
+  this->fields.clear();
+}
+
+// OFFSET: 0x00613A00
+// FUNCTION: fn_46307
+void CWorldViewMap::ClearFields() {
+  for (auto it = this->fields.begin(); it != this->fields.end(); ++it) {
+    delete *it;
+  }
+  this->fields.clear();
+}
+
+// OFFSET: 0x00613C60
+// FUNCTION: fn_46308
+CWorldViewField* CWorldViewMap::FieldAt(int x, int y) {
+  for (auto it = this->fields.begin(); it != this->fields.end(); ++it) {
+    CWorldViewField* field = *it;
+    if (AreaContains(field->left, field->top, field->right, field->bottom, x, y)) {
+      return field;
     }
   }
-
   return nullptr;
 }
+
+// OFFSET: 0x00613EB0
+// FUNCTION: fn_46309
+__forceinline bool CWorldViewMap::Contains(int x, int y) const {
+  return AreaContains(this->left, this->top, this->right, this->bottom, x, y);
+}
+
+// OFFSET: 0x00612D50
+// FUNCTION: fn_46316
+CWorldViewWorld::CWorldViewWorld() = default;
 
 // OFFSET: 0x00612C70
 // FUNCTION: fn_04345
@@ -40,14 +92,20 @@ __declspec(noinline) CWorldViewWorld::CWorldViewWorld(const char* name, const ch
   this->imageName = imageName;
 }
 
+// OFFSET: 0x00612FD0
+// FUNCTION: fn_46314
+CWorldViewField::CWorldViewField(WorldViewArea bounds, const std::string& mapName, const std::string& field, const std::string& text)
+    : area(bounds), name(mapName), fieldName(field), description(text) {
+}
+
+// OFFSET: 0x00613180
+// FUNCTION: fn_46315
+CWorldViewField::CWorldViewField() = default;
+
 // OFFSET: 0x00613050
 // FUNCTION: fn_04346
 __declspec(noinline) CWorldViewField::CWorldViewField(WorldViewArea area, const char* name, const char* fieldName, const char* description) {
-  this->left = area.left;
-  this->top = area.top;
-  this->right = area.right;
-  this->bottom = area.bottom;
-  this->areaFlags = area.areaFlags;
+  this->area = area;
   if (name) {
     this->name = name;
   }
@@ -59,13 +117,19 @@ __declspec(noinline) CWorldViewField::CWorldViewField(WorldViewArea area, const 
   }
 }
 
-// OFFSET: 0x00613360
-// FUNCTION: fn_04349
-CWorldViewWorld::~CWorldViewWorld() {
+// OFFSET: 0x006138F0
+// FUNCTION: fn_46317
+__forceinline void CWorldViewWorld::ClearMaps() {
   for (std::vector<CWorldViewMap*>::iterator it = this->maps.begin(); it != this->maps.end(); ++it) {
     delete *it;
   }
   this->maps.clear();
+}
+
+// OFFSET: 0x00613360
+// FUNCTION: fn_04349
+__declspec(noinline) CWorldViewWorld::~CWorldViewWorld() {
+  this->ClearMaps();
 }
 
 // OFFSET: 0x006135C0
@@ -80,7 +144,7 @@ void CWorldViewWorld::AddField(int mapId, const char* name, CWorldViewField* fie
   }
 
   if (!map) {
-    map = new CWorldViewMap(mapId, name, field->area);
+    map = new CWorldViewMap(mapId, field->area, name, name);
     this->maps.push_back(map);
   }
 
@@ -108,18 +172,38 @@ __declspec(noinline) bool CWorldViewWorld::LoadTexture() {
   return this->texture != nullptr;
 }
 
+// OFFSET: 0x00613D20
+// FUNCTION: fn_46318
+CWorldViewMap* CWorldViewWorld::FindMapAt(unsigned int& mapIndex, int x, int y) const {
+  const unsigned int count = this->maps.size();
+  CWorldViewMap* const* maps = this->maps.data();
+  for (unsigned int index = 0; index < count; ++index) {
+    const CWorldViewMap* map = maps[index];
+    if (map->id < 100 && !map->fields.empty()) {
+      const CWorldViewField* first = map->fields.front();
+      if (AreaContains(first->left, first->top, first->right, first->bottom, x, y)) {
+        mapIndex = index;
+        return this->maps[index];
+      }
+    } else if (map->Contains(x, y)) {
+      mapIndex = index;
+      return this->maps[index];
+    }
+  }
+  return nullptr;
+}
+
 // OFFSET: 0x00613AB0
 // FUNCTION: fn_04352
 CWorldViewField* CWorldViewWorld::FieldAt(unsigned int& mapIndex, int x, int y) {
   const unsigned int count = this->maps.size();
   for (unsigned int index = 0; index < count; ++index) {
-    const CWorldViewMap* map = this->maps[index];
     bool hit;
-    if (map->id < 100 && !map->fields.empty()) {
-      const CWorldViewField* first = map->fields.front();
+    if (this->maps[index]->id < 100 && !this->maps[index]->fields.empty()) {
+      const CWorldViewField* first = this->maps[index]->fields.front();
       hit = AreaContains(first->left, first->top, first->right, first->bottom, x, y);
     } else {
-      hit = AreaContains(map->left, map->top, map->right, map->bottom, x, y);
+      hit = AreaContains(this->maps[index]->left, this->maps[index]->top, this->maps[index]->right, this->maps[index]->bottom, x, y);
     }
 
     if (hit) {
@@ -144,8 +228,7 @@ CWorldViewField* CWorldViewWorld::FieldAt(unsigned int& mapIndex, int x, int y) 
 // OFFSET: 0x00613B80
 // FUNCTION: fn_04353
 __declspec(noinline) CWorldViewField* CWorldViewWorld::FindField(unsigned int& mapIndex, const char* name) {
-  const unsigned int count = this->maps.size();
-  for (unsigned int index = 0; index < count; ++index) {
+  for (unsigned int index = 0; index < this->maps.size(); ++index) {
     CWorldViewMap* map = this->maps[index];
     for (std::vector<CWorldViewField*>::iterator it = map->fields.begin(); it != map->fields.end(); ++it) {
       CWorldViewField* field = *it;
@@ -205,7 +288,7 @@ CWorldViewMap* CWorldViewWorld::MapAt(unsigned int& mapIndex, int x, int y) {
   for (unsigned int index = 0; index < this->maps.size(); ++index) {
     if (this->maps[index]->id < 100) {
       if (this->maps[index]->fields.empty()) {
-        if (AreaContains(this->maps[index]->left, this->maps[index]->top, this->maps[index]->right, this->maps[index]->bottom, x, y)) {
+        if (this->maps[index]->Contains(x, y)) {
           mapIndex = index;
           return this->maps[index];
         }
@@ -278,18 +361,31 @@ CWorldViewMgr::CWorldViewMgr() {
   }
 }
 
-// INLINED
-static void ScaleArea(int* area, int textureWidth, int textureHeight) {
+// OFFSET: 0x006152E0
+// FUNCTION: fn_46320
+CWorldViewMgr::~CWorldViewMgr() {
+  this->ClearMarks();
+  this->ClearLevels();
+  this->ResetSelection();
+  for (auto it = this->worlds.begin(); it != this->worlds.end(); ++it) {
+    delete *it;
+  }
+  this->worlds.clear();
+}
+
+// OFFSET: 0x00617880
+// FUNCTION: fn_46323
+__forceinline void CWorldViewMgr::ScaleArea(int* area, int topOffset, int textureWidth, int textureHeight) {
   if (!area) {
     return;
   }
 
   const float scaleX = static_cast<float>(g_renderer->viewport.width) / static_cast<float>(textureWidth);
-  const float scaleY = static_cast<float>(g_renderer->viewport.height - 17) / static_cast<float>(textureHeight);
+  const float scaleY = static_cast<float>(g_renderer->viewport.height - topOffset) / static_cast<float>(textureHeight);
   area[0] = static_cast<int>(static_cast<float>(area[0]) * scaleX + 0.5);
-  area[1] = static_cast<int>(static_cast<float>(area[1]) * scaleY + 0.5) + 17;
+  area[1] = static_cast<int>(static_cast<float>(area[1]) * scaleY + 0.5) + topOffset;
   area[2] = static_cast<int>(static_cast<float>(area[2]) * scaleX + 0.5);
-  area[3] = static_cast<int>(static_cast<float>(area[3]) * scaleY + 0.5) + 17;
+  area[3] = static_cast<int>(static_cast<float>(area[3]) * scaleY + 0.5) + topOffset;
 }
 
 // OFFSET: 0x006166E0
@@ -302,12 +398,12 @@ bool CWorldViewMgr::ScaleToScreen() {
 
     const int textureWidth = (*it)->texture->Width();
     const int textureHeight = (*it)->texture->Height();
-    for (CWorldViewMap* map : (*it)->maps) {
-      ScaleArea(&map->left, textureWidth, textureHeight);
-      for (CWorldViewField* field : map->fields) {
-        if (field) {
-          ScaleArea(&field->left, textureWidth, textureHeight);
-        }
+    const auto mapEnd = (*it)->maps.end();
+    for (auto mapIt = (*it)->maps.begin(); mapIt != mapEnd; ++mapIt) {
+      this->ScaleArea(&(*mapIt)->left, 17, textureWidth, textureHeight);
+      const auto fieldEnd = (*mapIt)->fields.end();
+      for (auto fieldIt = (*mapIt)->fields.begin(); fieldIt != fieldEnd; ++fieldIt) {
+        this->ScaleArea(&(*fieldIt)->left, 17, textureWidth, textureHeight);
       }
     }
   }
@@ -383,15 +479,11 @@ bool CWorldViewMgr::SelectField(const char* name) {
   unsigned int mapIndex = static_cast<unsigned int>(-1);
   for (unsigned int index = 0; index < this->worlds.size(); ++index) {
     CWorldViewField* field = this->worlds[index]->FindField(mapIndex, name);
-    if (field && this->worlds[index]->maps[mapIndex]->id >= 100) {
+    if (field && MapAt(this->worlds[index], mapIndex)->id >= 100) {
       this->selection.mapIndex = mapIndex;
       this->selection.worldIndex = index;
       this->selection.name = field->name;
-      this->selection.left = field->left;
-      this->selection.top = field->top;
-      this->selection.right = field->right;
-      this->selection.bottom = field->bottom;
-      this->selection.areaFlags = field->areaFlags;
+      this->selection.area = field->area;
       return true;
     }
   }
@@ -414,6 +506,19 @@ void CWorldViewMgr::Draw(int unused, int x, int y, int width, int height) {
   this->worlds[this->currentWorld]->Draw(unused, x, y, width, height);
 }
 
+// OFFSET: 0x00617090
+// FUNCTION: fn_46321
+WorldViewRecord* CWorldViewMgr::FindMark(const char* name) {
+  const std::string key(name);
+  for (std::vector<WorldViewRecord>::iterator it = this->marks.begin(); it != this->marks.end(); ++it) {
+    if (it->name == key) {
+      return &*it;
+    }
+  }
+
+  return nullptr;
+}
+
 // OFFSET: 0x00616DD0
 // FUNCTION: fn_04380
 bool CWorldViewMgr::AddMark(const char* name) {
@@ -421,24 +526,20 @@ bool CWorldViewMgr::AddMark(const char* name) {
     return false;
   }
 
-  if (FindRecord(this->marks, name)) {
+  if (this->FindMark(name)) {
     return true;
   }
 
   unsigned int mapIndex = static_cast<unsigned int>(-1);
   for (unsigned int index = 0; index < this->worlds.size(); ++index) {
     CWorldViewField* field = this->worlds[index]->FindField(mapIndex, name);
-    if (field && this->worlds[index]->maps[mapIndex]->id >= 100) {
+    if (field && MapAt(this->worlds[index], mapIndex)->id >= 100) {
       WorldViewRecord mark;
+      mark.worldIndex = index;
       mark.mapIndex = mapIndex;
       mark.level = 0;
-      mark.worldIndex = index;
       mark.name = field->name;
-      mark.areaFlags = field->areaFlags;
-      mark.left = field->left;
-      mark.top = field->top;
-      mark.right = field->right;
-      mark.bottom = field->bottom;
+      mark.area = field->area;
       this->marks.push_back(mark);
       return true;
     }
@@ -493,6 +594,19 @@ int CWorldViewMgr::SelectCurrentWorld() {
   return this->currentWorld = this->FindWorld(-1);
 }
 
+// OFFSET: 0x006175F0
+// FUNCTION: fn_46322
+WorldViewRecord* CWorldViewMgr::FindLevel(const char* name) {
+  const std::string key(name);
+  for (std::vector<WorldViewRecord>::iterator it = this->levels.begin(); it != this->levels.end(); ++it) {
+    if (it->name == key) {
+      return &*it;
+    }
+  }
+
+  return nullptr;
+}
+
 // OFFSET: 0x006172E0
 // FUNCTION: fn_04386
 bool CWorldViewMgr::AddLevel(const char* name, int level) {
@@ -500,19 +614,19 @@ bool CWorldViewMgr::AddLevel(const char* name, int level) {
     return false;
   }
 
-  if (WorldViewRecord* found = FindRecord(this->levels, name)) {
+  if (WorldViewRecord* found = this->FindLevel(name)) {
     if (level != 0) {
       const int current = found->level;
       if (level == 10000) {
         if (current < 10000) {
           found->level = current + 10000;
         }
-      } else if (current < 10000) {
-        if (current < level) {
-          found->level = level;
+      } else if (current >= 10000) {
+        if (level > current - 10000) {
+          found->level = level + 10000;
         }
-      } else if (current - 10000 < level) {
-        found->level = level + 10000;
+      } else if (level > current) {
+        found->level = level;
       }
     }
     return true;
@@ -521,16 +635,12 @@ bool CWorldViewMgr::AddLevel(const char* name, int level) {
   unsigned int mapIndex = static_cast<unsigned int>(-1);
   for (unsigned int index = 0; index < this->worlds.size(); ++index) {
     CWorldViewField* field = this->worlds[index]->FindField(mapIndex, name);
-    if (field && this->worlds[index]->maps[mapIndex]->id >= 100) {
+    if (field && MapAt(this->worlds[index], mapIndex)->id >= 100) {
       WorldViewRecord record;
-      record.mapIndex = mapIndex;
       record.worldIndex = index;
+      record.mapIndex = mapIndex;
       record.name = field->name;
-      record.areaFlags = field->areaFlags;
-      record.left = field->left;
-      record.top = field->top;
-      record.right = field->right;
-      record.bottom = field->bottom;
+      record.area = field->area;
       record.level = level;
       this->levels.push_back(record);
       return true;
@@ -561,7 +671,7 @@ int* CWorldViewMgr::LevelAreaAt(int& kind, unsigned int index, bool currentWorld
       kind = base + 5;
       return &this->levels[index].left;
     }
-    if (value > 49) {
+    if (value >= 50) {
       kind = base + 4;
       return &this->levels[index].left;
     }
@@ -594,10 +704,12 @@ CWorldViewWorld* CWorldViewMgr::CurrentWorld() {
 
 // OFFSET: 0x00617950
 // FUNCTION: fn_04391
-bool __stdcall IsMapDisplayNameTranslated(const char* mapName) {
+bool CWorldViewMgr::IsMapDisplayNameTranslated(const char* mapName) {
   const std::string placeholder = LookupMessage(MSI_NOWHERE);
   const std::string displayName = g_session.GetMapDisplayName(mapName);
-  return placeholder != displayName;
+  const char* translated = displayName.c_str();
+  const char* untranslated = placeholder.c_str();
+  return placeholder.size() != displayName.size() || std::memcmp(untranslated, translated, placeholder.size()) != 0;
 }
 
 // OFFSET: 0x00615450
@@ -611,12 +723,16 @@ void CWorldViewMgr::Load(LuaScript& script) {
     return;
   }
 
+  int mapId = -1;
   WorldViewArea area = {};
+  const char* mapName;
+  const char* fieldName;
+  const char* description;
   for (int worldIndex = 1; worldIndex < 400; ++worldIndex) {
-    const char* worldName = nullptr;
-    const char* mapTable = nullptr;
-    const char* fieldTable = nullptr;
     const char* imageName = nullptr;
+    const char* fieldTable = nullptr;
+    const char* mapTable = nullptr;
+    const char* worldName = nullptr;
     if (!script.Call("queryWorld_List", "d>ssss", worldIndex, &worldName, &mapTable, &fieldTable, &imageName)) {
       char error[260] = {};
       std::sprintf(error, "queryWorld_List // Line %d 읽기 실패", worldIndex);
@@ -633,10 +749,10 @@ void CWorldViewMgr::Load(LuaScript& script) {
       const std::string tableName(mapTable);
       if (!tableName.empty()) {
         for (int index = 1; index < 400; ++index) {
-          int mapId = -1;
-          const char* mapName = nullptr;
-          const char* fieldName = nullptr;
-          const char* description = nullptr;
+          description = nullptr;
+          fieldName = nullptr;
+          mapName = nullptr;
+          mapId = -1;
           area.bottom = -1;
           area.right = -1;
           area.top = -1;
@@ -651,7 +767,7 @@ void CWorldViewMgr::Load(LuaScript& script) {
           if (!mapName) {
             break;
           }
-          if (IsMapDisplayNameTranslated(mapName)) {
+          if (this->IsMapDisplayNameTranslated(mapName)) {
             CWorldViewField* field = new CWorldViewField(area, mapName, fieldName, description);
             world->AddField(mapId, mapName, field);
           }
@@ -663,15 +779,15 @@ void CWorldViewMgr::Load(LuaScript& script) {
       const std::string tableName(fieldTable);
       if (!tableName.empty()) {
         for (int index = 1; index < 400; ++index) {
-          int mapId = -1;
-          const char* mapName = nullptr;
-          const char* displayName = nullptr;
+          description = nullptr;
+          mapName = nullptr;
+          mapId = -1;
           area.bottom = -1;
           area.right = -1;
           area.top = -1;
           area.left = -1;
           if (!script.Call("queryfieldtable_load", "sd>dddddss", fieldTable, index, &mapId,
-                           &area.left, &area.top, &area.right, &area.bottom, &mapName, &displayName)) {
+                           &area.left, &area.top, &area.right, &area.bottom, &mapName, &description)) {
             char error[260] = {};
             std::sprintf(error, "queryfieldtable_load // %s Line %d 읽기 실패", fieldTable, worldIndex);
             MessageBoxA(hWnd, error, "Error", 0);
@@ -681,13 +797,9 @@ void CWorldViewMgr::Load(LuaScript& script) {
             break;
           }
           if (CWorldViewMap* map = world->FindMap(mapId)) {
-            map->displayName = displayName;
+            map->displayName = description;
             map->name = mapName;
-            map->left = area.left;
-            map->top = area.top;
-            map->right = area.right;
-            map->bottom = area.bottom;
-            map->areaFlags = area.areaFlags;
+            map->area = area;
           }
         }
       }
@@ -751,16 +863,13 @@ void CWorldViewMgr::Load(LuaScript& script) {
     this->searchColors[4] = static_cast<std::uint32_t>(fifth) << 24;
     this->searchColors[5] = static_cast<std::uint32_t>(sixth) << 24;
     this->searchColors[10] = static_cast<std::uint32_t>(alpha) << 24;
-    for (int index = 0; index < 16; ++index) {
+    std::uint32_t* searchColor = this->searchColors;
+    for (int index = 0; index < 16; ++index, ++searchColor) {
       if (script.Call("Get_Worldview_info_Sreach_Color", "d>ddd", index, &red, &green, &blue)) {
-        this->searchColors[index] += RGB(blue, green, red);
+        *searchColor += RGB(blue, green, red);
       }
     }
-    this->searchColors[11] = this->searchColors[1];
-    this->searchColors[12] = this->searchColors[2];
-    this->searchColors[13] = this->searchColors[3];
-    this->searchColors[14] = this->searchColors[4];
-    this->searchColors[15] = this->searchColors[5];
+    std::memcpy(this->searchColors + 11, this->searchColors + 1, 5 * sizeof(this->searchColors[0]));
   }
   if (script.Call("Get_Worldview_info_Run", ">dddd", &red, &green, &blue, &alpha)) {
     this->runColor = (static_cast<std::uint32_t>(alpha) << 24) + RGB(blue, green, red);

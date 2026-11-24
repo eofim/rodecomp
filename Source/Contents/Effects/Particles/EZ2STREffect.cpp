@@ -1,4 +1,5 @@
 #include "Contents/Actors/Pc.h"
+#include "Render/Primitives/RenderQueues.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Particles/EZ2STREffect.h"
 #include "Client/Mode/CGameMode.h"
@@ -33,11 +34,14 @@ CEZ2STRScreenEffect::CEZ2STRScreenEffect()
 // OFFSET: 0x00B51D60
 // FUNCTION: fn_19036
 float GetHatEffectOffsetX(int id, const char* name) {
-  float offset = 0.0f;
   float result = 0.0f;
+  float offset = 0.0f;
 
   switch (id) {
   case EF_STRANGELIGHTS:
+    offset = 5.0f;
+    result = offset;
+    break;
   case EF_SUPER_STAR:
     offset = 5.0f;
     result = offset;
@@ -108,15 +112,16 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     ignored = true;
   }
 
-  int offset = 0;
+  int height = 0;
   if (actor) {
     if (ignored == true) {
-      offset = 18;
+      height = 18;
     } else {
-      offset = static_cast<int>(actor->GetNameHeight());
+      height = static_cast<int>(actor->GetNameHeight());
     }
   }
 
+  int offset = height;
   switch (id) {
   case EF_STRANGELIGHTS:
     offset += 5;
@@ -152,13 +157,13 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     offset -= 8;
     break;
   case EF_NPC_GATE_SKYBLUE:
-    offset -= 8;
+    offset = height + (-8);
     break;
   case EF_FSTONE:
     offset -= 7;
     break;
   case EF_CHAIN_REACTION_SHOT:
-    offset -= 7;
+    offset = height + (-7);
     break;
   case EF_QSCARABA:
     offset -= 5;
@@ -185,7 +190,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     offset -= 5;
     break;
   case EF_ABYSS_DAGGER_HIT_2:
-    offset -= 5;
+    offset = height + (-5);
     break;
   case EF_FRESHSHRIMP:
   case EF_SU_TUNABELLY:
@@ -197,7 +202,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
   case EF_SU_BUNCHOFSHRIMP:
   case EF_STRATUM_TREMOR:
   case EF_STRATUM_TREMOR_BOTTOM:
-    offset -= 8;
+    offset = height + (-8);
     break;
   case EF_SU_CHATTERING:
   case EF_SU_POWEROFFLOCK:
@@ -264,7 +269,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     offset -= 6;
     break;
   case EF_OVERSLASH_HIT:
-    offset -= 6;
+    offset = height + (-6);
     break;
   case EF_WE_ONEFOREVER:
     offset -= 4;
@@ -363,7 +368,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     offset -= 4;
     break;
   case EF_BLAST_FORGE_HIT:
-    offset -= 4;
+    offset = height + (-4);
     break;
   case EF_FALLING_STAR:
     offset -= 10;
@@ -372,10 +377,10 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     offset -= 10;
     break;
   case EF_SOUL_REVOLVE:
-    offset -= 10;
+    offset = height + (-10);
     break;
   case EF_SOUL_GOLEM:
-    offset -= 16;
+    offset = height + (-16);
     break;
   case EF_NEWMOON_KICK:
   case EF_FULLMOON_KICK:
@@ -392,7 +397,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
   case EF_RED_WAVE_1:
   case EF_RED_WAVE_2:
   case EF_RED_WAVE_3:
-    offset -= 6;
+    offset = height + (-6);
     break;
   case EF_TETRA_VORTEX_CAST:
     offset -= 2;
@@ -419,7 +424,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
     offset -= 2;
     break;
   case EF_THE_W_PROTECTION_REUSE:
-    offset -= 2;
+    offset = height + (-2);
     break;
   case EF_ELEMENTAL_BUSTER_FIRE_REUSE:
     offset -= 2;
@@ -431,7 +436,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
   case EF_TETRA_VORTEX_BALL_2:
   case EF_TETRA_VORTEX_BALL_3:
   case EF_TETRA_VORTEX_BALL_4:
-    offset -= 10;
+    offset = height + (-10);
     break;
   case EF_TETRA_VORTEX_FIRE_EXP:
   case EF_TETRA_VORTEX_WATER_EXP:
@@ -690,7 +695,7 @@ int GetHatEffectOffsetY(int id, CGameActor* actor) {
   case EF_STATE_CRYSTALLIZATION:
   case EF_STATE_DEADLYPOISON:
   case EF_SERVANT_SIGN_BOTTOM:
-    offset -= 2;
+    offset = height + (-2);
     break;
   case EF_NEW_ARMSCANNON_01_UP:
   case EF_NEW_ARMSCANNON_01_DOWN:
@@ -1553,6 +1558,13 @@ bool CEZ2STRScreenEffect::IsAttachedToHead() const {
   }
 }
 
+// INLINED
+static __forceinline vector3d TransformPoint(const matrix& transform, const vector3d point) {
+  return vector3d{point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9],
+                  point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10],
+                  point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11]};
+}
+
 // OFFSET: 0x00B51A60
 // FUNCTION: fn_19032
 bool CEZ2STRScreenEffect::ApplyHeadOffset(CEZ2STRParticle* particle) {
@@ -1571,34 +1583,28 @@ bool CEZ2STRScreenEffect::ApplyHeadOffset(CEZ2STRParticle* particle) {
     offsetY -= 3.0f;
   }
 
-  float factor = GetSkillFactor(actor->GetEffectiveJob(-1));
+  float factor = g_session.GetSkillFactor(actor->GetEffectiveJob(-1));
   if (static_cast<bool>((actor->render.flags >> 4) & 1) && this->fadePulse == 1) {
     float scale = 1.0f;
     actor->ScaleByFadePulse(scale);
     factor = scale * factor;
   }
 
-  float shiftX = offsetX * factor;
   float shiftY = factor * offsetY;
-  if (!(shiftX >= 0.0f || shiftY >= 0.0f)) {
-    return false;
+  float shiftX = offsetX * factor;
+  if (shiftX >= 0.0f || shiftY >= 0.0f) {
+    vector3d position = particle->position;
+    const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
+    const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
+
+    vector3d viewPos = TransformPoint(view, position);
+    viewPos.x += shiftX;
+    viewPos.y -= shiftY;
+    particle->position = TransformPoint(inverse, viewPos);
+    return true;
   }
 
-  vector3d position = particle->position;
-  const matrix& view = g_modeMgr.GetGameMode()->camera->frame.view;
-  const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
-
-  float x = position.y * view.values[3] + position.x * view.values[0] + position.z * view.values[6] + view.values[9] + shiftX;
-  float y = position.y * view.values[4] + position.x * view.values[1] + position.z * view.values[7] + view.values[10] - shiftY;
-  float z = position.y * view.values[5] + position.x * view.values[2] + position.z * view.values[8] + view.values[11];
-
-  float worldX = y * inverse.values[3] + x * inverse.values[0] + z * inverse.values[6] + inverse.values[9];
-  float worldY = y * inverse.values[4] + x * inverse.values[1] + z * inverse.values[7] + inverse.values[10];
-  float worldZ = y * inverse.values[5] + x * inverse.values[2] + z * inverse.values[8] + inverse.values[11];
-  particle->position.x = worldX;
-  particle->position.y = worldY;
-  particle->position.z = worldZ;
-  return true;
+  return false;
 }
 
 // OFFSET: 0x00B51CC0
@@ -5370,10 +5376,10 @@ void CEZ2STRScreenEffect::InitParticle(CEZ2STRParticle* particle, int id) {
   }
 }
 
-// OFFSET: 0x00B65EE0
-// FUNCTION: fn_19044
-void CEZ2STRScreenEffect::OnProcess() {
-  if (this->followCamera == 1 && this->particle) {
+// OFFSET: 0x00B663D0
+// FUNCTION: fn_46000
+__forceinline void CEZ2STRScreenEffect::UpdateCameraAngle() {
+  if (this->particle) {
     double yaw = g_modeMgr.GetGameMode()->camera->camera.yaw;
     if (yaw != this->cameraAngle) {
       CEZ2STRParticle* particle = this->particle;
@@ -5387,19 +5393,33 @@ void CEZ2STRScreenEffect::OnProcess() {
       this->cameraAngle = yaw;
     }
   }
+}
 
-  CEZ2STRParticle* target = this->particle;
-  target->position.x = this->position[0];
-  target->position.y = this->position[1];
-  target->position.z = this->position[2];
-
-  if (CEZ2STRParticle* particle = this->particle) {
+// OFFSET: 0x00B66140
+// FUNCTION: fn_45998
+__forceinline void CEZ2STRScreenEffect::ProcessParticle(CEZ2STRParticle* particle) {
+  if (particle) {
     if (this->ApplyHeadOffset(particle) || this->id == EF_NEW_RANGEDATTACK) {
       particle->Process(0.0f, 0.0f, 0.0f);
     } else {
       particle->Process(0.0f, -80.0f, 0.0f);
     }
   }
+}
+
+// OFFSET: 0x00B65EE0
+// FUNCTION: fn_19044
+void CEZ2STRScreenEffect::OnProcess() {
+  if (this->followCamera == 1 && this->particle) {
+    this->UpdateCameraAngle();
+  }
+
+  CEZ2STRParticle* target = this->particle;
+  target->position.x = this->position[0];
+  target->position.y = this->position[1];
+  target->position.z = this->position[2];
+
+  this->ProcessParticle(this->particle);
 
   ++this->particle->elapsedFrames;
   if (this->id == EF_ABYSS_SQUARE) {
@@ -5434,10 +5454,9 @@ void CEZ2STRScreenEffect::OnProcess() {
   this->particle->m_lift = actor->render.hoverOffset;
 }
 
-// OFFSET: 0x00B661B0
-// FUNCTION: fn_19045
-void CEZ2STRScreenEffect::Render() {
-  CEZ2STRParticle* particle = this->particle;
+// OFFSET: 0x00B662C0
+// FUNCTION: fn_45999
+__forceinline void CEZ2STRScreenEffect::RenderParticle(CEZ2STRParticle* particle) {
   if (!particle) {
     return;
   }
@@ -5471,6 +5490,12 @@ void CEZ2STRScreenEffect::Render() {
 
 draw:
   particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+}
+
+// OFFSET: 0x00B661B0
+// FUNCTION: fn_19045
+void CEZ2STRScreenEffect::Render() {
+  this->RenderParticle(this->particle);
 }
 
 // OFFSET: 0x00B66460
@@ -5526,9 +5551,10 @@ void CEZ2STRScreenEffect::SetWindowOffset(vector3d offset, int attachToWindow, i
     return;
   }
 
-  particle->m_windowOffset.x = offset.x;
-  particle->m_windowOffset.y = offset.y;
-  particle->m_windowOffset.z = offset.z;
+  vector3d windowOffset = offset;
+  particle->m_windowOffset.x = windowOffset.x;
+  particle->m_windowOffset.y = windowOffset.y;
+  particle->m_windowOffset.z = windowOffset.z;
   if (static_cast<unsigned char>(attachToWindow) == 1) {
     this->particle->m_attachToWindow = true;
     this->particle->m_windowId = windowId;
@@ -5780,6 +5806,10 @@ void CEZ2STRScreenEffect::Open() {
 // FUNCTION: fn_19040
 void CEZ2STRScreenEffect::InitEvents() {
   const int id = this->id;
+  float fromX;
+  float fromY;
+  float toX;
+  float toY;
   switch (id) {
   case EF_POTION1:
   case EF_POTION2:
@@ -5896,24 +5926,24 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_LIGHTNING_LAND_CAST_BOTTOM:
   case EF_ELEMENTAL_BUSTER_CAST:
     this->AddEvent(0, "effect\\EF_BeginSpell.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_NEW_AXETORNADO_BOTTOM:
   case EF_MINEFFECT_AXETORNADO_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "ice_titan_attack.wav", 5, 0);
     break;
 
   case EF_NEW_FATAL_MENACE_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\EF_Bash.wav", 0, 0);
     this->AddEvent(0, "effect\\rog_intimidate.wav", 0x23, 0);
     break;
 
   case EF_NEW_CANNON_SPEAR_BOTTOM:
   case EF_MINEFFECT_CANNON_SPEAR_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\EF_hit2.wav", 0xa, 0);
     this->AddEvent(0, "effect\\EF_hit4.wav", 0x14, 0);
     break;
@@ -5941,7 +5971,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_RED_WAVE_1:
   case EF_RED_WAVE_2:
   case EF_RED_WAVE_3:
-    this->particle->flags = 5;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND;
     break;
 
   case EF_NEW_FEARBREEZE:
@@ -5969,7 +5999,7 @@ void CEZ2STRScreenEffect::InitEvents() {
 
   case EF_NEW_SOULEXPANSION_HIT_BOTTOM:
     this->AddEvent(0, "effect\\매직 크래쉬.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_GRADE_ENCHANT_INTRO:
@@ -5987,11 +6017,11 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_RUNE_BROKEN:
   case EF_RUNE_SLOT_SMALL:
   case EF_RUNE_SLOT_BIG:
-    this->particle->flags = 517;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_NO_DEPTH;
     break;
 
   case EF_GRADE_ENCHANT_FAILED:
-    this->particle->flags = 517;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_NO_DEPTH;
     this->AddEvent(1, nullptr, 0xb4, 0);
     break;
 
@@ -6011,7 +6041,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_ASTRAL_STRIKE_CAST_BOTTOM:
   case EF_FROZEN_SLASH_CAST_BOTTOM:
   case EF_FLORAL_FLARE_ROAD_CAST_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\EF_BeginSpell.wav", 0, 0);
     break;
 
@@ -6020,7 +6050,7 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_HACKANDSLASH_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\DK_HACKANDSLASHER.wav", 0, 0);
     break;
 
@@ -6030,7 +6060,7 @@ void CEZ2STRScreenEffect::InitEvents() {
 
   case EF_NEW_POWERSWING_BOTTOM:
   case EF_NEW_RUSH_QUAKE_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\wizard_fire_pillar_b.wav", 0xf, 0);
     this->AddEvent(1, nullptr, 0x14, 0);
     break;
@@ -6041,7 +6071,7 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_SERVANT_SIGN_DOWN_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\DK_SERVANT_W_SIGN.wav", 0x28, 0);
     break;
 
@@ -6104,44 +6134,44 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_ABR_MOTHER_01:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\MT_ABR_NET_REPAIR.wav", 0, 0);
     break;
 
   case EF_ABR_MOTHER_02:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\MT_ABR_NET_SUPPORT.wav", 0, 0);
     break;
 
   case EF_NEW_D_MACHINE_START:
     this->AddEvent(0, "effect\\MT_D_MACHINE.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_NEW_AXE_STOMP_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(1, nullptr, 0x14, 0);
     break;
 
   case EF_SECOND_FLAME_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\wizard_fire_pillar_b.wav", 0xf, 0);
     this->AddEvent(1, nullptr, 0x28, 0);
     break;
 
   case EF_ARBITRIUM_BOTTOM:
     this->AddEvent(0, "effect\\CD_ARBITRIUM.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_NEW_DILECTIO_HEAL_TARGET_BOTTOM:
     this->AddEvent(0, "effect\\CD_DILECTIO_HEAL.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_COMPETENTIA_BOTTOM:
     this->AddEvent(0, "effect\\CD_COMPETENTIA.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_CRYSTAL_IMPACT:
@@ -6162,7 +6192,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_HELLTREE_CAST_BOTTOM:
   case EF_WOODEN_WARRIOR_CAST_BOTTOM:
   case EF_WOODEN_FAIRY_CAST_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     [[fallthrough]];
 
   case EF_NEW_GATEOFHELL_CAST:
@@ -6207,21 +6237,21 @@ void CEZ2STRScreenEffect::InitEvents() {
 
   case EF_MASSIVE_FLAME_BLASTER:
     this->AddEvent(0, "effect\\IQ_MASSIVE_F_BLASTER.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_THIRD_FLAME_BOMB_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\IQ_THIRD_FLAME_BOMB.wav", 0, 0);
     break;
 
   case EF_THIRD_PUNISH_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\IQ_THIRD_PUNISH.wav", 0, 0);
     break;
 
   case EF_KVASIRSONATA_CAST_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\TR_KVASIR_SONATA.wav", 0, 0);
     break;
 
@@ -6230,7 +6260,7 @@ void CEZ2STRScreenEffect::InitEvents() {
     [[fallthrough]];
 
   case EF_STRATUM_TREMOR_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     switch (this->effectLevel) {
     case 1:
       this->SetScale(0.7f);
@@ -6247,10 +6277,6 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_SHADOW_STAB: {
     float fromReciprocalDepth = 0.0f;
     float toReciprocalDepth = 0.0f;
-    float fromX;
-    float fromY;
-    float toX;
-    float toY;
     g_renderer->ProjectViewport(this->position, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
     g_renderer->ProjectViewport(this->sourcePosition, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
 
@@ -6268,7 +6294,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   }
 
   case EF_SINCERE_FAITH:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     [[fallthrough]];
 
   case EF_POWERFUL_FAITH:
@@ -6284,10 +6310,6 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_CHAIN_REACTION_SHOT: {
     float fromReciprocalDepth = 0.0f;
     float toReciprocalDepth = 0.0f;
-    float fromX;
-    float fromY;
-    float toX;
-    float toY;
     g_renderer->ProjectViewport(this->position, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
     g_renderer->ProjectViewport(this->sourcePosition, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
 
@@ -6305,7 +6327,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   }
 
   case EF_MYSTICSYMPHONY_CAST:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     [[fallthrough]];
 
   case EF_KVASIRSONATA_CAST:
@@ -6334,7 +6356,7 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_SERPENS_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\EM_SUMMON_ELEMENTAL_SERPENS_2.wav", 0, 0);
     break;
 
@@ -6370,7 +6392,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_DIAMOND_STORM_BOTTOM: {
     CEZ2STRParticle* particle = this->particle;
     particle->life = EffectLifetime(EF_DIAMOND_STORM_BOTTOM) / 60.0f;
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\EM_DIAMOND_STORM.wav", 0, 0);
     break;
   }
@@ -6378,11 +6400,11 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_DIAMOND_STORM_CAST_BOTTOM:
   case EF_CONFLAGRATION_CAST_BOTTOM:
     this->AddEvent(0, "effect\\ef_beginspell.wav", 0, 0);
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   case EF_VENOM_SWAMP_BOTTOM:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\EM_VENOM_SWAMP.wav", 0, 0);
     break;
 
@@ -6397,10 +6419,6 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_ROSEBLOSSOM_SHOT: {
     float fromReciprocalDepth = 0.0f;
     float toReciprocalDepth = 0.0f;
-    float fromX;
-    float fromY;
-    float toX;
-    float toY;
     g_renderer->ProjectViewport(this->position, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
     g_renderer->ProjectViewport(this->sourcePosition, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
 
@@ -6424,7 +6442,7 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_JAWAII_SERENADE:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\TR_JAWAII_SERENADE.wav", 0, 0);
     break;
 
@@ -6437,7 +6455,7 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_FROM_THE_ABYSS:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     this->AddEvent(0, "effect\\ABC_FROM_THE_ABYSS.wav", 0, 0);
     break;
 
@@ -6723,7 +6741,7 @@ void CEZ2STRScreenEffect::InitEvents() {
   case EF_UI_ENCHANT_FAIL:
   case EF_UI_LEVELUP_FAIL:
   case EF_UI_RESET_FAIL:
-    this->particle->flags = 0x205;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_NO_DEPTH;
     this->AddEvent(1, nullptr, 0, 0);
     break;
 
@@ -6752,202 +6770,787 @@ void CEZ2STRScreenEffect::InitEvents() {
     break;
 
   case EF_NEW_METEORSTORM_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_ADORAMUS_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TETRA_VORTEX_FIRE_GROUND:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TETRA_VORTEX_WATER_GROUND:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TETRA_VORTEX_WIND_GROUND:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TETRA_VORTEX_EARTH_GROUND:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CRIMSONROCK_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TETRA_VORTEX_CORE_GROUND:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_DIAMONDDUST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_DIAMONDDUST_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SECRAMENT:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_PSYCHICWAVE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_PSYCHICWAVE_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_TRIANGLESHOT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_RAMPAGEBLASTER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_FEINTBOMB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_ARMSCANNON_01_DOWN:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_ARMSCANNON_11_DOWN:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_ARMSCANNON_EXPLOSION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CART_CANNON_EXPLOSION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CART_CANNON_FIRE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CART_TORNADO_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_HELP_ANGEL_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_BANISHINGPOINT_TARGET_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_BANISHINGPOINT_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_DRAGONBREATH_BOMB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_ARMSCANNON_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_DRAGONBREATH_WATER_BOMB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_COUNTER_SLASH_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_FATAL_MENACE_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_COMET_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_COMET_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_COMET_SUB_EXP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_ADORAMUS_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_TETRA_FIRE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_TETRA_WATER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_TETRA_WIND_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_TETRA_EARTH_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_TETRA_CORE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_CRIMSONROCK_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_DIAMONDDUST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_DIAMONDDUST_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_SECRAMENT:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_PSYCHICWAVE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_PSYCHICWAVE_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_TRIANGLESHOT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_RAMPAGEBLASTER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_FEINTBOMB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_ARMSCANNON_01:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_ARMSCANNON_11:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_ARMSCANNON_EXPLOSION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_ARMSCANNON_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_CART_CANNON_EXPLOSION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_CART_CANNON_FIRE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_CART_TORNADO_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_BANISHINGPOINT_TARGET_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_BANISHINGPOINT_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_COMET_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_COMET_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MINEFFECT_COMET_SUB_EXP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_POISONSMOKE_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_HELLINFERNO_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_HELLINFERNO_SUB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CLEARANCE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_VARETYRSPEAR_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_VARETYRSPEAR_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_FALLENEMPIRE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_HOWLINGOFLION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_HOWLINGOFLION_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_METALLICSOUND_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_REPRODUCE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SOULEXPANSION_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SOULEXPANSION_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_AROMAOIL_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_BATHFOAM_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_WALLOFTHORN_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_EARTHGRAVE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_IGNITIONBREAK_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_JUDEX_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_JUDEX_CAST_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_JUDEX_TARGET_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_JUDEX_LIGHT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CHAINLIGHTNING_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CHAINLIGHTNING_LOCKON:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_MANDRAGORA_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SOUNDOFDESTRUCTION_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_UNLIMIT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_AXEBOOMERANG_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SPELLFIST_FIRE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SPELLFIST_WATER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CARTBOOST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_OVERBRAND_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_WINDCUTTER_BOTTOM_01:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_WINDCUTTER_BOTTOM_05:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SERVANTWEAPON_HIT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_SERVANTWEAPON_SHOOT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_VULCANARM_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_EARTHDRIVE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_SERVANT_PHANTOM_HIT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_SERVANT_PHANTOM_SUB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DRAGONIC_AURA_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DRAGONIC_AURA_HIT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DRAGONIC_AURA_BUFF_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MADNESS_CRUSHER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_AUTOSHADOWSPELL_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DESTRUCTIVE_HURRICANE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ROCKDOWN_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_CHARGINGPIERCE_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MYSTERY_ILLUSION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TORNADO_STORM_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_VIOLENT_QUAKE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ALL_BLOOM_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_CLIMAX_CAST_LOOP:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_D_MACHINE_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ARBITRIUM_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_COMPETENTIA_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_CRYSTAL_IMPACT_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_ENCHANTING_SHADOW_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_IMPACT_CRATER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABR_INFINITY_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABR_INFINITY_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_DILECTIO_HEAL_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_PRAMEN_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEW_BATTLE_W_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_FIRST_FAITH_POWER:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_JUDGE:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_JUDGE_AURA:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_THIRD_EXOR_FLAME:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_THIRD_EXOR_FLAME_AURA:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_CHAIN_REACTION_SHOT_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DILUVIO_ICE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ARDOR_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_LIGHTNING_LAND_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ROSEBLOSSOM_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_FIRST_BRAND_AURA:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_CONFLAGRATION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_SOUND_BLEND_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_JAWAII_SERENADE_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_PRONMARCH_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_RHYTHMSHOOTING_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_SECOND_FAITH_AURA:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABYSS_STRIKE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABYSS_STRIKE_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABYSS_STRIKE_GROUND_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_MASSIVE_FLAME_BLASTER_HIT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_PROCELLA_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_GEF_NOCTURN_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ROKI_CAPRICCIO_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABYSS_SLAYER_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABYSS_SQUARE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TERRA_DRIVE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ELEMENTAL_BUSTER_FIRE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ELEMENTAL_BUSTER_LAND_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ELEMENTAL_BUSTER_POISON_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ELEMENTAL_BUSTER_WATER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ELEMENTAL_BUSTER_WIND_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_OVERSLASH_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ADVANCED_PROTECTION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ADVANCED_PROTECTION_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_CROSS_RAIN_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_CROSS_RAIN_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_GRAND_JUDGEMENT_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_GUARDIANSHIELD_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_JUDGEMENT_CROSS_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_JUDGEMENT_CROSS_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_REBOUND_SHIELD_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_REBOUND_SHIELD_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ULTIMATESACRIFICE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_FIRE_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_FIRE_START_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_FIRE_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_WATER_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_WATER_START_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_WATER_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_WIND_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_WIND_START_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_WIND_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_GROUND_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_GROUND_START_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ACIDIFIED_ZONE_GROUND_LOOP_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_RESEARCH_REPORT_CAST_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_SERPENS_DEEP_POISONING_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DILUVIO_COLD_FORCE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ARDOR_FLAMETECHNIC_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_PROCELLA_GRACE_BREEZE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TERREMOTUS_EARTH_CARE_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_THIRD_CONSECRATION_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_SERVANT_SIGN_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NPC_KILLING_AURA:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_TOXIN_OF_MANDARA_BOMB_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_NEEDLE_STINGER_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_ABSOLUTE_ZEPHYR_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_HEILIGE_PFERD_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_HEILIGE_PFERD_CAST:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_THE_ONE_FIGHTER_RISES_BOTTOM:
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
+    break;
+
   case EF_DESTRUCTIVE_HURRICANE_BOTTOM_REUSE:
-    this->particle->flags = 13;
+    this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
     break;
 
   default:
@@ -6955,7 +7558,7 @@ void CEZ2STRScreenEffect::InitEvents() {
       bool renderBefore = false;
       g_session.m_hotkeyScript->Call("IsRenderBeforeCharacter", "d>b", id - 0x9B5, &renderBefore);
       if (renderBefore) {
-        this->particle->flags = 13;
+        this->particle->flags = RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_TOPMOST;
       }
     }
     break;

@@ -1,5 +1,6 @@
 #include "Contents/Actors/CharacterRender.h"
 #include "Client/Session/Session.h"
+#include "Contents/Actors/AccessoryId.h"
 #include "Contents/Camera/Camera.h"
 #include "Render/Drawing/SpriteGeometry.h"
 #include "Render/Primitives/SpriteQuad.h"
@@ -32,14 +33,17 @@ void CCharacterRender::OffsetLayerDepth(int layer, SpriteQuad& quad, float botto
       quad.topRhw = 0.000045f + topDepth;
     }
     break;
-  case 4:
+  case 4: {
+    float& bottom = quad.bottomRhw;
+    float& top = quad.topRhw;
     if (g_cameraDistance < robeTopLayerThreshold) {
       topDepth += 0.00003f;
       bottomDepth += 0.00003f;
     }
-    quad.bottomRhw = bottomDepth;
-    quad.topRhw = topDepth;
+    bottom = bottomDepth;
+    top = topDepth;
     break;
+  }
   }
 }
 
@@ -48,7 +52,7 @@ void CCharacterRender::OffsetLayerDepth(int layer, SpriteQuad& quad, float botto
 void CCharacterRender::OffsetAccessoryLayerDepth(int layer, SpriteQuad& quad, float bottomDepth, float topDepth) const {
   switch (layer) {
   case 1:
-    if (this->upperHeadgear != 1095) {
+    if (this->upperHeadgear != ACCESSORY_RABBIT_HEAD_DRESS) {
       if (g_cameraDistance < robeTopLayerThreshold) {
         quad.bottomRhw = bottomDepth + 0.000025f;
         quad.topRhw = topDepth + 0.000025f;
@@ -135,8 +139,32 @@ void CCharacterRender::OffsetAccessoryLayerDepth(int layer, SpriteQuad& quad, fl
   case 2:
     switch (this->lowerHeadgear) {
     case 1041:
+      if (g_cameraDistance < robeTopLayerThreshold) {
+        quad.bottomRhw = 0.0008f + bottomDepth;
+        quad.topRhw = 0.0008f + topDepth;
+      } else {
+        quad.bottomRhw = 0.00019f + bottomDepth;
+        quad.topRhw = 0.00019f + topDepth;
+      }
+      break;
     case 1358:
+      if (g_cameraDistance < robeTopLayerThreshold) {
+        quad.bottomRhw = 0.0008f + bottomDepth;
+        quad.topRhw = 0.0008f + topDepth;
+      } else {
+        quad.bottomRhw = 0.00019f + bottomDepth;
+        quad.topRhw = 0.00019f + topDepth;
+      }
+      break;
     case 1478:
+      if (g_cameraDistance < robeTopLayerThreshold) {
+        quad.bottomRhw = 0.0008f + bottomDepth;
+        quad.topRhw = 0.0008f + topDepth;
+      } else {
+        quad.bottomRhw = 0.00019f + bottomDepth;
+        quad.topRhw = 0.00019f + topDepth;
+      }
+      break;
     case 1499:
       if (g_cameraDistance < robeTopLayerThreshold) {
         quad.bottomRhw = 0.0008f + bottomDepth;
@@ -186,16 +214,24 @@ void CCharacterRender::OffsetAccessoryLayerDepth(int layer, SpriteQuad& quad, fl
   double farOffset = 0.0;
   g_session.m_hotkeyScript->Call("OffsetItemPos_GetUppingBottomItem", "d>bll", this->lowerHeadgear, &enabled, &nearOffset, &farOffset);
 
-  if (layer == 2 && enabled) {
-    if (nearOffset == 0.0) {
+  if (layer == 2 && enabled == true) {
+    if (0.0 == nearOffset) {
       nearOffset = 0.00025;
     }
-    if (farOffset == 0.0) {
+    if (0.0 == farOffset) {
       farOffset = 0.0001;
     }
 
-    const double offset = g_cameraDistance < robeTopLayerThreshold ? nearOffset : farOffset;
-    quad.bottomRhw = static_cast<float>(static_cast<double>(bottomDepth) + offset);
-    quad.topRhw = static_cast<float>(static_cast<double>(topDepth) + offset);
+    double bottom = bottomDepth;
+    double top = topDepth;
+    if (g_cameraDistance < robeTopLayerThreshold) {
+      bottom += nearOffset;
+      top += nearOffset;
+    } else {
+      bottom += farOffset;
+      top += farOffset;
+    }
+    quad.bottomRhw = static_cast<float>(bottom);
+    quad.topRhw = static_cast<float>(top);
   }
 }

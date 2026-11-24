@@ -41,14 +41,19 @@ struct GroundWater {
 struct GroundLegacyLightmap {
   /* 0000 */ unsigned char bits[40];
 
+  unsigned char GetSample(int index) const;
+  void SetSample(int index, unsigned char value);
   void Decode(unsigned char* output) const;
+  void Encode(const unsigned char* input);
 };
 
 class CGndRes : public CRes {
 public:
   CGndRes();
   CGndRes(const char* extension, const char* prefix);
-  ~CGndRes() override;
+  // OFFSET: 0x0074E390
+  // FUNCTION: fn_07908
+  ~CGndRes() override = default;
   CGndRes* Create() override;
   bool Load(const char* name) override;
   void Unload() override;

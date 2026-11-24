@@ -2,10 +2,19 @@
 
 // OFFSET: 0x00545790
 // FUNCTION: fn_01832
-CDCBitmap::CDCBitmap(int width, int height) : m_bitmap(width, height) {
+CDCBitmap::CDCBitmap(int width, int height) : m_alpha(false) {
+  this->m_bitmap.dc = CreateCompatibleDC(nullptr);
+  this->Create(width, height);
 }
 
-CDCBitmap::~CDCBitmap() = default;
+// OFFSET: 0x005459F0
+// FUNCTION: fn_46355
+__declspec(noinline) CDCBitmap::~CDCBitmap() {
+  this->ClearTextures();
+  SelectObject(this->m_bitmap.dc, this->m_bitmap.previous);
+  DeleteObject(this->m_bitmap.bitmap);
+  DeleteDC(this->m_bitmap.dc);
+}
 
 // OFFSET: 0x00569E90
 // FUNCTION: fn_02273
@@ -42,6 +51,3 @@ void CDCBitmap::CopyRegion(
   this->m_bitmap.CopyRegion(x, y, sourceLeft, sourceTop, sourceRight, sourceBottom, source, sourceWidth, sourceHeight, transparent, alpha);
 }
 
-void CDCBitmap::Dim(int x, int y, int width, int height, int percent) {
-  this->m_bitmap.Dim(x, y, width, height, percent);
-}

@@ -58,7 +58,8 @@ namespace {
 TipBoxEntry::TipBoxEntry() {
 }
 
-// INLINED
+// OFFSET: 0x007ABD90
+// FUNCTION: fn_46455
 CTipBoxMgr::CTipBoxMgr()
     : m_width(240),
       m_height(320),
@@ -66,17 +67,17 @@ CTipBoxMgr::CTipBoxMgr()
       m_entries{},
       m_randomList{},
       m_currentEntry{},
-      m_image{},
-      m_imagePath{},
       paragraphIndex(0),
-      m_initialized(true),
-      m_missing{},
-      currentTipId(0),
-      maxTipId(0) {
+      m_missing{} {
+  this->m_initialized = true;
+  this->currentTipId = 0;
+  this->maxTipId = 0;
+  this->m_missing.title = "";
 }
 
-// INLINED
-CTipBoxMgr::~CTipBoxMgr() = default;
+// OFFSET: 0x007AC220
+// FUNCTION: fn_46456
+__declspec(noinline) CTipBoxMgr::~CTipBoxMgr() = default;
 
 // OFFSET: 0x007AC710
 // FUNCTION: fn_09122
@@ -184,32 +185,30 @@ std::string CTipBoxMgr::Title(int id, std::string* abbreviated, int width) const
 // OFFSET: 0x007ACF50
 // FUNCTION: fn_09128
 void CTipBoxMgr::Sub7ACF50() {
-  const TipBoxEntry& entry = this->m_currentEntry;
-
-  if (entry.bitmapName.size() == 0) {
+  if (this->m_currentEntry.bitmapName.size() == 0) {
     this->m_image.kind = 2;
     return;
   }
 
-  const int cell = entry.imageCell - 1;
+  const int cell = this->m_currentEntry.imageCell - 1;
   const float cellWidth = static_cast<float>(this->m_width) / 3.0f;
   const int row = cell / 3;
   const int column = cell % 3;
   const float cellHeight = static_cast<float>(this->m_height) / 3.0f;
-  const std::size_t found = entry.bitmapName.find("유저인터페이스\\");
+  const std::size_t found = this->m_currentEntry.bitmapName.find("유저인터페이스\\");
 
   this->m_image.x = static_cast<float>(column) * cellWidth + cellWidth * 0.5f;
   this->m_image.y = static_cast<float>(this->m_maximumId) + cellHeight * 0.5f + static_cast<float>(row) * cellHeight;
 
   if (found != std::string::npos) {
-    this->m_imagePath = entry.bitmapName + ".bmp";
+    this->m_image.path = this->m_currentEntry.bitmapName + ".bmp";
 
-    const auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_imagePath.c_str())));
+    const auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_image.path.c_str())));
     if (!bitmap) {
       return;
     }
 
-    const float scale = static_cast<float>(entry.imageScalePercent) * 0.01f;
+    const float scale = static_cast<float>(this->m_currentEntry.imageScalePercent) * 0.01f;
     this->m_image.x -= static_cast<float>(bitmap->image.width) * 0.5f * scale;
     this->m_image.y -= static_cast<float>(bitmap->image.height) * 0.5f * scale;
 
@@ -233,9 +232,9 @@ void CTipBoxMgr::Sub7ACF50() {
     this->m_image.scale = scale;
     this->m_image.height = static_cast<float>(bitmap->image.height) * scale;
   } else {
-    this->m_imagePath = "sprite\\" + entry.bitmapName;
+    this->m_image.path = "sprite\\" + this->m_currentEntry.bitmapName;
 
-    const auto* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(this->m_imagePath + ".spr"));
+    const auto* sprite = static_cast<CSprRes*>(ResourceMgr::Instance().Load(this->m_image.path + ".spr"));
     if (!sprite) {
       return;
     }
@@ -245,8 +244,8 @@ void CTipBoxMgr::Sub7ACF50() {
       return;
     }
 
-    const float scale = static_cast<float>(entry.imageScalePercent) * 0.01f;
-    const float ratio = static_cast<float>(entry.imageScalePercent) / 100.0f;
+    const float scale = static_cast<float>(this->m_currentEntry.imageScalePercent) * 0.01f;
+    const float ratio = static_cast<float>(this->m_currentEntry.imageScalePercent) / 100.0f;
     this->m_image.x -= static_cast<float>(image->width) * 0.5f * scale;
     this->m_image.y -= static_cast<float>(image->height) * 0.5f * scale;
 
@@ -435,7 +434,7 @@ int AddIsTag(lua_State* state) {
 
   const int id = static_cast<int>(lua_tonumber(state, -2));
   const int searchable = static_cast<int>(lua_tonumber(state, -1));
-  g_itemTagOwner->SetSearchable(id, searchable != 0);
+  g_itemTagOwner->SetSearchable(id, searchable);
   lua_pushboolean(state, 1);
   lua_pushstring(state, "good");
   return 2;
@@ -529,15 +528,8 @@ int AddPageEx(lua_State* state) {
   const double clipX = lua_tonumber(state, -2);
   const float scale = static_cast<float>(lua_tonumber(state, -1));
   if (kind != -1 && id > 0) {
-    TipBoxImage image;
-    image.kind = kind;
-    image.blink = static_cast<int>(x);
-    image.fromX = static_cast<int>(y);
-    image.fromY = static_cast<int>(width);
-    image.toX = static_cast<int>(height);
-    image.toY = static_cast<int>(clipX);
-    image.duration = scale;
-    g_itemTagOwner->AddImage(id, image);
+    g_itemTagOwner->AddImage(id, kind, static_cast<int>(x), static_cast<int>(y), static_cast<int>(width),
+                             static_cast<int>(height), static_cast<int>(clipX), scale);
   }
 
   lua_pushboolean(state, 1);

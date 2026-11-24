@@ -28,7 +28,7 @@ void UIBalloonOpenBtn::OnCreate(int width, int height) {
 // FUNCTION: fn_12892
 void UIDebuffRemoveWnd::OnCreate(int width, int height) {
   this->m_button = new UIBasicButton();
-  this->m_button->Configure(0x96, LookupMessage(0x10E6));
+  this->m_button->Configure(0x96, LookupMessage(MSI_DEBUFF_REMOVE));
   this->m_button->Move(0xF, 0x16);
   this->m_button->SetId(ID_OK);
   this->AddChild(this->m_button);
@@ -90,7 +90,7 @@ void UIGuild_Storage_Log::OnCreate(int width, int height) {
   this->m_tabs->Configure(1, 20, 50, 1, 0, 0, 0, 0, 0, 0, 0, 0);
   this->m_tabs->Move(0, 17);
   this->AddChild(this->m_tabs);
-  this->m_tabs->AddTab(LookupMessage(MSI_GUILD_STORAGE_LOG_WND_NAME), "");
-  this->m_tabs->AddTab(LookupMessage(MSI_GUILD_STORAGE_LOG_CAUTION), "");
-  this->m_tabs->AddTab(LookupMessage(MSI_GUILD_STORAGE_CLOSE_TIMEOUT), "");
+  this->m_tabs->AddTab(LookupMessage(MSI_GUILD_STORAGE_LOG_ALL), "");
+  this->m_tabs->AddTab(LookupMessage(MSI_GUILD_STORAGE_LOG_IN), "");
+  this->m_tabs->AddTab(LookupMessage(MSI_GUILD_STORAGE_LOG_OUT), "");
 }

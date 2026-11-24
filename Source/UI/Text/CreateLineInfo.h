@@ -30,18 +30,18 @@ enum LineSegmentType {
 
 struct LineTextStyle {
   // INLINED
-  LineTextStyle(std::uint32_t color, int fontHeight, bool bold, bool italic) : color(color), fontHeight(fontHeight), bold(bold), italic(italic) {
+  LineTextStyle(std::uint32_t color, int fontHeight, unsigned char bold, unsigned char italic) : color(color), fontHeight(fontHeight), bold(bold), italic(italic) {
   }
 
   /* 0000 */ std::uint32_t color;
   /* 0004 */ int fontHeight;
-  /* 0008 */ bool bold;
-  /* 0009 */ bool italic;
+  /* 0008 */ unsigned char bold;
+  /* 0009 */ unsigned char italic;
 };
 
 struct LineTextSegment {
   // INLINED
-  LineTextSegment(const std::string& text, const LineTextStyle& style)
+  LineTextSegment(std::string text, LineTextStyle style)
       : text(text), style(style), type(LINE_SEGMENT_TEXT), auxiliaryState(0), auxiliaryValue(0) {
   }
 
@@ -50,11 +50,6 @@ struct LineTextSegment {
   /* 0024 */ int type;
   /* 0028 */ int auxiliaryState;
   /* 002C */ int auxiliaryValue;
-};
-
-struct LineFontFlags {
-  /* 0000 */ bool bold;
-  /* 0001 */ bool italic;
 };
 
 struct LineFontState {
@@ -99,7 +94,7 @@ public:
   /* 007C */ int m_height;
 
   CCreateLineInfo(
-    UIWindow* parent, const char* text, int width, int lineSpacing, std::uint32_t color, int fontHeight, LineFontFlags flags, bool outlineEnabled,
+    UIWindow* parent, const char* text, int width, int lineSpacing, LineTextStyle style, bool outlineEnabled,
     int outlineColorValue, bool padding_0030, int shadowColorValue, unsigned char align
   );
   virtual ~CCreateLineInfo();

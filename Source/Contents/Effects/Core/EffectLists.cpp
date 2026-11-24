@@ -147,16 +147,14 @@ float DirectionAngle(float x, float z) {
 double ScreenAngle(vector3d from, vector3d to) {
   float fromReciprocalDepth = 0.0f;
   float toReciprocalDepth = 0.0f;
-  float fromX;
-  float fromY;
-  float toX;
-  float toY;
-  g_renderer->ProjectViewport(&from.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromX, &fromY, &fromReciprocalDepth);
-  g_renderer->ProjectViewport(&to.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &toX, &toY, &toReciprocalDepth);
-  const float dx = toX - fromX;
-  const float dy = toY - fromY;
+  float fromScreen[2];
+  float toScreen[2];
+  g_renderer->ProjectViewport(&from.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &fromScreen[0], &fromScreen[1], &fromReciprocalDepth);
+  g_renderer->ProjectViewport(&to.x, g_modeMgr.GetGameMode()->camera->frame.view.values, &toScreen[0], &toScreen[1], &toReciprocalDepth);
+  const float dx = toScreen[0] - fromScreen[0];
+  const float dy = toScreen[1] - fromScreen[1];
   double angle = static_cast<float>(std::acos(static_cast<double>(dx / SquareRoot(dy * dy + dx * dx)))) / 3.141592f * 180.0f;
-  if (fromY > toY) {
+  if (fromScreen[1] > toScreen[1]) {
     angle = 360.0 - angle;
   }
 
@@ -224,11 +222,13 @@ void EffectLists::Retire(CEffect* effect, unsigned char removeActive) {
 // OFFSET: 0x00B25120
 // FUNCTION: fn_18777
 void EffectLists::Retire(int actor, int id) {
-  if (CEffect* effect = this->Find(actor, id)) {
+  if (CEffect* found = this->Find(actor, id)) {
+    CEffect* effect = found;
     this->retired.push_back(effect);
 
     const int owner = effect->actor;
-    if (this->active.find(owner) != this->active.end()) {
+    auto entry = this->active.find(owner);
+    if (entry != this->active.end()) {
       this->active[owner].remove_if([effect](CEffect* other) { return other == effect; });
     }
   }
@@ -270,11 +270,8 @@ CEffect* EffectLists::At(int id, unsigned index) const {
   return found->second[index];
 }
 
-// OFFSET: 0x00B24190
-// FUNCTION: fn_18771
-void EffectLists::Add(int actor, CEffect* effect) {
-  this->active[actor].push_back(effect);
-
+// INLINED
+static void IndexEffect(EffectLists* lists, CEffect* effect) {
   const int id = effect->id;
   switch (id) {
   case EF_EMITTER:
@@ -283,9 +280,19 @@ void EffectLists::Add(int actor, CEffect* effect) {
   case EF_ANIMATED_EMITTER:
   case EF_NEW_RANGEDATTACK:
   case EF_UNK_2343:
-    this->indexed[id].push_back(effect);
+    {
+      std::vector<CEffect*>& list = lists->indexed[static_cast<int>(id)];
+      list.push_back(effect);
+    }
     break;
   }
+}
+
+// OFFSET: 0x00B24190
+// FUNCTION: fn_18771
+void EffectLists::Add(int actor, CEffect* effect) {
+  this->active[actor].push_back(effect);
+  IndexEffect(this, effect);
 }
 
 // OFFSET: 0x00B24A50

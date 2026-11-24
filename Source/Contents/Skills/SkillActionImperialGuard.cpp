@@ -9,6 +9,7 @@
 #include "Contents/Effects/Core/EffectActor.h"
 #include "Contents/Effects/Core/EffectLists.h"
 #include "Contents/Effects/Particles/EZ2STREffectEx.h"
+#include "Contents/Skills/SkillId.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Contents/Sound/SoundMgr.h"
@@ -202,13 +203,13 @@ void CEfstAction_IG_GUARDIAN_SHIELD::OnEfstUpdate(int efstId, int value, int arg
 // OFFSET: 0x007880C0
 // FUNCTION: fn_08594
 EfstActionMessage CEfstAction_IG_GUARDIAN_SHIELD::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_IG_REBOUND_SHIELD_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_IG_GUARDIAN_SHIELD_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x007880F0
 // FUNCTION: fn_08595
 EfstActionMessage CEfstAction_IG_GUARDIAN_SHIELD::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_HOLY_SHIELD_ON), 0xFF};
+  return {LookupMessage(MSI_IG_GUARDIAN_SHIELD_OFF), 0xFF};
 }
 
 // OFFSET: 0x00788120
@@ -271,13 +272,13 @@ void CEfstAction_IG_HOLY_SHIELD::OnEfstUpdate(int efstId, int value, int argumen
 // OFFSET: 0x00788B20
 // FUNCTION: fn_08601
 EfstActionMessage CEfstAction_IG_HOLY_SHIELD::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_IG_ULTIMATE_SACRIFICE_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_IG_HOLY_SHIELD_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00788B50
 // FUNCTION: fn_08602
 EfstActionMessage CEfstAction_IG_HOLY_SHIELD::GetEfstEndMessage() {
-  return {LookupMessage(MSI_AG_CLIMAX_ON), 0xFF};
+  return {LookupMessage(MSI_IG_HOLY_SHIELD_OFF), 0xFF};
 }
 
 // OFFSET: 0x00788B80
@@ -416,13 +417,13 @@ void CSkillAction_IG_REBOUND_SHIELD::OnSkillEffect(int level, CGameActor* source
 // OFFSET: 0x00789EE0
 // FUNCTION: fn_08614
 EfstActionMessage CEfstAction_REBOUND_S::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_IG_HOLY_SHIELD_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_IG_REBOUND_SHIELD_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x00789F10
 // FUNCTION: fn_08615
 EfstActionMessage CEfstAction_REBOUND_S::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_ULTIMATE_SACRIFICE_ON), 0xFF};
+  return {LookupMessage(MSI_IG_REBOUND_SHIELD_OFF), 0xFF};
 }
 
 // OFFSET: 0x00789F40
@@ -681,13 +682,13 @@ void CEfstAction_IG_ATTACK_STANCE::OnEfstUpdate(int efstId, int value, int argum
 // OFFSET: 0x0078BFC0
 // FUNCTION: fn_08641
 EfstActionMessage CEfstAction_IG_ATTACK_STANCE::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_IG_GUARD_STANCE_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_IG_ATTACK_STANCE_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x0078BFF0
 // FUNCTION: fn_08642
 EfstActionMessage CEfstAction_IG_ATTACK_STANCE::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_GUARDIAN_SHIELD_ON), 0xFF};
+  return {LookupMessage(MSI_IG_ATTACK_STANCE_OFF), 0xFF};
 }
 
 // OFFSET: 0x0078C020
@@ -750,6 +751,13 @@ class CSkillObjectAction_IG_CROSS_RAIN : public CSkillObjectAction {
 public:
   void OnSkillObjectCreate(int argument, CRenderObject* object, CGameActor* source) override;
 };
+
+// OFFSET: 0x0078CC20
+// FUNCTION: fn_45577
+template <>
+CSkillObjectAction* NewAction<CSkillObjectAction_IG_CROSS_RAIN, CSkillObjectAction>() {
+  return new CSkillObjectAction_IG_CROSS_RAIN;
+}
 
 class CSkillAction_IG_GRAND_JUDGEMENT : public CSkillAction {
 public:
@@ -831,6 +839,21 @@ void CSkillAction_IG_GRAND_JUDGEMENT::OnSkillCast(int level, CGameActor* source)
   }
 }
 
+// INLINED
+static int RandomInRange(int low, int high) {
+  if (high == 0) {
+    return 0;
+  }
+
+  const int value = rand() % high;
+  return value >= low ? value : low;
+}
+
+// INLINED
+static CEffect* SpawnAt(EffectLists* effects, int id, const vector3d& position) {
+  return effects->Spawn(0, id, position, 0, -1, 0, 0);
+}
+
 // OFFSET: 0x007871F0
 // FUNCTION: fn_08584
 void CSkillAction_IG_GRAND_JUDGEMENT::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
@@ -844,33 +867,19 @@ void CSkillAction_IG_GRAND_JUDGEMENT::OnSkillEffect(int level, CGameActor* sourc
   effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("new_grand_judgement_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
   const int subEffectId = CEZ2STREffectMgr::GetInstance()->EffectId("new_grand_judgement_sub");
   for (int index = 0; index < 8; ++index) {
-    const float originX = target->render.position.x;
-    float x = originX;
-    const float y = target->render.position.y;
-    const float originZ = target->render.position.z;
-    float z = originZ;
-    int roll;
-    switch (index & 3) {
-    case 1:
-      roll = rand() % 8;
-      x = originX + static_cast<float>(roll >= 0 ? roll : 0);
-      roll = rand() % 8;
-      z = originZ + static_cast<float>(roll >= 0 ? roll : 0);
-      break;
-    case 2:
-      roll = rand() % 8;
-      x = originX + static_cast<float>(roll >= 0 ? roll : 0);
-      roll = rand() % 8;
-      z = originZ - static_cast<float>(roll >= 0 ? roll : 0);
-      break;
-    case 3:
-      roll = rand() % 8;
-      x = originX - static_cast<float>(roll >= 0 ? roll : 0);
-      roll = rand() % 8;
-      z = originZ + static_cast<float>(roll >= 0 ? roll : 0);
-      break;
+    vector3d position = {target->render.position.x, target->render.position.y, target->render.position.z};
+    const int quadrant = index & 3;
+    if (quadrant == 1) {
+      position.x += static_cast<float>(RandomInRange(0, 8));
+      position.z += static_cast<float>(RandomInRange(0, 8));
+    } else if (quadrant == 2) {
+      position.x += static_cast<float>(RandomInRange(0, 8));
+      position.z -= static_cast<float>(RandomInRange(0, 8));
+    } else if (quadrant == 3) {
+      position.x -= static_cast<float>(RandomInRange(0, 8));
+      position.z += static_cast<float>(RandomInRange(0, 8));
     }
-    CEffect* effect = g_effectMgr->Spawn(0, subEffectId, vector3d{x, y, z}, 0, -1, 0, 0);
+    CEffect* effect = SpawnAt(g_effectMgr, subEffectId, position);
     if (effect) {
       effect->SetDelay(140 * (index + 1));
     }
@@ -928,62 +937,66 @@ void CEfstAction_IG_GUARD_STANCE::OnEfstUpdate(int efstId, int value, int argume
 // OFFSET: 0x0078C850
 // FUNCTION: fn_08649
 EfstActionMessage CEfstAction_IG_GUARD_STANCE::GetEfstBeginMessage() {
-  return {LookupMessage(MSI_IG_GUARDIAN_SHIELD_OFF), 0xFFFF00};
+  return {LookupMessage(MSI_IG_GUARD_STANCE_ON), 0xFFFF00};
 }
 
 // OFFSET: 0x0078C880
 // FUNCTION: fn_08650
 EfstActionMessage CEfstAction_IG_GUARD_STANCE::GetEfstEndMessage() {
-  return {LookupMessage(MSI_IG_REBOUND_SHIELD_ON), 0xFF};
+  return {LookupMessage(MSI_IG_GUARD_STANCE_OFF), 0xFF};
 }
 
 // GLOBAL: gl_25794
-static EfstActionRegistrar s_efstAction1203(1203, NewAction<CEfstAction_IG_ATTACK_STANCE, CEfstAction>);
+static EfstActionRegistrar s_efstActionIgAttackStance{EFST_ATTACK_STANCE, NewAction<CEfstAction_IG_ATTACK_STANCE, CEfstAction>};
 // GLOBAL: gl_25795
-static EfstActionRegistrar s_efstAction1222(1222, NewAction<CEfstAction_IG_GRAND_JUDGEMENT, CEfstAction>);
+static EfstActionRegistrar s_efstActionIgGrandJudgement{EFST_SPEAR_SCAR, NewAction<CEfstAction_IG_GRAND_JUDGEMENT, CEfstAction>};
 // GLOBAL: gl_25796
-static EfstActionRegistrar s_efstAction1204(1204, NewAction<CEfstAction_IG_GUARDIAN_SHIELD, CEfstAction>);
+static EfstActionRegistrar s_efstActionIgGuardianShield{EFST_GUARDIAN_S, NewAction<CEfstAction_IG_GUARDIAN_SHIELD, CEfstAction>};
 // GLOBAL: gl_25797
-static EfstActionRegistrar s_efstAction1202(1202, NewAction<CEfstAction_IG_GUARD_STANCE, CEfstAction>);
+static EfstActionRegistrar s_efstActionIgGuardStance{EFST_GUARD_STANCE, NewAction<CEfstAction_IG_GUARD_STANCE, CEfstAction>};
 // GLOBAL: gl_25798
-static EfstActionRegistrar s_efstAction1220(1220, NewAction<CEfstAction_IG_HOLY_SHIELD, CEfstAction>);
+static EfstActionRegistrar s_efstActionIgHolyShield{EFST_HOLY_S, NewAction<CEfstAction_IG_HOLY_SHIELD, CEfstAction>};
 // GLOBAL: gl_25799
-static EfstActionRegistrar s_efstAction1221(1221, NewAction<CEfstAction_IG_ULTIMATE_SACRIFICE, CEfstAction>);
+static EfstActionRegistrar s_efstActionIgUltimateSacrifice{EFST_ULTIMATE_S, NewAction<CEfstAction_IG_ULTIMATE_SACRIFICE, CEfstAction>};
 // GLOBAL: gl_25800
-static EfstActionRegistrar s_efstAction1217(1217, NewAction<CEfstAction_REBOUND_S, CEfstAction>);
+static EfstActionRegistrar s_efstActionReboundS{EFST_REBOUND_S, NewAction<CEfstAction_REBOUND_S, CEfstAction>};
+
+struct SkillObjectActionRegistration {
+  // INLINED
+  __forceinline SkillObjectActionRegistration(int skillId, std::function<CSkillObjectAction*()> factory) {
+    CSkillActionMgr::GetInstance()->RegisterSkillObjectAction(skillId, factory);
+  }
+};
 
 // OFFSET: 0x0045A7E0
 // FUNCTION: fn_45565
-static bool s_skillObjectActionRegistered275 = [](std::function<CSkillObjectAction*()> factory) {
-  CSkillActionMgr::GetInstance()->RegisterSkillObjectAction(275, factory);
-  return true;
-}(NewAction<CSkillObjectAction_IG_CROSS_RAIN, CSkillObjectAction>);
+static SkillObjectActionRegistration s_skillObjectActionRegistered275(275, NewAction<CSkillObjectAction_IG_CROSS_RAIN, CSkillObjectAction>);
 
 // GLOBAL: gl_25801
-static SkillActionRegistrar s_skillAction5260(5260, NewAction<CSkillAction_IG_ATTACK_STANCE, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgAttackStance{IG_ATTACK_STANCE, NewAction<CSkillAction_IG_ATTACK_STANCE, CSkillAction>};
 // GLOBAL: gl_25802
-static SkillActionRegistrar s_skillAction5267(5267, NewAction<CSkillAction_IG_CROSS_RAIN, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgCrossRain{IG_CROSS_RAIN, NewAction<CSkillAction_IG_CROSS_RAIN, CSkillAction>};
 // GLOBAL: gl_25803
-static SkillActionRegistrar s_skillAction5263(5263, NewAction<CSkillAction_IG_GRAND_JUDGEMENT, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgGrandJudgement{IG_GRAND_JUDGEMENT, NewAction<CSkillAction_IG_GRAND_JUDGEMENT, CSkillAction>};
 // GLOBAL: gl_25804
-static SkillActionRegistrar s_skillAction5256(5256, NewAction<CSkillAction_IG_GUARDIAN_SHIELD, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgGuardianShield{IG_GUARDIAN_SHIELD, NewAction<CSkillAction_IG_GUARDIAN_SHIELD, CSkillAction>};
 // GLOBAL: gl_25805
-static SkillActionRegistrar s_skillAction5255(5255, NewAction<CSkillAction_IG_GUARD_STANCE, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgGuardStance{IG_GUARD_STANCE, NewAction<CSkillAction_IG_GUARD_STANCE, CSkillAction>};
 // GLOBAL: gl_25806
-static SkillActionRegistrar s_skillAction5262(5262, NewAction<CSkillAction_IG_HOLY_SHIELD, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgHolyShield{IG_HOLY_SHIELD, NewAction<CSkillAction_IG_HOLY_SHIELD, CSkillAction>};
 // GLOBAL: gl_25807
-static SkillActionRegistrar s_skillAction6504(6504, NewAction<CSkillAction_IG_IMPERIAL_CROSS, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgImperialCross{IG_IMPERIAL_CROSS, NewAction<CSkillAction_IG_IMPERIAL_CROSS, CSkillAction>};
 // GLOBAL: gl_25808
-static SkillActionRegistrar s_skillAction6505(6505, NewAction<CSkillAction_IG_IMPERIAL_PRESSURE, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgImperialPressure{IG_IMPERIAL_PRESSURE, NewAction<CSkillAction_IG_IMPERIAL_PRESSURE, CSkillAction>};
 // GLOBAL: gl_25809
-static SkillActionRegistrar s_skillAction5264(5264, NewAction<CSkillAction_IG_JUDGEMENT_CROSS, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgJudgementCross{IG_JUDGEMENT_CROSS, NewAction<CSkillAction_IG_JUDGEMENT_CROSS, CSkillAction>};
 // GLOBAL: gl_25810
-static SkillActionRegistrar s_skillAction5266(5266, NewAction<CSkillAction_IG_OVERSLASH, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgOverslash{IG_OVERSLASH, NewAction<CSkillAction_IG_OVERSLASH, CSkillAction>};
 // GLOBAL: gl_25811
-static SkillActionRegistrar s_skillAction6503(6503, NewAction<CSkillAction_IG_RADIANT_SPEAR, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgRadiantSpear{IG_RADIANT_SPEAR, NewAction<CSkillAction_IG_RADIANT_SPEAR, CSkillAction>};
 // GLOBAL: gl_25812
-static SkillActionRegistrar s_skillAction5257(5257, NewAction<CSkillAction_IG_REBOUND_SHIELD, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgReboundShield{IG_REBOUND_SHIELD, NewAction<CSkillAction_IG_REBOUND_SHIELD, CSkillAction>};
 // GLOBAL: gl_25813
-static SkillActionRegistrar s_skillAction5265(5265, NewAction<CSkillAction_IG_SHIELD_SHOOTING, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgShieldShooting{IG_SHIELD_SHOOTING, NewAction<CSkillAction_IG_SHIELD_SHOOTING, CSkillAction>};
 // GLOBAL: gl_25814
-static SkillActionRegistrar s_skillAction5261(5261, NewAction<CSkillAction_IG_ULTIMATE_SACRIFICE, CSkillAction>);
+static SkillActionRegistrar s_skillActionIgUltimateSacrifice{IG_ULTIMATE_SACRIFICE, NewAction<CSkillAction_IG_ULTIMATE_SACRIFICE, CSkillAction>};

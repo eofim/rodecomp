@@ -9,16 +9,15 @@
 // FUNCTION: fn_05150
 CGuildEmblemReqBundle::CGuildEmblemReqBundle() = default;
 
-// INLINED
+// OFFSET: 0x0065C860
+// FUNCTION: fn_46444
 CGuildEmblemReqBundle::~CGuildEmblemReqBundle() = default;
 
 // OFFSET: 0x0065CA90
 // FUNCTION: fn_05154
 void CGuildEmblemReqBundle::Add(std::uint32_t guildId, std::uint32_t version) {
-  const auto request = std::pair{guildId, version};
-
-  if (std::find(this->m_pending.begin(), this->m_pending.end(), request) == this->m_pending.end()) {
-    this->m_pending.push_back(request);
+  if (this->m_pending.end() == std::find(this->m_pending.begin(), this->m_pending.end(), std::make_pair(guildId, version))) {
+    this->m_pending.push_back(std::make_pair(guildId, version));
   }
 }
 
@@ -36,19 +35,19 @@ void CGuildEmblemReqBundle::Update() {
   }
 
   while (!this->m_pending.empty()) {
-    const auto request = this->m_pending.front();
+    const auto [guildId, version] = this->m_pending.front();
     const auto end = this->m_recent.end();
-    if (std::find_if(this->m_recent.begin(), end, [request](const Recent& value) {
-          return request.first == value.guildId && request.second == value.version;
-        }) != end) {
+    if (end != std::find_if(this->m_recent.begin(), end, [guildId, version](const Recent& value) {
+          return guildId == value.guildId && version == value.version;
+        })) {
       this->m_pending.pop_front();
       continue;
     }
 
     this->m_pending.pop_front();
-    if (request.first != 0) {
-      g_emblemDataMgr->Download(request.first, request.second);
-      this->m_recent.push_back({request.first, request.second, timeGetTime()});
+    if (guildId != 0) {
+      g_emblemDataMgr->Download(guildId, version);
+      this->m_recent.push_back(Recent(guildId, version, timeGetTime()));
     }
 
     return;

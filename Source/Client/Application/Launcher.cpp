@@ -27,6 +27,7 @@
 #include "Contents/Map/MapPropertyMgr.h"
 #include "Contents/Map/MapSkyMgr.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "Contents/Messenger/WhisperBlockMgr.h"
 #include "Contents/Party/AdventurerAgencyMgr.h"
 #include "Contents/Actors/PlayerNameDictionary.h"
@@ -57,7 +58,6 @@
 #include "Archive/GPakUpdate.h"
 #include "Archive/PakRegistry.h"
 #include "Client/Application/ApplicationWindow.h"
-#include "Client/Application/ClientInfo.h"
 #include "Client/Application/ErrorDialog.h"
 #include "Client/Application/UnhandledExceptionHandler.h"
 #include "Client/Input/InputCharset.h"
@@ -697,7 +697,6 @@ void ApplyAiPatch() {
     operation.hwnd = nullptr;
     operation.wFunc = FO_DELETE;
     operation.pFrom = path;
-    operation.pTo = nullptr;
     operation.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
     SHFileOperationA(&operation);
   }
@@ -814,16 +813,6 @@ bool ReplaceClientExecutable(char* executable, const char* update) {
   return true;
 }
 
-namespace EquipmentProperties {
-class CEquipmentPropertiesMgr {
-public:
-  virtual ~CEquipmentPropertiesMgr();
-
-  static CEquipmentPropertiesMgr* GetInstance();
-  bool InitializeLua();
-};
-}
-
 // OFFSET: 0x00E58100
 // FUNCTION: fn_24362
 int InitApp(HINSTANCE instance, int showCommand) {
@@ -854,36 +843,33 @@ int InitApp(HINSTANCE instance, int showCommand) {
   int y = 0;
   if (!g_configuredFullscreen) {
     GetSystemMetrics(SM_CXSCREEN);
-    int posX;
-    int posY;
     if (g_configuredOldWidth == g_viewportWidth && g_configuredOldHeight == g_viewportHeight) {
       int defaultX = (GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) / 2;
-      posX = g_session.GetOptionInteger(OBFUSCATE_BYTES_TEXT("Window_XPos", 0x9B17C9EFDBB39F2FULL), defaultX);
+      x = g_session.GetOptionInteger(OBFUSCATE_BYTES_TEXT("Window_XPos", 0x9B17C9EFDBB39F2FULL), defaultX);
 
       int defaultY = (GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) / 2;
-      posY = g_session.GetOptionInteger(OBFUSCATE_BYTES_TEXT("Window_YPos", 0x69D345DB950F336DULL), defaultY);
+      y = g_session.GetOptionInteger(OBFUSCATE_BYTES_TEXT("Window_YPos", 0x69D345DB950F336DULL), defaultY);
     } else {
-      posX = (GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) / 2;
-      posY = (GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) / 2;
+      x = (GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) / 2;
+      y = (GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) / 2;
     }
 
-    if (posX > GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) {
-      posX = (GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) / 2;
+    if (x > GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) {
+      x = (GetSystemMetrics(SM_CXSCREEN) - g_viewportWidth) / 2;
     }
-    x = posX < 0 ? 0 : posX;
-    if (posY > GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) {
-      posY = (GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) / 2;
+    if (x < 0) {
+      x = 0;
     }
-    if (posY < 0) {
-      posY = 0;
+    if (y > GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) {
+      y = (GetSystemMetrics(SM_CYSCREEN) - g_viewportHeight) / 2;
     }
-    y = posY;
+    if (y < 0) {
+      y = 0;
+    }
   }
 
-  const __int64 width = rect.right - rect.left;
-  const __int64 height = rect.bottom - rect.top;
-  int windowWidth = static_cast<int>(width);
-  int windowHeight = static_cast<int>(height);
+  __int64 width = rect.right - rect.left;
+  __int64 height = rect.bottom - rect.top;
   if (!g_configuredFullscreen) {
     RECT trayRect;
     HWND tray = FindWindowA(OBFUSCATE_BYTES_TEXT("Shell_TrayWnd", 0xC7912587FFF31B71ULL), nullptr);
@@ -897,17 +883,17 @@ int InitApp(HINSTANCE instance, int showCommand) {
       const __int64 trayWidth = trayRect.right - trayRect.left;
       const __int64 trayHeight = trayRect.bottom - trayRect.top;
       if (trayWidth < trayHeight) {
-        windowWidth = static_cast<int>(screenWidth - trayWidth);
-      } else if (trayHeight < trayWidth) {
-        windowHeight = static_cast<int>(screenHeight - trayHeight);
+        width = screenWidth - trayWidth;
+      } else if (trayWidth > trayHeight) {
+        height = screenHeight - trayHeight;
       }
     }
   }
 
-  hWnd = CreateApplicationWindow(0, windowClass.lpszClassName, g_windowName, style, x, y, windowWidth, windowHeight, nullptr, nullptr, instance, nullptr);
+  hWnd = CreateWindowExA(0, windowClass.lpszClassName, g_windowName, style, x, y, static_cast<int>(width), static_cast<int>(height), nullptr, nullptr, instance, nullptr);
   if (!hWnd) {
     const char* caption = OBFUSCATE_BYTES_TEXT("ERROR", 0x078333BB9725B7C9ULL);
-    MessageBoxA(nullptr, OBFUSCATE_BYTES_TEXT("Window Creation Failed", 0x8F1B5BFD5F6175B5ULL), caption, MB_OK);
+    MessageBoxA(nullptr, OBFUSCATE_TEXT("Window Creation Failed", 0x8F1B5BFD5F6175B5ULL), caption, MB_OK);
     return 0;
   }
 
@@ -1128,7 +1114,7 @@ std::pair<bool, std::string> InitializeManagers() {
     return std::pair<bool, std::string>(false, std::string(name.Text()));
   }
 
-  InitMapTypeInfoTable();
+  g_session.InitMapTypeInfoTable();
   if (!RodexMailStore::Create()) {
     const std::array<char, 34> nameSource = OBFUSCATE_SOURCE_ARRAY_CHAR("CRodexSystemMgr::CreateInstance()", 0x07112F85A39F4FABULL);
     EncryptedName<sizeof(nameSource), 0x07112F85A39F4FABULL>& name = OBFUSCATE_DECRYPT_NAME(0x07112F85A39F4FABULL, nameSource);
@@ -1299,7 +1285,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
 
   const std::array<char, 6> rocSource = OBFUSCATE_SOURCE_ARRAY_CHAR("1roc1", 0xE3FB23537D2785BFULL);
   EncryptedName<sizeof(rocSource), 0xE3FB23537D2785BFULL>& roc = OBFUSCATE_DECRYPT_NAME(0xE3FB23537D2785BFULL, rocSource);
-  g_session.SetOption(18, std::strstr(commandLine, roc.Text()) != nullptr, 0);
+  g_session.SetOption(18, std::strstr(commandLine, roc.Text()) != nullptr);
 
   const std::array<char, 15> stoveSandboxSource = OBFUSCATE_SOURCE_ARRAY_CHAR("/stove_sandbox", 0x1FDB81175D1557E3ULL);
   EncryptedName<sizeof(stoveSandboxSource), 0x1FDB81175D1557E3ULL>& stoveSandbox = OBFUSCATE_DECRYPT_NAME(0x1FDB81175D1557E3ULL, stoveSandboxSource);
@@ -1397,7 +1383,30 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
 
   const std::array<char, 6> ragSource = OBFUSCATE_SOURCE_ARRAY_CHAR("1rag1", 0x6BC977B3B5993503ULL);
   EncryptedName<sizeof(ragSource), 0x6BC977B3B5993503ULL>& rag = OBFUSCATE_DECRYPT_NAME(0x6BC977B3B5993503ULL, ragSource);
-  std::strstr(commandLine, rag.Text());
+  if (!std::strstr(commandLine, rag.Text())) {
+    const std::array<char, 6> sakArgumentSource = OBFUSCATE_SOURCE_ARRAY_CHAR("1sak1", 0x91493751EF33B5FDULL);
+    EncryptedName<sizeof(sakArgumentSource), 0x91493751EF33B5FDULL>& sakArgument = OBFUSCATE_DECRYPT_NAME(0x91493751EF33B5FDULL, sakArgumentSource);
+    if (!std::strstr(commandLine, sakArgument.Text())) {
+      const std::array<char, 6> guildSource = OBFUSCATE_SOURCE_ARRAY_CHAR("1gld1", 0x67DD5BAB1919D9D1ULL);
+      EncryptedName<sizeof(guildSource), 0x67DD5BAB1919D9D1ULL>& guild = OBFUSCATE_DECRYPT_NAME(0x67DD5BAB1919D9D1ULL, guildSource);
+      if (!std::strstr(commandLine, guild.Text())) {
+        const std::array<char, 6> secondRagSource = OBFUSCATE_SOURCE_ARRAY_CHAR("2rag2", 0xB5F3F779237315F3ULL);
+        EncryptedName<sizeof(secondRagSource), 0xB5F3F779237315F3ULL>& secondRag = OBFUSCATE_DECRYPT_NAME(0xB5F3F779237315F3ULL, secondRagSource);
+        if (!std::strstr(commandLine, secondRag.Text())) {
+          const std::array<char, 6> eventArgumentSource = OBFUSCATE_SOURCE_ARRAY_CHAR("1eve1", 0xB96B77B7255F8569ULL);
+          EncryptedName<sizeof(eventArgumentSource), 0xB96B77B7255F8569ULL>& eventArgument = OBFUSCATE_DECRYPT_NAME(0xB96B77B7255F8569ULL, eventArgumentSource);
+          if (!std::strstr(commandLine, eventArgument.Text())) {
+            const std::array<char, 5> pkSource = OBFUSCATE_SOURCE_ARRAY_CHAR("1pk1", 0x9BE3EF737387AD79ULL);
+            EncryptedName<sizeof(pkSource), 0x9BE3EF737387AD79ULL>& pk = OBFUSCATE_DECRYPT_NAME(0x9BE3EF737387AD79ULL, pkSource);
+            if (!std::strstr(commandLine, pk.Text())) {
+              ShowErrorDialog(g_runPatcherMessage, 0);
+              return 0;
+            }
+          }
+        }
+      }
+    }
+  }
 
   {
     std::string arguments(commandLine);
@@ -1417,38 +1426,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
   std::memset(protection, 0, sizeof(protection));
   const std::array<char, 9> dataGrfSource = OBFUSCATE_SOURCE_ARRAY_CHAR("data.grf", 0x875FCDF1E7A1795FULL);
   EncryptedName<sizeof(dataGrfSource), 0x875FCDF1E7A1795FULL>& dataGrf = OBFUSCATE_DECRYPT_NAME(0x875FCDF1E7A1795FULL, dataGrfSource);
-  dataGrf.Text();
-  HMODULE kernel = GetModuleHandleA("kernel32.dll");
-  if (kernel) {
-    typedef DWORD(WINAPI * ReadProfileString)(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
-    typedef BOOL(WINAPI * WriteProfileString)(LPCSTR, LPCSTR, LPCSTR, LPCSTR);
-    auto readString = reinterpret_cast<ReadProfileString>(GetProcAddress(kernel, "GetPrivateProfileStringA"));
-    if (readString) {
-      auto writeString = reinterpret_cast<WriteProfileString>(GetProcAddress(kernel, "WritePrivateProfileStringA"));
-      if (writeString) {
-        bool loading = true;
-        while (loading) {
-          int added = 0;
-          char key[2] = {'9', 0};
-          do {
-            char file[0x74];
-            readString("Data", key, key, file, sizeof(file), ".\\DATA.INI");
-            if (file[0] != key[0] || file[1] != key[1]) {
-              g_pakRegistry.Add(file);
-              ++added;
-            }
-
-            --key[0];
-          } while (key[0] >= '0');
-
-          key[0] = '2';
-          key[1] = 0;
-          loading = added == 0 && writeString("Data", key, "data.grf", ".\\DATA.INI");
-        }
-      }
-    }
-  }
-  LoadClientInfo(protection);
+  g_pakRegistry.Add(dataGrf.Text());
+  InitializeServiceStrings(protection);
 
   const std::array<char, 15> patchSandboxSource = OBFUSCATE_SOURCE_ARRAY_CHAR("/stove_sandbox", 0x79DF094DD9616575ULL);
   EncryptedName<sizeof(patchSandboxSource), 0x79DF094DD9616575ULL>& patchSandbox = OBFUSCATE_DECRYPT_NAME(0x79DF094DD9616575ULL, patchSandboxSource);
@@ -1502,12 +1481,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
   if (!CSoundMgr::Create()) {
     const std::array<char, 25> audioFailureSource = OBFUSCATE_SOURCE_ARRAY_CHAR("Audio System Init Failed", 0x6BF729E30729CF29ULL);
     EncryptedName<sizeof(audioFailureSource), 0x6BF729E30729CF29ULL>& audioFailure = OBFUSCATE_DECRYPT_NAME(0x6BF729E30729CF29ULL, audioFailureSource);
-    if (audioFailure.Encrypted()) {
-      audioFailure.Text();
-    } else {
-      ShowErrorDialog(audioFailure.Text(), MB_OK);
-      return 0;
-    }
+    ShowErrorDialog(audioFailure.Text(), MB_OK);
+    return 0;
   }
 
   g_session.InitClientData();
@@ -1664,13 +1639,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
   if (g_restartClient) {
     const std::array<char, 4> devServerSource = OBFUSCATE_SOURCE_ARRAY_CHAR("Dev", 0x4B755DB19953E311ULL);
     EncryptedName<sizeof(devServerSource), 0x4B755DB19953E311ULL>& devServer = OBFUSCATE_DECRYPT_NAME(0x4B755DB19953E311ULL, devServerSource);
-    if (!std::strstr(g_launchServerName, devServer.Text())) {
-      const char* parameters = LookupMessage(MSI_FRIEND_ALREADY_FRIEND);
-      const char* file = LookupMessage(MSI_FRIEND_ALREADY_FRIEND);
-      const std::array<char, 5> openSource = OBFUSCATE_SOURCE_ARRAY_CHAR("OPEN", 0xD7A749EB27D5BF6DULL);
-      EncryptedName<sizeof(openSource), 0xD7A749EB27D5BF6DULL>& open = OBFUSCATE_DECRYPT_NAME(0xD7A749EB27D5BF6DULL, openSource);
-      ShellExecuteA(nullptr, open.Text(), file, parameters, nullptr, SW_SHOWNORMAL);
-    } else if (g_serviceMode == 0) {
+    if (std::strstr(g_launchServerName, devServer.Text())) {
+      if (g_serviceMode == 0) {
       const std::array<char, 62> parametersSource = OBFUSCATE_SOURCE_ARRAY_CHAR("http://admtools.gnjoy.com/gamestarter/devro.asp?GameCode=4011", 0xFD69A9B3F311818DULL);
       EncryptedName<sizeof(parametersSource), 0xFD69A9B3F311818DULL>& parameters = OBFUSCATE_DECRYPT_NAME(0xFD69A9B3F311818DULL, parametersSource);
       const char* arguments = parameters.Text();
@@ -1690,6 +1660,13 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR commandLine, in
       const std::array<char, 5> openSource = OBFUSCATE_SOURCE_ARRAY_CHAR("OPEN", 0x9B0F234DEFDF7593ULL);
       EncryptedName<sizeof(openSource), 0x9B0F234DEFDF7593ULL>& open = OBFUSCATE_DECRYPT_NAME(0x9B0F234DEFDF7593ULL, openSource);
       ShellExecuteA(nullptr, open.Text(), target, arguments, nullptr, SW_SHOWNORMAL);
+      }
+    } else {
+      const char* parameters = LookupMessage(MSI_WEB_ADDRESS_FOR_RESTART);
+      const char* file = LookupMessage(MSI_WEB_ADDRESS_FOR_RESTART);
+      const std::array<char, 5> openSource = OBFUSCATE_SOURCE_ARRAY_CHAR("OPEN", 0xD7A749EB27D5BF6DULL);
+      EncryptedName<sizeof(openSource), 0xD7A749EB27D5BF6DULL>& open = OBFUSCATE_DECRYPT_NAME(0xD7A749EB27D5BF6DULL, openSource);
+      ShellExecuteA(nullptr, open.Text(), file, parameters, nullptr, SW_SHOWNORMAL);
     }
   }
 

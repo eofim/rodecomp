@@ -75,7 +75,8 @@ void UICaptchaRegisterWnd::OnCreate(int width, int height) {
   this->m_fileComboBox->SetColor(232, 232, 232);
   this->AddChild(this->m_fileComboBox);
 
-  for (const std::string& file : files) {
+  for (auto fileIt = files.begin(); fileIt != files.end(); ++fileIt) {
+    const std::string& file = *fileIt;
     this->m_fileComboBox->AddOption(file.c_str(), 0);
   }
 
@@ -97,7 +98,7 @@ void UICaptchaRegisterWnd::OnCreate(int width, int height) {
   this->registerButton->SetBitmap("유저인터페이스\\btn_ok_dis.bmp", 3, 0);
   this->registerButton->SetSize(this->registerButton->BitmapWidth(), this->registerButton->BitmapHeight());
   this->registerButton->Move(238, 181);
-  this->registerButton->SetId(345);
+  this->registerButton->SetId(ID_SEND);
   this->AddChild(this->registerButton);
 }
 
@@ -115,57 +116,22 @@ int UICaptchaRegisterWnd::SendMsg(
   UIWindow* sender, int message, std::intptr_t a1, std::intptr_t a2, std::intptr_t a3, std::intptr_t a4
 ) {
   switch (message) {
-  case UM_COMBOBOX_SELECTED:
-    if (sender == this->m_fileComboBox) {
-      this->m_selectedFile = this->m_fileComboBox->GetSelectedText();
-      if (!this->m_selectedFile.empty()) {
-        std::string fullPath = this->m_pathText->tooltip.c_str() + this->m_selectedFile;
-        CFile file;
-        if (file.Open(fullPath.c_str(), 0, 1, 0)) {
-          CBitmapRes bitmap;
-          if (bitmap.Decode(fullPath.c_str(), file.GetData(), file.GetSize(), false)) {
-            if (bitmap.image.width == 220 && bitmap.image.height == 90) {
-              if (this->m_decompressedData != nullptr) {
-                std::free(this->m_decompressedData);
-                this->m_decompressedData = nullptr;
-                this->m_decompressedSize = 0;
-              }
-
-              this->m_decompressedSize = compressBound(file.GetSize());
-              this->m_decompressedData = std::malloc(this->m_decompressedSize);
-              compress(
-                static_cast<Bytef*>(this->m_decompressedData),
-                &this->m_decompressedSize,
-                static_cast<const Bytef*>(file.GetData()),
-                file.GetSize()
-              );
-
-              this->m_captchaBitmap->SetBitmap(fullPath.c_str());
-              this->m_captchaBitmap->Invalidate();
-              this->Invalidate();
-            } else {
-              g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("image size error"), 0xFF, 0, 0, 0);
-            }
-          }
-        }
-      }
-    }
-    break;
   case UM_COMMAND:
     switch (a1) {
     case ID_SEND:
       if (this->m_editCtrl->Length() < 4) {
-        g_windowMgr.Confirm(LookupMessage(MSI_MACRO_DETECTOR_WRONG_ANSWER_REMAIN_CNT), 0, 1, 0, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_MACRO_INPUT_ANSWER), 0, 1, 0, 0, "Message", 280, 120, 0);
       } else if (this->m_selectedFile.empty()) {
-        g_windowMgr.Confirm(LookupMessage(MSI_MACRO_SEND_MACRO), 0, 1, 0, 0, "Message", 280, 120, 0);
-      } else if (this->m_decompressedSize == 0) {
+        g_windowMgr.Confirm(LookupMessage(MSI_MACRO_SELECT_CAPTCHA), 0, 1, 0, 0, "Message", 280, 120, 0);
+      } else if (this->m_decompressedSize <= 0) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("compress data size error"), 0xFF, 0, 0, 0);
       } else {
         const int result =
-          g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_MACRO_REPORTER), this->m_editCtrl->Text()).c_str(), 2, 0, 0, 0, "Message", 280, 120, 0);
-        if (result != 188) {
-          this->registerButton->SetDisabled(1);
-          this->registerButton->Invalidate();
+          g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_MACRO_CHECK_ANSWER), this->m_editCtrl->Text()).c_str(), 2, 0, 0, 0, "Message", 280, 120, 0);
+        if (result != ID_NO) {
+          UIBitmapButton* button = this->registerButton;
+          button->SetDisabled(1);
+          button->Invalidate();
 
           CaptchaRegisterPacket packet;
           packet.id = ID_CZ_REQ_UPLOAD_MACRO_DETECTOR;
@@ -181,6 +147,42 @@ int UICaptchaRegisterWnd::SendMsg(
     case ID_CLOSE:
       g_windowMgr.CloseWindow(WID_CAPTCHAREGISTERWND);
       break;
+    }
+    break;
+  case UM_COMBOBOX_SELECTED:
+    if (sender == this->m_fileComboBox) {
+      this->m_selectedFile = this->m_fileComboBox->GetSelectedText();
+      if (!this->m_selectedFile.empty()) {
+        std::string fullPath = this->m_pathText->tooltip.c_str() + this->m_selectedFile;
+        CFile file;
+        if (file.Open(fullPath.c_str(), 0, 1, 0)) {
+          CBitmapRes bitmap;
+          if (bitmap.Decode(fullPath.c_str(), file.GetData(), file.GetSize(), false)) {
+            if (bitmap.image.width == 220 && bitmap.image.height == 90) {
+              if (this->m_decompressedData != nullptr) {
+                delete[] this->m_decompressedData;
+                this->m_decompressedData = nullptr;
+                this->m_decompressedSize = 0;
+              }
+
+              this->m_decompressedSize = compressBound(file.GetSize());
+              this->m_decompressedData = new unsigned char[this->m_decompressedSize];
+              compress(
+                this->m_decompressedData,
+                &this->m_decompressedSize,
+                static_cast<const Bytef*>(file.GetData()),
+                file.GetSize()
+              );
+
+              this->m_captchaBitmap->SetBitmap(fullPath.c_str());
+              this->m_captchaBitmap->Invalidate();
+              this->Invalidate();
+            } else {
+              g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("image size error"), 0xFF, 0, 0, 0);
+            }
+          }
+        }
+      }
     }
     break;
   }

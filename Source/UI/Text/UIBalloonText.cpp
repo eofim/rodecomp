@@ -2,6 +2,7 @@
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/ActorNameCard.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Tables/ForbiddenWords.h"
 #include "Render/DeviceContext/DeviceContext.h"
 #include "Render/Text/TextContext.h"
@@ -19,10 +20,6 @@
 #include <cstring>
 #include <string>
 #include <utility>
-
-template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
-
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
 
 // GLOBAL: gl_24926
 int g_nameBalloonFontHeight = 12;
@@ -52,8 +49,6 @@ __declspec(noinline) UIBalloonText::UIBalloonText() : UIWindow(0) {
   this->m_textColor = 0xFFFFFF;
   this->m_outlineColor = 0;
 }
-
-UIBalloonText::~UIBalloonText() = default;
 
 // OFFSET: 0x00851A00
 // FUNCTION: fn_10695
@@ -109,24 +104,25 @@ void UIBalloonText::FitText() {
   int height = 4;
 
   for (unsigned int index = 0; index < this->m_lines.size(); ++index) {
-    if (this->m_fontMode == 3) {
+    const std::int16_t mode = this->m_fontMode;
+    if (mode == 3) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 22, this->m_fontHeight, 0, 0));
       height = (height + (this->TextHeight(this->m_lines[index].c_str(), 0, 22, this->m_fontHeight, 0, 0) + 4));
-    } else if (this->m_fontMode == 2) {
+    } else if (mode == 2) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 20, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 1) {
+    } else if (mode == 1) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 21, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 4) {
+    } else if (mode == 4) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 23, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 5) {
+    } else if (mode == 5) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 24, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 6) {
+    } else if (mode == 6) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 25, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 7) {
+    } else if (mode == 7) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 26, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 8) {
+    } else if (mode == 8) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 27, this->m_fontHeight, 0, 0));
-    } else if (this->m_fontMode == 9) {
+    } else if (mode == 9) {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 28, this->m_fontHeight, 0, 0));
     } else {
       width = std::max(width, this->TextWidth(this->m_lines[index].c_str(), 0, 0, this->m_fontHeight, 0, 0));
@@ -300,8 +296,6 @@ void UINameBalloonText::SetIcon(const char* name, unsigned char framed) {
     this->iconName = path;
     if (!framed) {
       this->Resize(this->nameWidth + 25, std::max(this->geometry.height, 24));
-      this->Invalidate();
-      return;
     }
   }
 
@@ -311,6 +305,21 @@ void UINameBalloonText::SetIcon(const char* name, unsigned char framed) {
 
   this->Invalidate();
 }
+
+// OFFSET: 0x00865C40
+// FUNCTION: fn_45617
+void UIVerticalNameBalloonText::SetIcon(const char* name) {
+  if (name == nullptr || std::strlen(name) == 0) {
+    return;
+  }
+
+  this->iconName = name;
+  if (this->iconName.size() != 0) {
+    this->Resize(std::max(this->geometry.width, 24), this->textHeight + 25);
+  }
+  this->Invalidate();
+}
+
 // OFFSET: 0x0084FED0
 // FUNCTION: fn_10668
 UINameBalloonText::UINameBalloonText() : UIBalloonText(), monsterType(0), framed(0) {
@@ -339,18 +348,18 @@ void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsi
   }
 
   if (g_serviceFlag05) {
-    if (std::strlen(info.displayName.c_str()) != 0) {
+    if (info.displayName[0] != '\0') {
       this->m_lines.push_back(info.displayName.c_str());
     }
 
-    if (std::strlen(info.clanName.c_str()) == 0) {
+    if (info.clanName[0] == '\0') {
       this->nameWidth = 0;
     } else {
       char position[260];
       std::memset(position, 0, sizeof(position));
       strncpy_s(position, sizeof(position), info.clanName.c_str(), info.clanName.size());
-      if (g_forbiddenWords.Contains(position)) {
-        std::string masked;
+      if (g_forbiddenWords.Contains(position) == true) {
+        std::string masked = "";
         g_forbiddenWords.Mask(position, &masked);
       }
       this->m_lines.push_back(position);
@@ -358,36 +367,40 @@ void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsi
 
     this->m_lines.push_back(name.c_str());
   } else {
-    if (std::strlen(info.displayName.c_str()) != 0) {
+    if (info.displayName[0] != '\0') {
       this->m_lines.push_back(info.displayName.c_str());
     }
 
-    if (std::strlen(info.title.c_str()) != 0) {
-      name = FormatOwnedString("[%s] %s", info.title.c_str(), name.c_str());
+    if (info.title[0] != '\0') {
+      name = static_cast<const std::string&>(FormatOwnedString("[%s] %s", info.title.c_str(), name.c_str()));
     }
 
-    if (std::strlen(info.partyName.c_str()) == 0) {
+    if (info.partyName[0] == '\0') {
       this->m_lines.push_back(name.c_str());
     } else {
       char party[260];
       std::memset(party, 0, sizeof(party));
       strncpy_s(party, sizeof(party), info.partyName.c_str(), info.partyName.size());
-      if (g_forbiddenWords.Contains(party)) {
-        std::string masked;
+      if (g_forbiddenWords.Contains(party) == true) {
+        std::string masked = "";
         g_forbiddenWords.Mask(party, &masked);
       }
 
       char line[260];
       std::memset(line, 0, sizeof(line));
-      sprintf_s(line, sizeof(line), g_serviceType != 0 ? "%s (%s)" : "%s (%s) ", name.c_str(), party);
+      if (g_serviceType == ServiceKorea) {
+        sprintf_s(line, sizeof(line), "%s (%s) ", name.c_str(), party);
+      } else {
+        sprintf_s(line, sizeof(line), "%s (%s)", name.c_str(), party);
+      }
       this->m_lines.push_back(line);
     }
 
-    if (std::strlen(info.guildName.c_str()) != 0) {
+    if (info.guildName[0] != '\0') {
       char guild[260];
       std::memset(guild, 0, sizeof(guild));
       strncpy_s(guild, sizeof(guild), info.guildName.c_str(), info.guildName.size());
-      if (g_forbiddenWords.Contains(guild)) {
+      if (g_forbiddenWords.Contains(guild) == true) {
         std::string masked = "";
         g_forbiddenWords.Mask(guild, &masked);
       }
@@ -395,21 +408,26 @@ void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsi
       char position[260];
       std::memset(position, 0, sizeof(position));
       strncpy_s(position, sizeof(position), info.clanName.c_str(), info.clanName.size());
-      if (g_forbiddenWords.Contains(position)) {
+      if (g_forbiddenWords.Contains(position) == true) {
         std::string masked = "";
         g_forbiddenWords.Mask(position, &masked);
       }
 
       char line[260];
       std::memset(line, 0, sizeof(line));
-      sprintf_s(line, sizeof(line), g_serviceType != 0 ? "%s [%s]" : "%s (%s) ", guild, position);
+      if (g_serviceType == ServiceKorea) {
+        sprintf_s(line, sizeof(line), "%s (%s) ", guild, position);
+      } else {
+        sprintf_s(line, sizeof(line), "%s [%s]", guild, position);
+      }
       this->m_lines.push_back(line);
     }
   }
 
   int width = 32;
   for (auto line = this->m_lines.begin(); line != this->m_lines.end(); ++line) {
-    const int lineWidth = this->TextWidth(line->c_str(), 0, 0, g_nameBalloonFontHeight, g_serviceFlag06, 0) + 8;
+    const std::string text = *line;
+    const int lineWidth = this->TextWidth(text.c_str(), 0, 0, g_nameBalloonFontHeight, g_serviceFlag06, 0) + 8;
     width = std::max(lineWidth, width);
   }
 
@@ -449,10 +467,10 @@ void UINameBalloonText::AddNameLine(const char* text) {
   }
 
   this->m_lines.clear();
-  this->m_lines.push_back(std::string(text));
-  const std::string& last = this->m_lines.back();
-  this->nameWidth =
-    std::max(this->TextWidth(last.c_str(), last.size(), 0, g_nameBalloonFontHeight, g_serviceFlag06, 0) + 8, 32);
+  this->m_lines.push_back(text);
+  this->nameWidth = std::max(
+    this->TextWidth(this->m_lines.back().c_str(), this->m_lines.back().size(), 0, g_nameBalloonFontHeight, g_serviceFlag06, 0) + 8, 32
+  );
   this->Resize(this->nameWidth, g_nameBalloonFontHeight + 8);
   this->Invalidate();
 }
@@ -465,9 +483,65 @@ void UIVerticalNameBalloonText::AddNameLine(const char* text) {
   }
 
   this->m_lines.clear();
-  this->m_lines.push_back(std::string(text));
+  this->m_lines.push_back(text);
   const int textHeight = this->VerticalTextHeight(this->m_lines.back().c_str(), 0, 0, g_nameBalloonFontHeight, g_serviceFlag06);
   this->textHeight = std::max(textHeight + 8, 32);
   this->Resize(g_nameBalloonFontHeight + 8, this->textHeight);
   this->Invalidate();
+}
+
+// OFFSET: 0x00867000
+// FUNCTION: fn_45651
+void UIVerticalNameBalloonText::SetNameLines(const CActorNameCard& info, bool stripHash) {
+  this->m_lines.clear();
+
+  std::string name = info.name;
+  if (stripHash) {
+    const std::size_t hash = name.find('#');
+    if (hash != std::string::npos) {
+      name.resize(hash);
+    }
+  }
+
+  char line[256];
+  if (g_serviceFlag05) {
+    if (info.clanName[0] == '\0') {
+      this->textHeight = 0;
+    } else {
+      this->m_lines.push_back(info.clanName.c_str());
+      const int height = this->VerticalTextHeight(this->m_lines.back().c_str(), this->m_lines.back().size(), 0, g_nameBalloonFontHeight, g_serviceFlag06);
+      this->textHeight = std::max(height + 8, 32);
+    }
+    this->m_lines.push_back(name.c_str());
+    const int nameHeight = this->VerticalTextHeight(this->m_lines.back().c_str(), 0, 0, g_nameBalloonFontHeight, g_serviceFlag06);
+    this->textHeight = std::max(nameHeight + 8, this->textHeight);
+  } else {
+    if (info.partyName[0] == '\0') {
+      this->m_lines.push_back(name.c_str());
+    } else {
+      std::sprintf(line, "%s (%s)", name.c_str(), info.partyName.c_str());
+      this->m_lines.push_back(line);
+    }
+    const int firstHeight = this->VerticalTextHeight(this->m_lines.back().c_str(), this->m_lines.back().size(), 0, g_nameBalloonFontHeight, g_serviceFlag06);
+    this->textHeight = std::max(firstHeight + 8, 32);
+
+    if (info.guildName[0] != '\0') {
+      std::sprintf(line, "%s [%s]", info.guildName.c_str(), info.clanName.c_str());
+      this->m_lines.push_back(line);
+      const int guildHeight = this->VerticalTextHeight(this->m_lines.back().c_str(), 0, 0, g_nameBalloonFontHeight, g_serviceFlag06);
+      this->textHeight = std::max(guildHeight + 8, this->textHeight);
+    }
+  }
+
+  this->Resize(this->textHeight, static_cast<int>(this->m_lines.size()) * (g_nameBalloonFontHeight + 2) + 6);
+  this->Invalidate();
+}
+
+// FOLDED: fn_21415
+std::string UIBalloonText::GetLine(unsigned int index) {
+  if (!this->m_lines.empty() && index <= this->m_lines.size()) {
+    return this->m_lines[index];
+  }
+
+  return "";
 }

@@ -16,6 +16,10 @@
 #include "UI/Window/WindowBorder.h"
 #include "UI/Text/UIStaticText.h"
 
+// OFFSET: 0x008519B0
+// FUNCTION: fn_45642
+UIMerchantShopTitle::~UIMerchantShopTitle() = default;
+
 // OFFSET: 0x0085ACE0
 // FUNCTION: fn_10788
 void UIMerchantShopTitle::OnCreate(int, int) {
@@ -38,8 +42,9 @@ void UIMerchantShopTitle::Paint() {
   const std::uint32_t color = this->ownerAid == g_session.storeSearchOwnerAid ? 0x7DFAFF : 0xFFFFFF;
   this->DrawFilledRoundedOutline(0, 0, this->geometry.width, this->geometry.height - 6, color);
   this->DrawRoundedOutline(2, 2, this->geometry.width - 4, this->geometry.height - 10, 0xC3C3C3);
-  const char* icon = this->buyingShop != 0 ? "유저인터페이스\\buyingshop.bmp" : "유저인터페이스\\shop.bmp";
-  this->DrawBitmap(3, 3, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(icon))), true);
+  const int buying = this->buyingShop;
+  CBitmapRes* icon = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(buying == 0 ? "유저인터페이스\\shop.bmp" : "유저인터페이스\\buyingshop.bmp")));
+  this->DrawBitmap(3, 3, icon, true);
 }
 
 // OFFSET: 0x0085EC40
@@ -97,6 +102,14 @@ UIMerchantShopTitle::UIMerchantShopTitle(int buyingShop) : UIWindow(0), buyingSh
   this->geometry.id = 189;
 }
 
+// INLINED
+static void SetLabelFont(UIStaticText* label, int family, int height) {
+  label->fontFamily = family;
+  label->fontHeight = height;
+  label->bold = 0;
+  label->italic = 0;
+}
+
 // OFFSET: 0x00864DB0
 // FUNCTION: fn_10918
 int UIMerchantShopTitle::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -117,43 +130,41 @@ int UIMerchantShopTitle::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       title = title.substr(0, end);
     }
 
+    const char* fitted = title.c_str();
     this->fontStyle = static_cast<std::int16_t>(b);
     switch (this->fontStyle) {
     case 1:
-      this->label->fontFamily = 21;
+      SetLabelFont(this->label, 21, 12);
       break;
     case 2:
-      this->label->fontFamily = 20;
+      SetLabelFont(this->label, 20, 12);
       break;
     case 3:
-      this->label->fontFamily = 22;
+      SetLabelFont(this->label, 22, 12);
       break;
     case 4:
-      this->label->fontFamily = 23;
+      SetLabelFont(this->label, 23, 12);
       break;
     case 5:
-      this->label->fontFamily = 24;
+      SetLabelFont(this->label, 24, 12);
       break;
     case 6:
-      this->label->fontFamily = 25;
+      SetLabelFont(this->label, 25, 12);
       break;
     case 7:
-      this->label->fontFamily = 26;
+      SetLabelFont(this->label, 26, 12);
       break;
     case 8:
-      this->label->fontFamily = 27;
+      SetLabelFont(this->label, 27, 12);
       break;
     case 9:
-      this->label->fontFamily = 28;
+      SetLabelFont(this->label, 28, 12);
       break;
     default:
-      this->label->fontFamily = 0;
+      SetLabelFont(this->label, 0, 12);
       break;
     }
-    this->label->bold = 0;
-    this->label->italic = 0;
-    this->label->fontHeight = 12;
-    this->label->SetTextFitted(title.c_str());
+    this->label->SetTextFitted(fitted);
     this->Invalidate();
     break;
   }

@@ -35,9 +35,24 @@ UIGuild_Storage_Log::UIGuild_Storage_Log() : UIFrameWnd(0) {
   this->m_pageCounts[2] = (third + 9) / 10;
 }
 
+// INLINED
+static unsigned PreviousOffset(int state, const unsigned& offset) {
+  if (state == 11) {
+    return std::max(0u, offset - 20);
+  }
+  return std::max(0u, offset - offset % 10 - 10);
+}
+
 // OFFSET: 0x00950450
 // FUNCTION: fn_12941
 int UIGuild_Storage_Log::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
+  const auto select = [this](int category) {
+    this->m_category = category;
+    this->m_page = 1;
+    this->m_state = 1;
+    this->m_logTextHeight = 0;
+    this->m_offset = 0;
+  };
   switch (message) {
   case UM_COMMAND:
     switch (a) {
@@ -74,14 +89,7 @@ int UIGuild_Storage_Log::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         this->m_state = 1;
         this->m_logTextHeight = 0;
 
-        unsigned offset;
-        if (state == 11) {
-          offset = this->m_offset - 20;
-        } else {
-          offset = this->m_offset - this->m_offset % 10 - 10;
-        }
-
-        this->m_offset = std::max(0u, offset);
+        this->m_offset = PreviousOffset(state, this->m_offset);
         this->m_page = std::max(1u, page - 1);
         this->m_rowFlags.clear();
         this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
@@ -94,11 +102,7 @@ int UIGuild_Storage_Log::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     return 0;
 
   case UM_TAB:
-    this->m_category = static_cast<int>(a);
-    this->m_page = 1;
-    this->m_state = 1;
-    this->m_logTextHeight = 0;
-    this->m_offset = 0;
+    select(static_cast<int>(a));
     this->m_rowFlags.clear();
     this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
     return 0;
@@ -122,9 +126,10 @@ int UIGuild_Storage_Log::SendMsg(UIWindow* sender, int message, std::intptr_t a,
 // INLINED
 __forceinline void UIGuild_Storage_Log::FillLogRows(int index) {
   const std::vector<GuildStorageLogEntry>& logs = g_session.guildStorageLogs[index];
+  auto it = logs.begin();
   char number[256];
   std::memset(number, 0, 255);
-  for (auto it = logs.begin(); it != logs.end(); ++this->m_state, ++it, ++this->m_offset) {
+  for (; it != logs.end(); ++this->m_state, ++it, ++this->m_offset) {
     if (static_cast<unsigned>(this->m_state) >= 11 || this->m_offset >= this->m_categoryCounts[index]) {
       break;
     }
@@ -185,31 +190,31 @@ void UIGuild_Storage_Log::FillRows() {
 // OFFSET: 0x0094D290
 // FUNCTION: fn_12904
 void UIGuild_Storage_Log::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_INCORRECT_GAMESAMBEID), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_GUILD_STORAGE_LOG_WND_NAME), 0);
   this->DrawPanelBackground(17, 0, "");
   this->DrawButtonBar(2, 0, 1);
   CBitmapRes* out = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\out.bmp")));
   CBitmapRes* in = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\in.bmp")));
 
   for (int tab = 0; tab < static_cast<int>(this->m_tabs->labels.size()); ++tab) {
-    this->m_tabs->colors[tab] = 0xFFFFFFFF;
-    this->m_tabs->Invalidate();
+    UITabControl* tabs = this->m_tabs;
+    tabs->colors[tab] = 0xFFFFFFFF;
+    tabs->Invalidate();
   }
   UITabControl* tabs = this->m_tabs;
   tabs->colors[this->m_category] = 0xC89623;
   tabs->Invalidate();
 
-  this->DrawTextAt(234, 23, LookupMessage(MSI_EA5), 0, 0, 11, 0xFF, 0, 0);
-  this->DrawTextAt(6, 47, LookupMessage(MSI_GUILD_STORAGE_LOG_IN), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(70, 47, LookupMessage(MSI_GUILD_STORAGE_LOG_TIME), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(150, 47, LookupMessage(MSI_GUILD_STORAGE_ITEM_IN_OUT), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(200, 47, LookupMessage(MSI_GUILD_STORAGE_LOG_FINISH), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(320, 47, LookupMessage(MSI_GUILD_STORAGE_LOG_ALL), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(234, 23, LookupMessage(MSI_GUILD_STORAGE_LOG_CAUTION), 0, 0, 11, 0xFF, 0, 0);
+  this->DrawTextAt(6, 47, LookupMessage(MSI_GUILD_STORAGE_ITEM_IN_OUT), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(70, 47, LookupMessage(MSI_GUILD_STORAGE_ITEM), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(150, 47, LookupMessage(MSI_GUILD_STORAGE_ITEM_COUNT), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(200, 47, LookupMessage(MSI_GUILD_STORAGE_USER_NAME), 0, 0, 12, 0, 0, 0);
+  this->DrawTextAt(320, 47, LookupMessage(MSI_GUILD_STORAGE_LOG_TIME), 0, 0, 12, 0, 0, 0);
   this->FillRows();
 
-  int y = 60;
-  for (auto it = this->m_rowFlags.begin(); it != this->m_rowFlags.end(); ++it) {
-    this->DrawBitmap(6, y, *it != 1 ? out : in, true);
-    y += 15;
+  int row = 0;
+  for (auto it = this->m_rowFlags.begin(); it != this->m_rowFlags.end(); ++it, ++row) {
+    this->DrawBitmap(6, 60 + 15 * row, *it != 1 ? out : in, true);
   }
 }

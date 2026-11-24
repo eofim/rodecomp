@@ -12,7 +12,9 @@ class UIComboBoxDefWnd;
 class UIListBox;
 
 struct SecondCostumeEntry {
-  SecondCostumeEntry() : name(""), value(0) {
+  SecondCostumeEntry(const char* entryName, int entryValue) {
+    this->name = entryName;
+    this->value = entryValue;
   }
   ~SecondCostumeEntry() {
     this->name.clear();
@@ -34,6 +36,8 @@ public:
   void DrawCharacterPreview(int x, int y);
   void LoadLists();
   void SelectSavedEntries();
+  int SelectedEntryValue(int tab) const;
+  int FindEntryIndex(int tab, int value) const;
 
 protected:
   /* 00B4 */ UIComboBoxDefWnd* m_typeCombo;

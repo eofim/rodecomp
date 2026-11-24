@@ -28,6 +28,7 @@ public:
   UIBitmapButton* AddBaseButton();
   UIBitmapButton* AddBigCloseButton(const char* tooltip, int width);
   UIBitmapButton* AddMinimizeButton(const char* tooltip, int width);
+  UIBitmapButton* AddMaximizeButton(const char* tooltip, int width);
   UIBitmapButton* AddBitmapButton(int id, int x, int y, const char* name, const char* tooltip);
   UIBitmapButton* AddNumberedButton(int id, int x, int y, const char* name, const char* tooltip, bool prefix);
   UICheckBox* AddStyledCheckBox(int id, int width, int height, const char* text, int x, int y, bool checked, const char* tooltip, int fontHeight,
@@ -36,21 +37,22 @@ public:
   UICheckBox* AddCheckBox(int id, int width, int height, const char* text, int x, int y, int checked, const char* tooltip);
   void DrawBorder(int x, int y, int width, int height);
   void DrawSkinBox(const char* name, int x, int y, int width, int height, bool tiled);
+  void WrapTextSegments(int width, int maxLines, const std::vector<std::pair<int, std::string>>& segments, FrameTextLines& lines);
   void FitLastTextLine(int width, unsigned lineCount, int family, int height, FrameTextLines& lines);
   void DrawTextLines(int x, int y, int family, int lineHeight, const FrameTextLines& lines);
   int DrawItemName(int x, int y, int width, const ITEM_INFO* item, int unused, int family, int height);
   int DrawWrappedItemName(int x, int y, int width, const ITEM_INFO* item, int unused, int family, int lineHeight);
   int BuildItemName(
-    const ITEM_INFO* item, int* highlightColor, std::vector<char*>* breaks, char** cursor, int* remaining, char** highlight, char withSlots,
+    const ITEM_INFO* item, int* highlightColor, std::vector<const char*>* breaks, char** cursor, int* remaining, char** highlight, char withSlots,
     char withOptions
   );
   void DrawItemNameText(
     const void* info, const char* text, const char* highlight, std::uint32_t color, std::uint32_t highlightColor, int width,
-    const std::vector<char*>* breaks
+    const std::vector<const char*>* breaks
   );
   int DrawFittedItemName(int x, int y, const ITEM_INFO* item, std::uint32_t color, int unused, int unused2, char option);
   void SplitHighlightText(
-    const char* text, const char* highlight, const int& highlightColor, const int& color, const std::vector<char*>& breaks,
+    const char* text, const char* highlight, const int& highlightColor, const int& color, const std::vector<const char*>& breaks,
     std::vector<std::pair<int, std::string>>& segments
   );
 

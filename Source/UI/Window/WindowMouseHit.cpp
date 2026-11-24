@@ -28,6 +28,8 @@
 
 #include <algorithm>
 
+template __declspec(noinline) void std::fill<std::_List_unchecked_const_iterator<std::_List_val<std::_List_simple_types<UIWindow*>>>*, std::_List_unchecked_const_iterator<std::_List_val<std::_List_simple_types<UIWindow*>>>>(std::_List_unchecked_const_iterator<std::_List_val<std::_List_simple_types<UIWindow*>>>* const, std::_List_unchecked_const_iterator<std::_List_val<std::_List_simple_types<UIWindow*>>>* const, const std::_List_unchecked_const_iterator<std::_List_val<std::_List_simple_types<UIWindow*>>>&);
+
 // INLINED
 static MessengerMember PartyMember(UIMiniPartyWnd* window) {
   return window->m_member;
@@ -44,20 +46,22 @@ static __forceinline void PromoteWindow(UIWindowMgr* manager, UIWindow* window) 
   }
 
   int companion = -1;
-  if (window->geometry.id == 12) {
+
+  if (window->geometry.id == WID_ITEMCOLLECTIONWND) {
     companion = 234;
-  } else if (window->geometry.id == 82) {
+  }
+  if (window->geometry.id == WID_COMBINEDCARDITEMCOLLECTIONWND) {
     companion = 250;
   }
 
   if (companion != -1) {
-    const auto entry = std::find_if(manager->rendered.begin(), manager->rendered.end(), [companion](const UIWindow* value) {
-      return value->geometry.id == companion;
-    });
-    if (entry != manager->rendered.end()) {
-      UIWindow* value = *entry;
-      manager->rendered.erase(entry);
-      manager->rendered.push_back(value);
+    for (auto entry = manager->rendered.begin(); entry != manager->rendered.end(); ++entry) {
+      if ((*entry)->geometry.id == companion) {
+        UIWindow* value = *entry;
+        manager->rendered.erase(entry);
+        manager->rendered.push_back(value);
+        break;
+      }
     }
   }
 
@@ -197,12 +201,12 @@ int UIWindowMgr::ProcessMouse() {
 
   for (auto account = this->closedMiniPartyIds.begin(); account != this->closedMiniPartyIds.end(); ++account) {
     for (auto entry = this->snapExcluded.begin(); entry != this->snapExcluded.end();) {
-      UIWindow* window = *entry;
-      if (*account == static_cast<int>(PartyMember(static_cast<UIMiniPartyWnd*>(window)).accountId)) {
-        this->Destroy(window);
-        entry = this->snapExcluded.erase(entry);
-      } else {
+      const int accountId = PartyMember(static_cast<UIMiniPartyWnd*>(*entry)).accountId;
+      if (*account != accountId) {
         ++entry;
+      } else {
+        this->Destroy(*entry);
+        entry = this->snapExcluded.erase(entry);
       }
     }
   }
@@ -216,9 +220,15 @@ int UIWindowMgr::ProcessMouse() {
       int right;
       int bottom;
       WindowScreenBounds(suggestions->m_suggestions, left, top, right, bottom);
-      const bool outside = left > x || right < x || top > y || bottom < y;
+      bool outside = false;
+      if (left > x || right < x || top > y || bottom < y) {
+        outside = true;
+      }
+      bool outsideCompanion = false;
       WindowScreenBounds(this->cashEmotionListWnd, left, top, right, bottom);
-      const bool outsideCompanion = left > x || right < x || top > y || bottom < y;
+      if (left > x || right < x || top > y || bottom < y) {
+        outsideCompanion = true;
+      }
       if (outside && outsideCompanion) {
         suggestions->ShowSuggestions(0);
         if (suggestions->m_chatEdit) {
@@ -277,7 +287,19 @@ int UIWindowMgr::ProcessMouse() {
     }
 
     if (g_mouse.buttons[0] == 1) {
-      ::SetPressedWindowRoot(this->keyboardCommandRootWnd, window);
+      if (!window) {
+        this->keyboardCommandRootWnd = window;
+      } else {
+        UIWindow* root = window;
+        for (;;) {
+          UIWindow* next = root->parent;
+          if (!next) {
+            break;
+          }
+          root = next;
+        }
+        this->keyboardCommandRootWnd = root;
+      }
     }
 
     if (window) {
@@ -285,12 +307,13 @@ int UIWindowMgr::ProcessMouse() {
       int left;
       int top;
       WindowScreenPosition(window, left, top);
-      const int localX = x - left;
-      const int localY = y - top;
 
       if (g_mouse.buttons[0] == 4 && (g_replayAnimationScaling == 0 || g_modeMgr.state == 0)) {
-        window->OnLBtnDblClk(localX, localY);
+        window->OnLBtnDblClk(x - left, y - top);
       }
+
+      const int localX = x - left;
+      const int localY = y - top;
 
       if (g_mouse.buttons[1] == 4) {
         window->OnRBtnDblClk(localX, localY);
@@ -345,14 +368,17 @@ int UIWindowMgr::ProcessMouse() {
       }
 
       if (this->comboBoxIDWnd) {
-        if (!window) {
-          this->CloseWindow(WID_COMBOBOXIDWND);
-          this->CloseDropDown();
-        } else if (window != this->comboBoxIDWnd && !window->IsDescendantOf(this->comboBoxIDWnd)) {
+        if (window) {
+          if (window != this->comboBoxIDWnd && !window->IsDescendantOf(this->comboBoxIDWnd)) {
+            this->CloseWindow(WID_COMBOBOXIDWND);
+          }
+        } else {
           this->CloseWindow(WID_COMBOBOXIDWND);
         }
-      } else if (!window) {
-        this->CloseDropDown();
+      }
+      if (!window && this->dropDownBoxWnd && this->dropDownBoxWnd->geometry.visible != 0) {
+        this->dropDownBoxWnd->Detach();
+        this->dropDownBoxWnd->Show(0);
       }
     }
 
@@ -406,8 +432,8 @@ int UIWindowMgr::ProcessMouse() {
     handled = 1;
   }
 
-  for (auto& entry : this->browsers) {
-    if (entry.second && entry.second->cursorState != 0) {
+  for (auto entry = this->browsers.begin(); entry != this->browsers.end(); ++entry) {
+    if (entry->second && entry->second->cursorState != 0) {
       handled = 1;
       break;
     }

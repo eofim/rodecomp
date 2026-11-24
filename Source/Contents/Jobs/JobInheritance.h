@@ -4,10 +4,6 @@
 #include <cstdint>
 #include <string>
 
-std::string GetJobTitleString(int job);
-bool ResetHotkeySlots();
-bool IsScreenShakeActive();
-bool __stdcall ValidateCharacterName(const char* name);
 bool IsNavigationActive();
 bool __stdcall IsJobStyleAllowed(int job, int style);
 bool __stdcall IsJobHeadAllowed(int job, int head, int sex);

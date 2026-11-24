@@ -41,16 +41,51 @@ CMapSkyMgr::CMapSkyMgr() : m_script(nullptr) {
 void CMapSkyMgr::Unused() {
 }
 
+// OFFSET: 0x005B8DE0
+// FUNCTION: fn_46466
+__declspec(noinline) CMapSkyMgr::~CMapSkyMgr() {
+  if (this->m_script) {
+    this->m_script->Close();
+    delete this->m_script;
+    this->m_script = nullptr;
+  }
+}
+
 // OFFSET: 0x005B8F00
 // FUNCTION: fn_03435
 bool CMapSkyMgr::LoadData() {
   return this->m_script->Load("Lua Files\\MapSkyData\\MapSkyData", true, false);
 }
 
+// OFFSET: 0x005B8F20
+// FUNCTION: fn_46467
+void CMapSkyMgr::ApplyBackgroundFog(const std::string& mapName) {
+  bool backgroundFog = false;
+  this->m_script->Call("IsBackGroundFog", "s>b", mapName.c_str(), &backgroundFog);
+  if (backgroundFog == true) {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    mode->scene->backgroundFog = backgroundFog;
+  }
+}
+
+// OFFSET: 0x005B8FF0
+// FUNCTION: fn_46468
+void CMapSkyMgr::ApplyBackgroundColor(const std::string& mapName) {
+  int red = 0;
+  int green = 0;
+  int blue = 0;
+  this->m_script->Call("GetBackgroundColor", "s>ddd", mapName.c_str(), &red, &green, &blue);
+  g_renderer->SetClearColor(
+      0xFF000000u + (static_cast<unsigned char>(red) << 16) +
+      (static_cast<unsigned char>(green) << 8) + static_cast<unsigned char>(blue));
+}
+
 // OFFSET: 0x00C7B200
 // FUNCTION: fn_20362
-CWeatherEffect::CWeatherEffect()
-    : color(), targetColor(), fog(), lightColor() {
+CWeatherEffect::CWeatherEffect() {
+  this->targetColor[0] = 0.0f;
+  this->targetColor[1] = 0.0f;
+  this->targetColor[2] = 0.0f;
   this->darken = 0;
   this->enabled = 1;
   this->lightning = 0;
@@ -92,8 +127,10 @@ vector3d CWeatherEffect::GetWindDirection() const {
 // OFFSET: 0x00C7B790
 // FUNCTION: fn_20367
 __declspec(noinline) void CWeatherEffect::Play(char kind) {
-  if (this->effect && this->effect->GetDuration() - this->effect->state.stateCnt <= 300) {
-    return;
+  if (this->effect) {
+    if (this->effect->GetDuration() - this->effect->state.stateCnt <= 300) {
+      return;
+    }
   }
 
   CGameMode* mode = g_modeMgr.GetGameMode();
@@ -144,11 +181,41 @@ void CWeatherEffect::Fireworks() {
   }
 }
 
+// OFFSET: 0x00C7B960
+// FUNCTION: fn_45933
+void CWeatherEffect::Maple() {
+  if (this->effect) {
+    if (this->effect->GetDuration() - this->effect->state.stateCnt <= 300) {
+      return;
+    }
+  }
+
+  CGameMode* mode = g_modeMgr.GetGameMode();
+  this->actor = mode->scene->player;
+  this->effect = static_cast<EffectActor*>(this->actor)->LaunchEffect(EF_MAPLE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+}
+
+// OFFSET: 0x00C7BAA0
+// FUNCTION: fn_45581
+void CWeatherEffect::Sakura() {
+  if (this->effect) {
+    if (this->effect->GetDuration() - this->effect->state.stateCnt <= 300) {
+      return;
+    }
+  }
+
+  CGameMode* mode = g_modeMgr.GetGameMode();
+  this->actor = mode->scene->player;
+  this->effect = static_cast<EffectActor*>(this->actor)->LaunchEffect(EF_SAKURA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+}
+
 // OFFSET: 0x00C7BB20
 // FUNCTION: fn_20370
 void CWeatherEffect::Snow() {
-  if (this->effect && this->effect->GetDuration() - this->effect->state.stateCnt <= 300) {
-    return;
+  if (this->effect) {
+    if (this->effect->GetDuration() - this->effect->state.stateCnt <= 300) {
+      return;
+    }
   }
 
   CGameMode* mode = g_modeMgr.GetGameMode();
@@ -221,25 +288,11 @@ void CWeatherEffect::ApplyMapWeather(std::string mapName) {
     }
 
     if (entry->second == "snow") {
-      if (!this->effect || this->effect->GetDuration() - this->effect->state.stateCnt > 300) {
-        CGameMode* mode = g_modeMgr.GetGameMode();
-        this->actor = mode->scene->player;
-        this->effect = static_cast<EffectActor*>(this->actor)->LaunchEffect(EF_SNOW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      }
+      this->Snow();
     } else if (entry->second == "sakura") {
-      if (!this->effect || this->effect->GetDuration() - this->effect->state.stateCnt > 300) {
-        CGameMode* mode = g_modeMgr.GetGameMode();
-        this->actor = mode->scene->player;
-        this->effect = static_cast<EffectActor*>(this->actor)->LaunchEffect(EF_SAKURA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      }
+      this->Sakura();
     } else if (entry->second == "pokjuk") {
-      CGameMode* mode = g_modeMgr.GetGameMode();
-      this->actor = mode->scene->player;
-      static_cast<EffectActor*>(this->actor)->LaunchEffect(EF_POKJUK_SOUND, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-
-      for (int count = 0; count < 160; ++count) {
-        static_cast<EffectActor*>(this->actor)->LaunchEffect(EF_POKJUK, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      }
+      this->Fireworks();
     }
   }
 }
@@ -369,7 +422,7 @@ void CMapSkyMgr::CreateClouds(const std::string& mapName) {
       const float z = static_cast<float>((1 - 2 * signZ) * offsetZ);
       const float y = static_cast<float>(posY);
 
-      CEffect* spawned = g_effectMgr->Spawn(0, 0x47A, x, y, z, 0, -1, 0, 0);
+      CEffect* spawned = g_effectMgr->Spawn(0, EF_UNK_1146, x, y, z, 0, -1, 0, 0);
       if (!spawned) {
         continue;
       }
@@ -399,37 +452,31 @@ void CMapSkyMgr::Apply(const std::string& mapName) {
     return;
   }
 
-  int red = 0;
-  int green = 0;
-  int blue = 0;
-  this->m_script->Call("GetBackgroundColor", "s>ddd", sky.c_str(), &red, &green, &blue);
-  g_renderer->SetClearColor(
-    0xFF000000u | ((static_cast<unsigned>(red) & 255u) << 16) | ((static_cast<unsigned>(green) & 255u) << 8) | (static_cast<unsigned>(blue) & 255u)
-  );
+  this->ApplyBackgroundColor(sky);
 
-  unsigned char drawStar = 0;
-  this->m_script->Call("IsDrawStar", "s>b", sky.c_str(), &drawStar);
-  if (drawStar == 1) {
-    g_weatherEffect.Play(9);
+  {
+    unsigned char drawStar = 0;
+    this->m_script->Call("IsDrawStar", "s>b", sky.c_str(), &drawStar);
+    if (drawStar == 1) {
+      g_weatherEffect.Play(9);
+    }
   }
 
   this->CreateClouds(sky);
 
-  int oldCount = 0;
-  this->m_script->Call("GetOldCloudTypeNum", "s>d", sky.c_str(), &oldCount);
-  for (int index = 1; index <= oldCount; ++index) {
-    int info = -1;
-    this->m_script->Call("GetOldCloudInfo", "sd>d", sky.c_str(), index, &info);
-    if (info != -1) {
-      g_weatherEffect.Play(static_cast<char>(info));
+  {
+    int oldCount = 0;
+    this->m_script->Call("GetOldCloudTypeNum", "s>d", sky.c_str(), &oldCount);
+    for (int index = 1; index <= oldCount; ++index) {
+      int info = -1;
+      this->m_script->Call("GetOldCloudInfo", "sd>d", sky.c_str(), index, &info);
+      if (info != -1) {
+        g_weatherEffect.Play(static_cast<char>(info));
+      }
     }
   }
 
-  bool fog = false;
-  this->m_script->Call("IsBackGroundFog", "s>b", sky.c_str(), &fog);
-  if (fog == true) {
-    g_modeMgr.GetGameMode()->scene->backgroundFog = fog;
-  }
+  this->ApplyBackgroundFog(sky);
 }
 
 // GLOBAL: gl_24480
@@ -462,12 +509,12 @@ void RegisterLowercaseName(const char* name) {
 
   std::vector<std::string>::iterator it = g_session.skyMapNames.begin();
   for (; it != g_session.skyMapNames.end(); ++it) {
-    if (*it == lowered.c_str()) {
+    if (it->compare(lowered.c_str()) == 0) {
       break;
     }
   }
 
-  if (it == g_session.skyMapNames.end()) {
+  if (g_session.skyMapNames.end() == it) {
     g_session.skyMapNames.push_back(lowered.c_str());
   }
 }

@@ -13,6 +13,7 @@
 #include "Client/Mode/ModeDragState.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Tables/MessageTable.h"
 #include "File/ShortcutFilename.h"
 #include "Render/Renderer.h"
@@ -39,12 +40,6 @@
 #include <functional>
 #include <string>
 #include <windows.h>
-
-template __declspec(noinline) std::list<ExchangeUI::CItemData>::~list() noexcept;
-template void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::SetOnSelect(std::function<void(ExchangeUI::CUIItem*, const ExchangeUI::CItemData&)>);
-template void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::SetBinder(std::function<void(ExchangeUI::CUIItem*, const ExchangeUI::CItemData&)>);
-template void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::SetImages(const std::string&, const std::string&, const std::string&,
-                                                                                    const std::string&);
 
 // OFFSET: 0x00A0F840
 // FUNCTION: fn_15180
@@ -90,11 +85,7 @@ template <>
 void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
   this->scrollBar->Show(0);
-  {
-    CUIVScrollBar* bar = this->scrollBar;
-    const std::function<void(int)> onChange = [this](int position) { this->OnScroll(position); };
-    bar->onChange = onChange;
-  }
+  this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
 
@@ -321,10 +312,7 @@ void ExchangeUI::CUIItem::Paint() {
 void CUIExchangeUI::OnInit() {
   this->Move((g_renderer->viewport.width - 640) / 2 + 100, g_renderer->viewport.height * 100 / 480);
 
-  {
-    const std::string title = std::format("{} : ", LookupMessage(MSI_EXCHANGE));
-    this->titleBar->SetTitle(title);
-  }
+  this->titleBar->SetTitle(std::format("{} : ", LookupMessage(MSI_EXCHANGE)));
 
   this->screenshotLabel->SetText(LookupMessage(MSI_SCREENSHOT_FOR_EXCHANGE));
 
@@ -374,7 +362,7 @@ void CUIExchangeUI::OnProcess() {
     amount = amount < 0 ? 0 : amount;
 
     if (amount > 1000000000) {
-      g_windowMgr.Confirm(LookupMessage(MSI_BASIC_EXP_MSG_INDONESIA), 2, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_OVERPRICE_MAX), 2, true, false, 0, "Message", 280, 120, 0);
       FormatGroupedInteger(1000000000, text, sizeof(text));
       this->zenyEdit->SetText(text);
       this->SetZeny(1000000000);
@@ -419,10 +407,11 @@ int CUIExchangeUI::SendMsg(UIWindow* sender, int message, std::intptr_t argument
 
     this->partnerName = reinterpret_cast<const char*>(argument1);
     if (argument2 > 0) {
-      if (g_serviceType == 6) {
+      if (g_serviceType == ServiceIndonesia) {
         this->partnerText->SetText(std::format("{} Lv{}", this->partnerName, static_cast<int>(argument3)));
       } else {
-        std::string job = g_session.ShortcutFilename(argument2);
+        const int jobId = static_cast<int>(argument2);
+        std::string job = g_session.ShortcutFilename(jobId);
         this->partnerText->SetText(std::format("{} Lv{} ({})", this->partnerName, static_cast<int>(argument3), job));
       }
     } else {
@@ -464,9 +453,9 @@ int CUIExchangeUI::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       const int quantity = item.quantity;
       if (quantity <= 0) {
         list->AddData(ExchangeUI::CItemData(ITEM_INFO(), 0), false);
-      } else {
-        list->AddData(ExchangeUI::CItemData(item, quantity), false);
+        continue;
       }
+      list->AddData(ExchangeUI::CItemData(item, quantity), false);
     }
     this->firstList->UpdateScrollBar();
 
@@ -477,9 +466,9 @@ int CUIExchangeUI::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       const int quantity = item.quantity;
       if (quantity <= 0) {
         list->AddData(ExchangeUI::CItemData(ITEM_INFO(), 0), false);
-      } else {
-        list->AddData(ExchangeUI::CItemData(item, quantity), false);
+        continue;
       }
+      list->AddData(ExchangeUI::CItemData(item, quantity), false);
     }
     this->secondList->UpdateScrollBar();
     break;
@@ -531,21 +520,10 @@ void CUIExchangeUI::SetZeny(int amount) {
 // OFFSET: 0x00A18990
 // FUNCTION: fn_15307
 void CUIExchangeUI::UpdateZeny(bool mine) {
-  CUIStaticText* first;
-  CUIStaticText* second;
-  CUIStaticText* third;
-  int zeny;
-  if (mine) {
-    first = this->ownZenyHighlight;
-    second = this->ownZenyText;
-    third = this->ownZenyShadow;
-    zeny = g_session.exchangeMoney;
-  } else {
-    first = this->partnerZenyHighlight;
-    second = this->partnerZenyText;
-    third = this->partnerZenyShadow;
-    zeny = g_session.otherExchangeMoney;
-  }
+  CUIStaticText* const first = mine ? this->ownZenyHighlight : this->partnerZenyHighlight;
+  CUIStaticText* const second = mine ? this->ownZenyText : this->partnerZenyText;
+  CUIStaticText* const third = mine ? this->ownZenyShadow : this->partnerZenyShadow;
+  const int zeny = mine ? g_session.exchangeMoney : g_session.otherExchangeMoney;
 
   char text[24];
   FormatGroupedInteger(zeny, text, sizeof(text));
@@ -925,6 +903,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
   this->logCheckBox->disabled = 0;
   this->logCheckBox->Invalidate();
   {
+    CUICheckBox* checkBox = this->logCheckBox;
     // GLOBAL: gl_25424
     const std::string disabled(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0x452FEF0D7FC95565ULL));
     // GLOBAL: gl_25425
@@ -933,7 +912,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
     const std::string hover(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_1.bmp", 0x839B27DF8F5967B3ULL));
     // GLOBAL: gl_25427
     const std::string normal(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\checkbox_0.bmp", 0xF3CB6F7711A71B6DULL));
-    this->logCheckBox->SetImages(normal, hover, pressed, disabled);
+    checkBox->SetImages(normal, hover, pressed, disabled);
   }
   this->logCheckBox->checked = false;
   this->logCheckBox->Invalidate();
@@ -964,6 +943,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
   this->lockButton->disabled = 0;
   this->lockButton->Invalidate();
   {
+    CUIImageButton* button = this->lockButton;
     // GLOBAL: gl_25429
     const std::string disabled(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_ok_dis.bmp", 0x4F99DF03C3EF31B7ULL));
     // GLOBAL: gl_25430
@@ -972,7 +952,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
     const std::string hover(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_ok_b.bmp", 0x0F41EBBDA32D1B17ULL));
     // GLOBAL: gl_25432
     const std::string normal(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_ok.bmp", 0xFBD599E117C547C1ULL));
-    this->lockButton->SetImages(normal, hover, pressed, disabled);
+    button->SetImages(normal, hover, pressed, disabled);
   }
   this->AddChild(this->lockButton);
 
@@ -983,6 +963,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
   this->tradeButton->disabled = 0;
   this->tradeButton->Invalidate();
   {
+    CUIImageButton* button = this->tradeButton;
     // GLOBAL: gl_25433
     const std::string disabled(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_exchange_dis.bmp", 0x4F637DC51307B759ULL));
     // GLOBAL: gl_25434
@@ -991,7 +972,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
     const std::string hover(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_exchange_b.bmp", 0xCFF3899D95AF355FULL));
     // GLOBAL: gl_25436
     const std::string normal(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_exchange.bmp", 0x9171997D6963C9F7ULL));
-    this->tradeButton->SetImages(normal, hover, pressed, disabled);
+    button->SetImages(normal, hover, pressed, disabled);
   }
   this->AddChild(this->tradeButton);
 
@@ -1002,6 +983,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
   this->cancelButton->disabled = 0;
   this->cancelButton->Invalidate();
   {
+    CUIImageButton* button = this->cancelButton;
     // GLOBAL: gl_25437
     const std::string disabled(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_cancel.bmp", 0x33133B977BCD03CDULL));
     // GLOBAL: gl_25438
@@ -1010,7 +992,7 @@ void CUIExchangeUI::OnCreate(int width, int height) {
     const std::string hover(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_cancel_b.bmp", 0xB39FA7917BCFBB8DULL));
     // GLOBAL: gl_25440
     const std::string normal(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\btn_cancel.bmp", 0x2DCB7567394DC1ABULL));
-    this->cancelButton->SetImages(normal, hover, pressed, disabled);
+    button->SetImages(normal, hover, pressed, disabled);
   }
   this->AddChild(this->cancelButton);
 }
@@ -1034,13 +1016,16 @@ CUIExchangeUI* CreateExchangeUI() {
   return new CUIExchangeUI();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00493AD0
 // FUNCTION: fn_45549
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateExchangeUI;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10011, factory);
-  return true;
-}();
+static UIRegistration s_exchangeUIRegistered(10011, CreateExchangeUI);
 
 // OFFSET: 0x00A151F0
 // FUNCTION: fn_15195
@@ -1050,8 +1035,9 @@ void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::AddNewItem() {
     return;
   }
 
-  for (ExchangeUI::CUIItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -1067,12 +1053,12 @@ void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::AddNewItem() {
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (ExchangeUI::CUIItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         if (this->layoutFlag) {
           return;
         }
@@ -1095,7 +1081,7 @@ void CUIListBoxEx<ExchangeUI::CUIItem, ExchangeUI::CItemData>::AddNewItem() {
           std::advance(node, static_cast<int>(this->selected));
           this->onSelect(selectedItem, *node);
         }
-      };
+      });
       this->AddChild(item);
       slot = item;
     }

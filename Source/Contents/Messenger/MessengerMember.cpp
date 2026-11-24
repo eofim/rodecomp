@@ -1,4 +1,5 @@
 #include "Contents/Messenger/MessengerMember.h"
+#include "Client/Mode/ModeDragState.h"
 #include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
@@ -53,8 +54,6 @@
 #include <string>
 #include <vector>
 
-template __declspec(noinline) std::vector<unsigned char>::vector(const std::size_t, const unsigned char&, const std::allocator<unsigned char>&);
-
 namespace {
 #pragma pack(push, 1)
   struct MessengerRecordHeader {
@@ -70,8 +69,7 @@ namespace {
 
     // INLINED
     void Clear() {
-      this->bytes = 0;
-      this->id = 0;
+      this->bytes = this->id = 0;
     }
 
     /* 0000 */ std::int16_t id;
@@ -182,7 +180,7 @@ public:
   /* 00BC */ UIRadioBtn* tabs[2];
   /* 00C4 */ UIWindow* closeButton;
   /* 00C8 */ UIBitmapButton* buttons[11];
-  /* 00F4 */ UIWindow* resizeButton;
+  /* 00F4 */ UIResizer* resizeButton;
   /* 00F8 */ UIStaticText* titleText;
   /* 00FC */ std::list<MessengerMember> members;
   /* 0104 */ std::vector<MiniPartyInfoEntry> menuItems;
@@ -209,16 +207,17 @@ static_assert(sizeof(MiniPartyIconPosition) == 12);
 static_assert(sizeof(MessengerRecordHeader) == 6);
 #endif
 
-// OFFSET: 0x00D03DC0
-// FUNCTION: fn_21550
-MessengerMember::MessengerMember() : valid(1), dead(0) {
-}
-
 // OFFSET: 0x007382E0
 // FUNCTION: fn_07664
 UIDragMiniPartyWnd::UIDragMiniPartyWnd(MessengerMember member)
     : UIFrameWnd(0), member(member), gauge(nullptr), iconIndex(0) {
   this->geometry.state = 0;
+}
+
+// INLINED
+static void ReadBytes(std::vector<unsigned char>& buffer, const std::vector<unsigned char>& data, int& offset, int size) {
+  std::memcpy(buffer.data(), data.data() + offset, size);
+  offset += size;
 }
 
 // OFFSET: 0x00E48C00
@@ -229,8 +228,7 @@ int ReadMessengerMembers(std::list<MessengerMember>& members, int offset, int si
   }
 
   std::vector<unsigned char> buffer(size, 0);
-  std::memcpy(buffer.data(), data.data() + offset, size);
-  int end = offset + size;
+  ReadBytes(buffer, data, offset, size);
   std::uint32_t consumed = 0;
   std::vector<unsigned char> remaining(buffer);
   while (consumed < buffer.size()) {
@@ -243,7 +241,7 @@ int ReadMessengerMembers(std::list<MessengerMember>& members, int offset, int si
     }
   }
 
-  return end;
+  return offset;
 }
 
 // OFFSET: 0x00E494F0
@@ -253,10 +251,10 @@ std::uint32_t MessengerMember::Deserialize(const std::vector<unsigned char>& dat
     return 0xFFFFFFFF;
   }
 
-  std::uint32_t offset = 6;
   MessengerRecordHeader header;
   header.Clear();
   std::memcpy(&header, data.data(), sizeof(header));
+  std::uint32_t offset = 6;
   if (251 != header.id) {
     return 0xFFFFFFFF;
   }
@@ -408,20 +406,18 @@ void UIDragMiniPartyWnd::Paint() {
       );
     }
 
-    memset(path, 0, 0x100);
-    const char* statusIcon;
+    memset(text, 0, 0x100);
     if (this->member.offline == 0) {
       if (this->member.accountId == g_session.m_aid) {
-        statusIcon = "%sicon_party_me.bmp";
+        sprintf(text, "%sicon_party_me.bmp", prefix.c_str());
       } else {
-        statusIcon = "%sicon_party_on.bmp";
+        sprintf(text, "%sicon_party_on.bmp", prefix.c_str());
       }
     } else {
-      statusIcon = "%sicon_party_off.bmp";
+      sprintf(text, "%sicon_party_off.bmp", prefix.c_str());
     }
 
-    sprintf(path, statusIcon, prefix.c_str());
-    CBitmapRes* statusBmp = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
+    CBitmapRes* statusBmp = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(text)));
     if (this->gauge) {
       this->DrawBitmap(
         static_cast<int>(this->geometry.width * 0.8f),
@@ -570,13 +566,6 @@ int UIFriendOptionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   }
 }
 
-// OFFSET: 0x009A54B0
-// FUNCTION: fn_13630
-int FriendOptionWndInfo::IsValid() const {
-  return this->width == 280 && this->height == 120 && this->x >= 0 && this->x <= g_renderer->viewport.width - 280 && this->y >= 0 &&
-         this->y <= g_renderer->viewport.height - 120;
-}
-
 // OFFSET: 0x007392F0
 // FUNCTION: fn_07684
 void UIFriendOptionWnd::StoreInfo() {
@@ -603,17 +592,17 @@ UIJobIconButton::~UIJobIconButton() = default;
 void UIJobIconButton::Paint() {
   std::string name("");
   if (this->m_disabled == 1) {
-    name = this->m_names[3];
+    name = this->m_disabledName;
   } else {
     switch (this->geometry.state) {
     case 0:
-      name = this->m_names[0];
+      name = this->m_normalName;
       break;
     case 1:
-      name = this->m_names[1];
+      name = this->m_hoverName;
       break;
     case 2:
-      name = this->m_names[2];
+      name = this->m_pressedName;
       break;
     }
   }
@@ -727,18 +716,20 @@ __declspec(noinline) MessengerMember UIMessengerGroupWnd::MemberAt(int x, int y)
     return MessengerMember(0);
   }
 
-  if (y >= 17 && y < this->visibleRows * this->rowHeight + 17) {
-    this->selected = (y - 17) / this->rowHeight + this->scrollTop;
-    int position = 0;
-    for (auto it = this->members.begin(); it != this->members.end(); ++it, ++position) {
-      if (position == this->selected) {
-        return *it;
-      }
-    }
-
-    this->selected = -1;
+  if (y < 17 || y >= this->visibleRows * this->rowHeight + 17) {
+    return MessengerMember(0);
   }
 
+  const int index = (y - 17) / this->rowHeight + this->scrollTop;
+  this->selected = index;
+  int position = 0;
+  for (auto it = this->members.begin(); it != this->members.end(); ++it, ++position) {
+    if (position == index) {
+      return *it;
+    }
+  }
+
+  this->selected = -1;
   return MessengerMember(0);
 }
 
@@ -782,7 +773,7 @@ void UIMessengerGroupWnd::OnCreate(int, int) {
     maximize->SetSize(maximize->BitmapWidth(), maximize->BitmapHeight());
   }
   this->iconModeButtons[1]->Move(this->geometry.width - 28, 3);
-  this->iconModeButtons[1]->SetId(523);
+  this->iconModeButtons[1]->SetId(ID_RESTORE_PARTY_LIST);
   this->AddChild(this->iconModeButtons[1]);
 
   for (int index = 0; index < 40; ++index) {
@@ -848,8 +839,8 @@ void UIMessengerGroupWnd::OnCreate(int, int) {
       LookupMessage(MSI_LOCK_MOUSE), LookupMessage(MSI_UNLOCK_MOUSE), LookupMessage(MSI_CREATE_PARTY), LookupMessage(MSI_WITHDRAW_PARTY), LookupMessage(MSI_INVITE_PARTY),
     };
     const char* partyTooltips[11] = {
-      LookupMessage(MSI_CANNOT_MORE_SELECT_JOB), LookupMessage(MSI_1ON1),  LookupMessage(MSI_CHARACTER_INFO),  LookupMessage(MSI_PARTY_SETTING),  LookupMessage(MSI_EXPEL),  LookupMessage(MSI_LOCK_MOUSE),
-      LookupMessage(MSI_UNLOCK_MOUSE), LookupMessage(MSI_CREATE_PARTY), LookupMessage(MSI_WITHDRAW_PARTY), LookupMessage(MSI_INVITE_PARTY), LookupMessage(MSI_FAILED_ALL_RODEX_LIST),
+      LookupMessage(MSI_ADVENTURER_AGENCY), LookupMessage(MSI_1ON1),  LookupMessage(MSI_CHARACTER_INFO),  LookupMessage(MSI_PARTY_SETTING),  LookupMessage(MSI_EXPEL),  LookupMessage(MSI_LOCK_MOUSE),
+      LookupMessage(MSI_UNLOCK_MOUSE), LookupMessage(MSI_CREATE_PARTY), LookupMessage(MSI_WITHDRAW_PARTY), LookupMessage(MSI_INVITE_PARTY), LookupMessage(MSI_SORT_MINIPARTY),
     };
     unsigned char disabled[11] = {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0};
     this->hiddenButtons[0] = 0;
@@ -905,13 +896,12 @@ void UIMessengerGroupWnd::OnCreate(int, int) {
     }
   }
 
-  UIResizer* resizer = new UIResizer();
-  this->resizeButton = resizer;
-  resizer->SetSize(16, 16);
-  resizer->SetDirection(7);
-  resizer->SetBitmapName("유저인터페이스\\btn_resize.bmp");
-  resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
-  resizer->SetColors(0xFFFF00FF, 0xFFFF00FF);
+  this->resizeButton = new UIResizer();
+  this->resizeButton->SetSize(16, 16);
+  this->resizeButton->SetDirection(7);
+  this->resizeButton->SetBitmapName("유저인터페이스\\btn_resize.bmp");
+  this->resizeButton->Move(this->geometry.width - 15, this->geometry.height - 15);
+  this->resizeButton->SetColors(0xFFFF00FF, 0xFFFF00FF);
   this->AddChild(this->resizeButton);
   this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
 }
@@ -1018,7 +1008,9 @@ void UIMessengerGroupWnd::Paint() {
         1, 0
       );
 
+      color = it->offline;
       if (it->offline == 0) {
+        color = 0;
         UIPcGage* gauge = this->gauges[index];
         if (gauge->geometry.x != -100) {
           char hpText[128];
@@ -1028,9 +1020,10 @@ void UIMessengerGroupWnd::Paint() {
           );
         }
       }
+      color = it->offline;
 
       memset(path, 0, sizeof(path));
-      if (it->offline == 0) {
+      if (color == 0) {
         if (it->accountId == g_session.m_aid) {
           sprintf(path, "%sicon_party_me.bmp", prefix.c_str());
         } else {
@@ -1048,7 +1041,7 @@ void UIMessengerGroupWnd::Paint() {
       memset(path, 0, sizeof(path));
       sprintf(path, "%sbg_partymember.bmp", prefix.c_str());
       auto* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
-      this->DrawTextAt(this->geometry.width - 96, this->geometry.height - 16, LookupMessage(MSI_CONNECT_SNS_FAIL_CUZ_NOT_CONNECTING), 0, 0, 12, 0, 0, 0
+      this->DrawTextAt(this->geometry.width - 96, this->geometry.height - 16, LookupMessage(MSI_PARTYMEMBER), 0, 0, 12, 0, 0, 0
       );
       this->DrawBitmap(this->geometry.width - 58, this->geometry.height - 18, background, true);
 
@@ -1160,7 +1153,7 @@ void UIMessengerGroupWnd::OnLBtnDown(int x, int y) {
   gameMode->TargetActorByAid(member.accountId);
   MessengerMember selectedMember = this->MemberAtIndex(this->selected);
   if (this->mode == 1 && g_session.m_lockMouse != true && g_windowMgr.HasMiniPartyMember(selectedMember.accountId) != true) {
-    gameMode->SetDragIds(29, this->selected);
+    gameMode->SetDragIds(DRAG_MESSENGER_MEMBER, this->selected);
     if (!g_windowMgr.transientWnd) {
       UIDragMiniPartyWnd* window = new (std::nothrow) UIDragMiniPartyWnd(selectedMember);
       {
@@ -1174,11 +1167,11 @@ void UIMessengerGroupWnd::OnLBtnDown(int x, int y) {
         window->SetDragStartPosition(x, y - itemY);
 
         int index = 0;
-        for (const MessengerMember& entry : this->members) {
-          if (index >= this->scrollTop * this->columns && entry.valid && entry.accountId == selectedMember.accountId) {
-            CGameActor* actor = entry.accountId == g_session.m_aid
+        for (auto it = this->members.begin(); it != this->members.end(); ++it, ++index) {
+          if (index >= this->scrollTop * this->columns && it->valid && it->accountId == selectedMember.accountId) {
+            CGameActor* actor = it->accountId == g_session.m_aid
                                   ? gameMode->scene->player
-                                  : gameMode->scene->GetGameActorByAID(entry.accountId);
+                                  : gameMode->scene->GetGameActorByAID(it->accountId);
             if (actor) {
               window->SetGaugeValues(this->gauges[index]->current, this->gauges[index]->maximum);
             } else {
@@ -1186,7 +1179,6 @@ void UIMessengerGroupWnd::OnLBtnDown(int x, int y) {
             }
             break;
           }
-          ++index;
         }
       }
     }
@@ -1289,11 +1281,11 @@ void UIMessengerGroupWnd::UpdateScroll() {
     return;
   }
 
-  const int rows = this->members.size() / this->columns + (this->members.size() % this->columns != 0);
   const int visible = this->visibleRows;
-  int range = 0;
-  if (rows - visible >= 0) {
-    range = rows - visible;
+  const int rows = this->members.size() / this->columns + (this->members.size() % this->columns != 0);
+  int range = rows - visible;
+  if (range < 0) {
+    range = 0;
   }
   this->scrollable = range != 0;
   if (range) {
@@ -1330,7 +1322,6 @@ void UIMessengerGroupWnd::LayoutButtons() {
     }
   }
 
-  int x;
   if (this->mode == 1) {
     if (g_session.PartyCount()) {
       this->buttons[10]->Move(hidden * -26 + 213, this->geometry.height - 40);
@@ -1343,21 +1334,25 @@ void UIMessengerGroupWnd::LayoutButtons() {
       this->buttons[8]->Move(-100, -100);
       this->buttons[9]->Move(-100, -100);
     }
-    x = hidden * -26 + 135;
+    if (g_session.m_lockMouse) {
+      this->buttons[5]->Move(hidden * -26 + 135, this->geometry.height - 40);
+      this->buttons[6]->Move(-100, -100);
+    } else {
+      this->buttons[6]->Move(hidden * -26 + 135, this->geometry.height - 40);
+      this->buttons[5]->Move(-100, -100);
+    }
   } else {
     this->buttons[7]->Move(-100, -100);
     this->buttons[8]->Move(-100, -100);
     this->buttons[9]->Move(-100, -100);
     this->buttons[10]->Move(-100, -100);
-    x = 135;
-  }
-
-  if (g_session.m_lockMouse) {
-    this->buttons[5]->Move(x, this->geometry.height - 40);
-    this->buttons[6]->Move(-100, -100);
-  } else {
-    this->buttons[6]->Move(x, this->geometry.height - 40);
-    this->buttons[5]->Move(-100, -100);
+    if (g_session.m_lockMouse) {
+      this->buttons[5]->Move(135, this->geometry.height - 40);
+      this->buttons[6]->Move(-100, -100);
+    } else {
+      this->buttons[6]->Move(135, this->geometry.height - 40);
+      this->buttons[5]->Move(-100, -100);
+    }
   }
 }
 
@@ -1371,11 +1366,10 @@ void UIMessengerGroupWnd::UpdateGauges() {
 
   int shown = 0;
   int index = 0;
-  UIPcGage** gauge = this->gauges;
-  for (auto it = this->members.begin(); it != this->members.end(); ++it, ++index, ++gauge) {
+  for (auto it = this->members.begin(); it != this->members.end(); ++it, ++index) {
     if (index < this->scrollTop * this->columns) {
-      if ((*gauge)->geometry.x != -100) {
-        (*gauge)->Move(-100, -100);
+      if (this->gauges[index]->geometry.x != -100) {
+        this->gauges[index]->Move(-100, -100);
       }
       continue;
     }
@@ -1389,18 +1383,18 @@ void UIMessengerGroupWnd::UpdateGauges() {
       }
 
       const int y = shown / this->columns * this->rowHeight + 17;
-      if ((*gauge)->geometry.y != y) {
-        (*gauge)->Move(47, static_cast<int>(static_cast<float>(this->rowHeight) * 0.76f + static_cast<float>(y)));
+      if (this->gauges[index]->geometry.y != y) {
+        this->gauges[index]->Move(47, static_cast<int>(static_cast<float>(this->rowHeight) * 0.76f + static_cast<float>(y)));
       }
       if (pc && !it->offline) {
-        (*gauge)->SetColor(0x444444);
-      } else if ((*gauge)->geometry.x != -100) {
-        (*gauge)->Move(-100, -100);
+        this->gauges[index]->SetColor(0x444444);
+      } else if (this->gauges[index]->geometry.x != -100) {
+        this->gauges[index]->Move(-100, -100);
       }
     }
 
-    if (++shown > this->visibleRows * this->columns && (*gauge)->geometry.x != -100) {
-      (*gauge)->Move(-100, -100);
+    if (++shown > this->visibleRows * this->columns && this->gauges[index]->geometry.x != -100) {
+      this->gauges[index]->Move(-100, -100);
     }
   }
 }
@@ -1453,21 +1447,27 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       int index = 0;
       for (auto it = this->members.begin(); it != this->members.end(); ++it, ++index) {
         if (it->valid && !it->offline) {
+          CRenderObject* actor;
+          int current;
+          int maximum;
           if (it->accountId == g_session.m_aid) {
-            if (gameMode->scene->player) {
-              this->gauges[index]->SetValues(g_session.hp, g_session.maxHp);
+            actor = gameMode->scene->player;
+            current = g_session.hp;
+            maximum = g_session.maxHp;
+          } else {
+            actor = gameMode->scene->GetGameActorByAID(it->accountId);
+            if (actor) {
+              UIPcGage* gauge = static_cast<UIPcGage*>(static_cast<CPc*>(static_cast<CGameActor*>(actor))->gaugeWindow);
+              if (gauge) {
+                current = gauge->current;
+                maximum = gauge->maximum;
+              } else {
+                current = 0;
+                maximum = 0;
+              }
             }
-          } else if (CRenderObject* actor = gameMode->scene->GetGameActorByAID(it->accountId)) {
-            UIPcGage* gauge = static_cast<UIPcGage*>(static_cast<CPc*>(static_cast<CGameActor*>(actor))->gaugeWindow);
-            int current;
-            int maximum;
-            if (gauge) {
-              current = gauge->current;
-              maximum = gauge->maximum;
-            } else {
-              current = 0;
-              maximum = 0;
-            }
+          }
+          if (actor) {
             this->gauges[index]->SetValues(current, maximum);
           }
           this->jobIcons[index]->offline = 0;
@@ -1484,7 +1484,11 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
           dead = 1;
         }
         std::string prefix = "유저인터페이스\\renewalparty\\";
-        sprintf(path, dead ? "%sicon_jobs_%d_die.bmp" : "%sicon_jobs_%d.bmp", prefix.c_str(), it->job);
+        if (!dead) {
+          sprintf(path, "%sicon_jobs_%d.bmp", prefix.c_str(), it->job);
+        } else {
+          sprintf(path, "%sicon_jobs_%d_die.bmp", prefix.c_str(), it->job);
+        }
         this->jobIcons[index]->SetBitmap(path, 0, 0);
         this->jobIcons[index]->SetBitmap(path, 1, 0);
         this->jobIcons[index]->SetBitmap(path, 2, 0);
@@ -1510,7 +1514,6 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       g_windowMgr.modal->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
     }
 
-    int tooltip;
     if (this->mode == 0) {
       {
         UIBitmapButton* button = this->buttons[0];
@@ -1521,7 +1524,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 1, 0);
       this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 2, 0);
       this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_01_disable.bmp", 3, 0);
-      tooltip = 0x62;
+      this->buttons[0]->SetTooltip(LookupMessage(MSI_MSG));
     } else {
       {
         UIBitmapButton* button = this->buttons[0];
@@ -1531,21 +1534,20 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01.bmp", 0, 0);
       this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_a.bmp", 1, 0);
       this->buttons[0]->SetBitmap("유저인터페이스\\basic_interface\\mesbtn_partymaster_01_b.bmp", 2, 0);
-      tooltip = 0xDBA;
+      this->buttons[0]->SetTooltip(LookupMessage(MSI_ADVENTURER_AGENCY));
     }
-    this->buttons[0]->SetTooltip(LookupMessage(tooltip));
     this->LayoutButtons();
     return 0;
   }
   case UM_MAKEMENU:
-    this->menuItems.clear();
+    this->menuItems.erase(this->menuItems.begin(), this->menuItems.end());
     if (g_windowMgr.menuWnd) {
       g_windowMgr.CloseWindow(WID_MENUWND);
     }
     if (this->selected != -1) {
       if (this->mode == 0) {
         this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_OPEN_1ON1_WINDOW)).c_str(), 7));
-        this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_USA_PERSONALINFO_DEATH)).c_str(), 0x3A));
+        this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_SEND_RODEX)).c_str(), 0x3A));
         this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_DELETE)).c_str(), 0x13));
         MessengerMember member = this->MemberAtIndex(this->selected);
         if (member.valid && !member.offline && g_session.partyLeader
@@ -1557,7 +1559,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       } else {
         MessengerMember member = this->MemberAtIndex(this->selected);
         if (member.valid) {
-          this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_USA_PERSONALINFO_DEATH)).c_str(), 0x3A));
+          this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_SEND_RODEX)).c_str(), 0x3A));
           if (member.name == g_session.DecodePlayerName()) {
             this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_LEAVE_PARTY)).c_str(), 9));
           } else {
@@ -1568,8 +1570,8 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
             }
           }
           if (!member.offline) {
-            this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_DATE_MM_DD)).c_str(), 0x3C));
-            this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_ACHIEVEMENT_NEXT_GRADE)).c_str(), 0x3D));
+            this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_ADD_MINI_PARTYWND)).c_str(), 0x3C));
+            this->menuItems.push_back(MiniPartyInfoEntry(std::string(LookupMessage(MSI_DELETE_MINI_PARTYWND)).c_str(), 0x3D));
           }
         }
       }
@@ -1593,7 +1595,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     }
     MessengerMember member = this->MemberAtIndex(this->selected);
     if (member.name.find(g_messengerNamelessTag, 0) != std::string::npos) {
-      g_windowMgr.Confirm(LookupMessage(MSI_CHR_DELETE_FAIL_CHN_TAREN_PERSONALNUMBER), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_CALLING_USERNAME), 0, true, false, 0, "Message", 0x118, 0x78, 0);
       return 0;
     }
     if (!member.valid) {
@@ -1625,13 +1627,13 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       this->SendMsg(nullptr, UM_COMMAND, ID_LEAVE, 0, 0, 0);
       return 0;
     case MENUID_MAKE_WHISPER_WINDOW:
-      this->SendMsg(nullptr, 0x47, 0, 0, 0, 0);
+      this->SendMsg(nullptr, UM_MAKE_WHISPER_WINDOW, 0, 0, 0, 0);
       return 0;
     case 0x2B:
       if (this->selected != -1) {
         MessengerMember target = this->MemberAtIndex(this->selected);
         if (target.valid && !target.offline) {
-          if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_YIELD_PARTYMASTER), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+          if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_YIELD_PARTYMASTER), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
             g_modeMgr.currentMode->SendMsg(MM_GROUP_CHANGE_MASTER, target.accountId, 0, 0, 0);
           }
         } else {
@@ -1649,8 +1651,11 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     }
     case 0x3C: {
       MessengerMember target = this->MemberAtIndex(this->selected);
-      if (target.valid && g_session.FindMiniPartyRecord(target.accountId).active != 1) {
-        this->OpenMiniPartyWnd(g_windowMgr.FindMiniPartyCell(), target);
+      if (target.valid) {
+        SessionRecord0734 record = g_session.FindMiniPartyRecord(target.accountId);
+        if (record.active != 1) {
+          this->OpenMiniPartyWnd(g_windowMgr.FindMiniPartyCell(), target);
+        }
       }
       return 0;
     }
@@ -1675,11 +1680,11 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       if (!g_session.m_lockMouse && this->selected != -1) {
         MessengerMember member = this->MemberAtIndex(this->selected);
         if (member.valid && !(member.name == g_session.DecodePlayerName())) {
-          const char* tag;
+          const char* tag = nullptr;
           if (g_windowMgr.IsFriend(member.name.c_str())) {
             tag = LookupMessage(MSI_FRIEND);
-          } else {
-            tag = g_session.IsGuildMemberCharacter(member.characterId) ? "GuildMember" : nullptr;
+          } else if (g_session.IsGuildMemberCharacter(member.characterId)) {
+            tag = "GuildMember";
           }
           g_windowMgr.SendNotice(
             14, reinterpret_cast<std::intptr_t>(member.name.c_str()), reinterpret_cast<std::intptr_t>(tag),
@@ -1730,11 +1735,11 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         MessengerMember member = this->MemberAtIndex(this->selected);
         if (member.valid) {
           if (this->mode == 0) {
-            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
               g_modeMgr.currentMode->SendMsg(MM_DELETE_FRIEND, member.accountId, member.characterId, 0, 0);
             }
           } else if (!(member.name == g_session.DecodePlayerName())) {
-            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_EXPEL), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_EXPEL), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
               g_modeMgr.currentMode->SendMsg(MM_REQ_EXPEL_GROUP_MEMBER, reinterpret_cast<int>(member.name.c_str()), 0, 0, 0);
             }
           }
@@ -1748,7 +1753,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       if (!g_session.m_lockMouse && this->selected != -1) {
         MessengerMember member = this->MemberAtIndex(this->selected);
         if (member.valid && member.name == g_session.DecodePlayerName()) {
-          if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_LEAVE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+          if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_LEAVE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
             g_modeMgr.currentMode->SendMsg(MM_REQ_LEAVE_GROUP, 0, 0, 0, 0);
           }
         }
@@ -1772,11 +1777,11 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       int secondTip;
       int firstTip;
       if (this->mode == 0) {
-        secondTip = 0x15F;
-        firstTip = 0x163;
+        secondTip = MSI_DELETE;
+        firstTip = MSI_FRIEND_SETTING;
       } else {
-        secondTip = 0x61;
-        firstTip = 0x65;
+        secondTip = MSI_EXPEL;
+        firstTip = MSI_PARTY_SETTING;
       }
       this->buttons[3]->SetTooltip(LookupMessage(firstTip));
       this->buttons[4]->SetTooltip(LookupMessage(secondTip));
@@ -1786,7 +1791,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       this->SendMsg(nullptr, UM_RESIZE, 7, this->geometry.width, this->geometry.height, 0);
       return 0;
     }
-    case 0x22: {
+    case ID_UPDATE_MEMBER_HP: {
       CGameMode* gameMode = g_modeMgr.GetGameMode();
       if (!gameMode || this->mode == 0) {
         return 0;
@@ -1863,7 +1868,7 @@ int UIMessengerGroupWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       return 0;
     case ID_LEAVE_PARTY:
       if (!g_session.m_lockMouse) {
-        if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_LEAVE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == 0xBB) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_LEAVE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
           g_modeMgr.currentMode->SendMsg(MM_REQ_LEAVE_GROUP, 0, 0, 0, 0);
           if (g_windowMgr.partyInvitationToWnd) {
             g_windowMgr.CloseWindow(WID_PARTYINVITATIONTOWND);
@@ -2034,13 +2039,6 @@ void UIMessengerGroupWnd::StoreInfo() {
 UIMiniPartyInfoWnd::UIMiniPartyInfoWnd()
     : UIFrameWnd(0), m_gauge(nullptr), m_owner(nullptr) {
   this->m_entries.clear();
-}
-
-// OFFSET: 0x00740170
-// FUNCTION: fn_07728
-MessengerMember UIMiniPartyWnd::GetMember() {
-  MessengerMember member = this->m_member;
-  return member;
 }
 
 // OFFSET: 0x00740250

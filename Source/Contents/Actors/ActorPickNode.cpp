@@ -33,6 +33,14 @@ bool CPathFinder::Walkable(int column, int row) const {
   return this->attr->Walkable(column, row);
 }
 
+// OFFSET: 0x00ADA4F0
+// FUNCTION: fn_45894
+CActorPickNode::CActorPickNode() {
+  for (int index = 0; index < 4; ++index) {
+    this->children[index] = nullptr;
+  }
+}
+
 // OFFSET: 0x00ADA690
 // FUNCTION: fn_17906
 __declspec(noinline) CActorPickNode::~CActorPickNode() {
@@ -42,20 +50,20 @@ __declspec(noinline) CActorPickNode::~CActorPickNode() {
 // OFFSET: 0x00AD9980
 // FUNCTION: fn_17889
 bool CPathFinder::LoadAttr(std::string name) {
+  C3dAttr* attr;
   const auto found = this->attrCache.find(name);
   if (found != this->attrCache.end()) {
-    this->attr = found->second;
-    return true;
-  }
+    attr = found->second;
+  } else {
+    attr = new C3dAttr;
+    if (attr == nullptr) {
+      return false;
+    }
 
-  C3dAttr* attr = new C3dAttr;
-  if (attr == nullptr) {
-    return false;
+    this->attrCache[name] = attr;
+    name += ".gat";
+    attr->Load(name.c_str());
   }
-
-  this->attrCache[name] = attr;
-  name += ".gat";
-  attr->Load(name.c_str());
   this->attr = attr;
   return true;
 }
@@ -65,8 +73,8 @@ bool CPathFinder::LoadAttr(std::string name) {
 void CActorPickNode::AddPickInfo(ActorPickInfo* info) {
   CActorPickNode* node = this;
   while (node->children[0] != nullptr) {
-    const int x = static_cast<int>(info->left);
-    const int y = static_cast<int>(info->top);
+    const int x = static_cast<int>(info->corners[0].x);
+    const int y = static_cast<int>(info->corners[0].y);
     const int centerX = node->bounds.right / 2;
     const int centerY = node->bounds.bottom / 2;
     if (x <= centerX) {
@@ -104,20 +112,18 @@ ActorPickInfo* CActorPickNode::Pick(float x, float y) {
     ActorPickInfo* result = nullptr;
     float bestDepth = 0.0f;
     for (ActorPickInfo* info : this->pickInfos) {
-      if (x > info->left && x < info->right && y > info->top && y < info->bottom && info->depthOffset + info->depth > bestDepth) {
-        result = info;
-        bestDepth = info->depthOffset + info->depth;
+      if (info->Contains(x, y)) {
+        const float depth = info->corners[1].z + info->corners[0].z;
+        if (depth > bestDepth) {
+          bestDepth = depth;
+          result = info;
+        }
       }
     }
     return result;
   }
 
-  int quadrant;
-  if (static_cast<int>(x) <= this->bounds.right / 2) {
-    quadrant = static_cast<int>(y) <= this->bounds.bottom / 2 ? 0 : 3;
-  } else {
-    quadrant = (static_cast<int>(y) > this->bounds.bottom / 2) + 1;
-  }
+  const int quadrant = this->QuadrantAt(static_cast<int>(x), static_cast<int>(y));
 
   ActorPickInfo* result = this->children[quadrant]->Pick(x, y);
   if (result) {
@@ -134,6 +140,29 @@ ActorPickInfo* CActorPickNode::Pick(float x, float y) {
   return nullptr;
 }
 
+// OFFSET: 0x00ADA9E0
+// FUNCTION: fn_45895
+int CActorPickNode::QuadrantAt(int x, int y) const {
+  const int centerX = this->bounds.right / 2;
+  const int centerY = this->bounds.bottom / 2;
+  if (x <= centerX && y <= centerY) {
+    return 0;
+  }
+  if (x > centerX && y <= centerY) {
+    return 1;
+  }
+  if (x > centerX && y > centerY) {
+    return 2;
+  }
+  return 3;
+}
+
+// OFFSET: 0x00ADAA20
+// FUNCTION: fn_45896
+bool ActorPickInfo::Contains(float x, float y) const {
+  return x > this->corners[0].x && x < this->corners[1].x && y > this->corners[0].y && y < this->corners[1].y;
+}
+
 // OFFSET: 0x00ADAA60
 // FUNCTION: fn_17911
 void CActorPickNode::MakeQuardTree(int depth, ActorPickBounds bounds) {
@@ -143,28 +172,33 @@ void CActorPickNode::MakeQuardTree(int depth, ActorPickBounds bounds) {
     for (int index = 0; index < 4; ++index) {
       CActorPickNode* child = new CActorPickNode;
       this->children[index] = child;
-      ActorPickBounds childBounds = this->bounds;
-      switch (index) {
-      case 0:
-        childBounds.right /= 2;
-        childBounds.bottom /= 2;
-        break;
-      case 1:
-        childBounds.left = childBounds.right / 2 + 1;
-        childBounds.bottom /= 2;
-        break;
-      case 2:
-        childBounds.left = childBounds.right / 2 + 1;
-        childBounds.top = childBounds.bottom / 2 + 1;
-        break;
-      case 3:
-        childBounds.right /= 2;
-        childBounds.top = childBounds.bottom / 2 + 1;
-        break;
-      }
-      child->MakeQuardTree(depth - 1, childBounds);
+      child->MakeQuardTree(depth - 1, this->ChildBounds(this->bounds, index));
     }
   }
+}
+
+// OFFSET: 0x00ADABD0
+// FUNCTION: fn_45897
+ActorPickBounds CActorPickNode::ChildBounds(ActorPickBounds bounds, int quadrant) const {
+  switch (quadrant) {
+  case 0:
+    bounds.right /= 2;
+    bounds.bottom /= 2;
+    break;
+  case 1:
+    bounds.left = bounds.right / 2 + 1;
+    bounds.bottom /= 2;
+    break;
+  case 2:
+    bounds.left = bounds.right / 2 + 1;
+    bounds.top = bounds.bottom / 2 + 1;
+    break;
+  case 3:
+    bounds.right /= 2;
+    bounds.top = bounds.bottom / 2 + 1;
+    break;
+  }
+  return bounds;
 }
 
 // GLOBAL: gl_24536
@@ -173,35 +207,9 @@ float g_projectionScale = 0.16f;
 // GLOBAL: gl_24775
 int g_worldViewDrawn;
 
-// OFFSET: 0x00ADAC70
-// FUNCTION: fn_17912
-CView::CView() {
-  this->camera.target.x = 0.0f;
-  this->camera.target.y = 0.0f;
-  this->camera.target.z = 0.0f;
-  this->camera.desiredTarget.x = 0.0f;
-  this->camera.desiredTarget.y = 0.0f;
-  this->camera.desiredTarget.z = 0.0f;
-  this->backupCurrentTarget.x = 0.0f;
-  this->backupCurrentTarget.y = 0.0f;
-  this->backupCurrentTarget.z = 0.0f;
-  this->backupDesiredTarget.x = 0.0f;
-  this->backupDesiredTarget.y = 0.0f;
-  this->backupDesiredTarget.z = 0.0f;
-  this->frame.eye.x = 0.0f;
-  this->frame.eye.y = 0.0f;
-  this->frame.eye.z = 0.0f;
-  this->frame.up.x = 0.0f;
-  this->frame.up.y = 0.0f;
-  this->frame.up.z = 0.0f;
-  this->camera.yaw = 0.0f;
-  this->shake.enabled = 0;
-  this->skyBox = nullptr;
-  this->shake.start = 0;
-  *reinterpret_cast<unsigned char*>(&this->shake.resetFlags) = 0;
-}
-
-CView::~CView() {
+// OFFSET: 0x00ADAEA0
+// FUNCTION: fn_45884
+__declspec(noinline) CView::~CView() {
   if (this->skyBox) {
     delete this->skyBox;
   }

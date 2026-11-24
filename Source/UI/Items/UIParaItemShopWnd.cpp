@@ -46,15 +46,19 @@
 #include <cstring>
 #include <string>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
-
-
 namespace {
 #pragma pack(push, 1)
 struct ItemListChunkHeader {
   /* 0000 */ std::int16_t type;
   /* 0002 */ std::uint32_t size;
+
+  ItemListChunkHeader() : type(0), size(0) {
+  }
+
+  ~ItemListChunkHeader() {
+    this->size = 0;
+    this->type = 0;
+  }
 };
 #pragma pack(pop)
 
@@ -81,6 +85,20 @@ UIParaResultWnd::UIParaResultWnd() : UIItemBaseWnd() {
   this->alternateButtonBar = 1;
   this->footerHeight = 29;
   this->headerHeight = 0;
+}
+
+// OFFSET: 0x009A7E90
+// FUNCTION: fn_45717
+UIParaItemPurchaseWnd::~UIParaItemPurchaseWnd() = default;
+
+// OFFSET: 0x009A7EE0
+// FUNCTION: fn_45718
+UIParaItemShopWnd::~UIParaItemShopWnd() = default;
+
+// OFFSET: 0x009A7F30
+// FUNCTION: fn_45719
+UIParaResultWnd::~UIParaResultWnd() {
+  g_session.ClearTradeItems();
 }
 
 // OFFSET: 0x009A80F0
@@ -180,23 +198,26 @@ void UIParaResultWnd::OnLBtnDown(int x, int y) {
 // FUNCTION: fn_13755
 void UIParaResultWnd::OnMouseHover(int x, int y) {
   ITEM_INFO item = this->GetItemAt(x, y);
-  if (item.identity[1] != 0) {
-    int tooltipX = (x - 40) / 32 * 32 + 40;
-    int tooltipY = (y - 17) / 32 * 32 + 1;
+  if (item.identity[1] > 0) {
+    const int column = (x - 40) / 32;
+    const int row = (y - 17) / 32;
+    int tooltipX = column * 32 + 40;
+    int tooltipY = row * 32 + 1;
     this->ToScreen(tooltipX, tooltipY);
 
-    std::string text;
+    std::string text = "";
     char price[64];
     std::memset(price, 0, sizeof(price));
     if (item.prices[0] != item.prices[1]) {
       const char* amount = FormatGroupedInteger(static_cast<int>(item.prices[1]), price, sizeof(price));
-      text = FormatOwnedString("%s %d -> %s Zeny", item.DisplayName(0).c_str(), item.prices[0], amount);
+      text = static_cast<const std::string&>(FormatOwnedString("%s %d -> %s Zeny", item.DisplayName(0).c_str(), item.prices[0], amount));
     } else {
       const char* amount = FormatGroupedInteger(static_cast<int>(item.prices[1]), price, sizeof(price));
-      text = FormatOwnedString("%s %s Zeny", item.DisplayName(0).c_str(), amount);
+      text = static_cast<const std::string&>(FormatOwnedString("%s %s Zeny", item.DisplayName(0).c_str(), amount));
     }
 
-    g_modeMgr.currentMode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
+    CMode* mode = g_modeMgr.currentMode;
+    mode->ShowTooltip(text.c_str(), tooltipX, tooltipY, g_session.GetItemNameColor(item), 0, 1);
   }
 }
 
@@ -232,7 +253,7 @@ void UIParaResultWnd::OnCreate(int width, int height) {
 
   this->title = new UIStaticText();
   this->title->SetSize(70, 15);
-  this->title->SetText(LookupMessage(MSI_GUILD_INVITE), 0);
+  this->title->SetText(LookupMessage(MSI_PARA_RESULT_TITLE), 0);
   this->title->Move(16, 2);
   this->title->shadow = 1;
   this->AddChild(this->title);
@@ -259,7 +280,7 @@ void UIParaResultWnd::OnCreate(int width, int height) {
     this->buttons[0]->SetBitmap((prefix + "btn_ok_b.bmp").c_str(), 2, 0);
     this->buttons[0]->SetSize(this->buttons[0]->BitmapWidth(), this->buttons[0]->BitmapHeight());
     this->buttons[0]->Move(x, y);
-    this->buttons[0]->SetId(184);
+    this->buttons[0]->SetId(ID_OK);
     this->AddChild(this->buttons[0]);
   }
 
@@ -311,20 +332,21 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     ITEM_INFO item;
     item.Assign(drag);
     const int total = g_session.GetPurchaseItemTotalPrice();
-    const int price = drag.price;
-    const bool affordable = g_session.m_zeny >= static_cast<long long>(price) * drag.quantity + total;
+    const long long zeny = g_session.m_zeny;
+    const int price = mode->drag.price;
+    const bool affordable = zeny >= static_cast<long long>(price) * mode->drag.quantity + total;
 
     int existing = 0;
     for (const ITEM_INFO& value : this->items) {
-      if (value.itemId == item.itemId) {
+      if (item.itemId == value.itemId) {
         existing = value.quantity;
         break;
       }
     }
 
-    const int combined = existing + item.quantity;
-    if (combined > 30000) {
-      item.quantity += 30000 - combined;
+    existing += item.quantity;
+    if (existing > 30000) {
+      item.quantity += 30000 - existing;
       char text[200];
       std::memset(text, 0, sizeof(text));
       sprintf_s(text, sizeof(text), LookupMessage(MSI_LIMIT_BUY_ITEM2), 30000);
@@ -332,21 +354,21 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 255, 0, 0, 0);
     }
 
-    const int available = item.flags[3] == 1 ? g_session.GetShopItemNumOf(item) : g_session.GetShopItemNumByItemId(item);
+    const int available = item.uniqueItem == 1 ? g_session.GetShopItemNumOf(item) : g_session.GetShopItemNumByItemId(item);
     if (available != -1 && available < a) {
       item.quantity = available;
       g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PARA_PURCHASE_ITEM_FAIL)), 255, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PARA_WRONG_PURCHASE_COUNT_MSG)), 255, 0, 0, 0);
     }
 
     if (item.quantity > 0) {
       std::uint16_t weight;
-      if (item.flags[3] == 1) {
-        const std::uint16_t added = g_session.GetShopItemPriceFactor(item) * static_cast<std::uint16_t>(item.quantity);
-        weight = added + g_session.SumPurchasePriceFactor();
+      if (item.uniqueItem == 1) {
+        weight = g_session.GetShopItemPriceFactor(item) * static_cast<std::uint16_t>(item.quantity);
+        weight += g_session.SumPurchasePriceFactor();
       } else {
-        const std::uint16_t added = g_session.GetShopItemPriceFactorByItemId(item) * static_cast<std::uint16_t>(item.quantity);
-        weight = added + g_session.SumPurchasePriceFactorByItemId();
+        weight = g_session.GetShopItemPriceFactorByItemId(item) * static_cast<std::uint16_t>(item.quantity);
+        weight += g_session.SumPurchasePriceFactorByItemId();
       }
 
       if (!affordable) {
@@ -354,9 +376,9 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_INSUFFICIENT_MONEY)), 255, 0, 0, 0);
       } else if (weight + g_session.m_weight > g_session.m_maxWeight) {
         g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GUILD_STORAGE_ITEM_COUNT)), 255, 0, 0, 0);
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PARA_PURCHASE_ITEM_WEIGHT)), 255, 0, 0, 0);
       } else {
-        if (item.flags[3] == 1) {
+        if (item.uniqueItem == 1) {
           g_session.RemoveShopItem(item);
           g_session.MergePurchaseItem(item);
         } else {
@@ -378,7 +400,7 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     switch (a) {
     case ID_OK: {
       ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(0);
-      if (item.flags[3] == 1) {
+      if (item.uniqueItem == 1) {
         mode->SendMsg(MM_NPC_MARKET_PURCHASE_V2, 0, 0, 0, 0);
       } else {
         mode->SendMsg(MM_NPC_MARKET_PURCHASE, 0, 0, 0, 0);
@@ -410,10 +432,11 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       if (newWidth != this->geometry.width || newHeight != this->geometry.height) {
         this->Resize(newWidth, newHeight);
         this->columns = 1;
-        this->visibleRows = (this->geometry.height - 38) / 32;
+        const int listHeight = this->geometry.height - 38;
+        this->visibleRows = listHeight / 32;
         this->resizer->Move(this->geometry.width - 15, this->geometry.height - 15);
         this->scrollBar->Move(this->geometry.width - 15, 14);
-        this->scrollBar->Resize(this->scrollBar->geometry.width, this->geometry.height - 38);
+        this->scrollBar->Resize(this->scrollBar->geometry.width, listHeight);
         this->UpdateScrollBar();
       }
 
@@ -428,13 +451,13 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     }
     break;
   case UM_REFRESHITEM: {
-    this->items.erase(this->items.begin(), this->items.end());
     int sum = 0;
+    this->items.erase(this->items.begin(), this->items.end());
     const int size = g_session.GetNumPurchaseItems();
     for (int i = 0; i < size; ++i) {
       ITEM_INFO item = g_session.GetPurchaseItemInfoBySequence(i);
-      if (item.identity[1] != 0) {
-        sum += item.quantity * item.prices[1];
+      if (item.identity[1] > 0) {
+        sum += item.quantity * static_cast<int>(item.prices[1]);
         this->items.push_back(item);
       }
     }
@@ -451,9 +474,10 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
   }
   case UM_REPLAY_FRAMED_DATA: {
     const auto* bytes = reinterpret_cast<const unsigned char*>(a);
-    ItemListChunkHeader header = *reinterpret_cast<const ItemListChunkHeader*>(bytes);
+    ItemListChunkHeader header;
+    header = *reinterpret_cast<const ItemListChunkHeader*>(bytes);
     unsigned offset = 6;
-    if (header.type == 20700) {
+    if (20700 == header.type) {
       while (static_cast<unsigned>(b) > offset) {
         header = *reinterpret_cast<const ItemListChunkHeader*>(bytes + offset);
         offset += 6;
@@ -496,7 +520,7 @@ int UIParaItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     return 0;
   case UM_COMMAND:
     this->RecordResponse(static_cast<int>(a), b, c, d);
-    if (a == 213) {
+    if (a == ID_CHECK) {
       if (g_replayAnimationScaling != 0) {
         UICheckBox* checkBox = this->checkBox;
         checkBox->geometry.state = b;
@@ -514,7 +538,7 @@ int UIParaItemShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       ITEM_INFO item;
       item.Assign(drag);
       CSession* lists = &g_session;
-      if (item.flags[3] == 1) {
+      if (item.uniqueItem == 1) {
         lists->RemovePurchaseItem(item);
         lists->MergeShopItem(item);
       } else {
@@ -599,8 +623,8 @@ int UIParaResultWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     return 0;
   case UM_COMMAND: {
     this->RecordResponse(static_cast<int>(a), b, c, d);
-    CMode* mode = g_modeMgr.currentMode;
-    if (a == 184) {
+    if (a == ID_OK) {
+      CMode* mode = g_modeMgr.currentMode;
       mode->SendMsg(MM_NPC_MARKET_CLOSE, 0, 0, 0, 0);
       mode->SendMsg(MM_RELEASE_QUEST, 0, 0, 0, 0);
       g_session.ClearTradeItems();
@@ -610,7 +634,7 @@ int UIParaResultWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
   }
   case UM_SETTITLE:
     this->showQuantity = 0;
-    this->title->SetTextAutoWidth(LookupMessage(MSI_GUILD_INVITE));
+    this->title->SetTextAutoWidth(LookupMessage(MSI_PARA_RESULT_TITLE));
     this->SendMsg(nullptr, UM_RESIZE, 7, this->geometry.width, a, 0);
     return 0;
   case UM_RESIZE:
@@ -645,7 +669,8 @@ int UIParaResultWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     break;
   case UM_REFRESHITEM: {
     int sum = 0;
-    for (const ITEM_INFO& item : this->items) {
+    for (auto itemIt = this->items.begin(); itemIt != this->items.end(); ++itemIt) {
+      const ITEM_INFO& item = *itemIt;
       sum += item.prices[1] * item.quantity;
     }
 
@@ -686,7 +711,8 @@ void UIParaItemShopWnd::Paint() {
       this->DrawBitmap(0, left->image.height * i + titleHeight, left, false);
     }
     if (height % left->image.height > 0) {
-      this->DrawBitmap(0, this->geometry.height - barHeight - left->image.height, left, false);
+      const int bottom = this->geometry.height - barHeight;
+      this->DrawBitmap(0, bottom - left->image.height, left, false);
     }
   }
 
@@ -696,7 +722,8 @@ void UIParaItemShopWnd::Paint() {
       this->DrawBitmap(this->geometry.width - right->image.width, right->image.height * i + titleHeight, right, false);
     }
     if (height % right->image.height > 0) {
-      this->DrawBitmap(this->geometry.width - right->image.width, this->geometry.height - barHeight - right->image.height, right, false);
+      const int bottom = this->geometry.height - barHeight;
+      this->DrawBitmap(this->geometry.width - right->image.width, bottom - right->image.height, right, false);
     }
   }
 
@@ -725,10 +752,12 @@ void UIParaItemShopWnd::Paint() {
       this->FillRegion(72, top + 2, 191, 28, RGB(hoverRed, hoverGreen, hoverBlue));
     }
 
+    const ITEM_INFO& item = *it;
+    const int iconY = top + 4;
     if (this->sellMode == 1 || it->quantity != 0) {
-      this->DrawItemAndQuantity(34, top + 4, *it, 0, 0);
+      this->DrawItemAndQuantity(34, iconY, item, 0, 0);
     } else {
-      this->DrawItemAndQuantityAuxiliary(1, 34, top + 4, *it, 0, 0);
+      this->DrawItemAndQuantityAuxiliary(1, 34, iconY, item, 0, 0);
     }
 
     this->DrawWrappedItemName(70, top + 12, 120, &*it, 0, 0, 12);
@@ -810,16 +839,18 @@ void UIParaResultWnd::Paint() {
   {
     unsigned red = 0, green = 0, blue = 0;
     g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-    const int listHeight = this->geometry.height - this->footerHeight - 17;
-    this->FillRegion(20, 17, (this->geometry.width - 60) % 32, listHeight, RGB(red, green, blue));
-    this->FillRegion(20, listHeight / 32 * 32 + 17, this->geometry.width - 24, listHeight % 32, RGB(red, green, blue));
+    const int columnRemainder = (this->geometry.width - 60) % 32;
+    this->FillRegion(20, 17, columnRemainder, this->geometry.height - this->footerHeight - 17, RGB(red, green, blue));
+    const int rowRemainder = (this->geometry.height - this->footerHeight - 17) % 32;
+    const int remainderTop = (this->geometry.height - this->footerHeight - 17) / 32 * 32 + 17;
+    this->FillRegion(20, remainderTop, this->geometry.width - 24, rowRemainder, RGB(red, green, blue));
   }
   this->DrawButtonBar(this->alternateButtonBar != 1 ? 0 : 2, 0, 1);
 
   const int columns = (this->geometry.width - 40) / 32;
   const int slots = (this->geometry.height - this->headerHeight - this->footerHeight - 17) / 32;
-  for (int slot = slots, y = 17; slot > 0; --slot, y += 32) {
-    this->DrawItemSlotFrame(40, y);
+  for (int row = 0; row < slots; ++row) {
+    this->DrawItemSlotFrame(40, row * 32 + 17);
   }
 
   {
@@ -828,8 +859,8 @@ void UIParaResultWnd::Paint() {
     this->FillRegion(72, 17, columns * 32 - 32, slots * 32, RGB(red, green, blue));
   }
 
-  int index = 0;
   int visible = 0;
+  int index = 0;
 
   for (auto it = this->items.begin(); it != this->items.end(); ++it, ++index) {
     if (index < this->scroll * this->columns) {

@@ -18,13 +18,14 @@
 
 // OFFSET: 0x00DE8740
 // FUNCTION: fn_23498
-bool CSession::LoadMapNameTable() {
+BOOL CSession::LoadMapNameTable() {
   std::vector<char*> tokens;
   CCommonObject& storage = this->m_tableLoader;
   const bool loaded = storage.LoadTokens(tokens, OBFUSCATE_TEXT("mapNameTable.txt", 0x17FB0F6BFF3BE93FULL), 0);
 
   for (auto token = tokens.begin(); token != tokens.end(); token += 2) {
-    g_mapInfoMgr->AddMapDisplayName(token[0], token[1], false);
+    CMapInfoMgr* const mapInfoMgr = g_mapInfoMgr;
+    mapInfoMgr->AddMapDisplayName(token[0], token[1], false);
   }
 
   return loaded;
@@ -43,20 +44,16 @@ bool CSession::LoadMapPosTable() {
   }
 
   const char* cursor = static_cast<const char*>(file.GetData());
+  const char* start = cursor;
   const char* end = cursor + file.GetSize();
   int currentId = 0;
+  MapPosRect bounds = {};
   std::string name;
+  int boundsValid = 0;
   std::vector<std::string> fields;
   std::string token;
-  int boundsValid = 0;
-  MapPosRect bounds = {};
-  const char* start = cursor;
   for (; cursor < end; ++cursor) {
     switch (*cursor) {
-    case '\n':
-    case '\r':
-      start = cursor + 1;
-      break;
     case '@':
       if (this->m_mapPosListCount == -1) {
         this->m_mapPosListCount = std::atoi(std::string(start, cursor).c_str());
@@ -80,29 +77,18 @@ bool CSession::LoadMapPosTable() {
       } else if (fields.size() < 3) {
         fields.push_back(std::string(start, cursor));
       } else {
-        {
-          const std::string last(start, cursor);
-          fields.push_back(last);
-        }
+        fields.push_back(std::string(start, cursor));
         const int bottom = std::atoi(fields[3].c_str());
         const int right = std::atoi(fields[2].c_str());
         const int top = std::atoi(fields[1].c_str());
-        MapPosRect rect;
-        rect.left = std::atoi(fields[0].c_str());
-        rect.top = top;
-        rect.right = right;
-        rect.bottom = bottom;
-
-        MapPosEntry& listed = this->m_mapPosLists[currentId][name];
-        listed.rect = rect;
-        listed.valid = 1;
-        MapPosEntry& position = this->m_mapPositions[name];
-        position.rect = rect;
-        position.valid = 1;
+        const MapPosRect rect = {std::atoi(fields[0].c_str()), top, right, bottom};
+        const MapPosEntry position = {rect, 1};
+        this->m_mapPosLists[currentId][name] = position;
+        this->m_mapPositions[name] = position;
 
         if (boundsValid != 0) {
-          bounds.right = std::max(bounds.right, right);
-          bounds.bottom = std::max(bounds.bottom, bottom);
+          bounds.right = std::max(right, bounds.right);
+          bounds.bottom = std::max(bottom, bounds.bottom);
           bounds.left = std::min(bounds.left, rect.left);
           if (top < bounds.top) {
             bounds.top = top;
@@ -116,6 +102,10 @@ bool CSession::LoadMapPosTable() {
         name.clear();
         fields.clear();
       }
+      start = cursor + 1;
+      break;
+    case '\n':
+    case '\r':
       start = cursor + 1;
       break;
     }

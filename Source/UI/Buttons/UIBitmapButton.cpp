@@ -1,15 +1,61 @@
+#include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/ResourceMgr.h"
 #include "Resource/Bitmap/TextureNames.h"
 #include "UI/Buttons/UIBitmapButton.h"
+#include "UI/Buttons/UITextureButton.h"
+#include "UI/Buttons/UIBitmapButton2.h"
+#include "Render/Textures/Texture.h"
+#include "Render/Textures/TextureCache.h"
+
 // OFFSET: 0x0084EAB0
 // FUNCTION: fn_10650
 UIBitmapButton::UIBitmapButton()
-    : UIButton(), m_names{std::string(), std::string(), std::string(), std::string()} {
+    : UIButton() {
   this->m_bitmapWidth = 0;
   this->m_bitmapHeight = 0;
-  this->m_names[3].clear();
+  this->m_disabledName.clear();
   this->m_invalidateParent = 0;
+}
+
+// OFFSET: 0x0086C530
+// FUNCTION: fn_45791
+UIBitmapButton2::UIBitmapButton2()
+    : UIBitmapButton() {
+}
+
+// OFFSET: 0x00870280
+// FUNCTION: fn_45792
+UIBitmapButton2::~UIBitmapButton2() = default;
+
+// OFFSET: 0x008695B0
+// FUNCTION: fn_45624
+bool UITextureButton::SetTexture(const char* name, int state) {
+  if (g_serviceType != ServiceKorea) {
+    return false;
+  }
+
+  CTexture* texture = g_texMgr.Load(name, 0, false, true, false);
+  if (!texture) {
+    return false;
+  }
+
+  if (texture->Width() > this->textureWidth) {
+    this->textureWidth = texture->Width();
+  }
+  if (texture->Height() > this->textureHeight) {
+    this->textureHeight = texture->Height();
+  }
+
+  switch (state) {
+  case 0: this->normalTexture.assign(name, std::strlen(name)); break;
+  case 1: this->hoverTexture.assign(name, std::strlen(name)); break;
+  case 2: this->pressedTexture.assign(name, std::strlen(name)); break;
+  case 3: this->disabledTexture.assign(name, std::strlen(name)); break;
+  }
+
+  return true;
 }
 
 // OFFSET: 0x008657A0
@@ -31,10 +77,10 @@ bool UIBitmapButton::SetBitmap(const char* name, int state, unsigned char exactS
     this->m_bitmapHeight = bitmap->image.height;
   }
   switch (state) {
-  case 0: this->m_names[0] = name; break;
-  case 1: this->m_names[1] = name; break;
-  case 2: this->m_names[2] = name; break;
-  case 3: this->m_names[3] = name; break;
+  case 0: this->m_normalName = name; break;
+  case 1: this->m_hoverName = name; break;
+  case 2: this->m_pressedName = name; break;
+  case 3: this->m_disabledName = name; break;
   }
 
   return true;
@@ -47,18 +93,18 @@ void UIBitmapButton::Paint() {
 
   switch (this->geometry.state) {
   case 0:
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[0].c_str())));
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_normalName.c_str())));
     break;
   case 1:
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[1].c_str())));
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_hoverName.c_str())));
     break;
   case 2:
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[2].c_str())));
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_pressedName.c_str())));
     break;
   }
 
-  if (this->m_disabled != 0 && this->m_names[3].size() > 0) {
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_names[3].c_str())));
+  if (this->m_disabled != 0 && this->m_disabledName.size() > 0) {
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_disabledName.c_str())));
   }
 
   this->DrawBitmap(0, 0, bitmap, false);

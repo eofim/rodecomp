@@ -1,5 +1,6 @@
 #include "UI/Items/UIMakeTargetListWnd.h"
 #include "Client/Mode/ModeMessage.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
@@ -36,10 +37,11 @@ struct ReplayTaggedRecordHeader {
 // INLINED
 inline std::vector<unsigned char> MakeReplayTaggedRecord(std::uint16_t id, const void* data, std::uint32_t bytes) {
   std::vector<unsigned char> record(bytes + 6u, 0);
-  const ReplayTaggedRecordHeader header{id, bytes};
-  std::memcpy(record.data(), &header, sizeof(header));
+  ReplayTaggedRecordHeader* header = reinterpret_cast<ReplayTaggedRecordHeader*>(record.data());
+  header->id = id;
+  header->bytes = bytes;
   if (bytes != 0) {
-    std::memcpy(record.data() + sizeof(header), data, bytes);
+    std::memcpy(record.data() + sizeof(ReplayTaggedRecordHeader), data, bytes);
   }
   return record;
 }
@@ -161,8 +163,8 @@ int UIMakeTargetListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
 
       // INLINED
       ~ReplayTag() {
-        this->bytes = 0;
         this->id = 0;
+        this->bytes = 0;
       }
     };
 #pragma pack(pop)
@@ -172,17 +174,19 @@ int UIMakeTargetListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
     std::memcpy(&tag, bytes, sizeof(tag));
     unsigned offset = sizeof(tag);
 
-    if (tag.id == 22050) {
-      while (static_cast<unsigned>(b) > offset) {
+    if (22050 == tag.id) {
+      bool scanning = true;
+      while (scanning && static_cast<unsigned>(b) > offset) {
         std::memcpy(&tag, bytes + offset, sizeof(tag));
         offset += sizeof(tag);
 
         switch (tag.id) {
         case 22051:
-          return 0;
+          scanning = false;
+          break;
 
         case 22052:
-          itemId = 0;
+          itemId = ITEMID_NONE;
           std::memcpy(&itemId, bytes + offset, tag.bytes);
           offset += tag.bytes;
           this->SendMsg(nullptr, UM_ADDITEM, itemId, 0, 0, 0);

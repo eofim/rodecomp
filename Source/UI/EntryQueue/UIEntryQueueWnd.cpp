@@ -32,8 +32,6 @@
 #include <utility>
 #include <windows.h>
 
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // OFFSET: 0x00BA3920
 // FUNCTION: fn_19677
 UIEntryQueueHelpWnd::UIEntryQueueHelpWnd() : UIFrameWnd(0), m_viewer(nullptr), m_close(nullptr) {
@@ -47,7 +45,7 @@ void UIEntryQueueHelpWnd::OnDestroy() {
 // OFFSET: 0x00BA4270
 // FUNCTION: fn_19681
 void UIEntryQueueHelpWnd::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_BATTLEFIELD_WARNINGMSG1), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_BATTLEFIELD_HELP10), 0);
   this->DrawPanelBackground(17, 0, "");
 }
 
@@ -71,14 +69,16 @@ int UIEntryQueueHelpWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
 __declspec(noinline) UIEntryQueueListBox::UIEntryQueueListBox() : UIListBox() {
 }
 
-// INLINED
-UIEntryQueueListBox::~UIEntryQueueListBox() {
+// OFFSET: 0x00BA4370
+// FUNCTION: fn_46368
+__declspec(noinline) UIEntryQueueListBox::~UIEntryQueueListBox() {
 }
 
 // OFFSET: 0x00BA4490
 // FUNCTION: fn_19686
 void UIEntryQueueListBox::AddEntry(const char* name, int value) {
-  if (this->m_entries.insert(std::map<std::string, int>::value_type(name, value)).second) {
+  const auto result = this->m_entries.insert(std::map<std::string, int>::value_type(name, value));
+  if (result.second) {
     this->AddLine(name);
   }
 }
@@ -109,9 +109,9 @@ UIEntryQueueRequestWnd::UIEntryQueueRequestWnd()
     : UIFrameWnd(0), m_interval(1000), m_elapsed(0), m_delta(0), m_lastTick(0) {
 }
 
-// INLINED
-UIEntryQueueRequestWnd::~UIEntryQueueRequestWnd() {
-}
+// OFFSET: 0x00BA4820
+// FUNCTION: fn_46460
+__declspec(noinline) UIEntryQueueRequestWnd::~UIEntryQueueRequestWnd() = default;
 
 // OFFSET: 0x00BA48E0
 // FUNCTION: fn_19691
@@ -122,30 +122,31 @@ bool UIEntryQueueRequestWnd::Create() {
   this->SetSize(300, 250);
   this->OnCreate(300, 250);
   this->OnSize(300, 250);
-  this->Move((g_renderer->viewport.width - 640) / 2 + 185, (g_renderer->viewport.height - 480) / 2 + 180);
+  int top = (g_renderer->viewport.height - 480) / 2 + 180;
+  this->Move((g_renderer->viewport.width - 640) / 2 + 185, top);
 
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 280, 305, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = RGB(red, green, blue) | 0xFF000000u;
+  this->m_viewer->backgroundColor = ((blue & 0xFF) << 16 | (green & 0xFF) << 8 | (red & 0xFF)) | 0xFF000000u;
   this->m_viewer->Invalidate();
   this->AddChild(this->m_viewer);
 
   char message[0x104];
   std::memset(message, 0, sizeof(message));
-  if (g_entryQueueMgr->current) {
-    sprintf_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_WARNINGMSG2), g_entryQueueMgr->current->displayName);
+  if (EntryQueueInfo* current = g_entryQueueMgr->current) {
+    sprintf_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_START), current->displayName);
   }
 
   this->m_viewer->Clear();
   this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WARNINGMSG3)), 38, 0, 0);
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_DOYOU_MOVE)), 38, 0, 0);
   this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(""), 38, 0, 0);
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WARNINGMSG1)), 38, 0, 0);
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WARNINGMSG2)), 38, 0, 0);
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WARNINGMSG3)), 38, 0, 0);
   this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WARNINGMSG4)), 38, 0, 0);
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WAIT_PLAYER)), 38, 0, 0);
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_REQUEST_JOIN)), 38, 0, 0);
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WAITTIME_D)), 38, 0, 0);
 
   const std::string path = "유저인터페이스\\";
 
@@ -182,7 +183,7 @@ void UIEntryQueueRequestWnd::OnDestroy() {
 // OFFSET: 0x00BA5390
 // FUNCTION: fn_19693
 void UIEntryQueueRequestWnd::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_BATTLEFIELD_NAME_S), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_BATTLEFIELD_REQUEST_JOIN), 0);
   this->DrawPanelBackground(17, 0, "");
 
   char text[100];
@@ -192,7 +193,7 @@ void UIEntryQueueRequestWnd::Paint() {
     this->SendMsg(nullptr, UM_COMMAND, 1, 0, 0, 0);
   }
 
-  std::sprintf(text, LookupMessage(MSI_BATTLEFIELD_MEMBER_D), remaining);
+  std::sprintf(text, LookupMessage(MSI_BATTLEFIELD_WAITTIME_D), remaining);
   this->m_countdown->SetText(text, 0);
 }
 
@@ -219,7 +220,7 @@ int UIEntryQueueRequestWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
       g_entryQueueMgr->SendAdmissionReply(1);
       g_windowMgr.CloseWindow(WID_ENTRYQUEUESTANDBYWND);
       g_windowMgr.CloseWindow(WID_ENTRYQUEUEREQUESTWND);
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_STATE_JOINWAIT)), 0x64FFFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLEFIELD_WAIT_PLAYER)), 0x64FFFF, 0, 0, 0);
       break;
     case 1:
       g_entryQueueMgr->SendAdmissionReply(2);
@@ -239,9 +240,9 @@ UIEntryQueueStandByWnd::UIEntryQueueStandByWnd()
       m_rankingText() {
 }
 
-// INLINED
-UIEntryQueueStandByWnd::~UIEntryQueueStandByWnd() {
-}
+// OFFSET: 0x00BA5620
+// FUNCTION: fn_46465
+__declspec(noinline) UIEntryQueueStandByWnd::~UIEntryQueueStandByWnd() = default;
 
 // OFFSET: 0x00BA5700
 // FUNCTION: fn_19698
@@ -251,13 +252,15 @@ bool UIEntryQueueStandByWnd::Create() {
   this->SetSize(280, 120);
   this->OnCreate(280, 120);
   this->OnSize(280, 120);
-  this->Move((g_renderer->viewport.width - 640) / 2 + 185, (g_renderer->viewport.height - 480) / 2 + 180);
+  int top = (g_renderer->viewport.height - 480) / 2 + 180;
+  this->Move((g_renderer->viewport.width - 640) / 2 + 185, top);
 
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 260, 65, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
+  this->m_viewer->backgroundColor = ((blue & 0xFF) << 16 | (green & 0xFF) << 8 | (red & 0xFF)) | 0xFF000000u;
+  this->m_viewer->Invalidate();
   this->AddChild(this->m_viewer);
 
   const std::string path = "유저인터페이스\\";
@@ -290,7 +293,7 @@ void UIEntryQueueStandByWnd::OnDestroy() {
 // OFFSET: 0x00BA5E60
 // FUNCTION: fn_19700
 void UIEntryQueueStandByWnd::Paint() {
-  this->DrawTitleBar(true, LookupMessage(MSI_BATTLEFIELD_MYRANK_D), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_BATTLEFIELD_STATE_JOINWAIT), 0);
   this->DrawPanelBackground(17, 0, "");
 }
 
@@ -323,9 +326,9 @@ void UIEntryQueueStandByWnd::SetInfo(const char* queueName, int waiting, int ran
   this->m_queueName = queueName;
   this->m_waiting = waiting;
   this->m_ranking = ranking;
-  sprintf_s(this->m_queueText, sizeof(this->m_queueText), LookupMessage(MSI_BATTLEFIELD_DP_TITLE), queueName);
-  sprintf_s(this->m_waitingText, sizeof(this->m_waitingText), LookupMessage(MSI_BATTLEFIELD_DP_AIM), waiting);
-  sprintf_s(this->m_rankingText, sizeof(this->m_rankingText), LookupMessage(MSI_BATTLEFIELD_DP_MEMBER), ranking);
+  sprintf_s(this->m_queueText, sizeof(this->m_queueText), LookupMessage(MSI_BATTLEFIELD_NAME_S), queueName);
+  sprintf_s(this->m_waitingText, sizeof(this->m_waitingText), LookupMessage(MSI_BATTLEFIELD_MEMBER_D), waiting);
+  sprintf_s(this->m_rankingText, sizeof(this->m_rankingText), LookupMessage(MSI_BATTLEFIELD_MYRANK_D), ranking);
 
   if (this->m_viewer) {
     this->m_viewer->Clear();
@@ -346,9 +349,9 @@ UIEntryQueueWnd::UIEntryQueueWnd() : UIFrameWnd(0) {
   std::memset(this->m_values, 0, sizeof(this->m_values));
 }
 
-// INLINED
-UIEntryQueueWnd::~UIEntryQueueWnd() {
-}
+// OFFSET: 0x00BA60C0
+// FUNCTION: fn_46462
+__declspec(noinline) UIEntryQueueWnd::~UIEntryQueueWnd() = default;
 
 // OFFSET: 0x00BA6410
 // FUNCTION: fn_19706
@@ -381,8 +384,8 @@ void UIEntryQueueWnd::OnCreate(int width, int height) {
   g_entryQueueMgr->current = first->second;
 
   const char* labels[7] = {
-    LookupMessage(MSI_BATTLEFIELD_DP_REQUIRED), LookupMessage(MSI_BATTLEFIELD_DP_WIN), LookupMessage(MSI_BATTLEFIELD_DP_DRAW), LookupMessage(MSI_BATTLEFIELD_DP_LOSS),
-    LookupMessage(MSI_BATTLEFIELD_DOYOU_SINGLE), LookupMessage(MSI_BATTLEFIELD_DOYOU_PALTY), LookupMessage(MSI_BATTLEFIELD_DOYOU_GUILD),
+    LookupMessage(MSI_BATTLEFIELD_DP_TITLE), LookupMessage(MSI_BATTLEFIELD_DP_AIM), LookupMessage(MSI_BATTLEFIELD_DP_MEMBER), LookupMessage(MSI_BATTLEFIELD_DP_REQUIRED),
+    LookupMessage(MSI_BATTLEFIELD_DP_WIN), LookupMessage(MSI_BATTLEFIELD_DP_DRAW), LookupMessage(MSI_BATTLEFIELD_DP_LOSS),
   };
   int index = 0;
   for (int y = 165; y < 305; ++index, y += 20) {
@@ -452,7 +455,7 @@ void UIEntryQueueWnd::Paint() {
     }
   }
 
-  this->DrawShadowedText(10, 23, LookupMessage(MSI_BATTLEFIELD_LEVELUP_D), static_cast<int>(std::strlen(LookupMessage(MSI_BATTLEFIELD_LEVELUP_D))), 0, 0xC0C0C0, 0, 12, 0);
+  this->DrawShadowedText(10, 23, LookupMessage(MSI_BATTLEFIELD_LIST2), static_cast<int>(std::strlen(LookupMessage(MSI_BATTLEFIELD_LIST2))), 0, 0xC0C0C0, 0, 12, 0);
 }
 
 // OFFSET: 0x00BA7440
@@ -470,54 +473,67 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     switch (a) {
     case 0:
       if (g_session.GetMapProperty13() == 1) {
-        error = 0x86B;
+        error = MSI_BATTLEFIELD_MSG_NOT_JOINMAP;
       } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
-        error = 0x86C;
+        error = MSI_BATTLEFIELD_MSG_WAIT_1MM;
       } else {
-        if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_LIST2))) {
+        if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_DOYOU_SINGLE))) {
           g_entryQueueMgr->SendApply(1, info->name);
         }
         return 0;
       }
-      break;
+      {
+        const char* text = LookupMessage(error);
+        g_windowMgr.Confirm(text, 0, false, false, 0, "Message", 280, 120, 0);
+      }
+      return 0;
     case 1:
       if (g_session.GetMapProperty13() == 1) {
-        error = 0x86B;
+        error = MSI_BATTLEFIELD_MSG_NOT_JOINMAP;
       } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
-        error = 0x86C;
+        error = MSI_BATTLEFIELD_MSG_WAIT_1MM;
       } else if (g_session.PartyCount() == 0) {
-        error = 0x86D;
+        error = MSI_BATTLEFIELD_MSG_PLZ_PALTYJOIN;
       } else if (g_session.partyLeader == 0) {
-        error = 0x86E;
-      } else if (static_cast<unsigned>(g_entryQueueMgr->current->minLevel) <
-                 static_cast<unsigned>(g_session.OnlinePartyCount())) {
-        error = 0x86F;
+        error = MSI_BATTLEFIELD_MSG_NOT_PALTYBOSS;
+      } else if (EntryQueueInfo* current = g_entryQueueMgr->current; static_cast<unsigned>(current->minLevel) < static_cast<unsigned>(g_session.OnlinePartyCount())) {
+        error = MSI_BATTLEFIELD_MSG_OVER_PARTYMEMBER;
       } else {
-        if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_D_VS_D))) {
+        if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_DOYOU_PALTY))) {
           g_entryQueueMgr->SendApply(2, info->name);
         }
         return 0;
       }
-      break;
+      {
+        const char* text = LookupMessage(error);
+        g_windowMgr.Confirm(text, 0, false, false, 0, "Message", 280, 120, 0);
+      }
+      return 0;
     case 2: {
       GuildInfo* guild = &g_guildInfo;
-      if (g_session.GetMapProperty13() == 1) {
-        error = 0x86B;
-      } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
-        error = 0x86C;
-      } else if (guild->m_guildId < 1) {
-        error = 0x870;
-      } else if (guild->isMaster == 0) {
-        error = 0x871;
-      } else if (static_cast<unsigned>(g_entryQueueMgr->current->minLevel) < static_cast<unsigned>(guild->onlineMemberCount)) {
-        error = 0x872;
-      } else {
-        if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_LEVELDOWN_D))) {
-          g_entryQueueMgr->SendApply(4, info->name);
+      if (g_session.GetMapProperty13() != 1) {
+        if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
+          error = MSI_BATTLEFIELD_MSG_WAIT_1MM;
+        } else if (guild->m_guildId < 1) {
+          error = MSI_BATTLEFIELD_MSG_PLZ_GUILDJOIN;
+        } else if (guild->isMaster == 0) {
+          error = MSI_BATTLEFIELD_MSG_NOT_GUILDBOSS;
+        } else if (static_cast<unsigned>(g_entryQueueMgr->current->minLevel) < static_cast<unsigned>(guild->onlineMemberCount)) {
+          error = MSI_BATTLEFIELD_MSG_OVER_GUILDMEMBER;
+        } else {
+          if (this->ConfirmApply(LookupMessage(MSI_BATTLEFIELD_DOYOU_GUILD))) {
+            g_entryQueueMgr->SendApply(4, info->name);
+          }
+          return 0;
         }
-        return 0;
+      } else {
+        error = MSI_BATTLEFIELD_MSG_NOT_JOINMAP;
       }
-      break;
+      {
+        const char* text = LookupMessage(error);
+        g_windowMgr.Confirm(text, 0, false, false, 0, "Message", 280, 120, 0);
+      }
+      return 0;
     }
     case 3:
       if (!g_windowMgr.CloseWindow(WID_ENTRYQUEUEHELPWND)) {
@@ -574,17 +590,17 @@ void UIEntryQueueWnd::SelectQueue(EntryQueueInfo* info) {
       strcpy_s(text, sizeof(text), info->displayName);
       break;
     case 2:
-      sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_LEVEL_D_D), info->minLevel, info->maxLevel);
+      sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_D_VS_D), info->minLevel, info->maxLevel);
       break;
     case 3:
       if (info->limitType == 1) {
-        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_LIMITLESS), info->limitValue);
+        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_LEVELDOWN_D), info->limitValue);
       } else if (info->limitType == 2) {
-        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_MSG_NOT_JOINMAP), info->limitValue);
+        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_LEVELUP_D), info->limitValue);
       } else if (info->limitType == 3) {
-        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_MSG_WAIT_1MM), info->limitValue, info->limitValueEnd);
+        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_LEVEL_D_D), info->limitValue, info->limitValueEnd);
       } else {
-        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_MSG_PLZ_PALTYJOIN));
+        sprintf_s(text, sizeof(text), LookupMessage(MSI_BATTLEFIELD_LIMITLESS));
       }
       break;
     case 4:
@@ -648,12 +664,22 @@ void UIEntryQueueHelpWnd::OnCreate(int width, int height) {
   this->m_viewer->Configure(10, 22, 270, 225, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  const COLORREF rgb = RGB(red, green, blue);
-  this->m_viewer->SetBackgroundColor(0xFF000000u | rgb);
+  {
+    auto* viewer = this->m_viewer;
+    const COLORREF rgb = RGB(red, green, blue);
+    viewer->backgroundColor = rgb | 0xFF000000u;
+    viewer->Invalidate();
+  }
   this->AddChild(this->m_viewer);
 
   char message[0x104];
   std::memset(message, 0, sizeof(message));
+  strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP1));
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
+  strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP2));
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
+  strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP3));
+  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
   strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP4));
   this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
   strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP5));
@@ -665,12 +691,6 @@ void UIEntryQueueHelpWnd::OnCreate(int width, int height) {
   strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP8));
   this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
   strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP9));
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
-  strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_HELP10));
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
-  strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_START));
-  this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
-  strcpy_s(message, sizeof(message), LookupMessage(MSI_BATTLEFIELD_DOYOU_MOVE));
   this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(message), 38, 0, 0);
 
   const std::string path = "유저인터페이스\\";

@@ -73,13 +73,13 @@ UIWindow* UIMenuIconWnd::HitTest(int x, int y) {
   }
 
   if (!g_session.m_showMenuIcon) {
-    if (this->geometry.x + this->geometry.width <= x || this->geometry.y > y || this->geometry.y + this->notificationOpenButton->geometry.height <= y) {
+    if (!(this->geometry.x + this->geometry.width > x) || this->geometry.y > y || this->geometry.y + this->notificationOpenButton->geometry.height <= y) {
       return nullptr;
     }
-    if (this->notifiedCommands.size() == 0) {
-      return this->openButton;
+    if (this->notifiedCommands.size() != 0) {
+      return this->notificationOpenButton;
     }
-    return this->notificationOpenButton;
+    return this->openButton;
   }
 
   if (this->geometry.x + this->geometry.width <= x || this->geometry.y > y || this->geometry.y + this->geometry.height <= y) {
@@ -125,7 +125,10 @@ void UIMenuIconWnd::OnCreate(int width, int height) {
       names[index] = "status_doram";
     }
 
-    if (ids[index] == ID_SELECT_PARTY_LISTING || ids[index] == 600) {
+    switch (ids[index]) {
+    case MENUICON_BATTLE:
+    case ID_SELECT_PARTY_LISTING:
+    case 600:
       continue;
     }
 
@@ -206,17 +209,15 @@ void UIMenuIconWnd::Paint() {
   this->notificationOpenButton->Enable(0);
   this->closeButton->Enable(0);
 
-  UIButton* toggle;
   if (!g_session.m_showMenuIcon) {
     if (this->notifiedCommands.size() != 0) {
-      toggle = this->notificationOpenButton;
+      this->notificationOpenButton->Enable(1);
     } else {
-      toggle = this->openButton;
+      this->openButton->Enable(1);
     }
   } else {
-    toggle = this->closeButton;
+    this->closeButton->Enable(1);
   }
-  toggle->Enable(1);
 
   for (auto it = this->menuButtons.begin(); it != this->menuButtons.end(); ++it) {
     if (!g_session.m_showMenuIcon) {
@@ -225,8 +226,8 @@ void UIMenuIconWnd::Paint() {
         this->notificationButtons[it->first]->Enable(0);
       }
     } else {
-      this->DrawNamed(g_renderer->primitives, 0, 13, "유저인터페이스\\menu_icon\\bg_menu.tga", 0xFFFFFFFF, 0, 0);
-      const bool pinned = std::find(this->notifiedCommands.begin(), this->notifiedCommands.end(), it->first) != this->notifiedCommands.end();
+      this->DrawNamed(0, 13, "유저인터페이스\\menu_icon\\bg_menu.tga", 0xFFFFFFFF, 0, 0);
+      const bool pinned = this->notifiedCommands.end() != std::find(this->notifiedCommands.begin(), this->notifiedCommands.end(), it->first);
       it->second->Enable(!pinned);
       if (this->notificationButtons.end() != this->notificationButtons.find(it->first)) {
         this->notificationButtons[it->first]->Enable(pinned);
@@ -246,8 +247,9 @@ void UIMenuIconWnd::OnLBtnUp(int x, int y) {}
 // OFFSET: 0x0084BD40
 // FUNCTION: fn_10620
 void UIMenuIcon::OnMouseMove(int x, int y) {
+  const auto assignTooltip = [this](const std::string& text) { this->m_tooltip = text; };
   int behaviorId = 10041;
-  int message = 4698;
+  int message = MSI_EMPTY;
   bool known = true;
   switch (this->geometry.id) {
   case ID_STATUS:
@@ -272,7 +274,7 @@ void UIMenuIcon::OnMouseMove(int x, int y) {
     break;
   case MENUICON_GUILD:
     behaviorId = WID_GUILDWND;
-    message = MSI_CASHSHOP;
+    message = MSI_GUILD;
     break;
   case MENUICON_BATTLE:
     behaviorId = WID_JOINTO_BATTLEFIELDWND;
@@ -284,60 +286,60 @@ void UIMenuIcon::OnMouseMove(int x, int y) {
     break;
   case ID_MAP:
     behaviorId = WID_ROMAPWND;
-    message = MSI_MINIMAP_BUTTON_ON;
+    message = MSI_MINIMAP_TIP_WORLD_VIEW;
     break;
   case MENUICON_NAVIGATION:
     behaviorId = WID_NAVIGATIONV4WND;
-    message = MSI_CLAN_LEVEL;
+    message = MSI_MENU_NAVIGATIONWND;
     break;
   case ID_OPTION:
     message = MSI_OPTIONWND;
     break;
   case MENUICON_REC:
     behaviorId = WID_REPLAYRECCONTROLWND;
-    message = MSI_MENU_NAVIGATIONWND;
+    message = MSI_MENU_REPLAYWND;
     break;
   case ID_OPEN_HOTKEY:
-    message = MSI_IMAGE_CAPTURE;
+    message = MSI_HOTKEY_GUIDE;
     break;
   case MENUICON_BANK:
     behaviorId = 251;
-    message = MSI_SIT;
+    message = MSI_BANK;
     break;
   case MENUICON_MAIL:
     behaviorId = WID_RODEXINBOXWND;
-    message = MSI_MOVE;
+    message = MSI_MAIL;
     break;
   case MENUICON_ACHIEVEMENT:
     behaviorId = WID_ACHIEVEMENTWND;
-    message = MSI_ACHIEVEMENT_SCORE_REQUIRED_TO_REWARD;
+    message = MSI_ACHIEVEMENT_SYSTEM;
     break;
   case MENUICON_TIP:
     behaviorId = WID_TIPBOXWND;
-    message = MSI_REFINING_AGAIN_FAILED_INGREDIENT_CHANGED;
+    message = MSI_MENUICON_TIPBOX;
     break;
   case MENUICON_SHOP:
     behaviorId = WID_CASHSHOP_WND;
-    message = MSI_ROTATE;
+    message = MSI_CASHSHOP;
     break;
   case MENUICON_ATTENDANCE:
     behaviorId = WID_CHECKATTENDANCEWND;
-    message = MSI_CAN_NOT_OFFER_EXP_TO_GUILD_MAX_EXP;
+    message = MSI_CHECK_ATTENDANCE;
     break;
   case ID_TOGGLE_PARTY_BOARD:
     behaviorId = WID_ADVENPARTYBOARDWND;
-    message = MSI_CANNOT_MORE_SELECT_JOB;
+    message = MSI_ADVENTURER_AGENCY;
     break;
   case MENUICON_REPUTE:
     behaviorId = WID_REPUTEWND;
-    message = MSI_REPUTE_NOW_LOADING;
+    message = MSI_REPUTE_WND;
     break;
   case MENUICON_ADVENTURE_GUIDE:
     behaviorId = WID_ADVENTUREGUIDE;
-    message = MSI_RUNESYSTEM_CLOSE_RODEX;
+    message = MSI_ADVENTURE_GUIDE;
     break;
   case MENUICON_PROBABILITY:
-    message = MSI_REFINING_PROBABILITY_URL;
+    message = MSI_PROBABILITY_TITLE;
     break;
   default:
     known = false;
@@ -348,8 +350,7 @@ void UIMenuIcon::OnMouseMove(int x, int y) {
     const char* behavior = nullptr;
     g_session.m_hotkeyScript->Call("GetBeHaviorOfWindow", "d>s", behaviorId, &behavior);
     if (std::strlen(behavior) != 0) {
-      const std::string text = FormatOwnedString("%s (%s)", LookupMessage(message), behavior);
-      this->m_tooltip = text;
+      assignTooltip(FormatOwnedString("%s (%s)", LookupMessage(message), behavior));
     } else {
       this->m_tooltip = LookupMessage(message);
     }
@@ -368,7 +369,8 @@ void UIMenuIconWnd::OnMouseMove(int x, int y) {}
 // OFFSET: 0x0084C260
 // FUNCTION: fn_10622
 int UIMenuIconWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
-  if (message == UM_COMMAND) {
+  switch (message) {
+  case UM_COMMAND:
     if (!Replay::Instance().AllowsEvent(argument1)) {
       switch (argument1) {
       case ID_CLOSE:
@@ -404,7 +406,7 @@ int UIMenuIconWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         this->ToggleWindow(WID_MESSENGERWND);
         break;
       case MENUICON_GUILD:
-        this->ToggleWindow(static_cast<int>(g_guildInfo.m_guildId) < 1 ? WID_GUILDHELPERWND : WID_GUILDWND);
+        this->ToggleWindow(g_guildInfo.m_guildId < 1 ? WID_GUILDHELPERWND : WID_GUILDWND);
         break;
       case ID_QUEST:
         this->ToggleWindow(WID_RENEWQUESTUI);
@@ -445,14 +447,18 @@ int UIMenuIconWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         break;
       case MENUICON_MAIL:
         if (g_windowMgr.LookupWindow(WID_REFININGWND)) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_AURA_EFFECT_OFF)), 255, 0, 0, 0);
-        } else if (g_windowMgr.LookupWindow(WID_GRADEENCHANTWND)) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BROADCASTING_GRADE_ENCHANT_SUCCESS)), 255, 0, 0, 0);
-        } else if (g_windowMgr.LookupWindow(WID_ENCHANTUI)) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENCHANT_REQUEST)), 255, 0, 0, 0);
-        } else {
-          this->ToggleWindow(WID_RODEXINBOXWND);
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_OPEN_RODEX_DURING_REFINING)), 255, 0, 0, 0);
+          break;
         }
+        if (g_windowMgr.LookupWindow(WID_GRADEENCHANTWND)) {
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_OPEN_RODEX_DURING_GRADE_ENCHANT)), 255, 0, 0, 0);
+          break;
+        }
+        if (g_windowMgr.LookupWindow(WID_ENCHANTUI)) {
+          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_OPEN_RODEX_DURING_ENCHANT)), 255, 0, 0, 0);
+          break;
+        }
+        this->ToggleWindow(WID_RODEXINBOXWND);
         break;
       case MENUICON_ACHIEVEMENT:
         this->ToggleWindow(WID_ACHIEVEMENTWND);
@@ -483,21 +489,20 @@ int UIMenuIconWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         this->ToggleWindow(WID_ADVENTUREGUIDE);
         break;
       case MENUICON_PROBABILITY:
-        if (g_windowMgr.Confirm(LookupMessage(MSI_GENDER_CHANGE_FAILED_CAUSE_MONSTER_TRANSFORM), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
-          ShellExecuteA(hWnd, "open", LookupMessage(MSI_GENDER_CHANGE_FAILED_CAUSE_MARRIED), nullptr, nullptr, SW_SHOWNORMAL);
+        if (g_windowMgr.Confirm(LookupMessage(MSI_ETC_PROBABILITY_WEB_CONNECT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+          ShellExecuteA(hWnd, "open", LookupMessage(MSI_ETC_PROBABILITY_URL), nullptr, nullptr, SW_SHOWNORMAL);
         }
         break;
       }
     }
-  } else if (message == UM_REFRESH) {
-    this->SendMsg(nullptr, UM_COMMAND, g_session.m_showMenuIcon == true ? ID_CLOSE : MENUICON_OPEN, 0, 0, 0);
-  }
-
-  if (message == UM_COMMAND && argument1 == MENUICON_BATTLE && !Replay::Instance().AllowsEvent(argument1) && g_entryQueueMgr) {
-    if (reinterpret_cast<const unsigned char*>(g_entryQueueMgr)[0x3C] == 1) {
-      g_entryQueueMgr->SendRankingRequest();
+    break;
+  case UM_REFRESH:
+    if (g_session.m_showMenuIcon == true) {
+      this->SendMsg(nullptr, UM_COMMAND, ID_CLOSE, 0, 0, 0);
+    } else {
+      this->SendMsg(nullptr, UM_COMMAND, MENUICON_OPEN, 0, 0, 0);
     }
-    this->ToggleWindow(WID_JOINTO_BATTLEFIELDWND);
+    break;
   }
 
   return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);

@@ -28,6 +28,11 @@ __forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
 CAstralStrikeEffect::CAstralStrikeEffect() : CEffect(1768) {
 }
 
+// OFFSET: 0x006F48D0
+// FUNCTION: fn_46102
+__declspec(noinline) CAstralStrikeEffect::~CAstralStrikeEffect() {
+}
+
 // OFFSET: 0x006F49D0
 // FUNCTION: fn_06830
 void CAstralStrikeEffect::Init() {
@@ -120,14 +125,20 @@ bool CAstralStrikeEffect::IsAlive() {
   return this->ActorExists();
 }
 
+// OFFSET: 0x006F5730
+// FUNCTION: fn_46278
+__forceinline void CAstralStrikeEffect::ProcessParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->Process(0.0f, 0.0f, 0.0f);
+  }
+}
+
 // OFFSET: 0x006F54C0
 // FUNCTION: fn_06835
 void CAstralStrikeEffect::OnProcess() {
   for (auto it = this->emitters.begin(); it != this->emitters.end();) {
     if (IsParticleActive(*it) == true) {
-      if (*it) {
-        (*it)->Process(0.0f, 0.0f, 0.0f);
-      }
+      this->ProcessParticle(*it);
       ++it;
     } else {
       FreeParticle(*it);
@@ -144,9 +155,7 @@ void CAstralStrikeEffect::OnProcess() {
 
   for (auto it = this->strikes.begin(); it != this->strikes.end();) {
     if (IsParticleActive(*it) == true) {
-      if (*it) {
-        (*it)->Process(0.0f, 0.0f, 0.0f);
-      }
+      this->ProcessParticle(*it);
       ++it;
     } else {
       FreeParticle(*it);
@@ -155,18 +164,22 @@ void CAstralStrikeEffect::OnProcess() {
   }
 }
 
+// OFFSET: 0x006F57F0
+// FUNCTION: fn_46279
+__forceinline void CAstralStrikeEffect::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle) {
+    particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+  }
+}
+
 // OFFSET: 0x006F5760
 // FUNCTION: fn_06836
 void CAstralStrikeEffect::Render() {
   for (auto it = this->emitters.begin(); it != this->emitters.end(); ++it) {
-    if (*it) {
-      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    this->RenderParticle(*it);
   }
 
   for (auto it = this->strikes.begin(); it != this->strikes.end(); ++it) {
-    if (*it) {
-      (*it)->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
-    }
+    this->RenderParticle(*it);
   }
 }

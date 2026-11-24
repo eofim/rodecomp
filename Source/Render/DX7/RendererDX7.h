@@ -39,15 +39,16 @@ public:
   void DrawPrimitive(RenderCommand* primitive);
   void DrawLightmappedPrimitive(LightmappedPrimitive* primitive);
   void SetTextureMode(int mode);
-  bool RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture);
+  bool RenderToTexture(int width, int height, const std::list<RenderCommand*>& primitives, CTexture*& texture);
   int SaveBitmap(const char* filename, CBitmapRes* overlay) override;
   int SaveJpeg(const char* filename, CBitmapRes* overlay) override;
   bool SaveLogo(std::string filename) override;
   void SetTexture(unsigned stage, CTextureDX7* texture);
-  HRESULT Present(int option) override;
+  void Present(bool option) override;
   float FPS() const override;
-  bool CaptureBackBuffer() override;
-  bool RestoreBackBuffer() override;
+  void ResetFrameRate();
+  void CaptureBackBuffer() override;
+  void RestoreBackBuffer() override;
   void DrawAuxiliaryPrimitive(LightmappedCommand* primitive) override;
   void CleanupTextures() override;
   void DrawDepthSortedQueue();
@@ -59,9 +60,7 @@ public:
   void DrawTopmostQueue();
   void DrawBlendedQueue();
   void FlushRenderList();
-  // INLINED
   void BindTexture(CTextureDX7* texture);
-  // INLINED
   void BindLightmap(CTextureDX7* lightmap);
 };
 

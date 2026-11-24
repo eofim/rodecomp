@@ -242,24 +242,6 @@ static __forceinline unsigned int CryptonGammaTau(unsigned int a, unsigned int b
          (static_cast<unsigned int>(g_cryptonSbox[(d >> shift) & 255]) << 24);
 }
 
-// INLINED
-static __forceinline void CryptonSubstitute(unsigned int a, unsigned int b, unsigned int c, unsigned int d, unsigned int* output, bool alternate) {
-  for (unsigned int lane = 0; lane < 4; ++lane) {
-    const unsigned int shift = lane * 8;
-    if ((lane & 1) == alternate) {
-      output[lane] = g_cryptonSbox[(a >> shift) & 255] |
-                     (static_cast<unsigned int>(g_cryptonInverseSbox[(b >> shift) & 255]) << 8) |
-                     (static_cast<unsigned int>(g_cryptonSbox[(c >> shift) & 255]) << 16) |
-                     (static_cast<unsigned int>(g_cryptonInverseSbox[(d >> shift) & 255]) << 24);
-    } else {
-      output[lane] = g_cryptonInverseSbox[(a >> shift) & 255] |
-                     (static_cast<unsigned int>(g_cryptonSbox[(b >> shift) & 255]) << 8) |
-                     (static_cast<unsigned int>(g_cryptonInverseSbox[(c >> shift) & 255]) << 16) |
-                     (static_cast<unsigned int>(g_cryptonSbox[(d >> shift) & 255]) << 24);
-    }
-  }
-}
-
 #define RIPEMD128_F(b, c, d) ((b) ^ (c) ^ (d))
 #define RIPEMD128_G(b, c, d) (((b) & (c)) | (~(b) & (d)))
 #define RIPEMD128_H(b, c, d) (((b) | ~(c)) ^ (d))
@@ -418,11 +400,11 @@ void Ripemd128Transform(unsigned int* state, const unsigned int* block) {
   RIPEMD128_STEP(cc, dd, aa, bb, block[10], 15, RIPEMD128_F, 0u);
   RIPEMD128_STEP(bb, cc, dd, aa, block[14], 8, RIPEMD128_F, 0u);
 
-  const unsigned int result = state[1] + c + dd;
+  dd += c + state[1];
   state[1] = state[2] + d + aa;
   state[2] = state[3] + a + bb;
   state[3] = state[0] + b + cc;
-  state[0] = result;
+  state[0] = dd;
 }
 
 #undef RIPEMD128_STEP
@@ -451,11 +433,9 @@ void CryptonEncryptBlock(const unsigned int* input, unsigned int* output) {
   CryptonRound(b1, b0, g_cryptonEncryptKey + 36, false);
   CryptonRound(b0, b1, g_cryptonEncryptKey + 40, true);
   CryptonRound(b1, b0, g_cryptonEncryptKey + 44, false);
-  CryptonSubstitute(b1[0], b1[1], b1[2], b1[3], b0, true);
-  output[0] = b0[0] ^ g_cryptonEncryptKey[48];
-  output[1] = b0[1] ^ g_cryptonEncryptKey[49];
-  output[2] = b0[2] ^ g_cryptonEncryptKey[50];
-  output[3] = b0[3] ^ g_cryptonEncryptKey[51];
+  for (unsigned int lane = 0; lane < 4; ++lane) {
+    output[lane] = CryptonGammaTau(b1[0], b1[1], b1[2], b1[3], lane, true) ^ g_cryptonEncryptKey[48 + lane];
+  }
 }
 
 // OFFSET: 0x00B103A0
@@ -789,8 +769,8 @@ void BuildKeyedBoxes(unsigned char* boxes, const unsigned char* key, int keyLeng
   }
 
   int j = keyLength;
-  int keyIndex = 0;
   int base = 0;
+  int keyIndex = 0;
   for (int box = 0; box < count; ++box) {
     int offset = 0;
     for (int pass = 0; pass < 8; ++pass) {
@@ -807,8 +787,6 @@ void BuildKeyedBoxes(unsigned char* boxes, const unsigned char* key, int keyLeng
   }
 }
 
-#define SBOX_ROUND(a, b, c)                                                     ((g_sboxLookup[((a) & 0x36) | ((c) & 0x6900) | ((b) & 0x6C0)] & 0xF) |         (g_sboxLookup[((c) & 0x22A) | ((a) & 0x2980) | ((b) & 0x9011)] & 0xCC00) |    (g_sboxLookup[((b) & 0x4828) | ((c) & 0x10C4) | ((a) & 0x8601)] & 0x3300) |    (g_sboxLookup[((c) & 0x8411) | ((a) & 0x5048) | ((b) & 0x2106)] & 0xF0))
-
 // OFFSET: 0x00B120B0
 // FUNCTION: fn_18412
 void SboxEncryptBlock(unsigned char* block, const unsigned short* key) {
@@ -817,27 +795,35 @@ void SboxEncryptBlock(unsigned char* block, const unsigned short* key) {
   unsigned short x2 = static_cast<unsigned short>((block[5] << 8) | block[4]);
   unsigned short x3 = static_cast<unsigned short>((block[7] << 8) | block[6]);
 
-  for (int round = 8; round != 0; --round) {
-    unsigned int a;
-    unsigned int b;
-    unsigned int c;
-    a = static_cast<unsigned short>(key[0] ^ x1);
-    b = static_cast<unsigned short>(key[1] ^ x2);
-    c = static_cast<unsigned short>(key[2] ^ x3);
-    x0 ^= SBOX_ROUND(a, b, c);
-    a = static_cast<unsigned short>(key[3] ^ x2);
-    b = static_cast<unsigned short>(key[4] ^ x3);
-    c = static_cast<unsigned short>(key[5] ^ x0);
-    x1 ^= SBOX_ROUND(a, b, c);
-    a = static_cast<unsigned short>(key[6] ^ x3);
-    b = static_cast<unsigned short>(key[7] ^ x0);
-    c = static_cast<unsigned short>(key[8] ^ x1);
-    x2 ^= SBOX_ROUND(a, b, c);
-    a = static_cast<unsigned short>(key[9] ^ x0);
-    b = static_cast<unsigned short>(key[10] ^ x1);
-    c = static_cast<unsigned short>(key[11] ^ x2);
-    x3 ^= SBOX_ROUND(a, b, c);
-    key += 12;
+  const unsigned short* roundKey = key;
+  unsigned short a;
+  unsigned short b;
+  unsigned short c;
+
+  for (int round = 0; round < 8; ++round) {
+    a = x1 ^ *roundKey++;
+    b = x2 ^ *roundKey++;
+    c = x3 ^ *roundKey++;
+    x0 ^= (g_sboxLookup[(a & 0x36) | (b & 0x6C0) | (c & 0x6900)] & 0xF) | (g_sboxLookup[(a & 0x2980) | (b & 0x9011) | (c & 0x22A)] & 0xCC00) |
+          (g_sboxLookup[(a & 0x8601) | (b & 0x4828) | (c & 0x10C4)] & 0x3300) | (g_sboxLookup[(a & 0x5048) | (b & 0x2106) | (c & 0x8411)] & 0xF0);
+
+    a = x2 ^ *roundKey++;
+    b = x3 ^ *roundKey++;
+    c = x0 ^ *roundKey++;
+    x1 ^= (g_sboxLookup[(a & 0x36) | (b & 0x6C0) | (c & 0x6900)] & 0xF) | (g_sboxLookup[(a & 0x2980) | (b & 0x9011) | (c & 0x22A)] & 0xCC00) |
+          (g_sboxLookup[(a & 0x8601) | (b & 0x4828) | (c & 0x10C4)] & 0x3300) | (g_sboxLookup[(a & 0x5048) | (b & 0x2106) | (c & 0x8411)] & 0xF0);
+
+    a = x3 ^ *roundKey++;
+    b = x0 ^ *roundKey++;
+    c = x1 ^ *roundKey++;
+    x2 ^= (g_sboxLookup[(a & 0x36) | (b & 0x6C0) | (c & 0x6900)] & 0xF) | (g_sboxLookup[(a & 0x2980) | (b & 0x9011) | (c & 0x22A)] & 0xCC00) |
+          (g_sboxLookup[(a & 0x8601) | (b & 0x4828) | (c & 0x10C4)] & 0x3300) | (g_sboxLookup[(a & 0x5048) | (b & 0x2106) | (c & 0x8411)] & 0xF0);
+
+    a = x0 ^ *roundKey++;
+    b = x1 ^ *roundKey++;
+    c = x2 ^ *roundKey++;
+    x3 ^= (g_sboxLookup[(a & 0x36) | (b & 0x6C0) | (c & 0x6900)] & 0xF) | (g_sboxLookup[(a & 0x2980) | (b & 0x9011) | (c & 0x22A)] & 0xCC00) |
+          (g_sboxLookup[(a & 0x8601) | (b & 0x4828) | (c & 0x10C4)] & 0x3300) | (g_sboxLookup[(a & 0x5048) | (b & 0x2106) | (c & 0x8411)] & 0xF0);
   }
 
   block[0] = static_cast<unsigned char>(x0);
@@ -874,9 +860,9 @@ int KeyedBoxFeistel(const unsigned char* input, unsigned char* output, int lengt
     unsigned char left = context->boxes[round++][right] ^ input[0];
     output[0] = left;
     right = context->boxes[round++][left] ^ right;
+    g_keyedBoxRound = round + 1;
     output[1] = right;
-    output[0] = context->boxes[round++][right] ^ left;
-    g_keyedBoxRound = round;
+    output[0] = context->boxes[round][right] ^ left;
     return 0;
   }
 

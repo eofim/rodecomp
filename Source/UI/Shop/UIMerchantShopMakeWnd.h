@@ -12,6 +12,7 @@
 #include <vector>
 
 class UIBasicButton;
+class UICheckBox;
 class UIEditCtrl;
 
 class UIScrollBar;
@@ -29,6 +30,7 @@ public:
 
   __declspec(noinline) ITEM_INFO GetItemAt(int x, int y);
   void UpdateLayout();
+  void UpdateScrollBar();
   void SetSelection(short row, short column);
   bool HasSelection() const;
   void SendShopRequest();
@@ -47,7 +49,7 @@ public:
   /* 00CC */ UIEditCtrl* titleEdit;
   /* 00D0 */ unsigned char padding_00D0[0x8];
   /* 00D8 */ int editIndex;
-  /* 00DC */ UIWindow* notice;
+  /* 00DC */ UICheckBox* notice;
   /* 00E0 */ UIEditCtrl* priceEdits[13];
   /* 0114 */ UIEditCtrl* quantityEdits[5];
   /* 0128 */ UIEditCtrl* zenyLimitEdit;
@@ -76,6 +78,7 @@ public:
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(offsetof(UIMerchantShopMakeWnd, titleEdit) == 0xCC);
 static_assert(offsetof(UIMerchantShopMakeWnd, editIndex) == 0xD8);
+static_assert(offsetof(UIMerchantShopMakeWnd, notice) == 0xDC);
 static_assert(offsetof(UIMerchantShopMakeWnd, priceEdits) == 0xE0);
 static_assert(offsetof(UIMerchantShopMakeWnd, zenyLimitEdit) == 0x128);
 static_assert(offsetof(UIMerchantShopMakeWnd, items) == 0x148);

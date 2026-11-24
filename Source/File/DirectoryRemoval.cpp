@@ -8,8 +8,6 @@
 #include <sys/stat.h>
 #include <windows.h>
 
-template __declspec(noinline) std::string::~basic_string() noexcept;
-
 // OFFSET: 0x00AF45E0
 // FUNCTION: fn_18245
 void RemoveDirectoryTree(const char* path) {
@@ -27,17 +25,17 @@ void RemoveDirectoryTree(const char* path) {
     std::string dotdot("..");
     if (dot != found.cFileName && dotdot != found.cFileName) {
       if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-        directories.push_back(std::string(found.cFileName));
+        directories.push_back(found.cFileName);
       } else {
-        files.push_back(std::string(found.cFileName));
+        files.push_back(found.cFileName);
       }
     }
     while (FindNextFileA(search, &found)) {
       if (dot != found.cFileName && dotdot != found.cFileName) {
         if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-          directories.push_back(std::string(found.cFileName));
+          directories.push_back(found.cFileName);
         } else {
-          files.push_back(std::string(found.cFileName));
+          files.push_back(found.cFileName);
         }
       }
     }
@@ -45,11 +43,13 @@ void RemoveDirectoryTree(const char* path) {
 
     std::strcpy(filename, path);
     std::strcat(filename, "\\");
-    for (const std::string& file : files) {
+    for (auto it = files.begin(); it != files.end(); ++it) {
+      const std::string& file = *it;
       _chmod((filename + file).c_str(), _S_IWRITE);
       _unlink((filename + file).c_str());
     }
-    for (const std::string& directory : directories) {
+    for (auto it = directories.begin(); it != directories.end(); ++it) {
+      const std::string& directory = *it;
       RemoveDirectoryTree((filename + directory).c_str());
     }
   }

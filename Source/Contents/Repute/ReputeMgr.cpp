@@ -9,113 +9,11 @@
 #include "UI/Window/UIWindow.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Resource/Json/JsonCppLoader.h"
-#include "Resource/Json/JsonCppLoaderExternal.h"
 
 #include "Resource/MSGSTRINGID.h"
 #include <algorithm>
 #include <cstring>
 #include <utility>
-
-struct JsonValueCopy {
-  /* 0000 */ JsonValue value;
-
-  // INLINED
-  JsonValueCopy(const JsonValue& other) {
-    reinterpret_cast<void(__thiscall*)(JsonValue*, const JsonValue*)>(JsonCopyConstruct)(&this->value, &other);
-  }
-
-  JsonValueCopy(const JsonValueCopy&) = delete;
-
-  // INLINED
-  ~JsonValueCopy() {
-    reinterpret_cast<void(__thiscall*)(JsonValue*)>(JsonDestroy)(&this->value);
-  }
-};
-
-// OFFSET: 0x0050AE30
-// FUNCTION: fn_00894
-bool JsonCppLoader::GetReputeGroupData(std::map<int, ReputeGroupRecord>* out) {
-  if (!this->loaded) {
-    this->Fail("초기화가 되어야 합니다.");
-    return false;
-  }
-
-  const JsonValue* groups = nullptr;
-  if (const JsonObject* root = this->document.ObjectRange()) {
-    for (const JsonMember& entry : *root) {
-      if (entry.first == "ReputeGroup") {
-        groups = &entry.second;
-        break;
-      }
-    }
-  }
-
-  if (groups == nullptr) {
-    this->Fail("키에 해당하는 데이터가 없습니다. (key : %s)", "ReputeGroup");
-    return false;
-  }
-
-  if (const JsonObject* members = groups->ObjectRange()) {
-    for (const JsonMember& member : *members) {
-      const std::string name = member.first;
-      const JsonValueCopy node(member.second);
-      ReputeGroupRecord record;
-      this->GetStringValue(node.value, "ID", &record.id);
-      this->GetStringValue(node.value, "Name", &record.name);
-      this->GetIntVectorValue(node.value, "ReputeList", &record.reputes);
-
-      if (!out->insert(std::pair<int, ReputeGroupRecord>(std::stoi(name), record)).second) {
-        this->Fail("중복키가 입력되었습니다. (name : %s)", name.c_str());
-        return false;
-      }
-    }
-  }
-
-  return this->succeeded;
-}
-
-// OFFSET: 0x0050B830
-// FUNCTION: fn_00895
-bool JsonCppLoader::GetReputeInfoData(std::map<int, ReputeInfoRecord>* out) {
-  if (!this->loaded) {
-    this->Fail("초기화가 되어야 합니다.");
-    return false;
-  }
-
-  const JsonValue* infos = nullptr;
-  if (const JsonObject* root = this->document.ObjectRange()) {
-    for (const JsonMember& entry : *root) {
-      if (entry.first == "reputeInfo") {
-        infos = &entry.second;
-        break;
-      }
-    }
-  }
-
-  if (infos == nullptr) {
-    this->Fail("키에 해당하는 데이터가 없습니다. (key : %s)", "reputeInfo");
-    return false;
-  }
-
-  if (const JsonObject* members = infos->ObjectRange()) {
-    for (const JsonMember& member : *members) {
-      const std::string name = member.first;
-      const JsonValueCopy node(member.second);
-      ReputeInfoRecord record;
-      this->GetStringValue(node.value, "Name", &record.name);
-      this->GetIntValue(node.value, "MaxPoint_Positive", &record.maxPointPositive);
-      this->GetIntValue(node.value, "MaxPoint_Negative", &record.maxPointNegative);
-      this->GetStringValue(node.value, "Invisible", &record.invisible);
-
-      if (!out->insert(std::pair<int, ReputeInfoRecord>(std::stoi(name), record)).second) {
-        this->Fail("중복키가 입력되었습니다. (key : %s)", name.c_str());
-        return false;
-      }
-    }
-  }
-
-  return this->succeeded;
-}
 
 // OFFSET: 0x0060DC70
 // FUNCTION: fn_04294
@@ -128,13 +26,7 @@ bool CReputeMgr::LoadReputeGroupData(std::map<std::uint64_t, ReputeGroup>& group
 
   JsonCppLoader loader;
   const auto* data = static_cast<const unsigned char*>(file.GetData());
-  bool parsed;
-  {
-    std::vector<unsigned char> buffer(data, data + file.GetSize());
-    parsed = loader.Load(buffer, true);
-  }
-
-  if (!parsed) {
+  if (!loader.Load(std::vector<unsigned char>(data, data + file.GetSize()), true)) {
     return false;
   }
 
@@ -159,13 +51,7 @@ bool CReputeMgr::LoadReputeInfoData(std::map<std::uint64_t, ReputeInfo>& infos) 
 
   JsonCppLoader loader;
   const auto* data = static_cast<const unsigned char*>(file.GetData());
-  bool parsed;
-  {
-    std::vector<unsigned char> buffer(data, data + file.GetSize());
-    parsed = loader.Load(buffer, true);
-  }
-
-  if (!parsed) {
+  if (!loader.Load(std::vector<unsigned char>(data, data + file.GetSize()), true)) {
     return false;
   }
 
@@ -242,17 +128,21 @@ std::vector<const ReputeInfo*> CReputeMgr::GetAllReputes() const {
 // OFFSET: 0x0060DBF0
 // FUNCTION: fn_04293
 bool CReputeMgr::Load() {
-  if (!this->LoadReputeInfoData(this->m_infos)) {
-    ShowErrorDialog(GetRenderSystemHolder()->system, "Failed : LoadReputeInfoData", 0);
+  bool loaded = this->LoadReputeInfoData(this->m_infos);
+  if (!loaded) {
+    ShowErrorDialog("Failed : LoadReputeInfoData", 0);
     return false;
   }
 
-  if (!this->LoadReputeGroupData(this->m_groups)) {
-    ShowErrorDialog(GetRenderSystemHolder()->system, "Failed : LoadReputeInfoData", 0);
-    return false;
+  loaded = this->LoadReputeGroupData(this->m_groups);
+  if (!loaded) {
+    goto failed;
   }
-
   return true;
+
+failed:
+  ShowErrorDialog("Failed : LoadReputeInfoData", 0);
+  return false;
 }
 
 // OFFSET: 0x0060E4A0
@@ -267,7 +157,7 @@ void CReputeMgr::OpenRepute(std::uint64_t groupId, std::uint64_t reputeId) {
   const unsigned int groupIdHigh = static_cast<unsigned int>(groupId >> 32);
 
   if (groupIdLow == 0 && groupIdHigh == 0) {
-    window->SendMsg(nullptr, UM_TAB, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ENCHANT)), 0, 0, 0);
+    window->SendMsg(nullptr, UM_TAB, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_REPUTE_TOTAL)), 0, 0, 0);
   } else {
     auto group = this->m_groups.find(groupId);
     if (group != this->m_groups.end()) {
@@ -328,16 +218,16 @@ void CReputeMgr::InfoInserter::operator()(const std::pair<int, ReputeInfoRecord>
   info.maxPointPositive = entry.second.maxPointPositive;
   info.maxPointNegative = entry.second.maxPointNegative;
   const std::string invisible = FromUtf8(entry.second.invisible, g_textCodePage);
-  const char* text = invisible.c_str();
-  if (invisible.size() == 12 && text[0] == 'V' && text[1] == 'I' && text[2] == 'S' && text[3] == 'I' &&
-      text[4] == 'B' && text[5] == 'L' && text[6] == 'E' && text[7] == '_' && text[8] == 'T' &&
-      text[9] == 'R' && text[10] == 'U' && text[11] == 'E') {
-    info.visibility = REPUTE_VISIBLE;
+  ReputeVisibility visibility;
+  const uint32_t* words = reinterpret_cast<const uint32_t*>(invisible.data());
+  if (invisible.size() == 12 && words[0] == 0x49534956 && words[1] == 0x5f454c42 && words[2] == 0x45555254) {
+    visibility = REPUTE_VISIBLE;
   } else if (invisible == "VISIBLE_FALSE") {
-    info.visibility = REPUTE_HIDDEN;
+    visibility = REPUTE_HIDDEN;
   } else {
-    info.visibility = REPUTE_VISIBLE_WITH_POINT;
+    visibility = REPUTE_VISIBLE_WITH_POINT;
   }
+  info.visibility = visibility;
 
   (*this->dest)[entry.first] = info;
 }

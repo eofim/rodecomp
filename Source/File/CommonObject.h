@@ -14,12 +14,17 @@ public:
   CCommonObject() {
     this->Clear();
   }
-  virtual ~CCommonObject();
+  // INLINED
+  virtual ~CCommonObject() {
+    this->Clear();
+  }
   void Clear();
   bool LoadTokens(std::vector<char*>& tokens, const char* name, int mode);
   bool LoadCsv(const char* name, std::vector<std::string> (*transform)(const std::vector<std::string>&), void (*insert)(std::vector<const char*>&));
   bool LoadCsv(const char* name, std::function<std::vector<std::string>(std::vector<std::string>&)> transform,
                std::function<void(std::vector<const char*>&, std::any)> insert, std::any context);
+
+  void DecodeField(std::string& field, std::vector<std::string>& row, bool force);
 
 private:
   bool OpenCsv(const char* name, CFile& file);

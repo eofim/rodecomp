@@ -38,17 +38,27 @@ struct UIItemRepairRecordHeader {
 
   // INLINED
   ~UIItemRepairRecordHeader() {
-    this->bytes = 0;
     this->id = 0;
+    this->bytes = 0;
   }
 };
 #pragma pack(pop)
 
+namespace {
+#pragma pack(push, 1)
+struct ReplayTaggedRecordHeader {
+  /* 0000 */ std::uint16_t id;
+  /* 0002 */ std::uint32_t bytes;
+};
+#pragma pack(pop)
+}
+
 // INLINED
 static std::vector<unsigned char> MakeReplayTaggedRecord(std::uint16_t id, const void* data, std::uint32_t bytes) {
   std::vector<unsigned char> record(bytes + 6, 0);
-  *reinterpret_cast<std::uint16_t*>(record.data()) = id;
-  *reinterpret_cast<std::uint32_t*>(record.data() + 2) = bytes;
+  ReplayTaggedRecordHeader* header = reinterpret_cast<ReplayTaggedRecordHeader*>(record.data());
+  header->id = id;
+  header->bytes = bytes;
   std::memcpy(record.data() + 6, data, bytes);
   return record;
 }
@@ -84,9 +94,9 @@ void UIMakeTargetResultWnd::Paint() {
 
   const int secondWidth = this->DrawFittedItemName(0x10, 0x2A, &item, 0, 0, 0xC, 0);
   if (this->succeeded == 1) {
-    this->DrawShadowedText(secondWidth + 0x10, 0x2A, LookupMessage(0x1AF), 0, 0, 0xFFFFFF, 0, 0xC, 0);
+    this->DrawShadowedText(secondWidth + 0x10, 0x2A, LookupMessage(MSI_MAKE_TARGET_SUCCEESS_MSG), 0, 0, 0xFFFFFF, 0, 0xC, 0);
   } else {
-    this->DrawShadowedText(secondWidth + 0x10, 0x2A, LookupMessage(0x1AE), 0, 0, 0xFFFFFF, 0, 0xC, 0);
+    this->DrawShadowedText(secondWidth + 0x10, 0x2A, LookupMessage(MSI_MAKE_TARGET_FAIL_MSG), 0, 0, 0xFFFFFF, 0, 0xC, 0);
   }
 }
 
@@ -119,7 +129,7 @@ void UIItemRepairWnd::OnCreate(int width, int height) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x009A1590
@@ -151,16 +161,16 @@ void UIMakeTargetListWnd::OnCreate(int width, int height) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x009A2020
 // FUNCTION: fn_13606
 void UIMakeTargetProcessWnd::OnCreate(int width, int height) {
   const std::string prefix("유저인터페이스\\");
-  int positions[2][2] = {{width - 91, height - 24}, {width - 46, height - 24}};
   const char* names[2][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
   int ids[2] = {184, 185};
+  int positions[2][2] = {{width - 91, height - 24}, {width - 46, height - 24}};
 
   for (int i = 0; i < 2; ++i) {
     auto* button = new UIBitmapButton();
@@ -173,7 +183,7 @@ void UIMakeTargetProcessWnd::OnCreate(int width, int height) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x009A29B0
@@ -192,7 +202,7 @@ void UIMakeTargetResultWnd::OnCreate(int width, int height) {
   button->SetId(ID_OK);
   this->AddChild(button);
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x009A2DD0
@@ -224,7 +234,7 @@ void UIWeaponRefineWnd::OnCreate(int width, int height) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 }
 
 // OFFSET: 0x009A3DE0
@@ -276,9 +286,9 @@ int UIItemRepairWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
 
       const int selected = list->selected;
       if (selected >= 0) {
-        for (UIItemRepairEntry& entry : this->entries) {
-          if (entry.index == this->indices[selected]) {
-            g_modeMgr.currentMode->SendMsg(MM_REPAIRITEM_SELECT_FROM_LIST, reinterpret_cast<int>(&entry), 0, 0, 0);
+        for (std::list<UIItemRepairEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it) {
+          if (it->index == this->indices[selected]) {
+            g_modeMgr.currentMode->SendMsg(MM_REPAIRITEM_SELECT_FROM_LIST, reinterpret_cast<int>(&*it), 0, 0, 0);
             break;
           }
         }
@@ -294,24 +304,25 @@ int UIItemRepairWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
       g_windowMgr.CloseWindow(WID_ITEMREPAIRWND);
       return 0;
     }
-
-    return 0;
+    break;
   }
 
   case UM_REPLAY_FRAMED_DATA: {
     const auto* bytes = reinterpret_cast<const unsigned char*>(a);
     UIItemRepairRecordHeader header;
-    unsigned offset = 6;
     header = *reinterpret_cast<const UIItemRepairRecordHeader*>(bytes);
+    unsigned offset = 6;
 
-    if (header.id == 22150) {
-      while (static_cast<unsigned>(b) > offset) {
+    if (22150 == header.id) {
+      bool scanning = true;
+      while (scanning && static_cast<unsigned>(b) > offset) {
         header = *reinterpret_cast<const UIItemRepairRecordHeader*>(bytes + offset);
         offset += 6;
 
         switch (header.id) {
         case 22151:
-          return 0;
+          scanning = false;
+          break;
 
         case 22152: {
           UIItemRepairEntry entry;
@@ -327,12 +338,14 @@ int UIItemRepairWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
         }
       }
     }
-
-    return 0;
-  }
+    break;
   }
 
-  return this->UIFrameWnd::SendMsg(sender, message, a, b, c, d);
+  default:
+    return this->UIFrameWnd::SendMsg(sender, message, a, b, c, d);
+  }
+
+  return 0;
 }
 
 // OFFSET: 0x009A4C50
@@ -374,6 +387,11 @@ UIMakeTargetProcessWnd::UIMakeTargetProcessWnd()
     : UIFrameWnd(0), materials() {
 }
 
+// OFFSET: 0x0099FC80
+// FUNCTION: fn_45742
+UIMakeTargetProcessWnd::~UIMakeTargetProcessWnd() {
+}
+
 // OFFSET: 0x0099F950
 // FUNCTION: fn_13590
 UIMakeTargetResultWnd::UIMakeTargetResultWnd()
@@ -382,10 +400,20 @@ UIMakeTargetResultWnd::UIMakeTargetResultWnd()
   this->makeType = 0;
 }
 
+// OFFSET: 0x0099FCF0
+// FUNCTION: fn_45743
+UIMakeTargetResultWnd::~UIMakeTargetResultWnd() {
+}
+
 // OFFSET: 0x0099F9C0
 // FUNCTION: fn_13591
 UIWeaponRefineWnd::UIWeaponRefineWnd()
     : UIFrameWnd(0), itemIds(), indices() {
+}
+
+// OFFSET: 0x0099FD40
+// FUNCTION: fn_45744
+UIWeaponRefineWnd::~UIWeaponRefineWnd() {
 }
 
 // OFFSET: 0x0099FB70

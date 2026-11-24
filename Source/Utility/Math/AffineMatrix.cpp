@@ -1,7 +1,12 @@
 #include "Utility/Math/AffineMatrix.h"
 
+#include "Contents/Map/MapSkyMgr.h"
+#include "Render/Projection/RenderProjection.h"
+
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <xmmintrin.h>
 
 // STATIC: 0x01312438
 // GLOBAL: gl_21913
@@ -29,11 +34,11 @@ namespace {
     values[10] += rotation[10];
     values[11] += rotation[11];
   }
-}
 
-// INLINED
-void matrix::Identity() {
-  std::memcpy(this->values, g_identityMatrix, sizeof(g_identityMatrix));
+  // INLINED
+  __forceinline float FastSquareRoot(float value) {
+    return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(value)));
+  }
 }
 
 // OFFSET: 0x00555360
@@ -95,7 +100,13 @@ void matrix::AppendYRotation(float radians) {
 // FUNCTION: fn_02018
 void matrix::AppendZRotation(float radians) {
   matrix rotation;
-  rotation.MakeZRotation(radians);
+  rotation.Identity();
+  const float sine = sinf(radians);
+  const float cosine = cosf(radians);
+  rotation.values[0] = cosine;
+  rotation.values[4] = cosine;
+  rotation.values[3] = -sine;
+  rotation.values[1] = sine;
   Rotate(this->values, rotation.values);
 }
 
@@ -195,10 +206,10 @@ int matrix::IsIdentity() const {
   return 1;
 }
 
-// OFFSET: 0x00554F70
-// FUNCTION: fn_02031
-void matrix::MakeTransform(const float* rotaxis, float rotangle) {
-  const float omega = rotangle / 2.0f;
+// OFFSET: 0x00554E10
+// FUNCTION: fn_45850
+void matrix::MakeTransform(const float* position, const float* rotaxis, float rotangle) {
+  const float omega = rotangle * g_depthAverageHalf;
   const float s = static_cast<float>(sin(static_cast<double>(omega)));
   const float qx = rotaxis[0] * s;
   const float qy = rotaxis[1] * s;
@@ -218,16 +229,133 @@ void matrix::MakeTransform(const float* rotaxis, float rotangle) {
   const float yz = qy * z2;
   const float zz = qz * z2;
 
-  this->values[0] = 1.0f - (yy + zz);
+  const float projectionDepthNumerator = g_projectionDepthNumerator;
+  this->values[0] = projectionDepthNumerator - (yy + zz);
   this->values[1] = xy + wz;
-  this->values[2] = xz - wy;
   this->values[3] = xy - wz;
-  this->values[4] = 1.0f - (xx + zz);
-  this->values[5] = yz + wx;
+  this->values[2] = xz - wy;
   this->values[6] = xz + wy;
+  this->values[4] = projectionDepthNumerator - (xx + zz);
+  this->values[5] = yz + wx;
   this->values[7] = yz - wx;
-  this->values[8] = 1.0f - (xx + yy);
+  this->values[8] = projectionDepthNumerator - (xx + yy);
+  this->values[9] = position[0];
+  this->values[10] = position[1];
+  this->values[11] = position[2];
+}
+
+// OFFSET: 0x00554F70
+// FUNCTION: fn_02031
+void matrix::MakeTransform(const float* rotaxis, float rotangle) {
+  const float omega = rotangle * g_depthAverageHalf;
+  const float s = sinf(omega);
+  const float qx = s * rotaxis[0];
+  const float qy = s * rotaxis[1];
+  const float qz = s * rotaxis[2];
+  const float qw = cosf(omega);
+
+  const float x2 = qx + qx;
+  const float y2 = qy + qy;
+  const float z2 = qz + qz;
+  const float wx = qw * x2;
+  const float wy = qw * y2;
+  const float wz = qw * z2;
+  const float xx = qx * x2;
+  const float xy = qx * y2;
+  const float xz = qx * z2;
+  const float yy = qy * y2;
+  const float yz = qy * z2;
+  const float zz = qz * z2;
+
   this->values[9] = 0.0f;
   this->values[10] = 0.0f;
   this->values[11] = 0.0f;
+  const float projectionDepthNumerator = g_projectionDepthNumerator;
+  this->values[0] = projectionDepthNumerator - (yy + zz);
+  this->values[1] = xy + wz;
+  this->values[3] = xy - wz;
+  this->values[2] = xz - wy;
+  this->values[6] = xz + wy;
+  this->values[4] = projectionDepthNumerator - (xx + zz);
+  this->values[5] = yz + wx;
+  this->values[7] = yz - wx;
+  this->values[8] = projectionDepthNumerator - (xx + yy);
+}
+
+// OFFSET: 0x005544C0
+// FUNCTION: fn_46340
+void SlerpQuaternion(RotationQuaternion& result, double amount, const RotationQuaternion& first, const RotationQuaternion& second) {
+  double dot = second.w * first.w + second.x * first.x + second.y * first.y + second.z * first.z;
+  RotationQuaternion end;
+  if (0.0 > dot) {
+    dot = -dot;
+    end = {-second.w, -second.x, -second.y, -second.z};
+  } else {
+    end = second;
+  }
+
+  double firstWeight = 1.0 - amount;
+  double secondWeight = amount;
+  if (1.0 - dot > 0.00001f) {
+    const double angle = std::acos(dot);
+    const float sine = sinf(static_cast<float>(angle));
+    const float firstSine = sinf(static_cast<float>(firstWeight * angle));
+    const float secondSine = sinf(static_cast<float>(amount * angle));
+    firstWeight = static_cast<double>(firstSine) / sine;
+    secondWeight = static_cast<double>(secondSine) / sine;
+  }
+
+  const float firstScale = static_cast<float>(firstWeight);
+  const float secondScale = static_cast<float>(secondWeight);
+  float start[4];
+  float finish[4];
+  std::memcpy(start, &first, sizeof(start));
+  std::memcpy(finish, &end, sizeof(finish));
+  for (int component = 0; component < 4; ++component) {
+    start[component] = firstScale * start[component] + secondScale * finish[component];
+  }
+  std::memcpy(&result, start, sizeof(result));
+}
+
+// OFFSET: 0x005546F0
+// FUNCTION: fn_46341
+void MatrixToQuaternion(RotationQuaternion& result, const matrix& rotation) {
+  const float* m = rotation.values;
+  const float z = -m[0] - m[4] + m[8] + g_projectionDepthNumerator;
+  const float x = m[0] - m[4] - m[8] + g_projectionDepthNumerator;
+  const float y = m[4] - m[0] - m[8] + g_projectionDepthNumerator;
+  const float w = m[4] + m[0] + m[8] + g_projectionDepthNumerator;
+  const float wz = z > w ? z : w;
+  const float wyz = y > wz ? y : wz;
+  const float largest = x > wyz ? x : wyz;
+  const float divisor = FastSquareRoot(largest) * 2.0f;
+
+  if (x == largest) {
+    result.x = largest / divisor;
+    result.y = (m[3] + m[1]) / divisor;
+    result.z = (m[6] + m[2]) / divisor;
+    result.w = (m[7] - m[5]) / divisor;
+  } else if (y == largest) {
+    const float xValue = (m[3] + m[1]) / divisor;
+    result.y = largest / divisor;
+    result.x = xValue;
+    result.z = (m[7] + m[5]) / divisor;
+    result.w = (m[2] - m[6]) / divisor;
+  } else if (z == largest) {
+    result.x = (m[6] + m[2]) / divisor;
+    const float yValue = m[7] + m[5];
+    result.z = largest / divisor;
+    result.y = yValue / divisor;
+    result.w = (m[3] - m[1]) / divisor;
+  } else if (w == largest) {
+    result.x = (m[7] - m[5]) / divisor;
+    result.y = (m[2] - m[6]) / divisor;
+    const float zValue = m[3] - m[1];
+    result.w = largest / divisor;
+    result.z = zValue / divisor;
+  }
+
+  if (result.w < 0.0f) {
+    result = {-result.w, -result.x, -result.y, -result.z};
+  }
 }

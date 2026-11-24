@@ -23,6 +23,10 @@
 UIChatRoomTitle::UIChatRoomTitle() : UIWindow(0) {
 }
 
+// OFFSET: 0x00851440
+// FUNCTION: fn_45637
+UIChatRoomTitle::~UIChatRoomTitle() = default;
+
 // OFFSET: 0x0085AB80
 // FUNCTION: fn_10785
 void UIChatRoomTitle::OnCreate(int, int) {
@@ -42,12 +46,12 @@ void UIChatRoomTitle::OnCreate(int, int) {
 // FUNCTION: fn_10831
 void UIChatRoomTitle::OnLBtnDblClk(int, int) {
   CGameMode* mode = g_modeMgr.GetGameMode();
-  if (this->roomType != 0) {
-    if (this->roomType != 3) {
-      mode->SendMsg(MM_REQ_ENTER_ROOM, this->roomId, 0, 0, 0);
+  if (this->info.type != 0) {
+    if (this->info.type != 3) {
+      mode->SendMsg(MM_REQ_ENTER_ROOM, this->info.id, 0, 0, 0);
     }
   } else {
-    g_windowMgr.EnsureWindow(WID_PASSWORDWND)->SendMsg(nullptr, UM_SETROOMID, this->roomId, 0, 0, 0);
+    g_windowMgr.EnsureWindow(WID_PASSWORDWND)->SendMsg(nullptr, UM_SETROOMID, this->info.id, 0, 0, 0);
   }
 }
 
@@ -81,7 +85,7 @@ void UIChatRoomTitle::Paint() {
   bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\sysbox_arr_l.bmp")));
   this->DrawBitmap(this->geometry.width / 2 - bitmap->image.width / 2, this->geometry.height - bitmap->image.height, bitmap, false);
 
-  const char* icon = this->roomType == 0 ? "유저인터페이스\\chat_close.bmp" : "유저인터페이스\\chat_open.bmp";
+  const char* icon = this->info.type == 0 ? "유저인터페이스\\chat_close.bmp" : "유저인터페이스\\chat_open.bmp";
   bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(icon)));
   this->DrawBitmap(3, 3, bitmap, true);
 }
@@ -107,71 +111,76 @@ int UIChatRoomTitle::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     return UIWindow::SendMsg(sender, message, a, b, c, d);
   }
 
-  const ChatRoomTitleInfo* info = reinterpret_cast<const ChatRoomTitleInfo*>(a);
-  this->title = info->title;
-  this->password = info->password;
-  this->roomType = info->type;
-  this->memberCount = info->memberCount;
-  this->memberLimit = info->memberLimit;
-  this->roomId = info->id;
+  this->info = *reinterpret_cast<const ChatRoomTitleInfo*>(a);
 
-  const std::size_t lineEnd = this->title.find('\r');
+  const std::size_t lineEnd = this->info.title.find('\r');
   if (lineEnd != std::string::npos) {
-    this->title = this->title.substr(0, lineEnd);
+    this->info.title = this->info.title.substr(0, lineEnd);
   }
 
   std::string status;
   char text[384];
-  if (this->roomType == 0) {
+  if (this->info.type == 0) {
     status = LookupMessage(MSI_ROOM_PRIVATE);
-    std::sprintf(text, "%s (%d/%d)", this->title.c_str(), this->memberCount, this->memberLimit);
-  } else if (this->roomType == 3) {
+    std::sprintf(text, "%s (%d/%d)", this->info.title.c_str(), this->info.memberCount, this->info.memberLimit);
+  } else if (this->info.type == 3) {
     status.clear();
-    std::sprintf(text, "%s", this->title.c_str());
+    std::sprintf(text, "%s", this->info.title.c_str());
   } else {
     status = LookupMessage(MSI_ROOM_PUBLIC);
-    std::sprintf(text, "%s (%d/%d)", this->title.c_str(), this->memberCount, this->memberLimit);
+    std::sprintf(text, "%s (%d/%d)", this->info.title.c_str(), this->info.memberCount, this->info.memberLimit);
   }
 
   this->roomOption = static_cast<short>(b);
+  UIStaticText* label;
   switch (static_cast<short>(b)) {
   case 1:
-    this->label->fontFamily = 21;
+    label = this->label;
+    label->fontFamily = 21;
     break;
   case 2:
-    this->label->fontFamily = 20;
+    label = this->label;
+    label->fontFamily = 20;
     break;
   case 3:
-    this->label->fontFamily = 22;
+    label = this->label;
+    label->fontFamily = 22;
     break;
   case 4:
-    this->label->fontFamily = 23;
+    label = this->label;
+    label->fontFamily = 23;
     break;
   case 5:
-    this->label->fontFamily = 24;
+    label = this->label;
+    label->fontFamily = 24;
     break;
   case 6:
-    this->label->fontFamily = 25;
+    label = this->label;
+    label->fontFamily = 25;
     break;
   case 7:
-    this->label->fontFamily = 26;
+    label = this->label;
+    label->fontFamily = 26;
     break;
   case 8:
-    this->label->fontFamily = 27;
+    label = this->label;
+    label->fontFamily = 27;
     break;
   case 9:
-    this->label->fontFamily = 28;
+    label = this->label;
+    label->fontFamily = 28;
     break;
   default:
-    this->label->fontFamily = 0;
+    label = this->label;
+    label->fontFamily = 0;
     break;
   }
-  this->label->bold = 0;
-  this->label->italic = 0;
-  this->label->fontHeight = 12;
+  label->bold = 0;
+  label->italic = 0;
+  label->fontHeight = 12;
 
   if (g_forbiddenWords.Contains(text) == true) {
-    std::string masked;
+    std::string masked("");
     g_forbiddenWords.Mask(text, &masked);
   }
 

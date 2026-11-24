@@ -9,16 +9,26 @@
 #include <cstring>
 
 namespace {
+  struct GroundVertex : RenderVertex {
+    // INLINED
+    GroundVertex() {
+      this->x = 0.0f;
+      this->y = 0.0f;
+      this->z = 0.0f;
+      this->rhw = 0.0f;
+      this->diffuse = 0;
+      this->specular = 0xFF000000u;
+      this->u = 0.0f;
+      this->v = 0.0f;
+    }
+  };
+
   // INLINED
   __forceinline void SubmitGroundQuad(const float* matrix, const GroundQuad& quad, bool clip) {
-    RenderVertex vertices[4]{};
-
-    for (auto& vertex : vertices) {
-      vertex.specular = 0xFF000000u;
-    }
+    GroundVertex vertices[4];
 
     for (unsigned corner = 0; corner < 4; ++corner) {
-      g_renderer->viewport.Project(quad.vertices[corner].position, matrix, vertices[corner]);
+      g_renderer->Project(quad.vertices[corner].position, matrix, vertices[corner]);
     }
 
     if (clip && !GroundQuadVisible(vertices)) {
@@ -32,7 +42,7 @@ namespace {
       vertices[corner].diffuseChannels.alpha = 0x80;
     }
 
-    RenderPrimitive* primitive = g_renderer->primitives.Acquire();
+    RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
     std::memcpy(primitive->vertices, vertices, sizeof(vertices));
     primitive->texture = quad.texture;
     g_renderer->Submit(primitive, 0x800);

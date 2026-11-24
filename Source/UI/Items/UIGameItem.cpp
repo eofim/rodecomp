@@ -22,13 +22,6 @@
 #include <format>
 #include <string>
 
-// OFFSET: 0x009F71F0
-// FUNCTION: fn_14769
-CUIGameItem::CUIGameItem()
-    : CUIControl(), mode(0), showNameTooltip(1), allowItemInfo(1), transparent(0), scale(100), itemInfo(), name(), image(), showOverlay(0),
-      overlay(), onClick() {
-}
-
 // OFFSET: 0x009E72A0
 // FUNCTION: fn_14476
 void CUIGameItem::SetMode(int mode) {
@@ -107,7 +100,7 @@ void CUIGameItem::OnMouseHover(int x, int y) {
   if (this->itemInfo.optionCount > 0) {
     CMode* tooltip = g_modeMgr.currentMode;
     tooltip->ShowTooltip(
-      FormatOwnedString(LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), this->name.c_str(), this->itemInfo.optionCount).c_str(),
+      FormatOwnedString(LookupMessage(MSI_EA6), this->name.c_str(), this->itemInfo.optionCount).c_str(),
       screenX, screenY, g_session.GetItemNameColor(this->itemInfo), 0, 1
     );
   } else {
@@ -128,6 +121,35 @@ void CUIGameItem::OnRBtnDown(int, int) {
   if (window != nullptr) {
     window->SendMsg(nullptr, UM_ITEMEXPLANATION, reinterpret_cast<std::intptr_t>(&this->itemInfo), 0, 0, 0);
   }
+}
+
+// OFFSET: 0x009E77B0
+// FUNCTION: fn_45731
+__forceinline void CUIGameItem::ClearItem() {
+  this->itemInfo.Reset();
+  this->name = "";
+  this->image = nullptr;
+  this->overlay = nullptr;
+  this->Invalidate();
+}
+
+// OFFSET: 0x009E7870
+// FUNCTION: fn_45732
+void CUIGameItem::SetItemById(int itemId) {
+  if (itemId == 0) {
+    this->ClearItem();
+    return;
+  }
+
+  const ITEM_INFO* item = g_session.FindInventoryItemByItemId(itemId, false);
+  if (item && item->identity[1] > 0) {
+    this->SetItem(*item);
+    return;
+  }
+
+  ITEM_INFO fallback;
+  fallback.SetItemId(itemId);
+  this->SetItem(fallback);
 }
 
 // OFFSET: 0x009E79D0

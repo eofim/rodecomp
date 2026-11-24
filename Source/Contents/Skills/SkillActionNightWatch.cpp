@@ -11,6 +11,7 @@
 #include "Contents/Effects/Core/EffectActor.h"
 #include "Contents/Effects/Core/EffectLists.h"
 #include "Contents/Effects/Core/RagEffect.h"
+#include "Contents/Skills/SkillId.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Math/Vector3d.h"
@@ -19,6 +20,12 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+
+// INLINED
+static int ClampedRandom(int range) {
+  const int value = rand() % range;
+  return value >= 0 ? value : 0;
+}
 
 class CSkillAction_NW_INTENSIVE_AIM : public CSkillAction {
 public:
@@ -191,16 +198,16 @@ void CSkillAction_NW_INTENSIVE_AIM::OnSkillEffect(int level, CGameActor* source,
 void CEfstAction_INTENSIVE_AIM_COUNT::OnEfstBegin(int efstId, int value, int argument3, int argument4, CRenderObject* actor, bool argument6) {
   if (actor) {
     for (int index = 0; index <= 10; ++index) {
-      EffectLists* effects = g_effectMgr;
-      effects->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("intensive_aim_%02d", index)));
+      EffectLists* effectLists = g_effectMgr;
+      effectLists->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("intensive_aim_%02d", index)));
     }
-    EffectLists* effects = g_effectMgr;
-    effects->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("intensiveaim_full"));
-    effects = g_effectMgr;
-    effects->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("intensive_aim_%02d", value)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    EffectLists* effectLists = g_effectMgr;
+    effectLists->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("intensiveaim_full"));
+    effectLists = g_effectMgr;
+    effectLists->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("intensive_aim_%02d", value)), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     if (value == 10) {
-      effects = g_effectMgr;
-      effects->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("intensiveaim_full"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effectLists = g_effectMgr;
+      effectLists->Spawn(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("intensiveaim_full"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     }
   }
 }
@@ -216,11 +223,11 @@ void CEfstAction_INTENSIVE_AIM_COUNT::OnEfstUpdate(int efstId, int value, int ar
 void CEfstAction_INTENSIVE_AIM::OnEfstEnd(int efstId, int argument2, int argument3, int argument4, CRenderObject* actor) {
   if (actor) {
     for (int index = 0; index <= 10; ++index) {
-      EffectLists* effects = g_effectMgr;
-      effects->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("intensive_aim_%02d", index)));
+      EffectLists* effectLists = g_effectMgr;
+      effectLists->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("intensive_aim_%02d", index)));
     }
-    EffectLists* effects = g_effectMgr;
-    effects->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("intensiveaim_full"));
+    EffectLists* effectLists = g_effectMgr;
+    effectLists->Retire(actor->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("intensiveaim_full"));
   }
 }
 
@@ -231,35 +238,35 @@ void CSkillAction_NW_GRENADE_FRAGMENT::OnSkillEffect(int level, CGameActor* sour
     return;
   }
 
-  EffectLists* effects;
+  EffectLists* effectLists;
   switch (level) {
   case 1:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_water"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_water"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   case 2:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_wind"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_wind"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   case 3:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_earth"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_earth"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   case 4:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_fire"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_fire"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   case 5:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_darkness"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_darkness"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   case 6:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_saint"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_saint"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   case 7:
-    effects = g_effectMgr;
-    effects->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_reset"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    effectLists = g_effectMgr;
+    effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_reset"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
   }
 }
@@ -292,18 +299,17 @@ void CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_GATLING::OnSkillEffect(int level
 
   for (int index = 0; index < 7; ++index) {
     const vector3d position = target->render.position;
-    CEffect* effect = g_effectMgr->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("the_vigilante_at_night_crack"), position, 0, -1, 0, 0);
+    EffectLists* effects = g_effectMgr;
+    CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("the_vigilante_at_night_crack"), position, 0, -1, 0, 0);
     if (!effect) {
       return;
     }
 
     const int first = rand() % 15;
     const int second = rand() % 15;
-    effect->position[0] = static_cast<float>(index % 2 * 15 - (second >= 0 ? second : 0)) + target->render.position.x;
-    effect->position[2] = target->render.position.z + 0.0f;
-    effect->position[1] = static_cast<float>(index % 4 / 2 * 15 - (first >= 0 ? first : 0)) + target->render.position.y;
+    effect->positionVector = vector3d{static_cast<float>(index % 2 * 15 - (second >= 0 ? second : 0)) + target->render.position.x, static_cast<float>(index % 4 / 2 * 15 - (first >= 0 ? first : 0)) + target->render.position.y, target->render.position.z + 0.0f};
     effect->SetDelay(index * 32);
-    effect->SetScale(static_cast<float>(std::max(rand() % 51, 0) + 50) * 0.01f);
+    effect->SetScale(static_cast<float>(ClampedRandom(51) + 50) * 0.01f);
   }
 }
 
@@ -335,11 +341,9 @@ void CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN::OnSkillEffect(int level
 
     const int first = rand() % 10;
     const int second = rand() % 10;
-    effect->position[0] = static_cast<float>(index % 2 * 10 - (second >= 0 ? second : 0)) + target->render.position.x;
-    effect->position[2] = target->render.position.z + 0.0f;
-    effect->position[1] = static_cast<float>(index % 4 / 2 * 10 - (first >= 0 ? first : 0)) + target->render.position.y;
+    effect->positionVector = vector3d{static_cast<float>(index % 2 * 10 - (second >= 0 ? second : 0)) + target->render.position.x, static_cast<float>(index % 4 / 2 * 10 - (first >= 0 ? first : 0)) + target->render.position.y, target->render.position.z + 0.0f};
     effect->SetDelay(index * 32);
-    effect->SetScale(static_cast<float>(std::max(rand() % 31, 0) + 70) * 0.01f);
+    effect->SetScale(static_cast<float>(ClampedRandom(31) + 70) * 0.01f);
   }
 }
 
@@ -444,10 +448,20 @@ void CSkillAction_NW_WILD_FIRE::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x00790070
 // FUNCTION: fn_08698
 void CSkillAction_NW_WILD_FIRE::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
-  EffectLists* effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("wild_fire"), position.x, position.y, position.z, 0, -1, 0, 0);
-  effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("wild_fire_bottom"), position.x, position.y, position.z, 0, -1, 0, 0);
+  {
+    EffectLists* effects = g_effectMgr;
+    CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+    const std::string name = "wild_fire";
+    const int effectId = manager->EffectId(name);
+    effects->Spawn(0, effectId, position, 0, -1, 0, 0);
+  }
+  {
+    EffectLists* effects = g_effectMgr;
+    CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+    const std::string name = "wild_fire_bottom";
+    const int effectId = manager->EffectId(name);
+    effects->Spawn(0, effectId, position, 0, -1, 0, 0);
+  }
 }
 
 // OFFSET: 0x00790280
@@ -473,10 +487,20 @@ void CSkillAction_NW_BASIC_GRENADE::OnSkillCast(int level, CGameActor* source) {
 // OFFSET: 0x007902D0
 // FUNCTION: fn_08702
 void CSkillAction_NW_BASIC_GRENADE::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
-  EffectLists* effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("basic_grenade"), position.x, position.y, position.z, 0, -1, 0, 0);
-  effects = g_effectMgr;
-  effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("basic_grenade_bottom"), position.x, position.y, position.z, 0, -1, 0, 0);
+  {
+    EffectLists* effects = g_effectMgr;
+    CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+    const std::string name = "basic_grenade";
+    const int effectId = manager->EffectId(name);
+    effects->Spawn(0, effectId, position, 0, -1, 0, 0);
+  }
+  {
+    EffectLists* effects = g_effectMgr;
+    CEZ2STREffectMgr* manager = CEZ2STREffectMgr::GetInstance();
+    const std::string name = "basic_grenade_bottom";
+    const int effectId = manager->EffectId(name);
+    effects->Spawn(0, effectId, position, 0, -1, 0, 0);
+  }
 }
 
 // OFFSET: 0x007904F0
@@ -509,15 +533,17 @@ void CSkillAction_NW_HASTY_FIRE_IN_THE_HOLE::OnSkillCast(int level, CGameActor* 
 // FUNCTION: fn_08707
 void CSkillAction_NW_HASTY_FIRE_IN_THE_HOLE::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
   for (int index = 0; index < 3; ++index) {
-    CEffect* effect = g_effectMgr->Spawn(
-      0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_%d", index).c_str()), position, 0, -1, 0, 0
+    EffectLists* effectLists = g_effectMgr;
+    CEffect* effect = effectLists->Spawn(
+      0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_%d", index).c_str()), position.x, position.y, position.z, 0, -1, 0, 0
     );
     if (effect) {
       effect->SetDelay(index * 288);
     }
 
-    effect = g_effectMgr->Spawn(
-      0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_bottom_%d", index).c_str()), position, 0, -1, 0, 0
+    effectLists = g_effectMgr;
+    effect = effectLists->Spawn(
+      0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_bottom_%d", index).c_str()), position.x, position.y, position.z, 0, -1, 0, 0
     );
     if (effect) {
       effect->SetDelay(index * 288);
@@ -779,10 +805,9 @@ void CSkillAction_NW_MIDNIGHT_FALLEN::OnGroundSkillEffect(vector3d position, int
   for (int angle = 45; angle < 405; angle += 120) {
     const float radians = static_cast<float>(angle) / 180.0f * 3.141592f;
     const float offsetZ = ClientSin(radians) * 10.0f;
-    const float offsetX = ClientCos(radians) * 10.0f;
+    const float x = ClientCos(radians) * 10.0f + position.x;
     const float z = offsetZ + position.z;
     const float y = position.y + 0.0f;
-    const float x = offsetX + position.x;
     EffectLists* effects = g_effectMgr;
     CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("midnight_fallen_bottom"), x, y, z, 0, -1, 0, 0);
     if (effect) {
@@ -810,46 +835,46 @@ int CSkillAction_NW_MIDNIGHT_FALLEN::GetSkillScopeType() {
 }
 
 // GLOBAL: gl_25822
-static EfstActionRegistrar s_efstAction1354(1354, NewAction<CEfstAction_HIDDEN_CARD, CEfstAction>);
+static EfstActionRegistrar s_efstActionHiddenCard{EFST_HIDDEN_CARD, NewAction<CEfstAction_HIDDEN_CARD, CEfstAction>};
 // GLOBAL: gl_25823
-static EfstActionRegistrar s_efstAction1345(1345, NewAction<CEfstAction_INTENSIVE_AIM, CEfstAction>);
+static EfstActionRegistrar s_efstActionIntensiveAim{EFST_INTENSIVE_AIM, NewAction<CEfstAction_INTENSIVE_AIM, CEfstAction>};
 // GLOBAL: gl_25824
-static EfstActionRegistrar s_efstAction1346(1346, NewAction<CEfstAction_INTENSIVE_AIM_COUNT, CEfstAction>);
+static EfstActionRegistrar s_efstActionIntensiveAimCount{EFST_INTENSIVE_AIM_COUNT, NewAction<CEfstAction_INTENSIVE_AIM_COUNT, CEfstAction>};
 // GLOBAL: gl_25825
 static CSkillObjectActionRegistration s_skillObjectAction288(288, NewAction<CSkillObjectAction_NW_GRENADES_DROPPING, CSkillObjectAction>);
 // GLOBAL: gl_25826
 static CSkillObjectActionRegistration s_skillObjectAction291(291, NewAction<CSkillObjectAction_NW_MISSION_BOMBARD, CSkillObjectAction>);
 // GLOBAL: gl_25827
-static SkillActionRegistrar s_skillAction5413(5413, NewAction<CSkillAction_NW_AUTO_FIRING_LAUNCHER, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwAutoFiringLauncher{NW_AUTO_FIRING_LAUNCHER, NewAction<CSkillAction_NW_AUTO_FIRING_LAUNCHER, CSkillAction>};
 // GLOBAL: gl_25828
-static SkillActionRegistrar s_skillAction5410(5410, NewAction<CSkillAction_NW_BASIC_GRENADE, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwBasicGrenade{NW_BASIC_GRENADE, NewAction<CSkillAction_NW_BASIC_GRENADE, CSkillAction>};
 // GLOBAL: gl_25829
-static SkillActionRegistrar s_skillAction5412(5412, NewAction<CSkillAction_NW_GRENADES_DROPPING, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwGrenadesDropping{NW_GRENADES_DROPPING, NewAction<CSkillAction_NW_GRENADES_DROPPING, CSkillAction>};
 // GLOBAL: gl_25830
-static SkillActionRegistrar s_skillAction5404(5404, NewAction<CSkillAction_NW_GRENADE_FRAGMENT, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwGrenadeFragment{NW_GRENADE_FRAGMENT, NewAction<CSkillAction_NW_GRENADE_FRAGMENT, CSkillAction>};
 // GLOBAL: gl_25831
-static SkillActionRegistrar s_skillAction5411(5411, NewAction<CSkillAction_NW_HASTY_FIRE_IN_THE_HOLE, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwHastyFireInTheHole{NW_HASTY_FIRE_IN_THE_HOLE, NewAction<CSkillAction_NW_HASTY_FIRE_IN_THE_HOLE, CSkillAction>};
 // GLOBAL: gl_25832
-static SkillActionRegistrar s_skillAction5414(5414, NewAction<CSkillAction_NW_HIDDEN_CARD, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwHiddenCard{NW_HIDDEN_CARD, NewAction<CSkillAction_NW_HIDDEN_CARD, CSkillAction>};
 // GLOBAL: gl_25833
-static SkillActionRegistrar s_skillAction5403(5403, NewAction<CSkillAction_NW_INTENSIVE_AIM, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwIntensiveAim{NW_INTENSIVE_AIM, NewAction<CSkillAction_NW_INTENSIVE_AIM, CSkillAction>};
 // GLOBAL: gl_25834
-static SkillActionRegistrar s_skillAction5408(5408, NewAction<CSkillAction_NW_MAGAZINE_FOR_ONE, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwMagazineForOne{NW_MAGAZINE_FOR_ONE, NewAction<CSkillAction_NW_MAGAZINE_FOR_ONE, CSkillAction>};
 // GLOBAL: gl_25835
-static SkillActionRegistrar s_skillAction5501(5501, NewAction<CSkillAction_NW_MIDNIGHT_FALLEN, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwMidnightFallen{NW_MIDNIGHT_FALLEN, NewAction<CSkillAction_NW_MIDNIGHT_FALLEN, CSkillAction>};
 // GLOBAL: gl_25836
-static SkillActionRegistrar s_skillAction5415(5415, NewAction<CSkillAction_NW_MISSION_BOMBARD, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwMissionBombard{NW_MISSION_BOMBARD, NewAction<CSkillAction_NW_MISSION_BOMBARD, CSkillAction>};
 // GLOBAL: gl_25837
-static SkillActionRegistrar s_skillAction5406(5406, NewAction<CSkillAction_NW_ONLY_ONE_BULLET, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwOnlyOneBullet{NW_ONLY_ONE_BULLET, NewAction<CSkillAction_NW_ONLY_ONE_BULLET, CSkillAction>};
 // GLOBAL: gl_25838
-static SkillActionRegistrar s_skillAction5407(5407, NewAction<CSkillAction_NW_SPIRAL_SHOOTING, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwSpiralShooting{NW_SPIRAL_SHOOTING, NewAction<CSkillAction_NW_SPIRAL_SHOOTING, CSkillAction>};
 // GLOBAL: gl_25839
-static SkillActionRegistrar s_skillAction5405(5405, NewAction<CSkillAction_NW_THE_VIGILANTE_AT_NIGHT, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwTheVigilanteAtNight{NW_THE_VIGILANTE_AT_NIGHT, NewAction<CSkillAction_NW_THE_VIGILANTE_AT_NIGHT, CSkillAction>};
 // GLOBAL: gl_25840
-static SkillActionRegistrar s_skillAction5496(5496, NewAction<CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_GATLING, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwTheVigilanteAtNightGunGatling{NW_THE_VIGILANTE_AT_NIGHT_GUN_GATLING, NewAction<CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_GATLING, CSkillAction>};
 // GLOBAL: gl_25841
-static SkillActionRegistrar s_skillAction5497(5497, NewAction<CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwTheVigilanteAtNightGunShotgun{NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN, NewAction<CSkillAction_NW_THE_VIGILANTE_AT_NIGHT_GUN_SHOTGUN, CSkillAction>};
 // GLOBAL: gl_25842
-static SkillActionRegistrar s_skillAction5409(5409, NewAction<CSkillAction_NW_WILD_FIRE, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwWildFire{NW_WILD_FIRE, NewAction<CSkillAction_NW_WILD_FIRE, CSkillAction>};
 // GLOBAL: gl_25843
-static SkillActionRegistrar s_skillAction5500(5500, NewAction<CSkillAction_NW_WILD_SHOT, CSkillAction>);
+static SkillActionRegistrar s_skillActionNwWildShot{NW_WILD_SHOT, NewAction<CSkillAction_NW_WILD_SHOT, CSkillAction>};

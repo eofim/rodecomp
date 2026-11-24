@@ -31,6 +31,7 @@
 #include "Contents/Guild/GuildMgr.h"
 #include "Contents/Items/ItemDescription.h"
 #include "Contents/Items/ItemInfo.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "Contents/RuneSystem/RuneSystem.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Rodex/RodexMailStore.h"
@@ -80,7 +81,6 @@
 #include "UI/Party/UIPartySettingWnd.h"
 #include "UI/Rodex/UIRodexContentsWnd.h"
 #include "UI/Skill/UISkillListWnd.h"
-template __declspec(noinline) void std::list<ShortcutCooldownRecord>::push_back(const ShortcutCooldownRecord&);
 
 #pragma pack(push, 1)
 struct ClanInfoPacket {
@@ -550,14 +550,6 @@ static_assert(sizeof(ItemRewardPacket2) == 0x40);
 static_assert(sizeof(ActorSkillResultPacket) == 0x1D);
 #endif
 
-namespace EquipmentProperties {
-class CEquipmentPropertiesMgr {
-public:
-  static CEquipmentPropertiesMgr* GetInstance();
-  void RefreshExpansion(const int& kind, const int& itemId);
-};
-}
-
 static_assert(sizeof(PACKET_ZC_GROUP_LIST3) == 0x52);
 static_assert(sizeof(PACKET_ZC_PARTY_BOOKING_ACK_DELETE) == 4);
 static_assert(sizeof(PACKET_ZC_PARTY_BOOKING_ACK_REGISTER) == 4);
@@ -619,8 +611,9 @@ void CGameMode::ReceivePartyRoster(const unsigned char* packet) {
   std::vector<PartyRosterEntry> members;
   const int count = (value->packetLength - 28) / sizeof(PartyRosterEntry);
   const PartyRosterEntry* entries = value->members;
-  for (int i = 0; i < count; ++i) {
-    members.push_back(entries[i]);
+  for (int i = 1; i <= count; ++i) {
+    members.push_back(*entries);
+    ++entries;
   }
   this->SetPartyMemberList(value->partyName, &members);
 }
@@ -629,7 +622,8 @@ void CGameMode::ReceivePartyRoster(const unsigned char* packet) {
 // FUNCTION: fn_21822
 void CGameMode::ReceiveGroundSkillExtended(const unsigned char* record) {
   const GroundSkillPacketExtended& packet = *reinterpret_cast<const GroundSkillPacketExtended*>(record);
-  switch (packet.type) {
+  const int skillType = packet.type;
+  switch (skillType) {
   case UNT_GRAFFITI: {
     if (packet.length <= 23) {
       return;
@@ -649,22 +643,25 @@ void CGameMode::ReceiveGroundSkillExtended(const unsigned char* record) {
     return;
   }
 
-  GroundSkillExtendedData data;
-  data.skill.aid = packet.aid;
-  data.skill.owner = packet.owner;
-  data.skill.type = packet.type;
+  GroundSkillArgumentData arguments;
+  GroundSkillExtendedData& data = arguments.extended;
   data.skill.x = packet.x;
   data.skill.y = packet.y;
-  data.skill.visible = packet.visible;
+  const unsigned char visible = packet.visible;
+  data.skill.visible = visible;
+  data.skill.type = skillType;
   data.skill.level = packet.level;
+  data.skill.aid = packet.aid;
+  data.skill.owner = packet.owner;
   data.flags = packet.flags;
-  if (data.skill.owner != g_session.m_aid && !data.skill.visible) {
-    const auto found = std::find(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), data.skill.aid);
+  if (data.skill.owner != g_session.m_aid && !visible) {
+    const auto found = std::find_if(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), [&data](std::uint32_t id) { return data.skill.aid == id; });
     if (found != this->m_skillUnitIds.end()) {
       this->m_skillUnitIds.erase(found);
       data.skill.visible = 0;
     }
-  } else if (data.skill.visible) {
+  }
+  if (data.skill.visible) {
     this->m_skillUnitIds.push_back(packet.aid);
   }
 
@@ -690,18 +687,18 @@ void CGameMode::ReceiveGroundSkillExtended(const unsigned char* record) {
 // OFFSET: 0x00D413F0
 // FUNCTION: fn_21824
 void CGameMode::SpawnGroundSkill(std::uint32_t aid, std::uint32_t owner, int value, std::int16_t x, std::int16_t y, int type, signed char level, unsigned char visible, unsigned char flags) {
-  if (type != 0x126) {
+  if (type != UNT_SHINKIROU) {
     GroundSkillArgumentData data;
     data.extended.skill.aid = aid;
-    data.extended.skill.owner = owner;
     data.extended.skill.type = type;
     data.extended.skill.x = x;
     data.extended.skill.y = y;
     data.extended.skill.visible = visible;
+    data.extended.skill.owner = owner;
+    data.value = value;
     data.extended.skill.level = level;
     data.extended.flags = flags;
-    data.value = value;
-    if (owner != g_session.m_aid && !visible) {
+    if (g_session.m_aid != owner && !visible) {
       const auto found = std::find_if(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), [aid](std::uint32_t id) { return aid == id; });
       if (this->m_skillUnitIds.end() != found) {
         this->m_skillUnitIds.erase(found);
@@ -901,11 +898,10 @@ void CGameMode::ReceiveItem1718BasicList(const unsigned char* packet) {
   g_session.ClearTradeItems();
 
   const std::int64_t count = (static_cast<std::int64_t>(value->packetLength) - 4) / 19;
-  const Item1718BasicRecord* records = value->items;
 
   for (std::int64_t index = 0; index < count; ++index) {
     Item1718BasicRecord record;
-    memcpy_s(&record, sizeof(record), &records[index], sizeof(record));
+    memcpy_s(&record, sizeof(record), &value->items[index], sizeof(record));
 
     RawItemBasic item = {};
     _itoa(record.itemId, item.itemId, 10);
@@ -956,23 +952,23 @@ void CGameMode::ReceiveItem1718Result(const unsigned char* packet) {
     break;
   case 10:
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_ACCESS_BY_WEIGHTOVER_80)), 0xFFFF00, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_PURCHASES_BY_RODEX)), 0xFFFF00, 0, 0, 0);
     break;
   case 11:
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_OUT_OF_STOCK)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_EXCHANGED_FAILED)), 0xFF, 0, 0, 0);
     break;
   case 12:
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DEAD)), 0xFFFF00, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_EXCHANGED_SUCCEEDED)), 0xFFFF00, 0, 0, 0);
     break;
   case 13:
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_INVENTORY_EXTEND_OF_BODYITEM)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_OUT_OF_STOCK)), 0xFF, 0, 0, 0);
     break;
   case 14:
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PVP)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_NO_ITEM_FOR_EXCHANGE)), 0xFF, 0, 0, 0);
     break;
   }
 
@@ -987,11 +983,10 @@ void CGameMode::ReceiveItem1718IndexList(const unsigned char* packet) {
   g_session.ClearTradeItems();
 
   const int count = (value->packetLength - 4) / sizeof(Item1718IndexRecord);
-  const Item1718IndexRecord* records = value->items;
   for (int i = 0; i < count; ++i) {
-    const Item1718IndexRecord record = records[i];
+    const Item1718IndexRecord record = value->items[i];
     ITEM_INFO owned = g_session.LookupClientItemByIdentity(record.index);
-    if (owned.identity[1] != 0 && (owned.flags[0] == 0 || g_session.hotkeyAndSortOptions[10] == 0)) {
+    if (owned.identity[1] > 0 && (owned.placeEtcTab == 0 || g_session.hotkeyAndSortOptions[10] == 0)) {
       RawItemBasic item = {};
       item.id = record.index;
       strcpy_s(item.itemId, sizeof(item.itemId), owned.itemId.c_str());
@@ -1023,7 +1018,7 @@ void CGameMode::ReceivePetAct(unsigned char* packet) {
   if (kind == 2) {
     const std::int64_t emotion = value;
     const std::int64_t basePack = g_cashEmotionMgr->BasePackId();
-    actor->SendMsg(nullptr, 160, basePack, emotion, 0, 0, 0, 0);
+    actor->SendMsg(nullptr, AM_CASH_EMOTION, basePack, emotion, 0, 0, 0, 0);
     return;
   }
 
@@ -1049,22 +1044,22 @@ void CGameMode::ReceivePetAct(unsigned char* packet) {
 void CGameMode::NotifyPetEvolutionResult(int result) {
   switch (result) {
   case 0:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_RECIPE)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_UNKNOWN)), 0xFF, 0, 0, 0);
     break;
   case 1:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_MATERIAL)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_NOTEXIST_CALLPET)), 0xFF, 0, 0, 0);
     break;
   case 2:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_RG_FAMILIAR)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_NOT_PETEGG)), 0xFF, 0, 0, 0);
     break;
   case 3:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_AUTO_FEEDING)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_RECIPE)), 0xFF, 0, 0, 0);
     break;
   case 4:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_AUTO_FEEDING_REST)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_MATERIAL)), 0xFF, 0, 0, 0);
     break;
   case 5:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_AUTO_FEEDING_ON)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PET_EVOLUTION_FAIL_RG_FAMILIAR)), 0xFF, 0, 0, 0);
     break;
   case 7:
     g_session.ResetPetEggAndJob();
@@ -1095,7 +1090,7 @@ void CGameMode::PlayBgm(unsigned char type, std::string name) {
   }
   case 2: {
     CSoundMgr* soundMgr = g_soundMgr;
-    soundMgr->SetDefaultName(g_session.GetBgmFileName(std::string(this->mapName).c_str()));
+    soundMgr->SetDefaultName(g_session.GetBgmFileName(this->MapName().c_str()));
     g_soundMgr->secondaryEnabled = 0;
     break;
   }
@@ -1558,12 +1553,11 @@ void CGameMode::ReceiveActorMessage32(const unsigned char* packet) {
   message.userCount = value->users;
   message.maxUsers = value->limit;
   message.chatId = value->id;
-  if (message.text.size() > 60) {
+  if (60 < message.text.size()) {
     message.text.resize(60);
   }
 
-  const std::int64_t argument = reinterpret_cast<std::intptr_t>(&message);
-  actor->SendMsg(nullptr, AM_MAKE_CHAT_TITLE, argument, 0, 0, 0, 0, 0);
+  actor->SendMsg(nullptr, AM_MAKE_CHAT_TITLE, reinterpret_cast<int>(&message), 0, 0, 0, 0, 0);
 }
 
 // OFFSET: 0x00D3F3E0
@@ -1596,11 +1590,11 @@ void CGameMode::ReceiveRequestResult(const unsigned char* packet) {
     text = LookupMessage(MSI_CASH_FAILED_BUSY);
     break;
   case 303:
-    text = "- " + IntToString(303, 0) + " : " + LookupMessage(MSI_ZEROCHATWND_LOCK);
+    text = "- " + IntToString(303, 0) + " : " + LookupMessage(MSI_RESULT_ERROR_VTC_303);
     g_windowMgr.Confirm(text.c_str(), 0, false, false, 0, "Error", 280, 120, 0);
     break;
   case 304:
-    text = "- " + IntToString(304, 0) + " : " + LookupMessage(MSI_ZEROCHATWND_UNLOCK);
+    text = "- " + IntToString(304, 0) + " : " + LookupMessage(MSI_RESULT_ERROR_VTC_304);
     g_windowMgr.Confirm(text.c_str(), 0, false, false, 0, "Error", 280, 120, 0);
     break;
   default:
@@ -1685,6 +1679,19 @@ void CGameMode::ReceiveNamedResultNotice(const unsigned char* packet) {
   case 0:
     switch (packet[27]) {
     case 0:
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_TO_BLOCK_WHISPER)).c_str()), 0xFFFF, 0, 0, 0);
+      break;
+    case 1:
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_TO_BLOCK_WHISPER_FAILED1)).c_str()), 0xFFFF, 0, 0, 0);
+      break;
+    case 2:
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_TO_BLOCK_WHISPER_FAILED2)).c_str()), 0xFFFF, 0, 0, 0);
+      break;
+    }
+    break;
+  case 1:
+    switch (packet[27]) {
+    case 0:
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_TO_UNBLOCK_WHISPER)).c_str()), 0xFFFF, 0, 0, 0);
       break;
     case 1:
@@ -1692,19 +1699,6 @@ void CGameMode::ReceiveNamedResultNotice(const unsigned char* packet) {
       break;
     case 2:
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_TO_UNBLOCK_WHISPER_FAILED2)).c_str()), 0xFFFF, 0, 0, 0);
-      break;
-    }
-    break;
-  case 1:
-    switch (packet[27]) {
-    case 0:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_NO_BLOCK_LIST)).c_str()), 0xFFFF, 0, 0, 0);
-      break;
-    case 1:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_BLOCK_LIST)).c_str()), 0xFFFF, 0, 0, 0);
-      break;
-    case 2:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>((name + LookupMessage(MSI_RENEW_QUEST_TAB_PROCESS)).c_str()), 0xFFFF, 0, 0, 0);
       break;
     }
     break;
@@ -1867,7 +1861,7 @@ void CGameMode::ReceiveActorNameCard(const unsigned char* packet) {
   const auto* value = reinterpret_cast<const PACKET_ZC_ACK_REQNAMEALL2*>(packet);
   char name[25] = "";
 
-  memcpy_s(name, 24, value->name, 24);
+  memcpy_s(name, sizeof(name), value->name, 24);
   name[24] = '\0';
   this->SetActorNameCard(
     value->gid, name, value->partyName, value->guildName,
@@ -1901,7 +1895,8 @@ void CGameMode::ReceiveClanInfo(const unsigned char* data) {
   for (int i = 0; i < packet->allyCount; ++i) {
     char name[24] = {};
     StringFormat(name, sizeof(name), static_cast<std::size_t>(-1), "%s", relationName);
-    std::pair<int, std::string> relation(0, name);
+    std::pair<int, std::string> relation;
+    relation.second = name;
     g_clanInfo->m_relations.push_back(relation);
     relationName += sizeof(name);
   }
@@ -1909,7 +1904,9 @@ void CGameMode::ReceiveClanInfo(const unsigned char* data) {
   for (int i = 0; i < packet->hostileCount; ++i) {
     char name[24] = {};
     StringFormat(name, sizeof(name), static_cast<std::size_t>(-1), "%s", relationName);
-    std::pair<int, std::string> relation(1, name);
+    std::pair<int, std::string> relation;
+    relation.first = 1;
+    relation.second = name;
     g_clanInfo->m_relations.push_back(relation);
     relationName += sizeof(name);
   }
@@ -1993,42 +1990,42 @@ void CGameMode::ReceiveRuneRewardPacket(const unsigned char* packet) {
     break;
   }
   case 1:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_LACK_OF_ITEM)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_FAIL)), 0xFF, 0, 0, 0);
     break;
   case 2:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_ALREADY_EQUIPED)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_ALREADY_EQUIPED), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_CANNOT_FIND_ITEM)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_CANNOT_FIND_ITEM), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 3:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_NOTHING_EQUIPED)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_NOTHING_EQUIPED), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_NOT_ENOUGH_INVENTORY)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_NOT_ENOUGH_INVENTORY), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 4:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_INVALID_ID)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_INVALID_ID), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_HEAVY_INVENTORY)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_HEAVY_INVENTORY), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 5:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_MAX_LEVEL)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_MAX_LEVEL), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_OVER_ITEM_COUNT)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_OVER_ITEM_COUNT), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 6:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_INVALID_OWNER)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_INVALID_OWNER), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_RUNE_UI_NOT_OPENED)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_RUNE_UI_NOT_OPENED), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 7:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_TABLE_NOT_EXIT)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_TABLE_NOT_EXIT), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_TABLE_NOT_EXIT)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_TABLE_NOT_EXIT), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 8:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_DB_LOAD_NOT_YET)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_DB_LOAD_NOT_YET), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_NOT_ENOUGH_ITEM_COUNT)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_NOT_ENOUGH_ITEM_COUNT), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   }
 
   g_runeSystemMgr->SetRequestPending(false);
   if (UIWindow* window = g_windowMgr.LookupWindow(WID_RUNESYSTEMWND)) {
     window->SendMsg(window, UM_REFRESH, 0, 0, 0, 0);
-    window->SendMsg(nullptr, 0x69, 1000, 0, 0, 0);
+    window->SendMsg(nullptr, UM_SET_PRESSED, 1000, 0, 0, 0);
   }
 }
 
@@ -2126,25 +2123,25 @@ void CGameMode::ReceiveRuneRewardResult(int result, int tagId, std::int64_t id, 
     break;
   }
   case 1:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SECOND_PASSWORD_ONOFF_TIP_MSG)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_FAIL)), 0x64FFFF, 0, 0, 0);
     break;
   case 2:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_RUNE_UI_NOT_OPENED)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_CANNOT_FIND_ITEM)), 0x64FFFF, 0, 0, 0);
     break;
   case 3:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_TABLE_NOT_EXIT)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_MAX_INVENTORY)), 0x64FFFF, 0, 0, 0);
     break;
   case 4:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_MOVE_INDOOR_MAP)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_HEAVY_INVENTORY)), 0x64FFFF, 0, 0, 0);
     break;
   case 5:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GAME_SETTINGS_LOGINOUT)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_OVER_ITEM_COUNT)), 0x64FFFF, 0, 0, 0);
     break;
   case 6:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GAME_SETTINGS_TAB_ETC)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_RUNE_UI_NOT_OPENED)), 0x64FFFF, 0, 0, 0);
     break;
   case 7:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GAME_SETTINGS_FOG_ON)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_REWARD_TABLE_NOT_EXIT)), 0x64FFFF, 0, 0, 0);
     break;
   }
 }
@@ -2195,13 +2192,15 @@ void CGameMode::ReceiveRodexMailDeleteResult(int mailId, int result) {
         g_windowMgr.rodexInboxWnd->RemoveInboxMail(mailId);
       }
     }
-    message = 3865;
+    message = MSI_RODEX_SPAMOPTION_RETURN_SUCCESS;
   } else {
-    message = 3866;
+    message = MSI_RODEX_SPAMOPTION_RETURN_FAIL;
   }
 
-  g_windowMgr.Confirm(LookupMessage(message), 0, true, false, 0, "Message", 280, 120, false);
-  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(message)), 0x64FFFF, 0, 0, 0);
+  const char* text = LookupMessage(message);
+  g_windowMgr.Confirm(text, 0, true, false, 0, "Message", 280, 120, false);
+  const char* notice = LookupMessage(message);
+  g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(notice), 0x64FFFF, 0, 0, 0);
 }
 
 // OFFSET: 0x00D67360
@@ -2211,33 +2210,21 @@ void CGameMode::ReceiveRuneGradeResult(int result, int tagId, int type, std::int
     const int previousSlots = g_runeSystemMgr->GetCurSlotCount();
     const int state = g_runeSystemMgr->SetRuneGrade(tagId, type, id, grade, gradeLevel);
     if (state == 2) {
-      CEffect* effect = g_effectMgr->Spawn(g_session.m_aid, EF_RUNESET_UPGRADE_SUCCESS, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      const vector3d offset = {784.0f, 161.0f, 0.0f};
-      effect->SetWindowOffset(offset, 1, 361);
+      CEffect* effect = g_effectMgr->Spawn(g_session.m_aid, EF_RUNESET_UPGRADE_SUCCESS, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect->SetWindowOffset(vector3d{784.0f, 161.0f, 0.0f}, 1, 361);
     } else if (state == 1) {
-      CEffect* effect = g_effectMgr->Spawn(g_session.m_aid, EF_RUNESET_UPGRADE_FAIL, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      const vector3d offset = {784.0f, 161.0f, 0.0f};
-      effect->SetWindowOffset(offset, 1, 361);
+      CEffect* effect = g_effectMgr->Spawn(g_session.m_aid, EF_RUNESET_UPGRADE_FAIL, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect->SetWindowOffset(vector3d{784.0f, 161.0f, 0.0f}, 1, 361);
     } else {
-      CEffect* effect = g_effectMgr->Spawn(g_session.m_aid, type != 0 ? 2395 : 2396, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      vector3d offset = {0.0f, 0.0f, 0.0f};
-      if (type == 0) {
-        offset.x = 473.0f;
-        offset.y = 286.0f;
-      } else {
-        offset.x = 598.0f;
-        offset.y = 271.0f;
-      }
-      effect->SetWindowOffset(offset, 1, 361);
+      CEffect* effect = g_effectMgr->Spawn(g_session.m_aid, type != 0 ? 2395 : 2396, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+      effect->SetWindowOffset(type == 0 ? vector3d{473.0f, 286.0f, 0.0f} : vector3d{598.0f, 271.0f, 0.0f}, 1, 361);
     }
 
     if (RuneSetData* runeSet = g_runeSystemMgr->GetCurRuneSet()) {
       const int slots = runeSet->CountActiveSlots();
       if (previousSlots != slots) {
         g_runeSystemMgr->SetCurSlotCount(slots);
-        const int itemId = -1;
-        const int kind = 1;
-        EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshExpansion(kind, itemId);
+        EquipmentProperties::CEquipmentPropertiesMgr::GetInstance()->RefreshExpansion(1, -1);
       }
     }
   }
@@ -2245,7 +2232,7 @@ void CGameMode::ReceiveRuneGradeResult(int result, int tagId, int type, std::int
   g_runeSystemMgr->SetRequestPending(false);
   if (UIWindow* window = g_windowMgr.LookupWindow(WID_RUNESYSTEMWND)) {
     window->SendMsg(window, UM_REFRESH, type, 0, 0, 0);
-    window->SendMsg(nullptr, 0x69, 1000, 0, 0, 0);
+    window->SendMsg(nullptr, UM_SET_PRESSED, 1000, 0, 0, 0);
   }
 }
 
@@ -2256,49 +2243,49 @@ int CGameMode::HandleRuneResult(int result) {
   case 0:
     return 0;
   case 1:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_RUNE_UI_NOT_OPENED)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_RUNE_UI_NOT_OPENED), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_ALREADY_EXIST)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_ALREADY_EXIST), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 2:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_FAIL)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_FAIL), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_NOT_EXIST)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_NOT_EXIST), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 3:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_CANNOT_FIND_ITEM)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_CANNOT_FIND_ITEM), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_LACK_OF_ITEM)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_LACK_OF_ITEM), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 4:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_NOT_ENOUGH_INVENTORY)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_NOT_ENOUGH_INVENTORY), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_ALREADY_EQUIPED)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_ALREADY_EQUIPED), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 5:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_HEAVY_INVENTORY)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_HEAVY_INVENTORY), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_NOTHING_EQUIPED)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_NOTHING_EQUIPED), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 6:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_OVER_ITEM_COUNT)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_OVER_ITEM_COUNT), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_INVALID_ID)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_INVALID_ID), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 7:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_RUNE_UI_NOT_OPENED)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_RUNE_UI_NOT_OPENED), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_MAX_LEVEL)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_MAX_LEVEL), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 8:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_DECOM_TABLE_NOT_EXIT)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_TABLE_NOT_EXIT), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_INVALID_OWNER)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_INVALID_OWNER), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 10:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MACRO_USER_REPORT_NOT_USE_AREA)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_DECOM_NOT_ENOUGH_ITEM_COUNT), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_DB_LOAD_NOT_YET)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_TABLE_NOT_EXIT), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 11:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MACRO_USER_REPORT_NOT_USE_AREA)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_MACRO_USER_REPORT_NOT_USE_AREA), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_DB_LOAD_NOT_YET)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_DB_LOAD_NOT_YET), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   case 12:
   case 13:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GRAPHIC_SETTING_RENDER_SYSTEM)), 0xFF, 0, 0, 0);
-    g_windowMgr.Confirm(LookupMessage(MSI_GRAPHIC_SETTING_RENDER_SYSTEM), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RUNESYSTEM_INVALID_TABLE_DATA)), 0xFF, 0, 0, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_RUNESYSTEM_INVALID_TABLE_DATA), 0, true, false, 0, "Message", 280, 120, 0);
     break;
   }
 
@@ -2339,15 +2326,15 @@ void CGameMode::ReceiveGameOptionResult(int command, int result, int enabled) {
   switch (result) {
   case 1:
     if (command == 1) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_USERBLOCK)), 0x64FFFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_FAIL)), 0x64FFFF, 0, 0, 0);
     }
 
     g_session.m_gameOptionFlag = enabled != 0;
     g_windowMgr.RefreshGameSettings();
     if (!g_session.m_gameOptionFlag) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_RETURN_SUCCESS)), 0x64FFFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_ON)), 0x64FFFF, 0, 0, 0);
     } else {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_RETURN_FAIL)), 0x64FFFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_OFF)), 0x64FFFF, 0, 0, 0);
     }
 
     break;
@@ -2428,8 +2415,7 @@ void CGameMode::ReceiveAchievementUpdate(
   int score, short achievementLevel, int completed, int total, int id, unsigned char achieved, const std::uint32_t* objectives,
   __time32_t completedAt, unsigned char rewarded
 ) {
-  const SessionRecord6144 previous = g_session.FindAchievementRecord(id);
-  if (previous.completed == 0 && achieved == 1) {
+  if (g_session.FindAchievementRecord(id).completed == 0 && achieved == 1) {
     this->achievementBalloonTick = timeGetTime();
     if (!this->achievementBalloon) {
       UIAchBalloonText* balloon =
@@ -2439,9 +2425,9 @@ void CGameMode::ReceiveAchievementUpdate(
       g_windowMgr.AddRenderedFront(this->achievementBalloon);
     }
 
-    AchievementInfo info;
+    AchievementInfo info(id);
     g_achievementMgr->GetAchievement(info, id);
-    const std::string text = FormatOwnedString(LookupMessage(MSI_NOTICE_NEXT_ROULLETE_STAGE), info.title.c_str());
+    const std::string text = FormatOwnedString(LookupMessage(MSI_NOTICE_COMPLETE_ACHIEVEMENT), info.title.c_str());
     this->achievementBalloon->WrapText(text.c_str(), 72);
     this->achievementBalloon->m_fontHeight = 20;
     {
@@ -2498,6 +2484,30 @@ void CGameMode::ReceiveAchievementResult(unsigned char result, int id) {
   }
 }
 
+// INLINED
+static void ApplyItemReward(ITEM_INFO reward, std::uint16_t value, unsigned char result) {
+  switch (result) {
+  case 0:
+    g_session.AddStackedItem(reward);
+    g_session.RemoveInventoryItem(reward.identity[1], reward.quantity);
+    g_session.achievementResult = value;
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_SUCCEED)), 0x64FFFF, 0, 0, 0);
+    break;
+  case 1:
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_OVER_WEIGHT)), 0x64FFFF, 0, 0, 0);
+    break;
+  case 2:
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_FAILED)), 0x64FFFF, 0, 0, 0);
+    break;
+  case 3:
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_OVERCOUNT)), 0x64FFFF, 0, 0, 0);
+    break;
+  case 4:
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_UNMOVEABLE_ITEM)), 0x64FFFF, 0, 0, 0);
+    break;
+  }
+}
+
 // OFFSET: 0x00D68200
 // FUNCTION: fn_22040
 void CGameMode::ReceiveItemReward2(const unsigned char* data) {
@@ -2511,7 +2521,9 @@ void CGameMode::ReceiveItemReward2(const unsigned char* data) {
     item.identified = packet->identified;
     item.damaged = packet->damaged;
     item.refiningLevel = packet->refine;
-    std::memcpy(item.cards, packet->cards, sizeof(packet->cards));
+    for (int card = 0; card < 4; ++card) {
+      item.cards[card] = packet->cards[card];
+    }
 
     int count = 0;
     for (int i = 0; i < 5; ++i) {
@@ -2521,35 +2533,14 @@ void CGameMode::ReceiveItemReward2(const unsigned char* data) {
     }
     item.identity[2] = packet->expireTime;
     item.optionCount = count;
-    for (std::int64_t index = 0; index < count; ++index) {
+    for (std::int64_t index = 0; index < item.optionCount; ++index) {
       item.options[index] = packet->options[index];
     }
-    item.flags[0] = packet->bound;
+    item.placeEtcTab = packet->bound;
     item.grade = packet->grade;
   }
 
-  const std::uint16_t value = packet->value;
-  ITEM_INFO reward = item;
-  switch (packet->result) {
-  case 0:
-    g_session.AddStackedItem(reward);
-    g_session.RemoveInventoryItem(reward.identity[1], reward.quantity);
-    g_session.achievementResult = value;
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_SEND_MAIL)), 0x64FFFF, 0, 0, 0);
-    break;
-  case 1:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_CLOSE_ROULLETTE)), 0x64FFFF, 0, 0, 0);
-    break;
-  case 2:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_OPEN_ROULLETTE)), 0x64FFFF, 0, 0, 0);
-    break;
-  case 3:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RESULT_ALREADY_LOSING_IDX)), 0x64FFFF, 0, 0, 0);
-    break;
-  case 4:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_READ)), 0x64FFFF, 0, 0, 0);
-    break;
-  }
+  ApplyItemReward(item, packet->value, packet->result);
 }
 
 // OFFSET: 0x00D684C0
@@ -2566,30 +2557,34 @@ void CGameMode::ReceiveItemReward(const unsigned char* data) {
     item.identified = packet->identified;
     item.damaged = packet->damaged;
     item.refiningLevel = packet->refine;
-    std::memcpy(item.cards, packet->cards, sizeof(packet->cards));
-    item.optionCount = CountItemRandomOptions(packet->options);
-    item.identity[2] = packet->expireTime;
+    for (int card = 0; card < 4; ++card) {
+      item.cards[card] = packet->cards[card];
+    }
+    const int optionCount = CountItemRandomOptions(packet->options);
+    const int expireTime = packet->expireTime;
+    item.optionCount = optionCount;
+    item.identity[2] = expireTime;
     for (int index = 0; index < item.optionCount; ++index) {
       item.options[index] = packet->options[index];
     }
-    item.flags[0] = packet->bound;
+    item.placeEtcTab = packet->bound;
     g_session.AddStackedItem(item);
     g_session.RemoveInventoryItem(packet->index, packet->quantity);
     g_session.achievementResult = packet->value;
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_SEND_MAIL)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_SUCCEED)), 0x64FFFF, 0, 0, 0);
     break;
   }
   case 1:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_CLOSE_ROULLETTE)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_OVER_WEIGHT)), 0x64FFFF, 0, 0, 0);
     break;
   case 2:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_OPEN_ROULLETTE)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_FAILED)), 0x64FFFF, 0, 0, 0);
     break;
   case 3:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RESULT_ALREADY_LOSING_IDX)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_ITEMS_TO_MAIL_OVERCOUNT)), 0x64FFFF, 0, 0, 0);
     break;
   case 4:
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_READ)), 0x64FFFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SET_UNMOVEABLE_ITEM)), 0x64FFFF, 0, 0, 0);
     break;
   }
 }
@@ -2666,7 +2661,7 @@ void CGameMode::RequestWindow169(unsigned char enable) {
 // FUNCTION: fn_22020
 void CGameMode::ShowNoticeText(std::string text) {
   g_windowMgr.SendNotice(
-    UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_RODEX_SPAMOPTION_WARNING), text.c_str()).c_str()), 0x64FFFF, 0, 0, 0
+    UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_RODEX_SPAMOPTION_USERBLOCK), text.c_str()).c_str()), 0x64FFFF, 0, 0, 0
   );
 }
 
@@ -2690,14 +2685,14 @@ static_assert(sizeof(PACKET_ZC_RESULT_DDUKDDAKBOX_TEST) == 0x10);
 // FUNCTION: fn_21997
 void CGameMode::ReceiveDdukddakBoxTest(const unsigned char* packet) {
   const auto* value = reinterpret_cast<const PACKET_ZC_RESULT_DDUKDDAKBOX_TEST*>(packet);
-  std::map<int, int> counts;
   const DdukddakBoxTestEntry* source = value->entries;
+  std::map<int, int> counts;
   int total = 0;
   const int count = static_cast<unsigned int>(value->packetLength - 8) / sizeof(DdukddakBoxTestEntry);
   for (int i = 0; i < count; ++i) {
     DdukddakBoxTestEntry entry;
     memcpy_s(&entry, sizeof(entry), source, sizeof(entry));
-    if (counts.find(entry.itemId) == counts.end()) {
+    if (counts.end() == counts.find(entry.itemId)) {
       counts.insert(std::make_pair(entry.itemId, 0));
     }
     counts[entry.itemId] += entry.count;
@@ -2727,7 +2722,7 @@ void CGameMode::ReceiveDdukddakBoxTest(const unsigned char* packet) {
   std::string path = FormatOwnedString("%s\\%s\\%s", g_applicationDirectory, folder.c_str(), fileName.c_str());
   path = static_cast<const std::string&>(CreateUniqueFileName(path));
 
-  std::ofstream output(path.c_str());
+  std::ofstream output(path);
   output << FormatOwnedString("%s\t%s\t%s\t%s\n\n", "ID", "name", "count", "property");
   for (auto item = items.begin(); item != items.end(); ++item) {
     ITEM_INFO info;
@@ -2870,24 +2865,29 @@ void CGameMode::ReceiveSimulationResult(const unsigned char* packet) {
 void CGameMode::UpdateSkillCooldown(std::uint16_t skill, std::uint32_t remaining, std::uint32_t duration) {
   ShortcutCooldownRecord value;
   value.id = skill;
-  const std::uint32_t now = g_replayAnimationScaling == 1 ? Replay::Instance().elapsed : timeGetTime();
-  value.end = now + remaining;
+  if (g_replayAnimationScaling == 1) {
+    value.end = Replay::Instance().elapsed + remaining;
+  } else {
+    value.end = timeGetTime() + remaining;
+  }
   value.duration = duration;
 
-  for (const ShortcutCooldownIcon& icon : g_session.m_mainCooldownIcons) {
-    if (icon.id == value.id) {
-      value.main.push_back(CooldownState(icon.slot, icon.x, icon.y, duration, value.end - remaining, duration - remaining, 0));
+  for (auto iconIt = g_session.m_mainCooldownIcons.begin(); iconIt != g_session.m_mainCooldownIcons.end(); ++iconIt) {
+    const ShortcutCooldownIcon& icon = *iconIt;
+    if (icon.id == skill) {
+      value.main.push_back(CooldownState(icon.slot, icon.x, icon.y, value.duration, value.end - remaining, value.duration - remaining, 0));
     }
   }
 
-  for (const ShortcutCooldownIcon& icon : g_session.m_alternateCooldownIcons) {
-    if (icon.id == value.id) {
-      value.alternate.push_back(CooldownState(icon.slot, icon.x, icon.y, duration, value.end - remaining, duration - remaining, 0));
+  for (auto iconIt = g_session.m_alternateCooldownIcons.begin(); iconIt != g_session.m_alternateCooldownIcons.end(); ++iconIt) {
+    const ShortcutCooldownIcon& icon = *iconIt;
+    if (icon.id == skill) {
+      value.alternate.push_back(CooldownState(icon.slot, icon.x, icon.y, value.duration, value.end - remaining, value.duration - remaining, 0));
     }
   }
 
   const auto found = std::find_if(g_session.m_requestTimers.begin(), g_session.m_requestTimers.end(), [skill](const ShortcutCooldownRecord& timer) {
-    return timer.id == skill;
+    return skill == timer.id;
   });
   if (found == g_session.m_requestTimers.end()) {
     g_session.m_requestTimers.push_back(value);
@@ -2901,10 +2901,10 @@ void CGameMode::Zc_Skill_Entry(unsigned char* record) {
   GroundSkillArgumentData arguments;
   GroundSkillSpawnData& data = arguments.extended.skill;
   data.aid = packet.aid;
-  data.owner = packet.owner;
   data.type = packet.type;
   data.x = packet.x;
   data.y = packet.y;
+  data.owner = packet.owner;
   data.visible = true;
   data.level = 0;
   packet.visible = 1;
@@ -2912,7 +2912,7 @@ void CGameMode::Zc_Skill_Entry(unsigned char* record) {
   CSkill* skill = this->scene->GetSkillByAID(data.aid);
   if (data.owner != g_session.m_aid && !data.visible) {
 
-    const auto found = std::find(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), packet.aid);
+    const auto found = std::find_if(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), [&packet](std::uint32_t id) { return packet.aid == id; });
     if (found != this->m_skillUnitIds.end()) {
       this->m_skillUnitIds.erase(found);
       packet.visible = 0;
@@ -2942,11 +2942,11 @@ void CGameMode::Zc_Skill_Entry2(unsigned char* record) {
   GroundSkillPacket& packet = *reinterpret_cast<GroundSkillPacket*>(record);
   GroundSkillArgumentData arguments;
   GroundSkillSpawnData& data = arguments.extended.skill;
-  data.aid = packet.aid;
-  data.owner = packet.owner;
   data.type = packet.type;
   data.x = packet.x;
   data.y = packet.y;
+  data.aid = packet.aid;
+  data.owner = packet.owner;
   data.visible = true;
   data.level = 0;
   packet.visible = 1;
@@ -2957,13 +2957,15 @@ void CGameMode::Zc_Skill_Entry2(unsigned char* record) {
     this->scene->skills.push_back(skill);
     skill->SendMsg(nullptr, AM_SETMASTERGID, packet.aid, 0, 0, 0, 0, 0);
     const int address = reinterpret_cast<int>(packet.text);
-    skill->SendMsg(nullptr, AM_SET_SKILL, address, data.x, data.y, 0, 0, 0);
+    const int x = packet.x;
+    const int y = packet.y;
+    skill->SendMsg(nullptr, AM_SET_SKILL, address, x, y, 0, 0, 0);
     return;
   }
 
   CSkill* skill = this->scene->GetSkillByAID(data.aid);
   if (data.owner != g_session.m_aid && !data.visible) {
-    const auto found = std::find(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), packet.aid);
+    const auto found = std::find_if(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), [&packet](std::uint32_t id) { return packet.aid == id; });
     if (found != this->m_skillUnitIds.end()) {
       this->m_skillUnitIds.erase(found);
       packet.visible = 0;
@@ -2990,7 +2992,7 @@ void CGameMode::Zc_Skill_Entry2(unsigned char* record) {
 // FUNCTION: fn_21820
 void CGameMode::ReceiveGroundSkill8(const unsigned char* record) {
   const GroundSkillPacket8& packet = *reinterpret_cast<const GroundSkillPacket8*>(record);
-  if (packet.type == 176) {
+  if (packet.type == UNT_GRAFFITI) {
     if (packet.length <= 19) {
       return;
     }
@@ -3014,17 +3016,16 @@ void CGameMode::ReceiveGroundSkill8(const unsigned char* record) {
   data.y = packet.y;
   data.visible = packet.visible;
   data.level = packet.level;
-  if (data.owner == g_session.m_aid) {
-    if (data.visible) {
-      this->m_skillUnitIds.push_back(packet.aid);
+  if (data.owner != g_session.m_aid && !data.visible) {
+    for (auto it = this->m_skillUnitIds.begin(); it != this->m_skillUnitIds.end(); ++it) {
+      if (packet.aid == *it) {
+        this->m_skillUnitIds.erase(it);
+        data.visible = 0;
+        break;
+      }
     }
-  } else if (!data.visible) {
-    const auto found = std::find(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), data.aid);
-    if (found != this->m_skillUnitIds.end()) {
-      this->m_skillUnitIds.erase(found);
-      data.visible = 0;
-    }
-  } else {
+  }
+  if (data.visible) {
     this->m_skillUnitIds.push_back(packet.aid);
   }
 
@@ -3049,7 +3050,7 @@ void CGameMode::ReceiveGroundSkill8(const unsigned char* record) {
 // FUNCTION: fn_21821
 void CGameMode::ReceiveGroundSkill32(const unsigned char* record) {
   const GroundSkillPacket32& packet = *reinterpret_cast<const GroundSkillPacket32*>(record);
-  if (packet.type == 176) {
+  if (packet.type == UNT_GRAFFITI) {
     if (packet.length <= 22) {
       return;
     }
@@ -3073,17 +3074,16 @@ void CGameMode::ReceiveGroundSkill32(const unsigned char* record) {
   data.y = packet.y;
   data.visible = packet.visible;
   data.level = packet.level;
-  if (data.owner != g_session.m_aid) {
-    if (data.visible) {
-      this->m_skillUnitIds.push_back(packet.aid);
-    } else {
-      const auto found = std::find(this->m_skillUnitIds.begin(), this->m_skillUnitIds.end(), data.aid);
-      if (found != this->m_skillUnitIds.end()) {
-        this->m_skillUnitIds.erase(found);
+  if (data.owner != g_session.m_aid && !data.visible) {
+    for (auto it = this->m_skillUnitIds.begin(); it != this->m_skillUnitIds.end(); ++it) {
+      if (packet.aid == *it) {
+        this->m_skillUnitIds.erase(it);
         data.visible = 0;
+        break;
       }
     }
-  } else if (data.visible) {
+  }
+  if (data.visible) {
     this->m_skillUnitIds.push_back(packet.aid);
   }
 
@@ -3121,14 +3121,14 @@ void CGameMode::ReceiveSpriteChange2Mirrored(const unsigned char* packet) {
   const auto* value = reinterpret_cast<const SpriteChange2RelayPacket*>(packet);
   this->ReceiveSpriteChange2(packet);
   if (value->aid == g_session.m_aid) {
-    for (std::uint32_t aid : this->spriteMirrorActorIds) {
+    std::for_each(this->spriteMirrorActorIds.begin(), this->spriteMirrorActorIds.end(), [=](std::uint32_t aid) {
       SpriteChange2RelayPacket relay;
       relay.id = ID_ZC_SPRITE_CHANGE2;
       relay.aid = aid;
       relay.type = value->type;
       relay.value = value->value;
       this->ReceiveSpriteChange2(reinterpret_cast<const unsigned char*>(&relay));
-    }
+    });
   }
 }
 
@@ -3138,9 +3138,6 @@ struct Item1718PendingRecord {
   /* 0004 */ std::uint32_t realPrice;
   /* 0008 */ unsigned char type;
   /* 0009 */ std::int32_t itemId;
-  /* 000D */ std::uint16_t sprite;
-  /* 000F */ std::uint32_t location;
-  /* 0013 */ unsigned char padding_0013[6];
 };
 
 struct PACKET_ZC_PC_CASH_POINT_ITEMLIST {
@@ -3152,28 +3149,8 @@ struct PACKET_ZC_PC_CASH_POINT_ITEMLIST {
 };
 #pragma pack(pop)
 
-static_assert(sizeof(Item1718PendingRecord) == 0x19);
-static_assert(sizeof(PACKET_ZC_PC_CASH_POINT_ITEMLIST) == 0x25);
-
-struct Unknown015D4818Values {
-  /* 0000 */ std::uint32_t padding_0000[2];
-  /* 0008 */ std::uint32_t location;
-  /* 000C */ std::uint32_t padding_000C[25];
-  /* 0070 */ std::uint32_t sprite;
-};
-
-struct Unknown015D4818Entry {
-  /* 0000 */ std::uint32_t padding_0000[2];
-  /* 0008 */ Unknown015D4818Values values;
-};
-
-struct Unknown015D4818 {
-  /* 0000 */ std::uint32_t padding_0000;
-  /* 0004 */ Unknown015D4818Entry* entry;
-};
-
-// GLOBAL: gl_25368
-Unknown015D4818* g_pendingCashItemList;
+static_assert(sizeof(Item1718PendingRecord) == 0x0D);
+static_assert(sizeof(PACKET_ZC_PC_CASH_POINT_ITEMLIST) == 0x19);
 
 // OFFSET: 0x00D3BD40
 // FUNCTION: fn_21790
@@ -3191,9 +3168,8 @@ void CGameMode::ReceivePendingItem1718List(const unsigned char* packet) {
   }
 
   const int count = (value->packetLength - 12) / sizeof(Item1718PendingRecord);
-  const Item1718PendingRecord* record = value->items;
   for (int i = 0; i < count; ++i) {
-    const Item1718PendingRecord entry = *record;
+    const Item1718PendingRecord entry = value->items[i];
     RawItemBasic item = {};
     _itoa(entry.itemId, item.itemId, 10);
     item.price = entry.price;
@@ -3202,12 +3178,6 @@ void CGameMode::ReceivePendingItem1718List(const unsigned char* packet) {
     item.id = -1;
     item.identified = 1;
     g_session.AddShopItem(item, 0);
-    if (g_pendingCashItemList && g_pendingCashItemList->entry) {
-      Unknown015D4818Values& values = g_pendingCashItemList->entry->values;
-      values.sprite = entry.sprite;
-      values.location = entry.location;
-    }
-    ++record;
   }
 
   g_session.m_pendingAid = value->cashPoints;
@@ -3305,9 +3275,9 @@ void CGameMode::ReceiveSearchStoreItems(const unsigned char* packet) {
     }
     g_session.storeSearchResults.clear();
   }
+  const unsigned int count = (header->length - 7) / sizeof(SearchStoreItemPacket);
   g_session.m_storeSearchHasNext = header->hasNext;
   g_session.storeSearchCount = header->count;
-  const unsigned int count = (header->length - 7) / sizeof(SearchStoreItemPacket);
   for (long long i = 0; i < count; ++i) {
     const SearchStoreItemPacket record = items[i];
     SearchStoreResult entry;
@@ -3322,12 +3292,12 @@ void CGameMode::ReceiveSearchStoreItems(const unsigned char* packet) {
     entry.item.identified = 1;
     int optionCount = 0;
     for (int j = 0; j < 5; ++j) {
-      if (record.options[j].id != 0) {
+      if (0 != record.options[j].id) {
         ++optionCount;
       }
     }
     entry.item.optionCount = optionCount;
-    for (long long j = 0; j < optionCount; ++j) {
+    for (long long j = 0; j < entry.item.optionCount; ++j) {
       entry.item.options[j] = record.options[j];
     }
     for (long long j = 0; j < 4; ++j) {

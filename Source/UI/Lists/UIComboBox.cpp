@@ -7,8 +7,6 @@
 
 #include <algorithm>
 
-template __declspec(noinline) std::map<int, int>::iterator std::map<int, int>::_Mybase::find(const int&);
-
 // OFFSET: 0x00897C20
 // FUNCTION: fn_11543
 int UIComboBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
@@ -24,10 +22,10 @@ int UIComboBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       g_windowMgr.CloseWindow(WID_COMBOBOXWND);
     }
 
-    return 0;
+    break;
   case UM_UPPUSH:
     if (this->lines.size() == 0) {
-      return 0;
+      break;
     }
 
     --this->selected;
@@ -39,10 +37,12 @@ int UIComboBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       this->topLine = this->selected;
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   case UM_DOWNPUSH:
     if (this->lines.size() == 0) {
-      return 0;
+      break;
     }
 
     ++this->selected;
@@ -54,6 +54,8 @@ int UIComboBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       this->topLine = this->bottomMargin - this->geometry.height / this->lineHeight + this->selected + 1;
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   case UM_ADDITEM:
     this->AddLine(reinterpret_cast<const char*>(argument1));
@@ -72,13 +74,13 @@ int UIComboBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       this->selected = static_cast<int>(this->lines.size() - 1);
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   default:
     return UIListBox::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 
-  this->Refresh();
-  this->Invalidate();
   return 0;
 }
 
@@ -102,10 +104,10 @@ int UIComboBoxID::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       g_windowMgr.CloseWindow(WID_COMBOBOXWND);
     }
 
-    return 0;
+    break;
   case UM_UPPUSH:
     if (this->lines.size() == 0) {
-      return 0;
+      break;
     }
 
     --this->selected;
@@ -117,10 +119,12 @@ int UIComboBoxID::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       this->topLine = this->selected;
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   case UM_DOWNPUSH:
     if (this->lines.size() == 0) {
-      return 0;
+      break;
     }
 
     ++this->selected;
@@ -132,6 +136,8 @@ int UIComboBoxID::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       this->topLine = this->bottomMargin - this->geometry.height / this->lineHeight + this->selected + 1;
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   case UM_ADDITEM:
     this->AddLine(reinterpret_cast<const char*>(argument1), static_cast<int>(argument2), static_cast<int>(argument3));
@@ -150,13 +156,13 @@ int UIComboBoxID::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       this->selected = static_cast<int>(this->lines.size() - 1);
     }
 
+    this->Refresh();
+    this->Invalidate();
     break;
   default:
     return UIListBoxID::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 
-  this->Refresh();
-  this->Invalidate();
   return 0;
 }
 

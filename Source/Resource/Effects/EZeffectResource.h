@@ -57,6 +57,8 @@ struct EZeffectClip {
 };
 
 struct EZeffectData {
+  ~EZeffectData();
+
   /* 0000 */ int maximumFrame;
   /* 0004 */ int fps;
   /* 0008 */ int clipCount;
@@ -68,7 +70,9 @@ class CEZeffectRes : public CRes {
 public:
   CEZeffectRes();
   CEZeffectRes(const char* extension, const char* prefix);
-  ~CEZeffectRes() override;
+  // OFFSET: 0x0074D6F0
+  // FUNCTION: fn_07895
+  ~CEZeffectRes() override = default;
   CEZeffectRes* Create() override;
   bool Load(const char* name) override;
   void Unload() override;

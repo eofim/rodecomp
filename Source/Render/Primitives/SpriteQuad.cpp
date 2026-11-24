@@ -8,6 +8,25 @@
 #include "Resource/ResourceMgr.h"
 #include "Utility/Math/AffineMatrix.h"
 
+namespace {
+struct PrimitivePoolAccess : RenderPrimitivePool {
+  // INLINED
+  inline RenderPrimitive* AcquireLocal() {
+    if (this->m_commands.end() == this->m_current) {
+      this->m_commands.emplace_back();
+      this->m_current = this->m_commands.end();
+      return &this->m_commands.back();
+    }
+
+    RenderPrimitive* command = &*this->m_current;
+    ++this->m_current;
+    new (command) RenderPrimitive;
+
+    return command;
+  }
+};
+}
+
 // OFFSET: 0x00811FC0
 // FUNCTION: fn_10110
 RenderPrimitive* CCharacterRender::BuildSpriteQuad(const SpriteQuad& quad, const std::uint32_t* palette, int blend, float offsetX, float offsetY) const {
@@ -22,13 +41,15 @@ RenderPrimitive* CCharacterRender::BuildSpriteQuad(const SpriteQuad& quad, const
   } else {
     record.u0 = 0.0f;
     record.v0 = 0.0f;
-    record.u1 = static_cast<float>(texture->ImageWidth()) / static_cast<float>(texture->TextureWidth());
-    record.v1 = static_cast<float>(texture->ImageHeight()) / static_cast<float>(texture->TextureHeight());
+    record.u1 = static_cast<float>(static_cast<const CTexture*>(image->surface)->ImageWidth()) /
+                static_cast<float>(static_cast<const CTexture*>(image->surface)->TextureWidth());
+    record.v1 = static_cast<float>(static_cast<const CTexture*>(image->surface)->ImageHeight()) /
+                static_cast<float>(static_cast<const CTexture*>(image->surface)->TextureHeight());
   }
 
   const float bottomZ = RhwToDepth(quad.bottomRhw);
   const float topZ = RhwToDepth(quad.topRhw);
-  RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
+  RenderPrimitive* primitive = static_cast<PrimitivePoolAccess&>(g_renderer->primitives).AcquireLocal();
   RenderVertex* vertices = primitive->vertices;
   primitive->texture = texture;
 

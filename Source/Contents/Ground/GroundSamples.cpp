@@ -49,6 +49,17 @@ int GroundGeometry::Lighting(int column, int row, float& red, float& green, floa
   return 1;
 }
 
+// OFFSET: 0x00AC3090
+// FUNCTION: fn_45872
+void GroundGeometry::SetLighting(int column, int row, float& red, float& green, float& blue) {
+  if (!this->lighting.empty()) {
+    const unsigned index = static_cast<unsigned>(column) + 2u * static_cast<unsigned>(row) * static_cast<unsigned>(this->width);
+    this->lighting[index][0] = red;
+    this->lighting[index][1] = green;
+    this->lighting[index][2] = blue;
+  }
+}
+
 // OFFSET: 0x00AC11C0
 // FUNCTION: fn_17578
 int GroundBase::Lighting(int, int, float&, float&, float&) const {
@@ -57,62 +68,58 @@ int GroundBase::Lighting(int, int, float&, float&, float&) const {
 
 // INLINED
 static __forceinline void ReadLightmapSample(const GroundCell& cell, unsigned sample, unsigned char& alpha, unsigned char& red, unsigned char& green, unsigned char& blue) {
-  alpha = static_cast<unsigned char>(cell.top->lightmap->cornerColors[sample] >> 24);
-  red = static_cast<unsigned char>(cell.top->lightmap->cornerColors[sample] >> 16);
-  green = static_cast<unsigned char>(cell.top->lightmap->cornerColors[sample] >> 8);
-  blue = static_cast<unsigned char>(cell.top->lightmap->cornerColors[sample]);
+  alpha = cell.top->lightmap->cornerColors[sample].a;
+  red = cell.top->lightmap->cornerColors[sample].r;
+  green = cell.top->lightmap->cornerColors[sample].g;
+  blue = cell.top->lightmap->cornerColors[sample].b;
 }
 
 // OFFSET: 0x00AC11D0
 // FUNCTION: fn_17579
 void GroundGeometry::LightmapSample(int column, int row, unsigned char& alpha, unsigned char& red, unsigned char& green, unsigned char& blue) const {
-  if (column < 0 || (column >> 1) >= this->width || row < 0 || (row >> 1) >= this->height || this->cells.empty()) {
-    alpha = red = green = blue = 255;
-    return;
-  }
+  if (column >= 0 && (column >> 1) < this->width && row >= 0 && (row >> 1) < this->height && !this->cells.empty()) {
+    const unsigned index = static_cast<unsigned>(column >> 1) + static_cast<unsigned>(row >> 1) * static_cast<unsigned>(this->width);
+    const GroundCell& cell = this->cells[index];
 
-  const unsigned index = static_cast<unsigned>(column >> 1) + static_cast<unsigned>(row >> 1) * static_cast<unsigned>(this->width);
-
-  if (!this->cells[index].top || !this->cells[index].top->lightmap) {
-    alpha = red = green = blue = 255;
-    return;
-  }
-
-  const GroundCell& cell = this->cells[index];
-
-  if ((column & 1) == 0) {
-    if ((row & 1) == 0) {
-      ReadLightmapSample(cell, 0, alpha, red, green, blue);
-    } else {
-      ReadLightmapSample(cell, 2, alpha, red, green, blue);
-    }
-  } else {
-    if ((row & 1) == 0) {
-      ReadLightmapSample(cell, 1, alpha, red, green, blue);
-    } else {
-      ReadLightmapSample(cell, 3, alpha, red, green, blue);
+    if (cell.top && cell.top->lightmap) {
+      if ((column & 1) == 0) {
+        if ((row & 1) == 0) {
+          ReadLightmapSample(cell, 0, alpha, red, green, blue);
+        } else {
+          ReadLightmapSample(cell, 2, alpha, red, green, blue);
+        }
+      } else {
+        if ((row & 1) == 0) {
+          ReadLightmapSample(cell, 1, alpha, red, green, blue);
+        } else {
+          ReadLightmapSample(cell, 3, alpha, red, green, blue);
+        }
+      }
+      return;
     }
   }
+
+  alpha = 255;
+  red = 255;
+  green = 255;
+  blue = 255;
 }
 
+#pragma inline_depth(0)
 // OFFSET: 0x00AC0C40
 // FUNCTION: fn_17570
 bool GroundGeometry::TerrainCellCorners(int column, int row, float* vertices) const {
-  const int columns = 2 * this->width;
-  const int rows = 2 * this->height;
-
-  if (column < 0 || columns < column || row < 0 || rows < row) {
+  if (column < 0 || 2 * this->width < column || row < 0 || 2 * this->height < row) {
     return false;
   }
 
   const float size = this->cellSize * 0.5f;
-  const int dx = column - this->width;
-  const int dz = row - this->height;
-  const float left = static_cast<float>(dx) * size;
-  const float right = static_cast<float>(dx + 1) * size;
-  const float top = static_cast<float>(dz) * size;
-  const float bottom = static_cast<float>(dz + 1) * size;
-
+  int coordinate = column - this->width;
+  const float left = static_cast<float>(coordinate++) * size;
+  const float right = static_cast<float>(coordinate) * size;
+  coordinate = row - this->height;
+  const float top = static_cast<float>(coordinate++) * size;
+  const float bottom = static_cast<float>(coordinate) * size;
   vertices[1] = 0.0f;
   vertices[4] = 0.0f;
   vertices[7] = 0.0f;
@@ -138,3 +145,4 @@ bool GroundGeometry::TerrainCellCorners(int column, int row, float* vertices) co
 
   return true;
 }
+#pragma inline_depth()

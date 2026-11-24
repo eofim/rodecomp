@@ -23,12 +23,11 @@ struct SpritePixel {
 
 static_assert(sizeof(SpritePixel) == 4);
 
-// INLINED
+// OFFSET: 0x00760F50
+// FUNCTION: fn_08060
 CSprRes::CSprRes() : indexedCount(0) {
 }
 
-// OFFSET: 0x00760F50
-// FUNCTION: fn_08060
 CSprRes::~CSprRes() = default;
 
 // OFFSET: 0x0075FE90
@@ -75,21 +74,22 @@ bool CSprRes::Load(const char* name) {
   }
 
   std::uint16_t trueColorCount;
+  std::uint16_t dimensions[2];
 
   if (header.version >= 0x0200) {
     file.Read(&trueColorCount, sizeof(trueColorCount));
   }
 
   for (int index = 0; index < this->indexedCount; ++index) {
-    std::uint16_t dimensions[2];
     file.Read(dimensions, sizeof(dimensions));
-    auto* image = new SpriteRleImage{};
+    auto* image = new SpriteRleImage();
     image->surface = nullptr;
     image->width = static_cast<std::int16_t>(dimensions[0]);
     image->height = static_cast<std::int16_t>(dimensions[1]);
     image->doubleWidth = 0;
     image->doubleHeight = 0;
     std::uint16_t encodedBytes;
+    std::uint8_t value = 0;
 
     if (g_spriteHalfWidth == 0 && g_spriteHalfHeight == 0) {
       if (header.version >= 0x0201) {
@@ -114,22 +114,26 @@ bool CSprRes::Load(const char* name) {
         auto* pixels = new std::uint8_t[width * height];
         const std::uint8_t* current = runs;
         std::uint16_t zeroCount = 0;
-        unsigned int value;
+        std::uint8_t* row = pixels;
 
-        for (unsigned y = 0; y < height; ++y) {
-          for (unsigned x = 0; x < width; ++x) {
-            if (zeroCount == 0) {
-              value = *current++;
+        for (unsigned y = height; y != 0; --y) {
+          std::uint8_t* pixel = row;
+          if (pixel) {
+            for (unsigned x = width; x != 0; --x) {
+              if (zeroCount == 0) {
+                value = *current++;
 
-              if (value == 0) {
-                zeroCount = *current++;
+                if (value == 0) {
+                  zeroCount = *current++;
+                }
               }
-            }
 
-            const std::uint16_t before = zeroCount;
-            zeroCount = zeroCount != 0 ? zeroCount - 1 : 0;
-            pixels[y * width + x] = before == 0 ? value : 0;
+              const std::uint16_t before = zeroCount;
+              zeroCount = zeroCount != 0 ? zeroCount - 1 : 0;
+              *pixel++ = before == 0 ? value : 0;
+            }
           }
+          row += width;
         }
 
         delete[] runs;
@@ -172,10 +176,9 @@ bool CSprRes::Load(const char* name) {
   }
 
   if (header.version >= 0x0200) {
-    for (unsigned index = 0; index < trueColorCount; ++index) {
-      std::uint16_t dimensions[2];
+    for (int index = 0; index < trueColorCount; ++index) {
       file.Read(dimensions, sizeof(dimensions));
-      auto* image = new SpriteRleImage{};
+      auto* image = new SpriteRleImage();
       image->width = static_cast<std::int16_t>(dimensions[0]);
       image->height = static_cast<std::int16_t>(dimensions[1]);
       image->doubleWidth = 0;

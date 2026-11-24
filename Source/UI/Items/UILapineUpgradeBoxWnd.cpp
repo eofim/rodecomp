@@ -64,14 +64,16 @@ UILapineUpgradeBox_IngredientInfoWnd::UILapineUpgradeBox_IngredientInfoWnd()
     : UIFrameWnd(0), selected(0), quantity(0) {
 }
 
-// INLINED
-UILapineUpgradeBoxWnd::~UILapineUpgradeBoxWnd() {
+// OFFSET: 0x006030E0
+// FUNCTION: fn_46399
+__declspec(noinline) UILapineUpgradeBoxWnd::~UILapineUpgradeBoxWnd() {
   this->item = ITEM_INFO();
 
   LapineUpgradeClosePacket packet;
   packet.id = ID_CZ_RANDOM_UPGRADE_ITEM_UI_CLOSE;
   CRagConnection& connection = GetRagConnection();
-  connection.Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+  const int packetSize = GetRagConnection().GetPacketSize(packet.id);
+  connection.Send(packetSize, &packet);
 }
 
 // OFFSET: 0x006035D0
@@ -95,7 +97,7 @@ void UILapineUpgradeBoxWnd::OnCreate(int, int) {
   this->closeButton->SetBitmap("유저인터페이스\\lapine\\btn_cancel_dis.bmp", 3, 0);
   this->closeButton->SetSize(this->closeButton->BitmapWidth(), this->closeButton->BitmapHeight());
   this->closeButton->Move(280, 226);
-  this->closeButton->SetId(201);
+  this->closeButton->SetId(ID_CLOSE);
   this->AddChild(this->closeButton);
 
   this->upgradeButton = new UIBitmapButton();
@@ -105,7 +107,7 @@ void UILapineUpgradeBoxWnd::OnCreate(int, int) {
   this->upgradeButton->SetBitmap("유저인터페이스\\lapine\\btn_make_dis.bmp", 3, 0);
   this->upgradeButton->SetSize(this->upgradeButton->BitmapWidth(), this->upgradeButton->BitmapHeight());
   this->upgradeButton->Move(340, 226);
-  this->upgradeButton->SetId(509);
+  this->upgradeButton->SetId(ID_LAPINE_START_UPGRADE);
   this->AddChild(this->upgradeButton);
 
   this->selectButton = new UIBitmapButton();
@@ -115,7 +117,7 @@ void UILapineUpgradeBoxWnd::OnCreate(int, int) {
   this->selectButton->SetBitmap("유저인터페이스\\lapine\\btn_moveitem_dis.bmp", 3, 0);
   this->selectButton->SetSize(this->selectButton->BitmapWidth(), this->selectButton->BitmapHeight());
   this->selectButton->Move(213, 110);
-  this->selectButton->SetId(505);
+  this->selectButton->SetId(ID_LAPINE_ADD_INGREDIENT);
   this->AddChild(this->selectButton);
 }
 
@@ -156,7 +158,7 @@ void UILapineUpgradeBoxWnd::Paint() {
     this->DrawTitleBar(false, this->title.c_str(), 0);
   }
 
-  this->DrawCenteredText(35, 47, LookupMessage(MSI_LAPINE_FAIL_NOT_ENOUGH_REFINING_LEVEL), 156, 0, 11, 0xCD7A51, 0);
+  this->DrawCenteredText(35, 47, LookupMessage(MSI_LAPINE_INGREDIENT_TO_COMBINE), 156, 0, 11, 0xCD7A51, 0);
   this->DrawCenteredText(35, 63, this->description.c_str(), 156, 0, 11, 0x844A42, 0);
 
   if (this->item.identity[1] > 0) {
@@ -221,7 +223,7 @@ void UILapineUpgradeBoxWnd::OnLBtnDown(int x, int y) {
     UIFrameWnd::OnLBtnDown(x, y);
   }
   if (static_cast<unsigned>(x - 101) <= 24 && static_cast<unsigned>(y - 165) <= 24 && this->item.identity[1] > 0) {
-    g_modeMgr.GetGameMode()->BeginDragItem(26, this->item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_LAPINE_BOX, this->item, 1, -1);
   }
 }
 
@@ -229,7 +231,7 @@ void UILapineUpgradeBoxWnd::OnLBtnDown(int x, int y) {
 // FUNCTION: fn_04206
 void UILapineUpgradeBox_IngredientInfoWnd::OnLBtnDown(int x, int y) {
   if (this->item.identity[1] > 0) {
-    g_modeMgr.GetGameMode()->BeginDragItem(27, this->item, this->quantity, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_LAPINE_INGREDIENT, this->item, this->quantity, -1);
   }
 }
 
@@ -285,7 +287,7 @@ void UILapineUpgradeBoxWnd::SetIngredient(int id) {
   this->ingredientId = id;
 
   {
-    std::vector<char*> breaks;
+    std::vector<const char*> breaks;
     char name[0x104];
     std::memset(name, 0, sizeof(name));
     char* highlight = nullptr;
@@ -367,16 +369,16 @@ int UILapineUpgradeBox_IngredientListWnd::SendMsg(UIWindow* sender, int message,
     break;
 
   case UM_SETPOS: {
-    int y = 7;
+    int row = 0;
     for (auto it = this->items.begin(); it != this->items.end();) {
       if ((*it)->geometry.visible == 0) {
         (*it)->Invalidate();
         it = this->items.erase(it);
       } else {
-        this->MoveScrollChild(*it, 0, y);
+        this->MoveScrollChild(*it, 0, row * 0x1E + 7);
         (*it)->Invalidate();
+        ++row;
         ++it;
-        y += 0x1E;
       }
     }
     this->UpdateScrollRange();
@@ -409,7 +411,8 @@ void UILapineUpgradeBox_IngredientListWnd::OnWheel(int argument) {
 // OFFSET: 0x00605980
 // FUNCTION: fn_04223
 UILapineUpgradeBox_IngredientInfoWnd* UILapineUpgradeBox_IngredientListWnd::FindSelected() {
-  for (UILapineUpgradeBox_IngredientInfoWnd* entry : this->items) {
+  for (auto it = this->items.begin(); it != this->items.end(); ++it) {
+    UILapineUpgradeBox_IngredientInfoWnd* entry = *it;
     if (entry->selected == 1) {
       return entry;
     }
@@ -508,7 +511,7 @@ bool UILapineUpgradeBox_IngredientListWnd::AddIngredient(std::uint32_t identity)
   if (owned.identity[1] <= 0) {
     return false;
   }
-  if (owned.refiningLevel < this->minRefine || owned.refiningLevel > this->maxRefine || owned.optionCount < this->minOptionCount) {
+  if (this->minRefine > owned.refiningLevel || this->maxRefine < owned.refiningLevel || this->minOptionCount > owned.optionCount) {
     return false;
   }
   const int itemId = std::atoi(owned.itemId.c_str());
@@ -516,15 +519,17 @@ bool UILapineUpgradeBox_IngredientListWnd::AddIngredient(std::uint32_t identity)
     return false;
   }
   const auto material = std::find_if(this->materials.begin(), this->materials.end(), [owned](ITEM_INFO value) {
-    return std::atoi(owned.itemId.c_str()) == std::atoi(value.itemId.c_str());
+    const int ownedId = std::atoi(owned.itemId.c_str());
+    return ownedId == std::atoi(value.itemId.c_str());
   });
   if (material == this->materials.end()) {
     return false;
   }
-  for (UILapineUpgradeBox_IngredientInfoWnd* entry : this->items) {
-    if (entry->item.identity[1] == identity) {
-      return true;
-    }
+  const auto found = std::find_if(this->items.begin(), this->items.end(), [identity](UILapineUpgradeBox_IngredientInfoWnd* entry) {
+    return identity == entry->item.identity[1];
+  });
+  if (found != this->items.end()) {
+    return true;
   }
   auto* owner = static_cast<UILapineUpgradeBoxWnd*>(this->parent);
   auto* entry = new UILapineUpgradeBox_IngredientInfoWnd();
@@ -543,7 +548,7 @@ bool UILapineUpgradeBox_IngredientListWnd::AddIngredient(std::uint32_t identity)
 __declspec(noinline) void UILapineUpgradeBox_IngredientInfoWnd::SetItem(std::uint32_t identity) {
   this->item = g_session.LookupClientItemByIdentity(identity);
 
-  std::vector<char*> breaks;
+  std::vector<const char*> breaks;
   char name[0x104];
   std::memset(name, 0, sizeof(name));
   char* highlight = nullptr;
@@ -553,11 +558,11 @@ __declspec(noinline) void UILapineUpgradeBox_IngredientInfoWnd::SetItem(std::uin
   this->BuildItemName(&this->item, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
 
   if (this->item.identified == 1 && this->item.optionCount != 0) {
-    sprintf_s(name, sizeof(name), LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), name, this->item.optionCount);
+    sprintf_s(name, sizeof(name), LookupMessage(MSI_EA6), name, this->item.optionCount);
   }
 
   this->item.SetName(name);
-  this->tooltip.assign(name, std::strlen(name));
+  this->tooltip = name;
   this->Invalidate();
 }
 
@@ -565,17 +570,17 @@ __declspec(noinline) void UILapineUpgradeBox_IngredientInfoWnd::SetItem(std::uin
 // FUNCTION: fn_04222
 bool UILapineUpgradeBox_IngredientListWnd::CanUseIngredient(std::uint32_t identity) {
   auto entryIt = std::find_if(this->items.begin(), this->items.end(), [identity](UILapineUpgradeBox_IngredientInfoWnd* entry) {
-    return entry->item.identity[1] == identity;
+    return identity == entry->item.identity[1];
   });
   if (entryIt == this->items.end()) {
     return false;
   }
 
-  UILapineUpgradeBox_IngredientInfoWnd* entry = *entryIt;
-  const ITEM_INFO& item = entry->item;
+  const ITEM_INFO& item = (*entryIt)->item;
 
   const auto material = std::find_if(this->materials.begin(), this->materials.end(), [&item](ITEM_INFO required) {
-    return std::atoi(required.itemId.c_str()) == std::atoi(item.itemId.c_str());
+    const int itemId = std::atoi(item.itemId.c_str());
+    return itemId == std::atoi(required.itemId.c_str());
   });
   if (material == this->materials.end()) {
     return false;
@@ -589,14 +594,12 @@ bool UILapineUpgradeBox_IngredientListWnd::CanUseIngredient(std::uint32_t identi
   }
 
   if (this->minRefine != 0 && this->minRefine < item.refiningLevel) {
-    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEMSHOP_CURRENCY)), 0, 0, 0);
+    this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_WARNING_REFINING_LEVEL_HIGHER_THAN_NEEDED)), 0, 0, 0);
   }
 
   if (item.IsEquipment() == true && !item.IsApprenticeItem() && !item.HasSpecialCard()) {
-    const std::uint32_t* cards = item.cards;
-    const std::uint32_t* cardsEnd = cards + 4;
-    if (std::find_if(cards, cardsEnd, [](std::uint32_t card) { return card != 0; }) != cardsEnd) {
-      this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PURCHASEWND_TOTAL)), 0, 0, 0);
+    if (std::find_if(std::begin(item.cards), std::end(item.cards), [](std::uint32_t card) { return card != 0; }) != std::end(item.cards)) {
+      this->parent->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_LAPINE_WARNING_HAS_CARD_OR_ENCHANTED)), 0, 0, 0);
     }
   }
 
@@ -604,7 +607,7 @@ bool UILapineUpgradeBox_IngredientListWnd::CanUseIngredient(std::uint32_t identi
     return false;
   }
 
-  entry->Show(0);
+  (*entryIt)->Show(0);
   this->SendMsg(this, UM_SETPOS, 0, 0, 0, 0);
   return true;
 }
@@ -646,23 +649,25 @@ int UILapineUpgradeBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     }
     break;
   case UM_ADDITEM:
-    if (this->item.identity[1] == 0 && this->ingredientList->CanUseIngredient(static_cast<std::uint32_t>(a)) == 1) {
+    if (this->item.identity[1] <= 0 && this->ingredientList->CanUseIngredient(static_cast<std::uint32_t>(a)) == 1) {
       ITEM_INFO owned = g_session.LookupClientItemByIdentity(static_cast<std::uint32_t>(a));
-      if (owned.identity[1] != 0) {
-        std::vector<char*> breaks;
-        char name[260];
-        std::memset(name, 0, sizeof(name));
-        int highlightColor = 0;
-        char* cursor = name;
-        int remaining = sizeof(name);
-        char* highlight = nullptr;
-        this->BuildItemName(&owned, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
+      if (owned.identity[1] > 0) {
+        {
+          std::vector<const char*> breaks;
+          char name[260];
+          std::memset(name, 0, sizeof(name));
+          char* highlight = nullptr;
+          int remaining = sizeof(name);
+          char* cursor = name;
+          int highlightColor;
+          this->BuildItemName(&owned, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
 
-        if (owned.identified == 1 && owned.optionCount != 0) {
-          sprintf_s(name, sizeof(name), LookupMessage(MSI_FAILED_MAIL_LIMIT_CNT), name, owned.optionCount);
+          if (owned.identified == 1 && owned.optionCount != 0) {
+            sprintf_s(name, sizeof(name), LookupMessage(MSI_EA6), name, owned.optionCount);
+          }
+
+          owned.SetName(name);
         }
-
-        owned.SetName(name);
         this->item = owned;
         this->Invalidate();
       }

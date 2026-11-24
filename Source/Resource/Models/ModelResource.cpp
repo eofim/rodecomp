@@ -1,11 +1,14 @@
 #include "Client/Application/ErrorDialog.h"
 #include "Client/Session/Session.h"
+#include "Contents/Jobs/JobId.h"
 #include "File/File.h"
 #include "File/ResourcePath.h"
 #include "Render/DeviceContext/DCSurface.h"
+#include "Render/Projection/RenderProjection.h"
 #include "Render/Renderer.h"
 #include "Render/Textures/Texture.h"
 #include "Render/Textures/TextureCache.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Resource/Bitmap/BitmapResource.h"
 #include "Resource/Models/AnimatedModelResource.h"
 #include "Resource/Models/GrannyModelResource.h"
@@ -59,15 +62,15 @@ struct ModelVolumeRecordV1 {
   // INLINED
   void CopyTo(ModelVolume& volume) const {
     for (int index = 0; index < 3; ++index) {
-      volume.position[index] = this->position[index];
+      volume.position.values[index] = this->position[index];
     }
 
     for (int index = 0; index < 3; ++index) {
-      volume.rotation[index] = this->rotation[index];
+      volume.rotation.values[index] = this->rotation[index];
     }
 
     for (int index = 0; index < 3; ++index) {
-      volume.size[index] = this->size[index];
+      volume.size.values[index] = this->size[index];
     }
   }
 
@@ -93,7 +96,7 @@ AnimatedModelRecord::~AnimatedModelRecord() {
 
 // OFFSET: 0x00755630
 // FUNCTION: fn_07985
-ModelNode::ModelNode() : model(nullptr), parent(nullptr), alpha(255) {
+ModelNode::ModelNode() : model(nullptr), parent(nullptr), mesh(nullptr), alpha(255) {
 }
 
 // OFFSET: 0x007568E0
@@ -109,8 +112,8 @@ ModelNode::~ModelNode() {
   this->textures.clear();
 
   if (this->mesh) {
-    delete this->mesh.get();
-    this->mesh.release();
+    delete this->mesh;
+    this->mesh = nullptr;
   }
 
   this->children.clear();
@@ -119,20 +122,18 @@ ModelNode::~ModelNode() {
 // INLINED
 __forceinline ModelNodeV1::ModelNodeV1() = default;
 
-// INLINED
-ModelNodeV1::~ModelNodeV1() = default;
+// OFFSET: 0x00756A20
+// FUNCTION: fn_45858
+__declspec(noinline) ModelNodeV1::~ModelNodeV1() = default;
 
-// INLINED
-ModelNodeV2::~ModelNodeV2() = default;
+// OFFSET: 0x00756AA0
+// FUNCTION: fn_45859
+__declspec(noinline) ModelNodeV2::~ModelNodeV2() = default;
 
 // OFFSET: 0x007553E0
 // FUNCTION: fn_07982
 __declspec(noinline) C3dModelRes::C3dModelRes() : major(0), shade(0), alpha(255) {
 }
-
-// OFFSET: 0x007567B0
-// FUNCTION: fn_07995
-C3dModelRes::~C3dModelRes() = default;
 
 // OFFSET: 0x00755560
 // FUNCTION: fn_07983
@@ -209,22 +210,21 @@ __forceinline void C3dModelResV1::ReadNode(CFile& file, unsigned minor, const st
   file.Read(&node->angle, 4);
   file.Read(node->axis, sizeof(node->axis));
   file.Read(node->scale, sizeof(node->scale));
-  node->mesh = std::make_unique<ModelMesh>();
+  node->mesh = new ModelMesh;
   ModelMesh& mesh = *node->mesh;
   int vertexCount = 0;
   file.Read(&vertexCount, 4);
   mesh.vertexCount = vertexCount;
-  auto* vertices = new std::array<float, 3>[vertexCount]{};
+  ShadeVector* vertices = new ShadeVector[vertexCount];
   file.Read(vertices, static_cast<unsigned>(vertexCount) * 12u);
-  mesh.vertices = vertices;
+  mesh.vertices = reinterpret_cast<std::array<float, 3>*>(vertices);
 
   for (int index = 0; index < vertexCount; ++index) {
-    std::array<float, 3>& vertex = vertices[index];
-    const float y = ((vertex[0] * matrix[1] + vertex[1] * matrix[4]) + matrix[7] * vertex[2]) + matrix[10];
-    const float z = ((vertex[0] * matrix[2] + vertex[1] * matrix[5]) + matrix[8] * vertex[2]) + matrix[11];
-    vertex[0] = ((vertex[0] * matrix[0] + vertex[1] * matrix[3]) + vertex[2] * matrix[6]) + matrix[9];
-    vertex[1] = y;
-    vertex[2] = z;
+    ShadeVector transformed;
+    transformed.x = vertices[index].x * matrix[0] + vertices[index].y * matrix[3] + vertices[index].z * matrix[6] + matrix[9];
+    transformed.y = vertices[index].x * matrix[1] + vertices[index].y * matrix[4] + vertices[index].z * matrix[7] + matrix[10];
+    transformed.z = vertices[index].x * matrix[2] + vertices[index].y * matrix[5] + vertices[index].z * matrix[8] + matrix[11];
+    vertices[index] = transformed;
   }
 
   int textureVertexCount = 0;
@@ -275,13 +275,12 @@ __forceinline void C3dModelResV1::ReadNode(CFile& file, unsigned minor, const st
   }
 
   mesh.faces = faces;
-  // INLINED
-  std::sort(mesh.faces, mesh.faces + mesh.faceCount, [](const ModelFace& a, const ModelFace& b) { return a.texture < b.texture; });
+  std::sort(mesh.faces, mesh.faces + mesh.faceCount);
   mesh.CalculateNormals();
-  static_cast<ModelKeyList2&>(node->rotationKeys).Read(file);
+  node->rotationKeys.Read(file);
 
   this->nodes.push_back(node);
-  this->meshes[node->name] = node->mesh.get();
+  this->meshes[node->name] = node->mesh;
 }
 
 // OFFSET: 0x00750B10
@@ -297,8 +296,7 @@ bool C3dModelResV1::Load(const char* name) {
   file.Read(magic, 4);
 
   if (std::strcmp(magic, "GRSM") != 0) {
-    constexpr char message[] = "모델파일이 아닙니다. 형식을 다시한번 확인해주세요.";
-    ShowErrorDialog(message, 0);
+    ShowErrorDialog("모델파일이 아닙니다. 형식을 다시한번 확인해주세요.", 0);
     return false;
   }
 
@@ -309,33 +307,34 @@ bool C3dModelResV1::Load(const char* name) {
   file.Read(&minor, 1);
 
   if (major != 1 || minor > 5) {
-    constexpr char message[] = "지원되지 않는 버젼입니다. 내용물이 깨져있을 수 있습니다";
-    ShowErrorDialog(message, 0);
+    ShowErrorDialog("지원되지 않는 버젼입니다. 내용물이 깨져있을 수 있습니다", 0);
     return false;
   }
 
   file.Read(&this->animationLength, 4);
   file.Read(&this->shade, 4);
 
-  if (minor < 4) {
-    this->alpha = 255;
-  } else {
+  if (minor >= 4) {
     file.Read(&this->alpha, 1);
+  } else {
+    this->alpha = 255;
   }
 
   unsigned char reserved[16]{};
   file.Read(reserved, sizeof(reserved));
   std::vector<std::string> textureNames;
-  int textureCount = 0;
-  file.Read(&textureCount, 4);
-  char textureName[40]{};
+  {
+    int textureCount = 0;
+    file.Read(&textureCount, 4);
+    char textureName[40]{};
 
-  for (int index = 0; index < textureCount; ++index) {
-    file.Read(textureName, sizeof(textureName));
-    textureNames.push_back(textureName);
+    for (int index = 0; index < textureCount; ++index) {
+      file.Read(textureName, sizeof(textureName));
+      textureNames.push_back(textureName);
 
-    if (std::strstr(textureName, ".bik")) {
-      this->movieNames.push_back(textureName);
+      if (std::strstr(textureName, ".bik")) {
+        this->movieNames.push_back(textureName);
+      }
     }
   }
 
@@ -348,10 +347,12 @@ bool C3dModelResV1::Load(const char* name) {
     this->ReadNode(file, minor, textureNames);
   }
 
-  for (ModelNode* node : this->nodes) {
+  for (auto it = this->nodes.begin(); it != this->nodes.end(); ++it) {
+    ModelNode* node = *it;
     if (!node->parentName.empty()) {
-      node->parent = this->FindNode(node->parentName.c_str());
-      node->parent->children.push_back(node);
+      ModelNode* parent = this->FindNode(node->parentName.c_str());
+      node->parent = parent;
+      parent->children.push_back(*it);
     }
   }
 
@@ -363,15 +364,14 @@ bool C3dModelResV1::Load(const char* name) {
     if (minor >= 3) {
       for (int index = 0; index < volumeCount; ++index) {
         auto* volume = new ModelVolume;
-        std::memset(volume, 0, 132);
         ModelVolumeRecord record{};
         file.Read(&record, sizeof(record));
         volume->flag = record.flag;
-        std::memcpy(volume, &record, sizeof(ModelVolumeRecordV1));
+        record.CopyTo(*volume);
 
         if (volume->flag == 0) {
-          volume->size[0] = volume->size[0] + 3.0f;
-          volume->size[2] = volume->size[2] + 3.0f;
+          volume->size.values[0] = volume->size.values[0] + 3.0f;
+          volume->size.values[2] = volume->size.values[2] + 3.0f;
         }
 
         this->volumes.push_back(volume);
@@ -379,11 +379,10 @@ bool C3dModelResV1::Load(const char* name) {
     } else if (minor == 2) {
       for (int index = 0; index < volumeCount; ++index) {
         auto* volume = new ModelVolume;
-        std::memset(volume, 0, 132);
         ModelVolumeRecordV1 record{};
         file.Read(&record, sizeof(record));
         volume->flag = 0;
-        std::memcpy(volume, &record, sizeof(record));
+        record.CopyTo(*volume);
         this->volumes.push_back(volume);
       }
     }
@@ -406,21 +405,63 @@ void C3dGrannyModelRes::RebindMeshes(const C3dGrannyModelRes& target) {
   }
 }
 
+// OFFSET: 0x00759430
+// FUNCTION: fn_45846
+__forceinline GrannyTextureEntry* C3dGrannyModelRes::FindMaterialTexture(const granny_material* material) const {
+  const granny_texture* texture = GrannyGetMaterialTextureByType(material, 2);
+  if (texture) {
+    for (int index = 0; index < this->textureCount; ++index) {
+      GrannyTextureEntry* entry = &this->textures[index];
+      if (std::strcmp(entry->name, texture->fromFileName) == 0) {
+        return entry;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+// OFFSET: 0x00758B30
+// FUNCTION: fn_45844
+__forceinline void C3dGrannyModelRes::InitializeMesh(GrannyMeshEntry& entry, granny_mesh* mesh, granny_model_instance* instance) {
+  entry.mesh = mesh;
+  granny_skeleton* skeleton = GrannyGetSourceSkeleton(instance);
+  entry.binding = GrannyNewMeshBinding(mesh, skeleton, skeleton);
+
+  const unsigned int indexCount = GrannyGetMeshIndexCount(mesh);
+  entry.indices = new std::uint16_t[indexCount];
+  if (indexCount != 0) {
+    GrannyCopyMeshIndices(mesh, 2, entry.indices);
+  }
+
+  const int vertexBytes = GrannyGetMeshVertexCount(mesh) * 32;
+  entry.vertices = nullptr;
+  if (GrannyMeshIsRigid(mesh)) {
+    entry.vertices = new unsigned char[vertexBytes];
+    GrannyCopyMeshVertices(mesh, GrannyPNT332VertexType, entry.vertices);
+    entry.deformer = nullptr;
+  } else {
+    if (this->deformBufferSize < vertexBytes) {
+      this->deformBufferSize = vertexBytes;
+    }
+
+    entry.deformer = GrannyNewMeshDeformer(GrannyGetMeshVertexType(mesh), GrannyPNT332VertexType, 2);
+    if (!entry.deformer) {
+      ShowErrorDialog("Granny didn't find a matching deformer for the vertex format used by mesh", 0);
+    }
+  }
+
+  entry.materialCount = mesh->materialBindingCount;
+  entry.textures = new GrannyTextureEntry*[entry.materialCount];
+
+  for (int material = 0; material < entry.materialCount; ++material) {
+    entry.textures[material] = this->FindMaterialTexture(mesh->materialBindings[material].material);
+  }
+}
+
 // OFFSET: 0x00758E40
 // FUNCTION: fn_08009
 void C3dGrannyModelRes::InstantiateModel(GrannyModelInstance* target, const granny_model* model) {
-  auto findTexture = [this](const granny_texture* texture) -> GrannyTextureEntry* {
-    if (texture) {
-      for (int index = 0; index < this->textureCount; ++index) {
-        if (std::strcmp(this->textures[index].name, texture->fromFileName) == 0) {
-          return &this->textures[index];
-        }
-      }
-    }
-
-    return nullptr;
-  };
-
   const int boneCount = model->skeleton->boneCount;
   if (this->maxBoneCount < boneCount) {
     this->maxBoneCount = boneCount;
@@ -432,41 +473,7 @@ void C3dGrannyModelRes::InstantiateModel(GrannyModelInstance* target, const gran
   target->meshes = new GrannyMeshEntry[target->meshCount];
 
   for (int index = 0; index < target->meshCount; ++index) {
-    GrannyMeshEntry& entry = target->meshes[index];
-    granny_mesh* mesh = model->meshBindings[index].mesh;
-    entry.mesh = mesh;
-    granny_skeleton* skeleton = GrannyGetSourceSkeleton(target->instance);
-    entry.binding = GrannyNewMeshBinding(mesh, skeleton, skeleton);
-
-    const unsigned int indexCount = GrannyGetMeshIndexCount(mesh);
-    entry.indices = new std::uint16_t[indexCount];
-    if (indexCount != 0) {
-      GrannyCopyMeshIndices(mesh, 2, entry.indices);
-    }
-
-    const int vertexBytes = GrannyGetMeshVertexCount(mesh) * 32;
-    entry.vertices = nullptr;
-    if (GrannyMeshIsRigid(mesh)) {
-      entry.vertices = new unsigned char[vertexBytes];
-      GrannyCopyMeshVertices(mesh, GrannyPNT332VertexType, entry.vertices);
-      entry.deformer = nullptr;
-    } else {
-      if (this->deformBufferSize < vertexBytes) {
-        this->deformBufferSize = vertexBytes;
-      }
-
-      entry.deformer = GrannyNewMeshDeformer(GrannyGetMeshVertexType(mesh), GrannyPNT332VertexType, 2);
-      if (!entry.deformer) {
-        ShowErrorDialog("Granny didn't find a matching deformer for the vertex format used by mesh", 0);
-      }
-    }
-
-    entry.materialCount = mesh->materialBindingCount;
-    entry.textures = new GrannyTextureEntry*[entry.materialCount];
-
-    for (int material = 0; material < entry.materialCount; ++material) {
-      entry.textures[material] = findTexture(GrannyGetMaterialTextureByType(mesh->materialBindings[material].material, 2));
-    }
+    this->InitializeMesh(target->meshes[index], model->meshBindings[index].mesh, target->instance);
   }
 }
 
@@ -480,20 +487,25 @@ CTexture* C3dGrannyModelRes::CreateTexture(const granny_texture* texture, int) {
   unsigned char* pixels = new unsigned char[height * width * 4];
   GrannyCopyTextureImage(texture, 0, 0, GrannyRGBA8888PixelFormat, width, height, width * 4, source);
 
+  unsigned char red;
+  unsigned char green;
+  unsigned char blue;
+  unsigned char alpha;
+  int sourceIndex = 0;
+  int pixelIndex = 0;
   int format;
-  int offset = 0;
   if (hasAlpha) {
     for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; ++x) {
-        const unsigned char red = source[offset + 0];
-        const unsigned char green = source[offset + 1];
-        const unsigned char blue = source[offset + 2];
-        const unsigned char alpha = source[offset + 3];
-        pixels[offset + 0] = blue;
-        pixels[offset + 1] = green;
-        pixels[offset + 2] = red;
-        pixels[offset + 3] = alpha;
-        offset += 4;
+        red = source[sourceIndex + 0];
+        green = source[sourceIndex + 1];
+        blue = source[sourceIndex + 2];
+        alpha = source[sourceIndex + 3];
+        pixels[pixelIndex + 0] = blue;
+        pixels[pixelIndex + 1] = green;
+        pixels[pixelIndex + 2] = red;
+        pixels[pixelIndex + 3] = alpha;
+        pixelIndex += 4, sourceIndex += 4;
       }
     }
 
@@ -501,14 +513,15 @@ CTexture* C3dGrannyModelRes::CreateTexture(const granny_texture* texture, int) {
   } else {
     for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; ++x) {
-        const unsigned char red = source[offset + 0];
-        const unsigned char green = source[offset + 1];
-        const unsigned char blue = source[offset + 2];
-        pixels[offset + 0] = blue;
-        pixels[offset + 1] = green;
-        pixels[offset + 2] = red;
-        pixels[offset + 3] = 0xFF;
-        offset += 4;
+        red = source[sourceIndex + 0];
+        green = source[sourceIndex + 1];
+        blue = source[sourceIndex + 2];
+        alpha = source[sourceIndex + 3];
+        pixels[pixelIndex + 0] = blue;
+        pixels[pixelIndex + 1] = green;
+        pixels[pixelIndex + 2] = red;
+        pixels[pixelIndex + 3] = 0xFF;
+        pixelIndex += 4, sourceIndex += 4;
       }
     }
 
@@ -601,6 +614,73 @@ bool C3dModelRes::Load(const char*) {
   return false;
 }
 
+// OFFSET: 0x00758A60
+// FUNCTION: fn_45843
+__forceinline void GrannyAnimationLibrary::InitializeMesh(GrannyMeshEntry& entry, granny_mesh* mesh, granny_model_instance* instance) {
+  entry.mesh = mesh;
+  granny_skeleton* skeleton = GrannyGetSourceSkeleton(instance);
+  entry.binding = GrannyNewMeshBinding(mesh, skeleton, skeleton);
+
+  const unsigned int indexCount = GrannyGetMeshIndexCount(mesh);
+  entry.indices = new std::uint16_t[indexCount];
+  if (indexCount != 0) {
+    GrannyCopyMeshIndices(mesh, 2, entry.indices);
+  }
+
+  const int vertexBytes = GrannyGetMeshVertexCount(mesh) * 32;
+  if (GrannyMeshIsRigid(mesh)) {
+    entry.deformer = nullptr;
+  } else {
+    if (this->deformBufferSize < vertexBytes) {
+      this->deformBufferSize = vertexBytes;
+    }
+
+    entry.deformer = GrannyNewMeshDeformer(GrannyGetMeshVertexType(mesh), GrannyPNT332VertexType, 2);
+    if (!entry.deformer) {
+      ShowErrorDialog("Granny didn't find a matching deformer for the vertex format used by mesh", 0);
+    }
+  }
+}
+
+// OFFSET: 0x00758CE0
+// FUNCTION: fn_45845
+__forceinline void GrannyAnimationLibrary::InstantiateModel(GrannyModelInstance* target, const granny_model* model) {
+  const int boneCount = model->skeleton->boneCount;
+
+  if (this->maxBoneCount < boneCount) {
+    this->maxBoneCount = boneCount;
+  }
+
+  target->instance = GrannyInstantiateModel(model);
+  target->worldPose = GrannyNewWorldPose(boneCount);
+  target->meshCount = model->meshBindingCount;
+  target->meshes = new GrannyMeshEntry[target->meshCount];
+
+  for (int index = 0; index < target->meshCount; ++index) {
+    this->InitializeMesh(target->meshes[index], model->meshBindings[index].mesh, target->instance);
+  }
+}
+
+// OFFSET: 0x00759840
+// FUNCTION: fn_45855
+__forceinline granny_animation* GrannyAnimationLibrary::LoadAnimation(const GrannyModelInstance* instance, char* name, const char* suffix) {
+  granny_animation* animation = nullptr;
+  if (char* extension = std::strchr(name, '.')) {
+    *extension = '\0';
+  }
+
+  if (granny_file* file = this->ReadAnimationFile(name, suffix)) {
+    if (granny_file_info* info = GrannyGetFileInfo(file)) {
+      if (instance->instance && info->animationCount == 1) {
+        animation = info->animations[0];
+      } else {
+        ShowErrorDialog("This sample only supports single-animation files", 0);
+      }
+    }
+  }
+  return animation;
+}
+
 // OFFSET: 0x00757390
 // FUNCTION: fn_08005
 bool GrannyAnimationLibrary::Load(const char* name, int job, int action) {
@@ -641,67 +721,11 @@ bool GrannyAnimationLibrary::Load(const char* name, int job, int action) {
 
     GrannyModelInstance* instance = new GrannyModelInstance;
     this->instance = instance;
-    granny_model* model = info->models[0];
-    const int boneCount = model->skeleton->boneCount;
-
-    if (this->maxBoneCount < boneCount) {
-      this->maxBoneCount = boneCount;
-    }
-
-    instance->instance = GrannyInstantiateModel(model);
-    instance->worldPose = GrannyNewWorldPose(boneCount);
-    instance->meshCount = model->meshBindingCount;
-    instance->meshes = new GrannyMeshEntry[instance->meshCount];
-
-    for (int index = 0; index < instance->meshCount; ++index) {
-      GrannyMeshEntry& entry = instance->meshes[index];
-      granny_mesh* mesh = model->meshBindings[index].mesh;
-      entry.mesh = mesh;
-      granny_skeleton* skeleton = GrannyGetSourceSkeleton(instance->instance);
-      entry.binding = GrannyNewMeshBinding(mesh, skeleton, skeleton);
-
-      const unsigned int indexCount = GrannyGetMeshIndexCount(mesh);
-      entry.indices = new std::uint16_t[indexCount];
-      if (indexCount != 0) {
-        GrannyCopyMeshIndices(mesh, 2, entry.indices);
-      }
-
-      const int vertexBytes = GrannyGetMeshVertexCount(mesh) * 32;
-      if (GrannyMeshIsRigid(mesh)) {
-        entry.deformer = nullptr;
-      } else {
-        if (this->deformBufferSize < vertexBytes) {
-          this->deformBufferSize = vertexBytes;
-        }
-
-        entry.deformer = GrannyNewMeshDeformer(GrannyGetMeshVertexType(mesh), GrannyPNT332VertexType, 2);
-        if (!entry.deformer) {
-          ShowErrorDialog("Granny didn't find a matching deformer for the vertex format used by mesh", 0);
-        }
-      }
-    }
+    this->InstantiateModel(instance, info->models[0]);
 
     if (info->animationCount != 0) {
-      granny_animation* animation = nullptr;
-
-      if (char* extension = std::strchr(this->fileName, '.')) {
-        *extension = '\0';
-      }
-
-      if (granny_file* animationFile = this->ReadAnimationFile(this->fileName, "")) {
-        if (granny_file_info* animationInfo = GrannyGetFileInfo(animationFile)) {
-          if (!instance->instance || animationInfo->animationCount != 1) {
-            ShowErrorDialog("This sample only supports single-animation files", 0);
-            this->animations[job][action] = nullptr;
-            return false;
-          }
-
-          animation = animationInfo->animations[0];
-        }
-      }
-
+      granny_animation* animation = this->LoadAnimation(instance, this->fileName, "");
       this->animations[job][action] = animation;
-
       if (!animation) {
         return false;
       }
@@ -726,38 +750,39 @@ bool GrannyAnimationLibrary::Load(const char* name, int job, int action) {
   return result;
 }
 
+// OFFSET: 0x007596D0
+// FUNCTION: fn_45854
+granny_animation* GrannyAnimationLibrary::GetAnimation(unsigned job, unsigned action) {
+  granny_animation* const& animation = this->animations[job][action];
+  if (animation) {
+    return animation;
+  }
+
+  g_modelPath[0] = '\0';
+  if (job > JT_WIZARD || action > 4) {
+    return nullptr;
+  }
+  if (action == 0) {
+    std::sprintf(g_modelPath, "model\\3dmob\\%s", g_session.GetJobName(g_animationJobs[job], -1));
+  } else {
+    std::sprintf(g_modelPath, "model\\3dmob_bone\\%d_%s.gr2", job, g_animationNames[action]);
+  }
+  if (!g_modelPath[0] || !ResourceExists(g_modelPath, 0)) {
+    return nullptr;
+  }
+  if (job != JT_SWORDMAN) {
+    this->Load(g_modelPath, job, action);
+  }
+  return animation;
+}
+
 // OFFSET: 0x00757270
 // FUNCTION: fn_08004
 granny_control* C3dGrannyModelRes::PlayAnimation(unsigned action, granny_model_instance* instance, granny_control* control, int loopCount) {
   if (!control) {
-    const unsigned job = this->job;
-    GrannyAnimationLibrary* library = this->animations;
-    granny_animation* const& animation = library->animations[job][action];
-
+    granny_animation* animation = this->animations->GetAnimation(this->job, action);
     if (!animation) {
-      g_modelPath[0] = '\0';
-
-      if (job > 9 || action > 4) {
-        return nullptr;
-      }
-
-      if (action == 0) {
-        std::sprintf(g_modelPath, "model\\3dmob\\%s", g_session.GetJobName(g_animationJobs[job], -1));
-      } else {
-        std::sprintf(g_modelPath, "model\\3dmob_bone\\%d_%s.gr2", job, g_animationNames[action]);
-      }
-
-      if (!g_modelPath[0] || !ResourceExists(g_modelPath, 0)) {
-        return nullptr;
-      }
-
-      if (job != 1) {
-        library->Load(g_modelPath, job, action);
-      }
-
-      if (!animation) {
-        return nullptr;
-      }
+      return nullptr;
     }
 
     granny_control* result = GrannyPlayControlledAnimation(0.0f, animation, instance);
@@ -773,35 +798,39 @@ granny_control* C3dGrannyModelRes::PlayAnimation(unsigned action, granny_model_i
   return control;
 }
 
+// INLINED
+static vector3d TransformPoint(const vector3d& point, const float* m) {
+  return vector3d{
+    point.x * m[0] + point.y * m[3] + point.z * m[6] + m[9],
+    point.x * m[1] + point.y * m[4] + point.z * m[7] + m[10],
+    point.x * m[2] + point.y * m[5] + point.z * m[8] + m[11]
+  };
+}
+
 // OFFSET: 0x00758710
 // FUNCTION: fn_08008
 bool C3dGrannyModelRes::ProjectBounds(float* rect, const matrix& view, const matrix& world, const float* eye) const {
   matrix matrix;
   matrix.MakeZRotation(3.141592f);
-  const float* m = matrix.values;
-  const float x = this->position[1] * m[3] + this->position[0] * m[0] + this->position[2] * m[6] + m[9];
-  const float y = this->position[0] * m[1] + this->position[1] * m[4] + this->position[2] * m[7] + m[10];
-  const float z = this->position[0] * m[2] + this->position[1] * m[5] + this->position[2] * m[8] + m[11];
+  const vector3d position = TransformPoint(vector3d{this->position[0], this->position[1], this->position[2]}, matrix.values);
   matrix.Compose(world, view);
 
-  const float screenX = y * m[3] + x * m[0] + z * m[6] + m[9];
-  const float screenY = x * m[1] + y * m[4] + z * m[7] + m[10];
-  const float depth = y * m[5] + x * m[2] + z * m[8] + m[11];
-  const float deltaY = eye[1] - y;
-  const float deltaX = eye[0] - x;
-  const float deltaZ = eye[2] - z;
+  const vector3d projected = TransformPoint(position, matrix.values);
+  const float deltaX = eye[0] - position.x;
+  const float deltaY = eye[1] - position.y;
+  const float deltaZ = eye[2] - position.z;
   const float distance = SquareRoot(deltaY * deltaY + deltaX * deltaX + deltaZ * deltaZ);
-  const float slope = std::min(std::fabs(1.0f / distance * deltaY), 1.0f);
+  const float slope = std::min(std::fabs(1.0f / distance * deltaY), g_projectionDepthNumerator);
   const float height = this->topHeight - (this->topHeight - this->baseHeight) * slope;
-  const float halfWidth = SquareRoot(this->baseHeight * this->baseHeight * 0.5f);
-  const float halfHeight = SquareRoot(height * height * 0.5f);
-  const float inverseDepth = 1.0f / depth;
+  const float halfWidth = SquareRoot(this->baseHeight * this->baseHeight * g_depthAverageHalf);
+  const float halfHeight = SquareRoot(height * height * g_depthAverageHalf);
+  const float inverseDepth = g_projectionDepthNumerator / projected.z;
 
   rect[4] = inverseDepth;
-  rect[0] = (screenX - halfWidth) * g_renderer->viewport.scaleX * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterX);
-  rect[1] = (screenY - halfHeight) * g_renderer->viewport.scaleY * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterY);
-  rect[2] = (halfWidth + screenX) * g_renderer->viewport.scaleX * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterX);
-  rect[3] = (halfHeight + screenY) * g_renderer->viewport.scaleY * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterY);
+  rect[0] = (projected.x - halfWidth) * g_renderer->viewport.scaleX * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterX);
+  rect[1] = (projected.y - halfHeight) * g_renderer->viewport.scaleY * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterY);
+  rect[2] = (halfWidth + projected.x) * g_renderer->viewport.scaleX * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterX);
+  rect[3] = (halfHeight + projected.y) * g_renderer->viewport.scaleY * inverseDepth + static_cast<float>(g_renderer->viewport.clipCenterY);
 
   return !(static_cast<unsigned>(rect[0]) > g_renderer->viewport.width && static_cast<unsigned>(rect[2]) > g_renderer->viewport.width &&
            static_cast<unsigned>(rect[1]) > g_renderer->viewport.height && static_cast<unsigned>(rect[3]) > g_renderer->viewport.height);
@@ -815,51 +844,51 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
   // GLOBAL: gl_24736
   static ShadeVector vertexNormals[30000];
   std::list<int> groups[32];
-  auto faceColors = [this](int index) { return this->faceColors[index].data(); };
+
+  auto transform = [matrix](const std::array<float, 3>& position) {
+    return vector3d{
+      position[0] * matrix[0] + position[1] * matrix[3] + position[2] * matrix[6] + matrix[9],
+      position[0] * matrix[1] + position[1] * matrix[4] + position[2] * matrix[7] + matrix[10],
+      position[0] * matrix[2] + position[1] * matrix[5] + position[2] * matrix[8] + matrix[11]
+    };
+  };
 
   switch (shadeType) {
   case 0: {
     for (int index = 0; index < this->faceCount; ++index) {
       const std::uint32_t color = (alpha << 24) + 0xFFFFFF;
-      faceColors(index)[0] = color;
-      faceColors(index)[1] = color;
-      faceColors(index)[2] = color;
+      this->faceColors[index][0] = color;
+      this->faceColors[index][1] = color;
+      this->faceColors[index][2] = color;
     }
     break;
   }
   case 1: {
     for (int index = 0; index < this->faceCount; ++index) {
       const AnimatedModelFace& face = this->faces[index];
-      const std::array<float, 3>* vertices = this->frames[frame].vertices;
-      const std::array<float, 3>& v0 = vertices[face.vertices[0]];
-      const std::array<float, 3>& v1 = vertices[face.vertices[1]];
-      const std::array<float, 3>& v2 = vertices[face.vertices[2]];
-      const float x2 = v2[0] * matrix[0] + v2[1] * matrix[3] + v2[2] * matrix[6] + matrix[9];
-      const float y2 = v2[0] * matrix[1] + v2[1] * matrix[4] + v2[2] * matrix[7] + matrix[10];
-      const float z2 = v2[0] * matrix[2] + v2[1] * matrix[5] + v2[2] * matrix[8] + matrix[11];
-      const float ax = x2 - (matrix[0] * v0[0] + v0[1] * matrix[3] + v0[2] * matrix[6] + matrix[9]);
-      const float ay = y2 - (matrix[1] * v0[0] + matrix[4] * v0[1] + matrix[7] * v0[2] + matrix[10]);
-      const float az = z2 - (matrix[2] * v0[0] + matrix[5] * v0[1] + matrix[8] * v0[2] + matrix[11]);
-      const float bx = x2 - (v1[0] * matrix[0] + v1[1] * matrix[3] + v1[2] * matrix[6] + matrix[9]);
-      const float by = y2 - (v1[0] * matrix[1] + v1[1] * matrix[4] + v1[2] * matrix[7] + matrix[10]);
-      const float bz = z2 - (v1[0] * matrix[2] + v1[1] * matrix[5] + v1[2] * matrix[8] + matrix[11]);
-      const float nx = by * az - bz * ay;
-      const float ny = bz * ax - bx * az;
-      const float nz = bx * ay - by * ax;
+      const AnimatedModelVertex* vertices = this->frames[frame].vertices;
+      const vector3d v0 = transform(vertices[face.vertices[0]].position);
+      const vector3d v1 = transform(vertices[face.vertices[1]].position);
+      const vector3d v2 = transform(vertices[face.vertices[2]].position);
+      const vector3d a{v2.x - v0.x, v2.y - v0.y, v2.z - v0.z};
+      const vector3d b{v2.x - v1.x, v2.y - v1.y, v2.z - v1.z};
+      const float nx = b.y * a.z - b.z * a.y;
+      const float ny = b.z * a.x - b.x * a.z;
+      const float nz = b.x * a.y - b.y * a.x;
       const float inverse = 1.0f / SquareRoot(ny * ny + nx * nx + nz * nz);
       const float dot = nx * inverse * light[0] + ny * inverse * light[1] + nz * inverse * light[2];
-      const float intensity = 0.0f > dot ? 0.0f : dot;
+      const float intensity = std::max(dot, 0.0f);
       const float redLevel = intensity * diffuse[0] + ambient[0];
-      const float red = 1.0f < redLevel ? 1.0f : redLevel;
+      const float red = std::min(redLevel, g_projectionDepthNumerator);
       const float greenLevel = intensity * diffuse[1] + ambient[1];
-      const float green = 1.0f < greenLevel ? 1.0f : greenLevel;
+      const float green = std::min(greenLevel, g_projectionDepthNumerator);
       const float blueLevel = intensity * diffuse[2] + ambient[2];
-      const float blue = 1.0f < blueLevel ? 1.0f : blueLevel;
+      const float blue = std::min(blueLevel, g_projectionDepthNumerator);
 
       for (int corner = 0; corner < 3; ++corner) {
         const int source = this->sharedTextureVertices == 0 ? frame : 0;
         const float scale = this->frames[source].textureVertices[face.textureVertices[corner]].shaded ? 128.0f : 255.0f;
-        faceColors(index)[corner] = ((((alpha << 8) | static_cast<int>(scale * red)) << 8 | static_cast<int>(scale * green)) << 8) | static_cast<int>(scale * blue);
+        this->faceColors[index][corner] = ((((alpha << 8) | static_cast<int>(scale * red)) << 8 | static_cast<int>(scale * green)) << 8) | static_cast<int>(scale * blue);
       }
     }
     break;
@@ -867,23 +896,16 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
   case 2: {
     for (int index = 0; index < this->faceCount; ++index) {
       const AnimatedModelFace& face = this->faces[index];
-      const std::array<float, 3>* vertices = this->frames[frame].vertices;
-      const std::array<float, 3>& v0 = vertices[face.vertices[0]];
-      const std::array<float, 3>& v1 = vertices[face.vertices[1]];
-      const std::array<float, 3>& v2 = vertices[face.vertices[2]];
-      const float x2 = v2[0] * matrix[0] + v2[1] * matrix[3] + v2[2] * matrix[6] + matrix[9];
-      const float y2 = v2[0] * matrix[1] + v2[1] * matrix[4] + v2[2] * matrix[7] + matrix[10];
-      const float z2 = v2[0] * matrix[2] + v2[1] * matrix[5] + v2[2] * matrix[8] + matrix[11];
-      const float ax = x2 - (v0[0] * matrix[0] + v0[1] * matrix[3] + v0[2] * matrix[6] + matrix[9]);
-      const float ay = y2 - (matrix[1] * v0[0] + matrix[4] * v0[1] + matrix[7] * v0[2] + matrix[10]);
-      const float az = z2 - (matrix[2] * v0[0] + matrix[5] * v0[1] + matrix[8] * v0[2] + matrix[11]);
-      const float bx = x2 - (v1[0] * matrix[0] + v1[1] * matrix[3] + v1[2] * matrix[6] + matrix[9]);
-      const float by = y2 - (v1[0] * matrix[1] + v1[1] * matrix[4] + v1[2] * matrix[7] + matrix[10]);
-      const float bz = z2 - (v1[0] * matrix[2] + v1[1] * matrix[5] + v1[2] * matrix[8] + matrix[11]);
+      const AnimatedModelVertex* vertices = this->frames[frame].vertices;
+      const vector3d v0 = transform(vertices[face.vertices[0]].position);
+      const vector3d v1 = transform(vertices[face.vertices[1]].position);
+      const vector3d v2 = transform(vertices[face.vertices[2]].position);
+      const vector3d a{v2.x - v0.x, v2.y - v0.y, v2.z - v0.z};
+      const vector3d b{v2.x - v1.x, v2.y - v1.y, v2.z - v1.z};
       ShadeVector& normal = faceNormals[index];
-      normal.x = by * az - bz * ay;
-      normal.y = ax * bz - bx * az;
-      normal.z = bx * ay - ax * by;
+      normal.x = b.y * a.z - b.z * a.y;
+      normal.y = a.x * b.z - b.x * a.z;
+      normal.z = b.x * a.y - a.x * b.y;
       const float inverse = 1.0f / SquareRoot(normal.y * normal.y + normal.x * normal.x + normal.z * normal.z);
       normal.x = inverse * normal.x;
       normal.y = inverse * normal.y;
@@ -926,15 +948,15 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
           const ShadeVector& normal = vertexNormals[face.vertices[corner]];
           const int source = this->sharedTextureVertices == 0 ? frame : 0;
           const float dot = normal.y * light[1] + light[0] * normal.x + normal.z * light[2];
-          const float intensity = 0.0f > dot ? 0.0f : dot;
+          const float intensity = std::max(dot, 0.0f);
           const float redLevel = intensity * diffuse[0] + ambient[0];
-          const float red = 1.0f < redLevel ? 1.0f : redLevel;
+          const float red = std::min(redLevel, g_projectionDepthNumerator);
           const float greenLevel = intensity * diffuse[1] + ambient[1];
-          const float green = 1.0f < greenLevel ? 1.0f : greenLevel;
+          const float green = std::min(greenLevel, g_projectionDepthNumerator);
           const float blueLevel = intensity * diffuse[2] + ambient[2];
-          const float blue = 1.0f < blueLevel ? 1.0f : blueLevel;
+          const float blue = std::min(blueLevel, g_projectionDepthNumerator);
           const float scale = this->frames[source].textureVertices[face.textureVertices[corner]].shaded ? 128.0f : 255.0f;
-          faceColors(index)[corner] = ((((alpha << 8) | static_cast<int>(scale * red)) << 8 | static_cast<int>(green * scale)) << 8) | static_cast<int>(blue * scale);
+          this->faceColors[index][corner] = ((((alpha << 8) | static_cast<int>(scale * red)) << 8 | static_cast<int>(green * scale)) << 8) | static_cast<int>(blue * scale);
         }
       }
     }
@@ -943,9 +965,9 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
   default: {
     for (int index = 0; index < this->faceCount; ++index) {
       const std::uint32_t color = (alpha << 24) + 0xFFFFFF;
-      faceColors(index)[0] = color;
-      faceColors(index)[1] = color;
-      faceColors(index)[2] = color;
+      this->faceColors[index][0] = color;
+      this->faceColors[index][1] = color;
+      this->faceColors[index][2] = color;
     }
 
     ShowErrorDialog("Invalid Shade Type", 0);
@@ -966,6 +988,13 @@ const void* C3dGrannyModelRes::GetMeshRenderData(
   return this->GetMeshRenderData(this->instance, mesh, texture, indices, triangleCount, transform, pose);
 }
 
+// INLINED
+static void SetRow(float* row, float x, float y, float z) {
+  row[0] = x;
+  row[1] = y;
+  row[2] = z;
+}
+
 // OFFSET: 0x0075CB60
 // FUNCTION: fn_08026
 const void* C3dGrannyModelRes::GetMeshRenderData(
@@ -982,22 +1011,18 @@ const void* C3dGrannyModelRes::GetMeshRenderData(
   const std::int32_t vertexCount = GrannyGetMeshVertexCount(meshes[mesh].mesh);
   const granny_tri_material_group* groups = GrannyGetMeshTriangleGroups(meshes[mesh].mesh);
   GrannyTextureEntry* entry = meshes[mesh].textures[groups->materialIndex];
-  *texture = entry != nullptr && meshes[mesh].materialCount > groups->materialIndex ? entry->texture : nullptr;
+  if (entry != nullptr && meshes[mesh].materialCount > groups->materialIndex) {
+    *texture = entry->texture;
+  } else {
+    *texture = nullptr;
+  }
 
   if (GrannyMeshIsRigid(meshes[mesh].mesh)) {
     const float* composite = GrannyGetWorldPoseComposite4x4(model->worldPose, boneIndices[0]);
-    transform->values[0] = composite[0];
-    transform->values[1] = composite[1];
-    transform->values[2] = composite[2];
-    transform->values[3] = composite[4];
-    transform->values[4] = composite[5];
-    transform->values[5] = composite[6];
-    transform->values[6] = composite[8];
-    transform->values[7] = composite[9];
-    transform->values[8] = composite[10];
-    transform->values[9] = composite[12];
-    transform->values[10] = composite[13];
-    transform->values[11] = composite[14];
+    for (int row = 0; row < 4; ++row) {
+      const float* source = composite + row * 4;
+      SetRow(transform->values + row * 3, source[0], source[1], source[2]);
+    }
 
     const void* vertices = meshes[mesh].vertices;
     *indices = meshes[mesh].indices;
@@ -1013,10 +1038,11 @@ const void* C3dGrannyModelRes::GetMeshRenderData(
     GrannyDeformVertices(meshes[mesh].deformer, boneIndices, matrices, vertexCount, GrannyGetMeshVertices(meshes[mesh].mesh), this->deformBuffer);
     GrannyGetMeshBytesPerIndex(meshes[mesh].mesh);
     GrannyGetMeshIndices(meshes[mesh].mesh);
+    const void* vertices = this->deformBuffer;
     *indices = meshes[mesh].indices;
     *triangleCount = GrannyGetMeshIndexCount(meshes[mesh].mesh) / 3;
-    std::memcpy(transform->values, g_identityMatrix, sizeof(g_identityMatrix));
-    return this->deformBuffer;
+    transform->Identity();
+    return vertices;
   }
 
   return nullptr;
@@ -1037,6 +1063,18 @@ bool C3dGrannyModelRes::FindHairPivot() {
   }
 
   return false;
+}
+
+// OFFSET: 0x0075CF70
+// FUNCTION: fn_45904
+void GrannyAnimationLibrary::SetAnimationDuration(float duration) {
+  this->animationDuration = duration / 5.0f + duration;
+}
+
+// OFFSET: 0x0075CF90
+// FUNCTION: fn_45905
+void C3dGrannyModelRes::SetAnimationDuration(float duration) {
+  this->animationDuration = duration / 5.0f + duration;
 }
 
 // OFFSET: 0x0075CFC0

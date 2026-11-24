@@ -2,10 +2,9 @@
 #include "Contents/Skills/SkillId.h"
 #include "Client/Session/Session.h"
 #include "Network/Connection/Connection.h"
+#include "Network/Packets/PacketId.h"
 
 #include <cstring>
-
-template __declspec(noinline) std::_Tree_find_result<std::map<int, std::int64_t>::_Mybase::_Nodeptr> std::map<int, std::int64_t>::_Mybase::_Find_lower_bound<int>(const int&) const;
 
 namespace {
   // INLINED
@@ -23,9 +22,10 @@ namespace {
   }
 
   // INLINED
-  void Cancel(std::int16_t id) {
+  void Cancel(std::int16_t id, int option) {
     const std::uint16_t packet[2] = {2833, static_cast<std::uint16_t>(id)};
     GetRagConnection().Send(sizeof(packet), packet);
+    g_session.SetOption(option, 0);
   }
 }
 
@@ -73,8 +73,7 @@ void AutomaticSkills::DisableAll() {
     const auto skill = static_cast<std::int16_t>(id);
     const int option = ActiveOption(skill);
     if (static_cast<int>(g_session.m_options.Get(option)) != 0) {
-      Cancel(skill);
-      g_session.SetOption(option, 0, 0);
+      Cancel(skill, option);
     }
   }
 }
@@ -83,7 +82,7 @@ void AutomaticSkills::DisableAll() {
 // FUNCTION: fn_09153
 void AutomaticSkills::Use(std::int16_t id, std::int16_t level, std::uint32_t target) {
   unsigned char packet[10];
-  const std::uint16_t header = 2832;
+  const std::uint16_t header = ID_CZ_USE_SKILL_START;
   std::memcpy(packet, &header, 2);
   std::memcpy(packet + 2, &id, 2);
   std::memcpy(packet + 4, &level, 2);
@@ -92,19 +91,10 @@ void AutomaticSkills::Use(std::int16_t id, std::int16_t level, std::uint32_t tar
   const int cancel = this->CancelOption(id);
 
   if (static_cast<int>(g_session.m_options.Get(cancel)) != 0) {
-    Cancel(id);
-    g_session.SetOption(cancel, 0, 0);
+    Cancel(id, cancel);
   } else {
     g_session.automaticSkillHotkey = g_session.m_currentHotkey;
-    g_session.SetOption(ActiveOption(id), 1, 0);
+    g_session.SetOption(ActiveOption(id), 1);
   }
 }
 
-// OFFSET: 0x00CEFD20
-// FUNCTION: fn_21406
-void AutomaticSkills::Complete(int id) {
-  const std::uint16_t skill = static_cast<std::uint16_t>(id);
-  if (g_session.m_automaticSkills.Contains(skill)) {
-    g_session.m_options.Values()[g_session.m_automaticSkills.CancelOption(skill)] = 0;
-  }
-}

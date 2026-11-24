@@ -1,12 +1,11 @@
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Items/UIItemStoreComboBox.h"
 #include "UI/Text/UIStaticText.h"
+#include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindow.h"
 
 #include <cstdio>
 #include <string>
-
-template __declspec(noinline) std::string::basic_string(std::_String_constructor_concat_tag, const std::string&, const char*, std::size_t, const char*, std::size_t);
 
 // OFFSET: 0x0086D530
 // FUNCTION: fn_11047
@@ -27,7 +26,7 @@ void UIItemStoreComboBoxWnd::OnCreate(int, int) {
   this->button->SetBitmap((path + disabled + ".bmp").c_str(), 2, 0);
   this->button->SetSize(this->button->BitmapWidth(), this->button->BitmapHeight());
   this->button->Move(this->geometry.width - this->button->BitmapWidth(), this->geometry.height - this->button->BitmapHeight());
-  this->button->SetId(273);
+  this->button->SetId(ID_OPEN_MEMBER_POS_COMBO);
   this->AddChild(this->button);
 
   UIItemStoreComboBox* items = new UIItemStoreComboBox();

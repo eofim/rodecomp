@@ -15,16 +15,11 @@
 #include <windows.h>
 #include <timeapi.h>
 
-template __declspec(noinline) std::string::basic_string(const char* const);
-
 // GLOBAL: gl_24639
 int g_textureReduction = 1;
 
 // GLOBAL: gl_24638
 TextureCache g_texMgr;
-
-using TextureMap = std::map<const char*, CTexture*, TextureNameLess>;
-template __declspec(noinline) TextureMap::iterator TextureMap::_Mybase::find(const char* const&);
 
 // INLINED
 bool TextureNameLess::operator()(const char* left, const char* right) const {
@@ -35,8 +30,7 @@ bool TextureNameLess::operator()(const char* left, const char* right) const {
   return static_cast<unsigned char>(*left) < static_cast<unsigned char>(*right);
 }
 
-// OFFSET: 0x004074F5
-// FUNCTION: fn_00152
+// INLINED
 TextureCache::TextureCache() {
 }
 
@@ -86,6 +80,7 @@ CTexture* TextureCache::CreateTexture(std::uint32_t width, std::uint32_t height,
 // FUNCTION: fn_02455
 CTexture* TextureCache::Create(const char* name, int option, bool fullSize, bool dynamic, bool renderTarget) {
   CTexture* texture;
+  std::uint32_t transparent;
 
   if (std::strstr(name, ".bik")) {
     if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->scene) {
@@ -96,8 +91,8 @@ CTexture* TextureCache::Create(const char* name, int option, bool fullSize, bool
 
         if (movie) {
           const auto* handle = movie->decoder->Handle();
-          const std::uint32_t width = handle->width;
           const std::uint32_t height = handle->height;
+          const std::uint32_t width = handle->width;
           texture = GetRenderSystemHolder()->CreateTexture(width, height, TextureFormat::A8R8G8B8, false, false);
 
           if (texture) {
@@ -107,7 +102,7 @@ CTexture* TextureCache::Create(const char* name, int option, bool fullSize, bool
       }
     }
 
-    const std::uint32_t transparent = 0;
+    transparent = 0;
     const int extent = 1 / g_textureReduction;
     texture = GetRenderSystemHolder()->CreateTexture(extent, extent, TextureFormat::A1R5G5B5, false, false);
 
@@ -119,15 +114,16 @@ CTexture* TextureCache::Create(const char* name, int option, bool fullSize, bool
 
     if (bitmap) {
       const auto& image = bitmap->image;
+      const auto format = image.alpha != 0 ? TextureFormat::A4R4G4B4 : TextureFormat::A1R5G5B5;
       texture = this->Upload(
-        image.width, image.height, image.pixels, image.alpha != 0 ? TextureFormat::A4R4G4B4 : TextureFormat::A1R5G5B5, option, fullSize, dynamic, renderTarget
+        image.width, image.height, image.pixels, format, option, fullSize, dynamic, renderTarget
       );
       ResourceMgr::Instance().Remove(bitmap);
 
       return texture;
     }
 
-    const std::uint32_t transparent = 0;
+    transparent = 0;
     const int extent = 1 / g_textureReduction;
     texture = GetRenderSystemHolder()->CreateTexture(extent, extent, TextureFormat::A1R5G5B5, false, false);
 
@@ -143,19 +139,29 @@ CTexture* TextureCache::Create(const char* name, int option, bool fullSize, bool
   return texture;
 }
 
+// OFFSET: 0x005714E0
+// FUNCTION: fn_45878
+void TextureCache::Insert(CTexture* texture) {
+  this->m_textures.insert({texture->m_name, texture});
+}
+
+// OFFSET: 0x00571760
+// FUNCTION: fn_45879
+CTexture* TextureCache::Find(const char* name) {
+  const auto found = this->m_textures.find(name);
+  return found == this->m_textures.end() ? nullptr : found->second;
+}
+
 // OFFSET: 0x005717A0
 // FUNCTION: fn_02454
 CTexture* TextureCache::Load(const char* name, int option, bool fullSize, bool dynamic, bool renderTarget) {
-  const char* key = name;
-  const auto found = this->m_textures.find(key);
-
-  if (found != this->m_textures.end() && found->second) {
-    CTexture* texture = found->second;
+  CTexture* texture = this->Find(name);
+  if (texture) {
     texture->Touch();
     return texture;
   }
 
-  CTexture* texture = this->Create(name, option, fullSize, dynamic, renderTarget);
+  texture = this->Create(name, option, fullSize, dynamic, renderTarget);
 
   if (!texture) {
     return this->Default();
@@ -163,8 +169,7 @@ CTexture* TextureCache::Load(const char* name, int option, bool fullSize, bool d
 
   texture->SetName(name);
   texture->Touch();
-  this->m_textures.insert({texture->m_name, texture});
-
+  this->Insert(texture);
   return texture;
 }
 
@@ -191,6 +196,19 @@ void TextureCache::Clear() {
   this->m_textures.clear();
 }
 
+// OFFSET: 0x00571B10
+// FUNCTION: fn_45880
+void TextureCache::ReloadTexture(CTexture* texture, int width, int height, const std::uint32_t* pixels) {
+  if (texture) {
+    if (texture->fullSize == 1) {
+      texture->Create(width, height, texture->m_format);
+    } else {
+      texture->Create(width / g_textureReduction, height / g_textureReduction, texture->m_format);
+    }
+    texture->Upload(0, 0, width, height, pixels, 0, 0);
+  }
+}
+
 // OFFSET: 0x00571B70
 // FUNCTION: fn_02456
 void TextureCache::Reload() {
@@ -201,20 +219,7 @@ void TextureCache::Reload() {
       continue;
     }
 
-    CTexture* texture = entry->second;
-    const auto* pixels = bitmap->image.pixels;
-    const int height = bitmap->image.height;
-    const int width = bitmap->image.width;
-
-    if (texture) {
-      if ((texture->textureFlags & 0xFF) == 1) {
-        texture->Create(width, height, texture->m_format);
-      } else {
-        texture->Create(width / g_textureReduction, height / g_textureReduction, texture->m_format);
-      }
-
-      texture->Upload(0, 0, width, height, pixels, 0, 0);
-    }
+    this->ReloadTexture(entry->second, bitmap->image.width, bitmap->image.height, bitmap->image.pixels);
 
     ResourceMgr::Instance().Remove(bitmap);
   }

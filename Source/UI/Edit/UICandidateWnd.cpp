@@ -25,6 +25,18 @@ UICompositionWnd::UICompositionWnd() : UIFrameWnd(0) {}
 // FUNCTION: fn_13196
 UIKeyStrokeWnd::UIKeyStrokeWnd() : UIFrameWnd(0) {}
 
+// OFFSET: 0x0096D450
+// FUNCTION: fn_45705
+UICandidateWnd::~UICandidateWnd() = default;
+
+// OFFSET: 0x0096D4C0
+// FUNCTION: fn_45706
+UICompositionWnd::~UICompositionWnd() = default;
+
+// OFFSET: 0x0096D520
+// FUNCTION: fn_45707
+UIKeyStrokeWnd::~UIKeyStrokeWnd() = default;
+
 // OFFSET: 0x0096D6F0
 // FUNCTION: fn_13200
 void UICandidateWnd::OnCreate(int, int) {}
@@ -49,25 +61,23 @@ void UICandidateWnd::Paint() {
     for (int i = 0; i < this->m_count; ++i) {
       StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d %s", i + 1, this->m_candidates[i].c_str());
       this->DrawTextAt(x, 12, text, 0, 0, 12, 0, 0, 0);
-      x += 8 + this->TextWidth(text, static_cast<unsigned>(std::strlen(text)), 0, 12, 0, 0);
+      x += this->TextWidth(text, static_cast<unsigned>(std::strlen(text)), 0, 12, 0, 0) + 8;
     }
-    this->FillTriangleRegion(8, 18, 14, 10, 14, 26, this->m_page > 0 ? 0xFF9F70 : 0xD2D2D2);
+    this->FillTriangleRegion(8, 18, 14, 10, 14, 26, this->m_page <= 0 ? 0xD2D2D2 : 0xFF9F70);
     const int width = this->geometry.width;
-    this->FillTriangleRegion(width - 8, 18, width - 14, 10, width - 14, 26, this->m_page < this->m_lastPage ? 0xFF9F70 : 0xD2D2D2);
+    this->FillTriangleRegion(width - 8, 18, width - 14, 10, width - 14, 26, this->m_page >= this->m_lastPage ? 0xD2D2D2 : 0xFF9F70);
     break;
   }
   case 2: {
     std::memset(text, 0, sizeof(text));
-    int y = 12;
     for (int i = 0; i < this->m_count; ++i) {
       StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d %s", i + 1, this->m_candidates[i].c_str());
       if (this->m_selection == i) {
         unsigned red, green, blue;
         g_skinInfo.PaletteChannels(6, 2, red, green, blue);
-        this->FillRegion(8, y - 2, this->TextWidth(text, 0, 0, 12, 0, 0) + 4, 16, RGB(red, green, blue));
+        this->FillRegion(8, i * 20 + 10, this->TextWidth(text, 0, 0, 12, 0, 0) + 4, 16, RGB(red, green, blue));
       }
-      this->DrawTextAt(10, y, text, 0, 0, 12, 0, 0, 0);
-      y += 20;
+      this->DrawTextAt(10, i * 20 + 12, text, 0, 0, 12, 0, 0, 0);
     }
     std::sprintf(text, "%d / %d", this->m_page + 1, this->m_lastPage + 1);
     this->DrawTextAt(110 - this->TextWidth(text, 0, 0, 12, 0, 0), 192, text, 0, 0, 12, 0, 0, 0);
@@ -79,16 +89,17 @@ void UICandidateWnd::Paint() {
     int x = 14;
     for (int i = 0; i < this->m_count; ++i) {
       StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d %s", i + 1, this->m_candidates[i].c_str());
-      if (i == this->m_selection) {
-        this->DrawTextAt(x, 12, text, static_cast<int>(std::strlen(text)), 0, 12, 0xFF, 0, 0);
-      } else {
+      if (i != this->m_selection) {
         this->DrawTextAt(x, 12, text, 0, 0, 12, 0, 0, 0);
+        x += this->TextWidth(text, static_cast<unsigned>(std::strlen(text)), 0, 12, 0, 0) + 8;
+      } else {
+        this->DrawTextAt(x, 12, text, static_cast<int>(std::strlen(text)), 0, 12, 0xFF, 0, 0);
+        x += this->TextWidth(text, static_cast<unsigned>(std::strlen(text)), 0, 12, 0, 0) + 8;
       }
-      x += this->TextWidth(text, static_cast<unsigned>(std::strlen(text)), 0, 12, 0, 0) + 8;
     }
-    this->FillTriangleRegion(8, 18, 14, 10, 14, 26, this->m_page > 0 ? 0xFF9F70 : 0xD2D2D2);
+    this->FillTriangleRegion(8, 18, 14, 10, 14, 26, this->m_page <= 0 ? 0xD2D2D2 : 0xFF9F70);
     const int width = this->geometry.width;
-    this->FillTriangleRegion(width - 8, 18, width - 14, 10, width - 14, 26, this->m_page < this->m_lastPage ? 0xFF9F70 : 0xD2D2D2);
+    this->FillTriangleRegion(width - 8, 18, width - 14, 10, width - 14, 26, this->m_page >= this->m_lastPage ? 0xD2D2D2 : 0xFF9F70);
     break;
   }
   }
@@ -121,10 +132,14 @@ void UIKeyStrokeWnd::Paint() {
   char text[3];
   text[2] = '\0';
 
-  for (int index = 0; index < 4; ++index) {
-    std::memcpy(text, g_serverLanguage->DisplayText() + index * 2, 2);
-    this->DrawTextAt(2 + index * 14, 2, text, 2, 0, 12, 0, 0, 0);
-  }
+  std::memcpy(text, g_serverLanguage->DisplayText(), 2);
+  this->DrawTextAt(2, 2, text, 2, 0, 12, 0, 0, 0);
+  std::memcpy(text, g_serverLanguage->DisplayText() + 2, 2);
+  this->DrawTextAt(16, 2, text, 2, 0, 12, 0, 0, 0);
+  std::memcpy(text, g_serverLanguage->DisplayText() + 4, 2);
+  this->DrawTextAt(30, 2, text, 2, 0, 12, 0, 0, 0);
+  std::memcpy(text, g_serverLanguage->DisplayText() + 6, 2);
+  this->DrawTextAt(44, 2, text, 2, 0, 12, 0, 0, 0);
 }
 
 // OFFSET: 0x0096DD40

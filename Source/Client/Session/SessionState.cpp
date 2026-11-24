@@ -1,5 +1,8 @@
 #include "Client/Mode/ModeMessage.h"
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/CombatTypes.h"
+#include "Contents/Effects/Core/EffectTypes.h"
+#include "Contents/Skills/SkillId.h"
 #include "UI/Window/UIEnums.h"
 #include "Client/Session/Session.h"
 #include "Client/Input/InputCharset.h"
@@ -48,6 +51,40 @@ static const SkillDelayField g_skillDelayFields[] = {
   {2, "SkillGlobalPostDelay"},
   {3, "SkillSinglePostDelay"},
 };
+
+// OFFSET: 0x00E2FBB0
+// FUNCTION: fn_45611
+int CSession::GetElementalSize() const {
+  CGameActor* actor = static_cast<CGameActor*>(g_modeMgr.GetGameMode()->scene->GetGameActorByAID(this->elementalGid));
+  if (!actor) {
+    return 0;
+  }
+
+  switch (actor->GetEffectiveJob(-1)) {
+  case JT_EL_AGNI_S:
+  case JT_EL_AQUA_S:
+  case JT_EL_VENTUS_S:
+  case JT_EL_TERA_S:
+    return 1;
+  case JT_EL_AGNI_M:
+  case JT_EL_AQUA_M:
+  case JT_EL_VENTUS_M:
+  case JT_EL_TERA_M:
+    return 2;
+  case JT_EL_AGNI_L:
+  case JT_EL_AQUA_L:
+  case JT_EL_VENTUS_L:
+  case JT_EL_TERA_L:
+  case JT_EM_DILUVIO:
+  case JT_EM_ARDOR:
+  case JT_EM_PROCELLA:
+  case JT_EM_TERREMOTUS:
+  case JT_EM_SERPENS:
+    return 3;
+  default:
+    return 0;
+  }
+}
 
 // OFFSET: 0x00E30940
 // FUNCTION: fn_24168
@@ -104,48 +141,12 @@ void CSession::LoadSkillDelayList(int skillId, std::vector<std::map<int, int>>& 
   }
   lua_settop(L, -2);
 
-  if (skillId == 2461) {
+  if (skillId == SO_EL_ACTION) {
     if (delays.empty()) {
       delays.resize(1);
     }
 
-    CGameActor* actor = static_cast<CGameActor*>(
-      g_modeMgr.GetGameMode()->scene->GetGameActorByAID(this->elementalGid)
-    );
-    int delay;
-    if (actor) {
-      switch (actor->GetEffectiveJob(-1)) {
-      case JT_EL_AGNI_S:
-      case JT_EL_AQUA_S:
-      case JT_EL_VENTUS_S:
-      case JT_EL_TERA_S:
-        delay = 3000;
-        break;
-      case JT_EL_AGNI_M:
-      case JT_EL_AQUA_M:
-      case JT_EL_VENTUS_M:
-      case JT_EL_TERA_M:
-        delay = 6000;
-        break;
-      case JT_EL_AGNI_L:
-      case JT_EL_AQUA_L:
-      case JT_EL_VENTUS_L:
-      case JT_EL_TERA_L:
-      case JT_EM_DILUVIO:
-      case JT_EM_ARDOR:
-      case JT_EM_PROCELLA:
-      case JT_EM_TERREMOTUS:
-      case JT_EM_SERPENS:
-        delay = 9000;
-        break;
-      default:
-        delay = 0;
-        break;
-      }
-    } else {
-      delay = 0;
-    }
-    delays[0][3] = delay;
+    delays[0][3] = this->GetElementalSize() * 3000;
   }
 }
 
@@ -198,10 +199,10 @@ bool CSession::IsThirdJobOrHigher(int job) {
 bool CSession::EquipSwapCostumeItem(const ITEM_INFO& item) {
   const EquipSlots slots = g_session.GetEquipSlots(static_cast<int>(item.identity[3]));
   int order[3];
-  order[0] = slots.values[2];
-  order[1] = slots.values[1];
-  order[2] = slots.values[0];
-  if (item.identity[3] == 0x8000) {
+  order[0] = std::get<0>(slots);
+  order[1] = std::get<1>(slots);
+  order[2] = std::get<2>(slots);
+  if (item.identity[3] == EQP_AMMO) {
     g_session.SetSwapArrowIndex(item.identity[1]);
   }
 
@@ -223,23 +224,23 @@ bool CSession::EquipSwapCostumeItem(const ITEM_INFO& item) {
 
 // OFFSET: 0x00E3D8A0
 // FUNCTION: fn_24192
-void CSession::UnequipSwapEquippedItem(const ITEM_INFO& item) {
+__declspec(safebuffers) void CSession::UnequipSwapEquippedItem(const ITEM_INFO& item) {
   const int location = static_cast<int>(item.identity[3]);
-  if (location == 0x8000) {
+  if (location == EQP_AMMO) {
     this->SetSwapArrowIndex(0);
   } else {
     const EquipSlots slots = g_session.GetEquipSlots(location);
-    if (slots.values[2] < 10) {
-      if (slots.values[2] != -1) {
-        ITEM_INFO& entry = this->swapEquippedItems[slots.values[2]];
-        entry.identity[3] = 0;
-        entry.Reset();
+    if (std::get<0>(slots) < 10) {
+      if (std::get<0>(slots) != -1) {
+        const int index = std::get<0>(slots);
+        this->swapEquippedItems[index].identity[3] = 0;
+        this->swapEquippedItems[index].Reset();
       }
-      if (slots.values[1] != -1 && slots.values[1] < 10) {
-        this->swapEquippedItems[slots.values[1]].Reset();
+      if (std::get<1>(slots) != -1 && std::get<1>(slots) < 10) {
+        this->swapEquippedItems[std::get<1>(slots)].Reset();
       }
-      if (slots.values[0] != -1 && slots.values[0] < 10) {
-        this->swapEquippedItems[slots.values[0]].Reset();
+      if (std::get<2>(slots) != -1 && std::get<2>(slots) < 10) {
+        this->swapEquippedItems[std::get<2>(slots)].Reset();
       }
     }
   }
@@ -254,7 +255,7 @@ void CSession::UnequipSwapEquippedItem(const ITEM_INFO& item) {
 // FUNCTION: fn_24193
 void CSession::UnequipSwapCostumeItem(const ITEM_INFO& item) {
   const int location = static_cast<int>(item.identity[3]);
-  if (location == 0x8000) {
+  if (location == EQP_AMMO) {
     ITEM_INFO equipped = g_session.FindItemByIdentity(item.identity[1], location);
     if (equipped.identity[1] > 0) {
       const char* message = LookupMessage(MSI_ITEM_IS_REMOVED);
@@ -263,17 +264,17 @@ void CSession::UnequipSwapCostumeItem(const ITEM_INFO& item) {
     this->SetSwapArrowIndex(0);
   } else {
     const EquipSlots slots = g_session.GetEquipSlots(location);
-    if (slots.values[2] < 10) {
-      if (slots.values[2] != -1) {
-        ITEM_INFO& entry = this->swapCostumeItems[slots.values[2]];
-        entry.identity[3] = 0;
-        entry.Reset();
+    if (std::get<0>(slots) < 10) {
+      if (std::get<0>(slots) != -1) {
+        const int index = std::get<0>(slots);
+        this->swapCostumeItems[index].identity[3] = 0;
+        this->swapCostumeItems[index].Reset();
       }
-      if (slots.values[1] != -1 && slots.values[1] < 10) {
-        this->swapCostumeItems[slots.values[1]].Reset();
+      if (std::get<1>(slots) != -1 && std::get<1>(slots) < 10) {
+        this->swapCostumeItems[std::get<1>(slots)].Reset();
       }
-      if (slots.values[0] != -1 && slots.values[0] < 10) {
-        this->swapCostumeItems[slots.values[0]].Reset();
+      if (std::get<2>(slots) != -1 && std::get<2>(slots) < 10) {
+        this->swapCostumeItems[std::get<2>(slots)].Reset();
       }
     }
   }
@@ -314,7 +315,7 @@ void CSession::SetSwapArrowIndex(std::uint32_t value) {
     return;
   }
 
-  const auto it = std::find_if(g_activeSkillEffects.begin(), g_activeSkillEffects.end(), [](const ActiveSkillEffect& effect) { return effect.id == 0x2B7; });
+  const auto it = std::find_if(g_activeSkillEffects.begin(), g_activeSkillEffects.end(), [](const ActiveSkillEffect& effect) { return effect.id == EFST_CLIENT_ONLY_EQUIP_ARROW; });
   if (it == g_activeSkillEffects.end()) {
     if (value) {
       ActiveSkillEffect effect;
@@ -340,7 +341,8 @@ void CSession::ResolvePendingActorName(std::uint32_t id, const char* name) {
     return;
   }
 
-  if (this->pendingActorNames.end() == this->pendingActorNames.find(static_cast<std::uint32_t>(id))) {
+  std::uint32_t key = id;
+  if (this->pendingActorNames.end() == this->pendingActorNames.find(key)) {
     return;
   }
 

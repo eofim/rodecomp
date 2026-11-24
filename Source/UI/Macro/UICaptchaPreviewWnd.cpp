@@ -4,6 +4,7 @@
 #include "UI/Edit/UIEditCtrl.h"
 #include "UI/Macro/UIMacroDetectorWnd.h"
 #include "UI/Window/InputFocus.h"
+#include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "UI/Window/WindowBorder.h"
 #include "Contents/Tables/MessageTable.h"
@@ -111,7 +112,7 @@ void UIMacroDetectorWnd::OnCreate(int, int) {
   this->m_button->SetBitmap("유저인터페이스\\btn_get_b.bmp", 2, 0);
   this->m_button->SetSize(this->m_button->BitmapWidth(), this->m_button->BitmapHeight());
   this->m_button->Move(253, 261);
-  this->m_button->SetId(345);
+  this->m_button->SetId(ID_SEND);
   this->AddChild(this->m_button);
 }
 
@@ -129,9 +130,9 @@ void UIMacroDetectorWnd::Paint() {
   this->FillRegion(0, 16, this->geometry.width, this->geometry.height - 36, 0xFFFFFFFF);
   this->DrawRectOutline(0, 16, this->geometry.width, this->geometry.height - 36, 0xC6C6C6);
 
-  this->DrawTextAt(25, 28, LookupMessage(MSI_MACRO_DETECTOR_REMAIN_COUNT), 0, 0, 12, 0, 1, 0);
-  this->DrawTextAt(25, 45, LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_CHAR), 0, 0, 12, 0, 1, 0);
-  this->DrawTextAt(25, 62, LookupMessage(MSI_MACRO_REPORTER_SELECT_MODE_CELL), 0, 0, 12, 0, 1, 0);
+  this->DrawTextAt(25, 28, LookupMessage(MSI_MACRO_DETECTOR_NOTICE1), 0, 0, 12, 0, 1, 0);
+  this->DrawTextAt(25, 45, LookupMessage(MSI_MACRO_DETECTOR_NOTICE2), 0, 0, 12, 0, 1, 0);
+  this->DrawTextAt(25, 62, LookupMessage(MSI_MACRO_DETECTOR_NOTICE3), 0, 0, 12, 0, 1, 0);
 
   this->DrawTextAt(25, 82, this->message.c_str(), 0, 0, 12, 0x2323FF, 1, 0);
 
@@ -144,12 +145,10 @@ void UIMacroDetectorWnd::Paint() {
     float width = (static_cast<float>(remaining) / static_cast<float>(this->totalDuration)) * 220.0f;
     this->FillRegion(60, 97, static_cast<int>(width), 30, 0xFF);
 
-    unsigned int seconds = remaining / 1000;
-    this->DrawRightAlignedText(280, 138, FormatOwnedString("%2d : %2d", seconds / 60, seconds).c_str(), 0, 0, 13, 0xFF2323, 1);
-    {
-      std::string str = FormatOwnedString(LookupMessage(MSI_MACRO_REPORTER_TOOLTIP_CHAR), this->remainingAttempts);
-      this->DrawTextAt(60, 138, str.c_str(), 0, 0, 13, 0x2323FF, 1, 0);
-    }
+    const unsigned int seconds = remaining / 1000;
+    const unsigned int minutes = seconds / 60;
+    this->DrawRightAlignedText(280, 138, FormatOwnedString("%2d : %2d", minutes, seconds).c_str(), 0, 0, 13, 0xFF2323, 1);
+    this->DrawTextAt(60, 138, FormatOwnedString(LookupMessage(MSI_MACRO_DETECTOR_REMAIN_COUNT), this->remainingAttempts).c_str(), 0, 0, 13, 0x2323FF, 1, 0);
   }
 }
 

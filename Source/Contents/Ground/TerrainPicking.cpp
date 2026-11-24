@@ -1,14 +1,13 @@
+#include <algorithm>
 #include "Resource/World/TerrainResource.h"
 #include "Utility/Math/RayTriangle.h"
 
 // OFFSET: 0x00749300
 // FUNCTION: fn_07842
 float C3dAttr::RayDistance(const float* ray, int column, int row) const {
-  float nearest = 999999.0f;
-  const TerrainHeightCell* cell;
-
-  cell = this->CellAt(column, row);
-
+  float firstDistance = 999999.0f;
+  float nearest = firstDistance;
+  const TerrainHeightCell* cell = this->CellAt(column, row);
   if (!cell) {
     return 0.0f;
   }
@@ -23,35 +22,32 @@ float C3dAttr::RayDistance(const float* ray, int column, int row) const {
     float z;
   };
   Point corners[4];
+  corners[0].y = cell->heights[0];
   const float size = static_cast<float>(this->cellSize);
   const int dx = column - this->width / 2;
   const int dz = row - this->height / 2;
-  const float left = static_cast<float>(dx) * size;
-  const float right = static_cast<float>(dx + 1) * size;
-  const float top = static_cast<float>(dz) * size;
-  const float bottom = static_cast<float>(dz + 1) * size;
-  corners[0].x = left;
-  corners[0].y = cell->heights[0];
-  corners[0].z = top;
-  corners[1].x = right;
+  corners[0].x = static_cast<float>(dx) * size;
+  corners[0].z = static_cast<float>(dz) * size;
+  corners[1].x = static_cast<float>(dx + 1) * size;
   corners[1].y = cell->heights[1];
-  corners[1].z = top;
-  corners[2].x = left;
+  corners[1].z = static_cast<float>(dz) * size;
+  corners[2].x = static_cast<float>(dx) * size;
   corners[2].y = cell->heights[2];
-  corners[2].z = bottom;
-  corners[3].x = right;
+  corners[2].z = static_cast<float>(dz + 1) * size;
+  corners[3].x = static_cast<float>(dx + 1) * size;
   corners[3].y = cell->heights[3];
-  corners[3].z = bottom;
+  corners[3].z = static_cast<float>(dz + 1) * size;
   float u;
   float v;
   float distance;
 
   if (IntersectRayTriangle(ray, &corners[0].x, &corners[1].x, &corners[2].x, u, v, distance)) {
-    nearest = distance < nearest ? distance : nearest;
+    firstDistance = std::min(distance, 999999.0f);
+    nearest = firstDistance;
   }
 
   if (IntersectRayTriangle(ray, &corners[1].x, &corners[3].x, &corners[2].x, u, v, distance)) {
-    nearest = distance < nearest ? distance : nearest;
+    nearest = std::min(distance, firstDistance);
   }
 
   return nearest;

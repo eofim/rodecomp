@@ -2,6 +2,7 @@
 #include "Utility/Math/ScalarConversion.h"
 
 #include <cstring>
+#include <memory>
 
 // OFFSET: 0x00AB5CE0
 // FUNCTION: fn_17464
@@ -53,7 +54,7 @@ void C3dNode::Draw(const float*, unsigned char, bool, unsigned char) {
 void C3dNodeV1::Initialize(const ModelNode& base) {
   const auto& resource = static_cast<const ModelNodeV1&>(base);
   this->name = resource.name;
-  this->mesh = resource.mesh.get();
+  this->mesh = resource.mesh;
   this->textures.resize(resource.textures.size());
   for (unsigned int i = 0; i < resource.textures.size(); ++i) {
     this->textures[i] = resource.textures[i];
@@ -65,7 +66,10 @@ void C3dNodeV1::Initialize(const ModelNode& base) {
     this->scaleKeys.Add(0, resource.scale[0], resource.scale[1], resource.scale[2], 1.0f, 0.0f, 0.0f, 0.0f);
   }
 
-  this->rotationKeys = resource.rotationKeys;
+  const std::vector<ModelRotationKey>& rotations = resource.rotationKeys;
+  if (&this->rotationKeys != &rotations) {
+    this->rotationKeys.assign(rotations.data(), std::to_address(rotations.end()));
+  }
 
   if (this->rotationKeys.size() == 0) {
     this->rotationKeys.Add(0, resource.axis[0], resource.axis[1], resource.axis[2], resource.angle);
@@ -74,7 +78,7 @@ void C3dNodeV1::Initialize(const ModelNode& base) {
   this->positionKeys = resource.legacyPositionKeys;
 
   if (this->positionKeys.size() == 0) {
-    this->positionKeys.push_back({0, {resource.position[0], resource.position[1], resource.position[2]}});
+    this->positionKeys.Add(0, resource.position[0], resource.position[1], resource.position[2]);
   }
 
   for (auto it = resource.children.begin(); it != resource.children.end(); ++it) {
@@ -94,7 +98,7 @@ void C3dNodeV1::Initialize(const ModelNode& base) {
 void C3dNodeV2::Initialize(const ModelNode& base) {
   const auto& resource = static_cast<const ModelNodeV2&>(base);
   this->name = resource.name;
-  this->mesh = resource.mesh.get();
+  this->mesh = resource.mesh;
   std::memcpy(this->resourceTransform.values, resource.transform, sizeof(resource.transform));
 
   if (!this->parent) {
@@ -112,11 +116,11 @@ void C3dNodeV2::Initialize(const ModelNode& base) {
   this->positionKeys = resource.positionKeys;
   this->textureKeys = resource.textureKeys;
 
-  for (const ModelNode* resourceChild : resource.children) {
+  for (auto resourceChildIt = resource.children.begin(); resourceChildIt != resource.children.end(); ++resourceChildIt) {
     auto* child = new C3dNodeV2;
     child->parent = this;
     child->model = this->model;
-    child->Initialize(*resourceChild);
+    child->Initialize(**resourceChildIt);
     this->children.push_back(child);
   }
 
@@ -163,7 +167,7 @@ void C3dNodeV2::Animate(double frame) {
   this->textureTransforms.clear();
 
   for (auto it = this->textureKeys.begin(); it != this->textureKeys.end(); ++it) {
-    SampleModelTexture(it->second, selected, this->textureTransforms[it->first]);
+    it->second.Sample(selected, this->textureTransforms[it->first]);
   }
 
   for (auto it = this->children.begin(); it != this->children.end(); ++it) {

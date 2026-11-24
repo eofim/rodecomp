@@ -17,6 +17,7 @@
 #include "UI/Window/UIWindowMgr.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <mbstring.h>
 #include <new>
 #include <windows.h>
@@ -65,7 +66,8 @@ void CSignBoardMgr::Initialize() {
   if (g_modeMgr.GetGameMode() != nullptr) {
     mapName = std::string(g_modeMgr.GetGameMode()->mapName);
   }
-  mapName = mapName.substr(0, mapName.find(".rsw"));
+  const char* extension = std::strstr(mapName.c_str(), ".rsw");
+  mapName = mapName.substr(0, extension != nullptr ? static_cast<std::size_t>(extension - mapName.c_str()) : std::string::npos);
 
   for (std::vector<SignBoardInfo>::iterator it = this->m_entries.begin(); it != this->m_entries.end(); ++it) {
     std::string entryMap(it->map);
@@ -79,7 +81,7 @@ void CSignBoardMgr::Initialize() {
         object->Create();
         std::string image;
         if (_mbsstr(reinterpret_cast<const unsigned char*>(it->image), reinterpret_cast<const unsigned char*>("유저인터페이스")) == nullptr) {
-          image = "유저인터페이스\\";
+          image = std::string("유저인터페이스\\");
         }
         image += it->image;
         object->SetWindowImage(image);
@@ -109,7 +111,7 @@ void CSignBoardMgr::Initialize() {
         object->Create();
         std::string image;
         if (_mbsstr(reinterpret_cast<const unsigned char*>(it->image), reinterpret_cast<const unsigned char*>("유저인터페이스")) == nullptr) {
-          image = "유저인터페이스\\";
+          image = std::string("유저인터페이스\\");
         }
         image += it->image;
         object->SetWindowImage(image);
@@ -174,7 +176,7 @@ void CSignBoardMgr::LoadList() {
 
 // OFFSET: 0x00821040
 // FUNCTION: fn_10254
-C3DCooRendering::C3DCooRendering() : window(nullptr) {
+__declspec(noinline) C3DCooRendering::C3DCooRendering() : window(nullptr) {
 }
 
 // OFFSET: 0x008210A0
@@ -211,11 +213,8 @@ CSignBoardWnd::~CSignBoardWnd() = default;
 // OFFSET: 0x008215D0
 // FUNCTION: fn_10262
 void CSignBoardWnd::ApplyColor() {
-  int red = 0;
-  int green = 0;
-  int blue = 0;
+  int values[3] = {};
   if (this->colorText.size() != 0) {
-    int values[3] = {0, 0, 0};
     int index = 0;
     std::string rest = this->colorText;
     std::string token = this->colorText;
@@ -230,19 +229,16 @@ void CSignBoardWnd::ApplyColor() {
       }
       values[index] = std::atoi(rest.c_str());
     }
-    red = values[0];
-    green = values[1];
-    blue = values[2];
     if (this->colorText.find("#") != std::string::npos) {
       std::string hex = this->colorText;
       hex = hex.substr(hex.find("#") + 1);
       const unsigned long color = std::strtoul(hex.c_str(), nullptr, 16);
-      red = static_cast<int>((color >> 16) & 0xff);
-      green = static_cast<int>((color >> 8) & 0xff);
-      blue = static_cast<int>(color & 0xff);
+      values[0] = static_cast<int>((color >> 16) & 0xff);
+      values[1] = static_cast<int>((color >> 8) & 0xff);
+      values[2] = static_cast<int>(color & 0xff);
     }
   }
-  this->text->SetColor(red, green, blue);
+  this->text->SetColor(values[0], values[1], values[2]);
 }
 
 // OFFSET: 0x00821B40
@@ -374,7 +370,7 @@ void CIcon::Load(const std::string& name) {
 
 // OFFSET: 0x00822310
 // FUNCTION: fn_10276
-void C3DCooRendering::SetBoard(const std::string& text, const std::string& color) {
+__declspec(noinline) void C3DCooRendering::SetBoard(const std::string& text, const std::string& color) {
   static_cast<CSignBoardWnd*>(this->window)->boardText = text;
   static_cast<CSignBoardWnd*>(this->window)->colorText = color;
   CSignBoardWnd* board = static_cast<CSignBoardWnd*>(this->window);
@@ -384,7 +380,7 @@ void C3DCooRendering::SetBoard(const std::string& text, const std::string& color
 
 // OFFSET: 0x00822390
 // FUNCTION: fn_10277
-void C3DCooRendering::SetWindowImage(const std::string& name) {
+__declspec(noinline) void C3DCooRendering::SetWindowImage(const std::string& name) {
   if (this->window == nullptr) {
     return;
   }

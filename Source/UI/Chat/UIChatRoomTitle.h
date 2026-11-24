@@ -22,6 +22,7 @@ class UIChatRoomTitle : public UIWindow {
 
 public:
   UIChatRoomTitle();
+  __declspec(noinline) ~UIChatRoomTitle() override;
   void OnCreate(int width, int height) override;
   void OnLBtnDblClk(int x, int y) override;
   void Paint() override;
@@ -29,14 +30,9 @@ public:
   int SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) override;
 
   /* 007C */ UIStaticText* label;
-  /* 0080 */ std::string title;
-  /* 0098 */ std::string password;
-  /* 00B0 */ int roomType;
-  /* 00B4 */ int memberCount;
-  /* 00B8 */ int memberLimit;
+  /* 0080 */ ChatRoomTitleInfo info;
 
 protected:
-  /* 00BC */ int roomId;
   /* 00C0 */ short roomOption;
 };
 

@@ -1,26 +1,24 @@
 #include "Contents/Models/ModelAnimation.h"
+#include "Contents/Map/MapSkyMgr.h"
+#include "Render/Projection/RenderProjection.h"
 
 #include <cmath>
 #include <cstring>
 
-namespace {
-  __declspec(noinline) ModelRotationKey MatrixQuaternion(const matrix& matrix);
+// OFFSET: 0x00554340
+// FUNCTION: fn_02022
+__declspec(noinline) ModelRotationKey matrix::GetRotation() const {
+  ModelRotationKey result{0, {0, 0, 0, 1}};
+  const float trace = ((this->values[0] + 1.0f) + this->values[4]) + this->values[8];
+  const float root = std::sqrt(trace);
+  const float w = root * 0.5f;
+  result.rotation[3] = w;
+  const float divisor = w * 4.0f;
+  result.rotation[0] = (this->values[7] - this->values[5]) / divisor;
+  result.rotation[1] = (this->values[2] - this->values[6]) / divisor;
+  result.rotation[2] = (this->values[3] - this->values[1]) / divisor;
 
-  // OFFSET: 0x00554340
-  // FUNCTION: fn_02022
-  ModelRotationKey MatrixQuaternion(const matrix& matrix) {
-    ModelRotationKey result{0, {0, 0, 0, 1}};
-    const float trace = ((matrix.values[0] + 1.0f) + matrix.values[4]) + matrix.values[8];
-    const float root = std::sqrt(trace);
-    const float w = root * 0.5f;
-    result.rotation[3] = w;
-    const float divisor = w * 4.0f;
-    result.rotation[0] = (matrix.values[7] - matrix.values[5]) / divisor;
-    result.rotation[1] = (matrix.values[2] - matrix.values[6]) / divisor;
-    result.rotation[2] = (matrix.values[3] - matrix.values[1]) / divisor;
-
-    return result;
-  }
+  return result;
 }
 
 // OFFSET: 0x00540370
@@ -30,7 +28,7 @@ void LegacyPositionTrack::Sample(int frame, matrix& output) const {
   const unsigned count = keys.size();
 
   if (count == 0) {
-    std::memcpy(output.values, g_identityMatrix, sizeof(g_identityMatrix));
+    output.Identity();
     return;
   }
 
@@ -39,18 +37,26 @@ void LegacyPositionTrack::Sample(int frame, matrix& output) const {
     return;
   }
 
-  for (unsigned next = 1; next < count; ++next) {
+  bool found = false;
+  unsigned next = 1;
+
+  for (; next < count; ++next) {
     if (keys[next].frame > frame) {
-      const auto& a = keys[next - 1];
-      const auto& b = keys[next];
-      const float amount = static_cast<float>((frame - a.frame)) / static_cast<float>((b.frame - a.frame));
-      const float previous = static_cast<float>(1.0 - static_cast<double>(amount));
-      output.MakeTranslate(
-        previous * a.position[0] + amount * b.position[0], previous * a.position[1] + amount * b.position[1], previous * a.position[2] + amount * b.position[2]
-      );
-      return;
+      found = true;
+      break;
     }
   }
+
+  if (!found) {
+    return;
+  }
+
+  const auto& a = keys[next - 1];
+  const auto& b = keys[next];
+  const float amount = static_cast<float>(frame - a.frame) / static_cast<float>(b.frame - a.frame);
+  const float previous = static_cast<float>(1.0 - static_cast<double>(amount));
+  const vector3d position{previous * a.position[0] + amount * b.position[0], previous * a.position[1] + amount * b.position[1], previous * a.position[2] + amount * b.position[2]};
+  output.MakeTranslate(position.x, position.y, position.z);
 }
 
 // OFFSET: 0x00540670
@@ -65,19 +71,21 @@ __declspec(safebuffers) void LegacyRotationTrack::Sample(int frame, matrix& outp
   }
 
   if (count == 1) {
-    QuaternionMatrix(keys[0], output);
+    output.MakeRotation(keys[0]);
     return;
   }
 
+  bool found = false;
   unsigned next = 1;
 
   for (; next < count; ++next) {
     if (keys[next].frame > frame) {
+      found = true;
       break;
     }
   }
 
-  if (next >= count) {
+  if (!found) {
     return;
   }
 
@@ -93,12 +101,12 @@ __declspec(safebuffers) void LegacyRotationTrack::Sample(int frame, matrix& outp
 
   if (next == 0) {
     result.Interpolate(0.0f, keys[0], keys[1], 0);
+    output.MakeRotation(result);
   } else {
     const float amount = static_cast<float>((frame - a.frame)) / static_cast<float>((b.frame - a.frame));
     result.Interpolate(amount, a, b, 0);
+    output.MakeRotation(result);
   }
-
-  QuaternionMatrix(result, output);
 }
 
 // OFFSET: 0x00540BF0
@@ -144,16 +152,23 @@ void ModelScaleTrack::Sample(float frame, matrix& output) const {
 
   for (unsigned next = 0; next < count; ++next) {
     if (static_cast<float>(keys[next].frame) > frame) {
-      if (next != 0) {
+      if (next == 0) {
+        second = keys[0];
+      } else {
         first = keys[next - 1];
+        second = keys[next];
       }
 
-      second = keys[next];
       break;
     }
   }
 
-  const float amount = second.frame != first.frame ? (frame - static_cast<float>(first.frame)) / static_cast<float>((second.frame - first.frame)) : 0.0f;
+  float amount = 0.0f;
+
+  if (second.frame != first.frame) {
+    amount = (frame - static_cast<float>(first.frame)) / static_cast<float>((second.frame - first.frame));
+  }
+
   scale.SetScale(
     (1.0f - amount) * first.rotation[0] + second.rotation[0] * amount, (1.0f - amount) * first.rotation[1] + second.rotation[1] * amount,
     first.rotation[2] * (1.0f - amount) + second.rotation[2] * amount
@@ -182,24 +197,30 @@ void ModelPositionTrack::Sample(float frame, const matrix& base, matrix& output)
   }
 
   if (frame >= static_cast<float>(keys[count - 1].frame)) {
-    output.values[9] = keys[keys.size() - 1].rotation[0];
+    output.values[9] = keys[count - 1].rotation[0];
     output.values[10] = keys[keys.size() - 1].rotation[1];
     output.values[11] = keys[keys.size() - 1].rotation[2];
     return;
   }
 
-  ModelPositionKey first;
-  ModelPositionKey second;
+  ModelRotationKey first;
+  ModelRotationKey second;
 
   for (unsigned next = 0; next < count; ++next) {
     if (static_cast<float>(keys[next].frame) > frame) {
       if (next == 0) {
-        first = ModelPositionKey{0, {base.values[9], base.values[10], base.values[11]}};
+        ModelRotationKey start;
+        start.frame = 0;
+        start.rotation[0] = base.values[9];
+        start.rotation[1] = base.values[10];
+        start.rotation[2] = base.values[11];
+        first = start;
+        second = keys[0];
       } else {
-        std::memcpy(&first, &keys[next - 1], sizeof(first));
+        first = keys[next - 1];
+        second = keys[next];
       }
 
-      std::memcpy(&second, &keys[next], sizeof(second));
       break;
     }
   }
@@ -207,9 +228,14 @@ void ModelPositionTrack::Sample(float frame, const matrix& base, matrix& output)
   const float amount = (frame - static_cast<float>(first.frame)) / static_cast<float>((second.frame - first.frame));
   const float previous = 1.0f - amount;
 
-  output.values[9] = first.position[0] * previous + second.position[0] * amount;
-  output.values[10] = first.position[1] * previous + second.position[1] * amount;
-  output.values[11] = first.position[2] * previous + second.position[2] * amount;
+  const vector3d position{
+    first.rotation[0] * previous + second.rotation[0] * amount, first.rotation[1] * previous + second.rotation[1] * amount,
+    first.rotation[2] * previous + second.rotation[2] * amount
+  };
+
+  output.values[9] = position.x;
+  output.values[10] = position.y;
+  output.values[11] = position.z;
 }
 
 // OFFSET: 0x005407A0
@@ -223,9 +249,9 @@ void ModelRotationTrack::Sample(float frame, const matrix& base, matrix& output)
   if (count == 0) {
     rotation = base;
   } else if (count == 1) {
-    QuaternionMatrix(keys[0], rotation);
+    rotation.MakeRotation(keys[0]);
   } else if (frame >= static_cast<float>(keys[count - 1].frame)) {
-    QuaternionMatrix(keys[count - 1], rotation);
+    rotation.MakeRotation(keys[count - 1]);
   } else {
     ModelRotationKey a{0, {0, 0, 0, 1}};
     ModelRotationKey b{0, {0, 0, 0, 1}};
@@ -233,13 +259,14 @@ void ModelRotationTrack::Sample(float frame, const matrix& base, matrix& output)
     for (unsigned next = 0; next < count; ++next) {
       if (static_cast<float>(keys[next].frame) > frame) {
         if (next == 0) {
-          a = MatrixQuaternion(base);
+          a = base.GetRotation();
           a.frame = 0;
+          b = keys[0];
         } else {
           a = keys[next - 1];
+          b = keys[next];
         }
 
-        b = keys[next];
         break;
       }
     }
@@ -250,7 +277,6 @@ void ModelRotationTrack::Sample(float frame, const matrix& base, matrix& output)
       amount = (frame - static_cast<float>(a.frame)) / static_cast<float>((b.frame - a.frame));
     }
 
-    ModelRotationKey result{0, {0, 0, 0, 1}};
     float ax = a.rotation[0];
     float ay = a.rotation[1];
     float az = a.rotation[2];
@@ -269,17 +295,20 @@ void ModelRotationTrack::Sample(float frame, const matrix& base, matrix& output)
       dot = -dot;
     }
 
+    ModelRotationKey result{0, {0, 0, 0, 1}};
+
     float firstWeight;
     float secondWeight;
 
     if (dot > -0.95f) {
+      firstWeight = g_projectionDepthNumerator - amount;
+
       if (dot > 0.95f) {
-        firstWeight = 1.0f - amount;
         secondWeight = amount;
       } else {
         const float angle = static_cast<float>(std::acos(static_cast<double>(dot)));
         const float denominator = ClientSin(angle);
-        firstWeight = ClientSin((1.0f - amount) * angle) / denominator;
+        firstWeight = ClientSin(firstWeight * angle) / denominator;
         secondWeight = ClientSin(angle * amount) / denominator;
       }
     } else {
@@ -287,7 +316,7 @@ void ModelRotationTrack::Sample(float frame, const matrix& base, matrix& output)
       by = ax;
       bz = -aw;
       bw = az;
-      firstWeight = ClientSin((0.5f - amount) * 3.141592f);
+      firstWeight = ClientSin((g_depthAverageHalf - amount) * 3.141592f);
       secondWeight = ClientSin(amount * 3.141592f);
     }
 
@@ -295,7 +324,7 @@ void ModelRotationTrack::Sample(float frame, const matrix& base, matrix& output)
     result.rotation[1] = by * secondWeight + firstWeight * ay;
     result.rotation[2] = bz * secondWeight + az * firstWeight;
     result.rotation[3] = bw * secondWeight + aw * firstWeight;
-    QuaternionMatrix(result, rotation);
+    rotation.MakeRotation(result);
   }
 
   matrix previous = output;

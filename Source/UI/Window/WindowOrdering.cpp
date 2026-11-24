@@ -11,9 +11,6 @@
 
 #include <algorithm>
 
-template __declspec(noinline) std::_Tree_find_result<std::map<UIWindow*, SnapRectangle>::_Mybase::_Nodeptr> std::map<UIWindow*, SnapRectangle>::_Mybase::_Find_lower_bound<UIWindow*>(UIWindow* const&) const;
-template __declspec(noinline) void std::map<UIWindow*, SnapRectangle>::_Mybase::clear() noexcept;
-
 // OFFSET: 0x00A966E0
 // FUNCTION: fn_17184
 void UIWindowMgr::InvalidateAll() {
@@ -74,26 +71,21 @@ void UIWindowMgr::EnableRouletteWnd() {
 
 // OFFSET: 0x00A96850
 // FUNCTION: fn_17189
-char UIWindowMgr::UpdateSnapRectangles() {
+void UIWindowMgr::UpdateSnapRectangles() {
   this->snapRectangles.clear();
 
   if (ServiceOptions::Get(141) == 0) {
-    return 0;
+    return;
   }
 
-  for (UIWindow* window : this->rendered) {
-    if (window->geometry.visible == 0) {
+  for (auto windowIt = this->rendered.begin(); windowIt != this->rendered.end(); ++windowIt) {
+    if ((*windowIt)->geometry.visible == 0) {
       continue;
     }
 
-    bool excluded = false;
-    for (UIWindow* ex : this->snapExcluded) {
-      if (ex == window) {
-        excluded = true;
-        break;
-      }
-    }
-    if (excluded) {
+    UIWindow* window = *windowIt;
+
+    if (std::find(this->snapExcluded.begin(), this->snapExcluded.end(), window) != this->snapExcluded.end()) {
       continue;
     }
 
@@ -101,8 +93,13 @@ char UIWindowMgr::UpdateSnapRectangles() {
       this->snapRectangles[window].Set(window->geometry.x, window->geometry.y, window->geometry.width, window->geometry.height);
     }
   }
+}
 
-  return 1;
+// INLINED
+static void RaiseEntry(std::list<UIWindow*>& windows, std::list<UIWindow*>::iterator entry) {
+  UIWindow* window = *entry;
+  windows.erase(entry);
+  windows.push_back(window);
 }
 
 // OFFSET: 0x00A976C0
@@ -118,19 +115,17 @@ void UIWindowMgr::Promote(UIWindow* window) {
 
   int companion = -1;
 
-  if (window->geometry.id == 12) {
+  if (window->geometry.id == WID_ITEMCOLLECTIONWND) {
     companion = 234;
   }
-  if (window->geometry.id == 82) {
+  if (window->geometry.id == WID_COMBINEDCARDITEMCOLLECTIONWND) {
     companion = 250;
   }
 
   if (companion != -1) {
     for (auto it = this->rendered.begin(); it != this->rendered.end(); ++it) {
       if ((*it)->geometry.id == companion) {
-        UIWindow* value = *it;
-        this->rendered.erase(it);
-        this->rendered.push_back(value);
+        RaiseEntry(this->rendered, it);
         break;
       }
     }

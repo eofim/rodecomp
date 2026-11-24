@@ -36,38 +36,41 @@ CShowRankingScheduler::CShowRankingScheduler(const std::uint64_t& timestamp, con
 // OFFSET: 0x00637C60
 // FUNCTION: fn_04739
 void CShowRankingScheduler::Process(const std::uint64_t& now) {
-  if (0 != this->rankingData.packetType) {
+  if (this->rankingData.packetType != 0) {
     const std::int64_t count = this->delay;
-    if (count != 0 && count > 0) {
+    if (0 != count && count > 0) {
       const std::int64_t due = static_cast<std::int64_t>(this->timestamp) + count * 10000;
       if ((due <=> static_cast<std::int64_t>(now)) <= 0) {
         this->Show();
-      } else {
-        bool complete = true;
-        for (int index = 0; index < 10; ++index) {
-          std::string name("");
-          if (this->rankingData.ids[index] == 0) {
-            continue;
-          }
-          for (std::size_t listed = 0; listed < this->rankingList.size(); ++listed) {
-            if (this->rankingList[listed] == this->rankingData.ids[index]) {
-              name = g_namelessName;
-              break;
-            }
-          }
-          if (name.find(g_namelessName) == std::string::npos) {
-            name = LookupPlayerName(this->rankingData.ids[index]);
-            if (name.empty()) {
-              complete = false;
-            }
-          }
-        }
-        if (!complete) {
-          g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STORE_ASSISTANT_TRADE_FORCED_REMOVAL_TITLE)), 0xffff, 0, 0, 0);
-          return;
-        }
-        this->Show();
+        this->active = false;
+        return;
       }
+
+      bool complete = true;
+      for (int index = 0; index < 10; ++index) {
+        std::string name("");
+        if (this->rankingData.ids[index] == 0) {
+          continue;
+        }
+        for (std::size_t listed = 0; listed < this->rankingList.size(); ++listed) {
+          if (this->rankingData.ids[index] == this->rankingList[listed]) {
+            name = g_namelessName;
+            break;
+          }
+        }
+        if (name.find(g_namelessName) != std::string::npos) {
+          continue;
+        }
+        name = LookupPlayerName(this->rankingData.ids[index]);
+        if (name.empty()) {
+          complete = false;
+        }
+      }
+      if (!complete) {
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RANK_LOADING)), 0xffff, 0, 0, 0);
+        return;
+      }
+      this->Show();
     }
   }
   this->active = false;
@@ -79,10 +82,15 @@ __declspec(noinline) std::map<int, RankingBoardStyle> RankingBoardStyles();
 // FUNCTION: fn_04738
 std::map<int, RankingBoardStyle> RankingBoardStyles() {
   std::map<int, RankingBoardStyle> styles;
-  styles.insert({0, {"========== BLACKSMITH RANK ============", 0x9B9B9B, 0xCDCDCD}});
-  styles.insert({1, {"=========== ALCHEMIST RANK =============", 0x9BCD9B, 0xCDFFCD}});
-  styles.insert({2, {"============ TAEKWON RANK =============", 0xCD9B9B, 0xFFCDCD}});
-  styles.insert({3, {"=========== KILLER RANK ==============", 0x9B9B9B, 0xCDCDCD}});
+  RankingBoardStyle style;
+  style = {"========== BLACKSMITH RANK ============", 0x9B9B9B, 0xCDCDCD};
+  styles.insert({0, style});
+  style = {"=========== ALCHEMIST RANK =============", 0x9BCD9B, 0xCDFFCD};
+  styles.insert({1, style});
+  style = {"============ TAEKWON RANK =============", 0xCD9B9B, 0xFFCDCD};
+  styles.insert({2, style});
+  style = {"=========== KILLER RANK ==============", 0x9B9B9B, 0xCDCDCD};
+  styles.insert({3, style});
   return styles;
 }
 
@@ -105,8 +113,8 @@ void CShowRankingScheduler::Show() {
   auto style = styles.find(kind);
   if (style != styles.end()) {
     title = style->second.title;
-    color = style->second.color;
     background = style->second.background;
+    color = style->second.color;
   } else {
     title = "===========================================";
     background = 0;
@@ -118,7 +126,7 @@ void CShowRankingScheduler::Show() {
     std::string name = "";
     if (this->rankingData.ids[index] != 0) {
       for (std::size_t listed = 0; listed < this->rankingList.size(); ++listed) {
-        if (this->rankingList[listed] == this->rankingData.ids[index]) {
+        if (this->rankingData.ids[index] == this->rankingList[listed]) {
           name = g_namelessName;
           break;
         }

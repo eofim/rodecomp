@@ -25,6 +25,7 @@ struct NavigationWindowInfo;
 
 class UINavigationWnd : public UIFrameWnd {
 public:
+  UINavigationWnd();
   void StoreInfo() override;
   void OnCreate(int width, int height) override;
   void Paint() override;
@@ -39,6 +40,10 @@ public:
   bool ClearHistory();
 
 protected:
+  void DrawRouteLabels(int activeLabel);
+  void DrawRoutePoints(int x, int y, float size);
+  bool DrawPlayerMarker(int x, int y, float size);
+
   /* 00B4 */ UIWindow* m_closeButton;
   /* 00B8 */ UIButton* m_minimizeButton;
   /* 00BC */ std::string m_title;

@@ -3,15 +3,19 @@
 
 // OFFSET: 0x00540EA0
 // FUNCTION: fn_01727
-void SampleModelTexture(ModelTextureChannels& channels, float frame, ModelTextureTransform& output) {
-  float* targets[5] = {&output.values[0], &output.values[1], &output.values[2], &output.values[3], &output.values[4]};
+void ModelTextureChannels::Sample(float frame, ModelTextureTransform& output) {
+  float* targets[5];
+  targets[0] = &output.values[0];
+  for (int i = 0; i < 4; ++i) {
+    targets[i + 1] = &output.values[i + 1];
+  }
 
   for (int channel = 0; channel < 5; ++channel) {
-    if (channels.find(channel) == channels.end()) {
+    if (this->find(channel) == this->end()) {
       continue;
     }
 
-    std::vector<ModelTextureKey>& keys = channels[channel];
+    std::vector<ModelTextureKey>& keys = (*this)[channel];
     unsigned next = 1;
     if (frame >= static_cast<float>(keys.back().frame)) {
       *targets[channel] = keys.back().value;
@@ -50,7 +54,7 @@ __declspec(safebuffers) void ModelKeyList2::Read(CFile& file) {
   for (int i = 0; i < count; ++i) {
     ModelRotationKey key;
     file.Read(&key, sizeof(key));
-    this->push_back(key);
+    this->push_back(std::move(key));
   }
 }
 
@@ -80,7 +84,7 @@ __declspec(safebuffers) void ModelKeyList4::Read(CFile& file) {
 
 // OFFSET: 0x005413D0
 // FUNCTION: fn_01732
-void ModelTextureChannelMap::Read(CFile& file) {
+void ModelTextureChannels::Read(CFile& file) {
   int count = 0;
   file.Read(&count, sizeof(count));
   for (int i = 0; i < count; ++i) {

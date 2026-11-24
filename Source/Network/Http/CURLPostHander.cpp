@@ -77,9 +77,3 @@ long CCURLPostHander::ResponseCode() {
   g_curlMgr->easyGetinfo(this->m_easy, 2097154, &code);
   return code;
 }
-
-// OFFSET: 0x005CDD40
-// FUNCTION: fn_03679
-std::string CCURLPostHander::Response() const {
-  return this->m_response;
-}

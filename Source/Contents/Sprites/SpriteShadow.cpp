@@ -16,28 +16,26 @@
 
 // OFFSET: 0x00811C10
 // FUNCTION: fn_10109
-__declspec(safebuffers) RenderPrimitive* CCharacterRender::DrawShadow(const float* matrix, float scale) const {
+RenderPrimitive* CCharacterRender::DrawShadow(const float* matrix, float scale) const {
   if (0.0f == scale || !g_modeMgr.GetGameMode() || !g_modeMgr.GetGameMode()->scene) {
     return nullptr;
   }
 
-  CGameMode* mode = g_modeMgr.GetGameMode();
-  const float* origin = &this->position.x;
-  const float height = mode->scene->terrain->Height(origin[0], origin[2]);
-  float position[3];
-  position[0] = origin[0];
-  position[1] = height;
-  position[2] = origin[2];
-  const float depth = position[0] * matrix[2] + position[1] * matrix[5] + position[2] * matrix[8] + matrix[11];
+  const float height = g_modeMgr.GetGameMode()->scene->terrain->Height(this->position.x, this->position.z);
+  vector3d position;
+  position.x = this->position.x;
+  position.y = height;
+  position.z = this->position.z;
+  const float depth = position.x * matrix[2] + position.y * matrix[5] + position.z * matrix[8] + matrix[11];
 
   float screenX;
   float screenY;
   float reciprocalDepth;
   if (this->viewportWidth == 0 && this->viewportHeight == 0) {
-    g_renderer->ProjectViewport(position, matrix, &screenX, &screenY, &reciprocalDepth);
+    g_renderer->ProjectViewport(&position.x, matrix, &screenX, &screenY, &reciprocalDepth);
   } else {
     g_renderer->ProjectViewportCentered(
-      position, matrix, &screenX, &screenY, &reciprocalDepth, static_cast<float>(this->viewportWidth) + this->viewportOffsetX, static_cast<float>(this->viewportHeight) + this->viewportOffsetY
+      &position.x, matrix, &screenX, &screenY, &reciprocalDepth, static_cast<float>(this->viewportWidth) + this->viewportOffsetX, static_cast<float>(this->viewportHeight) + this->viewportOffsetY
     );
   }
   const float distanceScale = g_renderer->ScaleDistance(reciprocalDepth);
@@ -53,21 +51,24 @@ __declspec(safebuffers) RenderPrimitive* CCharacterRender::DrawShadow(const floa
   const float size = g_session.GetNpcLocationRadius(this->job, this->riding) * scale;
   const double factor = distanceScale;
 
-  SpriteQuad quad;
-  quad.top = static_cast<float>(cell.y * factor * cell.scaleY * size + screenY);
-  quad.bottom = static_cast<float>(((image->doubleHeight + 1) * image->height + cell.y) * factor * cell.scaleY * size + screenY + 1.0);
-  quad.left = static_cast<float>(cell.x * factor * cell.scaleX * size + screenX);
-  quad.right = static_cast<float>(((image->doubleWidth + 1) * image->width + cell.x) * factor * cell.scaleX * size + screenX + 1.0);
-  if (quad.top >= static_cast<float>(g_renderer->viewport.height) || quad.bottom <= 0.0f || quad.left >= static_cast<float>(g_renderer->viewport.width)
-      || quad.right <= 0.0f) {
+  const float top = static_cast<float>(cell.y * factor * cell.scaleY * size + screenY);
+  const float bottom = static_cast<float>(((image->doubleHeight + 1) * image->height + cell.y) * factor * cell.scaleY * size + screenY + 1.0);
+  const float left = static_cast<float>(cell.x * factor * cell.scaleX * size + screenX);
+  const float right = static_cast<float>(((image->doubleWidth + 1) * image->width + cell.x) * factor * cell.scaleX * size + screenX + 1.0);
+  if (top >= static_cast<float>(g_renderer->viewport.height) || bottom <= 0.0f || left >= static_cast<float>(g_renderer->viewport.width) || right <= 0.0f) {
     return nullptr;
   }
 
-  quad.color = (((((((cell.color >> 24) & 0xFF) << 8) + (cell.color & 0xFF)) << 8) + ((cell.color >> 8) & 0xFF)) << 8) + ((cell.color >> 16) & 0xFF);
-  quad.bottomRhw = 1.0f / (depth - (quad.bottom - screenY) * g_cotangent) + 0.00001f;
-  quad.topRhw = 1.0f / (depth - (quad.top - screenY) * g_cotangent) + 0.00001f;
-  quad.angle = static_cast<float>(cell.rotation);
+  SpriteQuad quad;
+  quad.top = top;
+  quad.left = left;
+  quad.bottom = bottom;
+  quad.right = right;
   quad.image = image;
+  quad.color = (((((cell.colorChannels.alpha << 8) + cell.colorChannels.red) << 8) + cell.colorChannels.green) << 8) + cell.colorChannels.blue;
+  quad.bottomRhw = 1.0f / (depth - (bottom - screenY) * g_cotangent) + 0.00001f;
+  quad.topRhw = 1.0f / (depth - (top - screenY) * g_cotangent) + 0.00001f;
+  quad.angle = static_cast<float>(cell.rotation);
 
   return this->BuildSpriteQuad(quad, sprite->palette, 257, 0.0f, 0.0f);
 }

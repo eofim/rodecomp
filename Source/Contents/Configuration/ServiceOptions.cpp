@@ -1,5 +1,6 @@
 #include "Client/Mode/ModeMessage.h"
 #include "Contents/Actors/ActorEnums.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
 #include "Contents/Configuration/ServiceOptions.h"
@@ -437,8 +438,7 @@ bool GameSettings::RunFunction(int id) {
     return false;
   }
 
-  const std::function<void()> function = entry->second;
-  if (function) {
+  if (const std::function<void()> function = entry->second) {
     function();
     return true;
   }
@@ -462,11 +462,11 @@ std::optional<GameSettingsOption*> GameSettings::FindOption(int id) {
 // FUNCTION: fn_06316
 std::list<int> GameSettings::GetOptionIds(int tab) {
   std::list<int> ids;
-  for (const GameSettingsOption& option : this->options) {
+  std::for_each(this->options.begin(), this->options.end(), [&](const GameSettingsOption& option) {
     if (option.tab == tab) {
       ids.push_back(option.id);
     }
-  }
+  });
   return ids;
 }
 
@@ -525,9 +525,9 @@ bool GameSettings::ReadOptionTable() {
     return false;
   }
 
-  this->options.resize(lua_objlen(state, -1));
-  lua_pushnil(state);
-  while (lua_next(state, -2)) {
+  const size_t count = lua_objlen(state, -1);
+  this->options.resize(count);
+  for (lua_pushnil(state); lua_next(state, -2); lua_pop(state, 1)) {
     GameSettingsOption option;
     const int index = lua_tointeger(state, -2);
 
@@ -620,11 +620,13 @@ bool GameSettings::ReadOptionTable() {
     lua_pop(state, 1);
 
     this->options[index - 1] = std::move(option);
-    lua_pop(state, 1);
   }
 
   lua_pop(state, 1);
-  return lua_gettop(state) == 0;
+  if (lua_gettop(state) != 0) {
+    return false;
+  }
+  return true;
 }
 
 // OFFSET: 0x006C2610
@@ -637,6 +639,12 @@ void GameSettings::ResetToDefaults() {
   }
 }
 
+// INLINED
+__forceinline bool GetServiceOptionInline(int id) {
+  const auto entry = g_serviceOptions.values.find(id);
+  return entry == g_serviceOptions.values.end() ? false : entry->second;
+}
+
 // OFFSET: 0x006C27D0
 // FUNCTION: fn_06323
 void GameSettings::ToggleOption(int id) {
@@ -646,7 +654,7 @@ void GameSettings::ToggleOption(int id) {
   }
 
   if ((*option)->type == 0) {
-    this->SetOption(id, g_serviceOptions.Get(id) == 0, true);
+    this->SetOption(id, GetServiceOptionInline(id) == 0, true);
     g_windowMgr.RefreshGameSettingOption(id);
   } else if ((*option)->type == 1) {
     this->RunFunction(id);
@@ -744,10 +752,10 @@ void SendServiceOptionPacket() {
 void NotifyServiceOption(bool enabled, int enabledMessage, int disabledMessage, int color) {
   std::string text;
   if (enabled) {
-    if (enabledMessage != 0x125A) {
+    if (enabledMessage != MSI_EMPTY) {
       text = LookupMessage(enabledMessage);
     }
-  } else if (disabledMessage != 0x125A) {
+  } else if (disabledMessage != MSI_EMPTY) {
     text = LookupMessage(disabledMessage);
   }
 
@@ -850,10 +858,15 @@ void ApplyServiceOption(int id, bool value, bool notify, int enabledMessage, int
   }
 }
 
+// INLINED
+static int FacingDirection(float angle) {
+  return (static_cast<int>(angle) + 180) / 45 % 8;
+}
+
 // OFFSET: 0x006C42B0
 // FUNCTION: fn_06354
 void ToggleSitStand() {
-  if (std::find_if(g_activeSkillEffects.begin(), g_activeSkillEffects.end(), [](const ActiveSkillEffect& effect) { return effect.id == 933; }) != g_activeSkillEffects.end()) {
+  if (std::find_if(g_activeSkillEffects.begin(), g_activeSkillEffects.end(), [](const ActiveSkillEffect& effect) { return effect.id == EFST_SUHIDE; }) != g_activeSkillEffects.end()) {
     return;
   }
 
@@ -870,9 +883,9 @@ void ToggleSitStand() {
   const int motion = (player->render.curMotion != 2) + 1;
   player->render.curMotion = motion;
   player->render.angle = static_cast<float>(std::ceil(player->render.angle));
-  mode->SendMsg(MM_CHANGE_DIRECTION, (static_cast<int>(player->render.angle) + 180) / 45 % 8, motion, 0, 0);
+  mode->SendMsg(MM_CHANGE_DIRECTION, FacingDirection(player->render.angle), motion, 0, 0);
 
-  if (player->render.state == 6) {
+  if (player->render.state == ST_SIT) {
     std::list<unsigned long>& times = mode->periodicTicks;
     times.pop_front();
     times.push_back(timeGetTime());
@@ -930,7 +943,7 @@ void ApplyServiceOptionWithNotice(int id, bool value, bool notify, int enabledMe
   if (value != g_serviceOptions.Get(id)) {
     g_serviceOptions.Set(id, value);
     if (g_serviceOptions.Get(TT_HIDE_AURA_ON_OFF)) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SWAP_EQUIPITEM_FAIL_DEAD)), 0x64FFFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ALREADY_AURA_EFFECT_OFF)), 0x64FFFF, 0, 0, 0);
       return;
     }
 
@@ -1006,8 +1019,8 @@ void ApplyServiceOptionAskOnDisable(int id, bool value, bool notify, int enabled
   }
 
   if (!value &&
-      g_windowMgr.Confirm(LookupMessage(0x1104), 2, true, false, 0, "Message", 0x118, 0x78, 0) == 0xBC) {
-    g_serviceOptions.Set(0x128, 1);
+      g_windowMgr.Confirm(LookupMessage(MSI_PETINFO_ALERT), 2, true, false, 0, "Message", 0x118, 0x78, 0) == ID_NO) {
+    g_serviceOptions.Set(TT_PETINFO_ALERT_ONOFF, 1);
     g_windowMgr.RefreshGameSettingOption(0x128);
     return;
   }
@@ -1084,7 +1097,7 @@ void ApplyServiceOptionNotifyWindow(int id, bool value, bool notify, int enabled
   }
 
   if (UIWindow* window = static_cast<UIWindow*>(g_windowMgr.minimapZoomWnd)) {
-    window->SendMsg(nullptr, UM_COMMAND, 0x1F6, 0, 0, 0);
+    window->SendMsg(nullptr, UM_COMMAND, ID_REFRESH_MINIMAP_BUTTONS, 0, 0, 0);
   }
 }
 
@@ -1195,17 +1208,6 @@ void ApplyServiceOptionWindow27() {
 template <>
 CGameSettingsMgr* Singleton<CGameSettingsMgr>::s_instance = nullptr;
 
-// OFFSET: 0x00AB1040
-// FUNCTION: fn_17330
-template <>
-CGameSettingsMgr* Singleton<CGameSettingsMgr>::GetInstance() {
-  if (!s_instance) {
-    s_instance = new (std::nothrow) CGameSettingsMgr;
-  }
-
-  return s_instance;
-}
-
 // OFFSET: 0x006C45F0
 // FUNCTION: fn_06356
 void ApplyServiceOptionJitterScale(int id, bool value, bool notify, int enabledMessage, int disabledMessage) {
@@ -1284,9 +1286,10 @@ void ShowPlayerLocation() {
     return;
   }
 
+  const float z = player->render.position.z;
   int column = 0;
   int row = 0;
-  mode->WorldCell(player->render.position.x, player->render.position.z, column, row);
+  mode->WorldCell(player->render.position.x, z, column, row);
 
   std::string name = mode->MapName();
   if (name.size() > 4) {
@@ -1408,6 +1411,7 @@ void CSession::LoadOptionInfo() {
   g_outdoorCameraDistance = this->GetOptionFloat("Outdoor_ViewDistance", 300.0f);
   g_indoorCameraPitch = this->GetOptionFloat("Indoor_ViewLatitude", -45.0f);
   g_indoorCameraDistance = this->GetOptionFloat("Indoor_ViewDistance", 300.0f);
+  const float maxIndoorDistance = g_cameraBaseDistance;
 
   if (g_indoorCameraPitch < -55.0f) {
     g_indoorCameraPitch = -55.0f;
@@ -1419,12 +1423,12 @@ void CSession::LoadOptionInfo() {
     g_indoorCameraDistance = g_cameraMinDistance;
   }
 
-  if (g_indoorCameraDistance > g_cameraBaseDistance) {
-    g_indoorCameraDistance = g_cameraBaseDistance;
+  if (g_indoorCameraDistance > maxIndoorDistance) {
+    g_indoorCameraDistance = maxIndoorDistance;
   }
 
   Singleton<CGameSettingsMgr>::GetInstance();
-  ::SetOption(LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), this->GetOptionInteger(LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), 0) != 0);
+  ::SetOption(LookupMessage(MSI_EXPAND_SIGHT), this->GetOptionInteger(LookupMessage(MSI_EXPAND_SIGHT), 0) != 0);
   g_serviceOptionJitterScale = g_serviceOptions.Get(TT_EXPAND_SIGHT_ON_OFF) ? 730.0f : g_jitterDistanceScale;
 
   if (g_outdoorCameraPitch < -65.0f) {
@@ -1490,7 +1494,8 @@ void CSession::LoadOptionInfo() {
   switch (g_effectDetailLevel) {
   case 0:
     g_spriteHalfWidth = 1;
-    [[fallthrough]];
+    g_spriteHalfHeight = 1;
+    break;
   case 1:
     g_spriteHalfHeight = 1;
     break;
@@ -1523,7 +1528,7 @@ void CSession::LoadOptionInfo() {
   this->m_itemDescendingOrder = this->GetOptionInteger("bItemDescendingOrder", 0) != 0;
   this->m_showMenuIcon = this->GetOptionInteger("bShowMenuIcon", 1) != 0;
 
-  Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(0xF3, LookupMessage(MSI_USESKILL_FAIL_NEED_EQUIPPED_WEAPONE));
+  Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(0xF3, LookupMessage(MSI_EMBLEM_FRAME));
   Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(0x10B, "bExtendDamage");
   Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(0x10C, "bShowMapName");
   Singleton<CGameSettingsMgr>::GetInstance()->ApplyScriptOption(0x10D, "bShowOnlyMineFootprint");
@@ -1608,11 +1613,11 @@ void CSession::SaveOptionInfo() {
   this->WriteOptionInteger(output, "bItemDefaultSort", this->m_itemDefaultSort != 0);
   this->WriteOptionInteger(output, "bItemAscendingOrder", this->m_itemAscendingOrder != 0);
   this->WriteOptionInteger(output, "bItemDescendingOrder", this->m_itemDescendingOrder != 0);
-  this->WriteOptionInteger(output, LookupMessage(MSI_USESKILL_FAIL_NEED_EQUIPPED_WEAPONE), g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF));
+  this->WriteOptionInteger(output, LookupMessage(MSI_EMBLEM_FRAME), g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF));
   this->WriteOptionInteger(output, "bExtendDamage", g_serviceOptions.Get(TT_EXTEND_DAMAGE_ON_OFF));
   this->WriteOptionInteger(output, "bShowMapName", g_serviceOptions.Get(TT_SHOW_MAP_NAME_ON_OFF));
   this->WriteOptionInteger(output, "bShowOnlyMineFootprint", g_serviceOptions.Get(TT_HIDE_FOOTPRINT_ON_OFF));
-  this->WriteOptionInteger(output, LookupMessage(MSI_CHECK_LEVEL_BEFORE_REGISTER_AGENCY), g_serviceOptions.Get(TT_EXPAND_SIGHT_ON_OFF));
+  this->WriteOptionInteger(output, LookupMessage(MSI_EXPAND_SIGHT), g_serviceOptions.Get(TT_EXPAND_SIGHT_ON_OFF));
   this->WriteOptionInteger(output, "DamageSkin", this->m_damageSkinIndex);
   this->WriteOptionInteger(output, "DamageDir", this->m_damageSkinMode);
   this->WriteOptionInteger(output, "PriorityClass", this->m_priorityClass);

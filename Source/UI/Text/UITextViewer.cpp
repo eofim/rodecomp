@@ -25,8 +25,6 @@
 #include <algorithm>
 #include <new>
 
-template __declspec(noinline) std::string::basic_string(const std::string&);
-
 // OFFSET: 0x0086F0A0
 // FUNCTION: fn_11086
 UITextViewer::UITextViewer() : UIListBox(), splitTipLinks(0), outline(0), bold(0) {
@@ -35,7 +33,8 @@ UITextViewer::UITextViewer() : UIListBox(), splitTipLinks(0), outline(0), bold(0
   unsigned green;
   unsigned blue;
   g_skinInfo.PaletteChannels(18, 2, red, green, blue);
-  this->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
+  const COLORREF rgb = RGB(red, green, blue);
+  this->SetBackgroundColor(0xFF000000u | rgb);
 
   this->plainTextMode = 0;
 }
@@ -62,7 +61,8 @@ void UITextViewEX::Configure(int x, int y, int width, int height, unsigned char 
 // OFFSET: 0x0087A1E0
 // FUNCTION: fn_11228
 void UITextViewEX::Clear() {
-  for (UIWindow* link : this->extraLinks) {
+  for (auto linkIt = this->extraLinks.begin(), linkEnd = this->extraLinks.end(); linkIt != linkEnd; ++linkIt) {
+    UIWindow* link = *linkIt;
     this->RemoveChild(link, 1);
   }
   this->extraLinks.clear();
@@ -191,40 +191,44 @@ void UITextViewer::Paint() {
   }
 
   const int first = this->topLine;
-  int divisor = (this->lineHeight - this->bottomMargin);
-
+  int divisor = this->lineHeight - this->bottomMargin;
   if (divisor == 0) {
     divisor = 1;
   }
 
   std::uint32_t color = 0;
-  const int limit = (this->geometry.height / divisor + first);
+  const int limit = this->geometry.height / divisor + first;
   const int end = static_cast<int>(std::min(static_cast<unsigned>(limit), static_cast<unsigned>(this->lines.size())));
 
   for (int index = 0; index < first; ++index) {
     const char* current = this->lines[index].c_str();
-    const char* end = current + this->lines[index].size();
+    const char* last = current + this->lines[index].size();
 
-    while (current < end) {
-      current = ParseColorCode(SegmentEnd(current, end), color);
+    while (current < last) {
+      current = ParseColorCode(SegmentEnd(current, last), color);
     }
   }
 
-  const bool plain = (this->plainTextMode & 255) != 0;
+  if (first >= end) {
+    return;
+  }
 
-  for (int index = first; index < end; ++index) {
-    const auto& line = this->lines[index];
-    const int y = (index - first) * this->lineHeight + 4;
-    const auto bytes = static_cast<unsigned>(line.size());
+  if (this->plainTextMode == 0) {
+    for (int index = first; index < end; ++index) {
+      const auto& line = this->lines[index];
+      const unsigned bytes = static_cast<unsigned>(line.size());
 
-    if (!plain) {
       if (this->outline != 0) {
-        this->DrawOutlinedColoredText(3, y, line.c_str(), bytes, color, this->backgroundColor, 0, 12, this->bold);
+        this->DrawOutlinedColoredText(3, (index - first) * this->lineHeight + 4, line.c_str(), bytes, color, this->backgroundColor, 0, 12, this->bold);
       } else {
-        this->DrawColoredText(3, y, line.c_str(), bytes, color, 0, 12, false);
+        this->DrawColoredText(3, (index - first) * this->lineHeight + 4, line.c_str(), bytes, color, 0, 12, false);
       }
-    } else {
-      this->DrawOutlinedText(3, y, line.c_str(), bytes, 0, 0xFFFFFF, 0, 12, 0, 0);
+    }
+  } else {
+    for (int index = first; index < end; ++index) {
+      const auto& line = this->lines[index];
+      const unsigned bytes = static_cast<unsigned>(line.size());
+      this->DrawOutlinedText(3, (index - first) * this->lineHeight + 4, line.c_str(), bytes, 0, 0xFFFFFF, 0, 12, 0, 0);
     }
   }
 }
@@ -235,26 +239,29 @@ void UITextViewEX::OnCreate(int width, int height) {
   UIListBox::OnCreate(width, height);
 }
 
+// INLINED
+static void SetScrollRange(UIScrollBar* bar, int maximum, int visible, int total) {
+  bar->maximum = maximum;
+  bar->visible = visible;
+  bar->total = total;
+  bar->Invalidate();
+  if (bar->position > bar->maximum) {
+    bar->position = bar->maximum;
+  }
+}
+
 // OFFSET: 0x00896100
 // FUNCTION: fn_11515
 void UITextViewEX::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
-  const int overflow = std::max((static_cast<int>(this->lineLinks.size()) - visible), 0);
+  const int excess = static_cast<int>(this->lineLinks.size()) - visible;
+  const int overflow = excess >= 0 ? excess : 0;
 
   this->verticalOverflow = overflow != 0;
-  UIScrollBar* bar = this->verticalBar;
   if (overflow != 0) {
-    bar->maximum = this->bottomMargin + overflow;
-    bar->total = static_cast<int>(this->lineLinks.size());
+    SetScrollRange(this->verticalBar, this->bottomMargin + overflow, visible, static_cast<int>(this->lineLinks.size()));
   } else {
-    bar->maximum = 0;
-    bar->total = static_cast<int>(this->lineLinks.size());
-  }
-  bar->visible = visible;
-  bar->Invalidate();
-
-  if (bar->position > bar->maximum) {
-    bar->position = bar->maximum;
+    SetScrollRange(this->verticalBar, 0, visible, static_cast<int>(this->lineLinks.size()));
   }
 
   this->verticalBar->Invalidate();
@@ -293,13 +300,13 @@ int UITextViewEX::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     if (this->verticalOverflow != 0) {
       this->SendMsg(this->verticalBar, UM_SCROLLVERT, -1, 0, 0, 0);
     }
-    return 0;
+    break;
 
   case UM_DOWNPUSH:
     if (this->verticalOverflow != 0) {
       this->SendMsg(this->verticalBar, UM_SCROLLVERT, 1, 0, 0, 0);
     }
-    return 0;
+    break;
 
   case UM_SCROLLVERT:
   case UM_SCROLLVERTPAGEUP:
@@ -317,9 +324,8 @@ int UITextViewEX::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
       this->topLine = 0;
     }
 
-    const int maximum = this->bottomMargin + (static_cast<int>(this->lineLinks.size()) - this->geometry.height / this->lineHeight);
-    if (static_cast<unsigned>(this->topLine) > static_cast<unsigned>(maximum)) {
-      this->topLine = maximum;
+    if (static_cast<unsigned>(this->topLine) > static_cast<unsigned>(static_cast<int>(this->lineLinks.size()) - this->geometry.height / this->lineHeight + this->bottomMargin)) {
+      this->topLine = static_cast<int>(this->lineLinks.size()) - this->geometry.height / this->lineHeight + this->bottomMargin;
     }
 
     this->verticalBar->position = this->topLine;
@@ -335,19 +341,21 @@ int UITextViewEX::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
 
   case UM_SETTEXT: {
     std::string text(reinterpret_cast<const char*>(argument1));
-    for (UIWindow* link : this->extraLinks) {
+    for (auto linkIt = this->extraLinks.begin(), linkEnd = this->extraLinks.end(); linkIt != linkEnd; ++linkIt) {
+      UIWindow* link = *linkIt;
       this->RemoveChild(link, 1);
     }
     this->extraLinks.clear();
     this->lineLinks.clear();
     this->SetText(text);
     this->Invalidate();
-    return 0;
+    break;
   }
 
   default:
     return UIListBox::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
+  return 0;
 }
 
 // OFFSET: 0x00874A40
@@ -357,23 +365,22 @@ std::string UIItemTagCtrl::AddSkillTag(int tagId, unsigned int color) {
   const std::string title = g_itemTagOwner->Title(tagId, &label, 17);
 
   UIItemTagButton* button = this->CreateItemTagButton(title, label, tagId, nullptr, 0x7F00E4);
-  if (!button) {
-    return std::string();
+  if (button) {
+    this->AddTagButton(button);
+
+    std::string link = "00000T";
+    const std::string number = this->ItemLinkNumberText(tagId);
+    link += number;
+    link += "%0&0'0(1)0";
+
+    ItemTagRecord record;
+    record.child = button;
+    StringFormat(record.number, sizeof(record.number), _TRUNCATE, "%s", number.c_str());
+    StringFormat(record.name, sizeof(record.name), _TRUNCATE, "%s", label.c_str());
+    StringFormat(record.link, sizeof(record.link), _TRUNCATE, "%s", link.c_str());
+    this->tags.push_back(record);
+
+    return "<" + label + ">";
   }
-
-  this->AddTagButton(button);
-
-  std::string link = "00000T";
-  const std::string number = this->ItemLinkNumberText(tagId);
-  link += number;
-  link += "%0&0'0(1)0";
-
-  ItemTagRecord record;
-  record.child = button;
-  StringFormat(record.number, sizeof(record.number), _TRUNCATE, "%s", number.c_str());
-  StringFormat(record.name, sizeof(record.name), _TRUNCATE, "%s", label.c_str());
-  StringFormat(record.link, sizeof(record.link), _TRUNCATE, "%s", link.c_str());
-  this->tags.push_back(record);
-
-  return "<" + label + ">";
+  return std::string();
 }

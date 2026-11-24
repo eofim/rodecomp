@@ -161,6 +161,16 @@ void CUIEditCtrlEx::Paint() {
   this->PaintText();
 }
 
+// INLINED
+static int EnsureVisible(int position, int line, const int& visible) {
+  int first = std::min(position, line);
+  if (line >= visible + first) {
+    first = line - visible + 1;
+  }
+
+  return first;
+}
+
 // OFFSET: 0x009E4F90
 // FUNCTION: fn_14445
 void CUIEditCtrlEx::UpdateScrollBar() {
@@ -169,10 +179,7 @@ void CUIEditCtrlEx::UpdateScrollBar() {
   this->visibleLines = std::max(1, (this->geometry.height - this->verticalPadding) / this->lineHeight);
   this->scrollMaximum = std::max(0, total - this->visibleLines);
 
-  position = std::min(position, this->line);
-  if (this->line >= this->visibleLines + position) {
-    position = this->line - this->visibleLines + 1;
-  }
+  position = EnsureVisible(position, this->line, this->visibleLines);
   this->scrollPosition = std::clamp(position, 0, this->scrollMaximum);
 
   this->scrollBar->SetRange(this->scrollMaximum, this->visibleLines, total);
@@ -196,10 +203,11 @@ void CUIEditCtrlEx::Synchronize() {
 
   const std::string prefix = g_serverLanguage->Prefix(false);
   const std::string fullText = prefix + this->text;
-  std::vector<std::string> lines;
   std::vector<bool> breaks;
+  std::vector<std::string> lines;
+  const int width = this->geometry.width;
   if (this->multiline != 0) {
-    int wrapWidth = this->geometry.width - this->scrollBar->geometry.width - this->horizontalPadding;
+    int wrapWidth = width - this->scrollBar->geometry.width - this->horizontalPadding;
     this->WrapTextWithBreaks(fullText.c_str(), &lines, &breaks, wrapWidth);
     this->WrapLines(lines);
   } else {
@@ -209,8 +217,8 @@ void CUIEditCtrlEx::Synchronize() {
 
   this->lines.clear();
   if (!lines.empty()) {
-    int anchor = 0;
     int cursor = 0;
+    int anchor = 0;
     g_serverLanguage->Selection(anchor, cursor);
     if (anchor > cursor) {
       std::swap(anchor, cursor);
@@ -227,20 +235,12 @@ void CUIEditCtrlEx::Synchronize() {
       std::size_t lineEnd = currentOffset + rawLine.size();
       if (static_cast<std::size_t>(anchor) <= lineEnd) {
         int offset = anchor - currentOffset;
-        if (lineLen < offset) {
-          line.selectionBegin = lineLen;
-        } else {
-          line.selectionBegin = std::max(offset, 0);
-        }
+        line.selectionBegin = std::clamp(offset, 0, lineLen);
         line.selectionEnd = lineLen;
       }
       if (static_cast<std::size_t>(cursor) <= lineEnd) {
         int offset = cursor - currentOffset;
-        if (lineLen < offset) {
-          line.selectionEnd = lineLen;
-        } else {
-          line.selectionEnd = std::max(offset, 0);
-        }
+        line.selectionEnd = std::clamp(offset, 0, lineLen);
       }
       currentOffset = static_cast<int>(lineEnd);
 
@@ -273,20 +273,12 @@ void CUIEditCtrlEx::Synchronize() {
       }
     }
 
-    const int candidateCursor = g_serverLanguage->compositionCursor;
-    if (candidateCursor != 0) {
-      this->column += candidateCursor;
-      int cursorX = 0;
-      if (this->column > 0) {
-        cursorX = this->TextWidth(this->lines[this->line].text.c_str(), this->column, 0, 12, 0, 0);
-      }
-
-      int end = std::max(anchor, cursor) + candidateCursor + static_cast<int>(prefix.size());
-      int readingOffset = end - currentOffset;
-      int readingX = 0;
-      if (readingOffset > 0) {
-        readingX = this->TextWidth(this->lines[this->line].text.c_str(), readingOffset, 0, 12, 0, 0);
-      }
+    int end = std::max(anchor, cursor) + static_cast<int>(g_serverLanguage->candidate.size()) + static_cast<int>(prefix.size());
+    if (!g_serverLanguage->candidate.empty()) {
+      this->column += static_cast<int>(g_serverLanguage->candidate.size());
+      const int cursorX = this->column > 0 ? this->TextWidth(this->lines[this->line].text.c_str(), this->column, 0, 12, 0, 0) : 0;
+      const int readingOffset = end - currentOffset;
+      const int readingX = readingOffset > 0 ? this->TextWidth(this->lines[this->line].text.c_str(), readingOffset, 0, 12, 0, 0) : 0;
       int delta = std::max(cursorX - readingX, 2);
       this->MoveCandidateWindow(cursorX + 2 + delta);
       this->MoveReadingWindow(readingX);
@@ -342,6 +334,11 @@ void CUIEditBoxEx::SetBackgroundColor(std::uint32_t color) {
 #include "UI/Window/InputFocus.h"
 #include "UI/Window/UIWindowMgr.h"
 
+// INLINED
+static int SelectionLength(const CLanguageBase& language) {
+  return std::abs(language.cursor - language.anchor);
+}
+
 // OFFSET: 0x009E4BF0
 // FUNCTION: fn_14444
 void CUIEditCtrlEx::HandleKeyDown(int key, std::intptr_t lparam) {
@@ -369,7 +366,7 @@ void CUIEditCtrlEx::HandleKeyDown(int key, std::intptr_t lparam) {
     this->caretStart = std::chrono::system_clock::now();
     break;
   case VK_BACK:
-    if (std::abs(g_serverLanguage->cursor - g_serverLanguage->anchor) == 0 && g_serverLanguage->cursor >= 2 && g_serverLanguage->cursor - 1 < this->text.size()) {
+    if (SelectionLength(*g_serverLanguage) == 0 && g_serverLanguage->cursor >= 2 && g_serverLanguage->cursor - 1 < this->text.size()) {
       const bool lineBreak = this->text.substr(g_serverLanguage->cursor - 2, 2) == "\r\n";
       if (lineBreak) {
         g_serverLanguage->Character(VK_BACK, lparam);
@@ -378,7 +375,7 @@ void CUIEditCtrlEx::HandleKeyDown(int key, std::intptr_t lparam) {
     this->caretStart = std::chrono::system_clock::now();
     break;
   case VK_DELETE:
-    if (std::abs(g_serverLanguage->cursor - g_serverLanguage->anchor) == 0 && g_serverLanguage->cursor >= 0 && g_serverLanguage->cursor + 1 < this->text.size()) {
+    if (SelectionLength(*g_serverLanguage) == 0 && g_serverLanguage->cursor >= 0 && g_serverLanguage->cursor + 1 < this->text.size()) {
       const bool lineBreak = this->text.substr(g_serverLanguage->cursor, 2) == "\r\n";
       if (lineBreak) {
         g_serverLanguage->KeyDown(key, lparam);
@@ -394,12 +391,12 @@ void CUIEditCtrlEx::HandleKeyDown(int key, std::intptr_t lparam) {
     g_serverLanguage->KeyDown(key, lparam);
     break;
   case 'A':
-    if ((static_cast<unsigned short>(GetKeyState(VK_CONTROL)) >> 8) != 0) {
+    if (HIBYTE(GetKeyState(VK_CONTROL))) {
       g_serverLanguage->Select(0, static_cast<int>(this->text.size()));
     }
     break;
   case VK_HOME:
-    if ((static_cast<unsigned short>(GetKeyState(VK_CONTROL)) >> 8) != 0) {
+    if (HIBYTE(GetKeyState(VK_CONTROL))) {
       g_serverLanguage->RetreatCursor(g_serverLanguage->cursor);
     } else {
       g_serverLanguage->RetreatCursor(this->column);
@@ -409,7 +406,7 @@ void CUIEditCtrlEx::HandleKeyDown(int key, std::intptr_t lparam) {
   case VK_DOWN:
     return;
   case VK_END:
-    if ((static_cast<unsigned short>(GetKeyState(VK_CONTROL)) >> 8) != 0) {
+    if (HIBYTE(GetKeyState(VK_CONTROL))) {
       g_serverLanguage->AdvanceCursor(static_cast<int>(this->text.size()) - g_serverLanguage->cursor);
     } else {
       g_serverLanguage->AdvanceCursor(static_cast<int>(this->lines[this->line].text.size()) - this->column);

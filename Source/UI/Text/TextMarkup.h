@@ -13,20 +13,14 @@ struct TextLink {
   /* 0024 */ std::string metadata;
 };
 
-bool HasTextLinks(const std::string& text);
-std::string __stdcall ExpandTextEscapes(const std::string& text);
-std::string RemoveTextColors(const char* text);
-const std::string __stdcall DisplayTextTag(const std::string& source, const std::string& begin, const std::string& end);
-const std::string __stdcall DisplayItemTextTag(const std::string& text);
-const std::string __stdcall DisplayNavigationTextTag(const std::string& text);
-const std::string __stdcall DisplayQuestTextTag(const std::string& text);
-const std::string __stdcall DisplayTipBoxTextTag(const std::string& text);
-const std::string __stdcall DisplayUrlTextTag(const std::string& text);
-const std::string RemoveTextLinkInfo(const std::string& source);
-void __stdcall ExtractTextLinks(const std::string& source, const std::string& begin, const std::string& end, std::vector<TextLink>& links);
-void __stdcall ExtractNavigationTextLinks(const std::string& text, std::vector<TextLink>& links);
-void ExtractTipBoxTextLinks(const std::string& text, std::vector<TextLink>& links);
-void ExtractUrlTextLinks(const std::string& text, std::vector<TextLink>& links);
+extern const std::string g_naviTagBegin;
+extern const std::string g_naviTagEnd;
+extern const std::string g_itemTagBegin;
+extern const std::string g_itemTagEnd;
+extern const std::string g_tipBoxTagBegin;
+extern const std::string g_tipBoxTagEnd;
+extern const std::string g_questTagBegin;
+extern const std::string g_questTagEnd;
 
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(TextLink) == 60);

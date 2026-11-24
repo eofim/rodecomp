@@ -60,7 +60,7 @@ void CMergeItemWnd::SelectSameItems(int id) {
   const int itemId = this->ItemIdOf(id);
   int checked = 0;
   for (auto it = this->m_items.begin(); it != this->m_items.end(); ++it) {
-    if (itemId == std::atoi(g_session.LookupClientItemByIdentity((*it)->m_message).itemId.c_str())) {
+    if (itemId == this->ItemIdOf((*it)->m_message)) {
       const std::uint32_t state = (*it)->geometry.state;
       if ((*it)->m_message == id) {
         if (state == 0) {
@@ -75,20 +75,22 @@ void CMergeItemWnd::SelectSameItems(int id) {
   }
 
   for (auto it = this->m_items.begin(); it != this->m_items.end(); ++it) {
-    const int value = std::atoi(g_session.LookupClientItemByIdentity((*it)->m_message).itemId.c_str());
+    const int value = this->ItemIdOf((*it)->m_message);
     (*it)->SetChecked(itemId == value ? checked : 0);
   }
 }
 
-// INLINED
-CMergeItemWnd::~CMergeItemWnd() {
+// OFFSET: 0x007DEEA0
+// FUNCTION: fn_46370
+__declspec(noinline) CMergeItemWnd::~CMergeItemWnd() {
 }
 
 
 // OFFSET: 0x007DF3D0
 // FUNCTION: fn_09663
 int CMergeItemWnd::ItemIdOf(int id) {
-  return std::atoi(g_session.LookupClientItemByIdentity(id).itemId.c_str());
+  ITEM_INFO item = g_session.LookupClientItemByIdentity(id);
+  return std::atoi(item.itemId.c_str());
 }
 
 // OFFSET: 0x007DF580
@@ -99,7 +101,7 @@ void CMergeItemWnd::CreateControls() {
   this->m_mergeButton->SetBitmap("유저인터페이스\\btn_ok_a.bmp", 1, 0);
   this->m_mergeButton->SetBitmap("유저인터페이스\\btn_ok_b.bmp", 2, 0);
   this->m_mergeButton->SetSize(this->m_mergeButton->BitmapWidth(), this->m_mergeButton->BitmapHeight());
-  this->m_mergeButton->SetId(184);
+  this->m_mergeButton->SetId(ID_OK);
   this->AddChild(this->m_mergeButton);
 
   this->m_cancelButton = new UIBitmapButton();
@@ -107,7 +109,7 @@ void CMergeItemWnd::CreateControls() {
   this->m_cancelButton->SetBitmap("유저인터페이스\\btn_cancel_a.bmp", 1, 0);
   this->m_cancelButton->SetBitmap("유저인터페이스\\btn_cancel_b.bmp", 2, 0);
   this->m_cancelButton->SetSize(this->m_cancelButton->BitmapWidth(), this->m_cancelButton->BitmapHeight());
-  this->m_cancelButton->SetId(185);
+  this->m_cancelButton->SetId(ID_CANCEL);
   this->AddChild(this->m_cancelButton);
 
   this->m_closeButton = this->AddCloseButton("", 240);
@@ -136,7 +138,7 @@ void CMergeItemWnd::OnCreate(int, int) {
 void CMergeItemWnd::Paint() {
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->DrawTitleBar(true, LookupMessage(MSI_MERGE_ITEM_FAILED_NOT_MERGE), 0);
+  this->DrawTitleBar(true, LookupMessage(MSI_MERGE_ITEM), 0);
   this->FillRegion(0, 17, this->geometry.width, this->geometry.height, RGB(red, green, blue));
 
   for (int index = 0; index < this->m_visibleCount; ++index) {
@@ -155,8 +157,8 @@ void CMergeItemWnd::Paint() {
     }
 
     const int columns = (this->geometry.width - this->m_marginRight - this->m_gridLeft) / this->m_cellSize;
-    const int y = this->m_cellSize * (index / columns) + this->m_gridTop;
     const int x = this->m_cellSize * (index % columns) + this->m_gridLeft;
+    const int y = this->m_cellSize * (index / columns) + this->m_gridTop;
     UICheckBox* box = this->m_items[first + index];
     if (box != nullptr) {
       ITEM_INFO item = g_session.LookupClientItemByIdentity(box->m_message);
@@ -194,13 +196,16 @@ void CMergeItemWnd::OnLBtnDown(int x, int y) {
 // FUNCTION: fn_09668
 void CMergeItemWnd::OnMouseHover(int x, int y) {
   const int id = this->ItemAt(x, y);
-  int screenX = x;
   int screenY = y;
+  int screenX = x;
   ITEM_INFO item = g_session.LookupClientItemByIdentity(id);
   if (item.identity[1] > 0) {
     this->ToScreen(screenX, screenY);
-    std::string text = FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), item.quantity);
-    g_modeMgr.currentMode->ShowTooltip(text.c_str(), screenX, screenY, g_session.GetItemNameColor(item), 0, 1);
+    const int quantity = item.quantity;
+    std::string text = FormatOwnedString(LookupMessage(MSI_EA2), item.DisplayName(0).c_str(), quantity);
+    const auto color = g_session.GetItemNameColor(item);
+    CMode* mode = g_modeMgr.currentMode;
+    mode->ShowTooltip(text.c_str(), screenX, screenY, color, 0, 1);
   }
 }
 
@@ -264,8 +269,8 @@ void CMergeItemWnd::UpdateScroll() {
       this->m_scrollRow = 0;
     }
   } else {
-    maximum = 0;
     this->m_scrollRow = 0;
+    maximum = 0;
   }
   this->m_scrollable = maximum;
   this->m_scrollBar->SetRange(maximum, this->m_rows, total);
@@ -300,25 +305,15 @@ void CMergeItemWnd::FitToGrid(int width, int height) {
 
   int columns = width - this->m_marginRight - this->m_gridLeft;
   columns -= columns % this->m_cellSize;
-  int clamped = minWidth;
-  if (this->m_gridLeft + minWidth <= this->m_gridLeft + columns) {
-    clamped = columns;
-  }
-  int gridWidth = maxWidth;
-  if (this->m_gridLeft + clamped <= this->m_gridLeft + maxWidth) {
-    gridWidth = clamped;
-  }
+  const int clamped = this->m_gridLeft + columns >= this->m_gridLeft + minWidth ? columns : minWidth;
+  const int gridWidth = this->m_gridLeft + clamped <= this->m_gridLeft + maxWidth ? clamped : maxWidth;
+  const int right = this->m_gridLeft + gridWidth;
 
   int gridHeight = height - this->m_marginBottom - this->m_gridTop;
   gridHeight = gridHeight - gridHeight % this->m_cellSize + this->m_gridTop;
-  if (gridHeight < minHeight) {
-    gridHeight = minHeight;
-  }
-  if (gridHeight > maxHeight) {
-    gridHeight = maxHeight;
-  }
+  gridHeight = gridHeight < minHeight ? minHeight : gridHeight;
+  gridHeight = gridHeight > maxHeight ? maxHeight : gridHeight;
 
-  const int right = gridWidth + this->m_gridLeft;
   if (right != this->geometry.width || gridHeight != this->geometry.height) {
     this->Resize(this->m_marginRight + right, this->m_marginBottom + gridHeight);
     const int visibleColumns = (this->geometry.width - this->m_marginRight - this->m_gridLeft) / this->m_cellSize;
@@ -403,16 +398,18 @@ bool CMergeItemWnd::RequestMerge() {
   }
 
   if (ids.size() < this->m_minSelection) {
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MERGE_ITEM_FAILED_MAX_COUNT)), 0xFF, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SELECT_ITEM_TO_MERGE)), 0xFF, 0, 0, 0);
     return false;
   }
 
-  std::vector<char> packet;
-  MergeItemPacketHeader header{0x096E, 0};
-  packet.insert(packet.end(), reinterpret_cast<const char*>(&header), reinterpret_cast<const char*>(&header + 1));
-  packet.insert(packet.end(), reinterpret_cast<const char*>(ids.data()), reinterpret_cast<const char*>(ids.data() + ids.size()));
-  MergeItemPacketHeader* packetHeader = reinterpret_cast<MergeItemPacketHeader*>(packet.data());
-  packetHeader->length = static_cast<std::uint16_t>(packet.size());
-  GetRagConnection().Send(static_cast<int>(packet.size()), packetHeader);
+  {
+    std::vector<char> packet;
+    MergeItemPacketHeader header{0x096E, 0};
+    packet.insert(packet.end(), reinterpret_cast<char*>(&header), reinterpret_cast<char*>(&header + 1));
+    packet.insert(packet.end(), reinterpret_cast<char*>(ids.data()), reinterpret_cast<char*>(ids.data() + ids.size()));
+    MergeItemPacketHeader* packetHeader = reinterpret_cast<MergeItemPacketHeader*>(packet.data());
+    packetHeader->length = static_cast<std::uint16_t>(packet.size());
+    GetRagConnection().Send(static_cast<int>(packet.size()), packetHeader);
+  }
   return true;
 }

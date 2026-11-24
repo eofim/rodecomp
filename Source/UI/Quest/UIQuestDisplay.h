@@ -11,6 +11,7 @@ struct QuestDisplayInfo;
 class UIQuestDisplay : public UIWindow {
 public:
   UIQuestDisplay();
+  __declspec(noinline) ~UIQuestDisplay() override;
   bool IsTransmitMouseInput() override;
   void StoreInfo() override;
   void Paint() override;
@@ -19,6 +20,8 @@ public:
   void Create(int width, int height);
 
 protected:
+  void SelectQuestAt(int x, int y);
+
   /* 007C */ unsigned int selectedQuestId;
   /* 0080 */ int m_selectedIndex;
   /* 0084 */ std::vector<MiniPartyInfoEntry> m_menuItems;

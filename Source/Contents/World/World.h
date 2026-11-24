@@ -20,6 +20,12 @@ class CRenderObject;
 class CSkill;
 class GroundGeometry;
 
+struct ActorHealth {
+  /* 0000 */ std::int64_t maximum;
+  /* 0008 */ std::int64_t current;
+  /* 0010 */ bool found;
+};
+
 struct CellFloatPos {
   CellFloatPos() {
   }
@@ -42,6 +48,8 @@ public:
   CWorld& operator=(const CWorld&) = delete;
   void LoadMapEffects();
   void CellOrigin(int column, int row, float& x, float& z) const;
+  void CellToWorld(float column, float row, float& x, float& z) const;
+  void WorldToCell(float x, float z, int& column, int& row) const;
   void Clear();
   void ClearChildren();
   void OnExitFrame();
@@ -49,6 +57,7 @@ public:
   bool RemoveItem(std::uint32_t aid);
   bool FindActorInCell(const float* position, std::function<bool(std::uint32_t)> predicate) const;
   CGameActor* GetGameActorByAID(std::uint32_t aid) const;
+  ActorHealth GetActorHealth(std::uint32_t aid) const;
   CGameActor* GetGameActorByAidIncludeMe(std::uint32_t aid) const;
   __declspec(noinline) CSkill* GetSkillByAID(std::uint32_t aid) const;
   CItem* GetItemByAID(std::uint32_t aid) const;
@@ -67,8 +76,11 @@ public:
   void AddPcPos(std::uint32_t aid, const CellFloatPos& cell);
   void AddPcPosFromCell(std::uint32_t aid, const int* cell);
   void AddPcPosUnindexed(std::uint32_t aid, const CellFloatPos& cell);
+  void AddPcPosUnindexedFromCell(std::uint32_t aid, const int* cell);
+  float ActorCellKey(const CellFloatPos& cell) const;
   void InitWorld();
   void InitializeSpatial();
+  bool RemoveActor(CGameObject* object);
   void RemoveObject(CGameObject* object);
   void SendObjectMessage(CGameObject* sender, std::uint64_t identity, int message, int a, int b, int c, int d);
   static unsigned long __stdcall LoadDeferredModels(void* parameter);

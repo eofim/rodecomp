@@ -15,32 +15,30 @@ void UIMiniBtnWnd::Paint() {
   }
 
   UIWindow* window = g_windowMgr.LookupWindow(static_cast<WindowId>(this->m_windowId));
+  CBitmapRes* bitmap;
   if (window && window->geometry.visible != 0) {
-    auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_activeImage.c_str())));
-    this->DrawBitmap(0, 0, bitmap, false);
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_activeImage.c_str())));
   } else {
-    auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_inactiveImage.c_str())));
-    this->DrawBitmap(0, 0, bitmap, false);
+    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_inactiveImage.c_str())));
   }
+  this->DrawBitmap(0, 0, bitmap, false);
 }
 
 // OFFSET: 0x00930CD0
 // FUNCTION: fn_12694
 void UIMiniBtnWnd::OnLBtnDown(int, int) {
-  bool visible;
-  UIWindow* window = g_windowMgr.LookupWindow(static_cast<WindowId>(this->m_windowId));
-  if (window) {
-    visible = window->geometry.visible == 0;
-  } else {
-    window = g_windowMgr.EnsureWindow(this->m_windowId);
-    visible = true;
-  }
+  this->Toggle();
+}
 
-  if (window) {
-    window->Show(visible);
-    window->SendMsg(this, UM_COMMAND, ID_APPLY, visible, 0, 0);
+// OFFSET: 0x0093CAD0
+// FUNCTION: fn_45680
+void UIMiniBtnWnd::SetImages(const char* activeImage, const char* inactiveImage) {
+  const auto* activeBitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(activeImage)));
+  const auto* inactiveBitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(inactiveImage)));
+  if (activeBitmap && inactiveBitmap) {
+    this->m_activeImage = activeImage;
+    this->m_inactiveImage = inactiveImage;
   }
-  this->Invalidate();
 }
 
 // OFFSET: 0x00941120

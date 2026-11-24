@@ -1,6 +1,10 @@
 #include "Contents/ClientState.h"
+#include "Contents/Jobs/JobId.h"
+#include "Resource/MSGSTRINGID.h"
+#include "UI/GameSettings/TalkType.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/WindowId.h"
+#include "Contents/Actors/ActorEnums.h"
 
 #include "Client/Mode/CGameMode.h"
 #include "Contents/Configuration/ServiceOptions.h"
@@ -211,9 +215,9 @@ std::uint32_t CSession::ReadReplayStats(const std::vector<unsigned char>& data) 
       if (player) {
         player->SetMadogearType(this->madogearType);
         if (this->madogearType) {
-          player->SendMsg(nullptr, 105, 0, 0, 0, 0, 0, 0);
+          player->SendMsg(nullptr, AM_MAKE_CHICKEN, 0, 0, 0, 0, 0, 0);
         } else {
-          player->SendMsg(nullptr, 106, 0, 0, 0, 0, 0, 0);
+          player->SendMsg(nullptr, AM_DELETE_CHICKEN, 0, 0, 0, 0, 0, 0);
         }
       }
       break;
@@ -950,15 +954,22 @@ std::uint32_t CSession::ReadReplayShortcuts(const std::vector<unsigned char>& da
   return offset;
 }
 
+// INLINED
+static inline bool IsSecondJobId(int job) {
+  return job >= JT_RUNE_KNIGHT_2ND && job < JT_SECOND_JOB_END;
+}
+
 // OFFSET: 0x00E488C0
 // FUNCTION: fn_24221
 void CSession::UpdateBodyStyle(int job, int style, int renderJob) {
-  if (style >= 2 || this->IsSecondJob(renderJob)) {
+  const bool upperJob = job >= JT_NOVICE_H && job <= JT_CHICKEN2_H;
+  if (style >= 2 || IsSecondJobId(renderJob)) {
     this->m_bodyStyle = style;
-  } else if (static_cast<unsigned>(job - 4001) <= 21) {
-    this->m_bodyStyle = job <= 4007;
+  } else if (upperJob) {
+    this->m_bodyStyle = job <= JT_THIEF_H;
   } else {
-    this->m_bodyStyle = static_cast<unsigned>(g_session.GetBodyStyleJob(job) - 4001) <= 6;
+    const int bodyJob = g_session.GetBodyStyleJob(job);
+    this->m_bodyStyle = bodyJob >= JT_NOVICE_H && bodyJob <= JT_THIEF_H;
   }
 }
 
@@ -968,10 +979,10 @@ void CSession::SetHomunculusAutoFeed(bool enabled) {
   int message;
   if (enabled == true) {
     this->m_homunculusAutoFeed = true;
-    message = 3282;
+    message = MSI_HOMUN_SELF_FEEDING_ON;
   } else {
     g_session.m_homunculusAutoFeed = false;
-    message = 3283;
+    message = MSI_HOMUN_SELF_FEEDING_OFF;
   }
 
   const char* text = LookupMessage(message);
@@ -981,8 +992,16 @@ void CSession::SetHomunculusAutoFeed(bool enabled) {
 // OFFSET: 0x00E48980
 // FUNCTION: fn_24223
 void CSession::SetPetAutoFeed(bool enabled) {
-  g_session.m_petAutoFeed = enabled == true;
-  const char* text = LookupMessage(enabled ? 2579 : 2580);
+  int message;
+  if (enabled == true) {
+    g_session.m_petAutoFeed = true;
+    message = MSI_PET_AUTO_FEEDING_ON;
+  } else {
+    g_session.m_petAutoFeed = false;
+    message = MSI_PET_AUTO_FEEDING_OFF;
+  }
+
+  const char* text = LookupMessage(message);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x64FFFF, 0, 0, 0);
 }
 
@@ -991,7 +1010,7 @@ void CSession::SetPetAutoFeed(bool enabled) {
 void CSession::SetPetInfoAlert(bool enabled) {
   std::string notice = LookupMessage(enabled ? 4357 : 4379);
   g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(notice.c_str()), 0x64FFFF, 0, 0, 0);
-  g_serviceOptions.Set(0x128, enabled);
+  g_serviceOptions.Set(TT_PETINFO_ALERT_ONOFF, enabled);
   g_windowMgr.RefreshGameSettingOption(0x128);
 }
 
@@ -1008,7 +1027,7 @@ void CSession::CollectCardItems() {
 
 // OFFSET: 0x00E48B70
 // FUNCTION: fn_24226
-void RequestBasicInfoRefresh() {
+void CSession::RequestBasicInfoRefresh() {
   if (g_windowMgr.equipWnd != nullptr) {
     g_windowMgr.equipWnd->SendMsg(nullptr, UM_SET_DISABLE, 575, 0, 0, 0);
   }

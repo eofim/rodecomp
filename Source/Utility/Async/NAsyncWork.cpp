@@ -2,12 +2,6 @@
 
 #include <utility>
 
-// INLINED
-inline NRecycleObject::~NRecycleObject() = default;
-
-// INLINED
-NAsyncWork::~NAsyncWork() = default;
-
 // OFFSET: 0x005BAEE0
 // FUNCTION: fn_03450
 bool NAsyncWork::Execute() {
@@ -21,7 +15,7 @@ void NAsyncWork::Complete() {
 
 // OFFSET: 0x00731A90
 // FUNCTION: fn_07559
-NAsyncWorkPtr::NAsyncWorkPtr(NAsyncWorkPtr& other) : m_manager(other.m_manager), m_work(other.m_work) {
+NAsyncWorkPtr::NAsyncWorkPtr(const NAsyncWorkPtr& other) : m_manager(other.m_manager), m_work(other.m_work) {
   other.m_manager = nullptr;
   other.m_work = nullptr;
 }

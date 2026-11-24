@@ -7,6 +7,7 @@
 #include "Render/Renderer.h"
 #include "UI/GameSettings/GameSettingsUI.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -91,6 +92,23 @@ namespace {
   }
 }
 
+// OFFSET: 0x00548D90
+// FUNCTION: fn_46358
+HRESULT DebugStringDX7(const char* file, long line, HRESULT result, const char* message) {
+  char buffer[256];
+  std::sprintf(buffer, "%s(%ld): ", file, line);
+  OutputDebugStringA(buffer);
+  OutputDebugStringA(message);
+
+  if (result != S_OK) {
+    std::sprintf(buffer, "(hr=%08lx)\n", static_cast<unsigned long>(result));
+    OutputDebugStringA(buffer);
+  }
+
+  OutputDebugStringA("\n");
+  return result;
+}
+
 // OFFSET: 0x005493B0
 // FUNCTION: fn_01888
 DeviceOwnerDX7::DeviceOwnerDX7() {
@@ -158,15 +176,21 @@ HRESULT DeviceOwnerDX7::CreateSurfaces(const DDSURFACEDESC2* mode, DWORD flags) 
     status = this->draw->CreateSurface(&description, &this->primary, nullptr);
 
     if (FAILED(status)) {
-      return SurfaceError(status, 7);
+      if (status != DDERR_OUTOFVIDEOMEMORY) {
+        return DeviceError(7);
+      }
+      return DDERR_OUTOFVIDEOMEMORY;
     }
 
     if (flags & 2) {
-      DDSCAPS2 caps{DDSCAPS_BACKBUFFER};
+      DDSCAPS2 caps = {DDSCAPS_BACKBUFFER, 0, 0, 0};
       status = this->primary->GetAttachedSurface(&caps, &this->backBuffer);
 
       if (FAILED(status)) {
-        return SurfaceError(status, 10);
+        if (status != DDERR_OUTOFVIDEOMEMORY) {
+          return DeviceError(10);
+        }
+        return DDERR_OUTOFVIDEOMEMORY;
       }
     }
 
@@ -189,11 +213,17 @@ HRESULT DeviceOwnerDX7::CreateSurfaces(const DDSURFACEDESC2* mode, DWORD flags) 
     this->height = this->source.bottom;
     this->destination = ClientRectangle(this->window);
     SurfaceDescription(&description, DDSD_CAPS, 0);
-    description.ddsCaps.dwCaps = (flags & 2) ? DDSCAPS_PRIMARYSURFACE : DDSCAPS_PRIMARYSURFACE | DDSCAPS_3DDEVICE;
+    description.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
+    if (!(flags & 2)) {
+      description.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE | DDSCAPS_3DDEVICE;
+    }
     status = this->draw->CreateSurface(&description, &this->primary, nullptr);
 
     if (FAILED(status)) {
-      return SurfaceError(status, 7);
+      if (status != DDERR_OUTOFVIDEOMEMORY) {
+        return DeviceError(7);
+      }
+      return DDERR_OUTOFVIDEOMEMORY;
     }
 
     IDirectDrawClipper* clipper;
@@ -218,7 +248,10 @@ HRESULT DeviceOwnerDX7::CreateSurfaces(const DDSURFACEDESC2* mode, DWORD flags) 
       status = this->draw->CreateSurface(&description, &this->backBuffer, nullptr);
 
       if (FAILED(status)) {
-        return SurfaceError(status, 10);
+        if (status != DDERR_OUTOFVIDEOMEMORY) {
+          return DeviceError(10);
+        }
+        return DDERR_OUTOFVIDEOMEMORY;
       }
     } else {
       ClientToScreen(this->window, reinterpret_cast<POINT*>(&this->source.left));
@@ -228,21 +261,24 @@ HRESULT DeviceOwnerDX7::CreateSurfaces(const DDSURFACEDESC2* mode, DWORD flags) 
 
   SurfaceDescription(&this->primaryDescription, DDSD_CAPS, 0);
   this->primary->GetSurfaceDesc(&this->primaryDescription);
-  const auto& format = this->primaryDescription.ddpfPixelFormat;
-  this->bitDepth = format.dwRGBBitCount;
-  this->redMask = format.dwRBitMask;
-  this->greenMask = format.dwGBitMask;
-  this->blueMask = format.dwBBitMask;
-  this->alphaMask = format.dwRGBAlphaBitMask;
+  this->bitDepth = this->primaryDescription.ddpfPixelFormat.dwRGBBitCount;
+  this->redMask = this->primaryDescription.ddpfPixelFormat.dwRBitMask;
+  this->greenMask = this->primaryDescription.ddpfPixelFormat.dwGBitMask;
+  this->blueMask = this->primaryDescription.ddpfPixelFormat.dwBBitMask;
+  this->alphaMask = this->primaryDescription.ddpfPixelFormat.dwRGBAlphaBitMask;
   this->red = {0, 8};
   this->green = {0, 8};
   this->blue = {0, 8};
   this->alpha = {0, 8};
-  ChannelMask(this->red, format.dwRBitMask);
-  ChannelMask(this->green, format.dwGBitMask);
-  ChannelMask(this->blue, format.dwBBitMask);
-  ChannelMask(this->alpha, format.dwRGBAlphaBitMask);
-  this->renderTarget = (flags & 2) ? this->backBuffer : this->primary;
+  ChannelMask(this->red, this->primaryDescription.ddpfPixelFormat.dwRBitMask);
+  ChannelMask(this->green, this->primaryDescription.ddpfPixelFormat.dwGBitMask);
+  ChannelMask(this->blue, this->primaryDescription.ddpfPixelFormat.dwBBitMask);
+  ChannelMask(this->alpha, this->primaryDescription.ddpfPixelFormat.dwRGBAlphaBitMask);
+  if (flags & 2) {
+    this->renderTarget = this->backBuffer;
+  } else {
+    this->renderTarget = this->primary;
+  }
   this->renderTarget->AddRef();
   SurfaceDescription(&description, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT, 0);
   description.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
@@ -254,81 +290,134 @@ HRESULT DeviceOwnerDX7::CreateSurfaces(const DDSURFACEDESC2* mode, DWORD flags) 
   return FAILED(status) ? E_OUTOFMEMORY : S_OK;
 }
 
-// OFFSET: 0x0054A000
-// FUNCTION: fn_01895
-HRESULT DeviceOwnerDX7::CreateDevice(GUID* drawIdentity, const GUID* renderIdentity, const DDSURFACEDESC2* mode, DWORD flags) {
-  this->depthMemory =
-    std::memcmp(renderIdentity, &IID_IDirect3DHALDevice, sizeof(GUID)) == 0 || std::memcmp(renderIdentity, &IID_IDirect3DTnLHalDevice, sizeof(GUID)) == 0
-      ? DDSCAPS_VIDEOMEMORY
-      : DDSCAPS_SYSTEMMEMORY;
-
-  if (FAILED(DirectDrawCreateEx(drawIdentity, reinterpret_cast<void**>(&this->draw), IID_IDirectDraw7, nullptr))) {
+// INLINED
+static HRESULT CreateDirectDraw(DeviceOwnerDX7* owner, GUID* drawIdentity, DWORD flags) {
+  if (FAILED(DirectDrawCreateEx(drawIdentity, reinterpret_cast<void**>(&owner->draw), IID_IDirectDraw7, nullptr))) {
     return DeviceError(1);
   }
 
-  DDSURFACEDESC2 description{sizeof(description)};
-  this->draw->GetDisplayMode(&description);
-  this->desktopBitDepth = description.ddpfPixelFormat.dwRGBBitCount;
-  DWORD cooperative = this->fullscreen ? DDSCL_FULLSCREEN | DDSCL_ALLOWREBOOT | DDSCL_EXCLUSIVE : DDSCL_NORMAL;
+  DDSURFACEDESC2 description{};
+  description.dwSize = sizeof(description);
+  owner->draw->GetDisplayMode(&description);
+  owner->desktopBitDepth = description.ddpfPixelFormat.dwRGBBitCount;
+  DWORD cooperative = DDSCL_NORMAL;
 
-  if (!(flags & 16)) {
+  if (owner->fullscreen) {
+    cooperative = DDSCL_FULLSCREEN | DDSCL_ALLOWREBOOT | DDSCL_EXCLUSIVE;
+  }
+
+  if (0 == (flags & 16)) {
     cooperative |= DDSCL_FPUSETUP;
   }
 
-  if (FAILED(this->draw->SetCooperativeLevel(this->window, cooperative | DDSCL_MULTITHREADED))) {
+  if (FAILED(owner->draw->SetCooperativeLevel(owner->window, cooperative | DDSCL_MULTITHREADED))) {
     return DeviceError(2);
   }
 
-  const HRESULT status = this->CreateSurfaces(mode, flags);
+  return S_OK;
+}
+
+// INLINED
+static HRESULT CreateDirect3D(DeviceOwnerDX7* owner, const GUID* renderIdentity) {
+  if (FAILED(owner->draw->QueryInterface(IID_IDirect3D7, reinterpret_cast<void**>(&owner->direct3D)))) {
+    return DeviceError(3);
+  }
+
+  if (FAILED(owner->direct3D->CreateDevice(*renderIdentity, owner->renderTarget, &owner->device))) {
+    return DeviceError(4);
+  }
+
+  D3DVIEWPORT7 viewport{};
+  viewport.dwWidth = owner->width;
+  viewport.dwHeight = owner->height;
+  viewport.dvMaxZ = 1.0f;
+
+  if (FAILED(owner->device->SetViewport(&viewport))) {
+    return DeviceError(6);
+  }
+
+  return S_OK;
+}
+
+// INLINED
+static HRESULT CreateDepth(DeviceOwnerDX7* owner, const GUID* renderIdentity, DWORD flags) {
+  std::memset(&owner->depthFormat, 0, sizeof(owner->depthFormat));
+  if (flags & 8) {
+    owner->depthFormat.dwFlags = DDPF_ZBUFFER | DDPF_STENCILBUFFER;
+  } else {
+    owner->depthFormat.dwFlags = DDPF_ZBUFFER;
+  }
+  owner->direct3D->EnumZBufferFormats(*renderIdentity, SelectDepthFormat, &owner->depthFormat);
+
+  if (owner->depthFormat.dwSize != sizeof(owner->depthFormat)) {
+    return DeviceError(5);
+  }
+
+  owner->device->GetCaps(&owner->caps);
+
+  if (!(owner->caps.dpcTriCaps.dwRasterCaps & D3DPRASTERCAPS_ZBUFFERLESSHSR)) {
+    DDSURFACEDESC2 description;
+    SurfaceDescription(&description, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT, 0);
+    description.ddsCaps.dwCaps = owner->depthMemory | DDSCAPS_ZBUFFER;
+    description.dwWidth = owner->width;
+    description.dwHeight = owner->height;
+    description.ddpfPixelFormat = owner->depthFormat;
+    const HRESULT status = owner->draw->CreateSurface(&description, &owner->depthBuffer, nullptr);
+
+    if (FAILED(status)) {
+      if (status != DDERR_OUTOFVIDEOMEMORY) {
+        return DeviceError(5);
+      }
+
+      return DDERR_OUTOFVIDEOMEMORY;
+    }
+
+    if (FAILED(owner->renderTarget->AddAttachedSurface(owner->depthBuffer))) {
+      return DeviceError(5);
+    }
+
+    if (FAILED(owner->device->SetRenderTarget(owner->renderTarget, 0))) {
+      return DeviceError(5);
+    }
+  }
+
+  return S_OK;
+}
+
+// OFFSET: 0x0054A000
+// FUNCTION: fn_01895
+HRESULT DeviceOwnerDX7::CreateDevice(GUID* drawIdentity, const GUID* renderIdentity, const DDSURFACEDESC2* mode, DWORD flags) {
+  if (IsEqualIID(*renderIdentity, IID_IDirect3DHALDevice)) {
+    this->depthMemory = DDSCAPS_VIDEOMEMORY;
+  } else if (IsEqualIID(*renderIdentity, IID_IDirect3DTnLHalDevice)) {
+    this->depthMemory = DDSCAPS_VIDEOMEMORY;
+  } else {
+    this->depthMemory = DDSCAPS_SYSTEMMEMORY;
+  }
+
+  HRESULT status = CreateDirectDraw(this, drawIdentity, flags);
 
   if (FAILED(status)) {
     return status;
   }
 
-  if (renderIdentity) {
-    if (FAILED(this->draw->QueryInterface(IID_IDirect3D7, reinterpret_cast<void**>(&this->direct3D)))) {
-      return DeviceError(3);
-    }
+  status = this->CreateSurfaces(mode, flags);
 
-    if (FAILED(this->direct3D->CreateDevice(*renderIdentity, this->renderTarget, &this->device))) {
-      return DeviceError(4);
-    }
-
-    D3DVIEWPORT7 viewport{0, 0, this->width, this->height, 0.0f, 1.0f};
-
-    if (FAILED(this->device->SetViewport(&viewport))) {
-      return DeviceError(6);
-    }
-
-    this->depthFormat = {};
-    this->depthFormat.dwFlags = DDPF_ZBUFFER | ((flags & 8) ? DDPF_STENCILBUFFER : 0);
-    this->direct3D->EnumZBufferFormats(*renderIdentity, SelectDepthFormat, &this->depthFormat);
-
-    if (this->depthFormat.dwSize != sizeof(this->depthFormat)) {
-      return DeviceError(5);
-    }
-
-    this->device->GetCaps(&this->caps);
-
-    if (!(this->caps.dpcTriCaps.dwRasterCaps & D3DPRASTERCAPS_ZBUFFERLESSHSR)) {
-      SurfaceDescription(&description, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT, 0);
-      description.ddsCaps.dwCaps = this->depthMemory | DDSCAPS_ZBUFFER;
-      description.dwWidth = this->width;
-      description.dwHeight = this->height;
-      description.ddpfPixelFormat = this->depthFormat;
-      const HRESULT depthStatus = this->draw->CreateSurface(&description, &this->depthBuffer, nullptr);
-
-      if (FAILED(depthStatus)) {
-        return SurfaceError(depthStatus, 5);
-      }
-
-      if (FAILED(this->renderTarget->AddAttachedSurface(this->depthBuffer)) || FAILED(this->device->SetRenderTarget(this->renderTarget, 0))) {
-        return DeviceError(5);
-      }
-    }
+  if (FAILED(status)) {
+    return status;
   }
 
-  return S_OK;
+  if (!renderIdentity) {
+    return S_OK;
+  }
+
+  status = CreateDirect3D(this, renderIdentity);
+
+  if (FAILED(status)) {
+    return status;
+  }
+
+  return CreateDepth(this, renderIdentity, flags);
 }
 
 // OFFSET: 0x0054A7D0
@@ -403,7 +492,7 @@ HRESULT DeviceOwnerDX7::Initialize(HWND value, GUID* drawIdentity, const GUID* r
     return E_INVALIDARG;
   }
 
-  if (!mode && (flags & 1)) {
+  if (!mode && static_cast<bool>(flags & 1)) {
     return E_INVALIDARG;
   }
 
@@ -481,6 +570,78 @@ HRESULT DeviceOwnerDX7::Clear(DWORD color) {
 HRESULT DeviceOwnerDX7::ClearDepth() {
   D3DRECT rectangle{0, 0, static_cast<LONG>(this->width), static_cast<LONG>(this->height)};
   return this->device->Clear(1, &rectangle, D3DCLEAR_ZBUFFER, 0, 1.0f, 0);
+}
+
+// OFFSET: 0x00549640
+// FUNCTION: fn_45922
+HRESULT DeviceOwnerDX7::RestoreSurfaces() {
+  IDirectDrawSurface7* surfaces[] = {this->primary, this->backBuffer, this->depthBuffer};
+  HRESULT status = S_OK;
+
+  for (unsigned index = 0; index < 3; ++index) {
+    IDirectDrawSurface7* surface = surfaces[index];
+
+    if (surface) {
+      status = surface->IsLost();
+
+      if (status != S_OK) {
+        surface->Restore();
+      }
+    }
+
+    if (status == DDERR_SURFACELOST) {
+      this->draw->RestoreAllSurfaces();
+      return DDERR_SURFACELOST;
+    }
+  }
+
+  return status;
+}
+
+// OFFSET: 0x00549790
+// FUNCTION: fn_45923
+HRESULT DeviceOwnerDX7::BlitBackBuffer() {
+  if (!this->primary) {
+    return DeviceError(14);
+  }
+
+  if (!this->backBuffer) {
+    return this->primary->IsLost();
+  }
+
+  if (this->fullscreen) {
+    return this->backBuffer->Blt(nullptr, this->primary, nullptr, DDBLT_WAIT, nullptr);
+  }
+
+  this->destination = ClientRectangle(this->window);
+  return this->backBuffer->Blt(&this->source, this->primary, &this->destination, DDBLT_WAIT, nullptr);
+}
+
+// OFFSET: 0x0054A650
+// FUNCTION: fn_45924
+HRESULT DeviceOwnerDX7::CreateDepthBuffer() {
+  this->device->GetCaps(&this->caps);
+
+  if (!(this->caps.dpcTriCaps.dwRasterCaps & D3DPRASTERCAPS_ZBUFFERLESSHSR)) {
+    DDSURFACEDESC2 description;
+    SurfaceDescription(&description, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT, 0);
+    description.ddsCaps.dwCaps = this->depthMemory | DDSCAPS_ZBUFFER;
+    description.dwWidth = this->width;
+    description.dwHeight = this->height;
+    description.ddpfPixelFormat = this->depthFormat;
+    const HRESULT status = this->draw->CreateSurface(&description, &this->depthBuffer, nullptr);
+
+    if (FAILED(status)) {
+      if (status == DDERR_OUTOFVIDEOMEMORY) {
+        return status;
+      }
+    } else if (SUCCEEDED(this->renderTarget->AddAttachedSurface(this->depthBuffer)) && SUCCEEDED(this->device->SetRenderTarget(this->renderTarget, 0))) {
+      return S_OK;
+    }
+    return DeviceError(5);
+  }
+
+  return S_OK;
 }
 
 // OFFSET: 0x0054AF10

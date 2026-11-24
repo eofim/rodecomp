@@ -25,8 +25,6 @@
 #include <cstring>
 #include <mbstring.h>
 
-template __declspec(noinline) std::pair<std::map<int, IdListLine>::iterator, bool> std::_Tree<std::_Tmap_traits<int, IdListLine, std::less<int>, std::allocator<std::pair<const int, IdListLine>>, false>>::insert(std::pair<const int, IdListLine>&&);
-
 // OFFSET: 0x0086D940
 // FUNCTION: fn_11055
 UIListBox::UIListBox() : UIWindow(0) {
@@ -55,10 +53,6 @@ UIListBox::UIListBox() : UIWindow(0) {
 // FUNCTION: fn_11076
 UIServerListBox::UIServerListBox() : UIListBox(), balloon(nullptr) {
 }
-
-// OFFSET: 0x00871040
-// FUNCTION: fn_11105
-UIListBox::~UIListBox() = default;
 
 // OFFSET: 0x0087BB00
 // FUNCTION: fn_11251
@@ -217,12 +211,13 @@ void UIChatHisBox::AddText(const char* text, std::uint32_t color, const char* st
   }
   this->lineColors.push_back(color);
 
-  int mode = 4;
   const auto* bytes = reinterpret_cast<const unsigned char*>(text);
 
   if (_mbsstr(bytes, reinterpret_cast<const unsigned char*>(g_itemLinkTagBegin.c_str())) || _mbsstr(bytes, reinterpret_cast<const unsigned char*>(g_itemLinkTagEnd.c_str()))) {
+    int mode = 4;
     this->AddItemLinkLine(text, color, mode);
-  } else if (g_navigationLinkParser->HasLink(std::string(text))) {
+  } else if (GetNavigationLinkParser()->HasLink(std::string(text))) {
+    int mode = 4;
     this->AddNavigationLinkLine(text, color, mode);
   } else {
     this->UIListBox::AddLine(text);
@@ -260,29 +255,41 @@ void UIListBox::Clear() {
   this->Invalidate();
 }
 
+// INLINED
+static void SetScrollRange(UIScrollBar* bar, int maximum, int visible, int total) {
+  bar->maximum = maximum;
+  bar->visible = visible;
+  bar->total = total;
+  bar->Invalidate();
+  if (bar->position > bar->maximum) {
+    bar->position = bar->maximum;
+  }
+}
+
 // OFFSET: 0x00895ED0
 // FUNCTION: fn_11512
 void UIListBox::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
-  const int overflow = std::ranges::max(static_cast<int>(this->lines.size()) - visible, 0);
+  const int hidden = static_cast<int>(this->lines.size()) - visible;
+  const int overflow = hidden >= 0 ? hidden : 0;
 
   this->verticalOverflow = overflow != 0;
-  UIScrollBar* bar = this->verticalBar;
   if (overflow != 0) {
-    bar->maximum = this->bottomMargin + overflow;
-    bar->total = static_cast<int>(this->lines.size());
+    SetScrollRange(this->verticalBar, this->bottomMargin + overflow, visible, static_cast<int>(this->lines.size()));
   } else {
-    bar->maximum = 0;
-    bar->total = static_cast<int>(this->lines.size());
-  }
-  bar->visible = visible;
-  bar->Invalidate();
-
-  if (bar->position > bar->maximum) {
-    bar->position = bar->maximum;
+    SetScrollRange(this->verticalBar, 0, visible, static_cast<int>(this->lines.size()));
   }
 
   this->verticalBar->Invalidate();
+}
+
+// OFFSET: 0x0089C270
+// FUNCTION: fn_45597
+void UIListBox::SetScrollPosition(int value) {
+  if (this->verticalOverflow != 0) {
+    this->verticalBar->position = value;
+  }
+  this->Refresh();
 }
 
 // OFFSET: 0x008805F0
@@ -386,6 +393,8 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
       this->SendMsg(nullptr, UM_SCROLLVERT, 1, 0, 0, 0);
     }
 
+    this->Invalidate();
+    this->Refresh();
     break;
 
   case UM_UPPUSH:
@@ -399,6 +408,8 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
       this->SendMsg(nullptr, UM_SCROLLVERT, -1, 0, 0, 0);
     }
 
+    this->Invalidate();
+    this->Refresh();
     break;
 
   case UM_DOWNPUSH:
@@ -411,6 +422,8 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
       this->SendMsg(nullptr, UM_SCROLLVERT, 1, 0, 0, 0);
     }
 
+    this->Invalidate();
+    this->Refresh();
     break;
 
   case UM_SCROLLVERT:
@@ -448,17 +461,20 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
   case UM_SCROLLHORZPAGEUP:
   case UM_SCROLLHORZPAGEDOWN: {
     const int previous = this->horizontalOffset;
-    const int delta = message == UM_SCROLLHORZPAGEUP ? -15 : message == UM_SCROLLHORZPAGEDOWN ? 15 : value;
-    this->horizontalOffset = (previous + delta);
+    if (message == UM_SCROLLHORZPAGEUP) {
+      this->horizontalOffset = previous - 15;
+    } else if (message == UM_SCROLLHORZPAGEDOWN) {
+      this->horizontalOffset = previous + 15;
+    } else {
+      this->horizontalOffset = previous + value;
+    }
 
     if (this->horizontalOffset < 0) {
       this->horizontalOffset = 0;
     }
 
-    const int maximum = (((this->verticalOverflow * 16) - this->geometry.width) + this->contentWidth);
-
-    if (this->horizontalOffset > maximum) {
-      this->horizontalOffset = maximum;
+    if (this->horizontalOffset > this->verticalOverflow * 16 - this->geometry.width + this->contentWidth) {
+      this->horizontalOffset = this->verticalOverflow * 16 - this->geometry.width + this->contentWidth;
     }
 
     this->horizontalBar->position = this->horizontalOffset;
@@ -479,14 +495,12 @@ int UIListBox::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
       }
     }
 
-    return 0;
+    break;
 
   default:
     return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 
-  this->Invalidate();
-  this->Refresh();
   return 0;
 }
 
@@ -538,20 +552,20 @@ void UIChatHisBox::CopyHistory(const UIChatHisBox& other) {
 // FUNCTION: fn_11200
 void UIComboBoxID::AddLine(const char* text, int id, int data) {
   const int index = static_cast<int>(this->lines.size());
-  this->lines.insert({index, {id, text}});
+  this->lines.insert(std::pair<const int, IdListLine>(index, std::make_pair(id, text)));
   const int width = this->TextWidth(text, 0, 0, 12, 0, 0);
   this->contentWidth = std::max(this->contentWidth, width);
   this->Refresh();
 
   if (data != 0) {
-    this->lineData.try_emplace(index, data);
+    this->lineData.insert(std::pair<const int, int>(index, data));
   }
 }
 
 // OFFSET: 0x00875DD0
 // FUNCTION: fn_11203
 void UIListBoxID::AddLine(const char* text, int id) {
-  this->lines.insert({static_cast<int>(this->lines.size()), {id, text}});
+  this->lines.insert(std::pair<const int, IdListLine>(static_cast<int>(this->lines.size()), std::make_pair(id, text)));
   const int width = this->TextWidth(text, 0, 0, 12, 0, 0);
   this->contentWidth = std::max(this->contentWidth, width);
   this->Refresh();
@@ -560,4 +574,14 @@ void UIListBoxID::AddLine(const char* text, int id) {
 // OFFSET: 0x0086D8C0
 // FUNCTION: fn_11054
 UIListBox2::UIListBox2() : UIListBox(), fontFamily(0), fontHeight(12), bold(0), italic(0) {
+}
+
+// OFFSET: 0x0089BC80
+// FUNCTION: fn_45602
+void UIListBox2::SetFont(int family, int height, unsigned char boldValue, unsigned char italicValue) {
+  this->fontFamily = family;
+  this->fontHeight = height;
+  this->bold = boldValue;
+  this->italic = italicValue;
+  this->Invalidate();
 }

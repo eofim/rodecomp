@@ -30,6 +30,7 @@ struct ModeDragState;
 struct ITEM_INFO;
 class UIItemTagButton;
 struct PriceColors;
+struct TextLink;
 
 class UIWindow : public UIRPData {
   friend class UIWindowMgr;
@@ -98,6 +99,7 @@ public:
 
   void AddChild(UIWindow* child);
   void AddChildFront(UIWindow* child);
+  void Destroy();
   void DeleteChildren();
   void ClearChildren(bool destroy);
   void RemoveChild(UIWindow* child, unsigned char destroy);
@@ -106,10 +108,26 @@ public:
   int Contains(const UIWindow* window) const;
   bool IsDescendantOf(const UIWindow* ancestor) const;
   void BroadcastMsg4();
+  bool HasTextLinks(const std::string& text);
+  std::string ExpandTextEscapes(const std::string& text);
+  void ExtractTextLinks(const std::string& source, const std::string& begin, const std::string& end, std::vector<TextLink>& links);
+  void ExtractNavigationTextLinks(const std::string& text, std::vector<TextLink>& links);
+  void ExtractTipBoxTextLinks(const std::string& text, std::vector<TextLink>& links);
+  void ExtractUrlTextLinks(const std::string& text, std::vector<TextLink>& links);
+  std::string RemoveTextColors(const char* text);
+  const std::string RemoveTextLinkInfo(const std::string& source);
+  const std::string DisplayTextTag(const std::string& source, const std::string& begin, const std::string& end);
+  const std::string DisplayItemTextTag(const std::string& text);
+  const std::string DisplayNavigationTextTag(const std::string& text);
+  const std::string DisplayQuestTextTag(const std::string& text);
+  const std::string DisplayTipBoxTextTag(const std::string& text);
+  __declspec(noinline) const std::string DisplayUrlTextTag(const std::string& text);
+  std::string StripColorCodes(const char* text, unsigned bytes);
   void BroadcastMsg3();
   void PropagateMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4);
   __declspec(noinline) void ToScreen(int& x, int& y) const;
   void PlaceBeside(UIWindow* anchor);
+  bool CalculateUIPosNearSide(UIWindow* anchor);
   UIWindow* FindUid(std::uint32_t uid);
   // INLINED
   std::uint32_t Uid() const {
@@ -122,8 +140,8 @@ public:
   void ClearSurface(std::uint32_t color);
   void SetSize(int width, int height);
   void DrawBitmap(int x, int y, const BitmapImage* image, bool transparent);
-  void DrawBitmap(int x, int y, CBitmapRes* bitmap, bool transparent);
-  void DrawAlignedText(int x, int y, std::string text, int width, int align, std::uint32_t color, int arg7, int arg8, int arg9, int arg10, unsigned char bold);
+  void DrawBitmap(int x, int y, CBitmapRes* bitmap, int transparent);
+  void DrawAlignedText(int x, int y, std::string text, int width, int align, std::uint32_t color, int outlineColor, int family, int height, unsigned char bold, unsigned char outlined);
   void FillRegion(int x, int y, int width, int height, std::uint32_t color);
   std::string FitTextToWidth(const std::string& text, int width);
   void DrawRectOutline(int x, int y, int width, int height, std::uint32_t color);
@@ -142,6 +160,7 @@ public:
   void DrawVerticalText(int x, int y, const char* text, unsigned bytes, int family, int height, std::uint32_t color, unsigned char bold);
   void DrawCenteredText(int x, int y, const char* text, int width, int family, int height, std::uint32_t color, unsigned char bold);
   void DrawColoredText(int x, int y, const char* text, unsigned bytes, std::uint32_t& color, int family, int height, bool shadow);
+  void DrawRightColoredText(int right, int y, const char* text, unsigned bytes, std::uint32_t& color, int family, int height);
   void DrawStyledColoredText(
     int x, int y, const char* text, unsigned bytes, std::uint32_t& color, int family, int height, unsigned char bold, unsigned char italic,
     bool shadow
@@ -178,13 +197,13 @@ public:
   void WrapLinkText(int* kind, std::vector<std::string>* lines, const std::string& text);
   void WrapTextWithBreaks(const char* text, std::vector<std::string>* lines, std::vector<bool>* breaks, int width);
   int DrawItemNameSegments(
-    int x, int y, int width, const std::vector<char*>& breaks, const char* text, const char* highlight, std::uint32_t highlightColor,
+    int x, int y, int width, const std::vector<const char*>& breaks, const char* text, const char* highlight, std::uint32_t highlightColor,
     std::uint32_t color, int unused, int lineHeight
   );
   void DrawBitmapScaled(int x, int y, int width, int height, const CBitmapRes* bitmap, int option);
   void DrawBitmapRegion(int x, int y, CBitmapRes* bitmap, bool transparent, bool whole, int left, int top, int right, int bottom);
   void DrawAuxiliaryScaled(int mode, int x, int y, int width, int height, CBitmapRes* bitmap, int option, bool rebuild);
-  void DrawAuxiliary(int mode, int x, int y, CBitmapRes* bitmap, bool transparent, bool rebuild);
+  void DrawAuxiliary(int mode, int x, int y, CBitmapRes* bitmap, int transparent, bool rebuild);
   void DrawItemIcon(int x, int y, const ITEM_INFO& item, unsigned char identified);
   void DrawItemIconFromId(int x, int y, const char* id, unsigned char identified);
   void DrawItemSlotFrame(int x, int y);
@@ -210,6 +229,7 @@ public:
   int RecordData(std::uint16_t type, std::vector<unsigned char> data);
   void RecordValues(int value, int argument1, int argument2, int argument3, int argument4);
   void RecordWindowFlag(bool value);
+  void RecordMessageText(int message, int argument, const char* text);
   void RecordText(int event, const char* text);
   int RestoreEditTexts(const unsigned char* data);
   void DrawActionSprite(
@@ -263,6 +283,12 @@ private:
   UIWindow(const UIWindow&) = delete;
   UIWindow& operator=(const UIWindow&) = delete;
 };
+
+// OFFSET: 0x005C8F60
+// FUNCTION: fn_03629
+inline void UIWindow::SetId(int value) {
+  this->geometry.SetId(value);
+}
 
 extern std::uint32_t g_windowUid;
 

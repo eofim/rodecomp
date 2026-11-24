@@ -2,6 +2,7 @@
 #include "Client/Input/Mouse.h"
 #include "Client/Mode/CMode.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Map/MapSkyMgr.h"
 #include "Render/DeviceContext/DCSurface.h"
 #include "Render/Primitives/RenderPrimitive.h"
 #include "Render/Primitives/RenderPrimitivePool.h"
@@ -13,6 +14,7 @@
 #include "Resource/ResourceMgr.h"
 #include "Resource/Sprites/ActionResource.h"
 #include "Resource/Sprites/SpriteResource.h"
+#include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
 
 #include <windows.h>
@@ -79,12 +81,17 @@ void CMode::DrawCursor() {
   switch (this->cursorAction) {
   case 2:
   case 9:
-    if (g_mouse.buttons[0] == 0) {
+    if (g_mouse.buttons[0] != 0) {
+      const unsigned frame = ticks / divisor;
+      this->cursorActionFrame = frame % action->FrameCount(this->cursorAction);
+      if (frame / action->FrameCount(this->cursorAction) >= 1) {
+        this->cursorActionFrame = action->FrameCount(this->cursorAction) - 1;
+      }
+    } else {
       this->cursorTick = timeGetTime();
       this->cursorActionFrame = 0;
-      break;
     }
-    [[fallthrough]];
+    break;
   case 1: {
     const unsigned frame = ticks / divisor;
     this->cursorActionFrame = frame % action->FrameCount(this->cursorAction);
@@ -98,7 +105,7 @@ void CMode::DrawCursor() {
     break;
   }
 
-  g_windowMgr.SendNotice(16, this->cursorActionFrame, 0, 0, 0, 0);
+  g_windowMgr.SendNotice(UIM_SET_CURSOR_ACTION_FRAME, this->cursorActionFrame, 0, 0, 0, 0);
 
   const int y = static_cast<int>(static_cast<float>(g_mouse.y) + this->cursorOffsetY);
   const int x = static_cast<int>(static_cast<float>(g_mouse.x) + this->cursorOffsetX);
@@ -117,8 +124,8 @@ void CMode::DrawCursor() {
 
     const float scaleX = cell.scaleX;
     const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
-    float left = static_cast<float>(cell.x);
-    float right = static_cast<float>(image->width * (image->doubleWidth + 1) - 1 + cell.x);
+    const float left = static_cast<float>(cell.x);
+    const float right = static_cast<float>(image->width * (image->doubleWidth + 1) - 1 + cell.x);
     const float top = static_cast<float>(cell.y) * cell.scaleY;
     const float bottom = static_cast<float>(image->height * (image->doubleHeight + 1) - 1 + cell.y) * cell.scaleY;
 
@@ -133,16 +140,20 @@ void CMode::DrawCursor() {
     }
     primitive->texture = texture;
 
+    float scaledLeft;
+    float scaledRight;
     if (cell.mirrored & 1) {
-      const float swap = left;
-      left = right;
-      right = swap;
+      scaledLeft = scaleX * right;
+      scaledRight = scaleX * left;
+    } else {
+      scaledLeft = scaleX * left;
+      scaledRight = scaleX * right;
     }
 
-    const float x0 = static_cast<float>(x) + scaleX * left + 0.5f;
-    const float y0 = static_cast<float>(y) + top + 0.5f;
-    const float x1 = scaleX * right + static_cast<float>(x) + 0.5f;
-    const float y1 = static_cast<float>(y) + bottom + 0.5f;
+    const float x0 = static_cast<float>(x) + scaledLeft + g_depthAverageHalf;
+    const float y0 = static_cast<float>(y) + top + g_depthAverageHalf;
+    const float x1 = scaledRight + static_cast<float>(x) + g_depthAverageHalf;
+    const float y1 = static_cast<float>(y) + bottom + g_depthAverageHalf;
 
     RenderVertex* quad = primitive->quad;
     quad[0].x = x0;
@@ -174,6 +185,6 @@ void CMode::DrawCursor() {
     quad[3].v = record.v1;
     quad[3].diffuse = 0xFAFFFFFF;
 
-    g_renderer->Submit(primitive, 517);
+    g_renderer->Submit(primitive, RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_NO_DEPTH);
   }
 }

@@ -13,6 +13,7 @@ class CParticle;
 class CEvilsPawEffect : public CEffect {
 public:
   CEvilsPawEffect();
+  ~CEvilsPawEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -20,6 +21,10 @@ public:
   void Close() override;
   bool IsAlive() override;
   void ResetParticles() override;
+  void AddParticle();
+  void InitializeParticle(CParticle* particle);
+  void UpdateParticle(CParticle* particle);
+  void RenderParticle(CParticle* particle);
 
   /* 00CC */ std::vector<CParticle*> particles;
   /* 00D8 */ int frameDelay;

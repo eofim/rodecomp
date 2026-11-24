@@ -36,14 +36,14 @@ float CRendererDX9::FPS() const {
 
 // OFFSET: 0x005650E0
 // FUNCTION: fn_02212
-bool CRendererDX9::CaptureBackBuffer() {
-  return this->device->CaptureBackBuffer();
+void CRendererDX9::CaptureBackBuffer() {
+  this->device->CaptureBackBuffer();
 }
 
 // OFFSET: 0x00567FB0
 // FUNCTION: fn_02233
-bool CRendererDX9::RestoreBackBuffer() {
-  return this->device->RestoreBackBuffer();
+void CRendererDX9::RestoreBackBuffer() {
+  this->device->RestoreBackBuffer();
 }
 
 // OFFSET: 0x00565860
@@ -104,10 +104,6 @@ bool CRendererDX9::SaveLogo(std::string filename) {
   return this->SaveScreenshot(filename.c_str(), 1, overlay, nullptr);
 }
 
-void CRendererDX9::Submit(RenderCommand* command, std::uint16_t flags) {
-  this->Submit(command, flags);
-}
-
 // OFFSET: 0x00559BE0
 // FUNCTION: fn_02071
 void CRendererDX9::Submit(LightmappedPrimitive* command, int queue) {
@@ -117,10 +113,10 @@ void CRendererDX9::Submit(LightmappedPrimitive* command, int queue) {
 
   switch (queue) {
   case 0:
-    this->queues.lightmapped.first.push_back(command);
+    this->lightmappedFirst.emplace_back(command);
     break;
   case 1:
-    this->queues.lightmapped.second.push_back(command);
+    this->lightmappedSecond.emplace_back(command);
     break;
   }
 }

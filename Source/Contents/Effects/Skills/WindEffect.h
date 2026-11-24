@@ -13,6 +13,7 @@ class CParticle;
 class CWindEffect : public CEffect {
 public:
   CWindEffect();
+  ~CWindEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -22,6 +23,10 @@ public:
   void ResetParticles() override;
 
   void Init();
+  // INLINED
+  void SetTexture(std::string name) {
+    this->textureName = name;
+  }
 
   /* 00CC */ unsigned short ringCount = 4;
   /* 00CE */ unsigned char maxAlpha = 200;
@@ -39,6 +44,11 @@ public:
   /* 00FC */ std::string textureName = "effect\\cloud11.tga";
   /* 0114 */ EffectPoint lastPoints[2];
   /* 012C */ std::vector<CParticle*> particles;
+
+private:
+  void UpdateParticle(CParticle* particle);
+  void RenderParticle(CParticle* particle);
+  void UpdateParticleAlpha(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

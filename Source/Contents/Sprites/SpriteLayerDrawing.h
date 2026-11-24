@@ -57,9 +57,16 @@ public:
   __declspec(noinline) std::pair<bool, SpriteLayerResources> FindLayer(int layer);
   std::pair<bool, std::string> GetLayerSound(int layer, CActRes* action, int sound);
   void DrawLayer(
-    int index, int layer, const ActionFrame* frame, CSprRes* sprite, CActRes* action, int animation, int frameIndex, bool replaced
+    int index, int layer, const ActionFrame* frame, SpriteLayerResources resources, int animation, int frameIndex, bool replaced
   );
   void LoadLayers();
+  void PrepareLayers();
+  bool ShouldDrawLayer(int layer) const;
+  std::pair<bool, const ActionFrame*> FindSyncedFrame(int layer, CActRes* action) const;
+  int GetLayerBlend(int layer, std::uint32_t color) const;
+  void DrawQueuedLayers();
+  void QueueOutline(int layer, float yOffset, float xOffset, const std::uint32_t* palette, const SpriteQuad& quad, SpriteQuad& outline);
+  void IncludeLayerBounds(int layer, const float* box);
 
   /* 0000 */ float matrix[12];
   /* 0030 */ int blendMode;

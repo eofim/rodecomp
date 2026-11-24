@@ -1,3 +1,4 @@
+#include "Render/Primitives/DepthAlpha.h"
 #include "Render/Primitives/RenderPrimitive.h"
 #include "Render/Renderer.h"
 
@@ -37,34 +38,50 @@ bool RenderTriangle::Visible() const {
 
 // OFFSET: 0x00568F40
 // FUNCTION: fn_02244
-RenderCommand::RenderCommand()
-    : vertices(nullptr), vertexCount(0), texture(nullptr), indices(nullptr), indexCount(0), depthFlags(1), sourceBlend(0), destinationBlend(0), textureMode(0),
-      primitiveType(D3DPT_TRIANGLELIST) {
+RenderCommand::RenderCommand() {
+  this->vertices = nullptr;
+  this->vertexCount = 0;
+  this->texture = nullptr;
+  this->indices = nullptr;
+  this->indexCount = 0;
+  this->depthTest = 1;
+  this->commandMode = 0;
+  this->sourceBlend = 0;
+  this->destinationBlend = 0;
+  this->textureMode = 0;
+  this->primitiveType = D3DPT_TRIANGLELIST;
+}
+
+namespace {
+  struct QuadVertex : RenderVertex {
+    // INLINED
+    QuadVertex() {
+      this->Reset();
+    }
+  };
 }
 
 // OFFSET: 0x005691D0
 // FUNCTION: fn_02250
-RenderPrimitive::RenderPrimitive() : RenderCommand() {
-  this->vertices = this->quad;
+RenderPrimitive::RenderPrimitive() : RenderCommand(0) {
   this->vertexCount = 4;
+  this->vertices = this->quad;
+  this->texture = nullptr;
+  this->indices = nullptr;
+  this->indexCount = 0;
+  this->depthTest = 1;
+  this->commandMode = 0;
+  this->sourceBlend = 0;
+  this->destinationBlend = 0;
+  this->textureMode = 0;
+  new (this->quad) QuadVertex[4];
   this->primitiveType = D3DPT_TRIANGLESTRIP;
-
-  for (RenderVertex& vertex : this->quad) {
-    vertex.x = 0;
-    vertex.y = 0;
-    vertex.z = 0;
-    vertex.rhw = 0;
-    vertex.diffuse = 0;
-    vertex.specular = 0xFF000000;
-    vertex.u = 0;
-    vertex.v = 0;
-  }
 }
 
 // OFFSET: 0x00569120
 // FUNCTION: fn_02249
 RenderPrimitive::RenderPrimitive(const RenderPrimitive& other) : RenderPrimitive() {
-  std::memcpy(this->quad, other.quad, sizeof(this->quad));
+  *this = other;
 }
 
 // OFFSET: 0x005692F0
@@ -86,18 +103,26 @@ RenderPrimitive& RenderPrimitive::operator=(const RenderPrimitive& other) {
 // OFFSET: 0x00569380
 // FUNCTION: fn_02256
 void RenderCommand::AllocateTriangles(std::uint32_t triangleCount) {
-  const std::uint32_t vertexCount = triangleCount * 3;
-  auto* vertices = new RenderVertex[vertexCount];
-  for (std::uint32_t i = 0; i < vertexCount; ++i) {
-    vertices[i].Reset();
-  }
-  this->vertices = vertices;
+  struct Vertex : RenderVertex {
+    Vertex() {
+      this->Reset();
+    }
+  };
+  this->vertices = new Vertex[triangleCount * 3];
 }
 
 // OFFSET: 0x00569470
 // FUNCTION: fn_02257
 void RenderCommand::Draw(int unused) {
   g_renderer->DrawPrimitive(this);
+}
+
+// OFFSET: 0x005694A0
+// FUNCTION: fn_02260
+void RenderCommand::ApplyDepthAlpha() {
+  for (int index = 0; index < this->vertexCount; ++index) {
+    this->vertices[index].specular = DepthAlpha(this->vertices[index].rhw);
+  }
 }
 
 // OFFSET: 0x00569580

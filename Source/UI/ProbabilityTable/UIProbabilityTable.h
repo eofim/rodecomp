@@ -15,13 +15,12 @@ class CItemData {
 public:
   /* 0000 */ std::uint32_t color = 0xFFFFFFFF;
   /* 0004 */ std::string name;
-  /* 001C */ int padding_001C;
   /* 0020 */ double probability = 0.0;
 };
 
 class CUIItem : public CUIListItem {
 public:
-  CUIItem();
+  __declspec(noinline) CUIItem();
   void OnCreate(int width, int height) override;
   void OnInit() override;
   void Paint() override;

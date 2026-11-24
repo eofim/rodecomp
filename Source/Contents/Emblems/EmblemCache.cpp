@@ -21,19 +21,6 @@
 #include <windows.h>
 #include <zlib.h>
 
-namespace {
-  // INLINED
-  __forceinline std::string Basename(const std::string& path) {
-    std::string name = path;
-    const auto separator = path.rfind('\\');
-    if (separator != std::string::npos) {
-      name = path.substr(separator + 1, path.size());
-    }
-
-    return name;
-  }
-}
-
 // OFFSET: 0x0065ED00
 // FUNCTION: fn_05178
 std::string CGuildMgr::EmblemFilename(std::uint32_t guild, std::uint32_t revision) const {
@@ -45,14 +32,28 @@ std::string CGuildMgr::EmblemFilename(std::uint32_t guild, std::uint32_t revisio
 // OFFSET: 0x0065E6F0
 // FUNCTION: fn_05176
 bool CGuildMgr::IsInvalidEmblem(std::string path) const {
-  return this->m_invalidEmblems.find(Basename(path)) != this->m_invalidEmblems.end();
+  std::string name = path;
+  const auto separator = path.rfind('\\');
+  if (separator != std::string::npos) {
+    name = path.substr(separator + 1, path.size());
+  }
+
+  if (this->m_invalidEmblems.end() != this->m_invalidEmblems.find(name)) {
+    return true;
+  }
+  return false;
 }
 
 // OFFSET: 0x0065DFB0
 // FUNCTION: fn_05171
 void CGuildMgr::MarkInvalidEmblem(std::string path) {
-  const std::string name = Basename(path);
-  if (this->m_invalidEmblems.find(name) == this->m_invalidEmblems.end()) {
+  std::string name = path;
+  const auto separator = path.rfind('\\');
+  if (separator != std::string::npos) {
+    name = path.substr(separator + 1, path.size());
+  }
+
+  if (this->m_invalidEmblems.end() == this->m_invalidEmblems.find(name)) {
     this->m_invalidEmblems.insert(name);
   }
 }
@@ -77,7 +78,8 @@ void CGuildMgr::StoreEmblem(const void* bytes, std::uint32_t size, std::uint32_t
       std::list<std::string> names;
       EnumerateFileNames(names, directory.c_str(), path.c_str());
 
-      for (const std::string& name : names) {
+      for (auto nameIt = names.begin(); nameIt != names.end(); ++nameIt) {
+        const std::string& name = *nameIt;
         path = directory + name;
         _chmod(path.c_str(), _S_IWRITE);
         _unlink(path.c_str());
@@ -92,7 +94,8 @@ void CGuildMgr::StoreEmblem(const void* bytes, std::uint32_t size, std::uint32_t
       std::fclose(file);
     }
   } else {
-    g_guildMgr->MarkInvalidEmblem(filename);
+    CGuildMgr* manager = g_guildMgr;
+    manager->MarkInvalidEmblem(filename);
   }
 
   delete compressed;
@@ -104,18 +107,18 @@ void __stdcall CGuildMgr::ReceiveEmblem(std::uint16_t state, std::uint32_t guild
   CGuildMgr* manager = g_guildMgr;
   switch (static_cast<std::int16_t>(state)) {
   case 0:
-    manager->m_receiveGuildId = guild;
-    manager->m_receiveVersion = revision;
-    manager->m_receiveData.clear();
+    manager->m_receivedEmblem.guildId = guild;
+    manager->m_receivedEmblem.version = revision;
+    manager->m_receivedEmblem.data.clear();
     break;
   case 1:
-    if (guild == manager->m_receiveGuildId && revision == manager->m_receiveVersion) {
-      manager->m_receiveData.insert(manager->m_receiveData.end(), reinterpret_cast<const char*>(bytes), reinterpret_cast<const char*>(bytes) + size);
+    if (guild == manager->m_receivedEmblem.guildId && revision == manager->m_receivedEmblem.version) {
+      manager->m_receivedEmblem.data.insert(manager->m_receivedEmblem.data.end(), reinterpret_cast<const char*>(bytes), reinterpret_cast<const char*>(bytes) + size);
     }
     break;
   case 2:
-    if (guild == manager->m_receiveGuildId && revision == manager->m_receiveVersion) {
-      StoreEmblem(manager->m_receiveData.data(), static_cast<std::uint32_t>(manager->m_receiveData.size()), guild, revision);
+    if (guild == manager->m_receivedEmblem.guildId && revision == manager->m_receivedEmblem.version) {
+      StoreEmblem(manager->m_receivedEmblem.data.data(), static_cast<std::uint32_t>(manager->m_receivedEmblem.data.size()), guild, revision);
       RefreshEmblem(guild);
     }
     break;

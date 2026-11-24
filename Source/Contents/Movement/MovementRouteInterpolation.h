@@ -16,14 +16,17 @@ struct PathNode {
 };
 
 struct PathCell {
-  /* 0000 */ std::int32_t x;
-  /* 0004 */ std::int32_t y;
-  /* 0008 */ int metadata;
-  /* 000C */ std::uint32_t tick;
+  /* 0000 */ std::int32_t x = 0;
+  /* 0004 */ std::int32_t y = 0;
+  /* 0008 */ int metadata = 0;
+  /* 000C */ std::uint32_t tick = 0;
 };
 
 struct MovementRouteInterpolation {
   MovementRouteInterpolation();
+  // OFFSET: 0x00B92E80
+  // FUNCTION: fn_19557
+  ~MovementRouteInterpolation() = default;
 
   /* 0000 */ std::vector<PathCell> points;
   /* 000C */ std::uint32_t segment;
@@ -36,6 +39,12 @@ struct MovementRouteInterpolation {
   int NextPoint(std::uint32_t tick, std::uint32_t* nextTick, float* x, float* y) const;
   int Sample(std::uint32_t tick, float* x, float* y, int* metadata);
   std::uint32_t Segment() const;
+  float StartX() const;
+  float StartY() const;
+  void ResetSegment();
+  void SetSegment(std::uint32_t segment);
+  void SetStartX(float startX);
+  void SetStartY(float startY);
   std::uint32_t Duration() const;
   bool Empty() const;
 };

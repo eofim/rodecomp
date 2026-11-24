@@ -3,6 +3,7 @@
 #include "Network/Connection/Connection.h"
 #include "Network/Connection/ConnectionRuntime.h"
 #include "Network/Packets/PacketLengths.h"
+#include "Network/Packets/PacketId.h"
 #include "Render/DeviceContext/DCSurface.h"
 
 #include <algorithm>
@@ -12,6 +13,20 @@
 #include <timeapi.h>
 #include <memory>
 #include <string>
+
+// OFFSET: 0x00C7C970
+// FUNCTION: fn_20391
+int CRagConnection::GetPacketSize(int id) {
+  switch (id) {
+  case ID_ZC_SRPACKETR2_INIT:
+    return 12;
+
+  case ID_CZ_SRPACKETR2_START:
+    return 4;
+  }
+
+  return std::max(g_packetLengths.Lookup(id).length, 2);
+}
 
 // OFFSET: 0x00C7C110
 // FUNCTION: fn_20382
@@ -61,6 +76,54 @@ namespace {
     }
     return htons(static_cast<u_short>(port));
   }
+}
+
+namespace {
+  // GLOBAL: gl_24389
+  WSADATA wsaData;
+
+  // GLOBAL: gl_24390
+  HMODULE ws2Module;
+}
+// STATIC: 0x016FDC8C
+// GLOBAL: gl_24391
+int(WSAAPI* g_connectionSend)(SOCKET, const char*, int, int);
+
+// STATIC: 0x016FDC90
+// GLOBAL: gl_24392
+int(WSAAPI* g_connectionReceive)(SOCKET, char*, int, int);
+
+// OFFSET: 0x00C7C400
+// FUNCTION: fn_20387
+bool CRagConnection::CheckConnectionRuntime() {
+  const char* names[] = {"connect", "closesocket", "send", "select"};
+  HMODULE library = LoadLibraryA("ws2_32.dll");
+  if (library) {
+    for (unsigned index = 0; index < 4; ++index) {
+      FARPROC loadedFunction = GetProcAddress(library, names[index]);
+      FARPROC originalFunction = GetProcAddress(ws2Module, names[index]);
+      if (loadedFunction != originalFunction) {
+        FreeLibrary(library);
+        return false;
+      }
+    }
+
+    FreeLibrary(library);
+  }
+
+  return true;
+}
+
+// OFFSET: 0x00C7C4B0
+// FUNCTION: fn_20388
+void Cleanup() {
+  WSACleanup();
+  FreeLibrary(ws2Module);
+}
+
+// INLINED
+bool CConnection::ReadPacket(void* output, unsigned short* bytes, const PacketLengths& lengths) {
+  return this->ReadPacket(output, bytes);
 }
 
 // OFFSET: 0x00C7C4D0
@@ -257,10 +320,10 @@ bool CConnection::ReadPacket(void* output, unsigned short* bytes) {
   }
 
   unsigned short size;
+  unsigned header;
   if (g_packetLengths.Lookup(id).kind == 1) {
     size = static_cast<unsigned short>(static_cast<CRagConnection*>(this)->GetPacketSize(id));
   } else {
-    unsigned header;
     if (!this->m_input.PeekData(4, &header)) {
       return false;
     }
@@ -316,6 +379,18 @@ void CConnection::SetBlock(unsigned char value) {
     this->m_pending.RemoveData(bytes);
     this->Flush();
   }
+}
+
+// OFFSET: 0x00C7D020
+// FUNCTION: fn_20408
+bool InitializeConnections() {
+  WSAStartup(MAKEWORD(1, 1), &wsaData);
+  ws2Module = LoadLibraryA("ws2_32.dll");
+  g_connectionSend = reinterpret_cast<decltype(g_connectionSend)>(GetProcAddress(ws2Module, "send"));
+  g_connectionReceive = reinterpret_cast<decltype(g_connectionReceive)>(GetProcAddress(ws2Module, "recv"));
+  GetRagConnection().CheckConnectionRuntime();
+
+  return true;
 }
 
 // OFFSET: 0x00C7D7D0

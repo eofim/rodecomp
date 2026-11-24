@@ -75,6 +75,8 @@ public:
   void UpdateScroll();
 
 protected:
+  int MemberIndexAt(int x, int y);
+
   /* 00D0 */ UIStaticText* m_names[11];
   /* 00FC */ UIStaticText* m_reasons[11];
   /* 0128 */ UIScrollBar* m_scrollBar;
@@ -98,6 +100,9 @@ public:
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
 
 protected:
+  void DrawEmblem();
+  void RefreshEmblemFiles();
+
   void RefreshAgitList();
   void HideAgitMenu();
 
@@ -129,6 +134,8 @@ public:
   void UpdateScroll();
 
 protected:
+  int MemberIndexAt(int x, int y);
+
   bool DrawMember(GuildInfo::Member& member, int& index, int row);
   bool GetMember(int index, GuildInfo::Member& member);
   void SortMembers(int column);
@@ -148,7 +155,7 @@ protected:
   /* 0178 */ std::list<GuildInfo::Member> m_members;
   /* 0180 */ std::map<int, GuildMemberManageEntry> membersByCharacterId;
   /* 0188 */ int m_sortColumn;
-  /* 018C */ std::map<int, int> m_sortOrders;
+  /* 018C */ std::map<int, unsigned long> m_sortOrders;
   /* 0194 */ UICheckBox* m_onlineCheck;
   /* 0198 */ std::uint32_t m_buttonTime;
 };
@@ -257,6 +264,8 @@ public:
   void UpdateScroll();
 
 protected:
+  int GuildIndexAt(int x, int y);
+
   /* 00D0 */ UIStaticText* m_rows[12];
   /* 0100 */ UIScrollBar* m_scrollBar;
   /* 0104 */ int m_scrollTop;

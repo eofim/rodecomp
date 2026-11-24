@@ -12,6 +12,7 @@ class CParticle;
 class CRotateLineEffect : public CEffect {
 public:
   CRotateLineEffect();
+  ~CRotateLineEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -26,6 +27,12 @@ public:
   /* 00DC */ bool started;
   /* 00E0 */ EffectPoint previous[2];
   /* 00F8 */ std::vector<CParticle*> particles;
+
+private:
+  void SetParticleStyle(CParticle* particle);
+  void UpdateParticle(CParticle* particle);
+  void RenderParticle(CParticle* particle);
+  void UpdateVertices(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

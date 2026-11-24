@@ -20,40 +20,30 @@ int InsertIntro(lua_State* state) {
   if (!lua_isnumber(state, -4)) {
     lua_pushboolean(state, 0);
     lua_pushstring(state, "argment 1st is must number");
-    return 2;
-  }
-
-  if (!lua_isstring(state, -3)) {
+  } else if (!lua_isstring(state, -3)) {
     lua_pushboolean(state, 0);
     lua_pushstring(state, "argment 2nd is must string");
-    return 2;
-  }
-
-  if (!lua_isstring(state, -2)) {
+  } else if (!lua_isstring(state, -2)) {
     lua_pushboolean(state, 0);
     lua_pushstring(state, "argment 3th is must string");
-    return 2;
-  }
-
-  if (!lua_isstring(state, -1)) {
+  } else if (!lua_isstring(state, -1)) {
     lua_pushboolean(state, 0);
     lua_pushstring(state, "argment 4th is must string");
-    return 2;
-  }
-
-  const double id = lua_tonumber(state, -4);
-  const std::string_view name = lua_tostring(state, -3);
-  const std::string_view title = lua_tostring(state, -2);
-  const std::string_view text = lua_tostring(state, -1);
-  g_adventureGuideMgr->SetIntroTitle(title);
-  const AdventureGuideResult result = g_adventureGuideMgr->InsertGuideMenu(0, static_cast<int>(id), name, text);
-
-  if (!result.ok) {
-    lua_pushboolean(state, 0);
-    lua_pushstring(state, FormatString("InsertInfo : %s", result.message.c_str()));
   } else {
-    lua_pushboolean(state, 1);
-    lua_pushstring(state, "good");
+    const double id = lua_tonumber(state, -4);
+    const std::string_view name = lua_tostring(state, -3);
+    const std::string_view title = lua_tostring(state, -2);
+    const std::string_view text = lua_tostring(state, -1);
+    g_adventureGuideMgr->SetIntroTitle(title);
+    const AdventureGuideResult result = g_adventureGuideMgr->InsertGuideMenu(0, static_cast<int>(id), name, text);
+
+    if (!result.ok) {
+      lua_pushboolean(state, 0);
+      lua_pushstring(state, FormatString("InsertInfo : %s", result.message.c_str()));
+    } else {
+      lua_pushboolean(state, 1);
+      lua_pushstring(state, "good");
+    }
   }
 
   return 2;
@@ -80,19 +70,20 @@ int InsertIntroContents(lua_State* state) {
     return 2;
   }
 
-  const int id = static_cast<int>(lua_tonumber(state, -3));
-  const std::string_view title = lua_tostring(state, -2);
-  const std::string_view text = lua_tostring(state, -1);
-  const AdventureGuideResult result = g_adventureGuideMgr->InsertIntroContents(id, title, text);
+  const double id = lua_tonumber(state, -3);
+  const char* const title = lua_tostring(state, -2);
+  const std::string_view titleView(title);
+  const char* const text = lua_tostring(state, -1);
+  const AdventureGuideResult result = g_adventureGuideMgr->InsertIntroContents(static_cast<int>(id), titleView, std::string_view(text));
 
   if (!result.ok) {
     lua_pushboolean(state, 0);
     lua_pushstring(state, FormatString("InsertIntroContents : %s", result.message.c_str()));
-  } else {
-    lua_pushboolean(state, 1);
-    lua_pushstring(state, "good");
+    return 2;
   }
 
+  lua_pushboolean(state, 1);
+  lua_pushstring(state, "good");
   return 2;
 }
 
@@ -1122,7 +1113,12 @@ using AdventureGuideContentsTable = std::map<int, std::map<int, AdventureGuideCo
 // OFFSET: 0x0065F5C0
 // FUNCTION: fn_05188
 AdventureGuideEpisode::AdventureGuideEpisode(AdventureGuideEpisodeSource&& source)
-    : name(source.name), order(source.order), maxLevel(source.maxLevel), values(std::move(source.values)) {
+    : name(source.name), info(std::move(source.info)) {
+}
+
+// INLINED
+static AdventureGuideResult FailedResult(const std::string& message) {
+  return AdventureGuideResult(false, message);
 }
 
 // OFFSET: 0x0065F680
@@ -1204,9 +1200,17 @@ void CAdventureGuideMgr::Destroy() {
 void CAdventureGuideMgr::GetEpisodeList(std::list<AdventureGuideEpisode>& out) {
   out.clear();
 
-  for (const AdventureGuideEpisode& episode : m_episodes) {
-    if (episode.order <= g_session.m_level && g_session.m_level <= episode.maxLevel) {
-      out.push_back(episode);
+  const auto end = m_episodes.end();
+  auto it = m_episodes.begin();
+  if (it == end) {
+    return;
+  }
+
+  int level = g_session.m_level;
+  for (; it != end; ++it) {
+    if (it->info.order <= level && level <= it->info.maxLevel) {
+      out.push_back(*it);
+      level = g_session.m_level;
     }
   }
 }
@@ -1216,30 +1220,33 @@ void CAdventureGuideMgr::GetEpisodeList(std::list<AdventureGuideEpisode>& out) {
 void CAdventureGuideMgr::GetContentsList(std::list<std::pair<int, AdventureGuideContents>>& out, int type, int id) {
   out.clear();
 
-  std::map<int, std::map<int, AdventureGuideContents>>* table;
+  std::optional<std::map<int, AdventureGuideContents>*> contents;
   switch (type) {
   case 1:
-    table = &episodeContents;
+    contents = FindMapped(episodeContents, id);
     break;
   case 3:
-    table = &questContents;
+    contents = FindMapped(questContents, id);
     break;
   case 4:
-    table = &dungeonContents;
+    contents = FindMapped(dungeonContents, id);
     break;
   default:
     return;
   }
 
-  std::optional<std::map<int, AdventureGuideContents>*> contents = FindMapped(*table, id);
   if (!contents) {
     return;
   }
 
-  std::copy_if((*contents)->begin(), (*contents)->end(), std::back_inserter(out),
-               [](const std::pair<const int, AdventureGuideContents>& entry) {
-                 return entry.second.minLevel <= g_session.m_level && g_session.m_level <= entry.second.maxLevel;
-               });
+  std::for_each((*contents)->begin(), (*contents)->end(), [&out](const std::pair<const int, AdventureGuideContents>& entry) {
+    const auto inLevelRange = [](const AdventureGuideContents& contents) {
+      return contents.minLevel <= g_session.m_level && g_session.m_level <= contents.maxLevel;
+    };
+    if (inLevelRange(entry.second)) {
+      out.push_back(std::make_pair(entry.first, entry.second));
+    }
+  });
 
   out.sort([](const std::pair<int, AdventureGuideContents>& lhs, const std::pair<int, AdventureGuideContents>& rhs) {
     return lhs.second.minLevel < rhs.second.minLevel;
@@ -1251,19 +1258,18 @@ void CAdventureGuideMgr::GetContentsList(std::list<std::pair<int, AdventureGuide
 void CAdventureGuideMgr::GetEntryList(std::list<std::pair<int, AdventureGuideEntry>>& out, int type, int id) {
   out.clear();
 
-  std::map<int, std::map<int, AdventureGuideEntry>>* table;
+  std::optional<std::map<int, AdventureGuideEntry>*> entries;
   switch (type) {
   case 5:
-    table = &itemEntries;
+    entries = FindMapped(itemEntries, id);
     break;
   case 6:
-    table = &equipmentEntries;
+    entries = FindMapped(equipmentEntries, id);
     break;
   default:
     return;
   }
 
-  std::optional<std::map<int, AdventureGuideEntry>*> entries = FindMapped(*table, id);
   if (!entries) {
     return;
   }
@@ -1291,11 +1297,11 @@ AdventureGuideResult CAdventureGuideMgr::InsertDungeonContents(int id, int menu,
 // OFFSET: 0x00665150
 // FUNCTION: fn_05241
 AdventureGuideResult CAdventureGuideMgr::InsertDungeonReward(int id, std::string_view text) {
-  const auto it = std::find_if(dungeonContents.begin(), dungeonContents.end(), [&](const auto& entry) {
+  const auto it = std::find_if(dungeonContents.begin(), dungeonContents.end(), [id](const auto& entry) {
     return entry.second.end() != entry.second.find(id);
   });
-  if (it == dungeonContents.end()) {
-    return AdventureGuideResult(false, FormatOwnedString("[%d] cannot be find", id));
+  if (dungeonContents.end() == it) {
+    return FailedResult(FormatOwnedString("[%d] cannot be find", id));
   }
 
   it->second[id].values.emplace_back(text.data());
@@ -1337,11 +1343,11 @@ AdventureGuideResult CAdventureGuideMgr::InsertEpisodeContents(int id, int menu,
 // OFFSET: 0x00665750
 // FUNCTION: fn_05244
 AdventureGuideResult CAdventureGuideMgr::InsertEpisodeReward(int id, std::string_view text) {
-  const auto it = std::find_if(episodeContents.begin(), episodeContents.end(), [&](const auto& entry) {
+  const auto it = std::find_if(episodeContents.begin(), episodeContents.end(), [id](const auto& entry) {
     return entry.second.end() != entry.second.find(id);
   });
-  if (it == episodeContents.end()) {
-    return AdventureGuideResult(false, FormatOwnedString("[%d] cannot be find", id));
+  if (episodeContents.end() == it) {
+    return FailedResult(FormatOwnedString("[%d] cannot be find", id));
   }
 
   it->second[id].values.emplace_back(text.data());
@@ -1398,16 +1404,16 @@ AdventureGuideResult CAdventureGuideMgr::InsertObtainGuide(int type, int id, std
     it = std::find_if(itemEntries.begin(), itemEntries.end(), [id](const auto& entry) {
       return entry.second.end() != entry.second.find(id);
     });
-    if (it == itemEntries.end()) {
-      return AdventureGuideResult(false, FormatOwnedString("[%d] cannot be find", id));
+    if (itemEntries.end() == it) {
+      return FailedResult(FormatOwnedString("[%d] cannot be find", id));
     }
     break;
   case 6:
     it = std::find_if(equipmentEntries.begin(), equipmentEntries.end(), [id](const auto& entry) {
       return entry.second.end() != entry.second.find(id);
     });
-    if (it == equipmentEntries.end()) {
-      return AdventureGuideResult(false, FormatOwnedString("[%d] cannot be find", id));
+    if (equipmentEntries.end() == it) {
+      return FailedResult(FormatOwnedString("[%d] cannot be find", id));
     }
     break;
   }
@@ -1437,7 +1443,7 @@ AdventureGuideResult CAdventureGuideMgr::InsertEntrySubMenu(int type, int id, in
 // OFFSET: 0x00666220
 // FUNCTION: fn_05249
 AdventureGuideResult CAdventureGuideMgr::InsertIntroContents(int id, std::string_view title, std::string_view text) {
-  AdventureGuideText entry;
+  Guide_Intro::Contents entry;
   entry.first = title;
   entry.second = text;
   introPage.texts.try_emplace(id, std::as_const(entry));
@@ -1459,10 +1465,18 @@ AdventureGuideResult CAdventureGuideMgr::InsertGuideMenu(int type, int id, std::
   return AdventureGuideResult(true, "good");
 }
 
+// INLINED
+static AdventureGuideEpisodeSource MakeEpisodeSource(const char* name, const AdventureGuideEpisodeInfo& info) {
+  return AdventureGuideEpisodeSource{name, info};
+}
+
 // OFFSET: 0x00666860
 // FUNCTION: fn_05251
 AdventureGuideResult CAdventureGuideMgr::InsertMonsterContents(std::string_view name, int minLevel, int maxLevel) {
-  m_episodes.emplace_back(AdventureGuideEpisodeSource{name.data(), minLevel, maxLevel});
+  AdventureGuideEpisodeInfo info;
+  info.order = minLevel;
+  info.maxLevel = maxLevel;
+  m_episodes.emplace_back(MakeEpisodeSource(name.data(), info));
   return AdventureGuideResult(true, "good");
 }
 
@@ -1475,10 +1489,10 @@ AdventureGuideResult CAdventureGuideMgr::InsertMonsterReward(std::string_view na
 
   AdventureGuideEpisode& episode = m_episodes.back();
   if (name != episode.name) {
-    return AdventureGuideResult(false, FormatOwnedString("[%s] cannot be find", name));
+    return FailedResult(FormatOwnedString("[%s] cannot be find", name));
   }
 
-  episode.values.emplace_back(text.data());
+  episode.info.values.emplace_back(text.data());
   return AdventureGuideResult(true, "good");
 }
 
@@ -1499,11 +1513,11 @@ AdventureGuideResult CAdventureGuideMgr::InsertQuestContents(int id, int menu, i
 // OFFSET: 0x00666E70
 // FUNCTION: fn_05254
 AdventureGuideResult CAdventureGuideMgr::InsertQuestReward(int id, std::string_view text) {
-  const auto it = std::find_if(questContents.begin(), questContents.end(), [&](const auto& entry) {
+  const auto it = std::find_if(questContents.begin(), questContents.end(), [id](const auto& entry) {
     return entry.second.end() != entry.second.find(id);
   });
-  if (it == questContents.end()) {
-    return AdventureGuideResult(false, FormatOwnedString("[%d] cannot be find", id));
+  if (questContents.end() == it) {
+    return FailedResult(FormatOwnedString("[%d] cannot be find", id));
   }
 
   it->second[id].values.emplace_back(text.data());
@@ -1592,10 +1606,11 @@ bool CAdventureGuideMgr::Load() {
   m_lua.SetGlobal("InsertArmorContents", ::InsertArmorContents);
   m_lua.SetGlobal("InsertArmorObtainGuide", ::InsertArmorObtainGuide);
 
-  if (!m_lua.LoadFile("luafiles514\\Lua Files\\AdventureGuide\\AdventureGuide_F.lub")) {
-    return false;
+  bool loaded = m_lua.LoadFile("luafiles514\\Lua Files\\AdventureGuide\\AdventureGuide_F.lub");
+  if (loaded) {
+    loaded = m_lua.LoadFile("luafiles514\\Lua Files\\AdventureGuide\\Guide_Intro.lub");
   }
-  if (!m_lua.LoadFile("luafiles514\\Lua Files\\AdventureGuide\\Guide_Intro.lub")) {
+  if (!loaded) {
     return false;
   }
   if (!m_lua.LoadFile("luafiles514\\Lua Files\\AdventureGuide\\Guide_Episode.lub")) {
@@ -1622,7 +1637,7 @@ bool CAdventureGuideMgr::Load() {
   }
 
   m_episodes.sort([](const AdventureGuideEpisode& lhs, const AdventureGuideEpisode& rhs) {
-    return lhs.order < rhs.order;
+    return lhs.info.order < rhs.info.order;
   });
   return true;
 }

@@ -1,8 +1,11 @@
 #include "Contents/Effects/Particles/Particle.h"
+#include "Contents/Effects/Primitives/EffectPrim.h"
+#include "Render/Primitives/RenderQueues.h"
 #include "UI/GameSettings/TalkType.h"
 #include "UI/Window/WindowId.h"
 #include "Client/Mode/CGameMode.h"
 #include "Client/Mode/ModeMgr.h"
+#include "Client/Session/Session.h"
 #include "Contents/Actors/RenderObject.h"
 #include "Contents/Camera/Camera.h"
 #include "Contents/Configuration/ServiceOptions.h"
@@ -119,13 +122,13 @@ std::string EmitterInfoKey(std::string effect) {
 
 // OFFSET: 0x00B3C880
 // FUNCTION: fn_18812
-vector2d RandomDiscPoint(float x, float y, long long radius) {
+vector2d RandomDiscPoint(vector2d center, long long radius) {
   const double turn = rand() / 32767.0;
   const double distance = SquareRoot(static_cast<float>(rand() / 32767.0)) * static_cast<float>(radius);
   vector2d point;
   const double angle = (turn + turn) * 3.141592653589;
-  point.x = static_cast<float>(x + ClientCos(static_cast<float>(angle)) * distance);
-  point.y = static_cast<float>(y + ClientSin(static_cast<float>(angle)) * distance);
+  point.x = static_cast<float>(center.x + ClientCos(static_cast<float>(angle)) * distance);
+  point.y = static_cast<float>(center.y + ClientSin(static_cast<float>(angle)) * distance);
   return point;
 }
 
@@ -135,8 +138,9 @@ CEZ2STRParticle::CEZ2STRParticle(vector3d position, int flags) : CParticle(posit
   this->Clear();
 }
 
-// INLINED
-CEZ2STRParticle::~CEZ2STRParticle() {
+// OFFSET: 0x00B3CE90
+// FUNCTION: fn_45985
+__declspec(noinline) CEZ2STRParticle::~CEZ2STRParticle() {
 }
 
 // OFFSET: 0x00B3CFC0
@@ -158,6 +162,22 @@ std::string CEZ2STRParticle::ResolvePath(const std::string& name) {
   }
 
   return name;
+}
+
+// OFFSET: 0x00B3D470
+// FUNCTION: fn_45986
+matrix& CEZ2STRParticle::GetScreenRotation(matrix& result) {
+  result.Identity();
+  if (this->m_angle > 0.0f) {
+    result.AppendZRotation(ToRadians(this->m_angle));
+  }
+  if (this->m_pitch > 0.0f) {
+    result.AppendXRotation(ToRadians(this->m_pitch));
+  }
+  if (this->m_yaw > 0.0f) {
+    result.AppendYRotation(ToRadians(this->m_yaw));
+  }
+  return result;
 }
 
 // OFFSET: 0x00B3D540
@@ -222,10 +242,16 @@ void CEZ2STRParticle::Restart() {
   SecureZeroMemory(this->m_transforms, sizeof(this->m_transforms));
 }
 
+// OFFSET: 0x00B3D770
+// FUNCTION: fn_45987
+bool CEZ2STRParticle::HasScreenRotation() {
+  return this->m_angle > 0.0f || this->m_pitch > 0.0f || this->m_yaw > 0.0f;
+}
+
 // OFFSET: 0x00B3D7A0
 // FUNCTION: fn_18819
 void CEZ2STRParticle::Open(std::string name) {
-  this->m_res = CResPtr<CEZeffectRes>(static_cast<CEZeffectRes*>(ResourceMgr::Instance().Load(name)));
+  this->m_res = static_cast<CEZeffectRes*>(ResourceMgr::Instance().Load(name));
   this->m_name = name;
 
   char directory[256];
@@ -408,14 +434,14 @@ bool CEZ2STRParticle::Process(float x, float y, float z) {
 // OFFSET: 0x00B3E010
 // FUNCTION: fn_18822
 __declspec(safebuffers) void CEZ2STRParticle::UpdatePosition(float x, float y, float z) {
-  CGameMode* mode = g_modeMgr.GetGameMode();
+  const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
   RenderVertex screen = {0, 0, 0, 0, 0, 0xFF000000, 0, 0};
-  g_renderer->viewport.Project(&this->position.x, mode->camera->frame.view.values, screen);
+  g_renderer->Project(&this->position.x, view, screen);
   this->m_screen.x = screen.x + x;
   this->m_screen.y = screen.y + y;
   this->m_screen.z = screen.z + z;
 
-  if (this->flags == 0x205 || this->flags == 0x225) {
+  if (this->flags == (RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_NO_DEPTH) || this->flags == (RSF_ALPHA | RSF_CUSTOM_BLEND | RSF_SECONDARY | RSF_NO_DEPTH)) {
     this->m_screen.x = static_cast<float>(g_renderer->viewport.centerX) + this->m_windowOffset.x;
     this->m_screen.y =
       (static_cast<float>(g_renderer->viewport.centerY) - static_cast<float>(g_renderer->viewport.centerY) * 0.2f) + this->m_windowOffset.y;
@@ -474,11 +500,11 @@ void CEZ2STRParticle::RenderBillboard(EZeffectClip* clip, EZeffectTransform* tra
 
   matrix world;
   world.MakeZRotation(ToRadians(static_cast<float>(transform->rz / 2.8444444444444)));
-  vector3d offset;
-  offset.x = transform->x - 320.0f;
-  offset.z = 0;
-  offset.y = transform->y - 240.0f;
-  world.AppendTranslate(&offset.x);
+  vector3d point;
+  point.x = transform->x - 320.0f;
+  point.z = 0;
+  point.y = transform->y - 240.0f;
+  world.AppendTranslate(&point.x);
   const float scale = this->m_scale;
   const float scaleY = this->m_flipY ? scale * -1.0f : scale;
   const float scaleX = this->m_flipX ? scale * -1.0f : scale;
@@ -491,8 +517,10 @@ void CEZ2STRParticle::RenderBillboard(EZeffectClip* clip, EZeffectTransform* tra
   matrix combined;
   combined.Compose(world, view);
   for (int i = 0; i < 4; ++i) {
-    vector3d point = {vertices[i].x, vertices[i].y, vertices[i].z};
-    g_renderer->viewport.Project(&point.x, combined.values, vertices[i]);
+    point.x = vertices[i].x;
+    point.y = vertices[i].y;
+    point.z = vertices[i].z;
+    g_renderer->Project(&point.x, combined.values, vertices[i]);
     vertices[i].rhw = this->depthOffset + vertices[i].rhw;
     vertices[i].z = RhwToDepth(vertices[i].rhw);
     vertices[i].u = scaleU * vertices[i].u;
@@ -505,7 +533,7 @@ void CEZ2STRParticle::RenderBillboard(EZeffectClip* clip, EZeffectTransform* tra
   primitive->sourceBlend = transform->srcalpha;
   primitive->destinationBlend = transform->destalpha;
   primitive->textureMode = transform->mtpreset;
-  this->flags |= 0x20;
+  this->flags |= RSF_SECONDARY;
   this->submit(primitive, this->flags);
 }
 
@@ -516,8 +544,8 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
   RenderVertex* vertices = primitive->vertices;
   SetClipCorners(vertices, *transform);
 
-  float screenX;
   float screenY;
+  float screenX;
   float rhw;
   g_renderer->ProjectViewport(&this->position.x, view.values, &screenX, &screenY, &rhw);
   const float sine = ClientSin(ToRadians(static_cast<float>(transform->rz / 2.8444444444444)));
@@ -540,10 +568,10 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
     }
   }
 
-  for (int i = 0; i < 4; ++i) {
-    const float rotated = vertices[i].x * sine + vertices[i].y * cosine;
+  for (int i = 0; i <= 3; ++i) {
+    const float rotated = vertices[i].y * cosine + vertices[i].x * sine;
     vertices[i].x = ((vertices[i].x * cosine - vertices[i].y * sine) + (transform->x - 320.0f)) * scale + this->m_screen.x;
-    if (IsScreenShakeActive()) {
+    if (g_session.IsScreenShakeActive()) {
       const float shake = screenY - this->m_screen.y;
       vertices[i].y = (this->m_screen.y - ((transform->y - 240.0f) + rotated) * scale) + (shake + shake);
     } else {
@@ -555,10 +583,10 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
     float x = (vertices[i].x - screenX) * this->m_scale;
     float y = (vertices[i].y - screenY) * this->m_scale;
     if (this->m_flipX) {
-      x *= -1.0f;
+      x *= g_heightSpeedSign;
     }
     if (this->m_flipY) {
-      y *= -1.0f;
+      y *= g_heightSpeedSign;
     }
     vertices[i].x = x + screenX;
     vertices[i].y = y + screenY;
@@ -577,12 +605,13 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
       rotation.AppendYRotation(ToRadians(this->m_yaw));
     }
 
-    const float* values = rotation.values;
     for (int i = 0; i < 4; ++i) {
-      const float x = vertices[i].x - screenX;
-      const float y = vertices[i].y - screenY;
-      vertices[i].x = values[0] * x + values[3] * y + values[6] * 0.0f + values[9] + screenX;
-      vertices[i].y = values[1] * x + values[4] * y + values[7] * 0.0f + values[10] + screenY;
+      vector3d point;
+      point.x = vertices[i].x - screenX;
+      point.y = vertices[i].y - screenY;
+      point.z = 0.0f;
+      vertices[i].x = point.x * rotation.values[0] + point.y * rotation.values[3] + point.z * rotation.values[6] + rotation.values[9] + screenX;
+      vertices[i].y = point.x * rotation.values[1] + point.y * rotation.values[4] + point.z * rotation.values[7] + rotation.values[10] + screenY;
     }
   }
 
@@ -601,15 +630,15 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
   }
 
   CTexture* texture = ClipTexture(clip, *transform, *this);
-  const float depth = static_cast<float>(index) * 1e-05f;
   const float scaleU = static_cast<float>(texture->ImageWidth()) / static_cast<float>(texture->TextureWidth());
   const float scaleV = static_cast<float>(texture->ImageHeight()) / static_cast<float>(texture->TextureHeight());
+  const float depth = static_cast<float>(index) * 1e-05f;
   for (int i = 0; i < 4; ++i) {
     vertices[i].u = scaleU * vertices[i].u;
     vertices[i].v = scaleV * vertices[i].v;
+    vertices[i].diffuse = ClipColor(*transform, this->m_alpha);
     vertices[i].specular = 0xFFFFFFFF;
     vertices[i].z = 3.102122e-05f;
-    vertices[i].diffuse = ClipColor(*transform, this->m_alpha);
     vertices[i].rhw = rhw - depth;
   }
 
@@ -617,8 +646,15 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
   primitive->sourceBlend = transform->srcalpha;
   primitive->destinationBlend = transform->destalpha;
   primitive->textureMode = transform->mtpreset;
-  this->flags |= 0x20;
+  this->flags |= RSF_SECONDARY;
   this->submit(primitive, this->flags);
+}
+
+// INLINED
+static void MatrixMult(vector3d& result, const vector3d& v, const float* m) {
+  result.x = v.x * m[0] + v.y * m[3] + v.z * m[6] + m[9];
+  result.y = v.x * m[1] + v.y * m[4] + v.z * m[7] + m[10];
+  result.z = v.x * m[2] + v.y * m[5] + v.z * m[8] + m[11];
 }
 
 // OFFSET: 0x00B3F050
@@ -647,35 +683,33 @@ void CEZ2STRParticle::RenderGround(EZeffectClip* clip, EZeffectTransform* transf
   world.AppendYRotation(ToRadians(g_modeMgr.GetGameMode()->camera->camera.yaw + this->m_angle));
   world.AppendTranslate(&this->position.x);
 
-  const float* values = world.values;
   for (int i = 0; i < 4; ++i) {
-    const float x = vertices[i].x;
-    const float y = vertices[i].y;
-    const float z = vertices[i].z;
-    point.x = x * values[0] + y * values[3] + z * values[6] + values[9];
-    point.y = x * values[1] + y * values[4] + z * values[7] + values[10];
-    point.z = x * values[2] + y * values[5] + z * values[8] + values[11];
+    vector3d vertex;
+    vertex.x = vertices[i].x;
+    vertex.z = vertices[i].z;
+    vertex.y = vertices[i].y;
+    MatrixMult(point, vertex, world.values);
     CGameMode* mode = g_modeMgr.GetGameMode();
     point.y = mode->scene->terrain->PlaneHeight(point.x, point.z) - 2.0f;
-    if (this->m_groundHeight != -1000.0f && point.y - this->m_groundHeight > 5.0f) {
+    if (-1000.0f != this->m_groundHeight && point.y - this->m_groundHeight > 5.0f) {
       point.y = this->m_groundHeight;
     }
     this->m_groundHeight = point.y;
 
-    g_renderer->viewport.Project(&point.x, view.values, vertices[i]);
+    g_renderer->Project(&point.x, view.values, vertices[i]);
     vertices[i].rhw = this->depthOffset + vertices[i].rhw;
     vertices[i].z = RhwToDepth(vertices[i].rhw);
     vertices[i].u = scaleU * vertices[i].u;
     vertices[i].v = scaleV * vertices[i].v;
-    vertices[i].specular = 0xFFFFFFFF;
     vertices[i].diffuse = ClipColor(*transform, this->m_alpha);
+    vertices[i].specular = 0xFFFFFFFF;
   }
 
   primitive->texture = texture;
   primitive->sourceBlend = transform->srcalpha;
   primitive->destinationBlend = transform->destalpha;
   primitive->textureMode = transform->mtpreset;
-  this->flags |= 0x20;
+  this->flags |= RSF_SECONDARY;
   this->submit(primitive, this->flags);
 }
 
@@ -731,12 +765,14 @@ static __forceinline void ResetParticle(CParticle& particle) {
   particle.depthOffset = 0;
 
   for (int i = 0; i < 4; ++i) {
-    particle.vertices[i].x = 0;
-    particle.vertices[i].y = 0;
-    particle.vertices[i].z = 0;
-    particle.corners[i].x = 0;
-    particle.corners[i].y = 0;
-    particle.corners[i].z = 0;
+    RenderVertex& vertex = particle.vertices[i];
+    vertex.x = 0;
+    vertex.y = 0;
+    vertex.z = 0;
+    vector3d& corner = particle.corners[i];
+    corner.x = 0;
+    corner.y = 0;
+    corner.z = 0;
   }
 
   particle.InitParticleQuad(particle.vertices);
@@ -745,22 +781,24 @@ static __forceinline void ResetParticle(CParticle& particle) {
 
 // OFFSET: 0x00B3F630
 // FUNCTION: fn_18830
-CParticle::CParticle(vector3d position, int flags) : flags(flags), position(position), motionVelocity({0.0f, 0.0f, 0.0f}) {
-  for (RenderVertex& vertex : this->vertices) {
-    vertex.x = 0;
-    vertex.y = 0;
-    vertex.z = 0;
-    vertex.rhw = 0;
-    vertex.diffuse = 0;
-    vertex.specular = 0xFF000000;
-    vertex.u = 0;
-    vertex.v = 0;
+CParticle::CParticle(vector3d position, int flags) : flags(flags), position(position), motionVelocity{0.0f, 0.0f, 0.0f} {
+  RenderVertex* vertex = this->vertices;
+  for (int i = 4; i != 0; --i, ++vertex) {
+    vertex->x = 0;
+    vertex->y = 0;
+    vertex->z = 0;
+    vertex->rhw = 0;
+    vertex->diffuse = 0;
+    vertex->specular = 0xFF000000;
+    vertex->u = 0;
+    vertex->v = 0;
   }
 
-  for (vector3d& corner : this->corners) {
-    corner.x = 0;
-    corner.y = 0;
-    corner.z = 0;
+  vector3d* corner = this->corners;
+  for (int i = 4; i != 0; --i, ++corner) {
+    corner->x = 0;
+    corner->y = 0;
+    corner->z = 0;
   }
 
   this->submit = SubmitParticlePrimitive;
@@ -769,7 +807,7 @@ CParticle::CParticle(vector3d position, int flags) : flags(flags), position(posi
 
 // OFFSET: 0x00B3F950
 // FUNCTION: fn_18831
-CParticle::~CParticle() {
+__declspec(noinline) CParticle::~CParticle() {
 }
 
 // OFFSET: 0x00B3F990
@@ -872,7 +910,7 @@ void CParticle::Render(bool billboard, float top, float bottom, float left, floa
   world.Compose(*local, view);
   for (int i = 0; i < 4; ++i) {
     vector3d point = {output[i].x, output[i].y, output[i].z};
-    g_renderer->viewport.Project(&point.x, world.values, output[i]);
+    g_renderer->Project(&point.x, world.values, output[i]);
     const float rhw = this->depthOffset + output[i].rhw;
     output[i].rhw = rhw;
     if (0.0f > rhw) {

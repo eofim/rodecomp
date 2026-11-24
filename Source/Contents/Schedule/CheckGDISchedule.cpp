@@ -23,8 +23,8 @@ CCheckGDISchedule::CCheckGDISchedule(const std::uint64_t& timestamp, const std::
 // FUNCTION: fn_19718
 void CCheckGDISchedule::Process(const std::uint64_t& now) {
   this->CSchedule::Process(now);
-  if (CheckConnectionRuntime()) {
-    HMODULE gdi32 = LoadLibraryA("gdi32.dll");
+  if (GetRagConnection().CheckConnectionRuntime()) {
+    HMODULE gdi32 = LoadLibraryA("GDI32.dll");
     if (gdi32 != nullptr) {
       FARPROC proc = GetProcAddress(gdi32, "TextOutW");
       if (proc != reinterpret_cast<FARPROC>(TextOutW)) {

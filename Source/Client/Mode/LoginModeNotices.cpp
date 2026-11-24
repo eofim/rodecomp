@@ -7,6 +7,7 @@
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Network/Connection/Connection.h"
+#include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Utility/Cipher/XorBytes.h"
 #include "Utility/Cipher/LocalEncryptedName.h"
@@ -65,34 +66,30 @@ void CLoginMode::ReceiveBillingInfo(const unsigned char* data) {
     // GLOBAL: gl_25063
     const char* format = OBFUSCATE_BYTES_TEXT("%s\x0A", 0x4191BB5531FD3999ULL);
     sprintf(text, format, message);
-  } else if (remainingTime != 0) {
+  } else if (remainingTime > 0 && packet->remainingFreeTime > 0) {
     const std::uint32_t freeTime = packet->remainingFreeTime;
-    if (freeTime != 0) {
-      const char* message = LookupMessage(MSI_BILLING_BOTH);
-      sprintf(text, message, remainingTime / (60 * 24), remainingTime / minutesPerHour % hoursPerDay, remainingTime % minutesPerHour, freeTime / minutesPerHour, freeTime % minutesPerHour);
-    } else {
-      const char* message = LookupMessage(MSI_BILLING_100);
-      // GLOBAL: gl_25064
-      const char* format = OBFUSCATE_BYTES_TEXT("%s\x0A", 0xB19D1FA9116F39D3ULL);
-      sprintf(text, format, message);
-      const std::uint32_t time = packet->remainingTime;
-      const char* dayFormat = LookupMessage(MSI_BILLING_DAY_HOUR_MINUTES);
-      sprintf(text + strlen(text), dayFormat, time / (60 * 24), time / minutesPerHour % hoursPerDay, time % minutesPerHour);
-    }
+    const char* message = LookupMessage(MSI_BILLING_BOTH);
+    sprintf(text, message, remainingTime / (60 * 24), remainingTime / minutesPerHour % hoursPerDay, remainingTime % minutesPerHour, freeTime / minutesPerHour, freeTime % minutesPerHour);
+  } else if (remainingTime > 0) {
+    const char* message = LookupMessage(MSI_BILLING_100);
+    // GLOBAL: gl_25064
+    const char* format = OBFUSCATE_BYTES_TEXT("%s\x0A", 0xB19D1FA9116F39D3ULL);
+    sprintf(text, format, message);
+    const std::uint32_t time = packet->remainingTime;
+    const char* dayFormat = LookupMessage(MSI_BILLING_DAY_HOUR_MINUTES);
+    sprintf(text + strlen(text), dayFormat, time / (60 * 24), time / minutesPerHour % hoursPerDay, time % minutesPerHour);
+  } else if (packet->remainingFreeTime > 0) {
+    const char* message = LookupMessage(MSI_BILLING_800);
+    // GLOBAL: gl_25065
+    const char* format = OBFUSCATE_BYTES_TEXT("%s\x0A", 0x9569C9C7E70909AFULL);
+    sprintf(text, format, message);
+    const std::uint32_t freeTime = packet->remainingFreeTime;
+    const char* hourFormat = LookupMessage(MSI_BILLING_HOUR_MINUTES);
+    sprintf(text + strlen(text), hourFormat, freeTime / minutesPerHour, freeTime % minutesPerHour);
   } else {
-    if (packet->remainingFreeTime > 0) {
-      const char* message = LookupMessage(MSI_BILLING_800);
-      // GLOBAL: gl_25065
-      const char* format = OBFUSCATE_BYTES_TEXT("%s\x0A", 0x9569C9C7E70909AFULL);
-      sprintf(text, format, message);
-      const std::uint32_t freeTime = packet->remainingFreeTime;
-      const char* hourFormat = LookupMessage(MSI_BILLING_HOUR_MINUTES);
-      sprintf(text + strlen(text), hourFormat, freeTime / minutesPerHour, freeTime % minutesPerHour);
-    } else {
-      // GLOBAL: gl_25066
-      const char* format = OBFUSCATE_BYTES_TEXT("\x0A", 0xD7A749EB27D5BF6DULL);
-      sprintf(text, format);
-    }
+    // GLOBAL: gl_25066
+    const char* format = OBFUSCATE_BYTES_TEXT("\x0A", 0xD7A749EB27D5BF6DULL);
+    sprintf(text, format);
   }
 
   this->otpStarted = timeGetTime() + 90000;
@@ -129,7 +126,7 @@ void CLoginMode::ReceiveNotifyBan(const unsigned char* data) {
     break;
   case BAN_NOT_SETTLED:
     strcpy(text, LookupMessage(MSI_NOT_SETTLED));
-    if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 280, 120, 0) == 187) {
+    if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 280, 120, 0) == ID_YES) {
       g_modeMgr.Quit();
       this->OpenAccountRegistration();
     }
@@ -206,10 +203,10 @@ void CLoginMode::ReceiveNotifyBan(const unsigned char* data) {
     strcpy(text, LookupMessage(MSI_BAN_SHUTDOWN_TEENAGER));
     break;
   case 114:
-    strcpy(text, LookupMessage(MSI_PLANNED_TIME_SHUTDOWN));
+    strcpy(text, LookupMessage(MSI_BAN_BILLING_SERVER_ERROR));
     break;
   case 116:
-    strcpy(text, LookupMessage(MSI_MCSTORE_BACKUP_TOOLTIP));
+    strcpy(text, LookupMessage(MSI_BAN_IP_BLOCK_FOR_ZERO));
     break;
   default:
     strcpy(text, LookupMessage(MSI_BANNED));

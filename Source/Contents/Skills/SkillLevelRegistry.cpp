@@ -1,7 +1,7 @@
 #include "Contents/Skills/SkillInfo.h"
 #include "Client/Application/Registry.h"
 #include "Client/Session/Session.h"
-#include "Contents/Skills/SkillLevelRegistry.h"
+#include "UI/Window/UIWindowMgr.h"
 #include "Script/LuaScript.h"
 
 #include <cstdio>
@@ -14,7 +14,7 @@ const char* g_skillUseLevelInfoKeySuffix = "\\SkillUseLevelInfo";
 
 // OFFSET: 0x00A92370
 // FUNCTION: fn_17177
-void LoadSkillUseLevelRegistry() {
+void UIWindowMgr::LoadSkillUseLevelRegistry() {
   char key[512];
   std::strcpy(key, g_subKey);
   std::strcat(key, g_skillUseLevelInfoKeySuffix);
@@ -40,29 +40,43 @@ void LoadSkillUseLevelRegistry() {
     const char* skill = CSkillInfo::IdName(id);
     std::sprintf(name, "%s%d", skill, character);
 
-    return RegQueryValueExA(handle, name, nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS && CSkillInfo::UsesLevel(id);
+    return RegQueryValueExA(handle, name, nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS;
   };
 
-  int value;
   for (int id = 1; id < 7999; ++id) {
+    int value;
     if (read(id, value)) {
-      g_session.m_skillBundle.SetSkillValue(id, value);
+      if (CSkillInfo::UsesLevel(id)) {
+        g_session.m_skillBundle.SetSkillValue(id, value);
+      } else {
+        g_session.m_skillBundle.SetSkillValue(id, 0);
+      }
     } else {
       g_session.m_skillBundle.SetSkillValue(id, 0);
     }
   }
 
   for (int id = 8000; id < 8061; ++id) {
+    int value;
     if (read(id, value)) {
-      g_session.SetHomunSkillLevel(id, value);
+      if (CSkillInfo::UsesLevel(id)) {
+        g_session.SetHomunSkillLevel(id, value);
+      } else {
+        g_session.SetHomunSkillLevel(id, 0);
+      }
     } else {
       g_session.SetHomunSkillLevel(id, 0);
     }
   }
 
   for (int id = 8200; id < 8458; ++id) {
+    int value;
     if (read(id, value)) {
-      g_session.SetMercSkillLevel(id, value);
+      if (CSkillInfo::UsesLevel(id)) {
+        g_session.SetMercSkillLevel(id, value);
+      } else {
+        g_session.SetMercSkillLevel(id, 0);
+      }
     } else {
       g_session.SetMercSkillLevel(id, 0);
     }

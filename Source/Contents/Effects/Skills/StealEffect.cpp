@@ -13,6 +13,12 @@
 #include <algorithm>
 #include <cstdlib>
 
+// OFFSET: 0x00B4CBE0
+// FUNCTION: fn_45992
+CSteal::CSteal() : CEffect(18), particles() {
+  this->effectLifetime = 50;
+}
+
 // OFFSET: 0x00B4CCA0
 // FUNCTION: fn_18967
 __declspec(noinline) CSteal::~CSteal() {
@@ -48,7 +54,7 @@ void CSteal::SpawnParticles() {
     const int distanceRoll = rand() % 4;
     const float distance = static_cast<float>((distanceRoll >= 0 ? distanceRoll : 0) + 4);
 
-    vector3d& offset = this->offsets[i];
+    EffectPoint& offset = this->offsets[i];
     offset.x = 0.0f;
     offset.y = 0.0f;
     offset.z = 0.0f;
@@ -112,10 +118,10 @@ bool CSteal::IsAlive() {
 void CSteal::OnProcess() {
   for (auto it = this->particles.begin(); it != this->particles.end(); ++it) {
     CSpriteParticle* particle = *it;
-    const vector3d origin = this->positionVector;
     const float scale = particle->scale;
     float* params = &particle->animationParameter;
     const float scaleStep = params[5];
+    const vector3d origin = this->positionVector;
     const int index = particle->columnIndex;
     const float velocityX = particle->velocity.x;
     const float velocityY = particle->velocity.y;
@@ -152,10 +158,57 @@ void CSteal::OnProcess() {
   }
 }
 
+// OFFSET: 0x00B4D4F0
+// FUNCTION: fn_46188
+__declspec(noinline) void CSteal::UpdateParticle(CSpriteParticle* particle) {
+  const float scale = particle->scale;
+  float* params = &particle->animationParameter;
+  const float scaleStep = params[5];
+  const vector3d origin = this->positionVector;
+  const int index = particle->columnIndex;
+  const float velocityX = particle->velocity.x;
+  const float velocityY = particle->velocity.y;
+  const float velocityZ = particle->velocity.z;
+  float lift = params[3] + params[4];
+  const float distance = std::max(params[0] + particle->frameDelay, 0.0f);
+
+  matrix rotation;
+  rotation.MakeYRotation(GetRadian(static_cast<int>(params[1])));
+
+  this->offsets[index].x = 0.0f * rotation.values[3] + 0.0f * rotation.values[0] + distance * rotation.values[6] + rotation.values[9] + this->offsets[index].x;
+  this->offsets[index].y = lift + this->offsets[index].y;
+  this->offsets[index].z = 0.0f * rotation.values[5] + 0.0f * rotation.values[2] + distance * rotation.values[8] + rotation.values[11] + this->offsets[index].z;
+
+  const float x = velocityX + origin.x + this->offsets[index].x;
+  const float y = velocityY + origin.y + this->offsets[index].y;
+  const float z = velocityZ + origin.z + this->offsets[index].z;
+  const float newScale = scaleStep + scale;
+
+  if (lift > 0.0f) {
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    if (y > mode->scene->terrain->Height(x, z)) {
+      lift /= -1.5f;
+    }
+  }
+
+  particle->scale = newScale;
+  particle->frameDelay = distance;
+  params[3] = lift;
+  particle->position.x = x;
+  particle->position.y = y;
+  particle->position.z = z;
+}
+
 // OFFSET: 0x00B4D720
 // FUNCTION: fn_18975
 void CSteal::Render() {
   for (std::list<CSpriteParticle*>::iterator it = this->particles.begin(); it != this->particles.end(); ++it) {
     (*it)->Draw(1);
   }
+}
+
+// OFFSET: 0x00B4D750
+// FUNCTION: fn_46189
+__declspec(noinline) void CSteal::RenderParticle(CSpriteParticle* particle) {
+  particle->Draw(1);
 }

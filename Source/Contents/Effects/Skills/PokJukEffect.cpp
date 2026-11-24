@@ -4,6 +4,7 @@
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Camera/Camera.h"
 #include "Contents/Effects/Core/EffectMemoryMgr.h"
+#include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Map/MapSkyMgr.h"
 #include "Utility/Math/AffineMatrix.h"
@@ -28,6 +29,38 @@ __forceinline int ClampedRandom(int range) {
 }
 }
 
+// OFFSET: 0x00B6F280
+// FUNCTION: fn_46074
+CPokJukEffect::CPokJukEffect() : CEffect(EF_POKJUK) {
+}
+
+// OFFSET: 0x00B6F320
+// FUNCTION: fn_46075
+__declspec(noinline) CPokJukEffect::~CPokJukEffect() {
+}
+
+// OFFSET: 0x00B6F6C0
+// FUNCTION: fn_46076
+__forceinline void CPokJukEffect::SetRandomColor(CParticle* particle) {
+  switch (ClampedRandom(5)) {
+  case 0:
+    particle->SetColor(70, 70, 255);
+    break;
+  case 1:
+    particle->SetColor(255, 70, 70);
+    break;
+  case 2:
+    particle->SetColor(70, 255, 70);
+    break;
+  case 3:
+    particle->SetColor(255, 255, 90);
+    break;
+  case 4:
+    particle->SetColor(255, 70, 255);
+    break;
+  }
+}
+
 // OFFSET: 0x00B6F400
 // FUNCTION: fn_19120
 void CPokJukEffect::SpawnParticles() {
@@ -50,31 +83,16 @@ void CPokJukEffect::SpawnParticles() {
         this->particles.push_back(particle);
 
         const int index = row * 160 + column;
-        switch (ClampedRandom(5)) {
-        case 0:
-          particle->SetColor(70, 70, 255);
-          break;
-        case 1:
-          particle->SetColor(255, 70, 70);
-          break;
-        case 2:
-          particle->SetColor(70, 255, 70);
-          break;
-        case 3:
-          particle->SetColor(255, 255, 90);
-          break;
-        case 4:
-          particle->SetColor(255, 70, 255);
-          break;
-        }
+        this->SetRandomColor(particle);
 
         this->states[index] = 0;
         this->beats[index] = 0;
         this->delays[index] = ClampedRandom(4) * 20;
         for (int corner = 0; corner < 4; ++corner) {
-          this->trails[index][corner].x = -15.0f;
-          this->trails[index][corner].y = 0.0f;
-          this->trails[index][corner].z = 0.0f;
+          EffectPoint& point = this->trails[index][corner];
+          point.x = -15.0f;
+          point.y = 0.0f;
+          point.z = 0.0f;
         }
       }
     }
@@ -113,80 +131,163 @@ void CPokJukEffect::OnProcess() {
     position.y = this->position[1];
     position.z = this->position[2];
 
-    if (particle != nullptr) {
-      const int index = particle->rowIndex * 160 + particle->columnIndex;
-      const int age = particle->elapsedFrames;
+    this->UpdateParticle(particle);
 
-      if (age > 0) {
-        if (age % 3 == 0) {
-          this->trails[index][3].x = this->trails[index][2].x;
-          this->trails[index][3].y = this->trails[index][2].y;
-          this->trails[index][3].z = this->trails[index][2].z;
-          this->trails[index][2].x = this->trails[index][1].x;
-          this->trails[index][2].y = this->trails[index][1].y;
-          this->trails[index][2].z = this->trails[index][1].z;
-          this->trails[index][1].x = this->trails[index][0].x;
-          this->trails[index][1].y = this->trails[index][0].y;
-          this->trails[index][1].z = this->trails[index][0].z;
-        }
+    ++particle->elapsedFrames;
+  }
+}
 
-        const int delay = this->delays[index];
+// INLINED
+static void Shift(EffectPoint& point, float x, float z) {
+  point.x += x;
+  point.z += z;
+}
 
-        if (delay + 160 <= age && age <= delay + 180) {
-          const char beat = static_cast<char>(age % 20);
+// OFFSET: 0x00B6FB60
+// FUNCTION: fn_46077
+__forceinline void CPokJukEffect::UpdateParticle(CParticle* particle) {
+  if (particle != nullptr) {
+    const int index = particle->rowIndex * 160 + particle->columnIndex;
+    const int age = particle->elapsedFrames;
 
-          if (beat == 15 || beat == 19) {
-            this->beats[index] = 1;
-          } else {
-            this->beats[index] = beat == 17 ? 2 : 0;
-          }
+    if (age > 0) {
+      if (age % 3 == 0) {
+        this->trails[index][3].x = this->trails[index][2].x;
+        this->trails[index][3].y = this->trails[index][2].y;
+        this->trails[index][3].z = this->trails[index][2].z;
+        this->trails[index][2].x = this->trails[index][1].x;
+        this->trails[index][2].y = this->trails[index][1].y;
+        this->trails[index][2].z = this->trails[index][1].z;
+        this->trails[index][1].x = this->trails[index][0].x;
+        this->trails[index][1].y = this->trails[index][0].y;
+        this->trails[index][1].z = this->trails[index][0].z;
+      }
+
+      const int delay = this->delays[index];
+
+      if (delay + 160 <= age && age <= delay + 180) {
+        const char beat = static_cast<char>(age % 20);
+
+        if (beat == 15 || beat == 19) {
+          this->beats[index] = 1;
+        } else if (beat == 17) {
+          this->beats[index] = 2;
         } else {
           this->beats[index] = 0;
         }
+      } else {
+        this->beats[index] = 0;
+      }
 
-        float& spinAngle = particle->angle;
-        spinAngle = static_cast<float>((static_cast<int>(spinAngle) + 5) % 360);
+      float& spinAngle = particle->angle;
+      spinAngle = static_cast<float>((static_cast<int>(spinAngle) + 5) % 360);
 
-        if (this->states[index] == 0) {
-          this->trails[index][0].y -= 0.25f;
+      if (this->states[index] == 0) {
+        this->trails[index][0].y -= 0.25f;
 
-          if (age > 154) {
-            this->states[index] = 1;
-            particle->alpha = 250;
-          }
-        } else if (this->states[index] == 1) {
-          const int heading = particle->angleParameter;
-          const float speed = particle->scale;
-          this->trails[index][0].y += speed * g_sinTable[heading];
-          const float flat = speed * g_cosTable[heading];
-          this->trails[index][0].x += flat * g_cosTable[particle->phaseParameter];
-          this->trails[index][0].z += flat * g_sinTable[particle->phaseParameter];
-          this->trails[index][0].y += 0.02f;
-          particle->scale = speed * 0.98f;
-
-          const int alpha = particle->alpha;
-          if (ClampedRandom(2) == 0) {
-            const int faded = alpha - 2;
-            particle->alpha = faded >= 0 ? faded : 0;
-          } else {
-            const int faded = alpha - 1;
-            particle->alpha = faded < 0 ? 0 : faded;
-          }
+        if (age > 154) {
+          this->states[index] = 1;
+          particle->alpha = 250;
         }
+      } else if (this->states[index] == 1) {
+        const int heading = particle->angleParameter;
+        const int phase = particle->phaseParameter;
+        const float speed = particle->scale;
+        const float flat = speed * g_cosTable[heading];
+        this->trails[index][0].y += speed * g_sinTable[heading];
+        Shift(this->trails[index][0], flat * g_cosTable[phase], g_sinTable[phase] * flat);
+        this->trails[index][0].y += 0.02f;
+        particle->scale = speed * 0.98f;
 
-        if (age > 2000) {
-          particle->elapsedFrames = 0;
-          particle->phaseParameter = ClampedRandom(360);
-          particle->scale = static_cast<float>(ClampedRandom(100)) * 0.004f + 0.4f;
-          this->trails[index][0].x = -15.0f;
-          this->trails[index][0].y = 0.0f;
-          this->trails[index][0].z = 0.0f;
-          this->states[index] = 0;
+        const int alpha = particle->alpha;
+        if (ClampedRandom(2) == 0) {
+          const int faded = alpha - 2;
+          particle->alpha = faded < 0 ? 0 : faded;
+        } else {
+          const int faded = alpha - 1;
+          particle->alpha = faded < 0 ? 0 : faded;
         }
       }
-    }
 
-    ++particle->elapsedFrames;
+      if (age > 2000) {
+        particle->elapsedFrames = 0;
+        particle->phaseParameter = ClampedRandom(360);
+        particle->scale = static_cast<float>(ClampedRandom(100)) * 0.004f + 0.4f;
+        this->trails[index][0].x = -15.0f;
+        this->trails[index][0].y = 0.0f;
+        this->trails[index][0].z = 0.0f;
+        this->states[index] = 0;
+      }
+    }
+  }
+}
+
+// OFFSET: 0x00B70200
+// FUNCTION: fn_46078
+__forceinline void CPokJukEffect::RenderParticle(CParticle* particle) {
+  if (particle && particle->alpha > 0) {
+    const int index = particle->rowIndex * 160 + particle->columnIndex;
+    float shrink = 0.0f;
+
+    for (int layer = 0; layer < 2; ++layer) {
+      ZeroVector3d corners[4];
+      const float rotation = particle->angle;
+      const float radius = particle->speedParameter - shrink;
+      vector3d* corner = corners;
+      for (int offset = 0; offset < 360; offset += 90) {
+        corner->y = 0.0f;
+        int angle = static_cast<int>(static_cast<float>(offset) + rotation);
+        angle = angle % 360;
+        corner->x = radius * g_cosTable[angle];
+        corner->z = radius * g_sinTable[angle];
+        ++corner;
+      }
+
+      this->FaceCamera(corners);
+
+      const EffectPoint& base = this->trails[index][layer];
+
+      for (int corner = 0; corner < 4; ++corner) {
+        corners[corner].x += base.x;
+        corners[corner].y += base.y;
+        corners[corner].z += base.z;
+      }
+
+      particle->vertices[0].x = corners[3].x;
+      particle->vertices[0].y = corners[3].y;
+      particle->vertices[0].z = corners[3].z;
+      particle->vertices[1].x = corners[0].x;
+      particle->vertices[1].y = corners[0].y;
+      particle->vertices[1].z = corners[0].z;
+      particle->vertices[2].x = corners[2].x;
+      particle->vertices[2].y = corners[2].y;
+      particle->vertices[2].z = corners[2].z;
+      particle->vertices[3].x = corners[1].x;
+      particle->vertices[3].y = corners[1].y;
+      particle->vertices[3].z = corners[1].z;
+
+      if (this->beats[index] == 0) {
+        particle->SetTexture("effect\\pok1.tga");
+      } else if (this->beats[index] == 1) {
+        particle->SetTexture("effect\\pok3.tga");
+      } else if (this->beats[index] == 2) {
+        particle->SetTexture("effect\\pok2.tga");
+      }
+
+      const int alpha = particle->alpha;
+      particle->destinationBlend = 2;
+      particle->sourceBlend = 5;
+      int shown = alpha / (layer + 1);
+
+      if (this->beats[index] != 0) {
+        shown /= 2;
+      }
+
+      particle->alpha = shown;
+      particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
+      particle->alpha = alpha;
+      shrink += layer == 0 ? g_depthAverageHalf : 0.25f;
+    }
   }
 }
 
@@ -196,68 +297,7 @@ void CPokJukEffect::Render() {
   for (std::vector<CParticle*>::iterator it = this->particles.begin(); it != this->particles.end(); ++it) {
     CParticle* particle = *it;
 
-    if (particle && particle->alpha > 0) {
-      const int index = particle->rowIndex * 160 + particle->columnIndex;
-      float shrink = 0.0f;
-
-      for (int layer = 0; layer < 2; ++layer) {
-        ZeroVector3d corners[4];
-        const float radius = particle->speedParameter - shrink;
-
-        vector3d* corner = corners;
-        for (int offset = 0; offset < 360; offset += 90) {
-          corner->y = 0.0f;
-          int angle = static_cast<int>(static_cast<float>(offset) + particle->angle);
-          angle = angle % 360;
-          corner->x = radius * g_cosTable[angle];
-          corner->z = radius * g_sinTable[angle];
-          ++corner;
-        }
-
-        this->FaceCamera(corners);
-
-        const vector3d& base = this->trails[index][layer];
-
-        for (int corner = 0; corner < 4; ++corner) {
-          corners[corner] += base;
-        }
-
-        particle->vertices[0].x = corners[3].x;
-        particle->vertices[0].y = corners[3].y;
-        particle->vertices[0].z = corners[3].z;
-        particle->vertices[1].x = corners[0].x;
-        particle->vertices[1].y = corners[0].y;
-        particle->vertices[1].z = corners[0].z;
-        particle->vertices[2].x = corners[2].x;
-        particle->vertices[2].y = corners[2].y;
-        particle->vertices[2].z = corners[2].z;
-        particle->vertices[3].x = corners[1].x;
-        particle->vertices[3].y = corners[1].y;
-        particle->vertices[3].z = corners[1].z;
-
-        if (this->beats[index] == 0) {
-          particle->SetTexture("effect\\pok1.tga");
-        } else if (this->beats[index] == 1) {
-          particle->SetTexture("effect\\pok3.tga");
-        } else if (this->beats[index] == 2) {
-          particle->SetTexture("effect\\pok2.tga");
-        }
-
-        const int alpha = particle->alpha;
-        particle->destinationBlend = 2;
-        particle->sourceBlend = 5;
-        int shown = alpha / (layer + 1);
-
-        if (this->beats[index] != 0) {
-          shown /= 2;
-        }
-
-        particle->alpha = shown;
-        particle->Render(false, 0.0f, 1.0f, 0.0f, 1.0f, false, true);
-        particle->alpha = alpha;
-        shrink += layer == 0 ? g_depthAverageHalf : 0.25f;
-      }
-    }
+    this->RenderParticle(particle);
   }
 }
 

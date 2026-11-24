@@ -13,12 +13,13 @@ class CParticle;
 class CLevel99Effect : public CEffect {
 public:
   CLevel99Effect();
+  ~CLevel99Effect() override;
   void Open() override;
   void OnProcess() override;
   void Render() override;
   void Close() override;
   bool IsAlive() override;
-  void SetColor(int red, int green, int blue) override;
+  void SetColor(short red, short green, short blue) override;
   void SetParticleTexture(std::string name) override;
 
   void AddRings();
@@ -26,6 +27,14 @@ public:
   /* 00CC */ EffectPoint previousRingPoints[2];
   /* 00E4 */ std::vector<CParticle*> sparkles;
   /* 00F0 */ std::vector<CParticle*> sprites;
+
+private:
+  void AddSparkles();
+  void UpdateRingVertices(CParticle* particle);
+  void UpdateRing(CParticle* particle);
+  void UpdateSparkle(CParticle* particle);
+  void RenderRing(CParticle* particle);
+  void RenderSparkle(CParticle* particle);
 };
 
 #if defined(_WIN32) && !defined(_WIN64)

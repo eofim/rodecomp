@@ -4,17 +4,25 @@
 
 // OFFSET: 0x00ABB300
 // FUNCTION: fn_17514
-void C3dNode::AccumulateBounds(float* bounds, const float* matrix) {
-  struct matrix parentMatrix;
-  std::memcpy(parentMatrix.values, matrix, sizeof(parentMatrix.values));
-  struct matrix combined;
-  combined.Compose(this->transform, parentMatrix);
+void C3dNode::AccumulateBounds(float* bounds, const matrix& parent) {
+  matrix combined;
+  combined.Compose(this->transform, parent);
 
+  const auto* vertices = this->mesh->vertices;
   for (int index = 0; index < this->mesh->vertexCount; ++index) {
-    const auto& vertex = this->mesh->vertices[index];
-    const float x = ((vertex[0] * combined.values[0] + vertex[1] * combined.values[3]) + vertex[2] * combined.values[6]) + combined.values[9];
-    const float y = ((vertex[1] * combined.values[4] + vertex[0] * combined.values[1]) + vertex[2] * combined.values[7]) + combined.values[10];
-    const float z = ((vertex[0] * combined.values[2] + vertex[1] * combined.values[5]) + vertex[2] * combined.values[8]) + combined.values[11];
+    const auto& vertex = vertices[index];
+    float x = vertex[0] * combined.values[0];
+    x += vertex[1] * combined.values[3];
+    x += vertex[2] * combined.values[6];
+    x += combined.values[9];
+    float y = vertex[1] * combined.values[4];
+    y += vertex[0] * combined.values[1];
+    y += vertex[2] * combined.values[7];
+    y += combined.values[10];
+    float z = vertex[0] * combined.values[2];
+    z += vertex[1] * combined.values[5];
+    z += vertex[2] * combined.values[8];
+    z += combined.values[11];
 
     if (bounds[0] > x) {
       bounds[0] = x;
@@ -41,7 +49,8 @@ void C3dNode::AccumulateBounds(float* bounds, const float* matrix) {
     }
   }
 
-  for (C3dNode* child : this->children) {
-    child->AccumulateBounds(bounds, combined.values);
+  for (auto childIt = this->children.begin(); childIt != this->children.end(); ++childIt) {
+    C3dNode* child = *childIt;
+    child->AccumulateBounds(bounds, combined);
   }
 }

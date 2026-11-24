@@ -13,13 +13,14 @@
 #include "UI/Window/WindowManagerWindows.h"
 
 struct SkillIdHash {
-  std::size_t operator()(int id) const;
+  std::size_t operator()(const int& id) const;
 };
 
 class CPlayerSkillBundle {
 public:
   struct lcEXCInfo {
     lcEXCInfo();
+    lcEXCInfo(std::int32_t previous, std::int32_t target);
     virtual ~lcEXCInfo();
     /* 0004 */ std::int32_t previous;
     /* 0008 */ std::int32_t target;
@@ -43,8 +44,8 @@ public:
   void ClearGroups();
   CSkillInfo* FindGrouped(std::uint32_t id);
   std::list<CSkillInfo>& Group(int group);
-  void ForEachGrouped(std::function<bool(CSkillInfo*)> callback);
-  std::size_t GroupSize(int group) const;
+  void ForEachGrouped(std::function<bool(CSkillInfo&)> callback);
+  int GroupSize(int group) const;
   int GroupedLevel(std::uint32_t id);
   bool HasHigherLevel(std::uint32_t id);
   void RecordLevelChange(const CSkillInfo& value);

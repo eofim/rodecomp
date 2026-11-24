@@ -1,6 +1,7 @@
 #ifndef RAGNAROK_SOURCE_RENDER_DEVICECONTEXT_DCSURFACE_H
 #define RAGNAROK_SOURCE_RENDER_DEVICECONTEXT_DCSURFACE_H
 
+#include "Client/Session/Session.h"
 #include "Render/DeviceContext/DeviceContext.h"
 #include "Render/RenderSystemBase.h"
 
@@ -30,6 +31,22 @@ struct RenderSystemHolder {
   void RestoreDisplayMode();
   void PrepareErrorDialog();
   std::int32_t Backend() const;
+  const char* BackendName() const;
+  static const char* BackendNameFor(std::int32_t backend);
+
+  // OFFSET: 0x0056A260
+  // FUNCTION: fn_46361
+  static int PreferredBackend() {
+    switch (g_session.DefaultRenderBackend()) {
+    case 1:
+      return 1;
+    case 2:
+      return 2;
+    default:
+      return 2;
+    }
+  }
+
   CTexture* BackBufferTexture() const;
   std::uint32_t Width() const;
   std::uint32_t Height() const;
@@ -51,13 +68,14 @@ inline RenderSystemHolder* GetRenderSystemHolder() {
 
 class CDCSurface : public CDC {
 public:
+  CDCSurface(std::uint32_t width, std::uint32_t height);
   explicit CDCSurface(std::shared_ptr<CSurface> surface);
   ~CDCSurface() override;
   void Reset();
   void Grow(std::uint32_t width, std::uint32_t height) override;
   bool GetDC(HDC* output) override;
   void ReleaseDC(HDC dc) override;
-  void Copy(int x, int y, int width, int height, const std::uint32_t* source, bool transparent) override;
+  void Copy(int x, int y, int width, int height, const std::uint32_t* source, int transparent) override;
   void ScaleCopy(int x, int y, int sourceWidth, int sourceHeight, int width, int height, const std::uint32_t* source, int option) override;
   void CopyRegion(
     int x, int y, int sourceLeft, int sourceTop, int sourceRight, int sourceBottom, const std::uint32_t* source, int sourceWidth, int sourceHeight,

@@ -8,8 +8,8 @@
 
 class UIBarGraph : public UIWindow {
 public:
-  explicit UIBarGraph() : UIWindow(0), m_value(0) {
-  }
+  explicit UIBarGraph();
+  ~UIBarGraph() override;
 
   void Paint() override;
 
@@ -21,6 +21,7 @@ public:
 class UIBarGraph2 : public UIBarGraph {
 public:
   UIBarGraph2();
+  ~UIBarGraph2() override;
 
   void Paint() override;
 
@@ -47,6 +48,7 @@ class UIBarGraph4 : public UIBarGraph3 {
 public:
   explicit UIBarGraph4() : UIBarGraph3() {
   }
+  ~UIBarGraph4() override;
 
   void Paint() override;
   void OnMouseHover(int x, int y) override;
@@ -59,6 +61,7 @@ public:
 class UIINT64BarGraph : public UIWindow {
 public:
   UIINT64BarGraph();
+  ~UIINT64BarGraph() override;
 
   void Paint() override;
   void OnMouseHover(int x, int y) override;
@@ -76,6 +79,7 @@ protected:
 class UIPetInfoBarGraph : public UIWindow {
 public:
   UIPetInfoBarGraph();
+  ~UIPetInfoBarGraph() override;
 
   void Paint() override;
   void SetValue(int value);
@@ -86,6 +90,7 @@ public:
 class UIBarGraphHomun : public UIWindow {
 public:
   UIBarGraphHomun();
+  ~UIBarGraphHomun() override;
 
   void Paint() override;
 
@@ -114,6 +119,7 @@ class UIBarGraphPlayerAP : public UIBarGraphPlayer {
 public:
   explicit UIBarGraphPlayerAP() : UIBarGraphPlayer() {
   }
+  __declspec(noinline) ~UIBarGraphPlayerAP() override;
 
   void Paint() override;
 };

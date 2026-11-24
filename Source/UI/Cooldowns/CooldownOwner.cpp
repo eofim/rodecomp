@@ -1,32 +1,37 @@
 #include "UI/Cooldowns/CooldownOwner.h"
 
-// INLINED
+// OFFSET: 0x00CA5C90
+// FUNCTION: fn_45873
 CooldownOwner::CooldownOwner() {
   this->m_initialized = false;
-  this->m_drawing.normal.clear();
-  this->m_drawing.reverse.clear();
+  this->m_normal.clear();
+  this->m_reverse.clear();
   this->m_values.clear();
   this->m_initialized = true;
 }
 
-// INLINED
+// OFFSET: 0x00CA5FB0
+// FUNCTION: fn_45874
 CooldownOwner::~CooldownOwner() {
-  this->m_drawing.normal.clear();
-  this->m_drawing.reverse.clear();
+  this->m_normal.clear();
+  this->m_reverse.clear();
   this->m_values.clear();
 }
 
 // OFFSET: 0x00CA61A0
 // FUNCTION: fn_20957
 void CooldownOwner::Register(unsigned id, std::uint32_t duration, std::uint32_t start, std::uint32_t elapsed) {
-  this->Remove(id);
+  const auto previous = this->m_values.find(id);
+  if (previous != this->m_values.end()) {
+    this->m_values.erase(previous);
+  }
   this->m_values.insert(std::make_pair(id, CooldownState(0, 0, 0, duration, start, elapsed, 1)));
 }
 
 // OFFSET: 0x00CA64B0
 // FUNCTION: fn_20959
 void CooldownOwner::ClearReverseCommands() {
-  this->m_drawing.reverse.clear();
+  this->m_reverse.clear();
 }
 
 // INLINED

@@ -79,14 +79,13 @@ static inline int MaterialRowAt(int x, int y) {
 // OFFSET: 0x007E68F0
 // FUNCTION: fn_09738
 UIGradeEnchantWnd::UIGradeEnchantWnd()
-    : UIFrameWnd(0), enhancedUpButton(nullptr), state(0),
-      result(-1), itemFrameInterval(200), wheelFrameInterval(100), stateTick(0), wheelTick(0), itemFrame(1), wheelFrame(1), resultTick(0),
-      selectedMaterial(-1), hoverMaterial(-1), materials(), protect(0), blessingAmount(0), baseSuccessRate(0),
-      messageIds(), item(0), startButton(nullptr), enhancedDownButton(nullptr) {
+    : UIFrameWnd(0), startButton(nullptr), enhancedUpButton(nullptr), enhancedDownButton(nullptr), state(0), result(-1),
+      itemFrameInterval(200), wheelFrameInterval(100), stateTick(0), wheelTick(0), itemFrame(1), wheelFrame(1), resultTick(0),
+      selectedMaterial(-1), hoverMaterial(-1), materials(), protect(0), unknown_0111(0), blessingAmount(0), baseSuccessRate(0),
+      messageIds(), item(0) {
   this->requestPending = 0;
   this->info = {};
-  this->enchantOption = 0;
-  this->enchantOptionCount = 0;
+  std::memset(&this->enchantOption, 0, sizeof this->enchantOption);
 }
 
 // OFFSET: 0x007E6A60
@@ -127,8 +126,7 @@ void UIGradeEnchantWnd::ResetItem() {
   this->materials.clear();
   this->selectedMaterial = -1;
   this->info = GradeEnchantInfo{};
-  this->enchantOption = 0;
-  this->enchantOptionCount = 0;
+  std::memset(&this->enchantOption, 0, sizeof this->enchantOption);
   this->blessingAmount = 0;
   this->protect = 0;
   this->baseSuccessRate = 0;
@@ -234,7 +232,7 @@ void UIGradeEnchantWnd::OnCreate(int, int) {
   help->SetBitmap("유저인터페이스\\basic_interface\\btn_help_disabled.bmp", 3, 0);
   help->SetSize(help->BitmapWidth(), help->BitmapHeight());
   help->Move(0x8C, 100);
-  help->SetTooltip(LookupMessage(MSI_PROBABILITY_TITLE));
+  help->SetTooltip(LookupMessage(MSI_CHECK_PROBABILITY));
   help->SetId(GRADEENCHANT_BUTTON_PROBABILITY);
   this->AddChild(help);
 }
@@ -254,9 +252,9 @@ void UIGradeEnchantWnd::Paint() {
     this->DrawBitmap(152, 62, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\caution.bmp").c_str()))), true);
     this->DrawBitmap(152, 78, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\caution.bmp").c_str()))), true);
 
-    this->DrawAlignedText(166, 46, LookupMessage(MSI_HOTKEY_RESET), 228, 0, 0x00A0ADC, 0, 0, 11, 1, 0);
-    this->DrawAlignedText(166, 62, LookupMessage(MSI_HOTKEY_OLD_VER), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
-    this->DrawAlignedText(166, 78, LookupMessage(MSI_EXP_BAR_BASE_LV), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
+    this->DrawAlignedText(166, 46, LookupMessage(MSI_GRADE_ENCHANT_SUCCESS_REFINING_LEVEL_DISAPPEAR), 228, 0, 0x00A0ADC, 0, 0, 11, 1, 0);
+    this->DrawAlignedText(166, 62, LookupMessage(MSI_GRADE_ENCHANT_SUCCESS_RANDOM_OPT_ENCHANT_KEEP), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
+    this->DrawAlignedText(166, 78, LookupMessage(MSI_GRADE_ENCHANT_FAILED_REFINING_RANDOM_OPT_ENCHANT_KEEP), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
   }
 
   if (this->state == 1 || this->state == 2) {
@@ -275,13 +273,14 @@ void UIGradeEnchantWnd::Paint() {
     std::memset(description, 0, sizeof(description));
     int capacity = sizeof(description);
 
-    int y = 118;
-    for (auto material = this->materials.begin(); material != this->materials.end(); ++material, y += 40) {
+    int row = 0;
+    for (auto material = this->materials.begin(); material != this->materials.end(); ++material, ++row) {
+      const int y = row * 40 + 118;
       ITEM_INFO itemInfo;
       itemInfo.SetItemId(material->itemId);
       itemInfo.GetIdDisplayName(description, capacity, 0);
       this->DrawItemIcon(170, y - 9, itemInfo, 0);
-      std::string text = FormatOwnedString(LookupMessage(MSI_NO_ITEM_FOR_EXCHANGE), description, material->amount);
+      std::string text = FormatOwnedString(LookupMessage(MSI_BARTERITEM_NAME_COUNT), description, material->amount);
       this->DrawAlignedText(203, y, text, 180, 0, 0, 0, 0, 11, 0, 0);
     }
 
@@ -290,7 +289,7 @@ void UIGradeEnchantWnd::Paint() {
       itemInfo.SetItemId(this->info.blessingItemId);
       itemInfo.GetIdDisplayName(description, capacity, 0);
       this->DrawItemIcon(195, 228, itemInfo, 0);
-      std::string text = FormatOwnedString(LookupMessage(MSI_NO_ITEM_FOR_EXCHANGE), description, this->blessingAmount);
+      std::string text = FormatOwnedString(LookupMessage(MSI_BARTERITEM_NAME_COUNT), description, this->blessingAmount);
       this->DrawAlignedText(228, 237, text, 160, 0, 0xFFFFFF, 0, 0, 11, 1, 1);
     }
 
@@ -303,7 +302,7 @@ void UIGradeEnchantWnd::Paint() {
           const int itemY = 46 + i * 16;
           this->DrawBitmap(152, itemY, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(FormatOwnedString("유저인터페이스\\grade_enchant\\caution.bmp").c_str()))), true);
           const int msgId = this->messageIds[i];
-          if (msgId == 3711 || msgId == 3822) {
+          if (msgId == MSI_GRADE_ENCHANT_ITEM_PROTECT || msgId == MSI_GRADE_ENCHANT_ITEM_UNBREAKABLE) {
             this->DrawAlignedText(166, itemY, LookupMessage(msgId), 228, 0, 0x5AEB00, 0, 0, 11, 1, 0);
           } else {
             this->DrawAlignedText(166, itemY, LookupMessage(msgId), 228, 0, 0x00A0ADC, 0, 0, 11, 1, 0);
@@ -374,7 +373,7 @@ void UIGradeEnchantWnd::OnLBtnDown(int x, int y) {
   }
 
   if (this->state == 1 && this->item.identity[1] > 0 && x >= 64 && x <= 110 && y >= 125 && y <= 171) {
-    g_modeMgr.GetGameMode()->BeginDragItem(33, this->item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_GRADE_ENCHANT, this->item, 1, -1);
   }
 }
 
@@ -393,7 +392,7 @@ void UIGradeEnchantWnd::OnLBtnUp(int x, int y) {
 
   if (this->selectedMaterial != row) {
     if (this->blessingAmount > 0) {
-      g_windowMgr.Confirm(LookupMessage(MSI_ENCHANT_TAB_PERFECT), 0, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_GRADE_ENCHANT_ADDITIONAL_SOURCE_RESET), 0, true, false, 0, "Message", 280, 120, 0);
     }
 
     this->selectedMaterial = row;
@@ -422,7 +421,7 @@ void UIGradeEnchant_BtnEnhancedUp::OnMouseHover(int x, int y) {
     return;
   }
 
-  this->m_tooltip = FormatOwnedString(LookupMessage(MSI_JOB_WINDHAWK), this->tooltipValue);
+  this->m_tooltip = FormatOwnedString(LookupMessage(MSI_GRADE_ENCHANT_ENHANCED_UP), this->tooltipValue);
 
   int screenX = 0;
   int screenY = -20;
@@ -459,25 +458,25 @@ void UIGradeEnchantWnd::OnProcess() {
   if (this->state == 2 && now >= this->resultTick + 3000) {
     switch (this->result) {
     case ENCHANTGRADE_UPGRADE_SUCCESS:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL_BREAK)), 0xFFFF00, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_SUCCEESS)), 0xFFFF00, 0, 0, 0);
       break;
     case ENCHANTGRADE_UPGRADE_FAILED:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL_PROTECT)), 0xFFFF00, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL)), 0xFFFF00, 0, 0, 0);
       break;
     case ENCHANTGRADE_UPGRADE_DOWNGRADE:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GRADE_ENCHANT_SOURCE_NOT_SELECT)), 0xFFFF00, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL_DOWNGRADE)), 0xFFFF00, 0, 0, 0);
       break;
     case ENCHANTGRADE_UPGRADE_BREAK:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GRADE_ENCHANT_SOURCE_ENOUGH)), 0xFFFF00, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL_BREAK)), 0xFFFF00, 0, 0, 0);
       break;
     case ENCHANTGRADE_UPGRADE_PROTECTED:
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GRADE_ENCHANT_MONEY_ENOUGH)), 0xFFFF00, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ITEM_GRADE_ENCHANT_FAIL_PROTECT)), 0xFFFF00, 0, 0, 0);
       break;
     }
     this->ResetItem();
   }
 
-  const bool disabled = this->requestPending == 1 || this->item.identity[1] == 0 || this->selectedMaterial == -1 ||
+  const bool disabled = this->requestPending == 1 || this->item.identity[1] <= 0 || this->selectedMaterial == -1 ||
                         g_session.LookupClientItem(this->materials[this->selectedMaterial].itemId, 0).quantity <
                           this->materials[this->selectedMaterial].amount ||
                         g_session.m_zeny < this->SelectedMaterialZeny() || this->baseSuccessRate == 0;
@@ -549,20 +548,21 @@ int UIGradeEnchantWnd::SendMsg(
     switch (argument1) {
     case ID_OK:
       if (this->requestPending != 1 && this->item.identity[1] > 0 && this->selectedMaterial != -1) {
-        const int quantity = g_session.LookupClientItem(this->materials[this->selectedMaterial].itemId, 0).quantity;
-        if (quantity >= this->materials[this->selectedMaterial].amount && g_session.m_zeny >= this->SelectedMaterialZeny()) {
-          if (this->protect != 0 || this->blessingAmount != 0 ||
-              g_windowMgr.Confirm(LookupMessage(MSI_MERCHANTSHOP_TOTA_LOVER_ZENY_ERR), 2, true, false, 0, "Message", 280, 120, 0) != ID_NO) {
-            this->requestPending = 1;
+        if (g_session.LookupClientItem(this->materials[this->selectedMaterial].itemId, 0).quantity >= this->materials[this->selectedMaterial].amount) {
+          if (g_session.m_zeny >= this->SelectedMaterialZeny()) {
+            if (this->protect != 0 || this->blessingAmount != 0 ||
+                g_windowMgr.Confirm(LookupMessage(MSI_GRADE_ENCHANT_ADDITIONAL_SOURCE_NOT_SELECT), 2, true, false, 0, "Message", 280, 120, 0) != ID_NO) {
+              this->requestPending = 1;
 
-            GradeEnchantRequestPacket packet;
-            packet.id = ID_CZ_GRADE_ENCHANT_REQUEST;
-            packet.index = static_cast<std::uint16_t>(this->item.identity[1]);
-            packet.material = this->selectedMaterial;
-            packet.useBlessing = this->blessingAmount > 0;
-            packet.blessingCount = this->blessingAmount / this->info.blessingStepAmount;
-            packet.protect = this->protect;
-            GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+              GradeEnchantRequestPacket packet;
+              packet.id = ID_CZ_GRADE_ENCHANT_REQUEST;
+              packet.index = static_cast<std::uint16_t>(this->item.identity[1]);
+              packet.material = this->selectedMaterial;
+              packet.useBlessing = this->blessingAmount > 0;
+              packet.blessingCount = this->blessingAmount / this->info.blessingStepAmount;
+              packet.protect = this->protect;
+              GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+            }
           }
         }
       }
@@ -587,13 +587,14 @@ int UIGradeEnchantWnd::SendMsg(
       }
       break;
     case GRADEENCHANT_BUTTON_PROBABILITY:
-      ShellExecuteA(hWnd, "open", LookupMessage(MSI_ETC_PROBABILITY_URL), nullptr, nullptr, SW_SHOWNORMAL);
+      ShellExecuteA(hWnd, "open", LookupMessage(MSI_GRADE_ENCHANT_PROBABILITY_URL), nullptr, nullptr, SW_SHOWNORMAL);
       break;
     }
     break;
   case UM_REFRESHITEM:
     if (this->state == 0 || this->state == 1) {
-      const ITEM_INFO dropped = g_session.LookupClientItemByIdentity(argument1);
+      const int identity = static_cast<int>(argument1);
+      const ITEM_INFO dropped = g_session.LookupClientItemByIdentity(identity);
       if (g_session.HasSwapEquipmentItem(dropped.identity[1]) == 1) {
         g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
         return -1;
@@ -602,7 +603,7 @@ int UIGradeEnchantWnd::SendMsg(
       if (dropped.identity[1] > 0 && dropped.identified == 1) {
         GradeEnchantSelectPacket packet;
         packet.id = ID_CZ_GRADE_ENCHANT_SELECT_EQUIPMENT;
-        packet.index = static_cast<std::uint16_t>(argument1);
+        packet.index = static_cast<std::uint16_t>(identity);
         GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
       }
     }
@@ -619,39 +620,36 @@ void UIGradeEnchantWnd::SetEnchantInfo(
 ) {
   switch (this->state) {
   case 0:
-  case 1:
+  case 1: {
+    if (-1 == index) {
+      return;
+    }
+
+    const ITEM_INFO owned = g_session.LookupClientItemByIdentity(index);
+    if (owned.identity[1] <= 0) {
+      return;
+    }
+
+    this->item = owned;
+    this->info = info;
+    this->enchantOption = GradeEnchantOption{enchantOption, enchantOptionCount};
+    this->materials.assign(materials, materials + materialCount);
+    this->selectedMaterial = -1;
+    this->blessingAmount = 0;
+    this->baseSuccessRate = value;
+
+    this->state = 1;
+    this->result = -1;
+    this->stateTick = timeGetTime();
+    this->itemFrame = 1;
+    this->enhancedUpButton->tooltipEnabled = 1;
+    this->Invalidate();
+
+    this->requestPending = 0;
+    this->enhancedUpButton->tooltipValue = this->info.blessingStepAmount;
     break;
-  default:
-    return;
   }
-
-  if (index == -1) {
-    return;
   }
-
-  const ITEM_INFO owned = g_session.LookupClientItemByIdentity(index);
-  if (owned.identity[1] == 0) {
-    return;
-  }
-
-  this->item = owned;
-  this->info = info;
-  this->enchantOption = enchantOption;
-  this->enchantOptionCount = enchantOptionCount;
-  this->materials.assign(materials, materials + materialCount);
-  this->selectedMaterial = -1;
-  this->blessingAmount = 0;
-  this->baseSuccessRate = value;
-
-  this->state = 1;
-  this->result = -1;
-  this->stateTick = timeGetTime();
-  this->itemFrame = 1;
-  this->enhancedUpButton->tooltipEnabled = 1;
-  this->Invalidate();
-
-  this->requestPending = 0;
-  this->enhancedUpButton->tooltipValue = this->info.blessingStepAmount;
 }
 
 // OFFSET: 0x007E9910
@@ -749,8 +747,11 @@ void UIGradeEnchantWnd::UpdateEnchantMessages() {
   }
 
   if (this->selectedMaterial != -1 && this->materials[this->selectedMaterial].breakOnFailure == 1) {
-    int warning = this->SuccessRate() < 100 ? 3712 : 3822;
-    this->messageIds.push_back(warning);
+    if (this->SuccessRate() < 100) {
+      this->messageIds.push_back(3712);
+    } else {
+      this->messageIds.push_back(3822);
+    }
   }
 
   if (this->selectedMaterial != -1 && this->materials[this->selectedMaterial].downgradeAmount > 0) {

@@ -11,6 +11,11 @@
 #include <cmath>
 
 // INLINED
+static vector3d Subtract(const vector3d& left, const vector3d& right) {
+  return vector3d{left.x - right.x, left.y - right.y, left.z - right.z};
+}
+
+// INLINED
 static vector3d TransformPoint(const matrix& transform, const vector3d& point) {
   vector3d result;
   result.x = point.x * transform.values[0] + point.y * transform.values[3] + point.z * transform.values[6] + transform.values[9];
@@ -26,6 +31,11 @@ CThunderingOrb::CThunderingOrb(const std::string& name) : CBezierArcThrowEffect(
 // OFFSET: 0x007AAF40
 // FUNCTION: fn_09103
 CWindBomb::CWindBomb(const std::string& name) : CBezierArcThrowEffect(name) {}
+
+// OFFSET: 0x007AAFE0
+// FUNCTION: fn_46016
+__declspec(noinline) CBezierArcThrowEffect::~CBezierArcThrowEffect() {
+}
 
 // OFFSET: 0x007AB290
 // FUNCTION: fn_09107
@@ -74,19 +84,16 @@ void CBezierArcThrowEffect::OnProcess() {
 
   matrix rotation;
   if (targetViewX >= actorView.x) {
-    rotation.MakeYRotation(4.188789f);
+    rotation.MakeYRotation(240.0f / 180.0f * 3.141592f);
   } else {
-    rotation.MakeYRotation(2.094395f);
+    rotation.MakeYRotation(120.0f / 180.0f * 3.141592f);
   }
 
   actorView.y -= 10.0f;
   vector3d ctrlPt = TransformPoint(g_modeMgr.GetGameMode()->camera->frame.inverse, actorView);
   this->m_progress -= 0.07f;
 
-  vector3d delta;
-  delta.y = this->m_target.y - ctrlPt.y;
-  delta.x = this->m_target.x - ctrlPt.x;
-  delta.z = this->m_target.z - ctrlPt.z;
+  const vector3d delta = Subtract(this->m_target, ctrlPt);
 
   float distSq = delta.y * delta.y + delta.x * delta.x + delta.z * delta.z;
   float dist = SquareRoot(distSq);
@@ -99,15 +106,18 @@ void CBezierArcThrowEffect::OnProcess() {
 
   vector3d rotated = TransformPoint(rotation, norm);
 
+  vector3d start = this->m_target;
   float t = this->m_progress;
   float u = 1.0f - t;
-  float u2 = static_cast<float>(std::pow(static_cast<double>(u), 2.0));
-  float t2 = static_cast<float>(std::pow(static_cast<double>(t), 2.0));
-  float mid = (t + t) * u;
+  const vector3d first = start * static_cast<float>(std::pow(static_cast<double>(u), 2.0));
+  const vector3d last = ctrlPt * static_cast<float>(std::pow(static_cast<double>(t), 2.0));
+  vector3d end{rotated.x + this->m_target.x, rotated.y + this->m_target.y, rotated.z + this->m_target.z};
+  const vector3d middle = end * ((t + t) * u);
 
-  this->m_particle->position.x = (rotated.x + this->m_target.x) * mid + ctrlPt.x * t2 + this->m_target.x * u2;
-  this->m_particle->position.y = (rotated.y + this->m_target.y) * mid + ctrlPt.y * t2 + this->m_target.y * u2;
-  this->m_particle->position.z = (rotated.z + this->m_target.z) * mid + ctrlPt.z * t2 + this->m_target.z * u2;
+  CEZ2STRParticle* particle = this->m_particle;
+  particle->position.x = middle.x + last.x + first.x;
+  particle->position.y = middle.y + last.y + first.y;
+  particle->position.z = middle.z + last.z + first.z;
 
   this->m_particle->Process(0.0f, 0.0f, 0.0f);
   if (0.0f >= this->m_progress) {

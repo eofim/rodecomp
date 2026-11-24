@@ -31,6 +31,16 @@ namespace {
   struct ExchangeRecordHeader {
     /* 0000 */ std::int16_t type;
     /* 0002 */ std::uint32_t length;
+
+    // INLINED
+    ExchangeRecordHeader() : type(0), length(0) {
+    }
+
+    // INLINED
+    ~ExchangeRecordHeader() {
+      this->type = 0;
+      this->length = 0;
+    }
   };
 #pragma pack(pop)
 
@@ -63,12 +73,13 @@ void UIExchangeAcceptWnd::OnCreate(int width, int height) {
     this->AddChild(button);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
   this->viewer = new UITextViewer();
   this->viewer->Configure(10, 22, width - 20, height - 55, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->viewer->SetBackgroundColor(0xFF000000u | RGB(red, green, blue));
+  const COLORREF rgb = RGB(red, green, blue);
+  this->viewer->SetBackgroundColor(rgb | 0xFF000000u);
   this->AddChild(this->viewer);
   this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>("deal"), 38, 0, 0);
 }
@@ -107,19 +118,21 @@ int UIExchangeAcceptWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
       g_modeMgr.currentMode->SendMsg(MM_ACK_EXCHANGE_ITEM, 4, 0, 0, 0);
       return 0;
     }
-    return 0;
+    break;
   case UM_REPLAY_FRAMED_DATA: {
     const auto* bytes = reinterpret_cast<const unsigned char*>(a);
-    ExchangeRecordHeader header = {};
-    std::memcpy(&header, bytes, sizeof(header));
-    unsigned offset = sizeof(header);
-    if (header.type == 21650) {
-      while (offset < static_cast<unsigned>(b)) {
-        std::memcpy(&header, bytes + offset, sizeof(header));
-        offset += sizeof(header);
+    ExchangeRecordHeader header;
+    header = *reinterpret_cast<const ExchangeRecordHeader*>(bytes);
+    unsigned offset = 6;
+    if (21650 == header.type) {
+      bool scanning = true;
+      while (scanning && static_cast<unsigned>(b) > offset) {
+        header = *reinterpret_cast<const ExchangeRecordHeader*>(bytes + offset);
+        offset += 6;
         switch (header.type) {
         case 21651:
-          return 0;
+          scanning = false;
+          break;
         case 21652: {
           char text[260] = {};
           std::memcpy(text, bytes + offset, header.length);
@@ -136,11 +149,13 @@ int UIExchangeAcceptWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a,
         }
       }
     }
-    return 0;
+    break;
   }
   default:
     return this->UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
+
+  return 0;
 }
 
 // OFFSET: 0x00909EC0

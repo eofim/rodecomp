@@ -56,6 +56,14 @@ public:
   void MoveCandidateWindow(int x);
   void MoveReadingWindow(int x);
   bool DecodeItemLink(const std::vector<int>& values, ITEM_INFO& item);
+  int HasItemLinkTag(const std::string& text);
+  int HasNaviLinkTag(const std::string& text);
+  // INLINED
+  void SetTooltip(const char* text) {
+    if (text) {
+      this->tooltip = text;
+    }
+  }
 
   /* 007C */ int anchor;
   /* 0080 */ int cursor;
@@ -128,9 +136,11 @@ public:
   void PlaceLinks(const std::string& value, int y, int line, int firstLine, int endLine);
   std::string ResolveItemLinks(const std::string& source);
   std::string PlaceLineLinks(const char* line, std::string& text, const int* lineIndex);
+  void WrapText(std::vector<std::string>& lines, const std::string& text);
   void WrapLines(std::vector<std::string>& lines);
   std::string TakePendingText();
   void SetTagColor(std::uint32_t color);
+  void ClearTags();
   void ClearLineState();
   int DecodeLinkNumber(std::string text);
   void DecodeLinkOptions(std::vector<int>& options, const char* text, int& position, const int& length, const char& separator, const char& alternate);
@@ -165,6 +175,7 @@ public:
 
 class CUIEditCtrl : public UIEditCtrl3 {
 public:
+  __declspec(noinline) ~CUIEditCtrl() override;
   void Paint() override;
   void Invalidate() override;
   void DrawBlinkingCaret(const std::uint32_t& color) override;
@@ -203,6 +214,7 @@ public:
 class UIChatEditCtrl : public UIEditCtrl {
 public:
   UIChatEditCtrl();
+  __declspec(noinline) ~UIChatEditCtrl() override;
   void Paint() override;
   void OnLBtnDown(int x, int y) override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) override;
@@ -251,15 +263,14 @@ public:
   void SetText(const char* value) override;
 };
 
-bool HasItemLinkTag(const std::string& text);
-int __stdcall HasNaviLinkTag(const std::string& text);
-
 class UIShowAndEditTimeCtrl : public UIWindow {
 public:
   UIShowAndEditTimeCtrl();
   void Paint() override;
   void OnCreate(int width, int height) override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
+  void SetMinute(int value);
+  void SetSecond(int value);
 
   /* 007C */ UIEditCtrlVarId* fields[2];
 
@@ -286,6 +297,8 @@ static_assert(sizeof(UIEditCtrl5) == 0x13C);
 #endif
 
 extern int g_skillTooltipActive;
+extern const std::string g_itemLinkOpen;
+extern const std::string g_itemLinkClose;
 
 bool IsInputSuggestionAllowed();
 

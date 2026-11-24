@@ -17,7 +17,8 @@ AES::~AES() {
 
 // OFFSET: 0x0061AF30
 // FUNCTION: fn_04418
-ULONG AES::Decrypt(PUCHAR input, ULONG inputSize, PUCHAR output, ULONG outputSize, UCHAR flags) {
+ULONG AES::Decrypt(std::span<UCHAR> input, std::span<UCHAR> output, UCHAR flags) {
+  const ULONG decryptFlags = flags;
   PUCHAR iv;
   ULONG ivSize;
   if (m_mode == ECB) {
@@ -30,13 +31,13 @@ ULONG AES::Decrypt(PUCHAR input, ULONG inputSize, PUCHAR output, ULONG outputSiz
 
   ULONG result = 0;
   UCHAR scratch[16]{};
-  const NTSTATUS status = BCryptDecrypt(m_key, input, inputSize, nullptr, iv, ivSize, outputSize != 0 ? output : scratch, outputSize, &result, flags);
+  const NTSTATUS status = BCryptDecrypt(m_key, input.data(), input.size(), nullptr, iv, ivSize, output.empty() ? scratch : output.data(), output.size(), &result, decryptFlags);
   return status < 0 ? static_cast<ULONG>(-1) : result;
 }
 
 // OFFSET: 0x0061B1A0
 // FUNCTION: fn_04419
-bool AES::Initialize(PUCHAR secret, ULONG secretSize, std::span<const UCHAR> iv, int mode) {
+bool AES::Initialize(std::span<UCHAR> secret, std::span<UCHAR> iv, int mode) {
   if (m_key != nullptr) {
     BCryptDestroyKey(m_key);
     m_key = nullptr;
@@ -59,7 +60,7 @@ bool AES::Initialize(PUCHAR secret, ULONG secretSize, std::span<const UCHAR> iv,
     return false;
   }
   m_keyObject.resize(objectLength);
-  if (BCryptGenerateSymmetricKey(m_algorithm, &m_key, m_keyObject.data(), m_keyObject.size(), secret, secretSize, 0) < 0) {
+  if (BCryptGenerateSymmetricKey(m_algorithm, &m_key, m_keyObject.data(), m_keyObject.size(), secret.data(), secret.size(), 0) < 0) {
     return false;
   }
   return SetMode(mode);
@@ -67,9 +68,9 @@ bool AES::Initialize(PUCHAR secret, ULONG secretSize, std::span<const UCHAR> iv,
 
 // OFFSET: 0x0061B3C0
 // FUNCTION: fn_04420
-bool AES::Initialize(PUCHAR secret, ULONG secretSize, int mode) {
+bool AES::Initialize(std::span<UCHAR> secret, int mode) {
   UCHAR iv[16]{};
-  return Initialize(secret, secretSize, iv, mode);
+  return Initialize(secret, iv, mode);
 }
 
 // OFFSET: 0x0061B410

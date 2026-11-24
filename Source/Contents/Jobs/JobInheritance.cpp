@@ -1,4 +1,5 @@
 #include "Contents/Skills/SkillId.h"
+#include "Contents/Items/ItemId.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Contents/Actors/ActorEnums.h"
@@ -9,9 +10,11 @@
 #include "Client/Mode/CGameMode.h"
 #include "Contents/ClientState.h"
 #include "Contents/Items/ItemDescription.h"
+#include "Contents/Items/ItemType.h"
 #include "Contents/Items/WeaponType.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Messenger/ClientMessenger.h"
+#include "Contents/Messenger/EquipmentPropertiesMgr.h"
 #include "Contents/Messenger/EquipmentPropertyStore.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Client/Session/Session.h"
@@ -118,10 +121,10 @@ bool CSession::IsNpcJob(int job) const {
 
 // OFFSET: 0x00DFA630
 // FUNCTION: fn_23577
-bool __stdcall ValidateCharacterName(const char* name) {
+bool CSession::ValidateCharacterName(const char* name) {
   const int length = static_cast<int>(std::strlen(name));
   for (int index = 0; index < length; ++index) {
-    if (name[index] == 0) {
+    if (name[index] < 0) {
       return false;
     }
   }
@@ -132,8 +135,8 @@ bool __stdcall ValidateCharacterName(const char* name) {
 // FUNCTION: fn_23578
 bool CSession::IsNavigationAllowed() const {
   const std::string name = ScriptMapName(this->m_navigationPlayerMap);
-  for (const auto& forbidden : this->m_navigationForbiddenMaps) {
-    if (std::strcmp(forbidden.c_str(), name.c_str()) == 0) {
+  for (auto it = this->m_navigationForbiddenMaps.begin(); it != this->m_navigationForbiddenMaps.end(); ++it) {
+    if (std::strcmp(it->c_str(), name.c_str()) == 0) {
       return false;
     }
   }
@@ -337,6 +340,35 @@ bool CSession::HasJobShieldSprite(int job, int shield) const {
       return true;
     }
     return false;
+  case JT_TAEKWON:
+  case JT_STAR:
+  case JT_STAR2:
+  case JT_LINKER:
+  case JT_GANGSI:
+  case JT_DEATHKNIGHT:
+  case JT_COLLECTOR:
+  case JT_WOLF_RANGER:
+  case JT_WOLF_RANGER_H:
+  case JT_MADOGEAR:
+  case JT_MADOGEAR_H:
+  case JT_WOLF_RANGER_B:
+  case JT_MADOGEAR_B:
+  case JT_TAEKWON_B:
+  case JT_STAR_B:
+  case JT_LINKER_B:
+  case JT_STAR2_B:
+  case JT_STAR_EMPEROR:
+  case JT_SOUL_REAPER:
+  case JT_STAR_EMPEROR_B:
+  case JT_SOUL_REAPER_B:
+  case JT_STAR2_EMPEROR:
+  case JT_STAR2_EMPEROR_B:
+  case JT_WOLF_WINDHAWK:
+  case JT_MEISTER_MADOGEAR:
+  case JT_SKY_EMPEROR:
+  case JT_SOUL_ASCETIC:
+  case JT_SKY_EMPEROR2:
+    return false;
   case JT_DO_SUMMONER:
   case JT_DO_SUMMONER_B:
   case JT_SPIRIT_HANDLER:
@@ -472,18 +504,21 @@ bool CSession::IsJobWeaponTypeAllowed(int job, std::int64_t weaponType) const {
       return true;
     }
     break;
-  case JT_THIEF:
-  case JT_ROGUE:
-  case JT_THIEF_H:
-  case JT_ROGUE_H:
-  case JT_THIEF_B:
-  case JT_ROGUE_B:
-  case JT_SHADOW_CHASER:
-  case JT_SHADOW_CHASER_H:
-  case JT_SHADOW_CHASER_B:
+  case JT_ARCHER:
+  case JT_HUNTER:
+  case JT_ARCHER_H:
+  case JT_HUNTER_H:
+  case JT_ARCHER_B:
+  case JT_HUNTER_B:
+  case JT_RANGER:
+  case JT_RANGER_H:
+  case JT_WOLF_RANGER:
+  case JT_WOLF_RANGER_H:
+  case JT_RANGER_B:
+  case JT_WOLF_RANGER_B:
+  case JT_WINDHAWK:
     switch (weaponType) {
     case W_DAGGER:
-    case W_1HSWORD:
     case W_BOW:
       return true;
     }
@@ -558,21 +593,18 @@ bool CSession::IsJobWeaponTypeAllowed(int job, std::int64_t weaponType) const {
       return true;
     }
     break;
-  case JT_ARCHER:
-  case JT_HUNTER:
-  case JT_ARCHER_H:
-  case JT_HUNTER_H:
-  case JT_ARCHER_B:
-  case JT_HUNTER_B:
-  case JT_RANGER:
-  case JT_RANGER_H:
-  case JT_WOLF_RANGER:
-  case JT_WOLF_RANGER_H:
-  case JT_RANGER_B:
-  case JT_WOLF_RANGER_B:
-  case JT_WINDHAWK:
+  case JT_THIEF:
+  case JT_ROGUE:
+  case JT_THIEF_H:
+  case JT_ROGUE_H:
+  case JT_THIEF_B:
+  case JT_ROGUE_B:
+  case JT_SHADOW_CHASER:
+  case JT_SHADOW_CHASER_H:
+  case JT_SHADOW_CHASER_B:
     switch (weaponType) {
     case W_DAGGER:
+    case W_1HSWORD:
     case W_BOW:
       return true;
     }
@@ -808,113 +840,31 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
   bool result = false;
 
   switch (job) {
-  case JT_SWORDMAN:
-  case JT_KNIGHT:
-  case JT_CHICKEN:
-  case JT_CRUSADER:
-  case JT_CHICKEN2:
-  case JT_SWORDMAN_H:
-  case JT_KNIGHT_H:
-  case JT_CHICKEN_H:
-  case JT_CRUSADER_H:
-  case JT_CHICKEN2_H:
-  case JT_SWORDMAN_B:
-  case JT_KNIGHT_B:
-  case JT_CHICKEN_B:
-  case JT_CRUSADER_B:
-  case JT_CHICKEN2_B:
-  case JT_RUNE_KNIGHT:
-  case JT_RUNE_KNIGHT_H:
-  case JT_ROYAL_GUARD:
-  case JT_ROYAL_GUARD_H:
-  case JT_RUNE_CHICKEN:
-  case JT_RUNE_CHICKEN_H:
-  case JT_ROYAL_CHICKEN:
-  case JT_ROYAL_CHICKEN_H:
-  case JT_RUNE_CHICKEN2:
-  case JT_RUNE_CHICKEN2_H:
-  case JT_RUNE_CHICKEN3:
-  case JT_RUNE_CHICKEN3_H:
-  case JT_RUNE_CHICKEN4:
-  case JT_RUNE_CHICKEN4_H:
-  case JT_RUNE_CHICKEN5:
-  case JT_RUNE_CHICKEN5_H:
-  case JT_RUNE_KNIGHT_B:
-  case JT_ROYAL_GUARD_B:
-  case JT_RUNE_CHICKEN_B:
-  case JT_ROYAL_CHICKEN_B:
-  case JT_DRAGON_KNIGHT:
-  case JT_IMPERIAL_GUARD:
-  case JT_DRAGON_KNIGHT_CHICKEN:
-  case JT_IMPERIAL_GUARD_CHICKEN:
-    if (view == W_1HSPEAR || view == W_2HSPEAR) {
+  case JT_GUNSLINGER:
+  case JT_REBELLION:
+  case JT_GUNSLINGER_B:
+  case JT_REBELLION_B:
+  case JT_NIGHT_WATCH:
+    switch (view) {
+    case W_RIFLE:
+    case W_GATLING:
+    case W_SHOTGUN:
+    case W_GRENADE:
       result = true;
+      break;
+    default:
+      break;
     }
     break;
-  case JT_MAGICIAN:
-  case JT_MERCHANT:
-  case JT_MAGICIAN_H:
-  case JT_MERCHANT_H:
-  case JT_MAGICIAN_B:
-  case JT_MERCHANT_B:
-    if (view == W_DAGGER) {
-      result = true;
-    }
-    break;
-  case JT_ARCHER:
-  case JT_ARCHER_H:
-  case JT_ARCHER_B:
-    if (view != W_BOW) {
-      result = true;
-    }
-    break;
-  case JT_THIEF:
-  case JT_HUNTER:
-  case JT_ROGUE:
-  case JT_BARD:
-  case JT_DANCER:
-  case JT_THIEF_H:
-  case JT_HUNTER_H:
-  case JT_ROGUE_H:
-  case JT_BARD_H:
-  case JT_DANCER_H:
-  case JT_THIEF_B:
-  case JT_HUNTER_B:
-  case JT_ROGUE_B:
-  case JT_BARD_B:
-  case JT_DANCER_B:
-  case JT_RANGER:
-  case JT_RANGER_H:
-  case JT_MINSTREL:
-  case JT_WANDERER:
-  case JT_SHADOW_CHASER:
-  case JT_MINSTREL_H:
-  case JT_WANDERER_H:
-  case JT_SHADOW_CHASER_H:
-  case JT_WOLF_RANGER:
-  case JT_WOLF_RANGER_H:
-  case JT_RANGER_B:
-  case JT_MINSTREL_B:
-  case JT_WANDERER_B:
-  case JT_SHADOW_CHASER_B:
-  case JT_WOLF_RANGER_B:
-  case JT_WINDHAWK:
-  case JT_ABYSS_CHASER:
-  case JT_TROUBADOUR:
-  case JT_TROUVERE:
-  case JT_WOLF_WINDHAWK:
-    if (view == W_BOW) {
-      result = true;
-    }
-    break;
-  case JT_PRIEST:
-  case JT_PRIEST_H:
-  case JT_PRIEST_B:
-  case JT_ARCHBISHOP:
-  case JT_ARCHBISHOP_H:
-  case JT_ARCHBISHOP_B:
-  case JT_CARDINAL:
-    if (view == W_BOOK) {
+  case JT_NINJA:
+  case JT_KAGEROU:
+  case JT_OBORO:
+  case JT_NINJA_B:
+  case JT_KAGEROU_B:
+  case JT_OBORO_B:
+  case JT_SHINKIRO:
+  case JT_SHIRANUI:
+    if (view == W_HUUMA) {
       result = true;
     }
     break;
@@ -930,20 +880,71 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
   case JT_SOUL_REAPER_B:
   case JT_ARCH_MAGE:
   case JT_SOUL_ASCETIC:
+    if (view == W_DAGGER && slot == 1) {
+      result = true;
+    } else if ((view == W_STAFF || view == W_2HSTAFF) && slot == 0) {
+      result = true;
+    }
+    break;
+  case JT_ARCHER:
+  case JT_ARCHER_H:
+  case JT_ARCHER_B:
+    if (view != W_BOW) {
+      result = true;
+    }
+    break;
+  case JT_NOVICE:
+  case JT_SUPERNOVICE:
+  case JT_NOVICE_H:
+  case JT_NOVICE_B:
+  case JT_SUPERNOVICE_B:
+  case JT_SUPERNOVICE2:
+  case JT_SUPERNOVICE2_B:
+  case JT_HYPER_NOVICE:
+    switch (slot) {
+    case 0:
+      if (view == W_DAGGER) {
+        result = true;
+      }
+      break;
+    case 1:
+      switch (view) {
+      case W_1HSWORD:
+      case W_2HSWORD:
+      case W_1HAXE:
+      case W_2HAXE:
+      case W_MACE:
+      case W_2HMACE:
+      case W_STAFF:
+      case W_2HSTAFF:
+        result = true;
+        break;
+      default:
+        break;
+      }
+      break;
+    }
+    break;
+  case JT_MAGICIAN:
+  case JT_MERCHANT:
+  case JT_MAGICIAN_H:
+  case JT_MERCHANT_H:
+  case JT_MAGICIAN_B:
+  case JT_MERCHANT_B:
     if (view == W_DAGGER) {
-      if (slot == 1) {
-        result = true;
-      }
-      break;
+      result = true;
     }
-
-    if (view == W_STAFF || view == W_2HSTAFF) {
-      if (slot == 0) {
-        result = true;
-      }
-      break;
+    break;
+  case JT_PRIEST:
+  case JT_PRIEST_H:
+  case JT_PRIEST_B:
+  case JT_ARCHBISHOP:
+  case JT_ARCHBISHOP_H:
+  case JT_ARCHBISHOP_B:
+  case JT_CARDINAL:
+    if (view == W_BOOK) {
+      result = true;
     }
-
     break;
   case JT_BLACKSMITH:
   case JT_BLACKSMITH_H:
@@ -993,17 +994,6 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
       break;
     }
     break;
-  case JT_MONK:
-  case JT_MONK_H:
-  case JT_MONK_B:
-  case JT_SURA:
-  case JT_SURA_H:
-  case JT_SURA_B:
-  case JT_INQUISITOR:
-    if (view == W_FIST || view == W_KNUCKLE) {
-      result = true;
-    }
-    break;
   case JT_SAGE:
   case JT_SAGE_H:
   case JT_SAGE_B:
@@ -1040,65 +1030,96 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
       break;
     }
     break;
-  case JT_NOVICE:
-  case JT_SUPERNOVICE:
-  case JT_NOVICE_H:
-  case JT_NOVICE_B:
-  case JT_SUPERNOVICE_B:
-  case JT_SUPERNOVICE2:
-  case JT_SUPERNOVICE2_B:
-  case JT_HYPER_NOVICE:
-    if (slot == 0) {
-      if (view == W_DAGGER) {
-        result = true;
-      }
-      break;
-    }
-
-    if (slot != 1) {
-      break;
-    }
-
-    switch (view) {
-    case W_1HSWORD:
-    case W_2HSWORD:
-    case W_1HAXE:
-    case W_2HAXE:
-    case W_MACE:
-    case W_2HMACE:
-    case W_STAFF:
-    case W_2HSTAFF:
+  case JT_SWORDMAN:
+  case JT_KNIGHT:
+  case JT_CHICKEN:
+  case JT_CRUSADER:
+  case JT_CHICKEN2:
+  case JT_SWORDMAN_H:
+  case JT_KNIGHT_H:
+  case JT_CHICKEN_H:
+  case JT_CRUSADER_H:
+  case JT_CHICKEN2_H:
+  case JT_SWORDMAN_B:
+  case JT_KNIGHT_B:
+  case JT_CHICKEN_B:
+  case JT_CRUSADER_B:
+  case JT_CHICKEN2_B:
+  case JT_RUNE_KNIGHT:
+  case JT_RUNE_KNIGHT_H:
+  case JT_ROYAL_GUARD:
+  case JT_ROYAL_GUARD_H:
+  case JT_RUNE_CHICKEN:
+  case JT_RUNE_CHICKEN_H:
+  case JT_ROYAL_CHICKEN:
+  case JT_ROYAL_CHICKEN_H:
+  case JT_RUNE_CHICKEN2:
+  case JT_RUNE_CHICKEN2_H:
+  case JT_RUNE_CHICKEN3:
+  case JT_RUNE_CHICKEN3_H:
+  case JT_RUNE_CHICKEN4:
+  case JT_RUNE_CHICKEN4_H:
+  case JT_RUNE_CHICKEN5:
+  case JT_RUNE_CHICKEN5_H:
+  case JT_RUNE_KNIGHT_B:
+  case JT_ROYAL_GUARD_B:
+  case JT_RUNE_CHICKEN_B:
+  case JT_ROYAL_CHICKEN_B:
+  case JT_DRAGON_KNIGHT:
+  case JT_IMPERIAL_GUARD:
+  case JT_DRAGON_KNIGHT_CHICKEN:
+  case JT_IMPERIAL_GUARD_CHICKEN:
+    if (view == W_1HSPEAR || view == W_2HSPEAR) {
       result = true;
-      break;
-    default:
-      break;
     }
     break;
-  case JT_GUNSLINGER:
-  case JT_REBELLION:
-  case JT_GUNSLINGER_B:
-  case JT_REBELLION_B:
-  case JT_NIGHT_WATCH:
-    switch (view) {
-    case W_RIFLE:
-    case W_GATLING:
-    case W_SHOTGUN:
-    case W_GRENADE:
+  case JT_MONK:
+  case JT_MONK_H:
+  case JT_MONK_B:
+  case JT_SURA:
+  case JT_SURA_H:
+  case JT_SURA_B:
+  case JT_INQUISITOR:
+    if (view == W_FIST || view == W_KNUCKLE) {
       result = true;
-      break;
-    default:
-      break;
     }
     break;
-  case JT_NINJA:
-  case JT_KAGEROU:
-  case JT_OBORO:
-  case JT_NINJA_B:
-  case JT_KAGEROU_B:
-  case JT_OBORO_B:
-  case JT_SHINKIRO:
-  case JT_SHIRANUI:
-    if (view == W_HUUMA) {
+  case JT_THIEF:
+  case JT_HUNTER:
+  case JT_ROGUE:
+  case JT_BARD:
+  case JT_DANCER:
+  case JT_THIEF_H:
+  case JT_HUNTER_H:
+  case JT_ROGUE_H:
+  case JT_BARD_H:
+  case JT_DANCER_H:
+  case JT_THIEF_B:
+  case JT_HUNTER_B:
+  case JT_ROGUE_B:
+  case JT_BARD_B:
+  case JT_DANCER_B:
+  case JT_RANGER:
+  case JT_RANGER_H:
+  case JT_MINSTREL:
+  case JT_WANDERER:
+  case JT_SHADOW_CHASER:
+  case JT_MINSTREL_H:
+  case JT_WANDERER_H:
+  case JT_SHADOW_CHASER_H:
+  case JT_WOLF_RANGER:
+  case JT_WOLF_RANGER_H:
+  case JT_RANGER_B:
+  case JT_MINSTREL_B:
+  case JT_WANDERER_B:
+  case JT_SHADOW_CHASER_B:
+  case JT_WOLF_RANGER_B:
+  case JT_WINDHAWK:
+  case JT_ABYSS_CHASER:
+  case JT_TROUBADOUR:
+  case JT_TROUVERE:
+  case JT_WOLF_WINDHAWK:
+    if (view == W_BOW) {
       result = true;
     }
     break;
@@ -1132,6 +1153,11 @@ const char* CSession::GetWeaponClassName(int item) {
   return "";
 }
 
+// INLINED
+static const std::string SexNameOf(int sex) {
+  return g_session.GetSexName(sex);
+}
+
 // OFFSET: 0x00BAD420
 // FUNCTION: fn_19759
 std::string EquipmentResourceMgr::GetWeaponResourceName(int type, int job, int sex, int weapon, int weaponItem, int costume) {
@@ -1140,17 +1166,18 @@ std::string EquipmentResourceMgr::GetWeaponResourceName(int type, int job, int s
   std::string sexName("");
   std::string weaponName("");
 
-  const int spriteJob = g_session.GetSpriteJob(job > 31 ? job + 3950 : job, costume, true);
+  const int spriteJob = g_session.GetSpriteJob(job > JT_MAX_BASIC ? job + 3950 : job, costume, true);
   jobName = g_session.m_jobSpriteNames[spriteJob];
-  sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
+  sexName = SexNameOf(sex);
 
   if (weaponItem == -1) {
     weaponName = static_cast<const std::string&>(g_session.GetWeaponName(weapon));
     result = static_cast<const std::string&>(this->GetBodyRacePrefix(spriteJob)) +
       static_cast<const std::string&>(FormatOwnedString("\\%s_%s%s.%s", jobName.c_str(), sexName.c_str(), weaponName.c_str(), g_equipmentResourceExtensions[type]));
   } else {
+    const char* const className = g_session.GetWeaponClassName(weaponItem);
     result = static_cast<const std::string&>(this->GetBodyRacePrefix(spriteJob + 3950)) +
-      static_cast<const std::string&>(FormatOwnedString("\\%s_%s%s.%s", jobName.c_str(), sexName.c_str(), g_session.GetWeaponClassName(weaponItem), g_equipmentResourceExtensions[type]));
+      static_cast<const std::string&>(FormatOwnedString("\\%s_%s%s.%s", jobName.c_str(), sexName.c_str(), className, g_equipmentResourceExtensions[type]));
   }
 
   return result;
@@ -1165,9 +1192,9 @@ std::string EquipmentResourceMgr::GetWeaponEffectResourceName(int type, int job,
   std::string weaponName("");
   const char* const effects[] = {"_검광", "_발광"};
 
-  const int spriteJob = g_session.GetSpriteJob(job > 31 ? job + 3950 : job, costume, true);
+  const int spriteJob = g_session.GetSpriteJob(job > JT_MAX_BASIC ? job + 3950 : job, costume, true);
   jobName = g_session.m_jobSpriteNames[spriteJob];
-  sexName = static_cast<const std::string&>(g_session.GetSexName(sex));
+  sexName = SexNameOf(sex);
   weaponName = static_cast<const std::string&>(g_session.GetWeaponName(weapon));
 
   const char* const suffix = effects[effect];
@@ -1175,8 +1202,9 @@ std::string EquipmentResourceMgr::GetWeaponEffectResourceName(int type, int job,
     result = static_cast<const std::string&>(this->GetBodyRacePrefix(spriteJob)) +
       static_cast<const std::string&>(FormatOwnedString("\\%s_%s%s%s.%s", jobName.c_str(), sexName.c_str(), weaponName.c_str(), suffix, g_equipmentResourceExtensions[type]));
   } else {
+    const char* const className = g_session.GetWeaponClassName(weaponItem);
     result = static_cast<const std::string&>(this->GetBodyRacePrefix(spriteJob)) +
-      static_cast<const std::string&>(FormatOwnedString("\\%s_%s%s%s.%s", jobName.c_str(), sexName.c_str(), g_session.GetWeaponClassName(weaponItem), suffix, g_equipmentResourceExtensions[type]));
+      static_cast<const std::string&>(FormatOwnedString("\\%s_%s%s%s.%s", jobName.c_str(), sexName.c_str(), className, suffix, g_equipmentResourceExtensions[type]));
   }
 
   return result;
@@ -1214,7 +1242,7 @@ bool CSession::IsVisibleJob(int job) const {
 
 // OFFSET: 0x00E19230
 // FUNCTION: fn_23836
-std::string GetJobTitleString(int job) {
+std::string CSession::GetJobTitleString(int job) {
   const char* title = nullptr;
 
   if (g_session.m_hotkeyScript->Call("GetTitleString", "d>s", job, &title)) {
@@ -1240,14 +1268,14 @@ __declspec(noinline) int CSession::GetWeaponViewValue(int weapon) const {
 // FUNCTION: fn_23898
 int CSession::GetDualWieldWeaponType(int first, int second) const {
   int main = first;
-  int result = 0;
+  int result = W_FIST;
   int sub;
 
   if (first == 0) {
     main = second;
 
     if (second == 0) {
-      return result;
+      goto finished;
     }
 
     sub = 0;
@@ -1256,42 +1284,43 @@ int CSession::GetDualWieldWeaponType(int first, int second) const {
   }
 
   if (main >= 1100 && main < 1150 || main >= 13400 && main < 13500 || static_cast<unsigned>(main - 500000) <= 0x270F) {
-    result = 2;
+    result = W_1HSWORD;
 
     if (sub >= 1100 && sub < 1150 || sub >= 13400 && sub < 13500 || static_cast<unsigned>(sub - 500000) <= 0x270F) {
-      return 26;
+      return W_DOUBLE_SS;
     } else if (sub >= 1200 && sub < 1250 || sub >= 13000 && sub < 13100 || sub >= 28700 && sub < 28900 ||
       static_cast<unsigned>(sub - 510000) <= 0x270F) {
-      return 28;
+      return W_DOUBLE_DS;
     } else if (sub >= 1300 && sub < 1350 || static_cast<unsigned>(sub - 520000) <= 0x270F) {
-      return 30;
+      return W_DOUBLE_SA;
     }
   } else if (main >= 1200 && main < 1250 || main >= 13000 && main < 13100 || main >= 28700 && main < 28900 ||
     static_cast<unsigned>(main - 510000) <= 0x270F) {
-    result = 1;
+    result = W_DAGGER;
 
     if (sub >= 1100 && sub < 1150 || sub >= 13400 && sub < 13500 || static_cast<unsigned>(sub - 500000) <= 0x270F) {
-      return 28;
+      return W_DOUBLE_DS;
     } else if (sub >= 1200 && sub < 1250 || sub >= 13000 && sub < 13100 || sub >= 28700 && sub < 28900 ||
       static_cast<unsigned>(sub - 510000) <= 0x270F) {
-      return 25;
+      return W_DOUBLE_DD;
     } else if (sub >= 1300 && sub < 1350 || static_cast<unsigned>(sub - 520000) <= 0x270F) {
-      return 29;
+      return W_DOUBLE_DA;
     }
   } else if (main >= 1300 && main < 1350 || static_cast<unsigned>(main - 520000) <= 0x270F) {
-    result = 6;
+    result = W_1HAXE;
 
     if (sub >= 1300 && sub < 1350 || static_cast<unsigned>(sub - 520000) <= 0x270F) {
-      return 27;
+      return W_DOUBLE_AA;
     }
   }
 
+finished:
   return result;
 }
 
 // OFFSET: 0x00E25970
 // FUNCTION: fn_23906
-bool ResetHotkeySlots() {
+bool CSession::ResetHotkeySlots() {
   g_session.m_hotkeyScript->Call("ResetTheHotKey", "dddd", 1, 132, 192, 18);
   return g_session.m_hotkeyScript->Call("ResetTheHotKey", "dddd", 1, 135, 36, 18);
 }
@@ -1361,13 +1390,13 @@ int CSession::GetBattleFieldMode() const {
 // OFFSET: 0x00E1D970
 // FUNCTION: fn_23855
 bool CSession::IsShadowItemType(int type) const {
-  return type == 18;
+  return type == TYPE_CASH_POINT_ITEM;
 }
 
 // OFFSET: 0x00E1D980
 // FUNCTION: fn_23856
 bool CSession::IsConsumableItemType(int type) const {
-  if (type == 0 || type == 1 || type == 2 || type == 18) {
+  if (type == TYPE_HEAL || type == TYPE_SCHANGE || type == TYPE_SPECIAL || type == TYPE_CASH_POINT_ITEM) {
     return true;
   }
   return false;
@@ -1471,7 +1500,7 @@ int CSession::GetMapProperty0F() const {
 // OFFSET: 0x00E1DB20
 // FUNCTION: fn_23868
 bool CSession::IsEquipItemType(int type) const {
-  if (type == 4 || type == 11 || type == 12 || type == 13 || type == 14 || type == 5 || type == 8 || type == 9 || type == 15) {
+  if (type == TYPE_ARMOR || type == TYPE_ARMORTM || type == TYPE_ARMORTB || type == TYPE_ARMORMB || type == TYPE_ARMORTMB || type == TYPE_WEAPON || type == TYPE_BOW || type == TYPE_BOTHHAND || type == TYPE_GUN) {
     return true;
   }
   return false;
@@ -1480,7 +1509,7 @@ bool CSession::IsEquipItemType(int type) const {
 // OFFSET: 0x00E1DB60
 // FUNCTION: fn_23869
 bool CSession::IsMiscItemType(int type) const {
-  if (type == 6 || type == 3 || type == 7 || type == 10 || type == 16 || type == 17 || type == 19) {
+  if (type == TYPE_CARD || type == TYPE_EVENT || type == TYPE_PETEGG || type == TYPE_ARROW || type == TYPE_AMMO || type == TYPE_THROWWEAPON || type == TYPE_CANNONBALL) {
     return true;
   }
   return false;
@@ -1596,14 +1625,14 @@ int CSession::SetPairValue(int value, int slot) {
 
 // OFFSET: 0x00E25F20
 // FUNCTION: fn_23911
-int CSession::SetHotkeyEntry(char enabled, int id, int value, int slot) {
+void CSession::SetHotkeyEntry(char enabled, int id, int value, int slot) {
   for (int index = 0; index < 2; ++index) {
     NormalItemSlot& entry = this->SkillHotkey(index);
 
     if (id == static_cast<int>(entry.itemId) && value == entry.value && enabled == static_cast<char>(entry.enabled) ||
       !CSkillInfo::UsesLevel(static_cast<int>(entry.itemId)) && id == static_cast<int>(entry.itemId)) {
       entry.enabled = 0;
-      entry.itemId = 0;
+      entry.itemId = ITEMID_NONE;
       entry.value = 0;
       g_modeMgr.GetGameMode()->SendMsg(MM_SHORTCUT_KEY_CHANGE, index + 36, 0, 0, 0);
     }
@@ -1616,15 +1645,15 @@ int CSession::SetHotkeyEntry(char enabled, int id, int value, int slot) {
   } else {
     this->SkillHotkey(slot).value = 0;
     this->SkillHotkey(slot).enabled = 0;
-    this->SkillHotkey(slot).itemId = 0;
+    this->SkillHotkey(slot).itemId = ITEMID_NONE;
   }
 
-  return g_modeMgr.GetGameMode()->SendMsg(MM_SHORTCUT_KEY_CHANGE, slot + 36, 0, 0, 0);
+  g_modeMgr.GetGameMode()->SendMsg(MM_SHORTCUT_KEY_CHANGE, slot + 36, 0, 0, 0);
 }
 
 // OFFSET: 0x00E26030
 // FUNCTION: fn_23912
-int CSession::SetFlag(char value) {
+int CSession::SetFlag(int value) {
   const int result = value & 1;
   this->cachedSex = result;
   this->currentSex = result;
@@ -1633,7 +1662,7 @@ int CSession::SetFlag(char value) {
 
 // OFFSET: 0x00DFB490
 // FUNCTION: fn_23582
-bool IsScreenShakeActive() {
+bool CSession::IsScreenShakeActive() {
   return g_screenShakeDuration != 0 && g_screenShakeMode == 2;
 }
 
@@ -1813,50 +1842,35 @@ public:
   /* 0044 */ std::vector<CEquipmentAttachable> m_attachables;
   /* 0050 */ std::list<CEquipmentProperties*> m_children;
 };
-
-class CEquipmentPropertiesMgr {
-public:
-  virtual ~CEquipmentPropertiesMgr();
-  /* 0004 */ unsigned char padding_0004[0x9];
-  /* 000D */ bool m_dirty;
-  /* 000E */ unsigned char padding_000E[0x12];
-  /* 0020 */ UIWindow* observerWindow;
-  /* 0024 */ std::unordered_map<int, CEquipmentWearable*> properties1;
-  /* 0044 */ unsigned char padding_0044[0x1B8];
-
-  CEquipmentPropertiesMgr();
-  CEquipmentWearable* FindProperty1(const int& key);
-  void UnequipItem(const int& itemId, bool notify);
-  void UnequipWearable(const int& location);
-};
 }
 
 // OFFSET: 0x00E24B30
 // FUNCTION: fn_23899
 bool CSession::UnequipCostumeItem(int location) {
-  if (location == 0x8000) {
+  if (location == EQP_AMMO) {
     this->SetEquippedArrowIndex(0);
   } else {
     const EquipSlots slots = g_session.GetEquipSlots(location);
-    if (slots.values[2] < 10) {
+    const int slot = std::get<0>(slots);
+    if (slot < 10) {
       ITEM_INFO* const items = this->costumeItems;
-      if (slots.values[2] != -1) {
+      if (slot != -1) {
         const char* message = LookupMessage(MSI_ITEM_IS_REMOVED);
-        ITEM_INFO& item = items[slots.values[2]];
+        ITEM_INFO& item = items[slot];
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(FormatOwnedString("%s%s", item.DisplayName(0).c_str(), message).c_str()),
           0xFF, 7, 0, 0);
         item.identity[3] = 0;
         this->AddInventoryItem(item, 1);
         item.Reset();
       }
-      if (slots.values[1] != -1 && slots.values[1] < 10) {
-        items[slots.values[1]].Reset();
+      if (std::get<1>(slots) != -1 && std::get<1>(slots) < 10) {
+        items[std::get<1>(slots)].Reset();
       }
-      if (slots.values[0] != -1 && slots.values[0] < 10) {
-        items[slots.values[0]].Reset();
+      if (std::get<2>(slots) != -1 && std::get<2>(slots) < 10) {
+        items[std::get<2>(slots)].Reset();
       }
     }
-    RequestBasicInfoRefresh();
+    this->RequestBasicInfoRefresh();
   }
 
   this->InvalidateWindowFrames();
@@ -1873,8 +1887,8 @@ bool CSession::UnequipCostumeItem(int location) {
 // OFFSET: 0x00E1E250
 // FUNCTION: fn_45483
 bool LaunchLuaSkillEffect(int skillId, int level, CGameActor* source, CGameActor* target) {
-  const vector3d& position = source != nullptr ? source->render.position : vector3d{0.0f, 0.0f, 0.0f};
   const std::uint32_t sourceId = source != nullptr ? source->render.accountId : 0;
+  const vector3d& position = source != nullptr ? source->render.position : vector3d{0.0f, 0.0f, 0.0f};
   const std::uint32_t targetId = target != nullptr ? target->render.accountId : 0;
 
   bool hasInfo = false;
@@ -2115,7 +2129,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
   case AC_SHOWER: {
     CGameMode* mode = g_modeMgr.GetGameMode();
     vector3d* sourcePosition = &source->render.position;
-    mode->SpawnArrowEffect64(sourcePosition, &target->render.position, 18.0f);
+    mode->SpawnArrowEffectToPosition(sourcePosition, &target->render.position, 18.0f);
     int column;
     int row;
     mode->WorldCell(target->render.position.x, target->render.position.z, column, row);
@@ -2128,7 +2142,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
       position.x = x;
       position.y = mode->scene->terrain->Height(x, z);
       position.z = z;
-      mode->SpawnArrowEffect64(sourcePosition, &position, 18.0f);
+      mode->SpawnArrowEffectToPosition(sourcePosition, &position, 18.0f);
     }
     break;
   }
@@ -2271,7 +2285,7 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
   case CR_ACIDDEMONSTRATION: {
     CGameMode* mode = g_modeMgr.GetGameMode();
     vector3d position = target->render.position;
-    mode->LaunchDummyEffect(&position, 0x219, 100, 0);
+    mode->LaunchDummyEffect(&position, EF_ACIDDEMON, 100, 0);
     break;
   }
   case NJ_SYURIKEN:
@@ -2521,8 +2535,8 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     target->LaunchEffect(EF_DANCE_BLADE_ATK, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     break;
   case NPC_DARKPIERCING: {
-    CRagEffect* first = target->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-    CRagEffect* second = target->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    CRagEffect* first = source->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    CRagEffect* second = source->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (first) {
       vector3d position = source->render.position;
       first->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -2578,23 +2592,23 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     int effectId = 0;
     if (angle >= 0.0f && angle < 23.0f) {
-      effectId = 0x527;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_06;
     } else if (angle >= 23.0f && angle < 67.0f) {
-      effectId = 0x526;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_05;
     } else if (angle >= 67.0f && angle < 112.0f) {
-      effectId = 0x525;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_03;
     } else if (angle >= 112.0f && angle < 157.0f) {
-      effectId = 0x524;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_01;
     } else if (angle >= 157.0f && angle < 202.0f) {
-      effectId = 0x523;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_00;
     } else if (angle >= 202.0f && angle < 247.0f) {
-      effectId = 0x52A;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_11;
     } else if (angle >= 247.0f && angle < 292.0f) {
-      effectId = 0x529;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_09;
     } else if (angle >= 292.0f && angle < 337.0f) {
-      effectId = 0x528;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_07;
     } else if (angle >= 337.0f && angle <= 360.0f) {
-      effectId = 0x527;
+      effectId = EF_NEW_CROSSRIPPERSLASHER_06;
     }
     if (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF)) {
       effectId += 0xA3;
@@ -2662,13 +2676,13 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     int effectId;
     if (angle > 0.0f && angle < 90.0f) {
-      effectId = 0x66E;
+      effectId = EF_NEW_AIMEDBOLT_05;
     } else if (angle >= 90.0f && angle < 180.0f) {
-      effectId = 0x66D;
+      effectId = EF_NEW_AIMEDBOLT_01;
     } else if (angle >= 180.0f && angle < 270.0f) {
-      effectId = 0x670;
+      effectId = EF_NEW_AIMEDBOLT_11;
     } else {
-      effectId = 0x66F;
+      effectId = EF_NEW_AIMEDBOLT_07;
     }
     g_effectMgr->Spawn(source->render.accountId, effectId, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
@@ -2871,13 +2885,13 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     int effectId;
     if (angle > 0.0f && angle < 90.0f) {
-      effectId = 0x55E;
+      effectId = EF_NEW_BANISHINGPOINT_05;
     } else if (angle >= 90.0f && angle < 180.0f) {
-      effectId = 0x55D;
+      effectId = EF_NEW_BANISHINGPOINT_01;
     } else if (angle >= 180.0f && angle < 270.0f) {
-      effectId = 0x560;
+      effectId = EF_NEW_BANISHINGPOINT_11;
     } else {
-      effectId = 0x55F;
+      effectId = EF_NEW_BANISHINGPOINT_07;
     }
     const int duration = static_cast<int>(source->render.speed * 100.0f + 100.0f);
     CEffect* spawned;
@@ -2922,23 +2936,23 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     int effectId = 0;
     if (angle >= 0.0f && angle < 23.0f) {
-      effectId = 0x57C;
+      effectId = EF_NEW_CANNON_SPEAR_06;
     } else if (angle >= 23.0f && angle < 67.0f) {
-      effectId = 0x57B;
+      effectId = EF_NEW_CANNON_SPEAR_05;
     } else if (angle >= 67.0f && angle < 112.0f) {
-      effectId = 0x57A;
+      effectId = EF_NEW_CANNON_SPEAR_03;
     } else if (angle >= 112.0f && angle < 157.0f) {
-      effectId = 0x579;
+      effectId = EF_NEW_CANNON_SPEAR_01;
     } else if (angle >= 157.0f && angle < 202.0f) {
-      effectId = 0x578;
+      effectId = EF_NEW_CANNON_SPEAR_12;
     } else if (angle >= 202.0f && angle < 247.0f) {
-      effectId = 0x57F;
+      effectId = EF_NEW_CANNON_SPEAR_11;
     } else if (angle >= 247.0f && angle < 292.0f) {
-      effectId = 0x57E;
+      effectId = EF_NEW_CANNON_SPEAR_09;
     } else if (angle >= 292.0f && angle < 337.0f) {
-      effectId = 0x57D;
+      effectId = EF_NEW_CANNON_SPEAR_07;
     } else if (angle >= 337.0f && angle <= 360.0f) {
-      effectId = 0x57C;
+      effectId = EF_NEW_CANNON_SPEAR_06;
     }
     if (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF)) {
       if (!g_effectMgr->Find(source->render.accountId, EF_MINEFFECT_CANNON_SPEAR_BOTTOM)) {
@@ -3106,13 +3120,13 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     }
     int effectId;
     if (angle > 0.0f && angle < 90.0f) {
-      effectId = 0x6A5;
+      effectId = EF_NEW_POWERSWING_11;
     } else if (angle >= 90.0f && angle < 180.0f) {
-      effectId = 0x6A4;
+      effectId = EF_NEW_POWERSWING_07;
     } else if (angle >= 180.0f && angle < 270.0f) {
-      effectId = 0x6A3;
+      effectId = EF_NEW_POWERSWING_05;
     } else {
-      effectId = 0x6A2;
+      effectId = EF_NEW_POWERSWING_01;
     }
     g_effectMgr->Spawn(target->render.accountId, effectId, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     g_effectMgr->Spawn(target->render.accountId, EF_NEW_POWERSWING_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);

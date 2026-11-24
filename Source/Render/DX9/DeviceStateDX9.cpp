@@ -175,7 +175,7 @@ void ScopedDeviceStateDX9::Save() {
 
 // OFFSET: 0x005516A0
 // FUNCTION: fn_01998
-ScopedDeviceStateDX9::~ScopedDeviceStateDX9() {
+void ScopedDeviceStateDX9::Restore() {
   for (int state = 0; state < 210; ++state) {
     if (this->m_render[state] != this->m_state->render[state]) {
       this->m_state->SetRenderState(static_cast<D3DRENDERSTATETYPE>(state), this->m_render[state]);
@@ -184,8 +184,9 @@ ScopedDeviceStateDX9::~ScopedDeviceStateDX9() {
 
   for (int stage = 0; stage < 2; ++stage) {
     for (int state = 0; state < 33; ++state) {
-      if (this->m_textureStage[stage][state] != this->m_state->textureStage[stage][state]) {
-        this->m_state->SetTextureStageState(stage, static_cast<D3DTEXTURESTAGESTATETYPE>(state), this->m_textureStage[stage][state]);
+      const DWORD saved = this->m_textureStage[stage][state];
+      if (saved != this->m_state->textureStage[stage][state]) {
+        this->m_state->SetTextureStageState(stage, static_cast<D3DTEXTURESTAGESTATETYPE>(state), saved);
       }
     }
 

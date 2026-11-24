@@ -1,4 +1,5 @@
 #include "Client/Mode/CGameMode.h"
+#include "Contents/Jobs/JobId.h"
 #include "UI/GameSettings/TalkType.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Actors/ActorEnums.h"
@@ -51,7 +52,6 @@
 #include "UI/Text/UINameBalloonText.h"
 
 #include <algorithm>
-#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -66,16 +66,9 @@ HANDLE hObject;
 // GLOBAL: gl_24757
 std::vector<DeferredWorldModel> g_deferredWorldModels;
 
-template __declspec(noinline) void std::list<std::uint32_t>::push_back(const std::uint32_t&);
-
-// OFFSET: 0x00AC8220
-// FUNCTION: fn_17667
-CGameActor* CWorld::GetGameActorByAidIncludeMe(std::uint32_t aid) const {
-  if (aid == g_session.m_aid) {
-    return this->player;
-  }
-
-  for (auto it = this->actors.begin(); it != this->actors.end(); ++it) {
+// INLINED
+static CGameActor* FindActorByAid(const std::list<CGameActor*>& actors, std::uint32_t aid) {
+  for (auto it = actors.begin(); it != actors.end(); ++it) {
     CGameActor* actor = *it;
 
     if (actor->render.accountId == aid) {
@@ -84,6 +77,16 @@ CGameActor* CWorld::GetGameActorByAidIncludeMe(std::uint32_t aid) const {
   }
 
   return nullptr;
+}
+
+// OFFSET: 0x00AC8220
+// FUNCTION: fn_17667
+CGameActor* CWorld::GetGameActorByAidIncludeMe(std::uint32_t aid) const {
+  if (aid == g_session.m_aid) {
+    return this->player;
+  }
+
+  return FindActorByAid(this->actors, aid);
 }
 
 // OFFSET: 0x00ACA4E0
@@ -134,6 +137,19 @@ void CWorld::OnExitFrame() {
   g_texMgr.ClearUnused();
 }
 
+// OFFSET: 0x00ACA2B0
+// FUNCTION: fn_46302
+__forceinline bool CWorld::RemoveActor(CGameObject* object) {
+  auto it = std::find(this->actors.begin(), this->actors.end(), object);
+  if (it == this->actors.end()) {
+    return false;
+  }
+  this->RemovePcPos((*it)->render.accountId, true);
+  this->RemovePcPosForMove((*it)->render.accountId, true);
+  this->actors.erase(it);
+  return true;
+}
+
 // OFFSET: 0x00AC9F10
 // FUNCTION: fn_17688
 void CWorld::OnProcess() {
@@ -141,16 +157,16 @@ void CWorld::OnProcess() {
     this->movies->Update();
   }
 
-  std::atomic_ref<long> pending(this->pending);
-  const int ready = pending.load(std::memory_order_acquire);
+  const int ready = this->pending;
   if (ready != 0) {
     const int end = this->published + ready;
+    WorldSpatialTree& root = this->spatial;
     while (this->published < end) {
       C3dActor& model = *this->models[this->published];
       for (int index = 0; index < 4; ++index) {
-        WorldSpatialTree* child = this->spatial.children[index];
-        if (model.oriented.Intersects(child->minimum)) {
-          child->InsertModel(model, 1);
+        WorldSpatialTree* child = root.children[index];
+        if (IntersectsBounds(model.oriented, child->minimum)) {
+          child->InsertModel(&model, 1);
         }
       }
 
@@ -161,24 +177,13 @@ void CWorld::OnProcess() {
 
   auto objectEntry = this->objects.begin();
   while (objectEntry != this->objects.end()) {
-    CGameObject* object = *objectEntry;
-    if (object->OnProcess()) {
+    if (!(*objectEntry)->OnProcess()) {
+      this->RemoveActor(*objectEntry);
+      delete *objectEntry;
+      objectEntry = this->objects.erase(objectEntry);
+    } else {
       ++objectEntry;
-      continue;
     }
-
-    for (auto actorEntry = this->actors.begin(); actorEntry != this->actors.end(); ++actorEntry) {
-      if (*actorEntry == object) {
-        this->RemovePcPos((*actorEntry)->render.accountId, true);
-        this->RemovePcPosForMove((*actorEntry)->render.accountId, true);
-
-        this->actors.erase(actorEntry);
-        break;
-      }
-    }
-
-    delete *objectEntry;
-    objectEntry = this->objects.erase(objectEntry);
   }
 
   for (auto idEntry = this->pendingActorIds.begin(); idEntry != this->pendingActorIds.end(); ++idEntry) {
@@ -299,12 +304,23 @@ void CGameMode::SpawnArrowEffect(const vector3d* source, std::uint32_t target, f
 
 // OFFSET: 0x00CD80C0
 // FUNCTION: fn_21299
-void CGameMode::SpawnArrowEffect64(const vector3d* source, const vector3d* target, float speed) {
+void CGameMode::SpawnArrowEffectToPosition(const vector3d* source, const vector3d* target, float speed) {
   CArrowEffect* effect = new CArrowEffect;
 
   if (effect) {
     this->scene->objects.push_back(effect);
     effect->SendMsg(nullptr, AM_SETPOS2, reinterpret_cast<int>(source), reinterpret_cast<int>(target), reinterpret_cast<int>(&speed), 0, 0, 0);
+  }
+}
+
+// OFFSET: 0x00CD8580
+// FUNCTION: fn_46329
+void CGameMode::SpawnBlowEffect(float x, float y, float z) {
+  CBlowEffect* effect = new CBlowEffect;
+  if (effect) {
+    this->scene->objects.push_back(effect);
+    vector3d position{x, y, z};
+    effect->SendMsg(nullptr, AM_SETPOS, reinterpret_cast<std::intptr_t>(&position), 0, 0, 0, 0, 0);
   }
 }
 
@@ -411,7 +427,7 @@ __declspec(safebuffers) bool CGameMode::LaunchTargetEffect(int effectId, CGameAc
       effect->effectArgument = argument;
     }
 
-    if (effectId == 539) {
+    if (effectId == EF_THROWITEM4) {
       g_effectMgr->Spawn(source->render.accountId, EF_THROWITEM4_1, source->render.position,
                          target->render.accountId, -1, 0, 0);
     }
@@ -419,16 +435,15 @@ __declspec(safebuffers) bool CGameMode::LaunchTargetEffect(int effectId, CGameAc
   }
 
   CRagEffect* effect = source->LaunchEffect(effectId, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-  if (!effect) {
-    return false;
+  if (effect) {
+    vector3d position = target->render.position;
+    effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
+    if (argument != -1) {
+      effect->SendMsg(nullptr, AM_SETCOUNT, 0, argument, 0, 0, 0, 0);
+    }
+    return true;
   }
-
-  vector3d position = target->render.position;
-  effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
-  if (argument != -1) {
-    effect->SendMsg(nullptr, AM_SETCOUNT, 0, argument, 0, 0, 0, 0);
-  }
-  return true;
+  return false;
 }
 
 // OFFSET: 0x00CD7800
@@ -445,10 +460,9 @@ void CGameMode::UpdateNameBalloon(CGameActor* actor) {
   }
 
   if (actor->hasHp == 1 && (this->scene->isPKZone == 1 || this->scene->isSiegeMode == 1)) {
-    card.name = "??????";
+    card.SetName("??????");
   } else {
-    const std::string name = this->nameCard.Name(actor->render.accountId);
-    card.name = name;
+    card.SetName(this->nameCard.Name(actor->render.accountId));
   }
 
   if (g_session.IsMonsterActor(actor) == 1) {
@@ -487,23 +501,28 @@ void CGameMode::UpdateNameBalloon(CGameActor* actor) {
     this->nameBalloon->SetIcon(FormatOwnedString("유저인터페이스\\group\\group_%d.bmp", card.groupIconId).c_str(), 0);
   } else if (actor->GetGdid() && showEmblem) {
     const unsigned char framedEmblem = g_serviceOptions.Get(TT_EMBLEM_FRAME_ON_OFF);
-    std::string emblem = g_guildMgr->GetEmblemFilename(actor->GetGdid());
-    const unsigned char framed = g_modeMgr.GetGameMode()->scene->isSiegeMode == 1 && framedEmblem ? 1 : 0;
-    this->nameBalloon->SetIcon(emblem.c_str(), framed);
-  } else if (this->scene->player == actor) {
-    char path[256];
-    std::memset(path, 0, sizeof(path));
-    if (g_clanInfo->m_hasClan == true && g_clanInfo->m_clanId) {
-      StringFormat(path, sizeof(path), static_cast<std::size_t>(-1), "유저인터페이스\\clan_system\\clan_emblem%02d.bmp", g_clanInfo->m_clanId);
+    CGuildMgr* guildMgr = g_guildMgr;
+    std::string emblem = guildMgr->GetEmblemFilename(actor->GetGdid());
+    if (g_modeMgr.GetGameMode()->scene->isSiegeMode == 1 && framedEmblem) {
+      this->nameBalloon->SetIcon(emblem.c_str(), 1);
+    } else {
+      this->nameBalloon->SetIcon(emblem.c_str(), 0);
     }
-    this->nameBalloon->SetIcon(path, 0);
-  } else if (actor->hasSp) {
-    char path[256];
-    std::memset(path, 0, sizeof(path));
-    std::sprintf(path, "유저인터페이스\\clan_system\\clan_emblem%02d.bmp", actor->spGaugeValue);
-    this->nameBalloon->SetIcon(path, 0);
   } else {
-    this->nameBalloon->SetIcon("", 0);
+    char path[256];
+    const char* icon = "";
+    if (this->scene->player == actor) {
+      std::memset(path, 0, sizeof(path));
+      if (g_clanInfo->m_hasClan == true && g_clanInfo->m_clanId) {
+        StringFormat(path, sizeof(path), static_cast<std::size_t>(-1), "유저인터페이스\\clan_system\\clan_emblem%02d.bmp", g_clanInfo->m_clanId);
+      }
+      icon = path;
+    } else if (actor->hasSp) {
+      std::memset(path, 0, sizeof(path));
+      std::sprintf(path, "유저인터페이스\\clan_system\\clan_emblem%02d.bmp", actor->spGaugeValue);
+      icon = path;
+    }
+    this->nameBalloon->SetIcon(icon, 0);
   }
 
   UINameBalloonText* balloon = this->nameBalloon;
@@ -566,7 +585,7 @@ void CGameMode::ShowGuildEmblem(CGameActor* actor, int guildId, int unused) {
   }
 
   if (!IsAdminAccount(g_session.m_aid)) {
-    if (StateFlag02(actor->GetStateFlags()) || StateFlag01(actor->GetStateFlags()) || StateFlag06(actor->GetStateFlags())) {
+    if (IsCloaking(actor->GetStateFlags()) || IsHiding(actor->GetStateFlags()) || IsInvisible(actor->GetStateFlags())) {
       return;
     }
   }
@@ -580,7 +599,7 @@ void CGameMode::ShowGuildEmblem(CGameActor* actor, int guildId, int unused) {
 
 // OFFSET: 0x00CD8950
 // FUNCTION: fn_21303
-CMsgEffect* CGameMode::SpawnCashEmotion(int aid, int packId, int emotionId, std::uint32_t duration) {
+CMsgEffect* CGameMode::SpawnCashEmotion(const vector3d* position, int packId, int emotionId, std::uint32_t duration) {
   CashEmotionData* data = g_cashEmotionMgr->GetEmotionData(packId, emotionId);
   if (!data) {
     return nullptr;
@@ -600,7 +619,7 @@ CMsgEffect* CGameMode::SpawnCashEmotion(int aid, int packId, int emotionId, std:
     }
 
     effect->SendMsg(nullptr, AM_SETMASTERGID, duration, 1, 0, 0, 0, 0);
-    effect->SendMsg(nullptr, AM_SETPOS, aid, reinterpret_cast<int>(&names), data->actionIndex, 0, 0, 0);
+    effect->SendMsg(nullptr, AM_SETPOS, reinterpret_cast<int>(position), reinterpret_cast<int>(&names), data->actionIndex, 0, 0, 0);
   }
 
   return effect;
@@ -637,6 +656,8 @@ void CGameMode::SpawnMandraAttack(std::uint32_t target, int job, float startFram
   }
 }
 
+template __declspec(noinline) std::string std::operator+(std::string&&, std::string&&);
+
 // OFFSET: 0x00CD8FE0
 // FUNCTION: fn_21307
 void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
@@ -652,7 +673,7 @@ void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
   UIWindow* menu;
   char text[256];
   const int job = pick->job;
-  if ((job >= 45 && job < 1000) || g_session.IsMonsterClass(job) || g_session.IsCompanionJob(job) ||
+  if ((job >= JT_WARPNPC && job < JT_MON_BEGIN) || g_session.IsMonsterClass(job) || g_session.IsCompanionJob(job) ||
       pick->kind == 4) {
     CGameActor* actor = this->scene->GetGameActorByAID(pick->accountId);
     if (actor != nullptr) {
@@ -762,7 +783,7 @@ void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
     this->menuTargetAid = pick->accountId;
 
     this->actorMenuIds.push_back(0x41);
-    menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_INVALID_MAPPROPERTY_REQUEST_USER)), 0, 0, 0);
+    menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_STORE_ASSISTANT_TRADE_FORCED_REMOVAL)), 0, 0, 0);
     menu->SendMsg(nullptr, UM_ADJUSTSIZE, 0, 0, 0, 0);
     menu->Move(g_mouse.x + 1, g_mouse.y + 1);
   } else {
@@ -770,7 +791,7 @@ void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
     if (target->hasHp == 1 && (this->scene->isPKZone == 1 || this->scene->isSiegeMode == 1)) {
       name = "??????";
     } else {
-      name = this->ActorName(pick->accountId);
+      name = static_cast<const std::string&>(this->ActorName(pick->accountId));
     }
 
     if (g_windowMgr.menuWnd != nullptr) {
@@ -789,12 +810,12 @@ void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
     }
 
     CPlayer* player = g_modeMgr.GetGameMode()->scene->player;
-    if (!StateFlag01(player->GetStateFlags()) && !StateFlag02(player->GetStateFlags())) {
+    if (!IsHiding(player->GetStateFlags()) && !IsCloaking(player->GetStateFlags())) {
       this->actorMenuIds.push_back(0x2A);
       sprintf(line, LookupMessage(MSI_REQ_VIEW_OTHERUSER), name.c_str());
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(line), 0, 0, 0);
     }
-    if (!StateFlag01(player->GetStateFlags()) && !StateFlag02(player->GetStateFlags())) {
+    if (!IsHiding(player->GetStateFlags()) && !IsCloaking(player->GetStateFlags())) {
       this->actorMenuIds.push_back(4);
       sprintf(line, LookupMessage(MSI_REQ_DEAL_WITH2), name.c_str());
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(line), 0, 0, 0);
@@ -839,15 +860,16 @@ void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
       menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ADD_TO_FRIEND_CHAR_LIST)), 0, 0, 0);
     }
     this->actorMenuIds.push_back(0x3A);
-    menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_USA_PERSONALINFO_DEATH)), 0, 0, 0);
+    menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_SEND_RODEX)), 0, 0, 0);
     menu->SendMsg(nullptr, UM_ADDBOUNDARY, 0, 0, 0, 0);
 
-    if (g_whisperBlockMgr->Contains(name)) {
+    CWhisperBlockMgr* whisperBlockMgr = g_whisperBlockMgr;
+    if (whisperBlockMgr->Contains(name)) {
       this->actorMenuIds.push_back(0xD);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GRADE_ENCHANT_ITEM_UNBREAKABLE)), 0, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_UNBLOCK_CHAT)), 0, 0, 0);
     } else {
       this->actorMenuIds.push_back(0xC);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GRADE_ENCHANT_ADDITIONAL_SOURCE_NOT_SELECT)), 0, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BLOCK_CHAT)), 0, 0, 0);
     }
 
     if (IsAdminAccount(g_session.m_aid)) {
@@ -871,7 +893,7 @@ void CGameMode::OpenActorMenu(const ActorPickInfo* pick, int handled) {
     this->menuTargetName = name;
     menu->SendMsg(nullptr, UM_ADDBOUNDARY, 0, 0, 0, 0);
     this->actorMenuIds.push_back(0x3F);
-    menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MACRO_USER_REPORT_COOLTIME)), 0xFF, 0, 0);
+    menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MACRO_USER_REPORT)), 0xFF, 0, 0);
     menu->SendMsg(nullptr, UM_ADDBOUNDARY, 0, 0, 0, 0);
 
     if (CPc* pc = dynamic_cast<CPc*>(this->scene->GetGameActorByAID(pick->accountId))) {
@@ -912,34 +934,34 @@ bool CWorld::RemoveGroundItem(std::uint32_t aid) {
 // OFFSET: 0x00ACA8A0
 // FUNCTION: fn_17697
 bool CWorld::RemoveSkill(std::uint32_t aid) {
-  for (auto entry = this->skills.begin(); entry != this->skills.end(); ++entry) {
-    if ((*entry)->skillAid == aid) {
-      CSkill* skill = *entry;
-
-      if (!skill) {
-        return false;
-      }
-
-      skill->SendMsg(nullptr, AM_DISAPPEAR, 0, 0, 0, 0, 0, 0);
-
-      if (skill->HasPendingDamage() == true) {
-        for (std::uint32_t pending : this->pendingActorIds) {
-          if (pending == aid) {
-            return false;
-          }
-        }
-
-        this->pendingActorIds.push_back(aid);
-        return false;
-      }
-
-      this->RemoveObject(skill);
-      this->skills.erase(entry);
-      return true;
-    }
+  auto entry = std::find_if(this->skills.begin(), this->skills.end(), [aid](CSkill* skill) {
+    return skill->skillAid == aid;
+  });
+  if (entry == this->skills.end()) {
+    return false;
   }
 
-  return false;
+  CSkill* skill = *entry;
+  if (!skill) {
+    return false;
+  }
+
+  skill->SendMsg(nullptr, AM_DISAPPEAR, 0, 0, 0, 0, 0, 0);
+
+  if (skill->HasPendingDamage() == true) {
+    for (std::uint32_t pending : this->pendingActorIds) {
+      if (pending == aid) {
+        return false;
+      }
+    }
+
+    this->pendingActorIds.push_back(aid);
+    return false;
+  }
+
+  this->RemoveObject(skill);
+  this->skills.erase(entry);
+  return true;
 }
 
 // OFFSET: 0x00CDA2F0
@@ -967,7 +989,7 @@ CMsgEffect* CGameMode::SpawnDamageMsgEffect(const vector3d* position, std::uint3
 // OFFSET: 0x00CDA580
 // FUNCTION: fn_21309
 CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, std::uint32_t accountId, bool visible) {
-  std::string names[2];
+  std::string names[2] = {std::string(), std::string()};
   int type = 0;
   int animation = 0;
 
@@ -975,12 +997,128 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
   case MAKETYPE_MVP_EFFECT:
     names[0] = "이팩트\\mvp.spr";
     names[1] = "이팩트\\mvp.act";
+    animation = 0;
     type = 2;
     break;
   case MAKETYPE_CART_EFFECT:
     names[0] = "이팩트\\손수레.spr";
     names[1] = "이팩트\\손수레.act";
+    animation = 0;
     type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT2:
+    names[0] = "이팩트\\손수레1.spr";
+    names[1] = "이팩트\\손수레1.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT3:
+    names[0] = "이팩트\\손수레2.spr";
+    names[1] = "이팩트\\손수레2.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT4:
+    names[0] = "이팩트\\손수레3.spr";
+    names[1] = "이팩트\\손수레3.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT5:
+    names[0] = "이팩트\\손수레4.spr";
+    names[1] = "이팩트\\손수레4.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT6:
+    names[0] = "이팩트\\슈노손수레.spr";
+    names[1] = "이팩트\\슈노손수레.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT11:
+    names[0] = "이팩트\\손수레.spr";
+    names[1] = "이팩트\\베이비손수레.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT12:
+    names[0] = "이팩트\\손수레1.spr";
+    names[1] = "이팩트\\베이비손수레1.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT13:
+    names[0] = "이팩트\\손수레2.spr";
+    names[1] = "이팩트\\베이비손수레2.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT14:
+    names[0] = "이팩트\\손수레3.spr";
+    names[1] = "이팩트\\베이비손수레3.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT15:
+    names[0] = "이팩트\\손수레4.spr";
+    names[1] = "이팩트\\베이비손수레4.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_CART_EFFECT16:
+    names[0] = "이팩트\\슈노손수레.spr";
+    names[1] = "이팩트\\베이비슈노손수레.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_WARG_EFFECT:
+    names[0] = "몬스터\\워그.spr";
+    names[1] = "몬스터\\워그.act";
+    animation = 0;
+    type = 27;
+    break;
+  case MAKETYPE_BABY_WARG_EFFECT:
+    names[0] = "몬스터\\워그.spr";
+    names[1] = "몬스터\\베이비워그.act";
+    animation = 0;
+    type = 31;
+    break;
+  case MAKETYPE_BIRD_EFFECT:
+    names[0] = "이팩트\\매.spr";
+    names[1] = "이팩트\\매.act";
+    animation = 0;
+    type = 18;
+    break;
+  case MAKETYPE_BIRD_EFFECT2:
+    names[0] = "이팩트\\매2.spr";
+    names[1] = "이팩트\\매2.act";
+    animation = 0;
+    type = 18;
+    break;
+  case MAKETYPE_BIRD_EFFECT3:
+    names[0] = "이팩트\\매.spr";
+    names[1] = "이팩트\\베이비매.act";
+    animation = 0;
+    type = 18;
+    break;
+  case MAKETYPE_BIRD_EFFECT4:
+    names[0] = "몬스터\\demon_pungus.spr";
+    names[1] = "몬스터\\demon_pungus.act";
+    animation = 0;
+    type = 18;
+    break;
+  case MAKETYPE_BIRD_EFFECT5:
+    names[0] = "몬스터\\explosion.spr";
+    names[1] = "몬스터\\explosion.act";
+    animation = 0;
+    type = 18;
+    break;
+  case MAKETYPE_BIRD_EFFECT6:
+    names[0] = "몬스터\\lude.spr";
+    names[1] = "몬스터\\lude.act";
+    animation = 0;
+    type = 18;
     break;
   case MAKETYPE_PK_EFFECT:
     names[0] = "이팩트\\emotion.spr";
@@ -991,6 +1129,7 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
   case MAKETYPE_ICE_EFFECT:
     names[0] = "이팩트\\얼음땡.spr";
     names[1] = "이팩트\\얼음땡.act";
+    animation = 0;
     type = 5;
     break;
   case MAKETYPE_ICEBREAK_EFFECT:
@@ -1002,21 +1141,25 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
   case MAKETYPE_SMOKE_EFFECT:
     names[0] = "이팩트\\smoke.spr";
     names[1] = "이팩트\\smoke.act";
+    animation = 0;
     type = 6;
     break;
   case MAKETYPE_CURSE_EFFECT:
     names[0] = "이팩트\\Status-curse.spr";
     names[1] = "이팩트\\Status-curse.act";
+    animation = 0;
     type = 7;
     break;
   case MAKETYPE_SLEEP_EFFECT:
     names[0] = "이팩트\\Status-sleep.spr";
     names[1] = "이팩트\\Status-sleep.act";
+    animation = 0;
     type = 8;
     break;
   case MAKETYPE_STUN_EFFECT:
     names[0] = "이팩트\\Status-stun.spr";
     names[1] = "이팩트\\Status-stun.act";
+    animation = 0;
     type = 9;
     break;
   case MAKETYPE_SILENCE_EFFECT:
@@ -1043,48 +1186,6 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
     animation = 2;
     type = 15;
     break;
-  case MAKETYPE_LUCKY_EFFECT:
-    names[0] = FormatOwnedString("%s.spr", g_session.GetDamageSpriteName());
-    names[1] = FormatOwnedString("%s.act", g_session.GetDamageSpriteName());
-    animation = 3;
-    type = 17;
-    break;
-  case MAKETYPE_BIRD_EFFECT:
-    names[0] = "이팩트\\매.spr";
-    names[1] = "이팩트\\매.act";
-    type = 18;
-    break;
-  case MAKETYPE_CART_EFFECT2:
-    names[0] = "이팩트\\손수레1.spr";
-    names[1] = "이팩트\\손수레1.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT3:
-    names[0] = "이팩트\\손수레2.spr";
-    names[1] = "이팩트\\손수레2.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT4:
-    names[0] = "이팩트\\손수레3.spr";
-    names[1] = "이팩트\\손수레3.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT5:
-    names[0] = "이팩트\\손수레4.spr";
-    names[1] = "이팩트\\손수레4.act";
-    type = 3;
-    break;
-  case MAKETYPE_GUARD_EFFECT:
-    names[0] = FormatOwnedString("%s.spr", g_session.GetDamageSpriteName());
-    names[1] = FormatOwnedString("%s.act", g_session.GetDamageSpriteName());
-    animation = 1;
-    type = 24;
-    break;
-  case MAKETYPE_CART_EFFECT6:
-    names[0] = "이팩트\\슈노손수레.spr";
-    names[1] = "이팩트\\슈노손수레.act";
-    type = 3;
-    break;
   case MAKETYPE_BLUE_EFFECT:
     names[0] = FormatOwnedString("%s.spr", g_session.GetDamageSkinAuxiliaryName());
     if (g_session.m_damageSkinIndex == 0) {
@@ -1095,45 +1196,17 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
     animation = 2;
     type = 25;
     break;
-  case MAKETYPE_BIRD_EFFECT2:
-    names[0] = "이팩트\\매2.spr";
-    names[1] = "이팩트\\매2.act";
-    type = 18;
+  case MAKETYPE_LUCKY_EFFECT:
+    names[0] = FormatOwnedString("%s.spr", g_session.GetDamageSpriteName());
+    names[1] = FormatOwnedString("%s.act", g_session.GetDamageSpriteName());
+    animation = 3;
+    type = 17;
     break;
-  case MAKETYPE_BIRD_EFFECT3:
-    names[0] = "이팩트\\매.spr";
-    names[1] = "이팩트\\베이비매.act";
-    type = 18;
-    break;
-  case MAKETYPE_CART_EFFECT11:
-    names[0] = "이팩트\\손수레.spr";
-    names[1] = "이팩트\\베이비손수레.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT12:
-    names[0] = "이팩트\\손수레1.spr";
-    names[1] = "이팩트\\베이비손수레1.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT13:
-    names[0] = "이팩트\\손수레2.spr";
-    names[1] = "이팩트\\베이비손수레2.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT14:
-    names[0] = "이팩트\\손수레3.spr";
-    names[1] = "이팩트\\베이비손수레3.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT15:
-    names[0] = "이팩트\\손수레4.spr";
-    names[1] = "이팩트\\베이비손수레4.act";
-    type = 3;
-    break;
-  case MAKETYPE_CART_EFFECT16:
-    names[0] = "이팩트\\슈노손수레.spr";
-    names[1] = "이팩트\\베이비슈노손수레.act";
-    type = 3;
+  case MAKETYPE_GUARD_EFFECT:
+    names[0] = FormatOwnedString("%s.spr", g_session.GetDamageSpriteName());
+    names[1] = FormatOwnedString("%s.act", g_session.GetDamageSpriteName());
+    animation = 1;
+    type = 24;
     break;
   case MAKETYPE_CURSOR_EFFECT:
     names[0] = "cursors.spr";
@@ -1141,151 +1214,33 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
     animation = 10;
     type = 26;
     break;
-  case MAKETYPE_BIRD_EFFECT4:
-    names[0] = "몬스터\\demon_pungus.spr";
-    names[1] = "몬스터\\demon_pungus.act";
-    type = 18;
-    break;
-  case MAKETYPE_BIRD_EFFECT5:
-    names[0] = "몬스터\\explosion.spr";
-    names[1] = "몬스터\\explosion.act";
-    type = 18;
-    break;
-  case MAKETYPE_BIRD_EFFECT6:
-    names[0] = "몬스터\\lude.spr";
-    names[1] = "몬스터\\lude.act";
-    type = 18;
-    break;
-  case 35:
-    names[0] = "몬스터\\워그.spr";
-    names[1] = "몬스터\\워그.act";
-    type = 27;
-    break;
   case 36:
-    names[0] = "이팩트\\emotion.spr";
-    names[1] = "이팩트\\emotion.act";
-    animation = 80;
-    type = 28;
-    break;
   case 37:
-    names[0] = "이팩트\\emotion.spr";
-    names[1] = "이팩트\\emotion.act";
-    animation = 81;
-    type = 28;
-    break;
   case 38:
-    names[0] = "이팩트\\emotion.spr";
-    names[1] = "이팩트\\emotion.act";
-    animation = 82;
-    type = 29;
-    break;
   case 39:
-    names[0] = "이팩트\\emotion.spr";
-    names[1] = "이팩트\\emotion.act";
-    animation = 83;
-    type = 29;
-    break;
   case 40:
-    names[0] = "이팩트\\emotion.spr";
-    names[1] = "이팩트\\emotion.act";
-    animation = 84;
-    type = 30;
-    break;
   case 41:
     names[0] = "이팩트\\emotion.spr";
     names[1] = "이팩트\\emotion.act";
-    animation = 85;
-    type = 30;
-    break;
-  case 42:
-    names[0] = "몬스터\\워그.spr";
-    names[1] = "몬스터\\베이비워그.act";
-    type = 31;
-    break;
-  case 43:
-    names[0] = "이팩트\\shield.spr";
-    names[1] = "이팩트\\shield.act";
-    type = 32;
-    break;
-  case 44:
-    names[0] = "이팩트\\costumebody.spr";
-    names[1] = "이팩트\\costumebody.act";
-    type = 33;
-    break;
-  case 45:
-    names[0] = "이팩트\\손수레5.spr";
-    names[1] = "이팩트\\손수레5.act";
-    type = 3;
-    break;
-  case 46:
-    names[0] = "이팩트\\손수레5베이비.spr";
-    names[1] = "이팩트\\손수레5베이비.act";
-    type = 3;
-    break;
-  case 47:
-    names[0] = "이팩트\\손수레6.spr";
-    names[1] = "이팩트\\손수레6.act";
-    type = 3;
-    break;
-  case 48:
-    names[0] = "이팩트\\손수레6베이비.spr";
-    names[1] = "이팩트\\손수레6베이비.act";
-    type = 3;
-    break;
-  case 49:
-    names[0] = "이팩트\\손수레7.spr";
-    names[1] = "이팩트\\손수레7.act";
-    type = 3;
-    break;
-  case 50:
-    names[0] = "이팩트\\손수레7베이비.spr";
-    names[1] = "이팩트\\손수레7베이비.act";
-    type = 3;
-    break;
-  case 51:
-    names[0] = "이팩트\\손수레8.spr";
-    names[1] = "이팩트\\손수레8.act";
-    type = 3;
-    break;
-  case 52:
-    names[0] = "이팩트\\손수레8베이비.spr";
-    names[1] = "이팩트\\손수레8베이비.act";
-    type = 3;
-    break;
-  case 53:
-    names[0] = "이팩트\\OWL.spr";
-    names[1] = "이팩트\\OWL.act";
-    type = 18;
-    break;
-  case 54:
-    names[0] = "이팩트\\선물상자카트.spr";
-    names[1] = "이팩트\\선물상자카트.act";
-    type = 3;
-    break;
-  case 55:
-    names[0] = "이팩트\\선물상자카트_미니.spr";
-    names[1] = "이팩트\\선물상자카트_미니.act";
-    type = 3;
-    break;
-  case 56:
-    names[0] = "이팩트\\포링싣은카트.spr";
-    names[1] = "이팩트\\포링싣은카트.act";
-    type = 3;
-    break;
-  case 57:
-    names[0] = "이팩트\\포링싣은카트_미니.spr";
-    names[1] = "이팩트\\포링싣은카트_미니.act";
-    type = 3;
-    break;
-  case 58:
-    names[0] = "이팩트\\포링카트.spr";
-    names[1] = "이팩트\\포링카트.act";
-    type = 3;
-    break;
-  case 59:
-    names[0] = "이팩트\\포링카트_미니.spr";
-    names[1] = "이팩트\\포링카트_미니.act";
-    type = 3;
+    if (effectId == 36) {
+      animation = 80;
+      type = effectId - 8;
+    } else if (effectId == 37) {
+      animation = 81;
+      type = effectId - 9;
+    } else if (effectId == 38) {
+      animation = 82;
+      type = effectId - 9;
+    } else if (effectId == 39) {
+      animation = 83;
+      type = effectId - 10;
+    } else if (effectId == 40) {
+      animation = 84;
+      type = effectId - 10;
+    } else if (effectId == 41) {
+      animation = 85;
+      type = effectId - 11;
+    }
     break;
   case 60:
     names[0] = "이팩트\\emotion.spr";
@@ -1317,36 +1272,142 @@ CMsgEffect* CGameMode::SpawnMsgEffect(int effectId, const vector3d* position, st
     animation = 97;
     type = 36;
     break;
-  case 65:
+  case MAKETYPE_SHIELD_EFFECT:
+    names[0] = "이팩트\\shield.spr";
+    names[1] = "이팩트\\shield.act";
+    animation = 0;
+    type = 32;
+    break;
+  case MAKETYPE_COSTUME_BODY_EFFECT:
+    names[0] = "이팩트\\costumebody.spr";
+    names[1] = "이팩트\\costumebody.act";
+    animation = 0;
+    type = 33;
+    break;
+  case 45:
+    names[0] = "이팩트\\손수레5.spr";
+    names[1] = "이팩트\\손수레5.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 47:
+    names[0] = "이팩트\\손수레6.spr";
+    names[1] = "이팩트\\손수레6.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 49:
+    names[0] = "이팩트\\손수레7.spr";
+    names[1] = "이팩트\\손수레7.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 51:
+    names[0] = "이팩트\\손수레8.spr";
+    names[1] = "이팩트\\손수레8.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 46:
+    names[0] = "이팩트\\손수레5베이비.spr";
+    names[1] = "이팩트\\손수레5베이비.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 48:
+    names[0] = "이팩트\\손수레6베이비.spr";
+    names[1] = "이팩트\\손수레6베이비.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 50:
+    names[0] = "이팩트\\손수레7베이비.spr";
+    names[1] = "이팩트\\손수레7베이비.act";
+    animation = 0;
+    type = 3;
+    break;
+  case 52:
+    names[0] = "이팩트\\손수레8베이비.spr";
+    names[1] = "이팩트\\손수레8베이비.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_OWL_EFFECT:
+    names[0] = "이팩트\\OWL.spr";
+    names[1] = "이팩트\\OWL.act";
+    animation = 0;
+    type = 18;
+    break;
+  case MAKETYPE_GIFT_BOX_CART_EFFECT:
+    names[0] = "이팩트\\선물상자카트.spr";
+    names[1] = "이팩트\\선물상자카트.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_GIFT_BOX_CART_MINI_EFFECT:
+    names[0] = "이팩트\\선물상자카트_미니.spr";
+    names[1] = "이팩트\\선물상자카트_미니.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_PORING_LOADED_CART_EFFECT:
+    names[0] = "이팩트\\포링싣은카트.spr";
+    names[1] = "이팩트\\포링싣은카트.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_PORING_LOADED_CART_MINI_EFFECT:
+    names[0] = "이팩트\\포링싣은카트_미니.spr";
+    names[1] = "이팩트\\포링싣은카트_미니.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_PORING_CART_EFFECT:
+    names[0] = "이팩트\\포링카트.spr";
+    names[1] = "이팩트\\포링카트.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_PORING_CART_MINI_EFFECT:
+    names[0] = "이팩트\\포링카트_미니.spr";
+    names[1] = "이팩트\\포링카트_미니.act";
+    animation = 0;
+    type = 3;
+    break;
+  case MAKETYPE_MADO_CART_EFFECT:
     names[0] = "이팩트\\마도카트.spr";
     names[1] = "이팩트\\마도카트.act";
+    animation = 0;
     type = 3;
     break;
-  case 66:
+  case MAKETYPE_MADO_CART_MINI_EFFECT:
     names[0] = "이팩트\\마도카트_미니.spr";
     names[1] = "이팩트\\마도카트_미니.act";
+    animation = 0;
     type = 3;
     break;
-  case 67:
+  case MAKETYPE_LASSITUDE_EFFECT:
     names[0] = "이팩트\\emotion.spr";
     names[1] = "이팩트\\emotion.act";
     animation = 5;
     type = 37;
     break;
-  case 68:
+  case MAKETYPE_MISFORTUNE_EFFECT:
     names[0] = "이팩트\\emotion.spr";
     names[1] = "이팩트\\emotion.act";
     animation = 28;
     type = 38;
     break;
-  case 69:
+  case MAKETYPE_WINDHAWK_HAWK_EFFECT:
     names[0] = "이팩트\\WINDHAWK_HAWK.spr";
     names[1] = "이팩트\\WINDHAWK_HAWK.act";
+    animation = 0;
     type = 18;
     break;
-  case 70:
+  case MAKETYPE_WINDHAWK_WOLF_EFFECT:
     names[0] = "이팩트\\WINDHAWK_WOLF.spr";
     names[1] = "이팩트\\WINDHAWK_WOLF.act";
+    animation = 0;
     type = 27;
     break;
   default:

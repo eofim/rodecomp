@@ -54,7 +54,7 @@ void UIJobListWnd::OnCreate(int width, int height) {
     this->m_okButton->SetBitmap((path + "btn_ok_b" + ".bmp").c_str(), 2, 0);
     this->m_okButton->SetSize(this->m_okButton->BitmapWidth(), this->m_okButton->BitmapHeight());
     this->m_okButton->Move(this->geometry.width - 92, this->geometry.height - 24);
-    this->m_okButton->SetId(184);
+    this->m_okButton->SetId(ID_OK);
     this->AddChild(this->m_okButton);
   }
 
@@ -115,14 +115,19 @@ int UIJobListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     const auto end = g_partyBookingJobs.end();
     for (auto it = g_partyBookingJobs.begin(); it != end; ++it, ++index) {
       UIWindow* check = this->m_jobChecks[index];
-      std::int16_t job = -1;
-      bool enabled = false;
+      int job = -1;
+      bool enabled;
       if (check != nullptr) {
         if (check->geometry.state != 0) {
           ++selected;
           enabled = true;
-          job = static_cast<std::int16_t>(it->first);
+          job = static_cast<std::uint16_t>(it->first);
+        } else {
+          enabled = false;
+          job = -1;
         }
+      } else {
+        enabled = false;
       }
       packet.jobs[index] = job;
       it->second = enabled;
@@ -148,15 +153,17 @@ int UIJobListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
 // FUNCTION: fn_12834
 void UIJobListWnd::RefreshJobs() {
   const std::string path = "유저인터페이스\\";
-  for (int index = 0; index < 6; ++index) {
-    if (this->m_jobChecks[index]) {
-      this->RemoveChild(this->m_jobChecks[index], 1);
-      this->m_jobChecks[index] = nullptr;
+  for (int i = 0; i < 6; ++i) {
+    UICheckBox*& checkbox = this->m_jobChecks[i];
+    if (checkbox) {
+      this->RemoveChild(checkbox, 1);
+      checkbox = nullptr;
     }
   }
 
+  const auto end = g_partyBookingJobs.end();
   int index = 0;
-  for (auto it = g_partyBookingJobs.begin(); it != g_partyBookingJobs.end(); ++it, ++index) {
+  for (auto it = g_partyBookingJobs.begin(); it != end; ++it, ++index) {
     this->m_jobChecks[index] = new UICheckBox();
     this->m_jobChecks[index]->SetSize(120, 15);
     const int job = it->first;
@@ -187,3 +194,7 @@ void UIJobListWnd::RefreshJobs() {
 UIJobListWnd::UIJobListWnd()
     : UIFrameWnd(0), m_title(nullptr), m_okButton(nullptr), m_selectionState(0) {
 }
+
+// OFFSET: 0x00914170
+// FUNCTION: fn_45807
+UIJobListWnd::~UIJobListWnd() = default;

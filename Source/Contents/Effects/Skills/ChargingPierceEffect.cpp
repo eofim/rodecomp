@@ -19,6 +19,13 @@ static vector3d s_chargingPierceNewOffsets[10] = {
 };
 
 // INLINED
+static void MatrixMult(vector3d& result, const vector3d& v, const float* m) {
+  result.x = v.x * m[0] + v.y * m[3] + v.z * m[6] + m[9];
+  result.y = v.x * m[1] + v.y * m[4] + v.z * m[7] + m[10];
+  result.z = v.x * m[2] + v.y * m[5] + v.z * m[8] + m[11];
+}
+
+// INLINED
 static __forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
   if (0.0f == particle->life) {
     return true;
@@ -59,13 +66,49 @@ void CChargingPierceNewEffect::SetCount(int count) {
     }
 
     particle->Load(std::string("DRAGON_KNIGHT\\DK_CHARGINGPIERCE\\chargingpierce_cast2\\chargingpierce_cast2.str"));
-    particle->offsetX = s_chargingPierceNewOffsets[index].x;
-    particle->offsetY = s_chargingPierceNewOffsets[index].y;
-    particle->offsetZ = s_chargingPierceNewOffsets[index].z;
+    particle->offset = s_chargingPierceNewOffsets[index];
     particle->m_hold = true;
     particle->m_scale = 0.75f;
     this->emitters.push_back(particle);
   }
+}
+
+// OFFSET: 0x007036B0
+// FUNCTION: fn_46209
+__declspec(noinline) void CChargingPierceEffect::SetCount(std::uint64_t count) {
+  if (count > 10) {
+    return;
+  }
+
+  if (this->ActiveCount() > count) {
+    this->Close();
+  }
+
+  for (int index = this->ActiveCount(); index < count; ++index) {
+    if (this->sparks[index] || this->emitters[index]) {
+      continue;
+    }
+
+    CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
+    particle->Open(std::string("new_chargingpierce\\new_chargingpierce_cast\\new_chargingpierce_cast.str"));
+    this->emitters[index] = particle;
+  }
+}
+
+// OFFSET: 0x00703C70
+// FUNCTION: fn_46210
+__declspec(noinline) CEZ2STRParticle* CChargingPierceNewEffect::CreateParticle(const vector3d* position) {
+  CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(position, 5));
+  if (particle) {
+    particle->Load(std::string("DRAGON_KNIGHT\\DK_CHARGINGPIERCE\\chargingpierce_cast2\\chargingpierce_cast2.str"));
+    particle->offsetX = position->x;
+    particle->offsetY = position->y;
+    particle->offsetZ = position->z;
+    particle->m_hold = true;
+    particle->m_scale = 0.75f;
+    return particle;
+  }
+  return nullptr;
 }
 
 // OFFSET: 0x007038B0
@@ -162,12 +205,9 @@ void CChargingPierceEffect::OnProcess() {
       rotation.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
       rotation.AppendYRotation(g_modeMgr.GetGameMode()->camera->camera.yaw / 180.0f * 3.141592f);
 
-      const float x = offset.x + 0.0f;
-      const float y = height + offset.y;
-      const float z = offset.z + 0.0f;
-      const float rotatedX = y * rotation.values[3] + x * rotation.values[0] + z * rotation.values[6] + rotation.values[9];
-      const float rotatedY = y * rotation.values[4] + x * rotation.values[1] + z * rotation.values[7] + rotation.values[10];
-      const float rotatedZ = y * rotation.values[5] + x * rotation.values[2] + z * rotation.values[8] + rotation.values[11];
+      const vector3d local{offset.x + 0.0f, height + offset.y, offset.z + 0.0f};
+      vector3d rotated;
+      MatrixMult(rotated, local, rotation.values);
 
       matrix scaling;
       scaling.SetScale(spark->scale, spark->scale, 1.0f);
@@ -175,7 +215,8 @@ void CChargingPierceEffect::OnProcess() {
       billboard.MakeXRotation(g_modeMgr.GetGameMode()->camera->camera.pitch / 180.0f * 3.141592f);
       billboard.AppendYRotation(g_modeMgr.GetGameMode()->camera->camera.yaw / 180.0f * 3.141592f);
       matrix translation;
-      translation.MakeTranslate(rotatedX + this->position[0], rotatedY + this->position[1], rotatedZ + this->position[2]);
+      const vector3d moved{rotated.x + this->position[0], rotated.y + this->position[1], rotated.z + this->position[2]};
+      translation.MakeTranslate(moved.x, moved.y, moved.z);
       matrix first;
       first.Compose(scaling, billboard);
       matrix result;
@@ -192,20 +233,17 @@ void CChargingPierceEffect::OnProcess() {
           }
 
           const vector3d origin = this->positionVector;
-          const float x = origin.x;
-          const float y = origin.y;
-          const float z = origin.z;
           const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
           const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
-          const float viewZ = y * view[5] + x * view[2] + z * view[8] + view[11];
-          const float viewX = y * view[3] + x * view[0] + z * view[6] + view[9] + offset.x;
-          const float viewY = y * view[4] + x * view[1] + z * view[7] + view[10] + (height + offset.y);
-          const float worldX = viewY * inverse[3] + viewX * inverse[0] + viewZ * inverse[6] + inverse[9];
-          const float worldY = viewX * inverse[1] + viewY * inverse[4] + viewZ * inverse[7] + inverse[10];
-          const float worldZ = viewX * inverse[2] + viewY * inverse[5] + viewZ * inverse[8] + inverse[11];
-          emitter->position.x = worldX;
-          emitter->position.y = worldY;
-          emitter->position.z = worldZ;
+          vector3d viewPos;
+          MatrixMult(viewPos, origin, view);
+          viewPos.x += this->offsets[index].x;
+          viewPos.y += height + this->offsets[index].y;
+          vector3d worldPos;
+          MatrixMult(worldPos, viewPos, inverse);
+          emitter->position.x = worldPos.x;
+          emitter->position.y = worldPos.y;
+          emitter->position.z = worldPos.z;
           emitter->Process(0.0f, 0.0f, 0.0f);
           ++emitter->elapsedFrames;
         }
@@ -227,6 +265,38 @@ void CChargingPierceEffect::OnProcess() {
       }
     }
   }
+}
+
+// OFFSET: 0x00704580
+// FUNCTION: fn_46211
+__declspec(noinline) void CChargingPierceEffect::UpdateParticle(CEZ2STRParticle* particle, int index) {
+  if (!particle) {
+    return;
+  }
+
+  if (!g_modeMgr.GetGameMode()) {
+    return;
+  }
+
+  float height = -13.0f;
+  if (CGameActor* actor = static_cast<CGameActor*>(FindRenderObject(this->actor))) {
+    height = -13.0f - static_cast<float>(actor->MountType() ? 3 : 0);
+  }
+
+  const vector3d origin = this->positionVector;
+  const float* view = g_modeMgr.GetGameMode()->camera->frame.view.values;
+  const float* inverse = g_modeMgr.GetGameMode()->camera->frame.inverse.values;
+  vector3d viewPos;
+  MatrixMult(viewPos, origin, view);
+  viewPos.x += this->offsets[index].x;
+  viewPos.y += height + this->offsets[index].y;
+  vector3d worldPos;
+  MatrixMult(worldPos, viewPos, inverse);
+  particle->position.x = worldPos.x;
+  particle->position.y = worldPos.y;
+  particle->position.z = worldPos.z;
+  particle->Process(0.0f, 0.0f, 0.0f);
+  ++particle->elapsedFrames;
 }
 
 // OFFSET: 0x00704360
@@ -280,6 +350,14 @@ void CChargingPierceEffect::Render() {
 // FUNCTION: fn_07033
 void CChargingPierceNewEffect::Render() {
   for (CEZ2STRParticle* particle : this->emitters) {
+    particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
+  }
+}
+
+// OFFSET: 0x00704BF0
+// FUNCTION: fn_46212
+__declspec(noinline) void CChargingPierceNewEffect::RenderParticle(CEZ2STRParticle* particle) {
+  if (particle) {
     particle->DrawScreen(g_modeMgr.GetGameMode()->camera->frame.view);
   }
 }

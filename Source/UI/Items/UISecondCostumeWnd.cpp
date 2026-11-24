@@ -20,9 +20,11 @@
 #include "Script/LuaScript.h"
 #include "Resource/MSGSTRINGID.h"
 
-template __declspec(noinline) std::string::basic_string(const std::string&);
-// INLINED
-static int SelectedEntryValue(const std::vector<SecondCostumeEntry>& entries, const int& selected) {
+// OFFSET: 0x0094F320
+// FUNCTION: fn_45701
+int UISecondCostumeWnd::SelectedEntryValue(int tab) const {
+  const std::vector<SecondCostumeEntry>& entries = this->m_entries[tab];
+  const int& selected = this->m_selected[tab];
   if (entries.empty()) {
     return 0;
   }
@@ -32,8 +34,10 @@ static int SelectedEntryValue(const std::vector<SecondCostumeEntry>& entries, co
   return entries[selected].value;
 }
 
-// INLINED
-static int FindEntryIndex(const std::vector<SecondCostumeEntry>& entries, const int& value) {
+// OFFSET: 0x0094F3B0
+// FUNCTION: fn_45702
+int UISecondCostumeWnd::FindEntryIndex(int tab, int value) const {
+  const std::vector<SecondCostumeEntry>& entries = this->m_entries[tab];
   for (unsigned int index = 0; index < entries.size(); ++index) {
     if (entries[index].value == value) {
       return index;
@@ -50,18 +54,18 @@ void UISecondCostumeWnd::DrawCharacterPreview(int x, int y) {
   const std::uint32_t time = this->m_previewStartTime;
   const int action = this->m_page;
 
-  const int headPalette = SelectedEntryValue(this->m_entries[0], this->m_selected[0]);
+  const int headPalette = this->SelectedEntryValue(0);
 
-  const int bodyStyle = SelectedEntryValue(this->m_entries[2], this->m_selected[2]);
+  const int bodyStyle = this->SelectedEntryValue(2);
 
   const int robe = g_session.m_robe;
   const unsigned short midAccessory = static_cast<unsigned short>(g_session.m_accessory3);
   const unsigned short topAccessory = static_cast<unsigned short>(g_session.m_accessory2);
   const unsigned short bottomAccessory = static_cast<unsigned short>(g_session.m_accessory);
 
-  const unsigned short head = static_cast<unsigned short>(SelectedEntryValue(this->m_entries[1], this->m_selected[1]));
+  const unsigned short head = static_cast<unsigned short>(this->SelectedEntryValue(1));
 
-  const int body = SelectedEntryValue(this->m_entries[3], this->m_selected[3]);
+  const int body = this->SelectedEntryValue(3);
 
   FuncDrawWNDChar(
     this, x, y, static_cast<unsigned char>(g_session.GetCurrentSex()), static_cast<short>(g_session.GetDisplayJob()), g_session.GetDisplayJob(),
@@ -75,61 +79,51 @@ void UISecondCostumeWnd::DrawCharacterPreview(int x, int y) {
 void UISecondCostumeWnd::LoadLists() {
   const int job = g_session.GetDisplayJob();
   const int sex = g_session.GetCurrentSex();
+  const char* name;
+  int value;
 
   for (int index = 1;; ++index) {
-    const char* name = nullptr;
-    int value = 0;
+    name = nullptr;
+    value = 0;
     g_session.m_hotkeyScript->Call("_get_DressHeadPaletteList", "dd>sd", sex, index, &name, &value);
     if (name == nullptr) {
       break;
     }
 
-    SecondCostumeEntry entry;
-    entry.name = name;
-    entry.value = value;
-    this->m_entries[0].push_back(entry);
+    this->m_entries[0].push_back(SecondCostumeEntry(name, value));
   }
 
   for (int index = 1;; ++index) {
-    const char* name = nullptr;
-    int value = 0;
+    name = nullptr;
+    value = 0;
     g_session.m_hotkeyScript->Call("_get_Headstylelist", "dd>sd", sex, index, &name, &value);
     if (name == nullptr) {
       break;
     }
 
-    SecondCostumeEntry entry;
-    entry.name = name;
-    entry.value = value;
-    this->m_entries[1].push_back(entry);
+    this->m_entries[1].push_back(SecondCostumeEntry(name, value));
   }
 
   for (int index = 1;; ++index) {
-    const char* name = nullptr;
-    int value = 0;
+    name = nullptr;
+    value = 0;
     g_session.m_hotkeyScript->Call("_get_DressBodyPaletteList", "dd>sd", sex, index, &name, &value);
     if (name == nullptr) {
       break;
     }
 
-    SecondCostumeEntry entry;
-    entry.name = name;
-    entry.value = value;
-    this->m_entries[2].push_back(entry);
+    this->m_entries[2].push_back(SecondCostumeEntry(name, value));
   }
 
   for (int index = 1;; ++index) {
-    const char* name = nullptr;
-    int value = 0;
+    name = nullptr;
+    value = 0;
     g_session.m_hotkeyScript->Call("_get_dresslist", "ddd>sd", sex, job, index, &name, &value);
     if (name == nullptr) {
       break;
     }
 
-    SecondCostumeEntry entry;
-    entry.name = name;
-    entry.value = value;
-    this->m_entries[3].push_back(entry);
+    this->m_entries[3].push_back(SecondCostumeEntry(name, value));
   }
 
   this->SelectSavedEntries();
@@ -138,10 +132,10 @@ void UISecondCostumeWnd::LoadLists() {
 // OFFSET: 0x0094A2D0
 // FUNCTION: fn_12886
 void UISecondCostumeWnd::SelectSavedEntries() {
-  this->m_selected[0] = FindEntryIndex(this->m_entries[0], g_session.m_headPalette);
-  this->m_selected[1] = FindEntryIndex(this->m_entries[1], g_session.m_head);
-  this->m_selected[2] = FindEntryIndex(this->m_entries[2], g_session.m_bodyStyle);
-  this->m_selected[3] = FindEntryIndex(this->m_entries[3], g_session.m_bodyCostume);
+  this->m_selected[0] = this->FindEntryIndex(0, g_session.m_headPalette);
+  this->m_selected[1] = this->FindEntryIndex(1, g_session.m_head);
+  this->m_selected[2] = this->FindEntryIndex(2, g_session.m_bodyStyle);
+  this->m_selected[3] = this->FindEntryIndex(3, g_session.m_bodyCostume);
 }
 
 // OFFSET: 0x0094C5B0
@@ -155,7 +149,7 @@ void UISecondCostumeWnd::OnCreate(int width, int height) {
   this->m_list->backgroundRed = 210;
   this->m_list->backgroundGreen = 210;
   this->m_list->backgroundBlue = 210;
-  this->m_list->SetId(336);
+  this->m_list->SetId(ID_SELECT_ITEM);
   this->m_list->Move(4, 40);
   this->AddChild(this->m_list);
   this->RefreshList(this->m_tab);
@@ -167,10 +161,10 @@ void UISecondCostumeWnd::OnCreate(int width, int height) {
   this->m_typeCombo->SetBorderColor(100, 100, 100);
   this->m_typeCombo->SetColor(232, 232, 232);
   this->AddChild(this->m_typeCombo);
+  this->m_typeCombo->AddOption(LookupMessage(MSI_DRESSROOM_HEARCOLOR), 0);
+  this->m_typeCombo->AddOption(LookupMessage(MSI_DRESSROOM_HEARSTYLE), 0);
+  this->m_typeCombo->AddOption(LookupMessage(MSI_DRESSROOM_BODYCOLOR), 0);
   this->m_typeCombo->AddOption(LookupMessage(MSI_DRESSROOM_BODYSTYLE), 0);
-  this->m_typeCombo->AddOption(LookupMessage(MSI_MINIMAP_MSG_16), 0);
-  this->m_typeCombo->AddOption(LookupMessage(MSI_BANK_MAX_MONEY), 0);
-  this->m_typeCombo->AddOption(LookupMessage(MSI_BANK_MIN_MONEY), 0);
   this->m_typeCombo->Select(this->m_tab);
 
   auto* previous = new UIBitmapButton();
@@ -179,7 +173,7 @@ void UISecondCostumeWnd::OnCreate(int width, int height) {
   previous->SetBitmap("유저인터페이스\\scroll1left.bmp", 2, 0);
   previous->SetSize(previous->BitmapWidth(), previous->BitmapHeight());
   previous->Move(width - 202, 110);
-  previous->SetId(227);
+  previous->SetId(ID_LEFT);
   this->AddChild(previous);
 
   auto* next = new UIBitmapButton();
@@ -188,7 +182,7 @@ void UISecondCostumeWnd::OnCreate(int width, int height) {
   next->SetBitmap("유저인터페이스\\scroll1right.bmp", 2, 0);
   next->SetSize(next->BitmapWidth(), next->BitmapHeight());
   next->Move(width - 19, 110);
-  next->SetId(226);
+  next->SetId(ID_RIGHT);
   this->AddChild(next);
 }
 
@@ -212,7 +206,12 @@ int UISecondCostumeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, 
   case UM_COMMAND:
     switch (a) {
     case ID_LEFT:
-      this->m_page = this->m_page < 7 ? this->m_page + 1 : 0;
+      if (this->m_page >= 7) {
+        this->m_page = 0;
+      } else {
+        ++this->m_page;
+      }
+
       this->Invalidate();
       return 0;
 

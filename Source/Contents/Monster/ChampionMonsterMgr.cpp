@@ -22,10 +22,37 @@ extern "C" {
 // GLOBAL: gl_24813
 CChampionMonsterMgr* g_championMonsterMgr;
 
+// OFFSET: 0x00ADDAB0
+// FUNCTION: fn_46437
+CChampionMonsterMgr::CChampionMonsterMgr() {
+  this->m_isValid = true;
+}
+
+// OFFSET: 0x00ADDD90
+// FUNCTION: fn_46438
+__declspec(noinline) CChampionMonsterMgr::~CChampionMonsterMgr() = default;
+
+// OFFSET: 0x00ADDE00
+// FUNCTION: fn_46439
+CChampionMonsterMgr::lcData::~lcData() {
+}
+
 // OFFSET: 0x00ADDF50
 // FUNCTION: fn_17951
 __declspec(noinline) void CChampionMonsterMgr::AddItem(int id, float value) {
-  this->m_items.insert(std::pair<int, lcData>(id, lcData(value)));
+  lcData data(value);
+  this->m_items.insert(std::pair<int, lcData>(id, data));
+}
+
+// OFFSET: 0x00ADE140
+// FUNCTION: fn_46440
+void CChampionMonsterMgr::AddEffect(int id, int effect) {
+  if (!this->m_items.empty()) {
+    const auto it = this->m_items.find(id);
+    if (it != this->m_items.end()) {
+      it->second.m_effects.push_back(effect);
+    }
+  }
 }
 
 // OFFSET: 0x00ADE1B0
@@ -105,13 +132,13 @@ int CChampionMonsterMgr::ApplyEffects(int id, CGameActor* actor, int aid) {
   }
 
   std::vector<int>& effects = it->second.m_effects;
-  if (actor->render.visible && actor->render.enabled && !StateFlag02(actor->GetStateFlags())) {
+  if (actor->render.visible && actor->render.enabled && !IsCloaking(actor->GetStateFlags())) {
     for (unsigned int i = 0; i < effects.size(); ++i) {
       if (g_effectMgr->Find(aid, effects[i]) == nullptr) {
-        const vector3d& position = actor->render.position;
-        if (g_effectMgr->Spawn(aid, effects[i], position.x, position.y, position.z, 0, -1, 0, 0) == nullptr &&
+        EffectLists* effectMgr = g_effectMgr;
+        if (effectMgr->Spawn(aid, effects[i], actor->render.position, 0, -1, 0, 0) == nullptr &&
             !actor->HasId(effects[i])) {
-          actor->LaunchEffect(effects[i], actor->render.position, 0.0f);
+          actor->LaunchEffect(it->second.m_effects[i], actor->render.position, 0.0f);
         }
       }
     }

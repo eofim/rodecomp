@@ -57,8 +57,9 @@ std::uint8_t* CSprRes::ReduceSprite(const std::uint8_t* pixels, int width, int h
   auto* output = new std::uint8_t[outputWidth * outputHeight];
 
   for (int y = 0; y < outputHeight; ++y) {
+    std::uint8_t* line = &output[y * outputWidth];
     for (int x = 0; x < outputWidth; ++x) {
-      output[y * outputWidth + x] = pixels[(halfHeight + 1) * y * width + (halfWidth + 1) * x];
+      line[x] = pixels[(halfHeight + 1) * y * width + (halfWidth + 1) * x];
     }
   }
 
@@ -69,9 +70,50 @@ std::uint8_t* CSprRes::ReduceSprite(const std::uint8_t* pixels, int width, int h
 // FUNCTION: fn_02405
 void ConvertSpritePalette(std::uint32_t* output, const std::uint8_t* input, int count) {
   for (int index = 0; index < count; ++index) {
+    const std::uint8_t blue = input[index * 4 + 2];
     const std::uint8_t red = input[index * 4];
     const std::uint8_t green = input[index * 4 + 1];
-    const std::uint8_t blue = input[index * 4 + 2];
-    output[index] = red >= 254 && green < 4 && blue >= 254 ? 1057u : ((blue | 0x40000u) >> 3) | (4 * ((green & 0xF8u) | (32 * (red & 0xF8u))));
+    const std::uint32_t g = green;
+    const std::uint32_t b = blue;
+    const std::uint32_t r = red;
+    if (red >= 254 && green < 4 && blue >= 254) {
+      output[index] = 1057;
+    } else {
+      output[index] = ((b | 0x40000u) >> 3) | (4 * ((g & 0xF8u) | (32 * (r & 0xF8u))));
+    }
   }
+}
+
+// OFFSET: 0x007612C0
+// FUNCTION: fn_45828
+std::uint8_t* CSprRes::DecodeSpriteRuns(const std::uint8_t* runs, int width, int height) {
+  auto* pixels = new std::uint8_t[height * width];
+  std::uint8_t* line;
+  std::uint16_t zeroCount = 0;
+  int value;
+  const std::uint8_t* source = runs;
+
+  for (int y = 0; y < height; ++y) {
+    line = pixels + width * y;
+
+    if (line) {
+      for (int x = 0; x < width; ++x) {
+        if (zeroCount == 0) {
+          value = *source++;
+          if (value == 0) {
+            zeroCount = *source++;
+          }
+        }
+
+        if (zeroCount) {
+          *line++ = 0;
+          --zeroCount;
+        } else {
+          *line++ = static_cast<std::uint8_t>(value);
+        }
+      }
+    }
+  }
+
+  return pixels;
 }

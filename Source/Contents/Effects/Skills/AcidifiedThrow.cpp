@@ -10,9 +10,20 @@
 #include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Sound/SoundMgr.h"
 #include "Contents/World/World.h"
+#include "Render/Projection/RenderProjection.h"
 #include "Utility/Math/AffineMatrix.h"
 
 #include <cmath>
+
+namespace {
+// INLINED
+__forceinline bool IsParticleActive(const CEZ2STRParticle* particle) {
+  if (0.0f == particle->life) {
+    return true;
+  }
+  return particle->life * 60.0f > static_cast<float>(particle->elapsedFrames);
+}
+}
 
 // OFFSET: 0x006F3540
 // FUNCTION: fn_06821
@@ -20,6 +31,21 @@ CAcidifiedThrow::CAcidifiedThrow() : CEffect(-1) {
   this->impactPosition.x = 0.0f;
   this->impactPosition.y = 0.0f;
   this->impactPosition.z = 0.0f;
+}
+
+// OFFSET: 0x006F35C0
+// FUNCTION: fn_46014
+__declspec(noinline) CAcidifiedThrow::~CAcidifiedThrow() {
+}
+
+// OFFSET: 0x006F3680
+// FUNCTION: fn_46015
+vector3d CAcidifiedThrow::PointOnCurve(vector3d start, vector3d control, vector3d end, float t) {
+  const float oneMinusT = 1.0f - t;
+  const vector3d first = start * static_cast<float>(std::pow(static_cast<double>(oneMinusT), 2.0));
+  const vector3d third = end * static_cast<float>(std::pow(static_cast<double>(t), 2.0));
+  const vector3d second = control * ((t + t) * oneMinusT);
+  return vector3d{second.x + third.x + first.x, second.y + third.y + first.y, second.z + third.z + first.z};
 }
 
 // OFFSET: 0x006F3750
@@ -128,48 +154,30 @@ void CAcidifiedThrow::OnProcess() {
       rotation.MakeYRotation(2.0943947f);
     }
 
-    actorViewY -= 10.0f;
+    actorViewY -= g_projectionDepthOffset;
 
     const matrix& inverse = g_modeMgr.GetGameMode()->camera->frame.inverse;
-    float worldX = actorViewX * inverse.values[0] + actorViewY * inverse.values[3] + actorViewZ * inverse.values[6] + inverse.values[9];
-    float worldY = actorViewX * inverse.values[1] + actorViewY * inverse.values[4] + actorViewZ * inverse.values[7] + inverse.values[10];
-    float worldZ = actorViewX * inverse.values[2] + actorViewY * inverse.values[5] + actorViewZ * inverse.values[8] + inverse.values[11];
+    const vector3d world{
+        actorViewX * inverse.values[0] + actorViewY * inverse.values[3] + actorViewZ * inverse.values[6] + inverse.values[9],
+        actorViewX * inverse.values[1] + actorViewY * inverse.values[4] + actorViewZ * inverse.values[7] + inverse.values[10],
+        actorViewX * inverse.values[2] + actorViewY * inverse.values[5] + actorViewZ * inverse.values[8] + inverse.values[11]};
 
     this->trajectoryTime -= 0.07f;
 
-    const float dx = this->impactPosition.x - worldX;
-    const float dy = this->impactPosition.y - worldY;
-    const float dz = this->impactPosition.z - worldZ;
-    const float distSq = dy * dy + dx * dx + dz * dz;
+    const vector3d delta{this->impactPosition.x - world.x, this->impactPosition.y - world.y, this->impactPosition.z - world.z};
+    const float distSq = delta.y * delta.y + delta.x * delta.x + delta.z * delta.z;
     const float length = SquareRoot(distSq);
     const float inverseDist = 1.0f / SquareRoot(distSq);
+    const vector3d offset{delta.x * inverseDist * length, delta.y * inverseDist * length, delta.z * inverseDist * length};
+    const vector3d rotated{
+        offset.x * rotation.values[0] + offset.y * rotation.values[3] + offset.z * rotation.values[6] + rotation.values[9],
+        offset.x * rotation.values[1] + offset.y * rotation.values[4] + offset.z * rotation.values[7] + rotation.values[10],
+        offset.x * rotation.values[2] + offset.y * rotation.values[5] + offset.z * rotation.values[8] + rotation.values[11]};
+    const vector3d control{this->impactPosition.x + rotated.x, this->impactPosition.y + rotated.y, this->impactPosition.z + rotated.z};
 
-    vector3d offset;
-    offset.x = dx * inverseDist * length;
-    offset.y = dy * inverseDist * length;
-    offset.z = dz * inverseDist * length;
+    this->projectileEmitter->position = this->PointOnCurve(this->impactPosition, control, world, this->trajectoryTime);
 
-    float rotX = offset.x * rotation.values[0] + offset.y * rotation.values[3] + offset.z * rotation.values[6] + rotation.values[9];
-    float rotY = offset.x * rotation.values[1] + offset.y * rotation.values[4] + offset.z * rotation.values[7] + rotation.values[10];
-    float rotZ = offset.x * rotation.values[2] + offset.y * rotation.values[5] + offset.z * rotation.values[8] + rotation.values[11];
-
-    float p1X = this->impactPosition.x + rotX;
-    float p1Y = this->impactPosition.y + rotY;
-    float p1Z = this->impactPosition.z + rotZ;
-
-    float t = this->trajectoryTime;
-    const vector3d start = this->impactPosition;
-    float oneMinusT = 1.0f - t;
-    float term0 = static_cast<float>(std::pow(static_cast<double>(oneMinusT), 2.0));
-    float term1 = (t + t) * oneMinusT;
-    float term2 = static_cast<float>(std::pow(static_cast<double>(t), 2.0));
-
-    CEZ2STRParticle* emitter = this->projectileEmitter;
-    emitter->position.x = term1 * p1X + term2 * worldX + term0 * start.x;
-    emitter->position.y = term1 * p1Y + term2 * worldY + term0 * start.y;
-    emitter->position.z = term1 * p1Z + term2 * worldZ + term0 * start.z;
-
-    emitter->Process(0.0f, 0.0f, 0.0f);
+    this->projectileEmitter->Process(0.0f, 0.0f, 0.0f);
 
     if (!(this->trajectoryTime <= 0.0f)) {
       return;
@@ -202,24 +210,24 @@ void CAcidifiedThrow::OnProcess() {
     }
   }
 
+  __int64 i = 0;
   __int64 activeCount = 0;
-  for (__int64 i = 0; i < 3; ++i) {
+  for (; i < 3; ++i) {
     CEZ2STRParticle* emitter = this->impactEmitters[i];
     if (emitter) {
-      if (0.0f == emitter->life || static_cast<float>(emitter->elapsedFrames) < emitter->life * 60.0f) {
-        emitter->position.x = this->impactPosition.x - 1.0f;
-        emitter->position.y = this->impactPosition.y - 14.0f;
-        emitter->position.z = this->impactPosition.z;
-        emitter->Process(0.0f, 0.0f, 0.0f);
-        ++activeCount;
-      } else {
+      if (IsParticleActive(emitter) != true) {
         FreeParticle(emitter);
         this->impactEmitters[i] = nullptr;
+      } else {
+        const vector3d position = this->impactPosition;
+        this->impactEmitters[i]->position = vector3d{position.x - g_projectionDepthNumerator, position.y - 14.0f, position.z};
+        this->impactEmitters[i]->Process(0.0f, 0.0f, 0.0f);
+        ++activeCount;
       }
     }
   }
 
-  if (activeCount == 0) {
+  if (0 == activeCount) {
     this->active = false;
   }
 }

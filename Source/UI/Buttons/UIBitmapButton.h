@@ -8,7 +8,7 @@ class UIBitmapButton : public UIButton {
   friend class UIAchViewWnd;
 
 public:
-  UIBitmapButton();
+  __declspec(noinline) UIBitmapButton();
   ~UIBitmapButton() override;
   void Paint() override;
   bool SetBitmap(const char* name, int state, unsigned char exactSize);
@@ -24,10 +24,12 @@ public:
 protected:
   /* 00B4 */ int m_bitmapWidth;
   /* 00B8 */ int m_bitmapHeight;
-  /* 00BC */ std::string m_names[4];
+  /* 00BC */ std::string m_normalName;
+  /* 00D4 */ std::string m_hoverName;
+  /* 00EC */ std::string m_pressedName;
+  /* 0104 */ std::string m_disabledName;
   /* 011C */ unsigned char m_invalidateParent;
 };
-
 #if defined(_WIN32) && !defined(_WIN64)
 static_assert(sizeof(UIBitmapButton) == 0x120);
 #endif

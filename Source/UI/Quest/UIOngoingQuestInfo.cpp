@@ -25,9 +25,6 @@
 #include <format>
 #include <string>
 
-template __declspec(noinline) std::_Tree_find_result<std::_Tree_node<std::pair<const unsigned int, RenewQuestOngoingInfo>, void*>*>
-std::map<unsigned int, RenewQuestOngoingInfo>::_Mybase::_Find_lower_bound<unsigned int>(const unsigned int&) const;
-
 // OFFSET: 0x00A4F580
 // FUNCTION: fn_16213
 bool UnusedTrueA4F580() {
@@ -66,13 +63,16 @@ CUIOngoingQuestInfo* CreateOngoingQuestInfo() {
   return new CUIOngoingQuestInfo();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00497950
 // FUNCTION: fn_45552
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateOngoingQuestInfo;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10009, factory);
-  return true;
-}();
+static UIRegistration s_ongoingQuestRegistered(10009, CreateOngoingQuestInfo);
 
 // OFFSET: 0x00A4FDE0
 // FUNCTION: fn_16223
@@ -310,7 +310,7 @@ void CUIRewards::OnBindItem(CUIRewardItem* item, const CRewardItemData& data) {
 // OFFSET: 0x00A558B0
 // FUNCTION: fn_16308
 void CUIOngoingQuestInfo::OnInit() {
-  this->titleBar->SetTitle(LookupMessage(MSI_RENEW_QUEST_DETAIL_REWARD));
+  this->titleBar->SetTitle(LookupMessage(MSI_RENEW_QUEST_TITLE));
   UIWindow* window = g_windowMgr.LookupWindow(WID_RENEWQUESTUI);
   if (window) {
     this->Move(window->geometry.x + window->geometry.width, window->geometry.y);
@@ -327,9 +327,9 @@ void CUIScrollWindow::OnInit() {
   this->firstContents->EnableClip();
   this->secondContents->EnableClip();
   this->rewards->EnableClip();
-  this->firstContents->title->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_EXP));
-  this->secondContents->title->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_JEXP));
-  this->rewards->title->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_ITEM));
+  this->firstContents->title->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_DESCRIPTION));
+  this->secondContents->title->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_MONSTER));
+  this->rewards->title->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_REWARD));
 }
 
 }
@@ -339,9 +339,9 @@ namespace OngoingQuestInfo {
 // OFFSET: 0x00A55950
 // FUNCTION: fn_16310
 void CUIRewards::OnInit() {
-  this->firstLabel->SetText(LookupMessage(MSI_RENEW_QUEST_CHECK_TOOTIP1_ITEM));
-  this->secondLabel->SetText(LookupMessage(MSI_RENEW_QUEST_CHECK_TOOTIP2_ITEM));
-  this->thirdLabel->SetText(LookupMessage(MSI_RENEW_QUEST_CHECK_TOOTIP3_ITEM));
+  this->firstLabel->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_EXP));
+  this->secondLabel->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_JEXP));
+  this->thirdLabel->SetText(LookupMessage(MSI_RENEW_QUEST_DETAIL_ITEM));
   CUIListBoxEx<CUIRewardItem, CRewardItemData>* list = this->rewardList;
   list->layoutFlag = 1;
   list->Invalidate();
@@ -359,10 +359,12 @@ void CUIOngoingQuestInfo::UpdateHuntInfo() {
   OngoingQuestInfo::CUIScrollWindow* window = this->scrollWindow;
   const unsigned int questId = this->questId;
   window->secondContents->textViewer->Clear();
-  const auto found = g_renewQuestMgr->m_ongoingQuests.find(questId);
-  if (found != g_renewQuestMgr->m_ongoingQuests.end()) {
-    for (int index = 0; index < found->second.m_huntCount; ++index) {
-      window->secondContents->textViewer->AddLine(found->second.GetHuntText(index));
+  auto& quests = g_renewQuestMgr->m_ongoingQuests;
+  const auto found = quests.find(questId);
+  if (found != quests.end()) {
+    RenewQuestOngoingInfo& quest = found->second;
+    for (int index = 0; index < quest.m_huntCount; ++index) {
+      window->secondContents->textViewer->AddLine(quest.GetHuntText(index));
     }
   }
 
@@ -424,7 +426,8 @@ void CUIScrollWindow::SetQuest(unsigned int id) {
     this->rewards->firstText->SetText(quest.baseExpReward);
     this->rewards->secondText->SetText(quest.jobExpReward);
     for (const auto& reward : quest.m_rewards) {
-      this->rewards->rewardList->AddData(CRewardItemData{static_cast<int>(reward.first), static_cast<int>(reward.second)}, false);
+      const CRewardItemData data{static_cast<int>(reward.first), static_cast<int>(reward.second)};
+      this->rewards->rewardList->AddData(data, false);
     }
     this->rewards->rewardList->UpdateScrollBar();
 
@@ -551,7 +554,7 @@ void CUIContents::OnCreate(int width, int height) {
   this->title = new CUIStaticText();
   this->title->SetSize(50, 12);
   this->title->Move(25, 9);
-  this->title->SetText("", 0);
+  this->title->SetText("");
   this->title->SetFitText(0);
   this->title->SetAlign(0, 0);
   this->title->SetFont("Gulim");
@@ -745,8 +748,9 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
     return;
   }
 
-  for (OngoingQuestInfo::CUIRewardItem* item : this->items) {
-    this->RemoveChild(item, 1);
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
   }
   this->items.clear();
   this->selected = static_cast<unsigned int>(-1);
@@ -762,14 +766,14 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (OngoingQuestInfo::CUIRewardItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }

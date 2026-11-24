@@ -1,5 +1,6 @@
 #include "Archive/GPak.h"
 #include "Archive/GPakUpdate.h"
+#include "Archive/PakAuxiliary.h"
 #include "Archive/PakCipher.h"
 #include "Utility/AES.h"
 #include "Utility/Cipher/XorBytes.h"
@@ -71,13 +72,6 @@ namespace {
     /* 000D */ std::uint64_t dataOffset;
   };
 
-  struct PakAuxiliaryFile {
-    /* 0000 */ std::uint8_t version;
-    /* 0001 */ std::uint8_t padding_0001[3];
-    /* 0004 */ std::uint64_t identifier;
-    /* 000C */ std::uint32_t padding_000C;
-  };
-
 #pragma pack(pop)
 
   static_assert(sizeof(PakHeaderFile) == 46);
@@ -100,56 +94,18 @@ namespace {
   static_assert(sizeof(PakEntryFileV3) == 21);
   static_assert(offsetof(PakEntryFileV3, flags) == 12);
   static_assert(offsetof(PakEntryFileV3, dataOffset) == 13);
-  static_assert(sizeof(PakAuxiliaryFile) == 16);
-  static_assert(offsetof(PakAuxiliaryFile, identifier) == 4);
 
   // INLINED
   char SwapNibbles(char c) {
     return static_cast<char>((c << 4) | ((c >> 4) & 0x0F));
   }
 
-  __declspec(noinline) std::uint64_t ReadAuxiliaryIdentifier(std::span<const std::uint8_t> data);
-
-  // OFFSET: 0x00658FC0
-  // FUNCTION: fn_05116
-  std::uint64_t ReadAuxiliaryIdentifier(std::span<const std::uint8_t> data) {
-    if (data.size() != 0) {
-      PakAuxiliaryFile header;
-      std::memcpy(&header, data.data(), sizeof(header));
-      if (header.version <= 1) {
-        return header.identifier;
-      }
-    }
-
-    return UINT64_MAX;
-  }
-
   // INLINED
-  void SortEntries(std::vector<myGPack::PakEntry>& entries) {
-    std::sort(entries.begin(), entries.end(), [](const auto& first, const auto& second) { return first.name < second.name; });
+  void ModifyString(char* dest, const char* src, std::int32_t size) {
+    for (std::int32_t i = 0; i < size; ++i) {
+      dest[i] = SwapNibbles(src[i]);
+    }
   }
-}
-
-#if defined(_WIN32) && !defined(_WIN64)
-static_assert(offsetof(PakUniformRandom, m_distribution) == 0x1388);
-#endif
-
-// OFFSET: 0x006563E0
-// FUNCTION: fn_05073
-__declspec(noinline) void FillRandomBytes(char* first, char* last, PakUniformRandom& random) {
-  for (; first != last; ++first) {
-    *first = static_cast<char>(random.m_distribution(random.m_engine));
-  }
-}
-
-// OFFSET: 0x00656C70
-// FUNCTION: fn_05080
-PakAuxiliary::PakAuxiliary() {
-}
-
-// OFFSET: 0x00657640
-// FUNCTION: fn_05091
-PakAuxiliary::~PakAuxiliary() {
 }
 
 // OFFSET: 0x00AE97D0
@@ -161,6 +117,11 @@ CGPak::~CGPak() {
 // OFFSET: 0x00AEBC00
 // FUNCTION: fn_18130
 void CGPak::Reset() {
+  this->Clear();
+}
+
+// INLINED
+inline void CGPak::Clear() {
   this->m_entries.clear();
   this->m_file = nullptr;
   this->m_version = 0;
@@ -215,7 +176,25 @@ bool CGPak::Open(CPakFile* file) {
     return true;
   }
 
-  this->Reset();
+  this->Clear();
+  return false;
+}
+
+// STRING: st_14036
+char g_specialPakExtensions[4][5] = {".gnd", ".gat", ".act", ".str"};
+
+// INLINED
+static bool IsNeverEncrypt(const char* fileName) {
+  fileName = std::strrchr(fileName, '.');
+
+  if (fileName) {
+    for (const char* extension : g_specialPakExtensions) {
+      if (_stricmp(fileName, extension) == 0) {
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -227,79 +206,70 @@ bool CGPak::ReadTableV1() {
   this->m_entries.resize(this->m_entryCount);
 
   std::uint32_t maximum = 0;
-  std::uint32_t sequence = 1;
-  std::int32_t legacyKey = 95001;
 
   for (std::uint32_t i = 0; i < this->m_entryCount; ++i) {
-    std::uint32_t nameSize;
-    std::memcpy(&nameSize, cursor, sizeof(nameSize));
-    cursor += sizeof(nameSize);
+    std::int32_t length = *reinterpret_cast<const std::uint32_t*>(cursor);
+    cursor += sizeof(std::uint32_t);
+
     char name[256];
-
     if (this->m_version < 0x101) {
-      std::int32_t length = static_cast<std::int32_t>(std::strlen(reinterpret_cast<const char*>(cursor)) + 1);
-
-      for (std::int32_t j = 0; j < length; ++j) {
-        name[j] = SwapNibbles(static_cast<char>(cursor[j]));
-      }
-    } else {
-      if (this->m_version > 0x103) {
-        return false;
-      }
-
+      ModifyString(name, reinterpret_cast<const char*>(cursor), static_cast<std::int32_t>(std::strlen(reinterpret_cast<const char*>(cursor)) + 1));
+    } else if (this->m_version <= 0x103) {
+      std::int32_t number;
+      int decodedLength;
+      char decoded[256];
+      std::uint8_t key[8];
+      char digits[20];
       cursor += 2;
-      std::int32_t length = static_cast<std::int32_t>(nameSize - 6);
+      ModifyString(name, reinterpret_cast<const char*>(cursor), length - 6);
 
-      for (std::int32_t j = 0; j < length; ++j) {
-        name[j] = SwapNibbles(static_cast<char>(cursor[j]));
-      }
-
-      std::int32_t number = legacyKey;
-      if (this->m_version != 0x101) {
-        number = static_cast<std::int32_t>(3 * (31669u - (sequence >> 1)));
+      if (this->m_version == 0x101) {
+        number = 95000 - i * 2 + 1;
+      } else {
+        number = 95000 - ((i * 5 + 1) / 2) * 3 + 7;
       }
 
       if (number < 10000) {
         number += 85000;
       }
 
-      char digits[20];
       _itoa(number, digits, 10);
-      std::uint8_t key[8];
+      std::memcpy(key + 2, digits, 5);
       key[0] = 'P';
       key[1] = 'r';
-      std::memcpy(key + 2, digits, 5);
       key[7] = 'e';
+
       myGPack::PakCipher cipher(key);
-      std::uint8_t decoded[256];
-      int decodedLength;
-      cipher.Decode(reinterpret_cast<const std::uint8_t*>(name), length, decoded, &decodedLength, 1);
-      std::strcpy(name, reinterpret_cast<const char*>(decoded));
-      nameSize -= 2;
+      cipher.Decode(reinterpret_cast<const std::uint8_t*>(name), length - 6, reinterpret_cast<std::uint8_t*>(decoded), &decodedLength, 1);
+      std::strcpy(name, decoded);
+      length -= 2;
+    } else {
+      return false;
     }
 
-    const std::uint8_t* metadata = cursor + nameSize;
-    const PakEntryFile* fileEntry = reinterpret_cast<const PakEntryFile*>(metadata);
-    cursor = metadata + sizeof(PakEntryFile);
+    cursor += length;
+
+    const PakEntryFile* fileEntry = reinterpret_cast<const PakEntryFile*>(cursor);
+    cursor += sizeof(PakEntryFile);
 
     myGPack::PakEntry& entry = this->m_entries[i];
-    entry.compressedSize = fileEntry->compressedSize - fileEntry->originalSize - 715;
+    entry.compressedSize = fileEntry->compressedSize - (fileEntry->originalSize + 715);
     entry.alignedSize = fileEntry->alignedSize - 37579;
     entry.originalSize = fileEntry->originalSize;
     entry.flags = fileEntry->flags;
     entry.dataOffset = fileEntry->dataOffset;
     entry.name.Assign(name);
 
-    const char* extension = std::strrchr(name, '.');
-    bool special = extension && (_stricmp(extension, ".gnd") == 0 || _stricmp(extension, ".gat") == 0 || _stricmp(extension, ".act") == 0 ||
-                                 _stricmp(extension, ".str") == 0);
-    entry.flags |= special ? 4 : 2;
+    if (IsNeverEncrypt(name)) {
+      entry.flags |= 4;
+    } else {
+      entry.flags |= 2;
+    }
+
     maximum = std::max(maximum, entry.alignedSize);
-    sequence += 5;
-    legacyKey -= 2;
   }
 
-  SortEntries(this->m_entries);
+  std::sort(this->m_entries.begin(), this->m_entries.end(), [](const auto& first, const auto& second) { return first.name < second.name; });
   this->m_scratch.resize(maximum);
   return true;
 }
@@ -338,7 +308,7 @@ bool CGPak::ReadTableV2() {
     maximum = std::max(maximum, entry.alignedSize);
   }
 
-  SortEntries(this->m_entries);
+  std::sort(this->m_entries.begin(), this->m_entries.end(), [](const auto& first, const auto& second) { return first.name < second.name; });
   this->m_scratch.resize(maximum);
   return true;
 }
@@ -363,9 +333,10 @@ bool CGPak::ReadTableV3() {
 
   for (std::uint32_t i = 0; i < this->m_entryCount; ++i) {
     const char* name = reinterpret_cast<const char*>(cursor);
-    cursor += std::strlen(name);
-    const PakEntryFileV3* fileEntry = reinterpret_cast<const PakEntryFileV3*>(cursor + 1);
-    cursor += sizeof(PakEntryFileV3) + 1;
+    cursor += std::strlen(name) + 1;
+
+    const PakEntryFileV3* fileEntry = reinterpret_cast<const PakEntryFileV3*>(cursor);
+    cursor += sizeof(PakEntryFileV3);
 
     myGPack::PakEntry& entry = this->m_entries[i];
     entry.compressedSize = fileEntry->compressedSize;
@@ -377,7 +348,7 @@ bool CGPak::ReadTableV3() {
     maximum = std::max(maximum, entry.alignedSize);
   }
 
-  SortEntries(this->m_entries);
+  std::sort(this->m_entries.begin(), this->m_entries.end(), [](const auto& first, const auto& second) { return first.name < second.name; });
   this->m_scratch.resize(maximum);
   return true;
 }
@@ -453,7 +424,3 @@ __declspec(noinline) myGPack::CGPakUpdate::~CGPakUpdate() {
   this->Close();
 }
 
-// OFFSET: 0x00656B60
-// FUNCTION: fn_05078
-__declspec(noinline) PakUniformRandom::PakUniformRandom(int minimum, int maximum, unsigned int seed) : m_engine(seed), m_distribution(minimum, maximum) {
-}

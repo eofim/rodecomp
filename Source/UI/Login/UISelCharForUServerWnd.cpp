@@ -5,6 +5,7 @@
 #include "Client/Mode/CMode.h"
 #include "Client/Session/Session.h"
 #include "Contents/Actors/Pc.h"
+#include "Contents/Actors/Resources/EquipmentResourceMgr.h"
 #include "Contents/Sprites/SpriteRidingOffset.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Client/Session/Session.h"
@@ -64,11 +65,11 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
     this->confirmButton->SetBitmap((path + "btn_ok_b" + ".bmp").c_str(), 2, 0);
     this->confirmButton->SetSize(this->confirmButton->BitmapWidth(), this->confirmButton->BitmapHeight());
     this->confirmButton->Move(this->geometry.width - 46, this->geometry.height - 24);
-    this->confirmButton->SetId(184);
+    this->confirmButton->SetId(ID_OK);
     this->AddChild(this->confirmButton);
   }
 
-  this->m_message0 = 184;
+  this->m_message0 = ID_OK;
 
   for (int index = 0; index < g_session.characterCount; ++index) {
     this->m_checkBoxes[index] = new UICheckBox();
@@ -127,7 +128,7 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
       this->m_slots[slotIndex].headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(head, info->job, g_session.GetCurrentSex(), this->m_slots[slotIndex].headPalette));
     }
 
-    this->m_slots[slotIndex].imfName = g_session.GetBodyImfName(info->job, g_session.GetCurrentSex(), info->head, info->bodyCostume);
+    this->m_slots[slotIndex].imfName = g_equipmentResourceMgr->GetBodyImfName(info->job, g_session.GetCurrentSex(), info->head, info->bodyCostume);
   }
 }
 
@@ -140,7 +141,7 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
 
   switch (argument1) {
   case ID_OK: {
-    if (g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_SELECT_CHARACTERS), 2, false, false, 0, "Message", 280, 120, 0) != 0xBB) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_SELECT_CHARACTERS), 2, false, false, 0, "Message", 280, 120, 0) != ID_YES) {
       return 0;
     }
 
@@ -190,11 +191,24 @@ void UISelCharForUServerWnd::OnMouseMove(int x, int y) {
   UIFrameWnd::OnMouseMove(x, y);
 }
 
+// OFFSET: 0x0091B930
+// FUNCTION: fn_45672
+CharacterInfo* UISelCharForUServerWnd::GetCharacterInfoAt(int x, int y) {
+  if (x >= 27 && x < this->geometry.width - 26) {
+    if (y >= 95 && y <= 364 && (y >= 250 || y <= 210)) {
+      const std::int64_t index = static_cast<std::int64_t>((y - 95) / 135) * this->m_columns + (x - 27) / 81;
+      return reinterpret_cast<CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, static_cast<int>(index), 0, 0, 0));
+    }
+  }
+
+  return nullptr;
+}
+
 // OFFSET: 0x0093F1F0
 // FUNCTION: fn_12777
 void UISelCharForUServerWnd::UpdateCharInfoBalloon(int x, int y, std::uint32_t color) {
   const int red = (color >> 16) & 0xFF;
-  const int green = (color >> 8) & 0xFF;
+  const volatile int green = (color >> 8) & 0xFF;
   const int blue = color & 0xFF;
   if (!this->characterInfoBalloon) {
     this->characterInfoBalloon = new UICharInfoBalloonText();
@@ -204,72 +218,67 @@ void UISelCharForUServerWnd::UpdateCharInfoBalloon(int x, int y, std::uint32_t c
 
   this->characterInfoBalloon->Move(-400, -400);
   this->characterInfoLines.clear();
-  if (x > 26 && x < this->geometry.width - 26 && static_cast<unsigned>(y - 95) < 270 && (y > 249 || y < 211)) {
-    const int index = (y - 95) / 135 * this->m_columns + (x - 27) / 81;
-    CharacterInfo* info = reinterpret_cast<CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, index, 0, 0, 0));
-    if (info) {
-      char name[25];
-      std::memcpy(name, info->name, sizeof(info->name));
-      name[24] = '\0';
-      int width = this->TextWidth(name, 0, 0, 12, 0, 0) + 60;
+  if (CharacterInfo* info = this->GetCharacterInfoAt(x, y)) {
+    char name[25];
+    std::memcpy(name, info->name, sizeof(info->name));
+    name[24] = '\0';
+    int width = this->TextWidth(name, 0, 0, 12, 0, 0) + 60;
 
-      char text[100];
-      this->characterInfoLines.push_back("Name");
-      this->characterInfoLines.push_back(name);
-      this->characterInfoLines.push_back("Job");
-      this->characterInfoLines.push_back(g_session.GetJobName(info->job, -1));
-      this->characterInfoLines.push_back("Lv. ");
-      this->characterInfoLines.push_back(_itoa(info->level, text, 10));
-      this->characterInfoLines.push_back("EXP");
-      this->characterInfoLines.push_back(_itoa(static_cast<int>(info->exp), text, 10));
-      this->characterInfoLines.push_back("HP");
-      this->characterInfoLines.push_back(_i64toa(info->hp, text, 10));
-      this->characterInfoLines.push_back("SP");
-      this->characterInfoLines.push_back(_i64toa(info->sp, text, 10));
-      this->characterInfoLines.push_back("STR");
-      this->characterInfoLines.push_back(_itoa(info->stats[0], text, 10));
-      this->characterInfoLines.push_back("AGI");
-      this->characterInfoLines.push_back(_itoa(info->stats[1], text, 10));
-      this->characterInfoLines.push_back("VIT");
-      this->characterInfoLines.push_back(_itoa(info->stats[2], text, 10));
-      this->characterInfoLines.push_back("INT");
-      this->characterInfoLines.push_back(_itoa(info->stats[3], text, 10));
-      this->characterInfoLines.push_back("DEX");
-      this->characterInfoLines.push_back(_itoa(info->stats[4], text, 10));
-      this->characterInfoLines.push_back("LUK");
-      this->characterInfoLines.push_back(_itoa(info->stats[5], text, 10));
+    char text[100];
+    this->characterInfoLines.push_back("Name");
+    this->characterInfoLines.push_back(name);
+    this->characterInfoLines.push_back("Job");
+    this->characterInfoLines.push_back(g_session.GetJobName(info->job, -1));
+    this->characterInfoLines.push_back("Lv. ");
+    this->characterInfoLines.push_back(_itoa(info->level, text, 10));
+    this->characterInfoLines.push_back("EXP");
+    this->characterInfoLines.push_back(_itoa(static_cast<int>(info->exp), text, 10));
+    this->characterInfoLines.push_back("HP");
+    this->characterInfoLines.push_back(_i64toa(info->hp, text, 10));
+    this->characterInfoLines.push_back("SP");
+    this->characterInfoLines.push_back(_i64toa(info->sp, text, 10));
+    this->characterInfoLines.push_back("STR");
+    this->characterInfoLines.push_back(_itoa(info->stats[0], text, 10));
+    this->characterInfoLines.push_back("AGI");
+    this->characterInfoLines.push_back(_itoa(info->stats[1], text, 10));
+    this->characterInfoLines.push_back("VIT");
+    this->characterInfoLines.push_back(_itoa(info->stats[2], text, 10));
+    this->characterInfoLines.push_back("INT");
+    this->characterInfoLines.push_back(_itoa(info->stats[3], text, 10));
+    this->characterInfoLines.push_back("DEX");
+    this->characterInfoLines.push_back(_itoa(info->stats[4], text, 10));
+    this->characterInfoLines.push_back("LUK");
+    this->characterInfoLines.push_back(_itoa(info->stats[5], text, 10));
 
-      if (width < 140) {
-        width = 140;
-      }
-
-      this->characterInfoBalloon->Resize(width, 200);
-      this->characterInfoBalloon->m_outlineColor = 0;
-      this->characterInfoBalloon->m_textColor = RGB(red, green, blue);
-      this->characterInfoBalloon->SetBackground(0x88000000);
-      this->characterInfoBalloon->m_lines = this->characterInfoLines;
-
-      int screenX = x + 20;
-      int screenY = y;
-      this->ToScreen(screenX, screenY);
-      if (screenX < -3) {
-        screenX = -3;
-      }
-      const int maxX = g_renderer->viewport.width - this->characterInfoBalloon->geometry.width + 3;
-      if (screenX > maxX) {
-        screenX = maxX;
-      }
-      if (screenY < -3) {
-        screenY = -3;
-      }
-      const int maxY = g_renderer->viewport.height - this->characterInfoBalloon->geometry.height + 3;
-      if (screenY > maxY) {
-        screenY = maxY;
-      }
-
-      this->characterInfoBalloon->Move(screenX, screenY);
-      return;
+    if (width < 140) {
+      width = 140;
     }
+
+    this->characterInfoBalloon->Resize(width, 200);
+    this->characterInfoBalloon->SetColors(RGB(red, green, blue), 0);
+    this->characterInfoBalloon->SetBackground(0x88000000);
+    this->characterInfoBalloon->m_lines = this->characterInfoLines;
+
+    int screenX = x + 20;
+    int screenY = y;
+    this->ToScreen(screenX, screenY);
+    if (screenX < -3) {
+      screenX = -3;
+    }
+    const int maxX = g_renderer->viewport.width - this->characterInfoBalloon->geometry.width + 3;
+    if (screenX > maxX) {
+      screenX = maxX;
+    }
+    if (screenY < -3) {
+      screenY = -3;
+    }
+    const int maxY = g_renderer->viewport.height - this->characterInfoBalloon->geometry.height + 3;
+    if (screenY > maxY) {
+      screenY = maxY;
+    }
+
+    this->characterInfoBalloon->Move(screenX, screenY);
+    return;
   }
 
   g_windowMgr.Schedule(this->characterInfoBalloon);

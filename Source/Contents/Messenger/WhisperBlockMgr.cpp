@@ -3,8 +3,6 @@
 
 #include <new>
 
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // STATIC: 0x01389940
 // GLOBAL: gl_24357
 CWhisperBlockMgr* g_whisperBlockMgr;
@@ -15,8 +13,9 @@ CWhisperBlockMgr::CWhisperBlockMgr() : m_tracking(false), m_changes(0) {
   this->m_enabled = true;
 }
 
-// INLINED
-CWhisperBlockMgr::~CWhisperBlockMgr() = default;
+// OFFSET: 0x00610F00
+// FUNCTION: fn_46471
+__declspec(noinline) CWhisperBlockMgr::~CWhisperBlockMgr() = default;
 
 // OFFSET: 0x00611040
 // FUNCTION: fn_04325
@@ -92,11 +91,3 @@ void CWhisperBlockMgr::Reset() {
   this->m_changes = 0;
 }
 
-// OFFSET: 0x005BB190
-// FUNCTION: fn_03454
-void CWhisperBlockMgr::Export(Json::Value& values) const {
-  for (const std::string& name : this->m_names) {
-    const std::string copy = name;
-    values.append(ToUtf8(copy, g_textCodePage));
-  }
-}

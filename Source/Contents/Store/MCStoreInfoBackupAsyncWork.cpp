@@ -21,15 +21,7 @@ namespace {
   constexpr char saveSource[] = "C:\\repositories\\RagnarokClient\\RagnarokClient\\Contents\\MCStoreBackUpData\\CMCStoreInfoBackupSaveAsyncWork."
                                 "cpp";
 
-  // INLINED
-  __forceinline AsyncDiagnostic Diagnostic(bool success, const char* text, const char* file, std::uint32_t line) {
-    std::string message = text;
-    return AsyncDiagnostic(&success, &message, file, &line);
-  }
-
-  // INLINED
-    // INLINED
-  }
+}
 
 // GLOBAL: gl_25611
 const char* g_mcStoreInfoBackupLoadPoolName = OBFUSCATE_BYTES_TEXT("MerchantStoreInformation_Load", 0xA7471985F93F9BDFULL);
@@ -44,8 +36,9 @@ CMCStoreInfoBackupLoadAsyncWork::CMCStoreInfoBackupLoadAsyncWork()
       m_diagnostic(false, std::string(OBFUSCATE_BYTES_TEXT("unknwon", 0xF535E561137F138DULL)), loadSource, 28), m_type(0) {
 }
 
-// INLINED
-CMCStoreInfoBackupLoadAsyncWork::~CMCStoreInfoBackupLoadAsyncWork() = default;
+// OFFSET: 0x00607E10
+// FUNCTION: fn_46406
+__declspec(noinline) CMCStoreInfoBackupLoadAsyncWork::~CMCStoreInfoBackupLoadAsyncWork() = default;
 
 // OFFSET: 0x00608270
 // FUNCTION: fn_04244
@@ -89,8 +82,7 @@ bool CMCStoreInfoBackupLoadAsyncWork::Execute() {
 
   if (handler.Perform() == 0) {
     this->m_response = handler.Response();
-    AsyncDiagnostic diagnostic = Diagnostic(true, OBFUSCATE_BYTES_TEXT("good", 0x6B3301E1A3079125ULL), loadSource, 115);
-    this->m_diagnostic = std::move(diagnostic);
+    this->m_diagnostic = AsyncDiagnostic(true, std::string(OBFUSCATE_BYTES_TEXT("good", 0x6B3301E1A3079125ULL)), loadSource, 115);
   }
 
   return false;
@@ -109,8 +101,9 @@ CMCStoreInfoBackupSaveAsyncWork::CMCStoreInfoBackupSaveAsyncWork()
       m_diagnostic(false, std::string(OBFUSCATE_BYTES_TEXT("unknwon", 0x3FAF85D995034FD7ULL)), saveSource, 30), m_type(0) {
 }
 
-// INLINED
-CMCStoreInfoBackupSaveAsyncWork::~CMCStoreInfoBackupSaveAsyncWork() = default;
+// OFFSET: 0x00609080
+// FUNCTION: fn_46407
+__declspec(noinline) CMCStoreInfoBackupSaveAsyncWork::~CMCStoreInfoBackupSaveAsyncWork() = default;
 
 // OFFSET: 0x00609520
 // FUNCTION: fn_04250
@@ -169,6 +162,3 @@ bool CMCStoreInfoBackupSaveAsyncWork::Execute() {
 void CMCStoreInfoBackupSaveAsyncWork::Complete() {
   g_session.m_storeInfoBackup.CompleteSave(this->m_diagnostic, this->m_response);
 }
-
-template void std::deque<CMCStoreInfoBackupSaveAsyncWork*>::push_back(CMCStoreInfoBackupSaveAsyncWork*&&);
-template void std::deque<CMCStoreInfoBackupLoadAsyncWork*>::push_back(CMCStoreInfoBackupLoadAsyncWork*&&);

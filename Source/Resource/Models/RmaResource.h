@@ -22,6 +22,13 @@ public:
   CRmaRes* Create() override;
   bool Load(const char* name) override;
   void Unload() override;
+  int EndFrame(int action);
+  int GetFirstFrame(int action);
+  int GetDelay(int action);
+  std::string* GetModel(int action);
+  int GetStartFrame(int action);
+  int HasFrame(int action, int frame);
+  int IsValidAction(int action);
 
   /* 0110 */ std::vector<RmaAction> actions;
   /* 011C */ std::vector<std::string> models;

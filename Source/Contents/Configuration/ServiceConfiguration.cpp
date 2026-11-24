@@ -34,8 +34,6 @@
 #include <vector>
 #include <windows.h>
 
-template __declspec(noinline) bool std::_Traits_equal<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 // GLOBAL: gl_24542
 signed char g_language = 0;
 
@@ -144,10 +142,11 @@ const char* GetLicenceText() {
 
 void LoadEtcInfo();
 void InitializeLanguage();
+void InitializeServiceConfiguration();
 
 // OFFSET: 0x00ACFF90
 // FUNCTION: fn_17808
-void InitializeServiceStrings() {
+void InitializeServiceStrings(char* protection) {
   LoadEtcInfo();
 
   switch (g_serviceType) {
@@ -171,6 +170,7 @@ void InitializeServiceStrings() {
   case ServiceFrance:
   case ServiceUae:
   case ServiceEu:
+    InitializeServiceConfiguration();
     break;
   default: {
     ShowErrorDialog(OBFUSCATE_TEXT("Unknown ServiceType !!!", 0xD3755DD95F47A909ULL), 0);
@@ -181,11 +181,11 @@ void InitializeServiceStrings() {
   InitializeLanguage();
 
   if (g_serviceType == ServiceKorea || g_serviceType == ServiceIndonesia) {
-    g_nameBalloonFontHeight = 13;
     g_serviceFlag05 = true;
+    g_nameBalloonFontHeight = 13;
   } else {
-    g_nameBalloonFontHeight = 12;
     g_serviceFlag05 = false;
+    g_nameBalloonFontHeight = 12;
   }
   g_serviceFlag06 = g_serviceFlag05;
 
@@ -206,6 +206,12 @@ void InitializeServiceStrings() {
   }
 
   switch (g_serviceMode) {
+  case ServerSakray: {
+    g_clientExeName = OBFUSCATE_BYTES_TEXT("sakray.exe", 0x955D4DF94DE9BB07ULL);
+    g_patcherExeName = OBFUSCATE_BYTES_TEXT("Sakup.exe", 0x8741152D8FB34B4FULL);
+    g_runPatcherMessage = OBFUSCATE_TEXT("Please run sakray.exe", 0xB739073FE921AD6FULL);
+    break;
+  }
   case ServerLocal: {
     g_clientExeName = OBFUSCATE_BYTES_TEXT("RagIndoor.exe", 0xC399B7091589B50BULL);
     g_patcherExeName = OBFUSCATE_BYTES_TEXT("Indoorup.exe", 0x7FC1015DFFCF6D19ULL);
@@ -218,6 +224,7 @@ void InitializeServiceStrings() {
     g_runPatcherMessage = OBFUSCATE_TEXT("Please run RagGuild.exe", 0x3B915119EFD523EFULL);
     break;
   }
+  case ServerPrimary:
   default: {
     if (std::strstr(g_launchServerName, OBFUSCATE_BYTES_TEXT("Dev", 0x3F5315DFE32B4FAFULL))) {
       g_clientExeName = OBFUSCATE_BYTES_TEXT("RagnarokQM.exe", 0x33832D4D3FDFBDBFULL);
@@ -423,10 +430,6 @@ void InitializeLanguage() {
 //   strstr(g_launchServerName, "QmSakray"), then one of two key/address pairs and
 //   StringFormat into g_serviceAddress, then the shared admin/monster-job tail at 0x00AD299D.
 //   That surviving path is what is ported below. Whatever ran in the lost bytes before it is unknown.
-// - At runtime this function is never called. A live WinDbg run of the full client
-//   (servertype=primary) never hit 0x00AD1C90 or 0x00AD1E58. The protector's own loader in section
-//   .data6 (sub_3DE8027, called from WinMain at 0x00E5F078) reads clientinfo.xml itself and sets
-//   g_serviceFlag07, g_adminAccountIds, g_monsterJobs and the connection strings instead.
 // - Cases 2 and 3 and the code before the switch are fully intact and ported as they are.
 // OFFSET: 0x00AD1C90
 // FUNCTION: fn_17817
@@ -449,11 +452,9 @@ void InitializeServiceConfiguration() {
     g_serviceFlag07 = 29;
     if (std::strstr(g_launchServerName, "QmSakray")) {
       g_serviceOverrideKey = OBFUSCATE_TEXT("kro-qm-2a.ragnarok.co.kr:6900", 0x45E3F103CBB5F157ULL);
-
       StringFormat(g_serviceAddress, sizeof(g_serviceAddress), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0x2F2701A7E56D3D89ULL), OBFUSCATE_TEXT("kro-qm-1a.ragnarok.co.kr:6951", 0x2D33791F67AD47DFULL));
     } else {
       g_serviceOverrideKey = OBFUSCATE_TEXT("kro-acc3.ragnarok.co.kr:6900", 0x6B3301E1A3079125ULL);
-
       StringFormat(g_serviceAddress, sizeof(g_serviceAddress), static_cast<std::size_t>(-1), OBFUSCATE_BYTES_TEXT("%s", 0x2F2701A7E56D3D89ULL), OBFUSCATE_TEXT("kro-agency-s.ragnarok.co.kr:6954", 0xC39FB559A17D3963ULL));
     }
     g_adminAccountIds.assign(std::begin(s_adminIds), std::end(s_adminIds));
@@ -578,13 +579,14 @@ void ReadClientInfo(XmlNode* clientInfo) {
 
   XmlNode* loading = clientInfo->FindChild(OBFUSCATE_BYTES_TEXT("loading", 0x1D6D75EDE7CD311FULL));
   if (loading) {
-    for (XmlNode* image = loading->FindChild(OBFUSCATE_BYTES_TEXT("image", 0x3375B1C7DBB5FD55ULL)); image;
-         image = image->FindSibling(OBFUSCATE_BYTES_TEXT("image", 0xD98F03A52D35636DULL))) {
+    XmlNode* image = loading->FindChild(OBFUSCATE_BYTES_TEXT("image", 0x3375B1C7DBB5FD55ULL));
+    while (image) {
       char path[256];
       std::sprintf(path,
                    OBFUSCATE_TEXT("유저인터페이스\\%s", 0x0F0F8B6B8F9D19D1ULL),
                    image->Text().c_str());
       g_loadingScreens.push_back(std::string(path));
+      image = image->FindSibling(OBFUSCATE_BYTES_TEXT("image", 0xD98F03A52D35636DULL));
     }
   }
 

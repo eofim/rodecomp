@@ -1,11 +1,8 @@
-#include "Client/Mode/ModeDragState.h"
 #include "Client/Replay/Replay.h"
 #include "Client/Session/Session.h"
 #include "Network/Packets/PacketLengths.h"
 #include "Network/Packets/PacketId.h"
 #include "UI/Window/UIWindow.h"
-#include "UI/Window/UIWindowMgr.h"
-#include "UI/Window/WindowPolicy.h"
 
 #include <algorithm>
 #include <cstring>
@@ -80,11 +77,15 @@ bool Replay::Record(std::uint16_t bytes, const void* packet, int event, std::uin
 
   auto* words = reinterpret_cast<ReplayCipherWord*>(record.data() + 10);
   if (words) {
-    this->cipherKey = this->header.key1 >> 3;
+    const std::uint32_t key = this->header.key1 >> 3;
+    const int count = bytes / 4;
+    const std::uint32_t base = this->header.key0 >> 5;
+    this->cipherKey = key;
     this->cipherIndex = 0;
-    this->cipherBase = this->header.key0 >> 5;
-    for (int index = 0; index < bytes / 4; ++index) {
-      words[index].value ^= this->cipherKey * (++this->cipherIndex + this->cipherBase);
+    this->cipherBase = base;
+    for (int index = 0; index < count; ++index) {
+      ++this->cipherIndex;
+      words[index].value ^= (this->cipherBase + this->cipherIndex) * this->cipherKey;
     }
   }
 
@@ -94,27 +95,6 @@ bool Replay::Record(std::uint16_t bytes, const void* packet, int event, std::uin
   ++this->records;
 
   return true;
-}
-
-// OFFSET: 0x00A82F00
-// FUNCTION: fn_16999
-void UIWindow::RecordResponse(int response, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
-  if (Replay::Instance().state != 2) {
-    return;
-  }
-
-#pragma pack(push, 1)
-  struct Response {
-    std::uint32_t marker;
-    std::uint16_t bytes;
-    std::int32_t windowId;
-    std::int32_t response;
-    std::uint32_t arguments[3];
-  };
-#pragma pack(pop)
-  static_assert(sizeof(Response) == 26);
-  const Response packet{0x038408AEu, 26, this->geometry.id, response, {static_cast<std::uint32_t>(b), static_cast<std::uint32_t>(c), static_cast<std::uint32_t>(d)}};
-  Replay::Instance().Record(sizeof(packet), &packet, 42, 0);
 }
 
 // OFFSET: 0x00B86AB0
@@ -197,10 +177,13 @@ bool Replay::RecordPacket(const std::vector<unsigned char>& packet, int event, s
 
   auto* words = reinterpret_cast<ReplayCipherWord*>(record.data() + 10);
   if (words) {
-    this->cipherKey = this->header.key1 >> 3;
+    const std::uint32_t key = this->header.key1 >> 3;
+    const int count = bytes / 4;
+    const std::uint32_t base = this->header.key0 >> 5;
+    this->cipherKey = key;
     this->cipherIndex = 0;
-    this->cipherBase = this->header.key0 >> 5;
-    for (int index = 0; index < bytes / 4; ++index) {
+    this->cipherBase = base;
+    for (int index = 0; index < count; ++index) {
       words[index].value ^= this->cipherKey * (++this->cipherIndex + this->cipherBase);
     }
   }
@@ -226,96 +209,6 @@ void Replay::RecordCachedPackets() {
   }
 }
 
-namespace {
-#pragma pack(push, 1)
-  struct DropRecord {
-    /* 0000 */ std::uint32_t marker;
-    /* 0004 */ std::uint16_t bytes;
-    /* 0006 */ std::int32_t windowId;
-    /* 000A */ std::int32_t x;
-    /* 000E */ std::int32_t y;
-    /* 0012 */ std::int32_t source;
-    /* 0016 */ std::uint32_t id;
-    /* 001A */ std::uint32_t dragValue;
-    /* 001E */ std::uint32_t dragSubValue;
-    /* 0022 */ std::int32_t quantity;
-    /* 0026 */ std::int32_t slot;
-    /* 002A */ std::uint32_t type;
-    /* 002E */ std::uint32_t refine;
-    /* 0032 */ unsigned char identified;
-    /* 0033 */ char resource[100];
-    /* 0097 */ char name[100];
-    /* 00FB */ char skillName[100];
-    /* 015F */ std::int32_t skillLevel;
-    /* 0163 */ unsigned char cards[16];
-    /* 0173 */ unsigned char skill;
-    /* 0174 */ std::int32_t optionCount;
-    /* 0178 */ ItemOptionRecord options[5];
-  };
-
-  struct ValuesRecord {
-    /* 0000 */ std::uint32_t marker;
-    /* 0004 */ std::uint16_t bytes;
-    /* 0006 */ std::int32_t windowId;
-    /* 000A */ std::int32_t arguments[4];
-    /* 001A */ std::int32_t value;
-  };
-
-  struct TextRecord {
-    /* 0000 */ std::uint32_t marker;
-    /* 0004 */ std::uint16_t bytes;
-    /* 0006 */ std::int32_t windowId;
-    /* 000A */ std::int32_t event;
-    /* 000E */ char text[100];
-  };
-#pragma pack(pop)
-
-  static_assert(sizeof(DropRecord) == 0x191);
-  static_assert(sizeof(ValuesRecord) == 0x1E);
-  static_assert(sizeof(TextRecord) == 0x72);
-}
-
-// OFFSET: 0x00A82F80
-// FUNCTION: fn_17000
-void UIWindow::RecordDrop(int x, int y, const ModeDragState& drag, int target) {
-  if (Replay::Instance().state != 2) {
-    return;
-  }
-
-  if (g_windowMgr.WindowPolicy(5, this->geometry.id) == 0) {
-    return;
-  }
-
-  DropRecord packet;
-  std::memset(&packet, 0, sizeof(packet));
-  packet.marker = 0x038508AEu;
-  packet.bytes = sizeof(packet);
-  packet.windowId = target == -1 ? this->geometry.id : target;
-  packet.x = x;
-  packet.y = y;
-  packet.source = drag.source;
-  packet.id = drag.id;
-  packet.dragValue = drag.itemValue;
-  packet.dragSubValue = drag.price;
-  packet.quantity = drag.quantity;
-  packet.slot = drag.slot;
-  packet.type = drag.type;
-  packet.refine = drag.refine;
-  packet.identified = drag.identified;
-  packet.skillLevel = drag.skillLevel;
-  packet.skill = drag.skill;
-  std::memcpy(packet.resource, drag.resource.c_str(), static_cast<int>(drag.resource.size()) > 100 ? 100 : drag.resource.size());
-  std::memcpy(packet.name, drag.name.c_str(), static_cast<int>(drag.name.size()) > 100 ? 100 : drag.name.size());
-  std::memcpy(packet.skillName, drag.skillName.c_str(), static_cast<int>(drag.skillName.size()) > 100 ? 100 : drag.skillName.size());
-  std::memcpy(packet.cards, drag.cards, sizeof(packet.cards));
-  packet.optionCount = drag.optionCount;
-  for (int index = 0; index < 5; ++index) {
-    packet.options[index] = drag.options[index];
-  }
-
-  Replay::Instance().Record(packet.bytes, &packet, 42, 0);
-}
-
 // OFFSET: 0x00A83180
 // FUNCTION: fn_17001
 int UIWindow::RecordData(std::uint16_t type, std::vector<unsigned char> data) {
@@ -326,49 +219,14 @@ int UIWindow::RecordData(std::uint16_t type, std::vector<unsigned char> data) {
   std::vector<unsigned char> record(data.size() + 6);
   std::memcpy(record.data() + 6, data.data(), data.size());
 
+  unsigned char* buffer = record.data();
   const std::uint16_t header[2] = {ID_CC_REPLAYPACKET, type};
-  const std::uint16_t bytes = static_cast<std::uint16_t>(record.size());
-  std::memcpy(record.data(), header, sizeof(header));
-  std::memcpy(record.data() + 4, &bytes, sizeof(bytes));
+  const std::size_t bytes = record.size();
+  std::memcpy(buffer, header, sizeof(header));
+  *reinterpret_cast<std::uint16_t*>(buffer + 4) = static_cast<std::uint16_t>(bytes);
 
   Replay::Instance().RecordPacket(record, 41, 0);
   return static_cast<int>(record.size());
-}
-
-// OFFSET: 0x00A83300
-// FUNCTION: fn_17002
-void UIWindow::RecordValues(int value, int argument1, int argument2, int argument3, int argument4) {
-  if (g_replayAnimationScaling != 0 || Replay::Instance().state != 2) {
-    return;
-  }
-
-  ValuesRecord packet;
-  packet.marker = 0x039108AEu;
-  packet.bytes = sizeof(packet);
-  packet.windowId = this->geometry.id;
-  packet.value = value;
-  packet.arguments[0] = argument1;
-  packet.arguments[1] = argument2;
-  packet.arguments[2] = argument3;
-  packet.arguments[3] = argument4;
-  Replay::Instance().Record(packet.bytes, &packet, 42, 0);
-}
-
-// OFFSET: 0x00A83440
-// FUNCTION: fn_17003
-void UIWindow::RecordText(int event, const char* text) {
-  if (Replay::Instance().state != 2) {
-    return;
-  }
-
-  TextRecord packet;
-  std::memset(packet.text, 0, sizeof(packet.text));
-  packet.marker = 0x038B08AEu;
-  packet.bytes = sizeof(packet);
-  packet.windowId = this->geometry.id;
-  packet.event = event;
-  std::memcpy(packet.text, text, std::min(static_cast<int>(std::strlen(text)), 100));
-  Replay::Instance().Record(packet.bytes, &packet, 42, 0);
 }
 
 // INLINED

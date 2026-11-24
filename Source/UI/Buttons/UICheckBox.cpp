@@ -65,12 +65,16 @@ void UICheckBox::Paint() {
 }
 
 // INLINED
-__forceinline void UICheckBox::Notify() {
+inline void UICheckBox::InvalidateCheckState() {
   this->Invalidate();
   if (this->Root()) {
     this->Root()->Invalidate();
   }
+}
 
+// INLINED
+__forceinline void UICheckBox::Notify() {
+  this->InvalidateCheckState();
   if (this->parent) {
     this->parent->SendMsg(this, UM_COMMAND, this->geometry.id, this->geometry.state, 0, 0);
   }
@@ -85,6 +89,15 @@ void UICheckBox::SetChecked(int value) {
 
   this->geometry.state = value;
   this->Notify();
+}
+
+// OFFSET: 0x00865930
+// FUNCTION: fn_45633
+void UICheckBox::SetCheckedSilently(int value) {
+  if (this->m_disabled == 0) {
+    this->geometry.state = value;
+    this->InvalidateCheckState();
+  }
 }
 
 // OFFSET: 0x0086AF70
@@ -187,6 +200,12 @@ void UICheckBox::SetTooltip(const char* text) {
   }
 }
 
+// OFFSET: 0x00869700
+// FUNCTION: fn_45634
+void UICheckBox::SetUncheckedTooltip(const char* text) {
+  this->m_uncheckedTooltip = text;
+}
+
 // OFFSET: 0x008653B0
 // FUNCTION: fn_10925
 void UICheckBox::FitToText() {
@@ -194,7 +213,7 @@ void UICheckBox::FitToText() {
     return;
   }
 
-  const int width = this->TextWidth(this->m_text.c_str(), 0, 0, 12, 0, 0);
+  int width = this->TextWidth(this->m_text.c_str(), 0, 0, 12, 0, 0);
   CBitmapRes* bitmap = nullptr;
   switch (this->geometry.state) {
   case 0:
@@ -205,8 +224,9 @@ void UICheckBox::FitToText() {
     break;
   }
 
-  const int desired = ((bitmap->image.width + width) + 3);
-  if (desired != this->geometry.width) {
-    this->Resize(desired, this->geometry.height);
+  width += 3;
+  width += bitmap->image.width;
+  if (width != this->geometry.width) {
+    this->Resize(width, this->geometry.height);
   }
 }

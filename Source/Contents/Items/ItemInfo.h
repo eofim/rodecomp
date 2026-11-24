@@ -7,10 +7,17 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <windows.h>
 
 struct ModeDragState;
 
 struct RawItemBasic {
+  // OFFSET: 0x00D042A0
+  // FUNCTION: fn_21557
+  RawItemBasic() : id(0), price(0), realPrice(0), type(0), identified(0), location(0), sprite(0) {
+    SecureZeroMemory(this->itemId, sizeof(this->itemId));
+  }
+
   /* 0000 */ std::int32_t id;
   /* 0004 */ std::uint32_t price;
   /* 0008 */ std::uint32_t realPrice;
@@ -86,7 +93,15 @@ struct ITEM_INFO {
   const std::vector<const char*>& Description() const;
   std::vector<unsigned char> Serialize() const;
   std::uint32_t Deserialize(const std::vector<unsigned char>& data);
-  /* 0000 */ std::uint32_t identity[4];
+  union {
+    /* 0000 */ std::uint32_t identity[4];
+    struct {
+      /* 0000 */ std::uint32_t itemType;
+      /* 0004 */ std::uint32_t itemIndex;
+      /* 0008 */ std::uint32_t location;
+      /* 000C */ std::uint32_t wearLocation;
+    };
+  };
   /* 0010 */ std::int32_t quantity;
   /* 0014 */ std::uint32_t prices[2];
   /* 001C */ std::uint32_t cards[4];
@@ -100,7 +115,10 @@ struct ITEM_INFO {
   /* 0068 */ __time32_t expireTime;
   /* 006C */ std::uint16_t priceFactor;
   /* 0070 */ std::int32_t sprite;
-  /* 0074 */ unsigned char flags[4];
+  /* 0074 */ unsigned char placeEtcTab;
+  /* 0075 */ unsigned char selected;
+  /* 0076 */ unsigned char flagged;
+  /* 0077 */ unsigned char uniqueItem;
   /* 0078 */ ItemSaleData saleData;
   /* 0088 */ std::int16_t grade;
   /* 0090 */ std::uint64_t productId;

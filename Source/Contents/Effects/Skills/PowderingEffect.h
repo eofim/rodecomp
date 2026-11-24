@@ -12,6 +12,7 @@ class CSpriteParticle;
 class CPowderingEffect : public CEffect {
 public:
   CPowderingEffect();
+  __declspec(noinline) ~CPowderingEffect() override;
 
   void Open() override;
   void OnProcess() override;
@@ -22,6 +23,12 @@ public:
 
   void InitSpriteParticle(CParticle* particle);
   void InitSmokeParticle(CParticle* particle);
+  void CreateSpriteParticles();
+  void CreateSmokeParticles();
+  void UpdateParticle(CParticle* particle);
+  void UpdateSmokeParticle(CParticle* particle);
+  void RenderSmokeParticle(CParticle* particle);
+  void RenderSpriteParticle(CSpriteParticle* particle);
 
   /* 00CC */ std::vector<CParticle*> smokeParticles;
   /* 00D8 */ std::vector<CSpriteParticle*> spriteParticles;

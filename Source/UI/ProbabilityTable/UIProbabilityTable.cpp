@@ -129,13 +129,16 @@ CUIFrameWnd* CreateProbabilityTable() {
   return new CUIProbabilityTable();
 }
 
+struct UIRegistration {
+  // INLINED
+  __forceinline UIRegistration(int id, std::function<CUIFrameWnd*()> factory) {
+    Singleton<CUIRegisterMgr>::GetInstance()->Register(id, factory);
+  }
+};
+
 // OFFSET: 0x00496610
 // FUNCTION: fn_45551
-static bool s_registered = [] {
-  std::function<CUIFrameWnd*()> factory = CreateProbabilityTable;
-  Singleton<CUIRegisterMgr>::GetInstance()->Register(10012, factory);
-  return true;
-}();
+static UIRegistration s_probabilityTableRegistered(10012, CreateProbabilityTable);
 
 // OFFSET: 0x00A48740
 // FUNCTION: fn_16115
@@ -166,10 +169,7 @@ template <>
 void CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
   this->scrollBar->Show(0);
-  {
-    const std::function<void(int)> onChange = [this](int position) { this->OnScroll(position); };
-    this->scrollBar->onChange = onChange;
-  }
+  this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
 
@@ -232,7 +232,12 @@ void CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>::AddNe
     return;
   }
 
-  this->ClearItems();
+  const auto end = this->items.end();
+  for (auto it = this->items.begin(); it != end; ++it) {
+    this->RemoveChild(*it, 1);
+  }
+  this->items.clear();
+  this->selected = static_cast<unsigned int>(-1);
 
   if (this->geometry.height >= this->rowHeight) {
     unsigned int count = static_cast<unsigned int>(this->geometry.height / this->rowHeight) + 1;
@@ -245,14 +250,14 @@ void CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>::AddNe
       item->SetSize(this->itemWidth, this->rowHeight);
       item->Show(0);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
-      item->onHover = [this](CUIListItem* listItem) {
+      item->SetOnHover([this](CUIListItem* listItem) {
         for (ProbabilityTable::CUIItem* other : this->items) {
           other->SetHighlighted(other == listItem);
         }
-      };
-      item->onPress = [this](CUIListItem* listItem) {
+      });
+      item->SetOnPress([this](CUIListItem* listItem) {
         this->SelectItem(listItem);
-      };
+      });
       this->AddChild(item);
       slot = item;
     }
@@ -446,10 +451,14 @@ void CUIProbabilityTable::Search() {
     return FindSubstring(data.name, keyword) != -1;
   };
 
+  const unsigned int selected = list->selected;
   auto start = list->data.begin();
   if (keyword == this->m_lastSearch) {
-    const int next = list->data.size() - 1 != list->selected ? static_cast<int>(list->selected) + 1 : 0;
-    start = std::next(list->data.begin(), next);
+    int next = 0;
+    if (list->data.size() - 1 != selected) {
+      next = static_cast<int>(list->selected) + 1;
+    }
+    std::advance(start, next);
   }
 
   auto found = std::find_if(start, list->data.end(), matches);
@@ -462,16 +471,10 @@ void CUIProbabilityTable::Search() {
 
     CUIListBoxEx<ProbabilityTable::CUIItem, ProbabilityTable::CItemData>* current = this->m_list;
     const int index = static_cast<int>(std::distance(list->data.begin(), found));
-    current->scrollBar->SetPosition(current->rowHeight * index);
-    for (ProbabilityTable::CUIItem* item : current->items) {
-      if (index == item->index) {
-        current->SelectItem(item);
-        break;
-      }
-    }
+    current->SelectIndex(index);
     this->m_list->RebindIndex(this->m_list->selected);
   } else {
-    g_windowMgr.Confirm(LookupMessage(MSI_REFINING_BLACKSMITH_BLESSING_MSG3), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_NO_SEARCH_RESULTS), 0, true, false, 0, "Message", 280, 120, 0);
   }
 
   this->m_lastSearch = keyword;
@@ -487,9 +490,9 @@ void CUIProbabilityTable::OnInit() {
     this->Move(g_renderer->viewport.centerX, (g_renderer->viewport.height - this->geometry.height) / 2);
   }
 
-  this->m_titleBar->SetTitle(LookupMessage(MSI_REFINING_PROBABILITY_URL));
-  this->m_nameHeader->SetText(LookupMessage(MSI_GRADE_ENCHANT_PROBABILITY_URL));
-  this->m_probabilityHeader->SetText(LookupMessage(MSI_SELLINGSLOT_SUCCESS));
+  this->m_titleBar->SetTitle(LookupMessage(MSI_PROBABILITY_TITLE));
+  this->m_nameHeader->SetText(LookupMessage(MSI_COMPONENT_SEARCH));
+  this->m_probabilityHeader->SetText(LookupMessage(MSI_PROBABILITY));
 }
 
 // OFFSET: 0x00A4E030

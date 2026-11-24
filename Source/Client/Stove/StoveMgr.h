@@ -24,8 +24,7 @@ public:
   /* 0004 */ bool m_initialized;
   /* 0008 */ int m_pendingOperation;
   /* 000C */ int m_environment;
-  /* 0010 */ int m_purchaseIdLow;
-  /* 0014 */ int m_purchaseIdHigh;
+  /* 0010 */ std::int64_t m_purchaseId;
   /* 0018 */ std::string m_purchaseUrl;
   /* 0030 */ char m_accessToken[600];
   /* 0288 */ char m_memberNumber[24];
@@ -37,6 +36,8 @@ public:
   __declspec(noinline) void WaitForCallback();
   void FetchCategoryProducts();
   void FetchAllProducts();
+  void FetchStoveTermsAgreement();
+  void RunCallback();
   bool Initialize();
   void StartPurchase(const std::vector<ITEM_INFO>& items);
 };
@@ -51,7 +52,5 @@ static_assert(offsetof(CStoveMgr, m_applicationId) == 0x02B8);
 #endif
 
 extern CStoveMgr* g_stoveMgr;
-
-void FetchStoveTermsAgreement();
 
 #endif

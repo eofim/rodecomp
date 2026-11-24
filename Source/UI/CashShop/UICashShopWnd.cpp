@@ -52,10 +52,6 @@
 #include <shellapi.h>
 #include <timeapi.h>
 
-template __declspec(noinline) char* std::allocator<char>::allocate(const std::size_t);
-
-template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
-
 #pragma pack(push, 1)
 struct CashItemPurchase {
   /* 0000 */ int itemId;
@@ -243,7 +239,7 @@ void UICashShopWnd::OnCreate(int, int) {
   previous->SetBitmap("유저인터페이스\\cashshop\\bt_arrowL_on.bmp", 2, 0);
   previous->SetSize(previous->BitmapWidth(), previous->BitmapHeight());
   previous->Move(0xEC, 0x1ED);
-  previous->SetId(0x13C);
+  previous->SetId(ID_PREV_PAGE);
   this->AddChild(previous);
 
   UIBitmapButton* next = new UIBitmapButton();
@@ -252,7 +248,7 @@ void UICashShopWnd::OnCreate(int, int) {
   next->SetBitmap("유저인터페이스\\cashshop\\bt_arrowR_on.bmp", 2, 0);
   next->SetSize(next->BitmapWidth(), next->BitmapHeight());
   next->Move(0x122, 0x1ED);
-  next->SetId(0x13D);
+  next->SetId(ID_NEXT_PAGE);
   this->AddChild(next);
 
   UIBitmapButton* first = new UIBitmapButton();
@@ -261,7 +257,7 @@ void UICashShopWnd::OnCreate(int, int) {
   first->SetBitmap("유저인터페이스\\cashshop\\bt_arrowL2_on.bmp", 2, 0);
   first->SetSize(first->BitmapWidth(), first->BitmapHeight());
   first->Move(0xD9, 0x1ED);
-  first->SetId(0x183);
+  first->SetId(ID_FIRST_PAGE);
   this->AddChild(first);
 
   UIBitmapButton* last = new UIBitmapButton();
@@ -270,7 +266,7 @@ void UICashShopWnd::OnCreate(int, int) {
   last->SetBitmap("유저인터페이스\\cashshop\\bt_arrowR2_on.bmp", 2, 0);
   last->SetSize(last->BitmapWidth(), last->BitmapHeight());
   last->Move(0x130, 0x1ED);
-  last->SetId(0x184);
+  last->SetId(ID_LAST_PAGE);
   this->AddChild(last);
 
   UIBmpTextButton* charge = new UIBmpTextButton();
@@ -278,9 +274,9 @@ void UICashShopWnd::OnCreate(int, int) {
   charge->SetBitmap("유저인터페이스\\cashshop\\btn_charge_press.bmp", 1, 0);
   charge->SetBitmap("유저인터페이스\\cashshop\\btn_charge_press.bmp", 2, 0);
   charge->SetSize(charge->BitmapWidth(), charge->BitmapHeight());
-  charge->SetText(LookupMessage(MSI_ITEM_SEARCH));
+  charge->SetText(LookupMessage(MSI_CASHSHOP_CASH_CHARGE));
   charge->Move(0x28E, 0x2E);
-  charge->SetId(0x11C);
+  charge->SetId(ID_CHARGE);
   this->AddChild(charge);
 
   this->m_refreshButton = new UIBmpTextButton();
@@ -288,17 +284,17 @@ void UICashShopWnd::OnCreate(int, int) {
   this->m_refreshButton->SetBitmap("유저인터페이스\\cashshop\\btn_refresh_press.bmp", 1, 0);
   this->m_refreshButton->SetBitmap("유저인터페이스\\cashshop\\btn_refresh_press.bmp", 2, 0);
   this->m_refreshButton->SetSize(this->m_refreshButton->BitmapWidth(), this->m_refreshButton->BitmapHeight());
-  this->m_refreshButton->SetText(LookupMessage(MSI_STAR_EMPEROR_M));
+  this->m_refreshButton->SetText(LookupMessage(MSI_CASHSHOP_REFRESH));
   this->m_refreshButton->Move(0x1C4, 0x204);
-  this->m_refreshButton->SetId(0x19F);
+  this->m_refreshButton->SetId(ID_REFRESH);
   this->AddChild(this->m_refreshButton);
 
   this->m_searchEdit = new UIEditCtrl();
   this->m_searchEdit->SetSize(0x123, 0xE);
   this->m_searchEdit->Move(0x5E, 0x206);
   this->m_searchEdit->preserveInput = 1;
-  this->m_searchEdit->SetText(LookupMessage(MSI_CASHSHOP_CASH_POINT));
-  this->m_searchEdit->TextColor(0xB1B1B1, 0xFFFFFFFFu);
+  this->m_searchEdit->SetText(LookupMessage(MSI_ITEM_SEARCH));
+  this->m_searchEdit->TextColor(0xB1, 0xB1, 0xB1, 0xFFFFFFFFu);
   this->AddChild(this->m_searchEdit);
 
   UIBitmapButton* search = new UIBitmapButton();
@@ -307,7 +303,7 @@ void UICashShopWnd::OnCreate(int, int) {
   search->SetBitmap("유저인터페이스\\cashshop\\btn_searchbar_press.bmp", 2, 0);
   search->SetSize(search->BitmapWidth(), search->BitmapHeight());
   search->Move(0x188, 0x204);
-  search->SetId(0x141);
+  search->SetId(ID_SEARCH);
   this->AddChild(search);
 
   UIBmpTextButton* buy = new UIBmpTextButton();
@@ -315,9 +311,9 @@ void UICashShopWnd::OnCreate(int, int) {
   buy->SetBitmap("유저인터페이스\\cashshop\\btn_buy_press.bmp", 1, 0);
   buy->SetBitmap("유저인터페이스\\cashshop\\btn_buy_press.bmp", 2, 0);
   buy->SetSize(buy->BitmapWidth(), buy->BitmapHeight());
-  buy->SetText(LookupMessage(MSI_CASHSHOP_FREE_POINT));
+  buy->SetText(LookupMessage(MSI_CASHSHOP_ITEM_BUY));
   buy->Move(0x228, 0x1FC);
-  buy->SetId(0xE0);
+  buy->SetId(ID_BUY);
   this->AddChild(buy);
 
   this->m_pointsEdit = new UIEditCtrl_Custom();
@@ -363,15 +359,13 @@ void UICashShopWnd_Cart::OnCreate(int, int) {
   );
   this->AddChild(this->m_scrollBar);
 
-  int y = 5;
-  for (int index = 0; index < this->m_visibleCount; ++index) {
+  for (int index = 0, y = 5; index < this->m_visibleCount; ++index, y += 0x39) {
     UICashShopWnd_CartItem* item = new UICashShopWnd_CartItem();
     item->SetSize(0xAC, 0x36);
     item->Move(3, y);
     item->Show(0);
     this->AddChild(item);
     this->m_slots.push_back(item);
-    y += 0x39;
   }
 }
 
@@ -384,7 +378,7 @@ void UICashShopWnd_CartItem::OnCreate(int, int) {
   close->SetBitmap("유저인터페이스\\cashshop\\btn_close.bmp", 2, 0);
   close->SetSize(close->BitmapWidth(), close->BitmapHeight());
   close->Move(0xA1, 2);
-  close->SetId(0xD3);
+  close->SetId(ID_DELETE);
   this->AddChild(close);
 
   UIBitmapButton* plus = new UIBitmapButton();
@@ -393,7 +387,7 @@ void UICashShopWnd_CartItem::OnCreate(int, int) {
   plus->SetBitmap("유저인터페이스\\cashshop\\btn_plus_press.bmp", 2, 0);
   plus->SetSize(plus->BitmapWidth(), plus->BitmapHeight());
   plus->Move(0x52, 0x1D);
-  plus->SetId(0x117);
+  plus->SetId(ID_UP);
   this->AddChild(plus);
 
   UIBitmapButton* minus = new UIBitmapButton();
@@ -402,7 +396,7 @@ void UICashShopWnd_CartItem::OnCreate(int, int) {
   minus->SetBitmap("유저인터페이스\\cashshop\\btn_minus_press.bmp", 2, 0);
   minus->SetSize(minus->BitmapWidth(), minus->BitmapHeight());
   minus->Move(0x52, 0x26);
-  minus->SetId(0x118);
+  minus->SetId(ID_DOWN);
   this->AddChild(minus);
 }
 
@@ -417,7 +411,7 @@ void UICashShopWnd_Item::OnCreate(int, int) {
   this->m_addButton->SetSize(this->m_addButton->BitmapWidth(), this->m_addButton->BitmapHeight());
   this->m_addButton->SetText(LookupMessage(MSI_BUY));
   this->m_addButton->Move(0x53, 0x55);
-  this->m_addButton->SetId(0xE0);
+  this->m_addButton->SetId(ID_BUY);
   this->AddChild(this->m_addButton);
 
   this->m_soldOut = new UIStaticBitmap();
@@ -440,7 +434,7 @@ void UICashShopWnd::Paint() {
     );
   }
 
-  this->DrawTitleBar(false, LookupMessage(MSI_CASHSHOP_TAB_HOT), 0);
+  this->DrawTitleBar(false, LookupMessage(MSI_CASHSHOP_SALE_LIST), 0);
   if (this->m_pageCount == 0) {
     this->DrawWrappedFormattedText(0xF7, 0x1EE, std::string("0 / 0"), 0x2B, 0, 6, 0, 0xC, 0x6B2921, 0);
   } else {
@@ -459,14 +453,14 @@ void UICashShopWnd::Paint() {
       return title.Text();
     }(), 0xB9, 0, 0xE, 0xFFFFFF, 1);
   } else {
-    this->DrawCenteredText(0x21A, 0x1B, LookupMessage(MSI_CASHSHOP_TAB_LIMITED), 0xB9, 0, 0xE, 0, 1);
-    this->DrawCenteredText(0x219, 0x1A, LookupMessage(MSI_CASHSHOP_TAB_LIMITED), 0xB9, 0, 0xE, 0xFFFFFF, 1);
+    this->DrawCenteredText(0x21A, 0x1B, LookupMessage(MSI_CASHSHOP_BUY_LIST), 0xB9, 0, 0xE, 0, 1);
+    this->DrawCenteredText(0x219, 0x1A, LookupMessage(MSI_CASHSHOP_BUY_LIST), 0xB9, 0, 0xE, 0xFFFFFF, 1);
     this->DrawRightAlignedText(0x273, 0x33, IntToString(this->m_cashPoints, 0).c_str(), 0, 0, 0xC, 0xFFFFFF, 1);
-    this->DrawTextAt(0x226, 0x1B2, LookupMessage(MSI_CASHSHOP_REFRESH), 0, 0, 0xC, 0, 0, 0);
+    this->DrawTextAt(0x226, 0x1B2, LookupMessage(MSI_CASHSHOP_FREE_POINT), 0, 0, 0xC, 0, 0, 0);
     this->DrawRightAlignedText(0x2C4, 0x1B2, FormatOwnedString("%d C", this->m_secondaryPoints).c_str(), 0, 0, 0xC, 0, 0);
-    this->DrawTextAt(0x226, 0x1C2, LookupMessage(MSI_STAR_EMPEROR_F), 0, 0, 0xC, 0, 0, 0);
+    this->DrawTextAt(0x226, 0x1C2, LookupMessage(MSI_CASHSHOP_FREE_POINT_TO_USE), 0, 0, 0xC, 0, 0, 0);
     this->DrawRightAlignedText(0x2C4, 0x1C2, "C", 0, 0, 0xC, 0, 0);
-    this->DrawTextAt(0x226, 0x1D2, LookupMessage(MSI_SOUL_REAPER_F), 0, 0, 0xC, 0, 0, 0);
+    this->DrawTextAt(0x226, 0x1D2, LookupMessage(MSI_CASHSHOP_CASH_POINT), 0, 0, 0xC, 0, 0, 0);
     this->DrawRightAlignedText(0x2C4, 0x1D2, FormatOwnedString("%d C", 0).c_str(), 0, 0, 0xC, 0, 0);
   }
 
@@ -533,9 +527,9 @@ void UICashShopWnd_Item::Paint() {
     {
       std::string stock;
       if (this->m_item.prices[0] == 0) {
-        stock = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_CASHSHOP_NON_TRADABLE)));
+        stock = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_CASHSHOP_FREE)));
       } else {
-        stock = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_MAP_PROPERTY_DISABLE_CALLED), this->m_item.quantity));
+        stock = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_LIMIT_NUM), this->m_item.quantity));
       }
       this->DrawCenteredOutlinedText(6, 0x22, stock.c_str(), 0x49, 0, 0xFFFFFF, 0, 0, 0xB, 1);
     }
@@ -554,7 +548,7 @@ void UICashShopWnd_Item::Paint() {
     }
 
     if (this->m_item.prices[0] == 0) {
-      this->DrawTextAt(0x53, 0x4C, LookupMessage(MSI_ZEROQUEST_QUESTVIEW_ON), 0, 0, 0xB, 0xFF, 0, 0);
+      this->DrawTextAt(0x53, 0x4C, LookupMessage(MSI_CASHSHOP_NON_TRADABLE), 0, 0, 0xB, 0xFF, 0, 0);
     } else {
       std::string count;
       if (this->m_item.saleData.purchaseCount < 0) {
@@ -562,30 +556,23 @@ void UICashShopWnd_Item::Paint() {
       } else {
         count = static_cast<const std::string&>(FormatOwnedString("%d/%d", this->m_item.saleData.purchaseCount, this->m_item.quantity));
       }
-      this->DrawTextAt(0x53, 0x4C, LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_SOLD_OUT), 0, 0, 0xB, 0x6E4B41, 0, 0);
+      this->DrawTextAt(0x53, 0x4C, LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_NUM), 0, 0, 0xB, 0x6E4B41, 0, 0);
       this->DrawCenteredOutlinedText(0x53, 0x5B, count.c_str(), 0x51, 0, 0xFFFFFF, 0xD29374, 0, 0x10, 1);
     }
 
-    __time32_t& start = this->m_item.saleData.startTime;
-    __time32_t& end = this->m_item.saleData.endTime;
-    start = start < 0 ? 0 : start;
-    end = end < 0 ? 0 : end;
+    this->m_item.saleData.startTime = this->m_item.saleData.startTime < 0 ? 0 : this->m_item.saleData.startTime;
+    this->m_item.saleData.endTime = this->m_item.saleData.endTime < 0 ? 0 : this->m_item.saleData.endTime;
 
     __time32_t now;
     _time32(&now);
-    const tm startTime = *_localtime32(&start);
-    const tm endTime = *_localtime32(&end);
-    std::string startText = FormatOwnedString(LookupMessage(MSI_ACCOUNT_LIMITED_TOOL_RESULT_FORMAT), startTime.tm_mon + 1, startTime.tm_mday, startTime.tm_hour, startTime.tm_min);
+    const tm startTime = *_localtime32(&this->m_item.saleData.startTime);
+    const tm endTime = *_localtime32(&this->m_item.saleData.endTime);
+    std::string startText = FormatOwnedString(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_START_DATE), startTime.tm_mon + 1, startTime.tm_mday, startTime.tm_hour, startTime.tm_min);
     std::string endText =
-      FormatOwnedString(LookupMessage(MSI_GUILD_EXP_TRIBUTE), endTime.tm_year + 1900, endTime.tm_mon + 1, endTime.tm_mday, endTime.tm_hour, endTime.tm_min);
+      FormatOwnedString(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_NEXT_NEWDATE), endTime.tm_year + 1900, endTime.tm_mon + 1, endTime.tm_mday, endTime.tm_hour, endTime.tm_min);
 
-    const char* text = startText.c_str();
-    const int center = this->geometry.width / 2;
-    const int startWidth = this->TextWidth(text, 0, 0, 0xC, 0, 0);
-    this->DrawTextAt(static_cast<int>(center - startWidth * 0.5), 0xA0, text, 0, 0, 0xB, 0, 0, 0);
-    text = endText.c_str();
-    const int endWidth = this->TextWidth(text, 0, 0, 0xC, 0, 0);
-    this->DrawTextAt(0x9E - endWidth, 0xAD, text, 0, 0, 0xB, 0, 0, 0);
+    this->DrawTextAt(static_cast<int>(this->geometry.width / 2 - this->TextWidth(startText.c_str(), 0, 0, 0xC, 0, 0) * 0.5), 0xA0, startText.c_str(), 0, 0, 0xB, 0, 0, 0);
+    this->DrawTextAt(0x9E - this->TextWidth(endText.c_str(), 0, 0, 0xC, 0, 0), 0xAD, endText.c_str(), 0, 0, 0xB, 0, 0, 0);
   } else {
     this->DrawBitmap(
       0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\cashshop\\img_shop_itemBg.bmp"))), false
@@ -616,7 +603,7 @@ void UICashShopWnd_CartItem::OnLBtnDblClk(int, int) {
 void UICashShopWnd_CartItem::OnLBtnDown(int, int) {
   if (this->m_item.identity[1] > 0) {
     g_modeMgr.GetGameMode()
-      ->BeginDragItem(4, this->m_item, this->m_item.quantity, -1);
+      ->BeginDragItem(DRAG_ITEM_PURCHASE_CART, this->m_item, this->m_item.quantity, -1);
   }
 }
 
@@ -624,7 +611,7 @@ void UICashShopWnd_CartItem::OnLBtnDown(int, int) {
 // FUNCTION: fn_09546
 void UICashShopWnd_Item::OnLBtnDown(int, int) {
   if (this->m_item.identity[1] > 0) {
-    g_modeMgr.GetGameMode()->BeginDragItem(6, this->m_item, 1, -1);
+    g_modeMgr.GetGameMode()->BeginDragItem(DRAG_ITEM_STORAGE, this->m_item, 1, -1);
   }
 }
 
@@ -671,9 +658,9 @@ void UICashShopWnd_Banner::ResetCursor(int, int) {
 // FUNCTION: fn_09551
 void UICashShopWnd::OnProcess() {
   std::string search(this->m_searchEdit->Text());
-  if (search.compare(LookupMessage(MSI_CASHSHOP_CASH_POINT)) != 0) {
+  if (search.compare(LookupMessage(MSI_ITEM_SEARCH)) != 0) {
     if (search.size() == 0) {
-      this->m_searchEdit->SetText(LookupMessage(MSI_CASHSHOP_CASH_POINT));
+      this->m_searchEdit->SetText(LookupMessage(MSI_ITEM_SEARCH));
       this->m_searchEdit->TextColor(0xB1, 0xB1, 0xB1, 0xFFFFFFFFu);
     } else {
       this->m_searchEdit->TextColor(0, 0, 0, 0xFFFFFFFFu);
@@ -694,9 +681,12 @@ void UICashShopWnd::OnProcess() {
 // OFFSET: 0x007D14C0
 // FUNCTION: fn_09552
 void UICashShopWnd_Banner::OnProcess() {
-  if (!this->m_entries.empty() && this->m_lastTick + 5000 < timeGetTime()) {
-    const unsigned int next = this->m_index + 1;
-    this->SendMsg(this->m_buttons[next < this->m_entries.size() ? next : 0], UM_COMMAND, ID_RADIOBTN, 0, 0, 0);
+  if (!this->m_entries.empty()) {
+    const DWORD now = timeGetTime();
+    if (this->m_lastTick + 5000 < now) {
+      const unsigned int next = this->m_index + 1;
+      this->SendMsg(this->m_buttons[next < this->m_entries.size() ? next : 0], UM_COMMAND, ID_RADIOBTN, 0, 0, 0);
+    }
   }
 }
 
@@ -759,6 +749,13 @@ void UICashShopWnd_Banner::CreateButtons() {
   this->Invalidate();
 }
 
+// INLINED
+static void ResetCart(UICashShopWnd_Cart* cart) {
+  cart->m_cartItems.clear();
+  cart->SendMsg(cart, UM_SCROLLVERT, 0, 0, 0, 0);
+  cart->Invalidate();
+}
+
 // OFFSET: 0x007D17A0
 // FUNCTION: fn_09558
 int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
@@ -771,12 +768,10 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         this->m_banner->CreateButtons();
         this->m_secondBanner->CreateButtons();
         this->Invalidate();
-        return 0;
       }
     } else if (g_session.m_hotkeyScript->Call("set_cashshop_banner", "") == true) {
       this->m_banner->CreateButtons();
       this->Invalidate();
-      return 0;
     }
     return 0;
 
@@ -793,7 +788,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
     this->m_cashPoints = argument1;
     this->m_secondaryPoints = argument2;
     this->m_pointsEdit->SetText(IntToString(0, 0).c_str());
-    this->SendMsg(this, UM_COMMAND, 0x182, 0, 0, 0);
+    this->SendMsg(this, UM_COMMAND, ID_RESET_CART, 0, 0, 0);
     return 0;
   }
 
@@ -844,7 +839,8 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
     case 4: {
       std::vector<ITEM_INFO>& cartItems = this->m_cart->m_cartItems;
       std::vector<ITEM_INFO>::iterator entry = std::find_if(cartItems.begin(), cartItems.end(), [drag](const ITEM_INFO& item) {
-        return atoi(drag->name.c_str()) == atoi(item.itemId.c_str());
+        const int itemId = atoi(item.itemId.c_str());
+        return itemId == atoi(drag->name.c_str());
       });
 
       if (entry != cartItems.end()) {
@@ -863,9 +859,8 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         });
 
         if (product != this->m_items.end()) {
-          const int stock = product->saleData.purchaseCount;
-          if (stock <= 0) {
-            g_windowMgr.Confirm(LookupMessage(MSI_HAVE_ITEMTAG), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+          if (static_cast<int>(product->saleData.purchaseCount) <= 0) {
+            g_windowMgr.Confirm(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_DONT_MOVE_CART), 0, true, false, 0, "Message", 0x118, 0x78, 0);
             mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
             break;
           }
@@ -875,14 +870,15 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
             return atoi(drag->name.c_str()) == atoi(item.itemId.c_str());
           });
 
-          if (entry != cartItems.end() && stock < drag->quantity + entry->quantity) {
-            drag->quantity = stock - entry->quantity;
+          if (entry != cartItems.end() && static_cast<int>(product->saleData.purchaseCount) < drag->quantity + entry->quantity) {
+            drag->quantity = product->saleData.purchaseCount - entry->quantity;
           }
         }
       }
 
       std::list<ITEM_INFO>::iterator product = std::find_if(this->m_items.begin(), this->m_items.end(), [drag](const ITEM_INFO& item) {
-        return atoi(drag->name.c_str()) == atoi(item.itemId.c_str());
+        const int itemId = atoi(item.itemId.c_str());
+        return itemId == atoi(drag->name.c_str());
       });
 
       if (product != this->m_items.end()) {
@@ -898,11 +894,9 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
 
   case UM_COMMAND:
     switch (argument1) {
-    case 0x182:
+    case ID_RESET_CART:
       this->m_totalPrice = 0;
-      this->m_cart->m_cartItems.clear();
-      this->m_cart->SendMsg(this->m_cart, UM_SCROLLVERT, 0, 0, 0, 0);
-      this->m_cart->Invalidate();
+      ResetCart(this->m_cart);
       this->Invalidate();
       return 0;
     case ID_CLOSE:
@@ -922,7 +916,11 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       if (selected != this->m_selectedTab) {
         for (std::map<int, UIWindow*>::iterator tab = this->m_tabButtons.begin(); tab != this->m_tabButtons.end(); ++tab) {
           if (tab->first != 10 && tab->first != 8 && tab->second != nullptr) {
-            tab->second->SendMsg(this, UM_SETSTATE, selected == tab->first, 0, 0, 0);
+            if (selected == tab->first) {
+              tab->second->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+            } else {
+              tab->second->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+            }
           }
         }
         this->m_selectedTab = selected;
@@ -940,7 +938,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
     }
     case ID_SEARCH: {
       std::string query(this->m_searchEdit->Text());
-      if (query.size() != 0 && query.compare(LookupMessage(MSI_CASHSHOP_CASH_POINT)) != 0) {
+      if (query.size() != 0 && query.compare(LookupMessage(MSI_ITEM_SEARCH)) != 0) {
         itemLists.ClearInventoryCategoryItems(10);
         for (int list = 0; list < 11; ++list) {
           if (list == 10 || list == 8 || list == 9) {
@@ -971,7 +969,7 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
             }
           }
           this->LayoutPage();
-          return 0;
+          break;
         }
 
         g_windowMgr.Confirm(LookupMessage(MSI_NOTHING_SEARCH_ITEM), 0, true, false, 0, "Message", 0x118, 0x78, 0);
@@ -979,21 +977,21 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       return 0;
     }
     case ID_CHARGE:
-      ShellExecuteA(nullptr, "OPEN", LookupMessage(MSI_CASHSHOP_FREE_POINT_TO_USE), LookupMessage(MSI_CASHSHOP_FREE_POINT_TO_USE), nullptr, SW_SHOW);
+      ShellExecuteA(nullptr, "OPEN", LookupMessage(MSI_CASHSHOP_CASH_CHARGE_ADDRESS), LookupMessage(MSI_CASHSHOP_CASH_CHARGE_ADDRESS), nullptr, SW_SHOW);
       return 0;
-    case 0x183:
+    case ID_FIRST_PAGE:
       this->m_page = 0;
       this->LayoutPage();
       return 0;
     case ID_PREV_PAGE:
-      this->m_page = std::max(this->m_page - 1, 0);
+      this->m_page = this->m_page - 1 < 0 ? 0 : this->m_page - 1;
       this->LayoutPage();
       return 0;
     case ID_NEXT_PAGE:
-      this->m_page = std::min(this->m_page + 1, this->m_pageCount - 1);
+      this->m_page = this->m_pageCount <= this->m_page + 1 ? this->m_pageCount - 1 : this->m_page + 1;
       this->LayoutPage();
       return 0;
-    case 0x184:
+    case ID_LAST_PAGE:
       this->m_page = this->m_pageCount - 1;
       this->LayoutPage();
       return 0;
@@ -1005,9 +1003,10 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       }
 
       if (g_session.m_launchPassCommandLine) {
-        const int owned = lists.GetNumInventoryItems() + g_session.CountDistinctEquippedItems() + g_session.CountDistinctCostumeItems();
-        if (g_session.m_weight > g_session.m_maxWeight * 0.7f || cartItems.front().quantity + owned > g_session.extraInventorySlots + 100) {
-          g_windowMgr.Confirm(LookupMessage(MSI_ANOTHER_WORKING), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+        const ITEM_INFO& item = cartItems.front();
+        const int itemCount = lists.GetNumInventoryItems() + g_session.CountDistinctEquippedItems() + g_session.CountDistinctCostumeItems() + item.quantity;
+        if (g_session.m_weight > g_session.m_maxWeight * 0.7f || itemCount > g_session.extraInventorySlots + 100) {
+          g_windowMgr.Confirm(LookupMessage(MSI_PICKUP_FAILED_ITEMCREATE), 0, true, false, 0, "Message", 0x118, 0x78, 0);
           return 0;
         }
 
@@ -1023,11 +1022,14 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
       }
 
       const int available = this->m_cashPoints + points;
+      char buffer[0x800];
       char text[0x800];
       if (points > 0) {
-        FormatMessageBuffer(text, LookupMessage(MSI_CHANGE_MATERIAL_INVSORT), price - points, points);
+        const char* format = LookupMessage(MSI_BUY_RECONFIRM2_2019);
+        FormatMessageBuffer(text, format, price - points, points);
       } else {
-        FormatMessageBuffer(text, LookupMessage(MSI_BILLING_INFO_URL), price);
+        const char* format = LookupMessage(MSI_BUY_RECONFIRM1_2019);
+        FormatMessageBuffer(text, format, price);
       }
 
       if (this->m_totalPrice > available) {
@@ -1044,23 +1046,20 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         return 0;
       }
 
-      PACKET_CZ_SE_PC_BUY_CASHITEM_LIST packet;
-      packet.packetType = ID_CZ_SE_PC_BUY_CASHITEM_LIST;
-      packet.packetLength = static_cast<std::uint16_t>(length);
-      packet.count = static_cast<std::uint16_t>(count);
-      packet.kafraPoints = points;
+      PACKET_CZ_SE_PC_BUY_CASHITEM_LIST* packet = reinterpret_cast<PACKET_CZ_SE_PC_BUY_CASHITEM_LIST*>(buffer);
+      packet->packetType = ID_CZ_SE_PC_BUY_CASHITEM_LIST;
+      packet->packetLength = static_cast<std::uint16_t>(length);
+      packet->count = static_cast<std::uint16_t>(count);
+      packet->kafraPoints = points;
       for (int index = 0; index < count; ++index) {
         const ITEM_INFO& item = cartItems[index];
-        CashItemPurchase& purchase = packet.items[index];
-        purchase.itemId = atoi(item.itemId.c_str());
-        purchase.quantity = item.quantity;
-        purchase.tab = item.bindOnEquip;
+        packet->items[index] = CashItemPurchase{atoi(item.itemId.c_str()), item.quantity, item.bindOnEquip};
       }
 
-      GetRagConnection().Send(static_cast<short>(length), &packet);
+      GetRagConnection().Send(static_cast<short>(length), buffer);
       return 0;
     }
-    case ID_PARTY_RELOAD_FIRST_PAGE:
+    case ID_REFRESH:
       g_modeMgr.GetGameMode()->SendMsg(MM_GET_ACCOUNT_LIMITED_SALE_LIST, 0, 0, 0, 0);
       return 0;
     }
@@ -1070,7 +1069,11 @@ int UICashShopWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
     if (argument1 != 0 && argument1 != this->m_selectedTab) {
       for (std::map<int, UIWindow*>::iterator tab = this->m_tabButtons.begin(); tab != this->m_tabButtons.end(); ++tab) {
         if (tab->first != 10 && tab->first != 8 && tab->second != nullptr) {
-          tab->second->SendMsg(this, UM_SETSTATE, argument1 == tab->first, 0, 0, 0);
+          if (argument1 == tab->first) {
+            tab->second->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
+          } else {
+            tab->second->SendMsg(this, UM_SETSTATE, 0, 0, 0, 0);
+          }
         }
       }
       this->m_selectedTab = argument1;
@@ -1113,7 +1116,7 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
 
     const ITEM_INFO& item = *reinterpret_cast<const ITEM_INFO*>(argument1);
     if (argument2 == 0) {
-      g_windowMgr.Confirm(LookupMessage(MSI_HAVE_ITEMTAG), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_DONT_MOVE_CART), 0, true, false, 0, "Message", 0x118, 0x78, 0);
       return -1;
     }
 
@@ -1122,7 +1125,7 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       return itemId == atoi(item.itemId.c_str());
     });
 
-    if (it == this->m_cartItems.end()) {
+    if (this->m_cartItems.end() == it) {
       if (g_session.m_launchPassCommandLine && !this->m_cartItems.empty()) {
         const int result =
           g_windowMgr.Confirm(FormatOwnedString(CashShopReplaceCartItemText()().Text(), item.displayName.c_str()).c_str(), 2, true, false, 0, "Message", 0x118, 0x78, 0);
@@ -1133,14 +1136,14 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       }
 
       if (this->m_cartItems.size() >= 8) {
-        g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_USA_LOGINERRORMSG_NOT_USER), 8).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+        g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_CASHSHOP_CANNOT_BUY_OVER), 8).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
         return -1;
       }
 
       ITEM_INFO entry(item);
       if (entry.saleData.purchaseCount != 0) {
         if (argument2 > entry.saleData.purchaseCount) {
-          g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_BARGAINSALE_TOOLWND_CALL), entry.saleData.purchaseCount).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+          g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_BARGAINSALE_CASHSHOP_CHECK_COUNT_MSG), entry.saleData.purchaseCount).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
         }
         if (argument2 > entry.saleData.purchaseCount) {
           argument2 = entry.saleData.purchaseCount;
@@ -1151,7 +1154,7 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       this->SendMsg(this, UM_SCROLLVERT, 1, 0, 0, 0);
     } else {
       if (it->saleData.purchaseCount != 0 && it->quantity + argument2 > it->saleData.purchaseCount) {
-        g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_BARGAINSALE_TOOLWND_CALL), it->saleData.purchaseCount).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+        g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_BARGAINSALE_CASHSHOP_CHECK_COUNT_MSG), it->saleData.purchaseCount).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
         argument2 = it->saleData.purchaseCount - it->quantity;
         if (argument2 == 0) {
           return -1;
@@ -1162,15 +1165,17 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       if (total > 100) {
         g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_LIMIT_BUY_ITEM2), 100).c_str(), 0, true, false, 0, "Message", 0x118, 0x78, 0);
         it->quantity = 100;
+        this->SendMsg(this, UM_SCROLLVERT, 0, 0, 0, 0);
       } else {
         it->quantity = total <= 0 ? 1 : total;
+        this->SendMsg(this, UM_SCROLLVERT, 0, 0, 0, 0);
       }
-      this->SendMsg(this, UM_SCROLLVERT, 0, 0, 0, 0);
     }
 
     if (this->parent != nullptr) {
       int price = 0;
-      for (const ITEM_INFO& entry : this->m_cartItems) {
+      for (auto entryIt = this->m_cartItems.begin(); entryIt != this->m_cartItems.end(); ++entryIt) {
+        const ITEM_INFO& entry = *entryIt;
         price += entry.prices[0] * entry.quantity;
       }
       this->parent->SendMsg(this, UM_SET_CASHSHOP_TOTAL_PRICE, price, 0, 0, 0);
@@ -1193,7 +1198,8 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     this->m_cartItems.erase(it);
     if (this->parent != nullptr) {
       int price = 0;
-      for (const ITEM_INFO& entry : this->m_cartItems) {
+      for (auto entryIt = this->m_cartItems.begin(); entryIt != this->m_cartItems.end(); ++entryIt) {
+        const ITEM_INFO& entry = *entryIt;
         price += entry.prices[0] * entry.quantity;
       }
       this->parent->SendMsg(this, UM_SET_CASHSHOP_TOTAL_PRICE, price, 0, 0, 0);
@@ -1212,19 +1218,18 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
 
     const int maximum = std::max(count - this->m_visibleCount, 0);
 
-    UIScrollBar* scrollBar = static_cast<UIScrollBar*>(this->m_scrollBar);
     if (maximum == 0) {
       if (static_cast<int>(this->m_scrollIndex) > 0) {
         this->m_scrollIndex = 0;
-        scrollBar->SetRange(maximum, this->m_visibleCount, this->m_cartItems.size());
-        scrollBar->SetPosition(this->m_scrollIndex);
+        this->m_scrollBar->SetRange(maximum, this->m_visibleCount, this->m_cartItems.size());
+        this->m_scrollBar->SetPosition(this->m_scrollIndex);
       }
       break;
     }
 
     const int index = argument1 + this->m_scrollIndex;
-    if (index >= 0 && index <= maximum) {
-      this->m_scrollIndex = index;
+    if (index >= 0) {
+      this->m_scrollIndex = index > maximum ? maximum : index;
     } else if (index > maximum) {
       this->m_scrollIndex = maximum;
     } else {
@@ -1232,8 +1237,8 @@ int UICashShopWnd_Cart::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       break;
     }
 
-    scrollBar->SetRange(maximum, this->m_visibleCount, this->m_cartItems.size());
-    scrollBar->SetPosition(this->m_scrollIndex);
+    this->m_scrollBar->SetRange(maximum, this->m_visibleCount, this->m_cartItems.size());
+    this->m_scrollBar->SetPosition(this->m_scrollIndex);
     this->Invalidate();
     break;
   }
@@ -1305,7 +1310,7 @@ int UICashShopWnd_Item::SendMsg(UIWindow* sender, int message, std::intptr_t arg
           addButton->SetDisabled(1);
           addButton->Invalidate();
         }
-        this->m_addButton->SetText(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_DONT_MOVE_CART));
+        this->m_addButton->SetText(LookupMessage(MSI_ACCOUNT_LIMITED_SALE_ITEM_SOLD_OUT));
         this->m_addButton->AddTextStyle(0, 0xC, 0x313131, 1, 1, -1000, -1000);
         this->m_addButton->AddTextStyle(1, 0xC, 0x313131, 1, 1, -1000, -1000);
         this->m_addButton->AddTextStyle(2, 0xC, 0x313131, 1, 1, -1000, -1000);
