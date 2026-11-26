@@ -1,4 +1,5 @@
 #include "UI/Window/UIEnums.h"
+#include "UI/Buttons/ButtonState.h"
 #include "Client/Session/Session.h"
 #include "Contents/Tables/MessageTable.h"
 #include "File/ShortcutFilename.h"
@@ -50,19 +51,19 @@ CAdvenPartyInfo* UIPartyInfoWnd::Info() {
 // FUNCTION: fn_09294
 const char* UIPartyInfoWnd::TypeName(int value) {
   switch (value) {
-  case 0:
+  case ADVEN_PARTY_ALL:
     return LookupMessage(MSI_ALL_AREA);
-  case 1:
+  case ADVEN_PARTY_QUEST:
     return LookupMessage(MSI_ADVEN_QUEST);
-  case 2:
+  case ADVEN_PARTY_FIELD:
     return LookupMessage(MSI_ADVEN_FIELD);
-  case 3:
+  case ADVEN_PARTY_DUNGEON:
     return LookupMessage(MSI_ADVEN_DUNJUN);
-  case 4:
+  case ADVEN_PARTY_MEMORIAL_DUNGEON:
     return LookupMessage(MSI_ADVEN_MD);
-  case 5:
+  case ADVEN_PARTY_EDEN_GROUP:
     return LookupMessage(MSI_ADVEN_EDEN_GROUP);
-  case 6:
+  case ADVEN_PARTY_OTHER:
     return LookupMessage(MSI_ADVEN_ETC);
   default:
     return "";
@@ -99,13 +100,13 @@ void UIPartyInfoWnd::Paint() {
   CBitmapRes* background = nullptr;
 
   switch (this->geometry.state) {
-  case 0:
+  case BUTTON_STATE_NORMAL:
     background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_normalName.c_str())));
     break;
-  case 1:
+  case BUTTON_STATE_HOVER:
     background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_hoverName.c_str())));
     break;
-  case 2:
+  case BUTTON_STATE_PRESSED:
     background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->m_pressedName.c_str())));
     break;
   }

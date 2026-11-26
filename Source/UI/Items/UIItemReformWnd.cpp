@@ -68,13 +68,13 @@ void UIItemReformWnd_DetailMsg::SetText(const std::string& text) {
   this->Resize(257, 127);
   unsigned int height = this->geometry.height;
   CCreateLineInfo info(this, text.c_str(), this->geometry.width - 20, 4, LineTextStyle{0, 12, false, false}, false, 0, false, 0xFFFFFF, 0);
-  std::vector<std::vector<UIWindow*>> lines = info.m_lines;
+  std::vector<LineWindows> lines = info.m_lines;
   for (auto lineIt = lines.begin(); lineIt != lines.end(); ++lineIt) {
-    std::vector<UIWindow*> line = *lineIt;
+    std::vector<UIWindow*> line = lineIt->windows;
     for (auto windowIt = line.begin(); windowIt != line.end(); ++windowIt) {
       UIWindow* window = *windowIt;
       if (window) {
-        window->Move(window->geometry.x + 12, window->geometry.y + 12);
+        (*windowIt)->Move(window->geometry.x + 12, window->geometry.y + 12);
         this->AddChild(*windowIt);
         height = std::max<unsigned int>(window->geometry.y + 12, height);
       }
@@ -149,7 +149,7 @@ void UIItemReformWnd::OnCreate(int width, int height) {
 void UIItemReformWnd_List::OnCreate(int width, int height) {
   this->scrollBar = new UIScrollBar();
   this->scrollBar->Configure(width - 13, 0, 1, height);
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->AddChild(this->scrollBar);
   this->visibleCount = height / this->itemHeight;
   this->UpdateScrollBar();
@@ -346,14 +346,14 @@ void UIItemReformWnd_List::OnWheel(int delta) {
 void UIItemReformWnd_List::UpdateScrollBar() {
   const unsigned int count = this->items.size();
   if (count > this->visibleCount) {
-    this->scrollBar->Show(1);
+    this->scrollBar->Show(WINDOW_VISIBLE);
     this->scrollBar->SetRange(count - this->visibleCount, this->visibleCount, count);
     this->scrollPosition = std::max(0, this->scrollPosition);
     this->scrollPosition = std::min<unsigned int>(count - this->visibleCount, this->scrollPosition);
     this->scrollBar->SetPosition(this->scrollPosition);
   } else {
     this->scrollPosition = 0;
-    this->scrollBar->Show(0);
+    this->scrollBar->Show(WINDOW_HIDDEN);
   }
 
   this->Invalidate();
@@ -371,13 +371,12 @@ void UIItemReformWnd::SelectItem(ITEM_INFO* item) {
   UIItemReformWnd_Item* resultIcon = this->resultIcon;
   resultIcon->item = nullptr;
   resultIcon->Invalidate();
-  for (auto iconIt = this->materialIcons.begin(); iconIt != this->materialIcons.end(); ++iconIt) {
-    UIItemReformWnd_Item* icon = *iconIt;
+  std::for_each(this->materialIcons.begin(), this->materialIcons.end(), [](UIItemReformWnd_Item* icon) {
     if (icon) {
       icon->item = nullptr;
       icon->Invalidate();
     }
-  }
+  });
   this->warning.clear();
   this->materials.clear();
   this->selectedItem = item;
@@ -526,12 +525,7 @@ int UIItemReformWnd_List::SendMsg(
   case UM_SCROLLVERTPAGEUP:
   case UM_SCROLLVERTPAGEDOWN: {
     const unsigned int previous = this->scrollPosition;
-    if (message == UM_SCROLLVERTPAGEUP) {
-      argument1 = -1;
-    } else if (message == UM_SCROLLVERTPAGEDOWN) {
-      argument1 = 1;
-    }
-    this->scrollPosition = previous + argument1;
+    this->scrollPosition = previous + (message == UM_SCROLLVERTPAGEUP ? -1 : message == UM_SCROLLVERTPAGEDOWN ? 1 : argument1);
     if (previous != this->scrollPosition) {
       this->UpdateScrollBar();
     }
@@ -560,16 +554,17 @@ int UIItemReformWnd_List::SendMsg(
         if (info->needOptionNumMin > options) {
           continue;
         }
+        bool emptySocket = true;
         if (info->isEmptySocket == 1) {
-          unsigned int slot = std::min(item.SlotCount(), 4);
-          for (; slot < 4; ++slot) {
+          for (unsigned int slot = std::min(item.SlotCount(), 4); slot < 4; ++slot) {
             if (static_cast<int>(slot) < 4 && static_cast<int>(item.cards[slot]) > 0) {
+              emptySocket = false;
               break;
             }
           }
-          if (slot < 4) {
-            continue;
-          }
+        }
+        if (!emptySocket) {
+          continue;
         }
         this->items.push_back(item);
       }
@@ -579,10 +574,11 @@ int UIItemReformWnd_List::SendMsg(
     if (this->items.empty()) {
       return -1;
     }
-    break;
   }
+    return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
+  default:
+    return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
-  return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
 }
 
 // OFFSET: 0x005FECD0

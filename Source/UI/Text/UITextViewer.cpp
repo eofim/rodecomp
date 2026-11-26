@@ -110,15 +110,28 @@ void UITextViewer::OnLBtnDown(int, int) {
 void UITextViewer::OnLBtnDblClk(int, int) {
 }
 
+// OFFSET: 0x007B41D0
+// FUNCTION: fn_46563
+inline bool UIAchListWnd::HitTestRow(int x, int y, int* row) {
+  if (x < 0 || this->geometry.width - this->scrollBarWidth < x) {
+    return false;
+  }
+
+  const int index = y / this->rowHeight;
+  if (this->achievementList->size() <= static_cast<unsigned>(index)) {
+    *row = 0;
+    return false;
+  }
+
+  *row = index;
+  return true;
+}
+
 // OFFSET: 0x007B78D0
 // FUNCTION: fn_09228
 void UIAchListWnd::OnLBtnDown(int x, int y) {
-  if (x < 0 || this->geometry.width - this->scrollBarWidth < x) {
-    return;
-  }
-
-  const int row = y / this->rowHeight;
-  if (static_cast<unsigned>(this->achievementList->size()) <= static_cast<unsigned>(row)) {
+  int row;
+  if (!this->HitTestRow(x, y, &row)) {
     return;
   }
 
@@ -139,6 +152,20 @@ void UIAchTV::OnLBtnDown(int, int) {
   }
 }
 
+// OFFSET: 0x007B3850
+// FUNCTION: fn_46564
+inline void UIAchTab::NotifySelection(int group, int sub) {
+  this->selectedGroup = group;
+  this->selectedSub = sub;
+  if (this->parent) {
+    this->parent->SendMsg(this, UM_TAB, group, sub, 0, 0);
+    this->parent->Invalidate();
+  }
+
+  this->UpdateScrollBar();
+  this->Invalidate();
+}
+
 // OFFSET: 0x007B7960
 // FUNCTION: fn_09230
 void UIAchTab::OnLBtnDown(int x, int y) {
@@ -148,15 +175,7 @@ void UIAchTab::OnLBtnDown(int x, int y) {
     return;
   }
 
-  this->selectedGroup = a;
-  this->selectedSub = b;
-  if (this->parent) {
-    this->parent->SendMsg(this, UM_TAB, a, b, 0, 0);
-    this->parent->Invalidate();
-  }
-
-  this->UpdateScrollBar();
-  this->Invalidate();
+  this->NotifySelection(a, b);
   g_windowMgr.SetCapture(this);
 }
 
@@ -200,7 +219,8 @@ void UITextViewer::Paint() {
   const int limit = this->geometry.height / divisor + first;
   const int end = static_cast<int>(std::min(static_cast<unsigned>(limit), static_cast<unsigned>(this->lines.size())));
 
-  for (int index = 0; index < first; ++index) {
+  int index;
+  for (index = 0; index < first; ++index) {
     const char* current = this->lines[index].c_str();
     const char* last = current + this->lines[index].size();
 
@@ -209,26 +229,17 @@ void UITextViewer::Paint() {
     }
   }
 
-  if (first >= end) {
-    return;
-  }
-
   if (this->plainTextMode == 0) {
-    for (int index = first; index < end; ++index) {
-      const auto& line = this->lines[index];
-      const unsigned bytes = static_cast<unsigned>(line.size());
-
+    for (index = first; index < end; ++index) {
       if (this->outline != 0) {
-        this->DrawOutlinedColoredText(3, (index - first) * this->lineHeight + 4, line.c_str(), bytes, color, this->backgroundColor, 0, 12, this->bold);
+        this->DrawOutlinedColoredText(3, (index - first) * this->lineHeight + 4, this->lines[index].c_str(), static_cast<unsigned>(this->lines[index].size()), color, this->backgroundColor, 0, 12, this->bold);
       } else {
-        this->DrawColoredText(3, (index - first) * this->lineHeight + 4, line.c_str(), bytes, color, 0, 12, false);
+        this->DrawColoredText(3, (index - first) * this->lineHeight + 4, this->lines[index].c_str(), static_cast<unsigned>(this->lines[index].size()), color, 0, 12, false);
       }
     }
   } else {
-    for (int index = first; index < end; ++index) {
-      const auto& line = this->lines[index];
-      const unsigned bytes = static_cast<unsigned>(line.size());
-      this->DrawOutlinedText(3, (index - first) * this->lineHeight + 4, line.c_str(), bytes, 0, 0xFFFFFF, 0, 12, 0, 0);
+    for (index = first; index < end; ++index) {
+      this->DrawOutlinedText(3, (index - first) * this->lineHeight + 4, this->lines[index].c_str(), static_cast<unsigned>(this->lines[index].size()), 0, 0xFFFFFF, 0, 12, 0, 0);
     }
   }
 }
@@ -313,11 +324,11 @@ int UITextViewEX::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
   case UM_SCROLLVERTPAGEDOWN: {
     const int previous = this->topLine;
     if (message == UM_SCROLLVERTPAGEUP) {
-      this->topLine = previous - this->geometry.height / this->lineHeight + 1;
+      this->topLine -= this->geometry.height / this->lineHeight - 1;
     } else if (message == UM_SCROLLVERTPAGEDOWN) {
-      this->topLine = previous + this->geometry.height / this->lineHeight - 1;
+      this->topLine += this->geometry.height / this->lineHeight - 1;
     } else {
-      this->topLine = previous + static_cast<int>(argument1);
+      this->topLine += static_cast<int>(argument1);
     }
 
     if (this->topLine < 0) {

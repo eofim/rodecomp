@@ -78,8 +78,7 @@ void UIMacroReporterWnd::AddPickedActor(ActorPickInfo* pick) {
 // OFFSET: 0x007EF2E0
 // FUNCTION: fn_09840
 void UIMacroReporterWnd::AddActorByAID(int aid) {
-  CGameMode* mode = g_modeMgr.GetGameMode();
-  CGameActor* actor = mode->scene->GetGameActorByAID(aid);
+  CGameActor* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
   if (!actor) {
     return;
   }
@@ -88,18 +87,13 @@ void UIMacroReporterWnd::AddActorByAID(int aid) {
     return;
   }
 
-  mode = g_modeMgr.GetGameMode();
-  std::string name = mode->ActorName(aid);
+  std::string name = g_modeMgr.GetGameMode()->ActorName(aid);
 
-  for (auto it = this->m_entries.begin(); it != this->m_entries.end(); ++it) {
-    if (it->id == aid) {
-      goto found;
-    }
+  if (std::find_if(this->m_entries.begin(), this->m_entries.end(), [aid](const MacroReporterEntry& entry) { return entry.id == aid; }) ==
+      this->m_entries.end()) {
+    this->m_entries.push_back(MacroReporterEntry(name, aid, static_cast<short>(actor->GetEffectiveJob(-1))));
   }
 
-  this->m_entries.push_back(MacroReporterEntry(name, aid, static_cast<short>(actor->GetEffectiveJob(-1))));
-
-found:
   this->AddActorRow(aid, name);
   this->UpdateScrollBar();
 }
@@ -145,12 +139,12 @@ std::string UIMacroReporterWnd::EllipsizeText(int maxWidth, const char* text, in
   this->TextWidth("...", 0, font, height, bold, 0);
   if (maxWidth >= width) {
     return text;
-  }
+  } else {
 
   std::string fitted(text);
   std::wstring wide(ATL::CA2WEX<128>(text, CP_THREAD_ACP));
 
-  for (;;) {
+  do {
     if (wide.size() <= 1) {
       fitted = std::string(ATL::CW2AEX<128>(wide.c_str(), CP_THREAD_ACP)) + "...";
       break;
@@ -162,13 +156,10 @@ std::string UIMacroReporterWnd::EllipsizeText(int maxWidth, const char* text, in
     }
 
     fitted = std::string(ATL::CW2AEX<128>(wide.c_str(), CP_THREAD_ACP)) + "...";
+  } while (maxWidth < this->TextWidth(fitted.c_str(), 0, font, height, bold, 0));
 
-    if (maxWidth >= this->TextWidth(fitted.c_str(), 0, font, height, bold, 0)) {
-      break;
-    }
+  return std::string(fitted);
   }
-
-  return fitted;
 }
 
 // OFFSET: 0x007F0480
@@ -578,6 +569,18 @@ namespace {
   };
 }
 
+// INLINED
+static void SetDisabledState(UIButton* button, int disabled) {
+  button->SetDisabled(disabled);
+  button->Invalidate();
+}
+
+// INLINED
+static void SetDisabledState(UIEditCtrl* edit, int disabled) {
+  edit->disabled = disabled;
+  edit->Invalidate();
+}
+
 // OFFSET: 0x007F1420
 // FUNCTION: fn_09856
 int UIMacroReporterWnd::SendMsg(
@@ -596,7 +599,7 @@ int UIMacroReporterWnd::SendMsg(
     this->activeCheckBox->SetChecked(this->activeOnly);
     this->m_entries.clear();
     for (unsigned int index = 0; index < this->m_state->entries.size(); ++index) {
-      const MacroReporterEntry& entry = this->m_state->entries[index];
+      const MacroReporterRecord& entry = this->m_state->entries[index];
       this->m_entries.push_back(MacroReporterEntry(entry.name, entry.id, entry.reportValue));
       this->AddActorRow(entry.id, entry.name);
     }
@@ -619,12 +622,10 @@ int UIMacroReporterWnd::SendMsg(
       }
       for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
         if (sender == it->first) {
-          it->first->SetDisabled(1);
-          it->first->Invalidate();
+          SetDisabledState(it->first, 1);
           UIButton* first = it->first;
           this->m_removedRows.push_back(first);
-          it->second->SetDisabled(1);
-          it->second->Invalidate();
+          SetDisabledState(it->second, 1);
           UIButton* second = it->second;
           this->m_removedRows.push_back(second);
           this->m_rows.erase(it);
@@ -643,7 +644,7 @@ int UIMacroReporterWnd::SendMsg(
       if (this->m_mode == 2 || this->m_mode == 3) {
         this->m_namesValid = this->ValidateNames(1);
         this->m_targetValid = this->ValidateTarget(1);
-      } else if (this->m_mode == 0 || this->m_mode == 1) {
+      } else if (this->m_mode == 1 || this->m_mode == 0) {
         if (argument2) {
           this->geometry.targetAlpha = 128;
           this->geometry.alphaStart = timeGetTime();
@@ -673,7 +674,8 @@ int UIMacroReporterWnd::SendMsg(
           std::memcpy(buffer, &report.header, sizeof(report.header));
           for (int index = 0; index < this->m_nameCount; ++index) {
             if (!this->m_names[index].empty()) {
-              strncpy_s(report.name, sizeof(report.name), (this->m_names[index] + ".gat").c_str(), _TRUNCATE);
+              const std::string mapName = this->m_names[index] + ".gat";
+              strncpy_s(report.name, sizeof(report.name), mapName.c_str(), _TRUNCATE);
               memcpy_s(buffer + sizeof(report.header) + index * 16, 16, report.name, sizeof(report.name));
             }
           }
@@ -699,12 +701,10 @@ int UIMacroReporterWnd::SendMsg(
         }
         this->m_entries.clear();
         for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
-          it->first->SetDisabled(1);
-          it->first->Invalidate();
+          SetDisabledState(it->first, 1);
           UIButton* first = it->first;
           this->m_removedRows.emplace_back(first);
-          it->second->SetDisabled(1);
-          it->second->Invalidate();
+          SetDisabledState(it->second, 1);
           UIButton* second = it->second;
           this->m_removedRows.emplace_back(second);
         }
@@ -713,8 +713,8 @@ int UIMacroReporterWnd::SendMsg(
       break;
 
     case ID_RADIOBTN: {
-      if (this->activeOnly == true) {
-        if (this->m_mode == 0 || this->m_mode == 1) {
+      if (this->activeOnly) {
+        if (this->m_mode == 1 || this->m_mode == 0) {
           if (argument2 == 2 || argument2 == 3) {
             this->activeCheckBox->SetChecked(0);
           }
@@ -737,43 +737,37 @@ int UIMacroReporterWnd::SendMsg(
       }
       sender->SendMsg(this, UM_SETSTATE, 1, 0, 0, 0);
 
-      if (sender == this->m_tabs[1]) {
-        UIEditCtrl* edit = this->m_edit;
-        edit->disabled = 0;
-        edit->Invalidate();
+      if (this->m_tabs[1] == sender) {
+        SetDisabledState(this->m_edit, 0);
       } else {
-        UIEditCtrl* edit = this->m_edit;
-        edit->disabled = 1;
-        edit->Invalidate();
+        SetDisabledState(this->m_edit, 1);
       }
 
       if (sender == this->m_tabs[0] || sender == this->m_tabs[1]) {
         g_windowMgr.SetFocus(nullptr);
         for (int index = 0; index < this->m_visibleRows; ++index) {
-          this->m_fields[index]->disabled = 1;
-          this->m_fields[index]->Invalidate();
+          SetDisabledState(this->m_fields[index], 1);
           this->m_fields[index]->SetText("");
         }
         for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
-          it->first->SetDisabled(0);
-          it->first->Invalidate();
-          it->second->SetDisabled(0);
-          it->second->Invalidate();
-          it->first->Enable(1);
-          it->second->Enable(1);
+          if (it != this->m_rows.end()) {
+            SetDisabledState(it->first, 0);
+            SetDisabledState(it->second, 0);
+            it->first->Enable(1);
+            it->second->Enable(1);
+          }
         }
       } else {
         for (auto it = this->m_rows.begin(); it != this->m_rows.end(); ++it) {
-          it->first->SetDisabled(1);
-          it->first->Invalidate();
-          it->second->SetDisabled(1);
-          it->second->Invalidate();
-          it->first->Enable(0);
-          it->second->Enable(0);
+          if (it != this->m_rows.end()) {
+            SetDisabledState(it->first, 1);
+            SetDisabledState(it->second, 1);
+            it->first->Enable(0);
+            it->second->Enable(0);
+          }
         }
         for (int index = 0; index < this->m_visibleRows; ++index) {
-          this->m_fields[index]->disabled = 0;
-          this->m_fields[index]->Invalidate();
+          SetDisabledState(this->m_fields[index], 0);
           if (sender == this->m_tabs[2]) {
             this->m_fields[index]->SetText(this->m_names[index].c_str());
           } else if (sender == this->m_tabs[3]) {
@@ -804,14 +798,17 @@ int UIMacroReporterWnd::SendMsg(
       std::string text = this->m_edit->Text();
       if (text.size() > 1) {
         this->m_edit->SetText(IntToString(this->reportCount, 0).c_str());
-      } else if (text.c_str()[0] >= '0' && text.c_str()[0] <= '9') {
+        break;
+      }
+
+      if (text.c_str()[0] < '0' || text.c_str()[0] > '9') {
+        this->m_edit->SetText(IntToString(this->reportCount, 0).c_str());
+      } else {
         this->reportCount = std::atoi(text.c_str());
         if (this->reportCount > this->maxReportCount) {
           this->reportCount = this->maxReportCount;
           this->m_edit->SetText(IntToString(this->maxReportCount, 0).c_str());
         }
-      } else {
-        this->m_edit->SetText(IntToString(this->reportCount, 0).c_str());
       }
     }
     break;
@@ -837,10 +834,9 @@ int UIMacroReporterWnd::SendMsg(
     if (!g_windowMgr.CloseWindow(WID_MACROUSERINFOWND)) {
       UIMacroUserInfoWnd* info = static_cast<UIMacroUserInfoWnd*>(g_windowMgr.EnsureWindow(WID_MACROUSERINFOWND));
       info->Move(this->geometry.x + 15, this->geometry.y + row * 22 + 78);
-      const unsigned short job = entry->reportValue;
       std::string name = entry->name;
       info->m_name = name;
-      info->m_message = g_session.GetJobName(job, -1);
+      info->m_message = g_session.GetJobName(entry->reportValue, -1);
       info->Invalidate();
     }
     break;

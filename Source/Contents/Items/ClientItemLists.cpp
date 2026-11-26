@@ -161,11 +161,9 @@ namespace {
     }
 
     if (value.optionCount != 0) {
-      const auto* left = value.options;
-      const auto* right = item.options;
-
       for (int index = 0; index < count; ++index) {
-        if (left[index].id != right[index].id || left[index].value != right[index].value || left[index].parameter != right[index].parameter) {
+        if (value.options[index].id != item.options[index].id || value.options[index].value != item.options[index].value ||
+            value.options[index].parameter != item.options[index].parameter) {
           return false;
         }
       }
@@ -175,12 +173,12 @@ namespace {
   }
 
   // INLINED
-  void CountSameNameChar(const char& left, const char& right, short& matched) {
-    if (left == 'I' || left == 'l') {
-      if (right == 'I' || right == 'l') {
+  void CountSameNameChar(const char* left, short leftIndex, const char* right, short rightIndex, short& matched) {
+    if (left[leftIndex] == 'I' || left[leftIndex] == 'l') {
+      if (right[rightIndex] == 'I' || right[rightIndex] == 'l') {
         ++matched;
       }
-    } else if (left == right) {
+    } else if (left[leftIndex] == right[rightIndex]) {
       ++matched;
     }
   }
@@ -939,12 +937,11 @@ bool CSession::Equip(const ITEM_INFO& item) {
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
     if (slot != -1) {
-      ITEM_INFO& equipped = this->alternateEquippedItems[slot];
-      equipped = item;
-      equipped.quantity = 1;
-      equipped.expireTime = item.expireTime;
-      equipped.bindOnEquip = item.bindOnEquip;
-      equipped.sprite = item.sprite;
+      this->alternateEquippedItems[slot] = item;
+      this->alternateEquippedItems[slot].quantity = 1;
+      this->alternateEquippedItems[slot].expireTime = item.expireTime;
+      this->alternateEquippedItems[slot].bindOnEquip = item.bindOnEquip;
+      this->alternateEquippedItems[slot].sprite = item.sprite;
     }
   }
 
@@ -1000,12 +997,13 @@ void CSession::MergeItem1720ByName(const ITEM_INFO& item) {
 // FUNCTION: fn_23295
 void CSession::MergePurchaseItem(const ITEM_INFO& item) {
   for (auto it = this->m_purchaseItems.begin(); it != this->m_purchaseItems.end(); ++it) {
-    bool same = it->identity[1] == item.identity[1];
+    ITEM_INFO& value = *it;
+    bool same = value.identity[1] == item.identity[1];
     if (!item.uniqueItem) {
-      same = it->itemId == item.itemId;
+      same = value.itemId == item.itemId;
     }
     if (same == true) {
-      it->quantity += item.quantity;
+      value.quantity += item.quantity;
       return;
     }
   }
@@ -1104,9 +1102,8 @@ bool CSession::EquipInventoryItem(const ITEM_INFO& item, const char* name) {
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
     if (slot != -1 && slot < 10) {
-      ITEM_INFO& equipped = this->equippedItems[slot];
-      equipped = item;
-      equipped.quantity = 1;
+      this->equippedItems[slot] = item;
+      this->equippedItems[slot].quantity = 1;
     }
   }
 
@@ -1137,9 +1134,8 @@ bool CSession::OnItemEquipped(ITEM_INFO& item) {
     for (int index = 0; index < 3; ++index) {
       const int slot = order[index];
       if (slot != -1 && slot < 10) {
-        ITEM_INFO& equipped = this->equippedItems[slot];
-        equipped = item;
-        equipped.quantity = 1;
+        this->equippedItems[slot] = item;
+        this->equippedItems[slot].quantity = 1;
       }
     }
 
@@ -1186,7 +1182,7 @@ bool CSession::UnequipItem(int location, std::uint32_t identity) {
     const EquipSlots slots = g_session.GetEquipSlots(location);
     const int slot = std::get<0>(slots);
     if (slot < 10) {
-      ITEM_INFO* const items = this->equippedItems;
+      ITEM_INFO* const items = this->equippedItems.data();
       if (slot != -1) {
         const char* message = LookupMessage(MSI_ITEM_IS_REMOVED);
         ITEM_INFO& item = items[slot];
@@ -1264,7 +1260,7 @@ EquipSlots CSession::GetEquipSlots(int location) {
   case EQP_COSTUME_GARMENT:
     mask = EQP_GARMENT;
     break;
-  case 0x4000:
+  case EQP_COSTUME_FLOOR:
   case EQP_SHADOW_WEAPON:
     mask = EQP_HAND_R;
     break;
@@ -1444,16 +1440,15 @@ void CSession::CopyItems1760To1770() {
 // OFFSET: 0x00DD8EA0
 // FUNCTION: fn_23332
 std::pair<bool, ITEM_INFO> CSession::FindMerchantMyShopItem(const ITEM_INFO& item, unsigned char) {
-  const ITEM_INFO* found = nullptr;
-
-  for (const ITEM_INFO& value : this->m_merchantMyShopItems) {
+  auto found = this->m_merchantMyShopItems.begin();
+  for (; found != this->m_merchantMyShopItems.end(); ++found) {
+    const ITEM_INFO& value = *found;
     if (IsSameItem(value, item)) {
-      found = &value;
       break;
     }
   }
 
-  return found != nullptr ? std::make_pair(true, *found) : std::make_pair(false, ITEM_INFO());
+  return found != this->m_merchantMyShopItems.end() ? std::make_pair(true, *found) : std::make_pair(false, ITEM_INFO());
 }
 
 // OFFSET: 0x00DD91C0
@@ -1477,7 +1472,7 @@ __declspec(noinline) int CSession::IsDifferentName(const char* name, const char*
   if (firstLength >= secondLength + 2 && firstLength <= secondLength + 4) {
     short matched = 0;
     for (short index = 0; index < length; ++index) {
-      CountSameNameChar(first[index + 2], second[index], matched);
+      CountSameNameChar(first + 2, index, second, index, matched);
     }
 
     if (matched == length) {
@@ -1488,7 +1483,7 @@ __declspec(noinline) int CSession::IsDifferentName(const char* name, const char*
   if (firstLength >= secondLength + 1 && firstLength <= secondLength + 4) {
     short matched = 0;
     for (short index = 0; index < length; ++index) {
-      CountSameNameChar(first[index + 1], second[index], matched);
+      CountSameNameChar(first + 1, index, second, index, matched);
     }
 
     if (matched == length) {
@@ -1502,7 +1497,7 @@ __declspec(noinline) int CSession::IsDifferentName(const char* name, const char*
 
   short matched = 0;
   for (short index = 0; index < length; ++index) {
-    CountSameNameChar(first[index], second[index], matched);
+    CountSameNameChar(first, index, second, index, matched);
   }
 
   if (matched >= length - 2) {
@@ -1511,9 +1506,9 @@ __declspec(noinline) int CSession::IsDifferentName(const char* name, const char*
 
   matched = 0;
   char skip = 1;
-  int position = 0;
+  short position = 0;
   for (unsigned short index = 0; static_cast<short>(index) < length; ++index) {
-    CountSameNameChar(first[index], second[position], matched);
+    CountSameNameChar(first, index, second, position, matched);
 
     if (matched != index + 1 && skip == 1) {
       skip = 2;
@@ -1774,12 +1769,11 @@ bool CSession::EquipSwapEquipmentItem(const ITEM_INFO& item) {
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
     if (slot != -1) {
-      ITEM_INFO& equipped = this->swapEquippedItems[slot];
-      equipped = item;
-      equipped.quantity = 1;
-      equipped.expireTime = item.expireTime;
-      equipped.bindOnEquip = item.bindOnEquip;
-      equipped.sprite = item.sprite;
+      this->swapEquippedItems[slot] = item;
+      this->swapEquippedItems[slot].quantity = 1;
+      this->swapEquippedItems[slot].expireTime = item.expireTime;
+      this->swapEquippedItems[slot].bindOnEquip = item.bindOnEquip;
+      this->swapEquippedItems[slot].sprite = item.sprite;
     }
   }
 

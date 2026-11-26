@@ -1,3 +1,4 @@
+#include "UI/Buttons/ButtonState.h"
 #include "Client/Input/InputCharset.h"
 #include "Contents/Skin/SkinMgr.h"
 #include "Client/Mode/ModeMessage.h"
@@ -153,27 +154,27 @@ void UITextButton::OnMouseMove(int x, int y) {
   if (g_windowMgr.Capture() == this) {
     if (x >= 0 && x < this->geometry.width && y >= 0 && y < this->geometry.height) {
       this->m_color = this->m_hoverColor;
-      if (this->geometry.state != 2) {
-        this->geometry.state = 2;
+      if (this->geometry.state != BUTTON_STATE_PRESSED) {
+        this->geometry.state = BUTTON_STATE_PRESSED;
         this->Invalidate();
       }
     } else {
       this->m_color = this->m_normalColor;
-      if (this->geometry.state != 0) {
-        this->geometry.state = 0;
+      if (this->geometry.state != BUTTON_STATE_NORMAL) {
+        this->geometry.state = BUTTON_STATE_NORMAL;
         this->Invalidate();
       }
     }
   } else if (x >= 0 && x < this->geometry.width && y >= 0 && y < this->geometry.height) {
     this->m_color = this->m_hoverColor;
-    if (this->geometry.state != 1) {
-      this->geometry.state = 1;
+    if (this->geometry.state != BUTTON_STATE_HOVER) {
+      this->geometry.state = BUTTON_STATE_HOVER;
       this->Invalidate();
     }
   } else {
     this->m_color = this->m_normalColor;
-    if (this->geometry.state != 0) {
-      this->geometry.state = 0;
+    if (this->geometry.state != BUTTON_STATE_NORMAL) {
+      this->geometry.state = BUTTON_STATE_NORMAL;
       this->Invalidate();
     }
   }
@@ -197,9 +198,9 @@ void UITextButton::OnLBtnUp(int x, int y) {
   }
 
   if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    this->geometry.state = 0;
+    this->geometry.state = BUTTON_STATE_NORMAL;
   } else {
-    this->geometry.state = 1;
+    this->geometry.state = BUTTON_STATE_HOVER;
 
     if (this->parent) {
       this->parent->SendMsg(this, UM_TEXT_LBTN_UP, this->geometry.id, this->m_value, 0, 0);
@@ -233,9 +234,9 @@ void UITextButton::OnRBtnUp(int x, int y) {
   }
 
   if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    this->geometry.state = 0;
+    this->geometry.state = BUTTON_STATE_NORMAL;
   } else {
-    this->geometry.state = 1;
+    this->geometry.state = BUTTON_STATE_HOVER;
 
     if (this->parent) {
       this->parent->SendMsg(this, UM_TEXT_RBTN_UP, this->geometry.id, this->m_value, 0, 0);
@@ -318,16 +319,16 @@ bool UIBmpRadioBtn::SetBitmap(const char* name, int state) {
   this->Resize(this->geometry.width, this->geometry.height);
 
   switch (state) {
-  case 0:
+  case BUTTON_STATE_NORMAL:
     this->m_names[0] = name;
     break;
-  case 1:
+  case BUTTON_STATE_HOVER:
     this->m_names[1] = name;
     break;
-  case 2:
+  case BUTTON_STATE_PRESSED:
     this->m_names[2] = name;
     break;
-  case 3:
+  case BUTTON_STATE_DISABLED:
     this->m_names[3] = name;
     break;
   }
@@ -475,18 +476,14 @@ void UIImgMenu::OnMouseHover(int x, int y) {
 void UITabControl::OnMouseHover(int x, int y) {
   int index = this->TabAt(x, y);
 
-  if (index == -1) {
-    return;
+  if (index != -1) {
+    if (!this->tooltips[index].empty() && this->labels[index] != this->tooltips[index]) {
+      int screenX = this->TabOffset(index);
+      int screenY = -20;
+      this->ToScreen(screenX, screenY);
+      g_modeMgr.currentMode->ShowTooltip(this->tooltips[index].c_str(), screenX, screenY, -1, false, true);
+    }
   }
-
-  if (this->tooltips[index].empty() || this->labels[index] == this->tooltips[index]) {
-    return;
-  }
-
-  x = this->TabOffset(index);
-  y = -20;
-  this->ToScreen(x, y);
-  g_modeMgr.currentMode->ShowTooltip(this->tooltips[index].c_str(), x, y, -1, false, true);
 }
 
 // OFFSET: 0x00822660
@@ -600,15 +597,15 @@ void UIServerListBox::OnMouseHover(int x, int y) {
 // FUNCTION: fn_11456
 void UIMemberListBox::OnMouseHover(int, int y) {
   const unsigned count = static_cast<unsigned>(this->lines.size());
-  const int lineHeight = this->lineHeight;
-  const int topLine = this->topLine;
-  const unsigned end = this->geometry.height / lineHeight - this->bottomMargin + topLine;
-  const int line = topLine + y / lineHeight;
-  if (line < topLine) {
+  auto& lineHeightRef = this->lineHeight;
+  const int lineHeight = lineHeightRef;
+  const unsigned end = this->geometry.height / lineHeight - this->bottomMargin + this->topLine;
+  const int line = this->topLine + y / lineHeight;
+  if (line < this->topLine) {
     return;
   }
 
-  if (line >= static_cast<int>(std::min(count, end))) {
+  if (line >= static_cast<int>(std::min(end, count))) {
     return;
   }
 
@@ -619,7 +616,7 @@ void UIMemberListBox::OnMouseHover(int, int y) {
   }
 
   int screenX = -4;
-  y -= y % this->lineHeight;
+  y -= y % lineHeightRef;
   this->ToScreen(screenX, y);
   g_modeMgr.currentMode->ShowTooltip(this->lines[line].c_str(), screenX, y, -1, false, true);
 }
@@ -664,13 +661,14 @@ void UIComboBox::Configure(int x, int y, int width, int height, unsigned char va
 // FUNCTION: fn_11528
 void UIComboBox::Resize(int width, int height) {
   UIListBox::Resize(width, height);
-  this->topLine = 0;
-  const bool overflow = this->verticalOverflow;
-  this->verticalBar->position = this->topLine;
-  if (overflow) {
+  if (this->verticalOverflow) {
+    this->topLine = 0;
+    this->verticalBar->position = this->topLine;
     this->verticalBar->Move(width - 13, 0);
     this->verticalBar->Invalidate();
   } else {
+    this->topLine = 0;
+    this->verticalBar->position = this->topLine;
     this->verticalBar->Move(width - 13, 0);
   }
 }
@@ -681,22 +679,31 @@ void UIComboBox::OnCreate(int width, int height) {
   UIListBox::OnCreate(width, height);
 }
 
+// INLINED
+static void SetScrollRange(UIScrollBar* bar, int maximum, int visible, int total) {
+  bar->maximum = maximum;
+  bar->total = total;
+  bar->visible = visible;
+  bar->Invalidate();
+
+  if (bar->position > bar->maximum) {
+    bar->position = bar->maximum;
+  }
+}
+
 // OFFSET: 0x00895AC0
 // FUNCTION: fn_11509
 void UIComboBox::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
-  const int overflow = 0 > static_cast<int>(this->lines.size()) - visible ? 0 : static_cast<int>(this->lines.size()) - visible;
+  int overflow = static_cast<int>(this->lines.size()) - visible;
+
+  if (overflow < 0) {
+    overflow = 0;
+  }
 
   this->verticalOverflow = overflow != 0;
-  UIScrollBar* bar = this->verticalBar;
   if (overflow != 0) {
-    bar->maximum = this->bottomMargin + overflow;
-    bar->total = static_cast<int>(this->lines.size());
-    bar->visible = visible;
-    bar->Invalidate();
-    if (bar->position > bar->maximum) {
-      bar->position = bar->maximum;
-    }
+    SetScrollRange(this->verticalBar, this->bottomMargin + overflow, visible, static_cast<int>(this->lines.size()));
 
     if (this->selected < this->topLine) {
       this->topLine = this->selected;
@@ -714,13 +721,7 @@ void UIComboBox::Refresh() {
 
     this->verticalBar->position = this->topLine;
   } else {
-    bar->maximum = 0;
-    bar->total = static_cast<int>(this->lines.size());
-    bar->visible = visible;
-    bar->Invalidate();
-    if (bar->position > bar->maximum) {
-      bar->position = bar->maximum;
-    }
+    SetScrollRange(this->verticalBar, 0, visible, static_cast<int>(this->lines.size()));
   }
 
   this->verticalBar->Invalidate();
@@ -915,28 +916,37 @@ int UIImgMenu::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, s
     }
 
     this->Invalidate();
-    return 0;
+    break;
   }
 
   case UM_SETID:
     this->geometry.id = argument1;
-    return 0;
+    break;
 
   case UM_SET_CALLER_WID:
     this->callerWindowId = argument1;
-    return 0;
+    break;
 
   case UM_SET_PRESSED:
-    this->pressedItems[argument1 - 1] = argument2 != 0;
-    return 0;
+    if (argument2) {
+      this->pressedItems[argument1 - 1] = true;
+    } else {
+      this->pressedItems[argument1 - 1] = false;
+    }
+    break;
 
   case UM_SET_DISABLE:
-    this->disabledItems[argument1 - 1] = argument2 != 0;
-    return 0;
+    if (argument2) {
+      this->disabledItems[argument1 - 1] = true;
+    } else {
+      this->disabledItems[argument1 - 1] = false;
+    }
+    break;
 
   default:
     return UIWindow::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
+  return 0;
 }
 
 // OFFSET: 0x00897BF0
@@ -1014,15 +1024,15 @@ void UITVTextButton::OnMouseMove(int x, int y) {
   }
 
   if (x >= 0 && x < this->geometry.width && y >= 0 && y < this->geometry.height) {
-    if (this->geometry.state != 1) {
-      this->geometry.state = 1;
+    if (this->geometry.state != BUTTON_STATE_HOVER) {
+      this->geometry.state = BUTTON_STATE_HOVER;
 
       if (this->parent && this->mousePressed == 0) {
         this->parent->SendMsg(this, UM_MOUSE_HOVER_BTN, this->m_value, 0, 0, 0);
       }
     }
-  } else if (this->geometry.state != 0) {
-    this->geometry.state = 0;
+  } else if (this->geometry.state != BUTTON_STATE_NORMAL) {
+    this->geometry.state = BUTTON_STATE_NORMAL;
     this->Invalidate();
     this->drawBackground = 0;
     this->highlighted = 0;
@@ -1100,7 +1110,7 @@ void UIEditCtrl_Currency::OnProcess() {
   int separators = 0;
   int index = 0;
 
-  for (std::string::iterator it = digits.begin(); it != digits.end(); ++it, ++index) {
+  for (std::string::iterator it = digits.begin(); it != digits.end(); ++index, ++it) {
     if (this->text[index] == ',' && anchor > index) {
       ++separators;
     }
@@ -1220,9 +1230,9 @@ void UIBitmapButton2::OnRBtnUp(int x, int y) {
   }
 
   if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    this->geometry.state = 0;
+    this->geometry.state = BUTTON_STATE_NORMAL;
   } else {
-    this->geometry.state = 1;
+    this->geometry.state = BUTTON_STATE_HOVER;
 
     if (this->parent) {
       this->parent->SendMsg(this, UM_BMP_RBTN_UP, this->geometry.id, 0, 0, 0);
@@ -1271,9 +1281,9 @@ void UITVBitmapButton::OnRBtnUp(int x, int y) {
   }
 
   if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    this->geometry.state = 0;
+    this->geometry.state = BUTTON_STATE_NORMAL;
   } else {
-    this->geometry.state = 1;
+    this->geometry.state = BUTTON_STATE_HOVER;
 
     if (this->parent) {
       this->parent->SendMsg(this, UM_BMP_RBTN_UP, this->m_value, 0, 0, 0);
@@ -1347,21 +1357,23 @@ void UIListBoxID::Resize(int width, int height) {
 // FUNCTION: fn_11531
 void UIComboBoxID::Resize(int width, int height) {
   UIListBoxID::Resize(width, height);
-  this->topLine = 0;
-  this->verticalBar->position = this->topLine;
   if (this->verticalOverflow != 0) {
+    this->topLine = 0;
+    this->verticalBar->position = this->topLine;
     this->verticalBar->Move(width - 13, 0);
     this->verticalBar->Invalidate();
   } else {
+    this->topLine = 0;
+    this->verticalBar->position = this->topLine;
     this->verticalBar->Move(width - 13, 0);
   }
 }
 
 // INLINED
-static void SetScrollRange(UIScrollBar* bar, int maximum, int visible, int total) {
+__forceinline void SetBarRange(UIScrollBar* bar, int maximum, int visible, int total) {
   bar->maximum = maximum;
-  bar->total = total;
   bar->visible = visible;
+  bar->total = total;
   bar->Invalidate();
 
   if (bar->position > bar->maximum) {
@@ -1374,12 +1386,27 @@ static void SetScrollRange(UIScrollBar* bar, int maximum, int visible, int total
 void UIListBoxID::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
   const int count = static_cast<int>(this->lines.size());
-  const int overflow = count - visible >= 0 ? count - visible : 0;
+  int overflow = count - visible;
+
+  if (overflow < 0) {
+    overflow = 0;
+  }
+
   this->verticalOverflow = overflow != 0;
   if (overflow != 0) {
-    SetScrollRange(this->verticalBar, this->bottomMargin + overflow, visible, count);
+    this->verticalBar->maximum = this->bottomMargin + overflow;
   } else {
-    SetScrollRange(this->verticalBar, 0, visible, count);
+    this->verticalBar->maximum = 0;
+  }
+
+  auto* bar = this->verticalBar;
+
+  bar->total = count;
+  bar->visible = visible;
+  bar->Invalidate();
+
+  if (bar->position > bar->maximum) {
+    bar->position = bar->maximum;
   }
 
   this->verticalBar->Invalidate();
@@ -1389,30 +1416,40 @@ void UIListBoxID::Refresh() {
 // FUNCTION: fn_11511
 void UIComboBoxID::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
-  const int count = static_cast<int>(this->lines.size());
-  const int overflow = 0 > count - visible ? 0 : count - visible;
+  int overflow = static_cast<int>(this->lines.size()) - visible;
+
+  if (overflow < 0) {
+    overflow = 0;
+  }
 
   this->verticalOverflow = overflow != 0;
+  auto& verticalBarRef = this->verticalBar;
+  auto* bar = verticalBarRef;
+
   if (overflow != 0) {
-    SetScrollRange(this->verticalBar, this->bottomMargin + overflow, visible, count);
+    SetBarRange(bar, (this->bottomMargin + overflow), visible, static_cast<int>(this->lines.size()));
 
     if (this->selected < this->topLine) {
       this->topLine = this->selected;
-    } else if (this->topLine + visible <= this->selected) {
-      this->topLine = this->selected - visible + 1;
+    } else if ((this->topLine + visible) <= this->selected) {
+      this->topLine = ((this->selected - visible) + 1);
     }
+
     if (this->topLine < 0) {
       this->topLine = 0;
     }
+
     if (this->topLine > overflow) {
       this->topLine = overflow;
     }
+
     this->verticalBar->position = this->topLine;
   } else {
-    SetScrollRange(this->verticalBar, 0, visible, count);
+    SetBarRange(bar, 0, visible, static_cast<int>(this->lines.size()));
   }
 
   this->verticalBar->Invalidate();
+
   if (this->Root()) {
     this->Root()->Invalidate();
   }
@@ -1463,8 +1500,14 @@ void UITreeView::Resize(int width, int height) {
 void UITreeView::UpdateScrollBar() {
   const int visible = this->geometry.height / this->itemHeight;
   const int count = this->itemCount;
-  const int overflow = std::max(0, count - visible);
-  this->verticalOverflow = overflow != 0;
+  const int hidden = count - visible;
+  const int overflow = hidden >= 0 ? hidden : 0;
+  if (overflow != 0) {
+    this->verticalOverflow = 1;
+  } else {
+    this->verticalOverflow = 0;
+  }
+
   if (overflow != 0) {
     SetScrollRange(this->verticalBar, overflow, visible, count);
     this->verticalBar->Invalidate();
@@ -1608,7 +1651,7 @@ void UITVTextButton::OnLBtnDblClk(int x, int y) {
     return;
   }
 
-  this->geometry.state = 1;
+  this->geometry.state = BUTTON_STATE_HOVER;
 
   if (this->parent) {
     this->parent->SendMsg(this, UM_TEXT_LBTN_DblClk, this->m_value, x, y, 0);
@@ -1692,7 +1735,7 @@ void UITVTextButton::OnLBtnDown(int, int) {
     return;
   }
 
-  this->geometry.state = 2;
+  this->geometry.state = BUTTON_STATE_PRESSED;
   this->Invalidate();
 
   if (this->parent) {
@@ -1742,9 +1785,9 @@ void UIBitmapButton2::OnLBtnUp(int x, int y) {
   }
 
   if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    this->geometry.state = 0;
+    this->geometry.state = BUTTON_STATE_NORMAL;
   } else {
-    this->geometry.state = 1;
+    this->geometry.state = BUTTON_STATE_HOVER;
 
     if (this->parent) {
       this->parent->SendMsg(this, UM_BMP_LBTN_UP, this->geometry.id, 0, 0, 0);
@@ -1788,9 +1831,9 @@ void UITVBitmapButton::OnLBtnUp(int x, int y) {
   }
 
   if (x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
-    this->geometry.state = 0;
+    this->geometry.state = BUTTON_STATE_NORMAL;
   } else {
-    this->geometry.state = 1;
+    this->geometry.state = BUTTON_STATE_HOVER;
 
     if (this->parent) {
       this->parent->SendMsg(this, UM_BMP_LBTN_UP, this->m_value, 0, 0, 0);
@@ -2103,10 +2146,8 @@ void UIScrollBar_Custom::Paint() {
       middle = 0;
     } else {
       middle = this->m_trackMiddle->image.height;
-      int y = top;
       for (int index = 0; index < (this->geometry.height - top) / middle; ++index) {
-        this->DrawBitmap(0, y, this->m_trackMiddle, false);
-        y += middle;
+        this->DrawBitmap(0, top + index * middle, this->m_trackMiddle, false);
       }
     }
 
@@ -2122,8 +2163,16 @@ void UIScrollBar_Custom::Paint() {
       this->DrawBitmap(0, this->geometry.height - this->m_arrowDown->image.height, this->m_arrowDown, true);
     }
 
-    const int length = this->vertical == 0 ? this->geometry.width : this->geometry.height;
-    const int thumb = this->position * (length - this->arrowLength * 2 - this->ThumbLength()) / this->maximum + this->arrowLength;
+    int length = this->geometry.height;
+    switch (this->vertical) {
+    case 0:
+      length = this->geometry.width;
+      break;
+    case 1:
+      length = this->geometry.height;
+      break;
+    }
+    const int thumb = this->arrowLength + ((length - 2 * this->arrowLength - this->ThumbLength()) * this->position) / this->maximum;
     const int thumbLength = this->ThumbLength();
 
     int thumbTop = 0;
@@ -2465,12 +2514,11 @@ void UIStaticItem_Illust::Paint() {
   auto* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path.c_str())));
   if (!bitmap) {
     bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\collection\\사과.bmp")));
-    if (!bitmap) {
-      return;
-    }
   }
 
-  this->DrawBitmap(0, 0, &bitmap->image, true);
+  if (bitmap) {
+    this->DrawBitmap(0, 0, bitmap, 1);
+  }
 }
 
 // OFFSET: 0x0088F810
@@ -2869,8 +2917,8 @@ void UIItemTagOnMail::PlaceTagButton(UIWindow* button, const std::string& name, 
 
   UIRodexComposeWnd* compose = g_windowMgr.rodexComposeWnd;
   unsigned bytes = 0;
-  const int width = compose->MeasureText(name.c_str(), bytes);
   const int row = static_cast<int>(line) - firstLine;
+  const int width = compose->MeasureText(name.c_str(), bytes);
   if (row < 0 || static_cast<int>(line) >= firstLine + visibleLines) {
     button->Move(1000, 1000);
   } else {
@@ -3008,20 +3056,20 @@ void UISlotBmpButton::SetSlot(int slot, int fallback) {
   this->m_slot = slot;
   this->m_inRange = g_session.IsRestrictedCharacterSlot(slot == -1 ? fallback : slot);
   if (this->m_slot < 0) {
-    this->icon->Show(0);
+    this->icon->Show(WINDOW_HIDDEN);
     return;
   }
 
   const CharacterInfo* info = reinterpret_cast<const CharacterInfo*>(g_modeMgr.currentMode->SendMsg(MM_QUERYCHARICTORINFO, this->m_slot, 0, 0, 0));
   if (!info) {
-    this->icon->Show(0);
+    this->icon->Show(WINDOW_HIDDEN);
     return;
   }
 
   const std::string directory = "유저인터페이스\\renewalparty\\";
   char path[256];
   std::sprintf(path, "%sicon_jobs_%d.bmp", directory.c_str(), info->job);
-  this->icon->Show(1);
+  this->icon->Show(WINDOW_VISIBLE);
   this->icon->SetBitmap(path);
 }
 
@@ -3078,7 +3126,9 @@ void UIListBoxTitle::Paint() {
     if (index == this->selected) {
       this->FillRegion(0, (index - first) * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->selectionColor);
     } else {
-      if (std::find(g_windowCloseValue, g_savedWindowCloseValue, this->lines[index].id) != g_savedWindowCloseValue) {
+      const auto titleEnd = g_savedWindowCloseValue;
+      const int& id = this->lines[index].id;
+      if (std::find(g_windowCloseValue, g_savedWindowCloseValue, id) != titleEnd) {
         this->FillRegion(0, (index - first) * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->titleColor);
       }
     }
@@ -3370,7 +3420,7 @@ void UITextViewEX::Paint() {
         do {
           UIString* text = *buttonIt;
           if (StringText(*text) != "\n") {
-            text->Show(1);
+            text->Show(WINDOW_VISIBLE);
             x = text->enabled == 0 ? x : x - 5;
             if (x < 0) {
               x = 0;
@@ -3389,7 +3439,7 @@ void UITextViewEX::Paint() {
     } else {
       for (auto buttonIt = buttons.begin(), buttonEnd = buttons.end(); buttonIt != buttonEnd; ++buttonIt) {
         UIString* button = *buttonIt;
-        button->Show(0);
+        button->Show(WINDOW_HIDDEN);
       }
     }
   }

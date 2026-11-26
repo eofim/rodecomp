@@ -14,6 +14,15 @@ class UITextButton;
 struct TextLocale;
 struct tagSIZE;
 
+enum TextAlign : unsigned char {
+  TEXT_ALIGN_LEFT = 0,
+  TEXT_ALIGN_RIGHT = 1,
+  TEXT_ALIGN_CENTER = 2,
+  TEXT_ALIGN_TOP = 3,
+  TEXT_ALIGN_MIDDLE = 4,
+  TEXT_ALIGN_BOTTOM = 5,
+};
+
 enum LineSegmentType {
   LINE_SEGMENT_URL = 0x1B5,
   LINE_SEGMENT_NAVI = 0x1B6,
@@ -57,6 +66,14 @@ struct LineFontState {
   /* 0004 */ std::uint32_t color;
 };
 
+struct LineWindows {
+  // INLINED
+  LineWindows() {
+  }
+
+  /* 0000 */ std::vector<UIWindow*> windows;
+};
+
 // VTABLE: vt_00879
 class CCreateLineInfo {
 public:
@@ -90,7 +107,7 @@ public:
   /* 0048 */ bool m_newSegment;
   /* 004C */ std::string m_text;
   /* 0064 */ std::vector<LineTextSegment> m_segments;
-  /* 0070 */ std::vector<std::vector<UIWindow*>> m_lines;
+  /* 0070 */ std::vector<LineWindows> m_lines;
   /* 007C */ int m_height;
 
   CCreateLineInfo(
@@ -121,6 +138,7 @@ public:
   __declspec(noinline) int LayoutItemImage(int x, const std::string& text);
   __declspec(noinline) int LayoutText(int x, std::string text, LineTextStyle style);
   UITextButton* CreateLinkWindow(const std::string& text, const std::vector<std::string>& parts, int type, LineTextStyle style);
+  UIWindow* CreateItemImageWindow(std::string itemId);
   __declspec(noinline) UIWindow* CreateTextWindow(std::string text, const LineTextStyle& style);
 
 private:

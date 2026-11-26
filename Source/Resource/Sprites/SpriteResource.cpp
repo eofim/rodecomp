@@ -116,7 +116,7 @@ bool CSprRes::Load(const char* name) {
         std::uint16_t zeroCount = 0;
         std::uint8_t* row = pixels;
 
-        for (unsigned y = height; y != 0; --y) {
+        for (unsigned y = height; y > 0; --y) {
           std::uint8_t* pixel = row;
           if (pixel) {
             for (unsigned x = width; x != 0; --x) {
@@ -186,10 +186,11 @@ bool CSprRes::Load(const char* name) {
       auto* pixels = new std::uint32_t[image->width * image->height];
 
       for (int y = image->height - 1; y >= 0; --y) {
+        std::uint32_t* out = pixels + y * image->width;
         for (int x = 0; x < image->width; ++x) {
-          SpritePixel pixel;
-          file.Read(&pixel, sizeof(pixel));
-          pixels[y * image->width + x] = (((((pixel.alpha << 8) + pixel.red) << 8) + pixel.green) << 8) + pixel.blue;
+          std::uint32_t packed;
+          file.Read(&packed, sizeof(packed));
+          *out++ = ((((((packed & 0xFFu) << 8) + (packed >> 24)) << 8) + ((packed >> 16) & 0xFFu)) << 8) + ((packed >> 8) & 0xFFu);
         }
       }
 

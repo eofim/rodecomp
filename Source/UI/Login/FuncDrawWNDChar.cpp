@@ -33,10 +33,10 @@ FuncDrawWNDChar::FuncDrawWNDChar(
   this->offsetY = 0;
   g_session.m_hotkeyScript->CallTable(std::string("TB_Layer_Priority", 17), std::string("IsHelmRobe", 10), "d>b", this->m_robe, &this->m_helmRobe);
   this->m_drawOnTop = this->DrawOnTop();
-  this->m_layers[5] = this->m_bottomAccessory;
-  this->m_layers[4] = this->m_topAccessory;
-  this->m_layers[3] = this->m_midAccessory;
-  this->m_layers[6] = this->m_robe;
+  this->m_layers[WNDCHAR_LAYER_HEAD_LOW] = this->m_bottomAccessory;
+  this->m_layers[WNDCHAR_LAYER_HEAD_TOP] = this->m_topAccessory;
+  this->m_layers[WNDCHAR_LAYER_HEAD_MID] = this->m_midAccessory;
+  this->m_layers[WNDCHAR_LAYER_HELM_ROBE] = this->m_robe;
 }
 
 // OFFSET: 0x007E3E60
@@ -80,20 +80,20 @@ void FuncDrawWNDChar::Draw(bool option) {
     }
 
     const ActionFrame* frame = &act->Frame(this->m_action, this->m_motion);
-    if (layer == 2) {
+    if (layer == WNDCHAR_LAYER_HEAD) {
       FuncDrawOffset body = this->BodyAnchorOffset(frame, option);
       if (this->customRendering == 1) {
         continue;
       }
 
-      offset.x += body.x;
       offset.y += body.y;
+      offset.x += body.x;
     } else {
       switch (layer) {
-        case 3:
-        case 4:
-        case 5:
-        case 6: {
+        case WNDCHAR_LAYER_HEAD_MID:
+        case WNDCHAR_LAYER_HEAD_TOP:
+        case WNDCHAR_LAYER_HEAD_LOW:
+        case WNDCHAR_LAYER_HELM_ROBE: {
           if (!this->hideHeadLayer && this->Resource(2).second) {
             this->BodyAnchorOffset(&this->Resource(2).second->Frame(this->m_action, this->m_motion), option);
           }
@@ -104,7 +104,7 @@ void FuncDrawWNDChar::Draw(bool option) {
           break;
         }
         default:
-          if (layer == 0 || layer == 7) {
+          if (layer == WNDCHAR_LAYER_ROBE_BEHIND || layer == WNDCHAR_LAYER_ROBE_FRONT) {
             int baseMotion = this->m_motion;
             int syncedMotion = this->m_motion;
             CActRes* layerAct = this->Resource(layer).second;
@@ -135,15 +135,15 @@ void FuncDrawWNDChar::Draw(bool option) {
     }
 
     const SpriteFrameCell& cell = frame->Cell(this->IsSpecialLayer(layer));
+    if (cell.image == -1) {
+      continue;
+    }
+
     SpriteAtlasRecord record{};
     record.u0 = 0.0f;
     record.v0 = 0.0f;
+    const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
     if (option == true) {
-      if (cell.image == -1) {
-        continue;
-      }
-
-      const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
       if (cell.imageType == 0 && !g_renderer->atlas.Find(image, palette, record)) {
         g_renderer->atlas.Insert(image, palette, record);
       }
@@ -157,11 +157,6 @@ void FuncDrawWNDChar::Draw(bool option) {
         static_cast<float>(cell.rotation), window->Color(), palette, 1.0f
       );
     } else {
-      if (cell.image == -1) {
-        continue;
-      }
-
-      const SpriteRleImage* image = sprite->images[cell.imageType][cell.image];
       CTexture* texture;
       if (cell.imageType == 0) {
         texture = g_renderer->atlas.Find(image, palette, record);
@@ -203,32 +198,32 @@ std::list<int> FuncDrawWNDChar::DrawOrder() {
   for (int layer = 0; layer < 8; ++layer) {
     int priority;
     switch (layer) {
-      case 0:
+      case WNDCHAR_LAYER_ROBE_BEHIND:
         if (this->m_robe <= 0 || this->m_drawOnTop == true) {
           break;
         }
         [[fallthrough]];
-      case 1:
+      case WNDCHAR_LAYER_BODY:
         order[layer] = layer;
         break;
-      case 2:
+      case WNDCHAR_LAYER_HEAD:
         order[3] = 2;
         break;
-      case 6:
+      case WNDCHAR_LAYER_HELM_ROBE:
         if (!this->m_helmRobe) {
           break;
         }
         [[fallthrough]];
-      case 3:
-      case 4:
-      case 5:
+      case WNDCHAR_LAYER_HEAD_MID:
+      case WNDCHAR_LAYER_HEAD_TOP:
+      case WNDCHAR_LAYER_HEAD_LOW:
         if (this->m_layers[layer] > 0) {
           priority = -1;
           g_session.m_hotkeyScript->Call("GetLayerPriority", "ddd>d", 0, defaultPriorities[layer], this->m_layers[layer], &priority);
           order[priority] = layer;
         }
         break;
-      case 7:
+      case WNDCHAR_LAYER_ROBE_FRONT:
         if (this->m_robe > 0 && this->m_drawOnTop) {
           if (g_session.IsTopLayerRobe(this->m_robe) == true) {
             order[400] = layer;
@@ -265,13 +260,16 @@ bool FuncDrawWNDChar::DrawOnTop() {
   int job = this->m_job;
 
   if (g_session.m_newRobeDrawOnTop == 1) {
+    int ridden;
     if (this->m_flags == 1) {
-      job = g_session.GetRidingJob(job);
+      ridden = g_session.GetRidingJob(job);
+    } else {
+      ridden = job;
     }
 
     bool drawOnTop = true;
-    int layer = job;
-    if (g_session.m_hotkeyScript->Call(std::string("_New_DrawOnTop", 14), "ddddd>bd", this->m_robe, this->m_sex, job, this->m_action, this->m_motion, &drawOnTop, &layer) == 1) {
+    int layer = ridden;
+    if (g_session.m_hotkeyScript->Call(std::string("_New_DrawOnTop", 14), "ddddd>bd", this->m_robe, this->m_sex, ridden, this->m_action, this->m_motion, &drawOnTop, &layer) == 1) {
       return drawOnTop;
     }
   } else {
@@ -292,7 +290,7 @@ int FuncDrawWNDChar::IsSpecialLayer(int layer) {
     return 1;
   }
 
-  return layer == 2;
+  return layer == WNDCHAR_LAYER_HEAD;
 }
 
 // OFFSET: 0x007E5190
@@ -300,21 +298,21 @@ int FuncDrawWNDChar::IsSpecialLayer(int layer) {
 FuncDrawOffset FuncDrawWNDChar::BodyAnchorOffset(const ActionFrame* frame, bool keepScale) {
   FuncDrawOffset offset;
 
-  int layer = 1;
-  CActRes* act = this->m_resources.end() != this->m_resources.find(layer) ? this->m_resources[layer].second : nullptr;
+  CActRes* act = this->Resource(1).second;
   const ActionFrame& base = act->Frame(this->m_action, this->m_motion);
   if (frame->anchorCount > 0 && base.anchorCount > 0) {
-    const ActionAnchor* frameAnchor = frame->anchors.data();
     const ActionAnchor* baseAnchor = base.anchors.data();
+    const ActionAnchor* frameAnchor = frame->anchors.data();
     if (frameAnchor->attachmentId == baseAnchor->attachmentId) {
+      const int baseX = baseAnchor->x;
       if (this->m_shield != 0) {
         if (keepScale == true) {
-          offset.x += baseAnchor->x - frameAnchor->x;
+          offset.x += baseX - frameAnchor->x;
           offset.y += baseAnchor->y - frameAnchor->y;
           this->offsetY = offset.y;
           this->offsetX = offset.x;
         } else {
-          offset.x = static_cast<int>(static_cast<float>(baseAnchor->x) / base.Cell(0).scaleX - static_cast<float>(frameAnchor->x) + static_cast<float>(offset.x));
+          offset.x = static_cast<int>(static_cast<float>(baseX) / base.Cell(0).scaleX - static_cast<float>(frameAnchor->x) + static_cast<float>(offset.x));
           float baseY = static_cast<float>(base.anchors.data()->y);
           const ActionAnchor* currentAnchor = frame->anchors.data();
           offset.y = static_cast<int>(baseY / base.Cell(0).scaleY - static_cast<float>(currentAnchor->y) + static_cast<float>(offset.y));
@@ -322,7 +320,7 @@ FuncDrawOffset FuncDrawWNDChar::BodyAnchorOffset(const ActionFrame* frame, bool 
           this->offsetX = offset.x;
         }
       } else {
-        offset.x = baseAnchor->x - frameAnchor->x;
+        offset.x = baseX - frameAnchor->x;
         offset.y = baseAnchor->y - frameAnchor->y;
         this->offsetY = offset.y;
         this->offsetX = offset.x;
@@ -359,13 +357,13 @@ FuncDrawOffset FuncDrawWNDChar::LayerAnchorOffset(int layer, const ActionFrame**
   }
 
   offset.x += this->offsetX;
-  if (IsIgnoredRidingState(this->m_layers[layer], this->m_job, this->m_action - this->m_action % 8, this->m_flags) == true) {
+  if (IsIgnoredRidingState(this->m_layers[layer], this->m_job, this->m_action - this->m_action % 8, reinterpret_cast<const bool&>(this->m_flags)) == true) {
     offset.y += SpriteRidingOffset(&base, this->m_action, this->m_motion, this->m_job, this->m_sex, this->m_body);
   } else {
     offset.y += this->offsetY;
   }
 
-  if (layer == 4) {
+  if (layer == WNDCHAR_LAYER_HEAD_TOP) {
     switch (this->m_topAccessory) {
     case 181:
     case 197:
@@ -387,19 +385,19 @@ FuncDrawOffset FuncDrawWNDChar::LayerAnchorOffset(int layer, const ActionFrame**
 void FuncDrawWNDChar::LoadResources(const std::list<int>& layers) {
   for (auto it = layers.begin(); it != layers.end(); ++it) {
     const int& layer = *it;
+    __declspec(align(8)) volatile __int64 aligned = 1;
     std::string sprName;
     std::string actName;
-    __declspec(align(8)) volatile __int64 aligned = 0;
     (void)aligned;
     switch (layer) {
-      case 1: {
+      case WNDCHAR_LAYER_BODY: {
         int job = this->m_flags == 1 ? g_session.GetRidingJob(this->m_job) : this->m_job;
         sprName = static_cast<const std::string&>(g_session.GetBodySprName(job, this->m_sex, this->m_body, this->m_shield));
         actName = static_cast<const std::string&>(g_session.GetBodyActionResourceName(job, this->m_sex, this->m_body, this->m_shield));
         this->bodyPaletteName = static_cast<const std::string&>(g_session.GetBodyPalName(job, this->m_sex, this->m_bodyStyle, this->m_body, this->m_shield, 0));
         break;
       }
-      case 2: {
+      case WNDCHAR_LAYER_HEAD: {
         int head = this->m_head;
         sprName = static_cast<const std::string&>(g_session.GetHeadSprName(this->m_job, this->m_sex, &head));
         actName = static_cast<const std::string&>(g_session.GetHeadActName(this->m_job, this->m_sex, &head));
@@ -407,15 +405,15 @@ void FuncDrawWNDChar::LoadResources(const std::list<int>& layers) {
         this->headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(this->m_head, this->m_job, this->m_sex, this->m_headPalette));
         break;
       }
-      case 3:
-      case 4:
-      case 5:
-      case 6:
+      case WNDCHAR_LAYER_HEAD_MID:
+      case WNDCHAR_LAYER_HEAD_TOP:
+      case WNDCHAR_LAYER_HEAD_LOW:
+      case WNDCHAR_LAYER_HELM_ROBE:
         sprName = static_cast<const std::string&>(g_session.GetAccessorySprName(this->m_job, this->m_sex, this->m_head, this->m_layers[layer]));
         actName = static_cast<const std::string&>(g_session.GetAccessoryActName(this->m_job, this->m_sex, this->m_head, this->m_layers[layer]));
         break;
-      case 0:
-      case 7:
+      case WNDCHAR_LAYER_ROBE_BEHIND:
+      case WNDCHAR_LAYER_ROBE_FRONT:
         if (this->m_shield == 0) {
           sprName = g_session.GetRobeSprName(this->m_job, this->m_hairColor, this->m_sex, this->m_robe, this->m_flags, this->m_body);
           actName = g_session.GetRobeActName(this->m_job, this->m_hairColor, this->m_sex, this->m_robe, this->m_flags, this->m_body);
@@ -427,8 +425,8 @@ void FuncDrawWNDChar::LoadResources(const std::list<int>& layers) {
     CActRes* act = static_cast<CActRes*>(ResourceMgr::Instance().Load(actName));
     if (sprite && act) {
       std::pair<CSprRes*, CActRes*>& entry = this->m_resources.try_emplace(layer).first->second;
-      entry.first = sprite;
       entry.second = act;
+      entry.first = sprite;
     }
   }
 

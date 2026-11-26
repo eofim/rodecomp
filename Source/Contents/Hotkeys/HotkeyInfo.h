@@ -6,6 +6,13 @@
 #include <cstddef>
 #include <string>
 
+enum UserHotkeyTab : int {
+  HOTKEY_TAB_SKILL_BAR_1 = 0,
+  HOTKEY_TAB_INTERFACE = 1,
+  HOTKEY_TAB_EMOTION = 2,
+  HOTKEY_TAB_SKILL_BAR_2 = 3,
+};
+
 class LuaScript;
 
 struct HotkeyInfo {
@@ -25,7 +32,7 @@ struct HotkeyInfo {
 
   HotkeyInfo(HotkeyInfo&& other) = default;
   HotkeyInfo& operator=(const HotkeyInfo& other) = default;
-  HotkeyInfo& operator=(HotkeyInfo&& other) = default;
+  __declspec(noinline) HotkeyInfo& operator=(HotkeyInfo&& other) = default;
 
   // OFFSET: 0x005F7C30
   // FUNCTION: fn_04053

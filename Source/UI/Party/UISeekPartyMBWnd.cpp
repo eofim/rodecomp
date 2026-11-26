@@ -32,6 +32,21 @@ struct PACKET_CZ_PARTY_BOOKING_REQ_REGISTER {
 #pragma pack(pop)
 }
 
+// OFFSET: 0x00945E60
+// FUNCTION: fn_46632
+void UISeekPartyMBWnd::LoadSubTypeOptions(int type) {
+  this->m_subTypeCombo->Clear();
+
+  const auto& subTypes = this->m_subTypes;
+  auto found = subTypes.find(type);
+  if (found != subTypes.end()) {
+    const std::vector<std::pair<std::string, int>> entries = found->second;
+    for (const std::pair<std::string, int> entry : entries) {
+      this->m_subTypeCombo->AddOption(entry.first.c_str(), entry.second);
+    }
+  }
+}
+
 // OFFSET: 0x00939EE0
 // FUNCTION: fn_12756
 int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -64,7 +79,7 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
       }
 
       if (count == 0) {
-        g_windowMgr.Confirm(LookupMessage(MSI_PARTY_BOOKING_ERR2), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_PARTY_BOOKING_ERR2), 0, true, false, 0, "메시지", 280, 120, 0);
         break;
       }
 
@@ -72,14 +87,14 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
         char text[100];
         std::memset(text, 0, sizeof(text));
         std::sprintf(text, LookupMessage(MSI_PARTY_BOOKING_ERR3), count);
-        g_windowMgr.Confirm(text, 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(text, 0, true, false, 0, "메시지", 280, 120, 0);
         break;
       }
 
       std::string level(this->m_levelEdit->Text());
       for (unsigned int i = 0; i < level.size(); ++i) {
         if (level[i] < '/' || level[i] > '9') {
-          g_windowMgr.Confirm(LookupMessage(MSI_PARTY_BOOKING_ERR4), 0, true, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_PARTY_BOOKING_ERR4), 0, true, false, 0, "메시지", 280, 120, 0);
           return 0;
         }
       }
@@ -100,7 +115,7 @@ int UISeekPartyMBWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, st
         std::memset(text, 0, sizeof(text));
         const char* format = LookupMessage(MSI_PARTY_BOOKING_ERR5R2);
         StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), format, maximum);
-        g_windowMgr.Confirm(text, 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(text, 0, true, false, 0, "메시지", 280, 120, 0);
       }
       break;
     }

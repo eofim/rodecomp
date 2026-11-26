@@ -18,7 +18,7 @@ float g_depthEnd;
 // FUNCTION: fn_17826
 void CMode::DrawTexture(const RECT& rect, int angle, float rhw, std::uint32_t color, CTexture* texture, TextureRegion region) {
   RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
-  volatile RenderVertex* vertices = primitive->vertices;
+  RenderVertex* vertices = primitive->vertices;
   primitive->texture = texture;
   const float bottomZ = RhwToDepth(rhw);
   const float topZ = RhwToDepth(rhw);
@@ -28,20 +28,20 @@ void CMode::DrawTexture(const RECT& rect, int angle, float rhw, std::uint32_t co
     const float sine = ClientSine(angle);
     const float width = static_cast<float>(rect.right - rect.left);
     const float height = static_cast<float>(rect.bottom - rect.top);
-    const float right = width * g_depthAverageHalf;
-    const float bottom = height * g_depthAverageHalf;
-    const float centerX = static_cast<float>(rect.left) + right;
+    const float centerX = static_cast<float>(rect.left) + width * g_depthAverageHalf;
+    const float centerY = static_cast<float>(rect.top) + height * g_depthAverageHalf;
     const float left = -width * g_depthAverageHalf;
     const float top = -height * g_depthAverageHalf;
-    const float centerY = static_cast<float>(rect.top) + bottom;
+    const float right = width * g_depthAverageHalf;
+    const float bottom = height * g_depthAverageHalf;
 
     vertices[0].x = left * cosine - top * sine + centerX;
     vertices[0].y = top * cosine + left * sine + centerY;
     vertices[1].x = right * cosine - top * sine + centerX;
     vertices[1].y = right * sine + top * cosine + centerY;
     vertices[2].x = left * cosine - bottom * sine + centerX;
-    vertices[3].x = right * cosine - bottom * sine + centerX;
     vertices[2].y = bottom * cosine + left * sine + centerY;
+    vertices[3].x = right * cosine - bottom * sine + centerX;
     vertices[3].y = bottom * cosine + right * sine + centerY;
   } else {
     vertices[0].x = static_cast<float>(rect.left);
@@ -60,24 +60,24 @@ void CMode::DrawTexture(const RECT& rect, int angle, float rhw, std::uint32_t co
 
   vertices[0].z = topZ;
   vertices[0].rhw = rhw;
-  vertices[0].diffuse = color;
   vertices[0].u = region.left * scaleU + margin;
   vertices[0].v = region.top * scaleV + margin;
+  vertices[0].diffuse = color;
   vertices[1].z = topZ;
   vertices[1].rhw = rhw;
-  vertices[1].diffuse = color;
   vertices[1].u = region.right * scaleU - margin;
   vertices[1].v = region.top * scaleV + margin;
+  vertices[1].diffuse = color;
   vertices[2].z = bottomZ;
   vertices[2].rhw = rhw;
-  vertices[2].diffuse = color;
   vertices[2].u = region.left * scaleU + margin;
   vertices[2].v = region.bottom * scaleV - margin;
+  vertices[2].diffuse = color;
   vertices[3].z = bottomZ;
   vertices[3].rhw = rhw;
-  vertices[3].diffuse = color;
   vertices[3].u = region.right * scaleU - margin;
   vertices[3].v = region.bottom * scaleV - margin;
+  vertices[3].diffuse = color;
 
   g_renderer->Submit(primitive, 0x201);
 }

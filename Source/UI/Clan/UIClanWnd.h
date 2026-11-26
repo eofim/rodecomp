@@ -9,10 +9,12 @@ class UIStaticText;
 
 class UIClanWnd : public UIFrameWnd {
 public:
-  // INLINED
+  // OFFSET: 0x0084CC60
+  // FUNCTION: fn_46565
   UIClanWnd() : UIFrameWnd(0), m_saved(nullptr), m_title(nullptr) {
   }
   void StoreInfo() override;
+  void DrawTabBackground();
   void OnCreate(int width, int height) override = 0;
   void Paint() override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) override;
@@ -26,6 +28,7 @@ protected:
 class UIClanInfoManageWnd : public UIClanWnd {
 public:
   UIClanInfoManageWnd();
+  void CreateTitle();
   void OnCreate(int width, int height) override;
   void OnLBtnDown(int x, int y) override;
   void Paint() override;

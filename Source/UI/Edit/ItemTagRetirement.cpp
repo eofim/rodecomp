@@ -86,7 +86,7 @@ UIItemTagCtrl::~UIItemTagCtrl() {
 // OFFSET: 0x00879830
 // FUNCTION: fn_11218
 bool UIItemTagOnChat::CanInsertTag(const std::string& name, int width) {
-  if (g_windowMgr.GetHoverWindow()->geometry.id != 490 && g_windowMgr.GetHoverWindow()->geometry.id != 494 &&
+  if (g_windowMgr.GetHoverWindow()->geometry.id != ID_WHISPER_EDIT && g_windowMgr.GetHoverWindow()->geometry.id != ID_CHATROOM_EDIT &&
       !g_windowMgr.inputSuggestionsEnabled) {
     this->ClearTags();
     return false;
@@ -250,17 +250,17 @@ void UIItemTagCtrl::AddItemTag(const ITEM_INFO& item, unsigned int color) {
     link += this->ItemLinkNumberText(item.refiningLevel);
   }
 
-  link.push_back(delimiters[4]);
+  link += delimiters[4];
   link += this->ItemLinkNumberText(item.sprite);
   link.push_back(delimiters[5]);
   link += this->ItemLinkNumberText(item.grade);
 
-  const std::uint32_t* cards = item.cards;
   int slots = item.SlotCount();
   if (slots == 0) {
     slots = 4;
   }
 
+  const std::uint32_t* cards = item.cards;
   for (int index = 0; index < 4; ++index) {
     if (item.cards[index] != 0) {
       slots = 4;
@@ -379,8 +379,8 @@ void UIItemTagCtrl::UpdateItemTags() {
         prefix += head;
 
         std::string visible = head;
-        std::size_t firstVisible = 0;
-        int x = 0;
+        int firstVisible = 0;
+        int x;
         UIWindow* hover = g_windowMgr.GetHoverWindow();
         if (hover != nullptr) {
           switch (hover->geometry.id) {
@@ -396,13 +396,16 @@ void UIItemTagCtrl::UpdateItemTags() {
             visible = prefix.substr(firstVisible);
           }
 
-          x = 0;
           if (firstVisible != 0) {
             x = 1000;
             if (prefix.size() > firstVisible) {
               x = 0;
             }
+          } else {
+            x = 0;
           }
+        } else {
+          x = 0;
         }
 
         this->PlaceTagButton(current->child, visible, x, 0);
@@ -410,10 +413,10 @@ void UIItemTagCtrl::UpdateItemTags() {
         const int bytes = static_cast<int>(std::strlen(fitted.c_str()));
         if (!g_windowMgr.rodexComposeWnd || g_windowMgr.rodexComposeWnd->m_contents == g_windowMgr.GetHoverWindow()) {
           const int cursor = g_serverLanguage->cursor;
-          const int start = static_cast<int>(prefix.size());
-          const int end = start + bytes + 2;
-          if (cursor > start && cursor < end) {
-            const int position = cursor < start + bytes / 2 + 1 ? end : start;
+          if (cursor > static_cast<int>(prefix.size()) && cursor < static_cast<int>(prefix.size()) + bytes + 2) {
+            const int position = cursor < static_cast<int>(prefix.size()) + bytes / 2 + 1
+                                     ? static_cast<int>(prefix.size()) + bytes + 2
+                                     : static_cast<int>(prefix.size());
             g_serverLanguage->Select(position, position);
           }
         }

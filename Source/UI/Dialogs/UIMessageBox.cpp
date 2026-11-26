@@ -1,3 +1,4 @@
+#include "UI/Dialogs/MessageBoxType.h"
 #include "Render/DeviceContext/DCSurface.h"
 #include "Contents/Jobs/JobId.h"
 #include "Contents/Skin/SkinMgr.h"
@@ -80,6 +81,7 @@
 #include "UI/Lists/UIComboBox.h"
 #include "Contents/Sound/SoundMgr.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "UI/Login/UINewSelectCharWnd.h"
 #include "UI/Items/UIItemWnd.h"
 #include "Contents/Sound/SoundMaker.h"
@@ -177,7 +179,7 @@ UIMakeCharWnd::UIMakeCharWnd()
   this->m_info.maxSp = 100;
   this->m_info.sp = 100;
   this->m_info.exp = 0;
-  this->m_info.slot = static_cast<unsigned char>(g_selectedSlotIndex);
+  this->m_info.slot = g_charInfo.slot;
   this->m_info.headPalette = 0;
   this->m_info.bodyStyle = 0;
   this->m_info.shield = 0;
@@ -425,8 +427,8 @@ long long UIBank_NewWnd::TransactionAmount(unsigned char deposit) {
   std::string text = this->m_amountEdit->Text();
   this->m_amountEdit->SetText("");
   if (std::string(LookupMessage(MSI_BANK_MAX)) == text) {
-    const long long cash = g_session.m_zeny;
     const long long balance = g_session.m_bankBalance;
+    const long long cash = g_session.m_zeny;
     long long excess = 0;
     if (cash + balance > 0x7FFFFFFF) {
       excess = cash + balance - 0x7FFFFFFF;
@@ -619,6 +621,7 @@ __forceinline void UIMessageBox::FormatCountdown() {
 void UIMessageBox::Configure(
   const char* text, int type, int defaultAccept, int timeout, const char* title, int width, int height, int modalValue, const char* icon
 ) {
+  volatile int accept = defaultAccept;
   this->caption = title;
   this->messageText = text;
   this->format = text;
@@ -657,7 +660,7 @@ void UIMessageBox::Configure(
   this->viewer->SetBackgroundColor(RGB(red, green, blue) | 0xFF000000u);
   this->AddChild(this->viewer);
   this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(this->messageText.data()), static_cast<int>(static_cast<double>(width) / 7.5), 0, 0);
-  if (type == 2) {
+  if (type == MESSAGE_BOX_YES_NO) {
     this->m_message0 = ID_NO;
   } else {
     this->m_message0 = ID_CANCEL;
@@ -666,23 +669,23 @@ void UIMessageBox::Configure(
   const std::string prefix("유저인터페이스\\");
   const char* names[3][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
   int ids[3] = {ID_OK, ID_YES, ID_NO};
-  int positions[3][2] = {{189, height - 24}, {189, height - 24}, {234, height - 24}};
+  int positions[3][2] = {{189, height - 24}, {189, height - 24}, {189, height - 24}};
 
   switch (type) {
-  case 4: {
-    int x = width - 46;
+  case MESSAGE_BOX_CANCEL: {
     auto* button = new UIBitmapButton();
     button->SetBitmap((prefix + names[2][0] + ".bmp").c_str(), 0, 0);
     button->SetBitmap((prefix + names[2][1] + ".bmp").c_str(), 1, 0);
     button->SetBitmap((prefix + names[2][2] + ".bmp").c_str(), 2, 0);
     button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    int x = width - 46;
     button->Move(x, height - 24);
     button->SetId(ID_CANCEL);
     this->AddChild(button);
     this->m_message0 = ID_CANCEL;
     break;
   }
-  case 0: {
+  case MESSAGE_BOX_OK: {
     int x = width - 46;
     auto* button = new UIBitmapButton();
     button->SetBitmap((prefix + names[0][0] + ".bmp").c_str(), 0, 0);
@@ -695,7 +698,7 @@ void UIMessageBox::Configure(
     this->m_message0 = ID_OK;
     break;
   }
-  case 2: {
+  case MESSAGE_BOX_YES_NO: {
     int x = width - 91;
 
     for (int index = 1; index < 3; ++index) {
@@ -711,7 +714,7 @@ void UIMessageBox::Configure(
       x += 45;
     }
 
-    if (defaultAccept) {
+    if (accept) {
       this->m_message0 = ID_YES;
     } else {
       this->m_message0 = ID_NO;
@@ -719,7 +722,7 @@ void UIMessageBox::Configure(
     this->m_message1 = 188;
     break;
   }
-  case 5: {
+  case MESSAGE_BOX_RESTART_LINK: {
     int x = width - 46;
     auto* button = new UIBitmapButton();
     button->SetBitmap((prefix + names[0][0] + ".bmp").c_str(), 0, 0);
@@ -979,7 +982,7 @@ int UIMerInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     case ID_FIRE_MER: {
       CGameMode* mode = g_modeMgr.GetGameMode();
 
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_MER), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_MER), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         mode->SendMsg(MM_COMMAND_MER, 2, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_MERINFOWND);
         g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_1);
@@ -1111,7 +1114,7 @@ void UILoginOTPWnd::OnCreate(int, int) {
   button->AddTextStyle(1, 12, 0x313131, 1, 1, -1000, -1000);
   button->AddTextStyle(2, 12, 0x313131, 1, 1, -1000, -1000);
   this->AddChild(button);
-  this->m_message0 = 382;
+  this->m_message0 = ID_OTP_CONFIRM;
 }
 
 // OFFSET: 0x008B84B0
@@ -1140,15 +1143,17 @@ void UILoginWnd::SaveLogin() {
   }
 
   char id[52];
-  int saveId;
 
   if (this->saveId != 0) {
     std::strcpy(id, this->idEdit->Text());
-    saveId = this->saveId != 0;
-    id[50] = 0;
   } else {
     std::memset(id, 0, sizeof(id));
-    saveId = 0;
+  }
+
+  id[50] = 0;
+  int saveId = this->saveId;
+  if (saveId) {
+    saveId = 1;
   }
 
   EncryptedName<3, 0xC517FB932D95BB6DULL>& idName = OBFUSCATE_STRING("ID", 0xC517FB932D95BB6DULL);
@@ -1157,8 +1162,8 @@ void UILoginWnd::SaveLogin() {
   EncryptedName<10, 0x03772763F96D9DA5ULL>& checkName = OBFUSCATE_STRING("CHECKSAVE", 0x03772763F96D9DA5ULL);
   RegSetValueExA(key, checkName.Text(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&saveId), 4);
 
-  EncryptedName<8, 0x0B7109397F6B1387ULL>& bitwiseName = OBFUSCATE_STRING("BITWISE", 0x0B7109397F6B1387ULL);
   int bitwise = 1;
+  EncryptedName<8, 0x0B7109397F6B1387ULL>& bitwiseName = OBFUSCATE_STRING("BITWISE", 0x0B7109397F6B1387ULL);
   RegSetValueExA(key, bitwiseName.Text(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&bitwise), 4);
   RegCloseKey(key);
 }
@@ -1340,20 +1345,21 @@ int UINoticeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
     case ID_OK: {
       g_soundMgr->PlayWave("버튼소리.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       FILE* file = std::fopen("notice_read.txt", "wb");
-      const int index = this->m_index;
       unsigned char position;
 
-      if (index <= 0 && this->m_scroll <= 255) {
+      if (this->m_index <= 0 && this->m_scroll <= 255) {
         position = static_cast<unsigned char>(this->m_scroll);
 
-        if (position == this->m_bottomPositions[index] - 19) {
+        if (position == this->m_bottomPositions[this->m_index] - 19) {
           position = 255;
         } else if (position != 255) {
-          position = static_cast<unsigned char>(this->m_scroll + 19);
-          const int limit = this->m_bottomPositions[index] - 19;
-
-          if (this->m_scroll + 19 > limit) {
-            position = limit < 0 ? 0 : static_cast<unsigned char>(this->m_bottomPositions[index] - 19);
+          position += 19;
+          if (this->m_scroll + 19 > this->m_bottomPositions[this->m_index] - 19) {
+            if (this->m_bottomPositions[this->m_index] - 19 < 0) {
+              position = 0;
+            } else {
+              position = static_cast<unsigned char>(this->m_bottomPositions[this->m_index] - 19);
+            }
           }
         }
       } else {
@@ -1394,26 +1400,20 @@ int UINoticeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
   case UM_SCROLLVERTPAGEUP:
   case UM_SCROLLVERTPAGEDOWN: {
     const int previous = this->m_scroll;
-    std::intptr_t delta = a;
-
     if (message == UM_SCROLLVERTPAGEUP) {
-      delta = -1;
+      this->m_scroll = previous - 1;
     } else if (message == UM_SCROLLVERTPAGEDOWN) {
-      delta = 1;
+      this->m_scroll = previous + 1;
+    } else {
+      this->m_scroll = previous + static_cast<int>(a);
     }
 
-    int current = previous + delta;
-    this->m_scroll = current;
-    const int index = this->m_index;
-    const int upper = this->m_bottomPositions[index] - 19;
-    if (current > upper) {
-      this->m_scroll = upper;
-      current = upper;
+    if (this->m_scroll > this->m_bottomPositions[this->m_index] - 19) {
+      this->m_scroll = this->m_bottomPositions[this->m_index] - 19;
     }
 
-    const int lower = this->m_scrollPositions[index];
-    if (current < lower) {
-      this->m_scroll = lower;
+    if (this->m_scroll < this->m_scrollPositions[this->m_index]) {
+      this->m_scroll = this->m_scrollPositions[this->m_index];
     }
 
     this->LoadNotice();
@@ -1443,13 +1443,14 @@ void UIPayConfirmWnd::Configure(const std::string& text, int itemId) {
   this->viewer->Move(7, 0x17);
   this->viewer->SetBackgroundColor(0xFFFF00FF);
 
-  auto accept = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == ID_YES; });
-  if (this->m_children.end() != accept) {
+  auto& children = this->m_children;
+  auto accept = std::find_if(children.begin(), children.end(), [](UIWindow* child) { return child->geometry.id == ID_YES; });
+  if (children.end() != accept) {
     (*accept)->Move(0x59, 0x6D);
   }
 
-  auto cancel = std::find_if(this->m_children.begin(), this->m_children.end(), [](UIWindow* child) { return child->geometry.id == ID_NO; });
-  if (this->m_children.end() != cancel) {
+  auto cancel = std::find_if(children.begin(), children.end(), [](UIWindow* child) { return child->geometry.id == ID_NO; });
+  if (children.end() != cancel) {
     auto* button = static_cast<UIBitmapButton*>(*cancel);
     button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_off.bmp", 0, 0);
     button->SetBitmap("유저인터페이스\\basic_interface\\sys_close_on.bmp", 1, 0);
@@ -1567,9 +1568,9 @@ void UIMakeCharWnd::SetHairScrollRanges() {
 void UIMakeCharWnd::InitHairControls() {
   const std::string prefix("유저인터페이스\\");
   const char* names[2][3] = {{"btn_ok", "btn_ok_a", "btn_ok_b"}, {"btn_cancel", "btn_cancel_a", "btn_cancel_b"}};
-  int positions[2][2] = {{57, 262}, {104, 262}};
   const char* tooltips[2] = {"", ""};
   int ids[2] = {184, 185};
+  int positions[2][2] = {{57, 262}, {104, 262}};
 
   for (int index = 0; index < 2; ++index) {
     auto* button = new UIBitmapButton();
@@ -2329,13 +2330,13 @@ int UIReplayRECControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
       break;
     case ID_CONFIRM_REPLAY_RECORDING_PATH: {
       if (this->filenameEdit->Length() <= 0) {
-        g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_ENTERTHEFILENAME), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_ENTERTHEFILENAME), 0, true, false, 0, "메시지", 280, 120, 0);
         break;
       }
 
       if (_mbsstr(reinterpret_cast<const unsigned char*>(this->filenameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
           _mbsstr(reinterpret_cast<const unsigned char*>(this->filenameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
         break;
       }
 
@@ -2624,18 +2625,6 @@ void UILoginWnd::LoadLogin() {
   }
 }
 
-// OFFSET: 0x008AB050
-// FUNCTION: fn_11726
-int sub_8AB050() {
-  return 4;
-}
-
-// OFFSET: 0x008AB060
-// FUNCTION: fn_11727
-int sub_8AB060() {
-  return 6;
-}
-
 // OFFSET: 0x008A4220
 // FUNCTION: fn_11666
 UINoticeWnd::UINoticeWnd() : UIFrameWnd(0) {
@@ -2656,7 +2645,7 @@ UINoticeWnd::UINoticeWnd() : UIFrameWnd(0) {
 // OFFSET: 0x008AD190
 // FUNCTION: fn_11737
 void UIBank_NewWnd::OnCreate(int, int) {
-  this->AddCloseButton("Exit", 0);
+  this->AddCloseButton("닫기", 0);
   this->AddBitmapButton(462, 209, 77, "bank\\btn_deposit", LookupMessage(MSI_BANK_4));
   this->AddBitmapButton(463, 209, 102, "bank\\btn_withdraw", LookupMessage(MSI_BANK_5));
   this->AddBitmapButton(279, 177, 89, "bank\\btn_upper", LookupMessage(MSI_BANK_6));
@@ -2719,14 +2708,14 @@ int UIReplayControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     switch (argument1) {
     case ID_PAUSE_REPLAY:
       g_modeMgr.currentMode->SendMsg(MM_PAUSE_REPLAY, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_RESUME_REPLAY:
       g_modeMgr.currentMode->SendMsg(MM_RESUME_REPLAY, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_RESTART_REPLAY:
       g_modeMgr.currentMode->SendMsg(MM_RESTART_REPLAY, 0, 0, 0, 0);
       Replay::Instance().speed = 1.0f;
-      return 0;
+      break;
     case ID_EXIT_REPLAY:
       g_windowMgr.Schedule(this);
       g_modeMgr.currentMode->SendMsg(MM_EXIT_REPLAY, 0, 0, 0, 0);
@@ -2741,7 +2730,7 @@ int UIReplayControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       this->SendMsg(nullptr, UM_REFRESH, 0, 0, 0, 0);
       break;
     }
-    return 0;
+    break;
   case UM_REFRESHBUTTON:
     if (!this->m_paused) {
       this->m_playButton->Move(-100, -100);
@@ -2754,15 +2743,17 @@ int UIReplayControlWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
     }
     this->Invalidate();
     this->InvalidateChildren();
-    return 0;
+    break;
   case UM_REFRESH:
     this->RefreshInfo();
-    return 0;
+    break;
   case 251:
-    return 0;
+    break;
   default:
     return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
+
+  return 0;
 }
 
 // OFFSET: 0x008C3110
@@ -2852,14 +2843,14 @@ int UISelectReplayDataWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
             return 0;
           }
           Replay::Instance().CloseFile();
-          g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_SERVERNOMATCH), 0, true, true, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_SERVERNOMATCH), 0, true, true, 0, "메시지", 280, 120, 0);
         } else {
-          g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_NOREPLAYFILE), 0, true, true, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_NOREPLAYFILE), 0, true, true, 0, "메시지", 280, 120, 0);
         }
       }
       break;
     case ID_EXIT:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
         return 0;
@@ -2890,22 +2881,22 @@ bool UISelectReplayDataWnd::UpdateInfo() {
       std::memset(buffer, 0, sizeof(buffer));
       std::string service;
       switch (Replay::Instance().header.serviceType) {
-      case 0:
+      case ServerPrimary:
         service = "Primary";
         break;
-      case 1:
+      case ServerSakray:
         service = "Sakray";
         break;
-      case 2:
+      case ServerLocal:
         service = "Local";
         break;
-      case 3:
+      case ServerInstantEvent:
         service = "InstantEvent";
         break;
-      case 4:
+      case ServerPvp:
         service = "PVP";
         break;
-      case 5:
+      case ServerPk:
         service = "PK";
         break;
       default:
@@ -3003,18 +2994,18 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
   switch (message) {
   case UM_SETCURITEM:
     this->m_serverList->SendMsg(nullptr, UM_SETCURITEM, this->m_selectedServer, 0, 0, 0);
-    return 0;
+    break;
   case UM_UPPUSH:
     this->m_serverList->SendMsg(nullptr, UM_UPPUSH, 0, 0, 0, 0);
-    return 0;
+    break;
   case UM_DOWNPUSH:
     this->m_serverList->SendMsg(nullptr, UM_DOWNPUSH, 0, 0, 0, 0);
-    return 0;
+    break;
   case UM_SET_TARGET: {
     this->m_event = a;
     this->m_valueName = reinterpret_cast<const char*>(b);
     this->LoadServerSelection(this->m_valueName.c_str());
-    return 0;
+    break;
   }
   case UM_COMMAND:
     switch (a) {
@@ -3024,7 +3015,7 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       ReplayFileList::Instance().dialogState = g_session.GetCurrentSex();
       g_modeMgr.currentMode->SendMsg(LMM_SELECT_REPLAY_DATA, 0, 0, 0, 0);
       g_windowMgr.Schedule(this);
-      return 0;
+      break;
     case ID_OK:
       if (this->m_serverList->selected != -1) {
         g_windowMgr.Schedule(this);
@@ -3036,19 +3027,19 @@ int UISelectServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     case ID_CANCEL:
       g_windowMgr.Schedule(this);
       g_modeMgr.currentMode->SendMsg(LMM_CANCEL, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_EXIT:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
-        return 0;
+        break;
       }
       break;
     }
     break;
   case 89:
     this->m_okButton->Move(234, this->m_okButton->geometry.y);
-    return 0;
+    break;
   default:
     return UIFrameWnd::SendMsg(sender, message, a, b, c, d);
   }
@@ -3138,21 +3129,19 @@ void UIPetInfoWnd::UpdateFriendlyGauge() {
   int high;
   if (g_session.m_petFriendly >= 0 && g_session.m_petFriendly <= 100) {
     if (g_session.GetDisplayJob() >= JT_GANGSI && g_session.GetDisplayJob() <= JT_COLLECTOR) {
-      int message;
       if (g_session.m_petFriendly <= 20) {
         low = 0;
-        message = MSI_VERYHATE;
         high = 100;
+        this->friendlyText = LookupMessage(MSI_VERYHATE);
       } else if (g_session.m_petFriendly <= 40) {
         low = 20;
-        message = MSI_HATE;
         high = 40;
+        this->friendlyText = LookupMessage(MSI_HATE);
       } else {
         low = 40;
-        message = MSI_VERY_AWKWARD;
         high = 100;
+        this->friendlyText = LookupMessage(MSI_VERY_AWKWARD);
       }
-      this->friendlyText = LookupMessage(message);
     } else {
       this->friendlyText = LookupMessage(MSI_VERY_AWKWARD);
       low = 0;
@@ -3291,7 +3280,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
           ShellExecuteA(hWnd, OBFUSCATE_TEXT_NAMED("open", 0x839B27DF8F5967B3ULL, verbName), url, nullptr, nullptr, SW_SHOWNORMAL);
           break;
         }
-        if (g_windowMgr.Confirm(LookupMessage(MSI_CREATE_ACCOUNT), 2, true, false, 0, "Message", 280, 120, 0) != ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_CREATE_ACCOUNT), 2, true, false, 0, "메시지", 280, 120, 0) != ID_YES) {
           break;
         }
       }
@@ -3302,7 +3291,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       CSoundMgr* const soundMgr = g_soundMgr;
       soundMgr->PlayWave(OBFUSCATE_TEXT_NAMED("버튼소리.wav", 0x452FEF0D7FC95565ULL, soundName), 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
       if (this->passwordEdit->Length() >= 6 && this->idEdit->Length() >= 4) {
-        g_modeMgr.currentMode->SendMsg(LMM_CONNECT_TO_ACSVR, 0, 0, 0, 0);
+        g_modeMgr.currentMode->SendMsg(LMM_SET_STATE_GET_EMAIL_ADDRESS, 38, 0, 0, 0);
         StringFormat(g_launchAccountPassword, 24, static_cast<std::size_t>(-1), "%s", this->idEdit->Text());
         CMode* passwordMode = g_modeMgr.currentMode;
         passwordMode->SendMsg(LMM_PASSWORD, reinterpret_cast<int>(this->passwordEdit->Text()), 0, 0, 0);
@@ -3313,10 +3302,10 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         this->SaveLogin();
       } else if (this->idEdit->Length() < 4) {
         const char* format = LookupMessage(MSI_MUST_ID_EXCEED_CHAR);
-        g_windowMgr.Confirm(FormatOwnedString(format, 4).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(FormatOwnedString(format, 4).c_str(), 0, true, false, 0, "메시지", 280, 120, 0);
       } else {
         const char* format = LookupMessage(MSI_MUST_PASSWORD_EXCEED_CHAR);
-        g_windowMgr.Confirm(FormatOwnedString(format, 6).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(FormatOwnedString(format, 6).c_str(), 0, true, false, 0, "메시지", 280, 120, 0);
       }
       break;
     }
@@ -3325,7 +3314,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
       break;
     case ID_EXIT:
       this->SaveLogin();
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         goto quit;
       }
       break;
@@ -3378,7 +3367,7 @@ int UILoginWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::int
         break;
       }
       default: {
-        g_windowMgr.Confirm(OBFUSCATE_TEXT("unknown account class found!", 0x176F138D5DD7F365ULL), 0, false, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(OBFUSCATE_TEXT("unknown account class found!", 0x176F138D5DD7F365ULL), 0, false, false, 0, "메시지", 280, 120, 0);
         goto quit;
       }
       }
@@ -3403,7 +3392,7 @@ int UILoginOTPWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   case UM_COMMAND: {
     switch (a) {
     case ID_CANCEL:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_TO_QUIT), 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
         g_windowMgr.Schedule(this);
       }
@@ -3421,7 +3410,7 @@ int UILoginOTPWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
         g_modeMgr.currentMode->SendMsg(LMM_SEND_LOGIN_AUTH_CODE, 0, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_LOGINOTPWND);
       } else {
-        g_windowMgr.Confirm(LookupMessage(MSI_OTP_MUST_8_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_OTP_MUST_8_CHAR), 0, true, false, 0, "메시지", 280, 120, 0);
       }
       break;
     }
@@ -3541,63 +3530,70 @@ void UIHomunInfoWnd::Paint() {
   auto* background = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\homuninfo_bg.bmp")));
   this->DrawBitmap(0, 0, background, false);
   this->DrawFilledRoundedOutline(0, this->geometry.height - 40, this->geometry.width, 40, 0xFFFFFF);
-  char title[32];
-  std::sprintf(title, LookupMessage(MSI_HOMUN_INFO));
-  this->DrawTextAt(5, 2, title, 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(100, 24, LookupMessage(MSI_NAME), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(100, 47, LookupMessage(MSI_LEVEL), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(100, 105, LookupMessage(MSI_HOMUN_EXP), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(100, 131, LookupMessage(MSI_PET_HUNGRY), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(100, 159, LookupMessage(MSI_PET_FRIENDLY), 0, 0, 12, 0, 0, 0);
-  this->DrawTextAt(140, 159, ":", 0, 0, 12, 0, 0, 0);
-  const int* const stats = g_session.m_homunStats;
-  char number[12];
-  int bytes = std::sprintf(number, "%d", stats[0]);
-  this->DrawRightAlignedText(79, 24, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", stats[1]);
-  this->DrawRightAlignedText(79, 42, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", stats[2]);
-  this->DrawRightAlignedText(79, 60, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", stats[3]);
-  this->DrawRightAlignedText(79, 78, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", stats[4]);
-  this->DrawRightAlignedText(79, 96, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", stats[5]);
-  this->DrawRightAlignedText(79, 114, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", stats[6]);
-  this->DrawRightAlignedText(79, 132, number, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(number, "%d", (2000 - stats[7]) / 10);
-  this->DrawRightAlignedText(79, 150, number, bytes, 1, 14, 0, 0);
-  char level[12];
-  _itoa(g_session.m_homunLevel, level, 10);
-  this->DrawTextAt(135, 47, level, 0, 0, 12, 0, 0, 0);
-  if (g_session.m_homunJob == -1) {
-    return;
-  }
+  {
+    char title[32];
+    char text[24];
+    std::sprintf(title, LookupMessage(MSI_HOMUN_INFO));
+    this->DrawTextAt(5, 2, title, 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(100, 24, LookupMessage(MSI_NAME), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(100, 47, LookupMessage(MSI_LEVEL), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(100, 105, LookupMessage(MSI_HOMUN_EXP), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(100, 131, LookupMessage(MSI_PET_HUNGRY), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(100, 159, LookupMessage(MSI_PET_FRIENDLY), 0, 0, 12, 0, 0, 0);
+    this->DrawTextAt(140, 159, ":", 0, 0, 12, 0, 0, 0);
+    const int* const stats = g_session.m_homunStats;
+    int bytes;
+    {
+      char number[12];
+      bytes = std::sprintf(number, "%d", stats[0]);
+      this->DrawRightAlignedText(79, 24, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", stats[1]);
+      this->DrawRightAlignedText(79, 42, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", stats[2]);
+      this->DrawRightAlignedText(79, 60, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", stats[3]);
+      this->DrawRightAlignedText(79, 78, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", stats[4]);
+      this->DrawRightAlignedText(79, 96, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", stats[5]);
+      this->DrawRightAlignedText(79, 114, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", stats[6]);
+      this->DrawRightAlignedText(79, 132, number, bytes, 1, 14, 0, 0);
+      bytes = std::sprintf(number, "%d", (2000 - stats[7]) / 10);
+      this->DrawRightAlignedText(79, 150, number, bytes, 1, 14, 0, 0);
+    }
+    {
+      char level[8];
+      _itoa(g_session.m_homunLevel, level, 10);
+      this->DrawTextAt(135, 47, level, 0, 0, 12, 0, 0, 0);
+    }
+    if (g_session.m_homunJob == -1) {
+      return;
+    }
 
-  char text[24];
-  bytes = std::sprintf(text, "%lld", g_session.m_homunMaxExp);
-  this->DrawRightAlignedText(205, 104, text, bytes, 1, 14, 0, 0);
-  bytes = std::sprintf(text, "%d / %d", g_session.homunHunger, 100);
-  this->DrawRightAlignedText(200, 130, text, bytes, 1, 14, 0, 0);
-  if (g_session.homunFriendly >= 0 && g_session.homunFriendly <= 3) {
-    std::strcpy(text, LookupMessage(MSI_VERYHATE));
-  } else if (g_session.homunFriendly > 3 && g_session.homunFriendly <= 10) {
-    std::strcpy(text, LookupMessage(MSI_HATE));
-  } else if (g_session.homunFriendly > 10 && g_session.homunFriendly <= 100) {
-    std::strcpy(text, LookupMessage(MSI_VERY_AWKWARD));
-  } else if (g_session.homunFriendly > 100 && g_session.homunFriendly <= 250) {
-    std::strcpy(text, LookupMessage(MSI_AWKWARD));
-  } else if (g_session.homunFriendly > 250 && g_session.homunFriendly <= 750) {
-    std::strcpy(text, LookupMessage(MSI_NORMAL));
-  } else if (g_session.homunFriendly > 750 && g_session.homunFriendly <= 910) {
-    std::strcpy(text, LookupMessage(MSI_FRIENDLY));
-  } else if (g_session.homunFriendly > 910 && g_session.homunFriendly <= 1000) {
-    std::strcpy(text, LookupMessage(MSI_VERY_FRIENDLY));
-  } else {
-    std::strcpy(text, LookupMessage(MSI_UNKNOWN));
+    bytes = std::sprintf(text, "%lld", g_session.m_homunMaxExp);
+    this->DrawRightAlignedText(205, 104, text, bytes, 1, 14, 0, 0);
+    bytes = std::sprintf(text, "%d / %d", g_session.homunHunger, 100);
+    this->DrawRightAlignedText(200, 130, text, bytes, 1, 14, 0, 0);
+    if (g_session.homunFriendly >= 0 && g_session.homunFriendly <= 3) {
+      std::strcpy(text, LookupMessage(MSI_VERYHATE));
+    } else if (g_session.homunFriendly > 3 && g_session.homunFriendly <= 10) {
+      std::strcpy(text, LookupMessage(MSI_HATE));
+    } else if (g_session.homunFriendly > 10 && g_session.homunFriendly <= 100) {
+      std::strcpy(text, LookupMessage(MSI_VERY_AWKWARD));
+    } else if (g_session.homunFriendly > 100 && g_session.homunFriendly <= 250) {
+      std::strcpy(text, LookupMessage(MSI_AWKWARD));
+    } else if (g_session.homunFriendly > 250 && g_session.homunFriendly <= 750) {
+      std::strcpy(text, LookupMessage(MSI_NORMAL));
+    } else if (g_session.homunFriendly > 750 && g_session.homunFriendly <= 910) {
+      std::strcpy(text, LookupMessage(MSI_FRIENDLY));
+    } else if (g_session.homunFriendly > 910 && g_session.homunFriendly <= 1000) {
+      std::strcpy(text, LookupMessage(MSI_VERY_FRIENDLY));
+    } else {
+      std::strcpy(text, LookupMessage(MSI_UNKNOWN));
+    }
+    this->DrawTextAt(150, 159, text, 0, 0, 12, 0, 0, 0);
   }
-  this->DrawTextAt(150, 159, text, 0, 0, 12, 0, 0, 0);
   this->DrawWrappedFormattedText(225, 136, std::string(LookupMessage(MSI_HOMUN_SELF_FEEDING)), 0, 0, 0, 0, 12, 0, 0);
   this->DrawWrappedFormattedText(8, 180, std::string(LookupMessage(MSI_HOMUN_SELF_FEEDING_EXP_INFORMATION)), 0, 0, 0, 0, 12, 0xFF, 0);
 }
@@ -3619,19 +3615,22 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
     case ID_OK: {
       char* const name = g_session.m_homunName;
       if (std::strlen(this->nameEdit->Text()) >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_HOMUN_NAME_IN23), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_HOMUN_NAME_IN23), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
           _mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       char text[512];
       std::sprintf(text, LookupMessage(MSI_CHANGE_HOMUN_NAME), this->nameEdit->Text());
-      if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
-        if (g_forbiddenWords.Contains(this->nameEdit->Text()) == true) {
-          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_USE_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+      const int response = g_windowMgr.Confirm(text, 2, false, false, 0, "메시지", 280, 120, 0);
+      UIEditCtrl* edit = this->nameEdit;
+      if (response != ID_NO) {
+        if (g_forbiddenWords.Contains(edit->Text()) == true) {
+          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_USE_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
+          edit = this->nameEdit;
         } else {
           g_modeMgr.GetGameMode()->SendMsg(MM_MER_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
           std::sprintf(name, this->nameEdit->Text());
@@ -3639,7 +3638,7 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
           return 0;
         }
       }
-      this->nameEdit->SetText(name);
+      edit->SetText(name);
       this->nameEdit->Invalidate();
       return 0;
     }
@@ -3667,7 +3666,7 @@ int UIHomunInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std:
       return 0;
     case ID_DELETE_HOMUN: {
       CGameMode* mode = g_modeMgr.GetGameMode();
-      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_HOMUN), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_DELETE_HOMUN), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         mode->SendMsg(MM_COMMAND_HOMUN, 2, 0, 0, 0);
         g_windowMgr.CloseWindow(WID_HOMUNINFOWND);
         g_windowMgr.CloseWindow(WID_SKILLLISTWND_SKILLTAB_0);
@@ -3785,7 +3784,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
   case UM_COMBOBOX_SELECTED: {
     CGameMode* mode = g_modeMgr.GetGameMode();
     switch (a) {
-    case 467:
+    case ID_PET_FEED:
       if (g_windowMgr.rodexComposeWnd) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_PET_AUTO_FEEDING_CLOSE_RODEX)), 255, 0, 0, 0);
         break;
@@ -3795,19 +3794,19 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       g_windowMgr.AddRendered(this->feedConfirmationWnd);
       g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
       return 0;
-    case 468:
+    case ID_PET_PERFORMANCE:
       mode->SendMsg(MM_COMMAND_PET, 2, 0, 0, 0);
       g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
       return 0;
-    case 469:
+    case ID_PET_UNEQUIP_ACCESSORY:
       mode->SendMsg(MM_COMMAND_PET, 4, 0, 0, 0);
       g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
       return 0;
-    case 470:
+    case ID_PET_RETURN_TO_EGG:
       mode->SendMsg(MM_COMMAND_PET, 3, 0, 0, 0);
       g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
       return 0;
-    case 471:
+    case ID_PET_EVOLUTION:
       if (g_session.m_petFriendly > 900) {
         g_windowMgr.CloseWindow(WID_COMBOBOXIDWND);
         UIWindow* window = g_windowMgr.EnsureWindow(WID_PETEVOLUTIONWND);
@@ -3831,14 +3830,18 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
     switch (a) {
     case ID_OK:
       if (std::strlen(this->nameEdit->Text()) >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_PETNAME_IN23), 0, true, false, 0, "Message", 280, 120, 0);
-      } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
-                 _mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
-      } else {
+        g_windowMgr.Confirm(LookupMessage(MSI_PETNAME_IN23), 0, true, false, 0, "메시지", 280, 120, 0);
+        return 0;
+      }
+      if (_mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
+          _mbsstr(reinterpret_cast<const unsigned char*>(this->nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
+        return 0;
+      }
+      {
         char text[512];
         std::sprintf(text, LookupMessage(MSI_CHANGE_PETNAME), this->nameEdit->Text());
-        if (g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
+        if (g_windowMgr.Confirm(text, 2, false, false, 0, "메시지", 280, 120, 0) != ID_NO) {
           if (g_forbiddenWords.Contains(this->nameEdit->Text()) != true) {
             g_modeMgr.GetGameMode()->SendMsg(MM_PET_RENAME, reinterpret_cast<int>(this->nameEdit->Text()), 0, 0, 0);
             std::sprintf(g_session.petName, this->nameEdit->Text());
@@ -3846,7 +3849,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
             return 0;
           }
 
-          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_USE_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_CANNOT_USE_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
         }
 
         this->nameEdit->SetText(g_session.petName);
@@ -3875,10 +3878,10 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       performance = LookupMessage(MSI_PET_PERFORMANCE);
       returnToEgg = LookupMessage(MSI_PET_RETURN_EGG);
       unequip = LookupMessage(MSI_PET_ACC_OFF);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(feed.c_str()), 467, 0, 0);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(performance.c_str()), 468, 0, 0);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(unequip.c_str()), 469, 0, 0);
-      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(returnToEgg.c_str()), 470, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(feed.c_str()), ID_PET_FEED, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(performance.c_str()), ID_PET_PERFORMANCE, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(unequip.c_str()), ID_PET_UNEQUIP_ACCESSORY, 0, 0);
+      menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(returnToEgg.c_str()), ID_PET_RETURN_TO_EGG, 0, 0);
       const int petEgg = g_session.LookupClientItemByIdentity(g_session.petEggIndex).GetItemId();
       const std::pair<bool, std::vector<int>> targets = g_petEvolutionMgr->GetEvolutionTargets(petEgg);
       if (targets.first == true) {
@@ -3891,7 +3894,7 @@ int UIPetInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
           } else {
             text = static_cast<const std::string&>(FormatOwnedString(LookupMessage(MSI_PET_EVOLUTION_WITH_PET_NAME), name));
           }
-          menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(text.c_str()), 471, *it, 0);
+          menu->SendMsg(nullptr, UM_ADDITEM, reinterpret_cast<std::intptr_t>(text.c_str()), ID_PET_EVOLUTION, *it, 0);
         }
       }
       const int height = (static_cast<int>(targets.second.size()) + 4) * 16;
@@ -4119,6 +4122,16 @@ void UIFrameWnd::DrawSkinBox(const char* name, int x, int y, int width, int heig
   }
 }
 
+// INLINED
+static int AutoreturnLeft(int x) {
+  return (g_renderer->viewport.width - 640) / 2 + x;
+}
+
+// INLINED
+static int AutoreturnTop(int y) {
+  return (g_renderer->viewport.height - 480) / 2 + y;
+}
+
 // OFFSET: 0x008A8280
 // FUNCTION: fn_11714
 void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
@@ -4126,8 +4139,7 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   this->format = text;
   this->started = timeGetTime();
   this->deadline = timeGetTime() + static_cast<unsigned>(timeout);
-  const unsigned fraction = (this->deadline - this->started) % 1000 ? 1 : 0;
-  const unsigned seconds = (this->deadline - this->started) / 1000 + fraction;
+  const unsigned seconds = (this->deadline - this->started) / 1000 + ((this->deadline - this->started) % 1000 ? 1 : 0);
   this->remaining = seconds;
   this->seconds = seconds;
 
@@ -4143,16 +4155,16 @@ void UIMessageBoxAutoreturn::Configure(const char* text, int timeout) {
   this->SetSize(280, 120);
   this->OnCreate(280, 120);
   this->OnSize(280, 120);
-  const int y = (g_renderer->viewport.height - 480) / 2 + 180;
-  const int x = (g_renderer->viewport.width - 640) / 2 + 185;
-  this->Move(x, y);
+  this->Move(AutoreturnLeft(185), AutoreturnTop(180));
 
   this->viewer = new UITextViewer();
   this->viewer->Configure(10, 22, 260, 48, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->viewer->backgroundColor = RGB(red, green, blue) | 0xFF000000u;
-  this->viewer->Invalidate();
+  UITextViewer* const view = this->viewer;
+  const unsigned rgb = RGB(red, green, blue);
+  view->backgroundColor = rgb | 0xFF000000u;
+  view->Invalidate();
   this->AddChild(this->viewer);
   this->viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(this->messageText.c_str()), 38, 0, 0);
 
@@ -4191,7 +4203,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     case ID_OK: {
       if (_mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkOpening.c_str())) ||
           _mbsstr(reinterpret_cast<const unsigned char*>(this->m_nameEdit->Text()), reinterpret_cast<const unsigned char*>(s_messageBoxItemLinkClosing.c_str()))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_TAG_TO_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
         this->m_nameEdit->SetText("");
         return 0;
       }
@@ -4217,16 +4229,16 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 
         if (badName || !valid || blank) {
           if (badName) {
-            g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+            g_windowMgr.Confirm(LookupMessage(MSI_BAD_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
           }
           if (!valid) {
-            g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "Message", 280, 120, 0);
+            g_windowMgr.Confirm(LookupMessage(MSI_ENGLISHONLY), 0, true, false, 0, "메시지", 280, 120, 0);
           }
           if (blank) {
-            g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "Message", 280, 120, 0);
+            g_windowMgr.Confirm(LookupMessage(MSI_NO_SPACE_IN_NAME), 0, true, false, 0, "메시지", 280, 120, 0);
           }
         } else if (this->m_nameEdit->Length() >= 24) {
-          g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "메시지", 280, 120, 0);
           this->m_nameEdit->SetText("");
           return 0;
         } else {
@@ -4251,7 +4263,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           g_windowMgr.Schedule(this);
         }
       } else {
-        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ENTER_NAME_MORE_THAN_4_CHAR), 0, true, false, 0, "메시지", 280, 120, 0);
       }
 
       CMode* mode = g_modeMgr.currentMode;
@@ -4275,11 +4287,12 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       g_modeMgr.currentMode->SendMsg(MM_COMMAND, 10004, 0, 0, 0);
       return 0;
     case ID_LEFT: {
-      int action = this->m_view.action + 1;
-      if (action >= this->m_view.actionBase + 8) {
-        action = this->m_view.actionBase;
+      const int action = this->m_view.action + 1;
+      if (action < this->m_view.actionBase + 8) {
+        this->m_view.action = action;
+      } else {
+        this->m_view.action = this->m_view.actionBase;
       }
-      this->m_view.action = action;
       this->Invalidate();
       return 0;
     }
@@ -4306,7 +4319,8 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
   case UM_SCROLLHORZPAGEUP:
   case UM_SCROLLHORZPAGEDOWN: {
     const int sex = this->m_info.sex;
-    if (sender == this->m_hairStyleBar) {
+    UIScrollBar* bar = this->m_hairStyleBar;
+    if (bar == sender) {
       const int previous = this->m_hairStyle;
       if (message == UM_SCROLLHORZPAGEUP) {
         this->m_hairStyle = previous - 1;
@@ -4320,7 +4334,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       } else if (this->m_hairStyle > 22) {
         this->m_hairStyle = 22;
       }
-      this->m_hairStyleBar->SetPosition(this->m_hairStyle);
+      bar->SetPosition(this->m_hairStyle);
       this->m_hairStyleBar->Invalidate();
       this->Invalidate();
 
@@ -4336,7 +4350,8 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       return this->m_hairStyle - previous;
     }
 
-    if (sender == this->m_hairColorBar) {
+    bar = this->m_hairColorBar;
+    if (bar == sender) {
       const int previous = this->m_hairColor;
       if (message == UM_SCROLLHORZPAGEUP) {
         this->m_hairColor = previous - 1;
@@ -4350,7 +4365,7 @@ int UIMakeCharWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       } else if (this->m_hairColor > 8) {
         this->m_hairColor = 8;
       }
-      this->m_hairColorBar->SetPosition(this->m_hairColor);
+      bar->SetPosition(this->m_hairColor);
       this->m_hairColorBar->Invalidate();
       this->Invalidate();
 

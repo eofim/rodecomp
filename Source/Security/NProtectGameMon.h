@@ -9,6 +9,8 @@ enum NPGAMEMON_MESSAGE : int {
   NPGAMEMON_GAMEHACK_DETECT = 1013,
   NPGAMEMON_INIT_ERROR = 1014,
   NPGAMEMON_GAMEHACK_DOUBT = 1015,
+  NPGAMEMON_CHECK_CSAUTH2 = 1017,
+  NPGAMEMON_GAMEHACK_REPORT = 1018,
   NPGAMEMON_CHECK_CSAUTH3 = 1019,
   NPGAMEMON_SUCCESS = 0x755,
 };
@@ -17,5 +19,8 @@ void CloseNPGameMon();
 void PreInitNPGameMonA(const char* name);
 int InitNPGameMon();
 void SetCallbackToGameMon(int(__stdcall* callback)(int, const int*));
+int Send_CSAuth3ToGameMon(const unsigned char* packet, unsigned long size, unsigned long serverNumber);
+int SendUserIDToGameMon(const char* userId);
+void SetHwndToGameMon(unsigned long window);
 
 #endif

@@ -7,6 +7,9 @@
 
 #include <mbstring.h>
 
+// GLOBAL: gl_13419
+char g_emptyText[4] = {};
+
 // OFFSET: 0x008816E0
 // FUNCTION: fn_11299
 bool UIChatHisBox::Name(const std::string& encoded, std::string& output) {
@@ -41,7 +44,7 @@ bool UIChatHisBox::Name(const std::string& encoded, std::string& output) {
 // OFFSET: 0x0087FD70
 // FUNCTION: fn_11275
 bool UIChatHisBox::Next(std::string& remaining, std::string& encoded, unsigned& position, const char* original) {
-  auto close = remaining.find(g_itemLinkTagEnd);
+  std::size_t close = remaining.find(g_itemLinkTagEnd);
 
   if (close == std::string::npos) {
     return false;
@@ -49,7 +52,7 @@ bool UIChatHisBox::Next(std::string& remaining, std::string& encoded, unsigned& 
 
   while (close != std::string::npos) {
     remaining = remaining.substr(0, close);
-    auto begin = remaining.find(g_itemLinkTagBegin);
+    std::size_t begin = remaining.find(g_itemLinkTagBegin);
 
     if (close != std::string::npos && begin == std::string::npos) {
       position += static_cast<unsigned>(g_itemLinkTagEnd.size());
@@ -64,21 +67,20 @@ bool UIChatHisBox::Next(std::string& remaining, std::string& encoded, unsigned& 
       do {
         position += static_cast<unsigned>(begin);
         remaining = remaining.substr(begin + g_itemLinkTagBegin.size());
-        const auto beginSize = g_itemLinkTagBegin.size();
         begin = remaining.find(g_itemLinkTagBegin);
         close = remaining.find(g_itemLinkTagEnd);
 
         if (begin != std::string::npos) {
-          position += static_cast<unsigned>(beginSize);
+          position += static_cast<unsigned>(g_itemLinkTagBegin.size());
         }
       } while (begin != std::string::npos);
 
       encoded = remaining;
       remaining = original;
-      std::string name = "";
+      std::string name(g_emptyText);
 
       if (!this->Name(encoded, name)) {
-        position = static_cast<unsigned>(position + encoded.size() + g_itemLinkTagBegin.size() + g_itemLinkTagEnd.size());
+        position = static_cast<unsigned>(encoded.size()) + position + static_cast<unsigned>(g_itemLinkTagEnd.size()) + static_cast<unsigned>(g_itemLinkTagBegin.size());
         remaining = remaining.substr(position);
         return true;
       }

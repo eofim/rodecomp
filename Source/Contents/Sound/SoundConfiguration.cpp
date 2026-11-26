@@ -74,7 +74,7 @@ int ReadSetup() {
     type = REG_DWORD;
     size = sizeof(int);
 
-    RegQueryValueExA(settingsKey, OBFUSCATE_TEXT("SOUNDMODE", 0x69FD1D9733D3CFC1ULL), nullptr, &type, reinterpret_cast<BYTE*>(&g_soundConfiguration.mode),
+    RegQueryValueExA(settingsKey, OBFUSCATE_SOURCE_TEXT("SOUNDMODE", 0x69FD1D9733D3CFC1ULL), nullptr, &type, reinterpret_cast<BYTE*>(&g_soundConfiguration.mode),
                      &size);
 
     RegQueryValueExA(settingsKey, OBFUSCATE_TEXT("SPEAKERTYPE", 0x7FCD77F9C7CBD14DULL), nullptr, &type,
@@ -88,7 +88,7 @@ int ReadSetup() {
 
     if (RegQueryValueExA(settingsKey, OBFUSCATE_TEXT("NUMSAMPLETYPE", 0x0753A7E1EFA9E139ULL), nullptr, &type,
                          reinterpret_cast<BYTE*>(&g_soundConfiguration.numSampleType), &size) != ERROR_SUCCESS) {
-      g_soundConfiguration.numSampleType = 2;
+      g_soundConfiguration.numSampleType = SOUND_SAMPLES_16;
     }
 
     type = REG_SZ;

@@ -19,9 +19,9 @@ namespace {
   struct WorldModelFileRecord {
     /* 0000 */ char model[80];
     /* 0050 */ char node[80];
-    /* 00A0 */ vector3d position{};
-    /* 00AC */ vector3d rotation{};
-    /* 00B8 */ vector3d scale{};
+    /* 00A0 */ vector3d position;
+    /* 00AC */ vector3d rotation;
+    /* 00B8 */ vector3d scale;
   };
 
   struct WorldLightFileRecord {
@@ -140,6 +140,7 @@ bool C3dWorldRes::Load(const char* name) {
   this->major = major;
   this->minor = minor;
   unsigned build = 0;
+  int modelIndex;
 
   if (major == 2 && minor >= 5) {
     input.Read(&build, sizeof(build));
@@ -232,10 +233,9 @@ bool C3dWorldRes::Load(const char* name) {
   }
 
   if (CompareWorldVersion(std::tuple<int, int>(2, 7), std::tie(major, minor)) <= 0 && build >= 221) {
-    unsigned count;
-    input.Read(&count, sizeof(count));
+    input.Read(&modelIndex, sizeof(modelIndex));
 
-    input.Seek(4u * count, FILE_CURRENT);
+    input.Seek(4u * modelIndex, FILE_CURRENT);
   }
 
   int count;
@@ -246,12 +246,13 @@ bool C3dWorldRes::Load(const char* name) {
     input.Read(&type, sizeof(type));
 
     switch (type) {
-    case 1: {
+    case WORLD_OBJECT_MODEL: {
       int animation;
       int animationType;
-      int modelIndex = -1;
       float speed;
       unsigned char flag;
+
+      modelIndex = -1;
 
       if ((major == 1 && minor >= 3) || major >= 2) {
         input.Read(lastName, 40);
@@ -279,6 +280,9 @@ bool C3dWorldRes::Load(const char* name) {
       }
 
       WorldModelFileRecord wire;
+      wire.position = {};
+      wire.rotation = {};
+      wire.scale = {};
       input.Read(&wire, sizeof(wire));
       auto* record = new WorldModelRecord;
 
@@ -299,20 +303,20 @@ bool C3dWorldRes::Load(const char* name) {
       break;
     }
 
-    case 2: {
+    case WORLD_OBJECT_LIGHT: {
       WorldLightFileRecord light;
       input.Read(&light, sizeof(light));
       break;
     }
 
-    case 4: {
+    case WORLD_OBJECT_EFFECT: {
       auto* record = new WorldEffectRecord;
       input.Read(record, sizeof(*record));
       this->effects.push_back(record);
       break;
     }
 
-    case 3: {
+    case WORLD_OBJECT_SOUND: {
       if (major >= 2) {
         auto* record = new WorldSoundRecord;
         input.Read(record, sizeof(*record));

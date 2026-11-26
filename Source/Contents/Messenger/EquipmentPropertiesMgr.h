@@ -16,8 +16,12 @@
 class UIWindow;
 struct ITEM_INFO;
 
-struct EquipmentValueA {
-  /* 0000 */ int value;
+enum EquipmentPropertyAccumulation : int {
+  EQUIP_PROPERTY_SUM = 0,
+  EQUIP_PROPERTY_ONE = 1,
+  EQUIP_PROPERTY_MAX = 2,
+  EQUIP_PROPERTY_SUM_INDEX_AND_VALUE = 3,
+  EQUIP_PROPERTY_NONNEGATIVE_MAX = 4,
 };
 
 struct EquipmentValueC {
@@ -87,19 +91,19 @@ namespace EquipmentProperties {
     /* 0024 */ std::unordered_map<int, CEquipmentWearable*> properties1;
     /* 0044 */ std::unordered_map<unsigned int, CEquipmentExpansion*> properties2;
     /* 0064 */ std::unordered_map<unsigned int, CEquipmentCombiitem*> properties3;
-    /* 0084 */ std::multiset<unsigned long> activeItems;
+    /* 0084 */ std::multiset<unsigned int> activeItems;
     /* 008C */ std::map<unsigned int, EquipmentPropertyGroup> propertyGroups;
     /* 0094 */ std::unordered_map<unsigned int, CEquipmentInfo> equipmentInfo;
-    /* 00B4 */ std::unordered_map<int, EquipmentValueA> statVariables;
+    /* 00B4 */ std::unordered_map<unsigned int, unsigned int> statVariables;
     /* 00D4 */ std::unordered_map<unsigned int, std::list<unsigned int>> m_itemCombinations;
     /* 00F4 */ std::unordered_map<unsigned int, std::list<unsigned int>> m_combinationItems;
     /* 0114 */ std::unordered_map<unsigned int, std::list<unsigned int>> skillGroups;
-    /* 0134 */ std::unordered_map<int, EquipmentValueA> constantValues;
+    /* 0134 */ std::unordered_map<unsigned int, unsigned int> constantValues;
     /* 0154 */ std::unordered_map<std::uint64_t, EquipmentPropertyDefinition*> m_definitionsByName;
     /* 0174 */ std::unordered_map<int, EquipmentPropertyDefinition*> randomOptionDefinitions;
     /* 0194 */ std::set<std::uint64_t> functionPairs;
     /* 019C */ std::unordered_map<int, EquipmentValueC> displayValues;
-    /* 01BC */ std::unordered_map<int, std::unordered_map<int, std::unordered_map<unsigned int, float>>, CEquipmentValueHash> levelRates;
+    /* 01BC */ std::unordered_map<int, std::unordered_map<unsigned int, std::unordered_map<unsigned int, float>>, CEquipmentValueHash> levelRates;
     /* 01DC */ std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, EquipmentEntryB, CEquipmentValueHash>, CEquipmentValueHash>, CEquipmentValueHash> categoryValues;
 
     static CEquipmentPropertiesMgr* GetInstance();
@@ -108,7 +112,7 @@ namespace EquipmentProperties {
     virtual ~CEquipmentPropertiesMgr();
     void Clear();
     void SetWindow(UIWindow* window);
-    const int& GetConstantValue(const int& key);
+    const unsigned int& GetConstantValue(const unsigned int& key);
     CEquipment* GetCurrentEquipment();
     CEquipmentWearable* FindProperty1(const int& key);
     CEquipmentInfo* FindEquipmentInfo(const unsigned int& key);
@@ -118,7 +122,7 @@ namespace EquipmentProperties {
     std::unordered_map<int, EquipmentValueC>& GetDisplayValues();
     bool HasFunctionPair(const std::uint64_t& key);
     EquipmentPropertyDefinition* FindDefinition(const std::uint64_t& key);
-    int GetRefiningBonus(const int& first, const int& second, const unsigned int& third);
+    int GetRefiningBonus(const int& first, const unsigned int& second, const unsigned int& third);
     __declspec(noinline) void SetCurrentEquipment(CEquipment* equipment);
     void RefreshPretend();
     __declspec(noinline) void RefreshShop();

@@ -167,7 +167,7 @@ bool CGameActor::ProcessState() {
   case ST_STAND:
     if (this->render.motionType == 1 && this->render.isMotionFinished) {
       this->SetState(ST_STAND, 1);
-    } else if (this->objectType == 7 && this->render.accountId == g_session.petGid && static_cast<std::uint32_t>(this->petEmotionStartTick) > 0 &&
+    } else if (this->objectType == NPC_PET_TYPE && this->render.accountId == g_session.petGid && static_cast<std::uint32_t>(this->petEmotionStartTick) > 0 &&
                timeGetTime() > static_cast<std::uint32_t>(this->petEmotionStartTick) + 3000) {
       if (rand() % 100 < 25) {
         const int hungry = g_session.GetPetHungryState(g_session.petHunger);
@@ -230,8 +230,9 @@ bool CGameActor::ProcessState() {
         }
         this->render.previousAnimation = this->Get8Dir(angle) + this->render.animation;
       }
-      const float movedX = this->render.position.x - old.x;
-      this->dist += SquareRoot(movedX * movedX + (this->render.position.z - old.z) * (this->render.position.z - old.z));
+      float squared = (this->render.position.x - old.x) * (this->render.position.x - old.x);
+      squared += (this->render.position.z - old.z) * (this->render.position.z - old.z);
+      this->dist += SquareRoot(squared);
       if (this->isNeverAnimation == 0) {
         this->ProcessMotionWithDist();
       }
@@ -541,7 +542,6 @@ void CGameActor::UpdateGaugePositions() {
 
   if (this->actorWindows[0] != 0) {
     if (timeGetTime() < this->chatTick + 5000) {
-      UIWindow* window = this->actorWindows[0];
       int x = this->render.screenX - this->chatWidth / 2;
       int y = static_cast<int>(
         static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale - static_cast<float>(this->chatHeight)
@@ -549,18 +549,18 @@ void CGameActor::UpdateGaugePositions() {
       if (x < -3) {
         x = -3;
       }
-      const int maximumX = g_renderer->viewport.width - window->geometry.width + 3;
+      const int maximumX = g_renderer->viewport.width - this->actorWindows[0]->geometry.width + 3;
       if (x > maximumX) {
         x = maximumX;
       }
       if (y < -3) {
         y = -3;
       }
-      const int maximumY = g_renderer->viewport.height - window->geometry.height + 3;
+      const int maximumY = g_renderer->viewport.height - this->actorWindows[0]->geometry.height + 3;
       if (y > maximumY) {
         y = maximumY;
       }
-      window->Move(x, y);
+      this->actorWindows[0]->Move(x, y);
     } else {
       g_windowMgr.Schedule(this->actorWindows[0]);
       this->actorWindows[0] = 0;
@@ -593,11 +593,12 @@ void CGameActor::UpdateGaugePositions() {
         static_cast<int>(static_cast<float>(this->render.screenY) - s_gaugeOffsetY * this->render.distanceScale)
       );
       const std::uint32_t total = this->skillRechargeEndTick - this->skillRechargeStartTick;
-      std::uint32_t elapsed = timeGetTime() - this->skillRechargeStartTick;
+      const std::uint32_t elapsed = timeGetTime() - this->skillRechargeStartTick;
       if (elapsed > total) {
-        elapsed = total;
+        static_cast<UIRechargeGage*>(this->actorWindows[3])->SetValues(total, total);
+      } else {
+        static_cast<UIRechargeGage*>(this->actorWindows[3])->SetValues(elapsed, total);
       }
-      static_cast<UIRechargeGage*>(this->actorWindows[3])->SetValues(elapsed, total);
     }
   }
 
@@ -720,7 +721,7 @@ void CGameActor::UpdateHpGauge() {
   if (g_serviceOptions.Get(TT_MONSTERHP_ON_OFF) && this->hpGaugeWindow->displayMode != 0 &&
       !IsHiding(this->stateFlags) && !IsCloaking(this->stateFlags) && !IsInvisible(this->stateFlags) &&
       g_windowMgr.windowVisibilityState != 2) {
-    this->hpGaugeWindow->Show(1);
+    this->hpGaugeWindow->Show(WINDOW_VISIBLE);
     if (this->render.state == ST_DEAD && this->hpGaugeWindow->current != 0) {
       this->hpGaugeWindow->SetValues(0, this->hpGaugeWindow->maximum);
     }
@@ -731,7 +732,7 @@ void CGameActor::UpdateHpGauge() {
     return;
   }
 
-  this->hpGaugeWindow->Show(0);
+  this->hpGaugeWindow->Show(WINDOW_HIDDEN);
 }
 
 // OFFSET: 0x00CB0A90
@@ -1197,7 +1198,7 @@ void CGameActor::SetStackedEffect(int effectId, bool on) {
 
 // OFFSET: 0x00CAE3B0
 // FUNCTION: fn_21073
-void __stdcall CreateHallucinationPc(
+void CGameActor::CreateHallucinationPc(
   int job, int sex, int head, const vector3d* position, int alpha, int weapon, int shield, int bodyPalette
 ) {
   CPc* pc = new (std::nothrow) CPc;

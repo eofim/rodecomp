@@ -73,7 +73,7 @@ void UIReputeWnd::OnCreate(int width, int height) {
   search->Move(336, 25);
   search->SetId(ID_SEARCH);
   this->AddChild(search);
-  this->m_message0 = 321;
+  this->m_message0 = ID_SEARCH;
 
   this->m_prevButton = new UIBitmapButton();
   this->m_prevButton->SetBitmap("유저인터페이스\\Reputation\\arrow_prev.bmp", 0, 0);
@@ -203,6 +203,11 @@ void UIReputeWnd::Paint() {
   );
 }
 
+// INLINED
+static int FindComboLine(UIComboBoxDefWnd* combo, const std::string& text) {
+  return combo->list->FindLine(text);
+}
+
 // OFFSET: 0x006104F0
 // FUNCTION: fn_04315
 int UIReputeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
@@ -210,13 +215,15 @@ int UIReputeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
   case UM_COMBOBOX_SELECTED:
     if (sender == this->m_groupCombo) {
       std::string group = this->m_groupCombo->GetSelectedText();
-      if (group.size() != 0) {
-        this->m_searchEdit->SetText("");
-        this->ClearUpdated();
-        this->FilterByGroup(group);
-        this->SetPage(1);
-        this->Invalidate();
+      if (group.size() == 0) {
+        break;
       }
+
+      this->m_searchEdit->SetText("");
+      this->ClearUpdated();
+      this->FilterByGroup(group);
+      this->SetPage(1);
+      this->Invalidate();
     }
     break;
   case UM_COMMAND:
@@ -256,7 +263,8 @@ int UIReputeWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
       if (std::string(reinterpret_cast<const char*>(a)) == LookupMessage(MSI_REPUTE_TOTAL)) {
         index = 0;
       } else {
-        index = this->m_groupCombo->list->FindLine(std::string(reinterpret_cast<const char*>(a)));
+        UIComboBoxDefWnd* combo = this->m_groupCombo;
+        index = FindComboLine(combo, reinterpret_cast<const char*>(a));
         if (index == -1) {
           break;
         }

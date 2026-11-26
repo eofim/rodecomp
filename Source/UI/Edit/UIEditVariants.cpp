@@ -210,8 +210,6 @@ int UIEditCtrl3::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::in
 // OFFSET: 0x0085E420
 // FUNCTION: fn_10829
 void UIEditCtrl3::HandleInputMessage(unsigned key, std::intptr_t data) {
-  UIWindow* const chatWindow = ChatWindow() ? ChatWindow()->m_suggestions : nullptr;
-
   this->verticalCursorStep = 0;
   this->previousCursor = 0;
 
@@ -238,8 +236,6 @@ void UIEditCtrl3::HandleInputMessage(unsigned key, std::intptr_t data) {
       }
       if (length - 2 == this->cursor && this->lineBreaks[this->textY]) {
         g_serverLanguage->KeyDown(key, data);
-        g_serverLanguage->KeyDown(key, data);
-        return;
       }
     }
     g_serverLanguage->KeyDown(key, data);
@@ -262,12 +258,20 @@ void UIEditCtrl3::HandleInputMessage(unsigned key, std::intptr_t data) {
       for (int line = 0; line < this->textY; ++line) {
         offset -= static_cast<int>(std::strlen(this->wrappedLines[line].c_str()));
       }
-      const int length = static_cast<int>(std::strlen(this->wrappedLines[this->textY].c_str()));
-      g_serverLanguage->AdvanceCursor(this->lineBreaks[this->textY] ? length - offset - 2 : length - offset);
+      const int remaining = static_cast<int>(std::strlen(this->wrappedLines[this->textY].c_str())) - offset;
+      g_serverLanguage->AdvanceCursor(this->lineBreaks[this->textY] ? remaining - 2 : remaining);
       g_serverLanguage->Selection(this->anchor, this->cursor);
     }
     this->caretAtLineEnd = 1;
     return;
+  case VK_INSERT:
+  case VK_DELETE:
+  case 'A':
+  case 'C':
+  case 'V':
+  case 'X':
+    g_serverLanguage->KeyDown(key, data);
+    break;
   case VK_BACK:
     if (this->wrappedLines.size() != 0) {
       g_serverLanguage->Selection(this->anchor, this->cursor);
@@ -279,14 +283,6 @@ void UIEditCtrl3::HandleInputMessage(unsigned key, std::intptr_t data) {
         g_serverLanguage->Character(VK_BACK, data);
       }
     }
-    break;
-  case VK_INSERT:
-  case VK_DELETE:
-  case 'A':
-  case 'C':
-  case 'V':
-  case 'X':
-    g_serverLanguage->KeyDown(key, data);
     break;
   }
 }
@@ -440,8 +436,6 @@ void UIEditCtrl_OldList::RecallHistory(int step) {
 // OFFSET: 0x008551B0
 // FUNCTION: fn_10753
 void UIEditCtrl3::PaintText() {
-  FontCache& fonts = g_fontCache;
-
   int x = 3;
   if (this->invalidatesParent == 0 && this->firstVisible != 0) {
     x = 3 - this->TextWidth(this->text.c_str(), this->firstVisible, 0, 12, 0, 0);
@@ -475,12 +469,13 @@ void UIEditCtrl3::PaintText() {
     ++this->lineCount;
   }
 
+  const int rows = this->geometry.height / this->lineHeight;
+
   if (this->wrappedLines.size() == 0) {
     this->DrawBlinkingCaret(color);
     return;
   }
 
-  const int rows = this->geometry.height / this->lineHeight;
   const int first = this->firstVisibleLine;
   const int last = std::min<std::size_t>(rows + first, this->wrappedLines.size());
 
@@ -758,6 +753,11 @@ void UIEditCtrl4::OnBeginEdit() {
   this->SelectAll();
 }
 
+// INLINED
+static int SelectionLength(const CLanguageBase& language) {
+  return std::abs(language.cursor - language.anchor);
+}
+
 // OFFSET: 0x008563D0
 // FUNCTION: fn_10754
 void UIEditCtrl4::PaintText() {
@@ -778,14 +778,14 @@ void UIEditCtrl4::PaintText() {
     } else {
       const char* prefix = g_serverLanguage->Prefix(false);
       display = prefix + this->text;
-      begin = std::min(this->anchor, this->cursor) + std::strlen(prefix);
+      begin = std::min(this->cursor, this->anchor) + std::strlen(prefix);
       end = std::max(this->anchor, this->cursor) + g_serverLanguage->candidate.size() + std::strlen(prefix);
     }
 
     const int left = begin ? this->TextWidth(display.c_str(), begin, 0, 12, 0, 0) : 0;
     const int right = end ? this->TextWidth(display.c_str(), end, 0, 12, 0, 0) : 0;
 
-    if (std::abs(g_serverLanguage->cursor - g_serverLanguage->anchor) != 0) {
+    if (SelectionLength(*g_serverLanguage) != 0) {
       this->DrawSelection(left + x, right - left);
       if (this->secondColor == 0xFFFFFFFF) {
         this->DrawTextAt(x, this->textY, display.c_str(), 0, 0, 12, this->textColor, 0, 0);
@@ -824,11 +824,11 @@ void UIEditCtrl4::PaintText() {
     }
     if (this->secondColor == 0xFFFFFFFF) {
       if (this->placeholderEnabled == 1) {
-        const char* shown = display.c_str();
-        if (std::strcmp(shown, "") == 0) {
-          shown = this->placeholder.c_str();
+        if (std::strcmp(display.c_str(), "") == 0) {
+          this->DrawTextAt(x, this->textY, this->placeholder.c_str(), 0, 0, 12, this->placeholderColor, 0, 0);
+        } else {
+          this->DrawTextAt(x, this->textY, display.c_str(), 0, 0, 12, this->placeholderColor, 0, 0);
         }
-        this->DrawTextAt(x, this->textY, shown, 0, 0, 12, this->placeholderColor, 0, 0);
       } else {
         this->DrawTextAt(x, this->textY, display.c_str(), 0, 0, 12, this->textColor, 0, 0);
       }
@@ -1061,7 +1061,7 @@ void UIEditCtrl_OldList::OnWheel(int value) {
 
 // OFFSET: 0x0085E3D0
 // FUNCTION: fn_10827
-void UIEditCtrlVarId::OnFinishEdit(int) {
+void UIEditCtrlVarId::OnFinishEdit(bool) {
   this->Synchronize();
   this->Invalidate();
   this->SendMsg(this, UM_DEFPUSH, 0, 0, 0, 0);

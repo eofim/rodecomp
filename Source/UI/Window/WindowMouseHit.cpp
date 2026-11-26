@@ -291,12 +291,8 @@ int UIWindowMgr::ProcessMouse() {
         this->keyboardCommandRootWnd = window;
       } else {
         UIWindow* root = window;
-        for (;;) {
-          UIWindow* next = root->parent;
-          if (!next) {
-            break;
-          }
-          root = next;
+        while (root->parent) {
+          root = root->parent;
         }
         this->keyboardCommandRootWnd = root;
       }
@@ -367,18 +363,12 @@ int UIWindowMgr::ProcessMouse() {
         this->CloseWindow(WID_COMBOBOXWND);
       }
 
-      if (this->comboBoxIDWnd) {
-        if (window) {
-          if (window != this->comboBoxIDWnd && !window->IsDescendantOf(this->comboBoxIDWnd)) {
-            this->CloseWindow(WID_COMBOBOXIDWND);
-          }
-        } else {
-          this->CloseWindow(WID_COMBOBOXIDWND);
-        }
+      if (this->comboBoxIDWnd && (!window || (window != this->comboBoxIDWnd && !window->IsDescendantOf(this->comboBoxIDWnd)))) {
+        this->CloseWindow(WID_COMBOBOXIDWND);
       }
       if (!window && this->dropDownBoxWnd && this->dropDownBoxWnd->geometry.visible != 0) {
         this->dropDownBoxWnd->Detach();
-        this->dropDownBoxWnd->Show(0);
+        this->dropDownBoxWnd->Show(WINDOW_HIDDEN);
       }
     }
 

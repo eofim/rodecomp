@@ -279,15 +279,15 @@ void UINewSkillListWnd::DrawCharacter() {
 // OFFSET: 0x009AF300
 // FUNCTION: fn_13802
 void UINewSkillListWnd::DrawSkillList() {
-  int drawn = 0;
   int index = 0;
+  int drawn = 0;
 
   std::list<CSkillInfo>& skills = this->SkillList(this->m_tab, false);
   for (auto it = skills.begin(); it != skills.end(); ++it) {
     if (index >= this->m_firstRow * this->m_columns) {
       const int level = it->level;
-      const int y = drawn / this->m_columns * 32;
       const int x = drawn % this->m_columns * 32;
+      const int y = drawn / this->m_columns * 32;
 
       if (this->m_selectedSkill == index) {
         unsigned red, green, blue;
@@ -318,8 +318,8 @@ void UINewSkillListWnd::DrawSkillList() {
       }
 
       const bool raised = it->level > this->SkillAt(index, true).level;
-      const int red = raised ? 255 : shade;
       const int green = raised ? 0 : shade;
+      const int red = raised ? 255 : shade;
       const int textX = x + 112;
       const int textY = y + 47;
       const bool usesLevel = CSkillInfo::UsesLevel(static_cast<int>(it->id));
@@ -820,14 +820,13 @@ void UINewSkillListWnd::OnCreate(int width, int height) {
 
   {
     std::string minimizeTooltip("");
-    this->m_btnHelp = this->AddBaseButton();
-    this->m_btnMinimize = this->AddMinimizeButton(minimizeTooltip.c_str(), 0);
-    this->m_btnClose = this->AddCloseButton("Alt+S", 0);
+    this->m_titleButtons[0] = this->AddBaseButton();
+    this->m_titleButtons[1] = this->AddMinimizeButton(minimizeTooltip.c_str(), 0);
+    this->m_titleButtons[2] = this->AddCloseButton("Alt+S", 0);
 
     int titleButtonX[3] = {22, this->geometry.width - 30, this->geometry.width - 16};
-    UIBitmapButton** titleButtons = &this->m_btnHelp;
-    for (int i = 0; i < 3; ++i, ++titleButtons) {
-      (*titleButtons)->Move(titleButtonX[i], 5);
+    for (int i = 0; i < 3; ++i) {
+      this->m_titleButtons[i]->Move(titleButtonX[i], 5);
     }
   }
 
@@ -890,19 +889,18 @@ void UINewSkillListWnd::OnCreate(int width, int height) {
       {this->geometry.width - 100, this->geometry.height - 27},
       {this->geometry.width - 50, this->geometry.height - 27},
     };
-    UIBitmapButton** button = &this->m_btnApply;
-    for (int i = 0; i < 2; ++i, ++button) {
-      *button = new UIBitmapButton();
-      (*button)->SetBitmap((baseDir + buttonNames[i][0] + ".bmp").c_str(), 0, 0);
-      (*button)->SetBitmap((baseDir + buttonNames[i][1] + ".bmp").c_str(), 1, 0);
-      (*button)->SetBitmap((baseDir + buttonNames[i][2] + ".bmp").c_str(), 2, 0);
-      (*button)->SetSize((*button)->BitmapWidth(), (*button)->BitmapHeight());
-      (*button)->Move(buttonPos[i].x, buttonPos[i].y);
-      (*button)->SetId(buttonIds[i]);
-      UIBitmapButton* const created = *button;
+    for (int i = 0; i < 2; ++i) {
+      this->m_planButtons[i] = new UIBitmapButton();
+      this->m_planButtons[i]->SetBitmap((baseDir + buttonNames[i][0] + ".bmp").c_str(), 0, 0);
+      this->m_planButtons[i]->SetBitmap((baseDir + buttonNames[i][1] + ".bmp").c_str(), 1, 0);
+      this->m_planButtons[i]->SetBitmap((baseDir + buttonNames[i][2] + ".bmp").c_str(), 2, 0);
+      this->m_planButtons[i]->SetSize(this->m_planButtons[i]->BitmapWidth(), this->m_planButtons[i]->BitmapHeight());
+      this->m_planButtons[i]->Move(buttonPos[i].x, buttonPos[i].y);
+      this->m_planButtons[i]->SetId(buttonIds[i]);
+      UIBitmapButton* const created = this->m_planButtons[i];
       created->SetDisabled(1);
       created->Invalidate();
-      this->AddChild(*button);
+      this->AddChild(this->m_planButtons[i]);
     }
   }
 
@@ -1173,7 +1171,9 @@ void UINewSkillListWnd::UpdateRequiredSkills() {
     tabs->Invalidate();
   }
 
-  for (CSkillInfo& skill : this->SkillList(this->m_tab, false)) {
+  std::list<CSkillInfo>& list = this->SkillList(this->m_tab, false);
+  for (auto skillIt = list.begin(); skillIt != list.end(); ++skillIt) {
+    CSkillInfo& skill = *skillIt;
     const int key = static_cast<int>(skill.treePosition);
     if (key != -1 && key >= this->m_firstRow * this->m_columns && key == this->m_selectedSkill) {
       this->m_values.push_front({static_cast<int>(skill.id), 0});
@@ -1197,8 +1197,7 @@ void UINewSkillListWnd::UpdateRequiredSkills() {
           }
         }
         skill.entries[i].requiredLevel = level;
-        SkillInfoEntry& entry = skill.entries[i];
-        this->m_values.emplace_front(entry.skillId, entry.requiredLevel);
+        this->m_values.emplace_front(reinterpret_cast<const NewSkillListValue&>(skill.entries[i]));
       }
       return;
     }
@@ -1276,19 +1275,19 @@ void UINewSkillListWnd::LayoutButtons() {
     this->m_btnDetail->Move(-100, -100);
   }
 
-  this->m_btnMinimize->Move(this->geometry.width - 30, 5);
-  this->m_btnClose->Move(this->geometry.width - 16, 5);
-  this->m_btnApply->Move(this->geometry.width - inset - 100, this->geometry.height - 27);
-  this->m_btnCancel->Move(this->geometry.width - inset - 50, this->geometry.height - 27);
-  UIBitmapButton* apply = this->m_btnApply;
+  this->m_titleButtons[1]->Move(this->geometry.width - 30, 5);
+  this->m_titleButtons[2]->Move(this->geometry.width - 16, 5);
+  this->m_planButtons[0]->Move(this->geometry.width - inset - 100, this->geometry.height - 27);
+  this->m_planButtons[1]->Move(this->geometry.width - inset - 50, this->geometry.height - 27);
+  UIBitmapButton* apply = this->m_planButtons[0];
   apply->SetDisabled(!this->m_locked);
   apply->Invalidate();
-  UIBitmapButton* cancel = this->m_btnCancel;
+  UIBitmapButton* cancel = this->m_planButtons[1];
   cancel->SetDisabled(!this->m_locked);
   cancel->Invalidate();
   if (!this->m_locked) {
-    this->m_btnApply->SetState(0);
-    this->m_btnCancel->SetState(0);
+    this->m_planButtons[0]->SetState(0);
+    this->m_planButtons[1]->SetState(0);
   }
 
   int i;
@@ -1333,24 +1332,21 @@ void UINewSkillListWnd::LayoutButtons() {
 // OFFSET: 0x009B3580
 // FUNCTION: fn_13825
 int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
-  int& gate = g_session.m_simplifiedSkillList;
-
   switch (message) {
   case UM_SETINFO:
     this->m_saved = reinterpret_cast<SkillListWndInfo*>(a);
     if (this->m_saved->IsValid() == 0) {
       this->m_saved->Reset();
     }
-    if (gate != 0) {
+    if (g_session.m_simplifiedSkillList != 0) {
       this->SendMsg(nullptr, UM_RESIZE, 3, 330, this->m_saved->height, 0);
-      return 0;
     } else {
       this->SendMsg(nullptr, UM_RESIZE, 3, 560, 400, 0);
-      return 0;
     }
+    break;
   case UM_RESIZE:
     if (a == 3) {
-      if (gate != 0) {
+      if (g_session.m_simplifiedSkillList != 0) {
         const int minimum = this->m_tabs->geometry.height + 12;
         if (c < minimum) {
           c = minimum;
@@ -1369,44 +1365,40 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
       }
       this->Move(this->m_saved->x, this->m_saved->y);
       g_windowMgr.StoreSnapRectangle(this);
-      return 0;
     }
     break;
   case UM_COMMAND:
     switch (a) {
     case ID_CLOSE:
       g_windowMgr.CloseWindow(WID_SKILLLISTWND);
-      return 0;
+      break;
     case ID_APPLY:
-      if (g_windowMgr.Confirm(LookupMessage(MSI_APPLY_SKILL_UP), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_APPLY_SKILL_UP), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         this->ApplySkillPoints();
         this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
         if (ChatWindow()) {
           g_windowMgr.SetFocus(ChatWindow()->m_inputEdit);
-          return 0;
         }
       }
       break;
     case ID_RESET:
       this->ResetLists();
       this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-      return 0;
+      break;
     case ID_MINI: {
       this->StoreInfo();
       this->m_needsRedraw = 1;
-      const bool simplified = gate == 0;
-      gate = simplified;
-      if (simplified) {
+      g_session.m_simplifiedSkillList = g_session.m_simplifiedSkillList == 0;
+      if (g_session.m_simplifiedSkillList != 0) {
         this->SendMsg(nullptr, UM_RESIZE, 3, 330, this->m_saved->height, 0);
       } else {
         this->SendMsg(nullptr, UM_RESIZE, 3, 560, 400, 0);
       }
-      return 0;
+      break;
     }
     case ID_CHECK: {
-      int& flag = g_session.m_showSkillDescription;
-      flag = flag == 0;
-      return 0;
+      g_session.m_showSkillDescription = g_session.m_showSkillDescription == 0;
+      break;
     }
     case ID_LVLUP1:
     case ID_LVLUP2:
@@ -1426,28 +1418,25 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
           this->LayoutButtons();
           this->Invalidate();
         }
-        return 0;
       }
       break;
     case ID_PLUS: {
-      const int tab = this->m_tab;
-      int next = 0;
-      if (tab + 1 != this->m_tabs->TabCount()) {
-        next = tab + 1;
-      }
-      this->m_tabs->SelectTab(next);
-      return 0;
+      const int next = this->m_tab + 1;
+      UITabControl* tabs = this->m_tabs;
+      tabs->SelectTab(next != tabs->TabCount() ? next : 0);
+      break;
     }
     default: {
       g_session.SetOption(7, 1);
       const unsigned int offset = static_cast<unsigned int>(a) - 42;
-      const unsigned int slot = offset > 41 ? static_cast<unsigned int>(a) : offset;
-      CSkillInfo skill = this->SkillAt(this->m_columns * this->m_firstRow + slot, false);
+      CSkillInfo skill = this->SkillAt(this->m_columns * this->m_firstRow + (offset > 41 ? static_cast<unsigned int>(a) : offset), false);
+      const int id = skill.id;
       if (skill.available != 0) {
-        const int current = g_session.UseLevel(skill.id);
-        int level = current + 1;
-        if (offset > 41) {
-          level = current - 1;
+        int level = g_session.UseLevel(id);
+        if (offset <= 41) {
+          ++level;
+        } else {
+          --level;
         }
         if (level <= 0) {
           level = 1;
@@ -1455,11 +1444,11 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
         if (level > skill.level) {
           level = skill.level;
         }
-        g_session.m_skillBundle.SetSkillValue(skill.id, level);
+        g_session.m_skillBundle.SetSkillValue(id, level);
         this->m_needsRedraw = 1;
         this->Invalidate();
       }
-      return 0;
+      break;
     }
     }
     break;
@@ -1467,7 +1456,7 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     std::list<CSkillInfo>& list = this->SkillList(a, false);
     if (!this->IsExtraTab(a) && list.size() == 0) {
       this->m_tabs->activeTabIndex = this->m_tab;
-      return 0;
+      break;
     }
     if (this->m_tab != a) {
       this->m_selectedSkill = -1;
@@ -1478,19 +1467,21 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
         g_session.m_skillBundle.extraIds.clear();
       }
     }
-  }
-  refreshUi:
     this->UpdateScrollBar();
     this->LayoutButtons();
     this->Invalidate();
-    return 0;
+    break;
+  }
   case UM_REFRESHITEM:
     this->ResetLists();
     g_session.m_skillBundle.NumberExtra();
-    goto refreshUi;
+    this->UpdateScrollBar();
+    this->LayoutButtons();
+    this->Invalidate();
+    break;
   case UM_REFRESH:
     this->InitTabs();
-    return 0;
+    break;
   case UM_SCROLLVERT:
   case UM_SCROLLVERTPAGEUP:
   case UM_SCROLLVERTPAGEDOWN: {
@@ -1517,15 +1508,16 @@ int UINewSkillListWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, s
     const CSkillInfo* skill = reinterpret_cast<const CSkillInfo*>(a);
     if (skill->level != 0) {
       CMode* gameMode = g_modeMgr.currentMode;
-      gameMode->SendMsg(MM_USING_SKILL, a, g_session.UseLevel(skill->id), 0, 0);
-      return 0;
+      const int level = g_session.UseLevel(skill->id);
+      gameMode->SendMsg(MM_USING_SKILL, a, level, 0, 0);
     }
     break;
   }
   case UM_REFRESH_EXTRA_SKILL_TAB:
     if (!this->IsExtraTab(this->m_tab)) {
-      const int lastTab = this->m_tabs->TabCount() - 1;
-      this->m_tabs->SetFlag(lastTab, !g_session.m_skillBundle.extraIds.empty());
+      UITabControl* tabs = this->m_tabs;
+      const int lastTab = tabs->TabCount() - 1;
+      tabs->SetFlag(lastTab, !g_session.m_skillBundle.extraIds.empty());
       this->m_tabs->Invalidate();
     }
     break;
@@ -1634,8 +1626,8 @@ bool UINewSkillListWnd::IncreaseSkillLevel(int skillId) {
       if (skill.level >= static_cast<int>(skill.maxLevel)) {
         return false;
       }
-      ++skill.level;
       --this->m_skillPoints;
+      ++skill.level;
       return true;
     }
   }
@@ -1736,7 +1728,6 @@ void UINewSkillListWnd::DrawSkillTree() {
       }
     }
 
-    const int textY = y + 70;
     const bool raised = it->level > this->SkillAt(static_cast<int>(it->treePosition), true).level;
     int red = shade;
     int green = shade;
@@ -1747,6 +1738,10 @@ void UINewSkillListWnd::DrawSkillTree() {
       blue = 255;
     }
 
+    const int textY = y + 70;
+    const auto drawLevel = [&](int textX, const char* value, std::uint32_t color) {
+      this->DrawOutlinedText(textX, textY, value, 0, color, 0xFFFFFF, 0, 11, 1, 0);
+    };
     const bool usesLevel = CSkillInfo::UsesLevel(static_cast<int>(it->id));
     if (level != 0) {
       if (usesLevel) {
@@ -1757,9 +1752,9 @@ void UINewSkillListWnd::DrawSkillTree() {
         std::sprintf(text, "%d / %d", useLevel, it->level);
         int textX = (24 - this->TextWidth(text, 0, 0, 11, 1, 0)) / 2 + x + 4;
         std::sprintf(text, "%d", useLevel);
-        this->DrawOutlinedText(textX, textY, text, 0, useLevel == it->level ? (shade << 8 | shade) << 8 | shade : 0x7F3CFF, 0xFFFFFF, 0, 11, 1, 0);
+        drawLevel(textX, text, useLevel == it->level ? (shade << 8 | shade) << 8 | shade : 0x7F3CFF);
         textX += this->TextWidth(text, 0, 0, 11, 1, 0);
-        this->DrawOutlinedText(textX, textY, " / ", 0, (shade << 8 | shade) << 8 | shade, 0xFFFFFF, 0, 11, 1, 0);
+        drawLevel(textX, " / ", (shade << 8 | shade) << 8 | shade);
         textX += this->TextWidth(" / ", 0, 0, 11, 1, 0);
 
         const std::uint32_t id = it->id;
@@ -1773,10 +1768,11 @@ void UINewSkillListWnd::DrawSkillTree() {
           target = extra->level;
         }
         StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d", target);
-        this->DrawOutlinedText(textX, textY, text, 0, (blue << 8 | green) << 8 | red, 0xFFFFFF, 0, 11, 1, 0);
+        drawLevel(textX, text, (blue << 8 | green) << 8 | red);
       } else {
         std::sprintf(text, "%d", it->level);
-        this->DrawOutlinedText((24 - this->TextWidth(text, 0, 0, 11, 1, 0)) / 2 + x + 4, textY, text, 0, (blue << 8 | green) << 8 | red, 0xFFFFFF, 0, 11, 1, 0);
+        const int textX = (24 - this->TextWidth(text, 0, 0, 11, 1, 0)) / 2 + x + 4;
+        drawLevel(textX, text, (blue << 8 | green) << 8 | red);
       }
     }
 
@@ -1789,9 +1785,8 @@ void UINewSkillListWnd::DrawSkillTree() {
     );
 
     if (g_session.m_skillBundle.HasHigherLevel(it->id) == true) {
-      this->DrawBitmap(
-        x + 8, y + 58, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\item_skill.bmp"))), true
-      );
+      CBitmapRes* mark = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\item_skill.bmp")));
+      this->DrawBitmap(x + 8, y + 58, mark, true);
     }
   }
 }

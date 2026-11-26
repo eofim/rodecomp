@@ -1,5 +1,6 @@
 #include "Contents/Effects/Skills/StormKickEffect.h"
 #include "Contents/Effects/Core/EffectTypes.h"
+#include "Contents/Effects/Primitives/EffectPrim.h"
 
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Actors/RenderObject.h"
@@ -17,6 +18,17 @@ namespace {
 __forceinline int ClampedRandom(int range) {
   const int value = rand() % range;
   return value >= 0 ? value : 0;
+}
+
+// INLINED
+void SetCloudSegment(CParticle* particle, int effectId, int column, int row, int angle) {
+  particle->effectId = effectId;
+  particle->columnIndex = column;
+  particle->rowIndex = row;
+  particle->groupIndex = 1;
+  particle->alpha = 0;
+  particle->angleParameter = 30;
+  particle->angle = static_cast<float>(angle);
 }
 }
 
@@ -104,13 +116,7 @@ void CStormKickEffect::CreateClouds(int layer) {
       }
 
       particle->SetTexture("effect\\cloud11.tga");
-      particle->effectId = this->id;
-      particle->columnIndex = segment;
-      particle->rowIndex = ring;
-      particle->groupIndex = 1;
-      particle->alpha = 0;
-      particle->angleParameter = 30;
-      particle->angle = static_cast<float>(ring * 90);
+      SetCloudSegment(particle, this->id, segment, ring, ring * 90);
       particle->phaseParameter = ClampedRandom(21) + 80;
       particle->animationParameter = 1.0f;
 
@@ -261,13 +267,13 @@ void CStormKickEffect::Open() {
 void CStormKickEffect::InitEvents() {
   switch (this->id) {
   case EF_STORMKICK:
-    this->AddEvent(0, "effect\\T_회오리차기.wav", 5, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\T_회오리차기.wav", 5, 0);
     break;
   case EF_STORMKICK2:
-    this->AddEvent(0, "ice_titan_attack.wav", 5, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "ice_titan_attack.wav", 5, 0);
     break;
   case EF_STORMKICK6:
-    this->AddEvent(0, "effect\\REVERBERATION.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\REVERBERATION.wav", 0, 0);
     break;
   }
 }
@@ -341,7 +347,7 @@ __forceinline void CStormKickEffect::AdvanceStorm(CParticle* particle) {
 __forceinline void CStormKickEffect::AdvanceCloud(CParticle* particle) {
   if (particle) {
     float& rotation = particle->angle;
-    const float nextRotation = static_cast<float>(static_cast<int>(rotation + 5.0f) % 360);
+    const float nextRotation = static_cast<float>(static_cast<int>(rotation + g_fireflyModeFive) % 360);
     const int spread = std::min(particle->angleParameter + 3, 180);
     particle->angleParameter = spread;
     const int frame = particle->elapsedFrames;
@@ -372,7 +378,7 @@ __forceinline void CStormKickEffect::AdvanceCloud(CParticle* particle) {
 
     const int segment = particle->columnIndex;
     const float radius = particle->animationParameter;
-    const int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(spread) / 20.0f) * segment) + nextRotation) % 360;
+    const int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(spread) / g_fireflyGroundOffset) * segment) + nextRotation) % 360;
     const int tilt = particle->phaseParameter;
     const float horizontal = radius * g_cosTable[tilt];
     const float vertical = radius * g_sinTable[tilt];

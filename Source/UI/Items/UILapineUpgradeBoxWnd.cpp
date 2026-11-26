@@ -180,7 +180,7 @@ void UILapineUpgradeBoxWnd::DragAndDrop(int x, int y, std::intptr_t value) {
     return;
   }
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source == 27) {
+  if (drag->source == DRAG_LAPINE_INGREDIENT) {
     this->SendMsg(this, UM_ADDITEM, drag->id, 0, 0, 0);
   }
   mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -321,7 +321,7 @@ void UILapineUpgradeBoxWnd::SetIngredient(int id) {
 void UILapineUpgradeBox_IngredientListWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source == 26) {
+  if (drag->source == DRAG_LAPINE_BOX) {
     this->SendMsg(this, UM_ADDITEM, drag->id, 0, 0, 0);
   }
   mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -343,7 +343,7 @@ int UILapineUpgradeBox_IngredientListWnd::SendMsg(UIWindow* sender, int message,
     for (auto it = this->items.begin(); it != this->items.end(); ++it) {
       const ITEM_INFO owned = g_session.LookupClientItemByIdentity((*it)->item.identity[1]);
       if (owned.identity[1] <= 0) {
-        (*it)->Show(0);
+        (*it)->Show(WINDOW_HIDDEN);
       }
     }
     this->SendMsg(this, UM_SETPOS, 0, 0, 0, 0);
@@ -607,9 +607,41 @@ bool UILapineUpgradeBox_IngredientListWnd::CanUseIngredient(std::uint32_t identi
     return false;
   }
 
-  (*entryIt)->Show(0);
+  (*entryIt)->Show(WINDOW_HIDDEN);
   this->SendMsg(this, UM_SETPOS, 0, 0, 0, 0);
   return true;
+}
+
+// INLINED
+static void SelectItem(UILapineUpgradeBoxWnd* window, std::uint32_t identity) {
+  ITEM_INFO owned = g_session.LookupClientItemByIdentity(identity);
+  if (owned.identity[1] <= 0) {
+    return;
+  }
+
+  {
+    std::vector<const char*> breaks;
+    char name[260];
+    std::memset(name, 0, sizeof(name));
+    char* highlight = nullptr;
+    int remaining = sizeof(name);
+    char* cursor = name;
+    int highlightColor;
+    window->BuildItemName(&owned, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
+
+    if (owned.identified == 1 && owned.optionCount != 0) {
+      sprintf_s(name, sizeof(name), LookupMessage(MSI_EA6), name, owned.optionCount);
+    }
+
+    owned.SetName(name);
+  }
+  window->item = owned;
+  window->Invalidate();
+}
+
+// INLINED
+static void ClearItem(UILapineUpgradeBoxWnd* window) {
+  window->item = ITEM_INFO();
 }
 
 // OFFSET: 0x006041E0
@@ -639,10 +671,7 @@ int UILapineUpgradeBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
         packet.ingredientId = this->ingredientId;
         packet.itemId = static_cast<std::int16_t>(this->item.identity[1]);
         GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
-        this->waiting = 1;
-        this->upgradeButton->SetDisabled(1);
-        this->upgradeButton->Invalidate();
-        this->Invalidate();
+        this->SetWaiting(1);
         return 0;
       }
       break;
@@ -650,33 +679,13 @@ int UILapineUpgradeBoxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     break;
   case UM_ADDITEM:
     if (this->item.identity[1] <= 0 && this->ingredientList->CanUseIngredient(static_cast<std::uint32_t>(a)) == 1) {
-      ITEM_INFO owned = g_session.LookupClientItemByIdentity(static_cast<std::uint32_t>(a));
-      if (owned.identity[1] > 0) {
-        {
-          std::vector<const char*> breaks;
-          char name[260];
-          std::memset(name, 0, sizeof(name));
-          char* highlight = nullptr;
-          int remaining = sizeof(name);
-          char* cursor = name;
-          int highlightColor;
-          this->BuildItemName(&owned, &highlightColor, &breaks, &cursor, &remaining, &highlight, 1, 0);
-
-          if (owned.identified == 1 && owned.optionCount != 0) {
-            sprintf_s(name, sizeof(name), LookupMessage(MSI_EA6), name, owned.optionCount);
-          }
-
-          owned.SetName(name);
-        }
-        this->item = owned;
-        this->Invalidate();
-      }
+      SelectItem(this, static_cast<std::uint32_t>(a));
       return 0;
     }
     break;
   case UM_DECITEM:
     if (this->item.identity[1] != 0 && this->item.identity[1] == a) {
-      this->item = ITEM_INFO();
+      ClearItem(this);
       this->SendMsg(this, UM_RECEIVE_MSG, reinterpret_cast<std::intptr_t>(""), 0, 0, 0);
       this->Invalidate();
       this->ingredientList->AddIngredient(static_cast<std::uint32_t>(a));

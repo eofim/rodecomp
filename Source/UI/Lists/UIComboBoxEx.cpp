@@ -74,8 +74,8 @@ namespace {
 // INLINED
 __forceinline void SetBarRange(UIScrollBar* bar, int maximum, int visible, int total) {
   bar->maximum = maximum;
-  bar->total = total;
   bar->visible = visible;
+  bar->total = total;
   bar->Invalidate();
 
   if (bar->position > bar->maximum) {
@@ -88,13 +88,18 @@ __forceinline void SetBarRange(UIScrollBar* bar, int maximum, int visible, int t
 // FUNCTION: fn_11510
 void UIComboBoxEx::Refresh() {
   const int visible = this->geometry.height / this->lineHeight;
-  const int count = static_cast<int>(this->lines.size());
-  const int overflow = std::ranges::max(count - visible, 0);
+  int overflow = static_cast<int>(this->lines.size()) - visible;
+
+  if (overflow < 0) {
+    overflow = 0;
+  }
+
   this->verticalOverflow = overflow != 0;
-  auto* bar = this->verticalBar;
+  auto& verticalBarRef = this->verticalBar;
+  auto* bar = verticalBarRef;
 
   if (overflow != 0) {
-    SetBarRange(bar, (this->bottomMargin + overflow), visible, count);
+    SetBarRange(bar, (this->bottomMargin + overflow), visible, static_cast<int>(this->lines.size()));
 
     if (this->selected < this->topLine) {
       this->topLine = this->selected;
@@ -112,7 +117,7 @@ void UIComboBoxEx::Refresh() {
 
     this->verticalBar->position = this->topLine;
   } else {
-    SetBarRange(bar, 0, visible, count);
+    SetBarRange(bar, 0, visible, static_cast<int>(this->lines.size()));
   }
 
   this->verticalBar->Invalidate();
@@ -185,11 +190,10 @@ int UIComboBoxEx::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
   case UM_ADDITEM:
     if (b) {
       this->AddLine(reinterpret_cast<const char*>(a), static_cast<unsigned>(b));
-      this->Invalidate();
-      break;
+    } else {
+      this->AddLine(reinterpret_cast<const char*>(a), 0);
     }
 
-    this->AddLine(reinterpret_cast<const char*>(a), 0);
     this->Invalidate();
     break;
 
@@ -334,16 +338,17 @@ void UIComboBoxEx2::Resize(int width, int height) {
 // FUNCTION: fn_11353
 void UIComboBoxEx2::Paint() {
   this->ClearSurface(0xC59582u);
-  this->FillRegion(1, 1, (this->geometry.width - 2), (this->geometry.height - 2), 0xFCF4F0u);
+  auto& geometryRef = this->geometry;
+  this->FillRegion(1, 1, (geometryRef.width - 2), (geometryRef.height - 2), 0xFCF4F0u);
 
   const int top = this->topLine;
   const int end = static_cast<int>(std::min(
-    static_cast<unsigned>((top + (this->geometry.height / this->lineHeight - this->bottomMargin))), static_cast<unsigned>(this->lines.size())
+    static_cast<unsigned>((top + (geometryRef.height / this->lineHeight - this->bottomMargin))), static_cast<unsigned>(this->lines.size())
   ));
 
   for (int row = top; row < end; ++row) {
     if (row == this->selected) {
-      this->FillRegion(3, ((this->lineHeight * (row - top)) + 1), (this->geometry.width - 6), (this->lineHeight - 2), 0xF8D5C4u);
+      this->FillRegion(3, ((this->lineHeight * (row - top)) + 1), (geometryRef.width - 6), (this->lineHeight - 2), 0xF8D5C4u);
     }
   }
 
@@ -352,7 +357,7 @@ void UIComboBoxEx2::Paint() {
       this->DrawTextAt(3 - this->horizontalOffset, this->lineHeight * (row - top) + 2, this->lines[row].text.c_str(), 0, 0, 12, this->lines[row].color, 0, 0);
     } else if (this->alignment == 1) {
       const int x = static_cast<int>(
-        static_cast<float>(this->geometry.width) * 0.5f -
+        static_cast<float>(geometryRef.width) * 0.5f -
         static_cast<float>(this->TextWidth(this->lines[row].text.c_str(), 0, 0, 12, 0, 0)) * 0.5f
       );
       this->DrawTextAt(x, this->lineHeight * (row - top) + 2, this->lines[row].text.c_str(), 0, 0, 12, this->lines[row].color, 0, 0);

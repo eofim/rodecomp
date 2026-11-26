@@ -97,7 +97,7 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
     this->m_slots[slotIndex].action = 0;
     this->m_slots[slotIndex].frame = 0;
 
-    this->m_slots[slotIndex].actionNames[0] = static_cast<const std::string&>(g_session.GetBodyActionResourceName(info->job, g_session.GetCurrentSex(), info->bodyCostume, 0));
+    this->m_slots[slotIndex].actionNames[0] = static_cast<const std::string&>(g_equipmentResourceMgr->GetBodyResourceName(0, info->job, g_session.GetCurrentSex(), info->bodyCostume, 0));
     this->m_slots[slotIndex].spriteNames[0] = static_cast<const std::string&>(g_session.GetBodySprName(info->job, g_session.GetCurrentSex(), info->bodyCostume, 0));
 
     int head = info->head;
@@ -128,7 +128,7 @@ void UISelCharForUServerWnd::OnCreate(int, int) {
       this->m_slots[slotIndex].headPaletteName = static_cast<const std::string&>(g_session.GetHeadPalName(head, info->job, g_session.GetCurrentSex(), this->m_slots[slotIndex].headPalette));
     }
 
-    this->m_slots[slotIndex].imfName = g_equipmentResourceMgr->GetBodyImfName(info->job, g_session.GetCurrentSex(), info->head, info->bodyCostume);
+    this->m_slots[slotIndex].imfName = g_session.GetBodyImfName(info->job, g_session.GetCurrentSex(), info->head, info->bodyCostume);
   }
 }
 
@@ -141,7 +141,7 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
 
   switch (argument1) {
   case ID_OK: {
-    if (g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_SELECT_CHARACTERS), 2, false, false, 0, "Message", 280, 120, 0) != ID_YES) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_SELECT_CHARACTERS), 2, false, false, 0, "메시지", 280, 120, 0) != ID_YES) {
       return 0;
     }
 
@@ -168,14 +168,14 @@ int UISelCharForUServerWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
       return 0;
     }
 
-    g_windowMgr.Confirm(LookupMessage(MSI_NO_SELECT_CHARACTERS), 0, true, true, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_NO_SELECT_CHARACTERS), 0, true, true, 0, "메시지", 280, 120, 0);
     break;
   }
   case ID_CHECK:
     const int checkedCount = this->m_checkedCount + (sender->geometry.state != 0 ? 1 : -1);
     this->m_checkedCount = checkedCount;
     if (checkedCount > 9) {
-      g_windowMgr.Confirm(LookupMessage(MSI_ERROR_SELECT_CHARACTERS), 0, true, true, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_ERROR_SELECT_CHARACTERS), 0, true, true, 0, "메시지", 280, 120, 0);
       static_cast<UICheckBox*>(sender)->SetChecked(0);
     }
     break;

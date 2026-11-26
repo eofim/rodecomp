@@ -3,11 +3,13 @@
 
 #include "Client/Input/InputCharset.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Resource/ResourceMgr.h"
 #include "Resource/Bitmap/SkinPalette.h"
 #include "UI/Buttons/UIButton.h"
 #include "UI/Window/WindowBorder.h"
 #include "Utility/Text/FormatString.h"
+#include "UI/Window/UIEnums.h"
 
 #include <cstdio>
 #include <cstring>
@@ -55,7 +57,7 @@ void UICandidateWnd::Paint() {
   this->DrawBorder(0, 0, 0, 0);
   char text[65];
   switch (g_language) {
-  case 0: {
+  case LANGUAGE_KOREAN: {
     std::memset(text, 0, sizeof(text));
     int x = 14;
     for (int i = 0; i < this->m_count; ++i) {
@@ -68,7 +70,7 @@ void UICandidateWnd::Paint() {
     this->FillTriangleRegion(width - 8, 18, width - 14, 10, width - 14, 26, this->m_page >= this->m_lastPage ? 0xD2D2D2 : 0xFF9F70);
     break;
   }
-  case 2: {
+  case LANGUAGE_JAPANESE: {
     std::memset(text, 0, sizeof(text));
     for (int i = 0; i < this->m_count; ++i) {
       StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d %s", i + 1, this->m_candidates[i].c_str());
@@ -83,8 +85,8 @@ void UICandidateWnd::Paint() {
     this->DrawTextAt(110 - this->TextWidth(text, 0, 0, 12, 0, 0), 192, text, 0, 0, 12, 0, 0, 0);
     return;
   }
-  case 3:
-  case 4: {
+  case LANGUAGE_CHINESE:
+  case LANGUAGE_TAIWANESE: {
     std::memset(text, 0, sizeof(text));
     int x = 14;
     for (int i = 0; i < this->m_count; ++i) {
@@ -115,7 +117,7 @@ void UICompositionWnd::Paint() {
 // OFFSET: 0x0096DB60
 // FUNCTION: fn_13205
 void UIKeyStrokeWnd::Paint() {
-  if (g_language != 4) {
+  if (g_language != LANGUAGE_TAIWANESE) {
     return;
   }
 
@@ -145,7 +147,7 @@ void UIKeyStrokeWnd::Paint() {
 // OFFSET: 0x0096DD40
 // FUNCTION: fn_13206
 int UICandidateWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
-  if (message != 65) {
+  if (message != UM_IME_SET_CANDIDATE) {
     return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
   const std::string* candidates = reinterpret_cast<const std::string*>(argument1);
@@ -162,13 +164,13 @@ int UICandidateWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argumen
   int width = 0;
   for (int i = 0; i < this->m_count; ++i) {
     StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%d %s", i + 1, this->m_candidates[i].c_str());
-    if (g_language != 2) {
+    if (g_language != LANGUAGE_JAPANESE) {
       width += 8 + this->TextWidth(text, 0, 0, 12, 0, 0);
     } else {
       width = std::max(this->TextWidth(text, 0, 0, 12, 0, 0) + 8, width);
     }
   }
-  if (g_language != 2) {
+  if (g_language != LANGUAGE_JAPANESE) {
     this->Resize(width + 22, this->geometry.height);
   } else {
     this->Resize(width + 22, this->m_count * 20 + 14);

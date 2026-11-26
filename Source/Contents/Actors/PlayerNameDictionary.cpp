@@ -21,7 +21,8 @@ struct PACKET_CZ_REQNAME_BYGID2 {
 static_assert(sizeof(PACKET_CZ_REQNAME_BYGID2) == 6);
 #endif
 
-// INLINED
+// OFFSET: 0x0060A640
+// FUNCTION: fn_46484
 CPlayerNameDictionary::CPlayerNameDictionary() {
   this->m_enabled = true;
 }
@@ -34,14 +35,12 @@ __declspec(noinline) CPlayerNameDictionary::~CPlayerNameDictionary() {
 // OFFSET: 0x0060B010
 // FUNCTION: fn_04262
 std::string CPlayerNameDictionary::Lookup(std::uint32_t id) {
-  const auto entry = this->m_names.find(id);
+  const auto entry = std::as_const(this->m_names).find(id);
   if (entry != this->m_names.end()) {
     return entry->second.name;
   }
 
-  if (this->m_pending.end() == std::find(this->m_pending.begin(), this->m_pending.end(), id)) {
-    this->m_pending.push_back(id);
-  }
+  this->QueueRequest(id);
 
   return LookupMessage(MSI_NAMELESS_USER);
 }
@@ -68,6 +67,14 @@ void CPlayerNameDictionary::Clear() {
   this->m_requests.clear();
 }
 
+// OFFSET: 0x0060B320
+// FUNCTION: fn_46476
+void CPlayerNameDictionary::QueueRequest(std::uint32_t id) {
+  if (this->m_pending.end() == std::find(this->m_pending.begin(), this->m_pending.end(), id)) {
+    this->m_pending.push_back(id);
+  }
+}
+
 // OFFSET: 0x0060B420
 // FUNCTION: fn_04264
 bool CPlayerNameDictionary::Contains(std::uint32_t id) const {
@@ -86,27 +93,32 @@ void CPlayerNameDictionary::Update() {
     this->m_requests.pop_front();
   }
 
-  while (!this->m_pending.empty()) {
-    const std::uint32_t id = this->m_pending.front();
-    const auto cached = this->m_names.find(id);
-    if (this->m_names.end() == cached || cached->second.IsExpired()) {
-      const auto outstanding = std::find_if(this->m_requests.begin(), this->m_requests.end(), [&](const Request& request) { return id == request.id; });
-      if (this->m_requests.end() == outstanding) {
-        this->m_pending.pop_front();
-
-        if (id != 0) {
-          PACKET_CZ_REQNAME_BYGID2 packet;
-          packet.packetType = ID_CZ_REQNAME_BYGID2;
-          packet.gid = id;
-          GetRagConnection().Send(sizeof(packet), &packet);
-          this->m_requests.push_back({id, timeGetTime()});
+  const auto popNextRequest = [this]() -> std::uint32_t {
+    while (!this->m_pending.empty()) {
+      const std::uint32_t id = this->m_pending.front();
+      const std::map<std::uint32_t, Entry>::const_iterator cached = this->m_names.find(id);
+      if (cached == this->m_names.end() || cached->second.IsExpired()) {
+        const auto end = this->m_requests.end();
+        const auto outstanding = std::find_if(this->m_requests.begin(), end, [id](const Request& request) { return id == request.id; });
+        if (end == outstanding) {
+          this->m_pending.pop_front();
+          return id;
         }
-
-        return;
       }
+
+      this->m_pending.pop_front();
     }
 
-    this->m_pending.pop_front();
+    return 0;
+  };
+
+  const std::uint32_t id = popNextRequest();
+  if (id != 0) {
+    PACKET_CZ_REQNAME_BYGID2 packet;
+    packet.packetType = ID_CZ_REQNAME_BYGID2;
+    packet.gid = id;
+    GetRagConnection().Send(sizeof(packet), &packet);
+    this->m_requests.push_back({id, timeGetTime()});
   }
 }
 

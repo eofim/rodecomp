@@ -187,7 +187,19 @@ int UIScrollBar::ThumbOffset() {
 // OFFSET: 0x008806E0
 // FUNCTION: fn_11278
 int UIScrollBar::Part(int x, int y) {
-  if (this->maximum == 0 || x < 0 || x >= this->geometry.width || y < 0 || y >= this->geometry.height) {
+  if (this->maximum == 0) {
+    return -1;
+  }
+  if (x < 0) {
+    return -1;
+  }
+  if (x >= this->geometry.width) {
+    return -1;
+  }
+  if (y < 0) {
+    return -1;
+  }
+  if (y >= this->geometry.height) {
     return -1;
   }
 
@@ -220,9 +232,9 @@ int UIScrollBar::Part(int x, int y) {
       return 3;
     }
     return 4;
-  default:
-    return -1;
   }
+
+  return -1;
 }
 
 // OFFSET: 0x00890720
@@ -401,57 +413,73 @@ void UIScrollBar::Paint() {
 
   switch (this->vertical) {
   case 0: {
-    CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1left.bmp")));
-    this->DrawBitmap(1, 0, bitmap, false);
-    CBitmapRes* middle = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1mid.bmp")));
-    const int interior = this->geometry.width - this->arrowLength - 14;
-    const int count = interior / 13 + (interior % 13 != 0);
-
-    for (int index = 0; index < count; ++index) {
-      this->DrawBitmap(this->arrowLength + index * 13, 0, middle, false);
+    if (this->state == 1) {
+      this->DrawBitmap(1, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1left.bmp"))), false);
+    } else if (this->state == 4) {
+      this->DrawBitmap(1, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1left.bmp"))), false);
+    } else {
+      this->DrawBitmap(1, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1left.bmp"))), false);
     }
-
-    this->DrawBitmap(this->geometry.width - this->arrowLength - 13, 0, middle, false);
+    {
+      CBitmapRes* middle = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1mid.bmp")));
+      const int count = (this->geometry.width - this->arrowLength - 14) / 13 + ((this->geometry.width - this->arrowLength - 14) % 13 != 0);
+      for (int index = 0; index < count; ++index) {
+        this->DrawBitmap(this->arrowLength + index * 13, 0, middle, false);
+      }
+      this->DrawBitmap(this->geometry.width - this->arrowLength - 13, 0, middle, false);
+    }
     this->FillRegion(this->geometry.width - this->arrowLength, 0, 13, this->geometry.height, 0xFFFF00FFu);
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1right.bmp")));
-    this->DrawBitmap(this->geometry.width - this->arrowLength - 1, 0, bitmap, true);
-
-    const int thumb = this->arrowLength + this->ThumbOffset();
-    this->DrawBitmap(thumb, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_left.bmp"))), true);
-    const int end = thumb + this->ThumbLength() - 4;
-
-    for (int offset = thumb + 4; offset < end; offset += 4) {
-      this->DrawBitmap(offset, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_mid.bmp"))), true);
+    if (this->state == 2) {
+      this->DrawBitmap(this->geometry.width - this->arrowLength - 1, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1right.bmp"))), true);
+    } else if (this->state == 5) {
+      this->DrawBitmap(this->geometry.width - this->arrowLength - 1, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1right.bmp"))), true);
+    } else {
+      this->DrawBitmap(this->geometry.width - this->arrowLength - 1, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1right.bmp"))), true);
     }
-
-    this->DrawBitmap(end, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_right.bmp"))), true);
+    {
+      const int thumb = this->arrowLength + this->ThumbOffset();
+      this->DrawBitmap(thumb, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_left.bmp"))), true);
+      const int length = this->ThumbLength();
+      for (int offset = thumb + 4; offset < thumb + length - 4; offset += 4) {
+        this->DrawBitmap(offset, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_mid.bmp"))), true);
+      }
+      this->DrawBitmap(thumb + length - 4, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll1bar_right.bmp"))), true);
+    }
     break;
   }
   case 1: {
-    CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0up.bmp")));
-    this->DrawBitmap(0, 1, bitmap, false);
-    CBitmapRes* middle = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0mid.bmp")));
-    const int interior = this->geometry.height - this->arrowLength - 14;
-    const int count = interior / 13 + (interior % 13 != 0);
-
-    for (int index = 0; index < count; ++index) {
-      this->DrawBitmap(0, this->arrowLength + index * 13, middle, false);
+    if (this->state == 1) {
+      this->DrawBitmap(0, 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0up.bmp"))), false);
+    } else if (this->state == 4) {
+      this->DrawBitmap(0, 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0up.bmp"))), false);
+    } else {
+      this->DrawBitmap(0, 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0up.bmp"))), false);
     }
-
-    this->DrawBitmap(0, this->geometry.height - this->arrowLength - 13, middle, false);
+    {
+      CBitmapRes* middle = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0mid.bmp")));
+      const int count = (this->geometry.height - this->arrowLength - 14) / 13 + ((this->geometry.height - this->arrowLength - 14) % 13 != 0);
+      for (int index = 0; index < count; ++index) {
+        this->DrawBitmap(0, this->arrowLength + index * 13, middle, false);
+      }
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 13, middle, false);
+    }
     this->FillRegion(0, this->geometry.height - this->arrowLength, this->geometry.width, 13, 0xFFFF00FFu);
-    bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0down.bmp")));
-    this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, bitmap, true);
-
-    const int thumb = this->arrowLength + this->ThumbOffset();
-    this->DrawBitmap(0, thumb, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_up.bmp"))), true);
-    const int end = thumb + this->ThumbLength() - 4;
-
-    for (int offset = thumb + 4; offset < end; offset += 4) {
-      this->DrawBitmap(0, offset, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_mid.bmp"))), true);
+    if (this->state == 2) {
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0down.bmp"))), true);
+    } else if (this->state == 5) {
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0down.bmp"))), true);
+    } else {
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength - 1, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0down.bmp"))), true);
     }
-
-    this->DrawBitmap(0, end, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_down.bmp"))), true);
+    {
+      const int thumb = this->arrowLength + this->ThumbOffset();
+      this->DrawBitmap(0, thumb, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_up.bmp"))), true);
+      const int length = this->ThumbLength();
+      for (int offset = thumb + 4; offset < thumb + length - 4; offset += 4) {
+        this->DrawBitmap(0, offset, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_mid.bmp"))), true);
+      }
+      this->DrawBitmap(0, thumb + length - 4, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\scroll0bar_down.bmp"))), true);
+    }
     break;
   }
   }
@@ -462,14 +490,16 @@ void UIScrollBar::Paint() {
 void UIScrollBar::Configure(int x, int y, int vertical, int length) {
   this->vertical = vertical;
 
-  int width = length;
-  int height = length;
+  int width;
+  int height;
   switch (vertical) {
   case 0:
+    width = length;
     height = this->thickness;
     break;
   case 1:
     width = this->thickness;
+    height = length;
     break;
   }
 
@@ -580,7 +610,7 @@ void UITabControl::SetFlag(int index, bool value) {
 // FUNCTION: fn_11588
 void UITabControl::AddTab(const char* label, const char* tooltip) {
   this->labels.push_back(std::string(label));
-  this->tooltips.push_back(std::string());
+  this->tooltips.push_back("");
 
   if (this->parent) {
     const int tabWidth = this->parent->geometry.width / this->labels.size() - this->tabPadding;
@@ -601,7 +631,8 @@ void UITabControl::AddTab(const char* label, const char* tooltip) {
   }
 
   this->activeTabIndex = 0;
-  this->colors.push_back(0xFFFFFFFFu);
+  const std::uint32_t defaultColor = 0xFFFFFFFFu;
+  this->colors.push_back(defaultColor);
 
   int width;
   if (this->layout == 0 || this->layout == 2) {
@@ -816,9 +847,12 @@ void UIBasicItemCtrl::DrawItemIcon(int x, int y, int, bool compact) {
 // OFFSET: 0x008900D0
 // FUNCTION: fn_11399
 void UIChatHisBox::OnLBtnDblClk(int, int) {
-  const unsigned int index = static_cast<unsigned int>(this->selected);
+  if (this->selected == -1) {
+    return;
+  }
 
-  if (index != static_cast<unsigned int>(-1) && index < this->history.size() && this->history[index].size() > 0 && this->history[index].c_str() != nullptr) {
+  const unsigned int index = static_cast<unsigned int>(this->selected);
+  if (index < this->history.size() && this->history[index].size() > 0 && this->history[index].c_str() != nullptr) {
     this->parent->SendMsg(this, UM_COMMAND, ID_NAME, reinterpret_cast<std::intptr_t>(this->HistoryText(index)), 0, 0);
   }
 }
@@ -1094,7 +1128,7 @@ int UITabControl::SendMsg(UIWindow* sender, int message, std::intptr_t argument1
     }
 
     if ((this->tabPadding + this->TextWidth(text.c_str(), 0, 0, this->fontSize, 0, 0)) * this->TabCount() >= this->parent->geometry.width - 90) {
-      g_windowMgr.Confirm(LookupMessage(MSI_FAILED_CHANGE_TABNAME), 0, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_FAILED_CHANGE_TABNAME), 0, true, false, 0, "메시지", 280, 120, 0);
     } else {
       this->labels[this->activeTabIndex] = text;
       const int previousWidth = this->geometry.width;
@@ -1860,7 +1894,7 @@ bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) 
       atCursor = false;
     } else {
       remaining = remaining.substr(found + bytes);
-      absolute = (absolute == found ? absolute : absolute + found) + bytes;
+      absolute += (absolute == found ? 0 : found) + bytes;
       found = static_cast<int>(remaining.find(fitted));
       continue;
     }
@@ -1872,10 +1906,12 @@ bool UIItemTagCtrl::RemoveInvalidTag(std::list<ItemTagRecord>::iterator& entry) 
         remaining = this->taggedText.substr(0, absolute);
       }
       int end = absolute;
-      if (after.find(">") != std::string::npos) {
-        ++end;
+      if (after.find(">") == std::string::npos) {
+        end += bytes;
+      } else {
+        end += bytes + 1;
       }
-      remaining += this->taggedText.substr(end + bytes);
+      remaining += this->taggedText.substr(end);
       g_serverLanguage->ReplaceInput(remaining.c_str());
       this->RemoveTagChild(entry->child);
       entry = this->tags.erase(entry);
@@ -1941,7 +1977,10 @@ std::string UIChatHisBox::RenderItemLinks(const char* lineText, std::string& sou
     if (result.size() + prefix.size() > std::strlen(lineText)) {
       const int available = static_cast<int>(std::strlen(lineText) - result.size());
       if (available > 0) {
-        result += prefix.substr(0, available);
+        const unsigned clippedLength = prefix.size() < static_cast<unsigned>(available)
+            ? static_cast<unsigned>(prefix.size()) : static_cast<unsigned>(available);
+        const std::string clipped(prefix.data(), clippedLength);
+        result.append(clipped.data(), clipped.size());
         previous += available;
         break;
       }
@@ -2055,7 +2094,8 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
 
     NavigationLinkParser* const parser = g_navigationLinkParser;
     const std::string name = parser->FormatNavigationLink(link, false);
-    std::string label = "<";
+    std::string label("");
+    label += "<";
     const int width = this->geometry.width / 2;
     label += this->FitTextToWidth(name, width);
     label += ">";
@@ -2097,17 +2137,17 @@ std::string UIChatHisBox::RenderNavigationLinks(const char* text, std::string& s
 
 // OFFSET: 0x00894090
 // FUNCTION: fn_11508
-void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int& mode) {
+void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int mode) {
   const std::string open = "<";
   const std::string close = ">";
-  std::string remaining;
+  std::string remaining = "";
   for (unsigned int line = 0; line < wrapped.size(); ++line) {
-    std::vector<std::string> split;
     if (wrapped.size() > 23) {
       break;
     }
+    std::vector<std::string> split;
 
-    this->WrapLinkText(&mode, &split, wrapped[line]);
+    this->WrapLinkText(mode, &split, wrapped[line]);
     if (split.size() > 1) {
       for (unsigned int part = 0; part < split.size(); ++part) {
         if (part == 0) {
@@ -2165,7 +2205,7 @@ void UIChatHisBox::RewrapLinkLines(std::vector<std::string>& wrapped, int& mode)
         std::string& next = wrapped[line + 1];
         if (next.find(close) != std::string::npos) {
           remaining.append(next);
-          next.swap(remaining);
+          wrapped[line + 1].swap(remaining);
           wrapped[line] = wrapped[line].substr(0, offset);
         }
       }
@@ -2184,8 +2224,8 @@ void UIChatHisBox::AddItemLinkLine(const char* text, std::uint32_t& color, int& 
 
   std::vector<std::string> wrapped;
   const std::string converted = this->Convert(text);
-  this->WrapLinkText(&mode, &wrapped, converted);
-  this->RewrapLinkLines(wrapped, mode);
+  this->WrapLinkText(reinterpret_cast<int>(&mode), &wrapped, converted);
+  this->RewrapLinkLines(wrapped, reinterpret_cast<int>(&mode));
   std::string source = text;
   for (unsigned int line = 0; line < wrapped.size(); ++line) {
     wrapped[line] = this->RenderItemLinks(wrapped[line].c_str(), source);
@@ -2208,8 +2248,8 @@ void UIChatHisBox::AddNavigationLinkLine(const char* text, std::uint32_t& color,
 
   std::vector<std::string> wrapped;
   std::string display = parser->DisplayNavigationLink(text);
-  this->WrapLinkText(&mode, &wrapped, display);
-  this->RewrapLinkLines(wrapped, mode);
+  this->WrapLinkText(reinterpret_cast<int>(&mode), &wrapped, display);
+  this->RewrapLinkLines(wrapped, reinterpret_cast<int>(&mode));
   std::string source = text;
   for (unsigned int line = 0; line < wrapped.size(); ++line) {
     wrapped[line] = this->RenderNavigationLinks(wrapped[line].c_str(), source);

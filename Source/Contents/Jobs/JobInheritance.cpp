@@ -757,8 +757,8 @@ __declspec(noinline) int CSession::IsPlayerJob(int job) const {
 // OFFSET: 0x00E19110
 // FUNCTION: fn_23835
 int CSession::InheritedJob(int job) {
-  job = this->m_hotkeyScript->TableInteger("JobInheritTable", 0, job);
-  const int replacement = this->m_hotkeyScript->TableInteger("JOB_INHERIT_LIST2", 0, job);
+  job = this->m_hotkeyScript->TableInteger("JobInheritTable", 0, reinterpret_cast<const void*>(job));
+  const int replacement = this->m_hotkeyScript->TableInteger("JOB_INHERIT_LIST2", 0, reinterpret_cast<const void*>(job));
   return replacement != -1 ? replacement : job;
 }
 
@@ -926,10 +926,14 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
     }
     break;
   case JT_MAGICIAN:
-  case JT_MERCHANT:
   case JT_MAGICIAN_H:
-  case JT_MERCHANT_H:
   case JT_MAGICIAN_B:
+    if (view == W_DAGGER) {
+      result = true;
+    }
+    break;
+  case JT_MERCHANT:
+  case JT_MERCHANT_H:
   case JT_MERCHANT_B:
     if (view == W_DAGGER) {
       result = true;
@@ -1031,28 +1035,22 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
     }
     break;
   case JT_SWORDMAN:
+  case JT_SWORDMAN_H:
+  case JT_SWORDMAN_B:
+    if (view == W_1HSPEAR || view == W_2HSPEAR) {
+      result = true;
+    }
+    break;
   case JT_KNIGHT:
   case JT_CHICKEN:
-  case JT_CRUSADER:
-  case JT_CHICKEN2:
-  case JT_SWORDMAN_H:
   case JT_KNIGHT_H:
   case JT_CHICKEN_H:
-  case JT_CRUSADER_H:
-  case JT_CHICKEN2_H:
-  case JT_SWORDMAN_B:
   case JT_KNIGHT_B:
   case JT_CHICKEN_B:
-  case JT_CRUSADER_B:
-  case JT_CHICKEN2_B:
   case JT_RUNE_KNIGHT:
   case JT_RUNE_KNIGHT_H:
-  case JT_ROYAL_GUARD:
-  case JT_ROYAL_GUARD_H:
   case JT_RUNE_CHICKEN:
   case JT_RUNE_CHICKEN_H:
-  case JT_ROYAL_CHICKEN:
-  case JT_ROYAL_CHICKEN_H:
   case JT_RUNE_CHICKEN2:
   case JT_RUNE_CHICKEN2_H:
   case JT_RUNE_CHICKEN3:
@@ -1062,12 +1060,26 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
   case JT_RUNE_CHICKEN5:
   case JT_RUNE_CHICKEN5_H:
   case JT_RUNE_KNIGHT_B:
-  case JT_ROYAL_GUARD_B:
   case JT_RUNE_CHICKEN_B:
-  case JT_ROYAL_CHICKEN_B:
   case JT_DRAGON_KNIGHT:
-  case JT_IMPERIAL_GUARD:
   case JT_DRAGON_KNIGHT_CHICKEN:
+    if (view == W_1HSPEAR || view == W_2HSPEAR) {
+      result = true;
+    }
+    break;
+  case JT_CRUSADER:
+  case JT_CHICKEN2:
+  case JT_CRUSADER_H:
+  case JT_CHICKEN2_H:
+  case JT_CRUSADER_B:
+  case JT_CHICKEN2_B:
+  case JT_ROYAL_GUARD:
+  case JT_ROYAL_GUARD_H:
+  case JT_ROYAL_CHICKEN:
+  case JT_ROYAL_CHICKEN_H:
+  case JT_ROYAL_GUARD_B:
+  case JT_ROYAL_CHICKEN_B:
+  case JT_IMPERIAL_GUARD:
   case JT_IMPERIAL_GUARD_CHICKEN:
     if (view == W_1HSPEAR || view == W_2HSPEAR) {
       result = true;
@@ -1085,40 +1097,52 @@ bool CSession::IsJobWeaponAllowed(int job, int slot, std::int64_t weapon) const 
     }
     break;
   case JT_THIEF:
-  case JT_HUNTER:
-  case JT_ROGUE:
-  case JT_BARD:
-  case JT_DANCER:
   case JT_THIEF_H:
-  case JT_HUNTER_H:
-  case JT_ROGUE_H:
-  case JT_BARD_H:
-  case JT_DANCER_H:
   case JT_THIEF_B:
+    if (view == W_BOW) {
+      result = true;
+    }
+    break;
+  case JT_HUNTER:
+  case JT_HUNTER_H:
   case JT_HUNTER_B:
-  case JT_ROGUE_B:
-  case JT_BARD_B:
-  case JT_DANCER_B:
   case JT_RANGER:
   case JT_RANGER_H:
-  case JT_MINSTREL:
-  case JT_WANDERER:
-  case JT_SHADOW_CHASER:
-  case JT_MINSTREL_H:
-  case JT_WANDERER_H:
-  case JT_SHADOW_CHASER_H:
   case JT_WOLF_RANGER:
   case JT_WOLF_RANGER_H:
   case JT_RANGER_B:
-  case JT_MINSTREL_B:
-  case JT_WANDERER_B:
-  case JT_SHADOW_CHASER_B:
   case JT_WOLF_RANGER_B:
   case JT_WINDHAWK:
+  case JT_WOLF_WINDHAWK:
+    if (view == W_BOW) {
+      result = true;
+    }
+    break;
+  case JT_ROGUE:
+  case JT_ROGUE_H:
+  case JT_ROGUE_B:
+  case JT_SHADOW_CHASER:
+  case JT_SHADOW_CHASER_H:
+  case JT_SHADOW_CHASER_B:
   case JT_ABYSS_CHASER:
+    if (view == W_BOW) {
+      result = true;
+    }
+    break;
+  case JT_BARD:
+  case JT_DANCER:
+  case JT_BARD_H:
+  case JT_DANCER_H:
+  case JT_BARD_B:
+  case JT_DANCER_B:
+  case JT_MINSTREL:
+  case JT_WANDERER:
+  case JT_MINSTREL_H:
+  case JT_WANDERER_H:
+  case JT_MINSTREL_B:
+  case JT_WANDERER_B:
   case JT_TROUBADOUR:
   case JT_TROUVERE:
-  case JT_WOLF_WINDHAWK:
     if (view == W_BOW) {
       result = true;
     }
@@ -1408,13 +1432,13 @@ bool CSession::IsCostumeLocation(int location) const {
   switch (location) {
   case EQP_COSTUME_HEAD_TOP:
   case EQP_COSTUME_HEAD_MID:
-  case 0xC00:
+  case EQP_COSTUME_HEAD_TOP | EQP_COSTUME_HEAD_MID:
   case EQP_COSTUME_HEAD_LOW:
-  case 0x1400:
-  case 0x1800:
-  case 0x1C00:
+  case EQP_COSTUME_HEAD_TOP | EQP_COSTUME_HEAD_LOW:
+  case EQP_COSTUME_HEAD_MID | EQP_COSTUME_HEAD_LOW:
+  case EQP_COSTUME_HEAD_TOP | EQP_COSTUME_HEAD_MID | EQP_COSTUME_HEAD_LOW:
   case EQP_COSTUME_GARMENT:
-  case 0x4000:
+  case EQP_COSTUME_FLOOR:
   case EQP_SHADOW_ARMOR:
   case EQP_SHADOW_WEAPON:
   case EQP_SHADOW_SHIELD:
@@ -1853,7 +1877,7 @@ bool CSession::UnequipCostumeItem(int location) {
     const EquipSlots slots = g_session.GetEquipSlots(location);
     const int slot = std::get<0>(slots);
     if (slot < 10) {
-      ITEM_INFO* const items = this->costumeItems;
+      ITEM_INFO* const items = this->costumeItems.data();
       if (slot != -1) {
         const char* message = LookupMessage(MSI_ITEM_IS_REMOVED);
         ITEM_INFO& item = items[slot];
@@ -2535,8 +2559,8 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     target->LaunchEffect(EF_DANCE_BLADE_ATK, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     break;
   case NPC_DARKPIERCING: {
-    CRagEffect* first = source->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-    CRagEffect* second = source->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    CRagEffect* first = target->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    CRagEffect* second = target->LaunchEffect(EF_DARKPIERCING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     if (first) {
       vector3d position = source->render.position;
       first->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&position), 0, 0, 0, 0);
@@ -3098,21 +3122,17 @@ void CSession::PlaySkillEffect(int skillId, int level, CGameActor* source, CGame
     g_modeMgr.GetGameMode()->SendMsg(MM_QUAKE, 0, 0, 0, 0);
     g_soundMgr->PlayWave("effect\\맹호경파산.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
     break;
-  case NC_AXETORNADO:
-    if (g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF)) {
-      if (g_effectMgr->Find(source->render.accountId, EF_MINEFFECT_AXETORNADO)) {
-        return;
-      }
-      g_effectMgr->Spawn(source->render.accountId, EF_MINEFFECT_AXETORNADO, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(source->render.accountId, EF_MINEFFECT_AXETORNADO_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-    } else {
-      if (g_effectMgr->Find(source->render.accountId, EF_NEW_AXETORNADO)) {
-        return;
-      }
-      g_effectMgr->Spawn(source->render.accountId, EF_NEW_AXETORNADO, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
-      g_effectMgr->Spawn(source->render.accountId, EF_NEW_AXETORNADO_BOTTOM, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+  case NC_AXETORNADO: {
+    const bool minEffect = g_serviceOptions.Get(TT_MIN_EFFECT_ON_OFF);
+    const int castEffect = minEffect ? EF_MINEFFECT_AXETORNADO : EF_NEW_AXETORNADO;
+    const int bottomEffect = minEffect ? EF_MINEFFECT_AXETORNADO_BOTTOM : EF_NEW_AXETORNADO_BOTTOM;
+    if (g_effectMgr->Find(source->render.accountId, castEffect)) {
+      return;
     }
+    g_effectMgr->Spawn(source->render.accountId, castEffect, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
+    g_effectMgr->Spawn(source->render.accountId, bottomEffect, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
+  }
   case NC_POWERSWING: {
     float angle = g_modeMgr.GetGameMode()->CameraDesiredYaw() + source->render.angle;
     if (angle >= 360.0f) {

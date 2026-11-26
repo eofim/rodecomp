@@ -67,16 +67,17 @@ void CStormCannonEffect::Open() {
     this->emitters.push_back(cannon);
   }
 
-  this->direction = Subtract(this->sourcePositionVector, this->positionVector);
+  auto& sourcePositionVectorRef = this->sourcePositionVector;
+  this->direction = Subtract(sourcePositionVectorRef, this->positionVector);
   Normalize(this->direction);
 
   this->origin = this->positionVector;
   this->speed = 1.7;
 
-  this->distance = Distance(this->sourcePositionVector, this->positionVector);
+  this->distance = Distance(sourcePositionVectorRef, this->positionVector);
   this->Alpha() = 255;
 
-  this->AddEvent(0, "effect\\AG_STORM_CANNON.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\AG_STORM_CANNON.wav", 0, 0);
 }
 
 // OFFSET: 0x0072D350

@@ -177,30 +177,6 @@ inline std::uint32_t WindowGeometry::Color() {
 // GLOBAL: gl_24364
 std::uint32_t g_windowUid = 0xFFFFFFFFu;
 
-// OFFSET: 0x005C2260
-// FUNCTION: fn_03528
-int __fastcall sub_5C2260(const int* object) {
-  return object[0];
-}
-
-// OFFSET: 0x005C22D0
-// FUNCTION: fn_03529
-int __fastcall sub_5C22D0(const int* object) {
-  return object[8];
-}
-
-// OFFSET: 0x005C22E0
-// FUNCTION: fn_03530
-int __fastcall sub_5C22E0(const int* object) {
-  return object[7];
-}
-
-// OFFSET: 0x005C22F0
-// FUNCTION: fn_03531
-int __fastcall sub_5C22F0(const int* object) {
-  return object[9];
-}
-
 // OFFSET: 0x00A79A90
 // FUNCTION: fn_16914
 UIWindow::UIWindow(unsigned char cached)
@@ -463,12 +439,6 @@ void UIWindow::StoreMoveOrigin() {
 void UIWindow::MoveFromOrigin(int, int) {
 }
 
-// OFFSET: 0x005C9630
-// FUNCTION: fn_03632
-void UIWindow::Show(int visible) {
-  this->geometry.Show(visible);
-}
-
 // OFFSET: 0x005C6070
 // FUNCTION: fn_03584
 void UIWindow::OnCreate(int, int) {
@@ -517,7 +487,7 @@ void UIWindow::OnBeginEdit() {
 
 // OFFSET: 0x005C6F00
 // FUNCTION: fn_03591
-void UIWindow::OnFinishEdit(int) {
+void UIWindow::OnFinishEdit(bool) {
 }
 
 // OFFSET: 0x005FDA50
@@ -770,24 +740,24 @@ RenderPrimitive* UIWindow::DrawPrimitive() {
   RenderPrimitive* primitive = g_renderer->AcquirePrimitive();
   CTexture* const texture = this->m_texture;
   primitive->texture = texture;
-  const float width = static_cast<float>(static_cast<std::int32_t>(texture->TextureWidth()));
-  const float height = static_cast<float>(static_cast<std::int32_t>(texture->TextureHeight()));
+  const int textureWidth = static_cast<int>(texture->TextureWidth());
+  const int textureHeight = static_cast<int>(texture->TextureHeight());
   primitive->quad[0].x = static_cast<float>(this->geometry.x);
   primitive->quad[0].y = static_cast<float>(this->geometry.y);
-  primitive->quad[0].u = g_textureOffsetX / width;
-  primitive->quad[0].v = g_textureOffsetY / height;
+  primitive->quad[0].u = g_textureOffsetX / static_cast<float>(textureWidth);
+  primitive->quad[0].v = g_textureOffsetY / static_cast<float>(textureHeight);
   primitive->quad[1].x = static_cast<float>(this->geometry.x + this->geometry.width);
   primitive->quad[1].y = static_cast<float>(this->geometry.y);
-  primitive->quad[1].u = (static_cast<float>(this->geometry.width) + g_textureOffsetX) / width;
-  primitive->quad[1].v = g_textureOffsetY / height;
+  primitive->quad[1].u = (static_cast<float>(this->geometry.width) + g_textureOffsetX) / static_cast<float>(textureWidth);
+  primitive->quad[1].v = g_textureOffsetY / static_cast<float>(textureHeight);
   primitive->quad[2].x = static_cast<float>(this->geometry.x);
   primitive->quad[2].y = static_cast<float>(this->geometry.y + this->geometry.height);
-  primitive->quad[2].u = g_textureOffsetX / width;
-  primitive->quad[2].v = (static_cast<float>(this->geometry.height) + g_textureOffsetY) / height;
+  primitive->quad[2].u = g_textureOffsetX / static_cast<float>(textureWidth);
+  primitive->quad[2].v = (static_cast<float>(this->geometry.height) + g_textureOffsetY) / static_cast<float>(textureHeight);
   primitive->quad[3].x = static_cast<float>(this->geometry.x + this->geometry.width);
   primitive->quad[3].y = static_cast<float>(this->geometry.y + this->geometry.height);
-  primitive->quad[3].u = (static_cast<float>(this->geometry.width) + g_textureOffsetX) / width;
-  primitive->quad[3].v = (static_cast<float>(this->geometry.height) + g_textureOffsetY) / height;
+  primitive->quad[3].u = (static_cast<float>(this->geometry.width) + g_textureOffsetX) / static_cast<float>(textureWidth);
+  primitive->quad[3].v = (static_cast<float>(this->geometry.height) + g_textureOffsetY) / static_cast<float>(textureHeight);
 
   for (int i = 0; i < 4; ++i) {
     primitive->quad[i].z = 0.000001f;
@@ -897,6 +867,24 @@ static __forceinline void MoveWindowToScreenPosition(UIWindow* window, int x, in
   window->Move(static_cast<unsigned>(x) - parentX, static_cast<unsigned>(y) - parentY);
 }
 
+// INLINED
+static __forceinline bool MoveWindowHorizontally(bool canMoveLeft, bool canMoveRight, int left, int right, std::function<void()> moveLeft, std::function<void()> moveRight) {
+  if (!canMoveLeft && !canMoveRight) {
+    return false;
+  }
+
+  if (canMoveLeft) {
+    if (canMoveRight && left > right) {
+      moveRight();
+    } else {
+      moveLeft();
+    }
+  } else {
+    moveRight();
+  }
+  return true;
+}
+
 // OFFSET: 0x00A7AB50
 // FUNCTION: fn_45626
 bool UIWindow::CalculateUIPosNearSide(UIWindow* anchor) {
@@ -905,11 +893,11 @@ bool UIWindow::CalculateUIPosNearSide(UIWindow* anchor) {
   }
 
   const auto screenPosition = [](const UIWindow* window, int bounds[4]) {
-    int x = 0;
-    int y = 0;
-    for (const UIWindow* node = window; node; node = node->parent) {
-      x += node->geometry.x;
-      y += node->geometry.y;
+    int x = window->geometry.x;
+    int y = window->geometry.y;
+    for (const UIWindow* parent = window->parent; parent; parent = parent->parent) {
+      x += parent->geometry.x;
+      y += parent->geometry.y;
     }
     bounds[0] = x;
     bounds[1] = y;
@@ -932,7 +920,9 @@ bool UIWindow::CalculateUIPosNearSide(UIWindow* anchor) {
   const int bottom = anchorBounds[3] + this->geometry.height <= g_renderer->viewport.height ? anchorBounds[3] - windowBounds[1] : 0;
 
   const int nearestHorizontal = left > 0 ? (right > 0 ? std::min(left, right) : left) : (right > 0 ? right : 999999);
-  const int nearestVertical = top > 0 ? (bottom > 0 ? std::min(top, bottom) : top) : (bottom > 0 ? bottom : 999999);
+  const bool canMoveAbove = top > 0;
+  const bool canMoveBelow = bottom > 0;
+  const int nearestVertical = canMoveAbove ? (canMoveBelow ? std::min(top, bottom) : top) : (canMoveBelow ? bottom : 999999);
   const auto moveLeftAction = [this, &anchorBounds, &windowBounds] {
     MoveWindowToScreenPosition(this, static_cast<unsigned>(anchorBounds[0]) - this->geometry.width, windowBounds[1]);
   };
@@ -947,40 +937,15 @@ bool UIWindow::CalculateUIPosNearSide(UIWindow* anchor) {
   };
   const WindowActionRunner runWindowAction{};
   if (nearestHorizontal < nearestVertical) {
-    std::function<void()> moveRight = moveRightAction;
-    std::function<void()> moveLeft = moveLeftAction;
-    if (left > 0) {
-      if (right > 0 && left > right) {
-        moveRight();
-      } else {
-        moveLeft();
-      }
+    if (MoveWindowHorizontally(left > 0, right > 0, left, right, moveLeftAction, moveRightAction)) {
       return true;
     }
-    if (right > 0) {
-      moveRight();
-      return true;
-    }
-    return runWindowAction(top > 0, bottom > 0, top, bottom, moveAboveAction, moveBelowAction);
+    return runWindowAction(canMoveAbove, canMoveBelow, top, bottom, moveAboveAction, moveBelowAction);
   }
-  if (runWindowAction(top > 0, bottom > 0, top, bottom, moveAboveAction, moveBelowAction)) {
+  if (runWindowAction(canMoveAbove, canMoveBelow, top, bottom, moveAboveAction, moveBelowAction)) {
     return true;
   }
-  std::function<void()> moveRight = moveRightAction;
-  std::function<void()> moveLeft = moveLeftAction;
-  if (left > 0) {
-    if (right > 0 && left > right) {
-      moveRight();
-    } else {
-      moveLeft();
-    }
-    return true;
-  }
-  if (right > 0) {
-    moveRight();
-    return true;
-  }
-  return false;
+  return MoveWindowHorizontally(left > 0, right > 0, left, right, moveLeftAction, moveRightAction);
 }
 
 // OFFSET: 0x00A81A30
@@ -1384,10 +1349,10 @@ void UIWindow::DrawFormattedText(int x, int y, const std::string& text, int widt
 
   int drawX = x;
   switch (align) {
-  case 2:
+  case TA_RIGHT:
     drawX -= textWidth;
     break;
-  case 6:
+  case TA_CENTER:
     drawX = static_cast<int>((width - textWidth) * g_depthAverageHalf + drawX);
     break;
   }
@@ -1760,9 +1725,9 @@ int UIWindow::FormattedTextWidth(std::string text, int family, int height, unsig
 // FUNCTION: fn_16977
 std::string UIWindow::FitDisplayText(int width, const char* text, int family, int height, unsigned char bold) {
   std::string display = DisplayUrlTextTag(text);
-  display = DisplayNavigationTextTag(display);
-  display = DisplayTipBoxTextTag(display);
-  display = DisplayItemTextTag(display);
+  display = DisplayTextTag(display, g_naviTagBegin, g_naviTagEnd);
+  display = DisplayTextTag(display, g_tipBoxTagBegin, g_tipBoxTagEnd);
+  display = DisplayTextTag(display, g_itemTagBegin, g_itemTagEnd);
   display = RemoveTextLinkInfo(display);
 
   if (g_windowMgr.chatWnd) {
@@ -1771,32 +1736,38 @@ std::string UIWindow::FitDisplayText(int width, const char* text, int family, in
 
   NavigationLinkParser* const parser = g_navigationLinkParser;
   display = parser->DisplayNavigationLink(display);
-  display = DisplayQuestTextTag(display);
+  display = DisplayTextTag(display, g_questTagBegin, g_questTagEnd);
 
-  const int textWidth = this->TextWidth(display.c_str(), 0, family, height, bold, 0);
-  const int ellipsisWidth = this->TextWidth("...", 3, family, height, bold, 0);
+  int extent = this->TextWidth(display.c_str(), 0, family, height, bold, 0);
+  this->TextWidth("...", 3, family, height, bold, 0);
 
-  if (width >= textWidth) {
+  if (width >= extent) {
     return display;
   }
 
   std::string fitted(display);
   std::wstring remaining(ATL::CA2WEX<128>(display.c_str(), CP_THREAD_ACP));
 
-  while (remaining.size() > 1) {
-    std::size_t length = remaining.size() - 1;
-    if ((remaining[length - 1] & 0x80) != 0 && (remaining[length] & 0x80) != 0) {
-      --length;
-    }
-    remaining.resize(length);
-
-    fitted = std::string(ATL::CW2AEX<128>(remaining.c_str(), CP_THREAD_ACP)) + "...";
-    if (this->TextWidth(fitted.c_str(), 0, family, height, bold, 0) <= width) {
+  while (width < extent) {
+    if (remaining.size() <= 1) {
+      fitted = std::string(ATL::CW2AEX<128>(remaining.c_str(), CP_THREAD_ACP)) + "...";
       return fitted;
     }
+
+    if (remaining.size() >= 2) {
+      std::size_t length;
+      if ((remaining[remaining.size() - 2] & 0x80) != 0 && (remaining[remaining.size() - 1] & 0x80) != 0) {
+        length = remaining.size() - 2;
+      } else {
+        length = remaining.size() - 1;
+      }
+      remaining.resize(length);
+    }
+
+    fitted = std::string(ATL::CW2AEX<128>(remaining.c_str(), CP_THREAD_ACP)) + "...";
+    extent = this->TextWidth(fitted.c_str(), 0, family, height, bold, 0);
   }
 
-  fitted = std::string(ATL::CW2AEX<128>(remaining.c_str(), CP_THREAD_ACP)) + "...";
   return fitted;
 }
 
@@ -1804,18 +1775,17 @@ std::string UIWindow::FitDisplayText(int width, const char* text, int family, in
 // FUNCTION: fn_16978
 std::string UIWindow::FitVerticalDisplayText(int height, const char* text, int family, int fontHeight, unsigned char bold) {
   std::string display = DisplayUrlTextTag(text);
-  display = DisplayNavigationTextTag(display);
+  display = DisplayTextTag(display, g_naviTagBegin, g_naviTagEnd);
   display = DisplayTipBoxTextTag(display);
-  display = DisplayItemTextTag(display);
+  display = DisplayTextTag(display, g_itemTagBegin, g_itemTagEnd);
   display = RemoveTextLinkInfo(display);
 
   if (g_windowMgr.chatWnd) {
-    display = g_windowMgr.chatWnd->ConvertChat(std::move(display));
+    display = g_windowMgr.chatWnd->ConvertChat(display);
   }
 
-  NavigationLinkParser* const parser = g_navigationLinkParser;
-  display = parser->DisplayNavigationLink(display);
-  display = DisplayQuestTextTag(display);
+  display = g_navigationLinkParser->DisplayNavigationLink(display);
+  display = DisplayTextTag(display, g_questTagBegin, g_questTagEnd);
 
   if (this->VerticalTextHeight(display.c_str(), display.size(), family, fontHeight, bold) <= height) {
     return display;
@@ -1830,8 +1800,7 @@ std::string UIWindow::FitVerticalDisplayText(int height, const char* text, int f
     fitted.resize(length);
     fitted += ".";
 
-    const unsigned characters = static_cast<unsigned>(CountCharacters(static_cast<WORD>(g_textCodePage), begin, begin + length));
-    if (characters <= 1) {
+    if (CountCharacters(static_cast<WORD>(g_textCodePage), begin, begin + length) <= 1) {
       break;
     }
 
@@ -1869,7 +1838,7 @@ const char* UIWindow::TruncateText(const char* text, int maxBytes) {
       std::memcpy(buffer, text, bytes);
       buffer[bytes] = '\0';
       // GLOBAL: gl_25070
-      static std::string truncated;
+      static std::string truncated = "";
       truncated = buffer;
       delete[] buffer;
       return truncated.c_str();
@@ -1893,8 +1862,8 @@ void UIWindow::WrapTextWithBreaks(const char* text, std::vector<std::string>* li
 
   for (int offset = 0; offset < length;) {
     int bytes = 0;
-    const char* start = text + offset;
     int lineWidth = 0;
+    const char* start = text + offset;
     const char* end = start + std::strlen(start);
     if (start >= end) {
       continue;
@@ -1926,8 +1895,11 @@ void UIWindow::WrapTextWithBreaks(const char* text, std::vector<std::string>* li
       buffer[bytes] = '\0';
       lines->push_back(std::string(buffer));
       delete[] buffer;
-      newline = newline != false;
-      breaks->push_back(newline);
+      if (newline) {
+        breaks->push_back(true);
+      } else {
+        breaks->push_back(false);
+      }
       offset += bytes;
     }
   }
@@ -1949,9 +1921,10 @@ void UIWindow::WrapPixelText(const char* text, std::vector<std::string>& lines, 
   int offset = 0;
 
   for (int row = 0; offset < bytes;) {
-    if (row++ > 1000) {
+    if (row > 1000) {
       return;
     }
+    ++row;
 
     int extent = 0;
     int count = 0;
@@ -1961,9 +1934,10 @@ void UIWindow::WrapPixelText(const char* text, std::vector<std::string>& lines, 
     bool newline = false;
 
     for (int step = 0; current < end;) {
-      if (step++ > 1000) {
+      if (step > 1000) {
         break;
       }
+      ++step;
 
       const int previous = count;
       const char* next = g_serverLanguage->NextChar(current, static_cast<int>(end - current));
@@ -2034,16 +2008,10 @@ void UIWindow::WrapPixelText(const char* text, std::vector<std::string>& lines, 
     char* buffer = new char[count + 1];
     std::memcpy(buffer, begin, count);
 
-    if (newline) {
-      buffer[count - 1] = '\0';
-
-      if (std::strlen(buffer) == 0) {
-        lines.push_back(" ");
-      } else {
-        AppendLine(lines, buffer);
-      }
+    buffer[newline ? count - 1 : count] = '\0';
+    if (newline && std::strlen(buffer) == 0) {
+      lines.push_back(" ");
     } else {
-      buffer[count] = '\0';
       AppendLine(lines, buffer);
     }
 
@@ -2660,7 +2628,8 @@ void UIListBox_NaviSearch::Paint() {
   const int end = static_cast<int>(std::min(static_cast<unsigned>(limit), static_cast<unsigned>(this->lines.size())));
   std::uint32_t color = 0;
 
-  for (int index = first, row = 0; index < end; ++index, ++row) {
+  for (int index = first; index < end; ++index) {
+    const int row = index - first;
     if (index == this->selected) {
       this->FillRegion(0, row * this->lineHeight, this->geometry.width, this->lineHeight - 1, this->selectionColor);
     }
@@ -2865,7 +2834,7 @@ void UINavigationroadiconWnd::OnCreate(int, int) {
   const int slot = g_navigationManager.viewIcon;
   const int column = slot > 4 ? slot - 4 : slot;
   this->icon->Move(slot >= 1 && slot <= 8 ? column * 36 - 26 : 0, slot < 5 ? 24 : 60);
-  this->icon->Show(1);
+  this->icon->Show(WINDOW_VISIBLE);
   this->AddChild(this->icon);
 }
 
@@ -2980,10 +2949,10 @@ void UINavigationV4Wnd::Paint() {
       5, 0x2e, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\navigation_interface3\\bg_dot.bmp"))), false
     );
 
-    int mapX = 0x9b;
     int mapY = 0x3c;
     int mapSize = 0x64;
     const NavigationTarget target = g_navigationManager.GetCurrentTarget();
+    int mapX = 0x9b;
     if (target.type == 2) {
       mapX = 0xe3;
       mapSize = 0x28;
@@ -3049,7 +3018,7 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       if (result == 0) {
         {
           const NavigationTarget target = g_navigationManager.GetSavedTarget();
-          result = g_navigationManager.Navigate(target.x, target.y);
+          result = g_navigationManager.Navigate(target.cell.first, target.cell.second);
         }
         if (result >= 0) {
           g_navigationManager.displayMode = 1;
@@ -3209,8 +3178,8 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
         } else {
           const NavigationTarget target = g_navigationManager.GetCurrentTarget();
           CNavi_Object* object = static_cast<CNavi_Object*>(target.object);
-          int x = 1000;
           int y = 1000;
+          int x = 1000;
           if (type == 2) {
             NaviCell cell;
             x = object->GetCell(&cell)->x;
@@ -3223,7 +3192,7 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       break;
     case ID_CLOSE:
       if (g_navigationManager.viewMode == 2) {
-        if (g_windowMgr.Confirm(LookupMessage(MSI_NAVIGATION_GOEXIT), 2, true, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_NAVIGATION_GOEXIT), 2, true, false, 0, "메시지", 0x118, 0x78, 0) == ID_YES) {
           g_navigationManager.SetViewMode(1);
           g_navigationManager.displayMode = 0;
           g_navigationManager.ClearSavedTarget();
@@ -3235,8 +3204,8 @@ int UINavigationV4Wnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
         if (g_windowMgr.modal) {
           this->SendMsg(nullptr, UM_COMMAND, ID_MINI, 0, 0, 0);
         }
-        g_navigationManager.displayMode = 0;
         g_navigationManager.expandedMap = false;
+        g_navigationManager.displayMode = 0;
         g_navigationManager.Reset(true);
         g_worldViewMgr.ClearMarks();
         g_worldViewMgr.ClearLevels();
@@ -3358,15 +3327,14 @@ void UIListBox_NaviSearch::Refresh() {
   const int count = static_cast<int>(this->lines.size());
   const int excess = count - visible;
   const int overflow = excess >= 0 ? excess : 0;
-  int maximum = 0;
   if (overflow != 0) {
     this->verticalOverflow = 1;
-    maximum = this->bottomMargin + overflow;
+    this->verticalBar->SetRange(this->bottomMargin + overflow, visible, static_cast<int>(this->lines.size()));
   } else {
     this->verticalOverflow = 0;
+    this->verticalBar->SetRange(0, visible, static_cast<int>(this->lines.size()));
   }
 
-  this->verticalBar->SetRange(maximum, visible, static_cast<int>(this->lines.size()));
   this->verticalBar->Invalidate();
 }
 
@@ -3385,32 +3353,23 @@ int UIListBox_NaviSearch::SendMsg(
   }
 
   const int previous = this->topLine;
-  int lineHeight;
-  int top;
   if (message == UM_SCROLLVERTPAGEUP) {
-    lineHeight = this->lineHeight;
-    top = previous - this->geometry.height / lineHeight + 1;
+    this->topLine = previous - this->geometry.height / this->lineHeight + 1;
   } else if (message == UM_SCROLLVERTPAGEDOWN) {
-    lineHeight = this->lineHeight;
-    top = previous - 1 + this->geometry.height / lineHeight;
+    this->topLine = previous - 1 + this->geometry.height / this->lineHeight;
   } else {
-    top = static_cast<int>(argument1) + previous;
-    lineHeight = this->lineHeight;
+    this->topLine = previous + static_cast<int>(argument1);
   }
 
-  this->topLine = top;
-  if (top < 0) {
+  if (this->topLine < 0) {
     this->topLine = 0;
-    top = 0;
   }
 
-  const int maximum = this->bottomMargin + static_cast<int>(this->lines.size()) - this->geometry.height / lineHeight;
-  if (static_cast<unsigned int>(top) > static_cast<unsigned int>(maximum)) {
-    this->topLine = maximum;
-    top = maximum;
+  if (this->topLine > this->lines.size() - this->geometry.height / this->lineHeight + this->bottomMargin) {
+    this->topLine = this->lines.size() - this->geometry.height / this->lineHeight + this->bottomMargin;
   }
 
-  this->verticalBar->SetPosition(top);
+  this->verticalBar->SetPosition(this->topLine);
   this->verticalBar->Invalidate();
   this->Invalidate();
   if (this->transparent != 0 && this->parent) {
@@ -3581,14 +3540,14 @@ void UINavigationV4Wnd::SelectRoute(int route) {
   std::string text;
   for (int index = 0; index < count; ++index) {
     NavigationTarget target = g_navigationManager.GetState(g_navigationManager.nodePaths[route][index]);
-    const bool cellUnset = target.x == -1000 && target.y == -1000;
+    const bool cellUnset = target.cell.first == -1000 && target.cell.second == -1000;
     if (cellUnset) {
       text = this->MobName(static_cast<CNavi_Object*>(target.object));
     } else {
       text = this->ObjectLabel(target.type, target.object);
       if (target.type == 0) {
         char coords[30] = {};
-        std::sprintf(coords, " [%d,%d]", target.x, target.y);
+        std::sprintf(coords, " [%d,%d]", target.cell.first, target.cell.second);
         text += coords;
       }
     }
@@ -3764,8 +3723,14 @@ static const std::string g_windowNaviLinkCloseTag = "</NAVIL>";
 // OFFSET: 0x005C9E00
 // FUNCTION: fn_03636
 void UINavigationV4Wnd::InsertNavigationLink(std::string name, int x, int y) {
-  const std::string xText = g_navigationLinkParser->EncodeNavigationNumber(x >= 0 ? x : 1000);
-  const std::string yText = g_navigationLinkParser->EncodeNavigationNumber(y >= 0 ? y : 1000);
+  if (x < 0) {
+    x = 1000;
+  }
+  if (y < 0) {
+    y = 1000;
+  }
+  const std::string xText = g_navigationLinkParser->EncodeNavigationNumber(x);
+  const std::string yText = g_navigationLinkParser->EncodeNavigationNumber(y);
   std::string link = g_windowNaviLinkTag;
   link += name;
   link += xText;
@@ -3863,10 +3828,10 @@ void UIWindow::DrawAlignedText(
   const int textWidth = this->TextWidth(text.c_str(), static_cast<unsigned>(text.size()), family, height, bold, 0);
   int drawX = x;
   switch (align) {
-  case 2:
+  case TA_RIGHT:
     drawX -= textWidth;
     break;
-  case 6:
+  case TA_CENTER:
     drawX = static_cast<int>((width - textWidth) * g_depthAverageHalf + drawX);
     break;
   }
@@ -4066,18 +4031,17 @@ void UINavigationV4Wnd::DrawTargetSprite(int x, int y, int width, int height, co
   }
 
   CNavi_Object* target = static_cast<CNavi_Object*>(g_navigationManager.GetCurrentTarget().object);
-  NavigationTargetLook look;
-  std::memcpy(&look, &target->look, sizeof(look));
+  NavigationTargetLook look = *reinterpret_cast<const NavigationTargetLook*>(&target->look);
   if (!look.job) {
     owner->DrawActionSprite(g_navigationManager.previewSprite, g_navigationManager.previewAction, x, y, width, height, 1500, true, background);
     return;
   }
 
   std::vector<CActRes*> actions(9, nullptr);
+  float scale = 1.0f;
   std::vector<CSprRes*> sprites(9, nullptr);
   int offsetX = 0;
   int offsetY = 0;
-  float scale = 1.0f;
   actions[0] = static_cast<CActRes*>(ResourceMgr::Instance().Load(g_session.GetBodyActionResourceName(look.job, look.sex, look.job, 0)));
   sprites[0] = static_cast<CSprRes*>(ResourceMgr::Instance().Load(g_session.GetBodySprName(look.job, look.sex, look.job, 0)));
   if (!sprites[0] || !actions[0]) {
@@ -4154,7 +4118,7 @@ void UINavigationV4Wnd::DrawTargetSprite(int x, int y, int width, int height, co
   }
 
   const ActionFrame* body = &(*bodyFrames)[bodyFrame];
-  owner->geometry.surface->DrawScaledSprite(x, y, width, height, sprites[0], body, offsetX, offsetY, 1.0f, bodyPalette);
+  owner->geometry.surface->DrawScaledSprite(x, y, width, height, sprites[0], body, offsetX, offsetY, scale, bodyPalette);
 
   actions[1] = static_cast<CActRes*>(ResourceMgr::Instance().Load(g_session.GetHeadActName(look.job, look.sex, &look.head)));
   sprites[1] = static_cast<CSprRes*>(ResourceMgr::Instance().Load(g_session.GetHeadSprName(look.job, look.sex, &look.head)));
@@ -4181,12 +4145,12 @@ void UINavigationV4Wnd::DrawTargetSprite(int x, int y, int width, int height, co
       const std::vector<ActionFrame>* accessoryFrames = &actions[2]->Animation(0);
       if (accessoryFrames) {
         const int count = static_cast<int>(accessoryFrames->size());
+        const ActionFrame* frame = &(*accessoryFrames)[accessoryFrame0];
         if (static_cast<int>(now - accessoryTime0) / (owner->animationDuration / count) >= count) {
           accessoryTime0 = now;
+          frame = &(*accessoryFrames)[accessoryFrame0];
         }
-
         accessoryFrame0 = 0;
-        const ActionFrame* frame = &(*accessoryFrames)[accessoryFrame0];
         const int accessoryX = body->anchors[0].x - frame->anchors[0].x;
         const int accessoryY = body->anchors[0].y - frame->anchors[0].y;
         owner->geometry.surface->DrawScaledSprite(x + accessoryX, y + accessoryY, width, height, sprites[2], frame, offsetX, offsetY, scale, nullptr);
@@ -4244,7 +4208,7 @@ int UIWindow::DrawWrappedFormattedText(
   this->WrapFormattedText(text, &lines, width, family, height, bold);
 
   if (width == 0) {
-    width = this->FormattedTextWidth(text, family, height, bold);
+    width = this->FormattedTextWidth(text, 0, 12, 0);
   }
 
   int totalHeight = 0;

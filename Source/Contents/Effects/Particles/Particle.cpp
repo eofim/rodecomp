@@ -68,6 +68,11 @@ static __forceinline void SetClipCorners(RenderVertex* vertices, const EZeffectT
 }
 
 // INLINED
+static __forceinline void OffsetParticleDepth(RenderVertex& vertex, float offset) {
+  vertex.rhw += offset;
+}
+
+// INLINED
 static __forceinline std::uint32_t ClipColor(const EZeffectTransform& transform, float alpha) {
   return (((((static_cast<int>(transform.crA * alpha) << 8) + static_cast<unsigned char>(transform.crR)) << 8) + static_cast<unsigned char>(transform.crG)) << 8) +
          static_cast<unsigned char>(transform.crB);
@@ -204,9 +209,7 @@ void CEZ2STRParticle::Clear() {
   this->m_windowId = -1;
   this->m_attachToWindow = false;
   this->m_visible = true;
-  this->m_windowOffset.x = 0;
-  this->m_windowOffset.y = 0;
-  this->m_windowOffset.z = 0;
+  this->m_windowOffset = vector3d{0.0f, 0.0f, 0.0f};
   this->m_shiftX = 0;
   this->m_shiftY = 0;
   this->m_lift = 0;
@@ -375,16 +378,16 @@ bool CEZ2STRParticle::Process(float x, float y, float z) {
       transform.rz += key->transform.rz;
 
       switch (key->transform.anitype) {
-      case 1:
+      case EZ_ANIMATION_FRAME_OFFSET:
         transform.aniframe += key->transform.aniframe;
         break;
-      case 2:
+      case EZ_ANIMATION_FORWARD_CLAMP:
         transform.aniframe += key->transform.anidelta;
         if (transform.aniframe >= static_cast<float>(clip->textureCount)) {
           transform.aniframe = static_cast<float>(clip->textureCount) - 1.0f;
         }
         break;
-      case 3: {
+      case EZ_ANIMATION_FORWARD_LOOP: {
         const float frame = key->transform.anidelta + transform.aniframe;
         transform.aniframe = frame;
         const float count = static_cast<float>(clip->textureCount);
@@ -393,7 +396,7 @@ bool CEZ2STRParticle::Process(float x, float y, float z) {
         }
         break;
       }
-      case 4: {
+      case EZ_ANIMATION_REVERSE_LOOP: {
         float frame = transform.aniframe - key->transform.anidelta;
         transform.aniframe = frame;
         if (frame < 0.0f) {
@@ -406,7 +409,7 @@ bool CEZ2STRParticle::Process(float x, float y, float z) {
         }
         break;
       }
-      case 5: {
+      case EZ_ANIMATION_PING_PONG: {
         const int last = clip->textureCount - 1;
         const int frame = static_cast<int>(static_cast<float>(elapsed) * key->transform.anidelta + transform.aniframe);
         const int bounce = frame / last;
@@ -521,7 +524,7 @@ void CEZ2STRParticle::RenderBillboard(EZeffectClip* clip, EZeffectTransform* tra
     point.y = vertices[i].y;
     point.z = vertices[i].z;
     g_renderer->Project(&point.x, combined.values, vertices[i]);
-    vertices[i].rhw = this->depthOffset + vertices[i].rhw;
+    OffsetParticleDepth(vertices[i], this->depthOffset);
     vertices[i].z = RhwToDepth(vertices[i].rhw);
     vertices[i].u = scaleU * vertices[i].u;
     vertices[i].v = scaleV * vertices[i].v;
@@ -570,12 +573,13 @@ void CEZ2STRParticle::RenderScreen(EZeffectClip* clip, EZeffectTransform* transf
 
   for (int i = 0; i <= 3; ++i) {
     const float rotated = vertices[i].y * cosine + vertices[i].x * sine;
-    vertices[i].x = ((vertices[i].x * cosine - vertices[i].y * sine) + (transform->x - 320.0f)) * scale + this->m_screen.x;
+    auto& screen = this->m_screen;
+    vertices[i].x = ((vertices[i].x * cosine - vertices[i].y * sine) + (transform->x - 320.0f)) * scale + screen.x;
     if (g_session.IsScreenShakeActive()) {
-      const float shake = screenY - this->m_screen.y;
-      vertices[i].y = (this->m_screen.y - ((transform->y - 240.0f) + rotated) * scale) + (shake + shake);
+      const float shake = screenY - screen.y;
+      vertices[i].y = (screen.y - ((transform->y - 240.0f) + rotated) * scale) + (shake + shake);
     } else {
-      vertices[i].y = ((transform->y - 240.0f) + rotated) * scale + this->m_screen.y;
+      vertices[i].y = ((transform->y - 240.0f) + rotated) * scale + screen.y;
     }
   }
 
@@ -697,7 +701,7 @@ void CEZ2STRParticle::RenderGround(EZeffectClip* clip, EZeffectTransform* transf
     this->m_groundHeight = point.y;
 
     g_renderer->Project(&point.x, view.values, vertices[i]);
-    vertices[i].rhw = this->depthOffset + vertices[i].rhw;
+    OffsetParticleDepth(vertices[i], this->depthOffset);
     vertices[i].z = RhwToDepth(vertices[i].rhw);
     vertices[i].u = scaleU * vertices[i].u;
     vertices[i].v = scaleV * vertices[i].v;
@@ -755,9 +759,7 @@ static __forceinline void ResetParticle(CParticle& particle) {
   particle.auxiliaryIndex = 0;
   particle.elapsedFrames = 0;
   particle.renderOptions = 0;
-  particle.offsetX = 0;
-  particle.offsetY = 0;
-  particle.offsetZ = 0;
+  particle.offset = vector3d{0.0f, 0.0f, 0.0f};
   particle.sourceBlend = 5;
   particle.destinationBlend = 2;
   particle.primitive = RenderPrimitive();
@@ -769,10 +771,7 @@ static __forceinline void ResetParticle(CParticle& particle) {
     vertex.x = 0;
     vertex.y = 0;
     vertex.z = 0;
-    vector3d& corner = particle.corners[i];
-    corner.x = 0;
-    corner.y = 0;
-    corner.z = 0;
+    particle.corners[i] = vector3d{0.0f, 0.0f, 0.0f};
   }
 
   particle.InitParticleQuad(particle.vertices);

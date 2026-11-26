@@ -19,6 +19,7 @@ __declspec(noinline) RenderSystemHolder* GetRenderSystemHolder();
 #include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Messenger/ClientMessenger.h"
 #include "Contents/Messenger/MessengerMember.h"
+#include "Contents/Messenger/MessengerWindows.h"
 #include "Contents/Navigation/NavigationManager.h"
 #include "Contents/UserData/NormalItemSlots.h"
 #include "Contents/World/World.h"
@@ -108,6 +109,48 @@ UIWindow* UIWindowMgr::GetHoverWindow() {
   return this->hoverWindow;
 }
 
+// OFFSET: 0x00A91730
+// FUNCTION: fn_17164
+UIWindow* UIWindowMgr::FindItemWindow(int accountId) {
+  for (UIWindow* window : this->snapExcluded) {
+    if (accountId != static_cast<UIMiniPartyWnd*>(window)->GetMember().accountId) {
+      continue;
+    }
+    return window;
+  }
+  return nullptr;
+}
+
+// OFFSET: 0x00AA64D0
+// FUNCTION: fn_17230
+void UIWindowMgr::NotifyMemberWindows(const MessengerMember* target) {
+  if (this->messengerGroupWnd) {
+    this->messengerGroupWnd->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+  }
+  const unsigned int accountId = target->accountId;
+  for (UIWindow* window : this->snapExcluded) {
+    if (accountId != static_cast<UIMiniPartyWnd*>(window)->GetMember().accountId) {
+      continue;
+    }
+    if (window) {
+      window->SendMsg(nullptr, UM_REFRESHITEM, reinterpret_cast<std::intptr_t>(target), 0, 0, 0);
+    }
+    break;
+  }
+}
+
+// OFFSET: 0x00AAAF10
+// FUNCTION: fn_17276
+__declspec(noinline) void UIWindowMgr::NotifyItemWindows(int accountId, int lower, int upper) {
+  for (std::list<UIWindow*>::iterator it = this->snapExcluded.begin(); it != this->snapExcluded.end(); ++it) {
+    if (static_cast<unsigned int>(accountId) != static_cast<UIMiniPartyWnd*>(*it)->GetMember().accountId) {
+      continue;
+    }
+    (*it)->SendMsg(nullptr, UM_COMMAND, ID_UPDATE_MEMBER_HP, accountId, lower, upper);
+    break;
+  }
+}
+
 // OFFSET: 0x00A91C10
 // FUNCTION: fn_17169
 int UIWindowMgr::GetRenderedWindowIds(int* ids) {
@@ -126,7 +169,7 @@ int UIWindowMgr::GetRenderedWindowIds(int* ids) {
 // FUNCTION: fn_17170
 void UIWindowMgr::HideChatWnd() {
   if (this->chatWnd) {
-    this->chatWnd->Show(0);
+    this->chatWnd->Show(WINDOW_HIDDEN);
   }
 }
 
@@ -631,52 +674,30 @@ void UIWindowMgr::SaveVisibleWindowIds() {
   this->savedWindowIds.clear();
   for (auto it = this->rendered.begin(); it != this->rendered.end(); ++it) {
     int id = (*it)->geometry.id;
-    if (id == WID_ITEMWND) {
-      if (this->itemWndInfo.visible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_EQUIPWND) {
-      if (this->equipWndInfo.visible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_STATUSWND) {
-      if (this->statusWndInfo.visible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_OPTIONWND) {
-      if (this->optionWndInfo.visible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_SKILLLISTWND) {
-      if (this->skillListWndVisible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_RENEWQUESTWND) {
-      if (this->questWndVisible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == 205) {
-      if (this->questWndVisible) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == 134) {
-      if (this->questWndVisible) {
-        this->savedWindowIds.push_back(id);
-      }
+    if (id == WID_ITEMWND && this->itemWndInfo.visible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_EQUIPWND && this->equipWndInfo.visible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_STATUSWND && this->statusWndInfo.visible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_OPTIONWND && this->optionWndInfo.visible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_SKILLLISTWND && this->skillListWndVisible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_RENEWQUESTWND && this->questWndVisible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == 205 && this->questWndVisible) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == 134 && this->questWndVisible) {
+      this->savedWindowIds.push_back(id);
     } else if ((id == WID_MESSENGERWND || id == WID_MESSENGERGROUPWND) && this->messengerGroupWndInfo.visible) {
       this->savedWindowIds.push_back(id);
-    } else if (id == WID_ACHTRACINGWND) {
-      if (g_session.HasTrackedAchievements() == true) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_MACROREPORTERWND) {
-      if (this->macroReporterVisible == true) {
-        this->savedWindowIds.push_back(id);
-      }
-    } else if (id == WID_GAMESETTINGSUI) {
-      if (g_session.lowMemory && g_session.performanceWarningEnabled && g_effectDetailLevel == 2 && g_textureDetailLevel == 2) {
-        this->savedWindowIds.push_back(id);
-      }
+    } else if (id == WID_ACHTRACINGWND && g_session.HasTrackedAchievements() == true) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_MACROREPORTERWND && this->macroReporterVisible == true) {
+      this->savedWindowIds.push_back(id);
+    } else if (id == WID_GAMESETTINGSUI && g_session.lowMemory && g_session.performanceWarningEnabled && g_effectDetailLevel == 2 && g_textureDetailLevel == 2) {
+      this->savedWindowIds.push_back(id);
     } else if (id == WID_MINIPARTYWND) {
       for (auto entry = this->savedWindowIds.begin(); entry != this->savedWindowIds.end(); ++entry) {
         if (*entry == WID_MINIPARTYWND) {
@@ -1203,7 +1224,7 @@ void __stdcall Nullsub369(int, int, int, int) {
 void UIWindowMgr::RestoreHiddenWindows() {
   for (std::list<UIWindow*>::iterator it = this->rendered.begin(); it != this->rendered.end(); ++it) {
     if (this->hiddenWindows.end() != std::find(this->hiddenWindows.begin(), this->hiddenWindows.end(), *it)) {
-      (*it)->Show(1);
+      (*it)->Show(WINDOW_VISIBLE);
     }
   }
 
@@ -1261,7 +1282,7 @@ int UIWindowMgr::RunEmailAddress() {
 
     if (this->activeWindowId != 0) {
       if (UIWindow* active = this->Top()) {
-        active->Show(0);
+        active->Show(WINDOW_HIDDEN);
         this->Schedule(active);
         this->modalWindows.pop_back();
       }
@@ -1277,7 +1298,7 @@ int UIWindowMgr::RunEmailAddress() {
 
     if (this->modalResponse != 0) {
       if (UIWindow* active = this->Top()) {
-        active->Show(0);
+        active->Show(WINDOW_HIDDEN);
         this->Schedule(active);
         this->modalWindows.pop_back();
       }

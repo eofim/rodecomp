@@ -30,7 +30,8 @@ public:
     this->Save();
   }
 
-  // INLINED
+  // OFFSET: 0x00565030
+  // FUNCTION: fn_46703
   ~ScopedDeviceStateDX9() {
     this->Restore();
   }

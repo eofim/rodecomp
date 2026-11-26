@@ -79,11 +79,23 @@ float CRenderObject::CalcDist(float x, float y, float z) const {
   return SquareRoot(horizontal * horizontal + deltaY * deltaY);
 }
 
+// INLINED
+static void GroundLightAt(const vector3d& position, float& red, float& green, float& blue) {
+  CGameMode* mode = g_modeMgr.GetGameMode();
+  GroundGeometry* ground = mode->scene->ground;
+  if (ground->IsNewVer()) {
+    int column;
+    int row;
+    mode->WorldCell(position.x, position.z, column, row);
+    ground->Lighting(column, row, red, green, blue);
+  }
+}
+
 // OFFSET: 0x00CA9770
 // FUNCTION: fn_21011
 bool CRenderObject::PrepareSprite(
   int unused, int layer, float scale, const SpriteFrameCell& cell, float x, float y, const float* position, float shift, float* bottomDepth,
-  float* topDepth, const SpriteRleImage* image, SpriteQuad* quad, tagRECT* bounds, std::uint32_t* color, int offsetX, int offsetY, int flags
+  float* topDepth, const SpriteRleImage* image, SpriteQuad* quad, tagRECT* bounds, std::uint32_t* color, int offsetX, int offsetY, bool behind
 ) {
   const float depthBias = this->render.distanceScale * g_cameraScaleX;
   const float scaleY = scale * cell.scaleY * this->render.scale;
@@ -152,7 +164,7 @@ bool CRenderObject::PrepareSprite(
     if (this->render.isLieOnGround) {
       *bottomDepth = 1.0f / (position[2] - height * g_cotangent) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
       *topDepth = 1.0f / (position[2] - rise * g_cotangent) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
-    } else if (static_cast<unsigned char>(flags) != 0) {
+    } else if (behind) {
       *bottomDepth = 1.0f / (height * 0.06f + position[2]) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
       *topDepth = 1.0f / (rise * 0.06f + position[2]) + static_cast<float>(static_cast<int>(this->render.depthLayer) + 3 + layer) * g_cameraScaleY + depthBias;
     } else {
@@ -177,14 +189,7 @@ bool CRenderObject::PrepareSprite(
   float lightGreen = 1.0f;
   float lightBlue = 1.0f;
   if (this->render.useGroundLighting == 1 && g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF)) {
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    GroundGeometry* ground = mode->scene->ground;
-    if (ground->IsNewVer()) {
-      int column;
-      int row;
-      mode->WorldCell(this->render.position.x, this->render.position.z, column, row);
-      ground->Lighting(column, row, lightRed, lightGreen, lightBlue);
-    }
+    GroundLightAt(this->render.position, lightRed, lightGreen, lightBlue);
   }
 
   const float alpha = static_cast<float>(this->render.colorChannels.alpha);

@@ -72,7 +72,7 @@ void UIHotKeyWnd::OnCreate(int, int) {
   this->m_balloon = new UITransBalloonText();
   this->m_balloon->SetSize(this->geometry.width, 20);
   this->m_balloon->SetText(LookupMessage(MSI_HOTKEYWND_NOTICE1), 60);
-  this->m_balloon->Show(0);
+  this->m_balloon->Show(WINDOW_HIDDEN);
   g_windowMgr.AddRendered(this->m_balloon);
 
   this->m_tabs = new UITabControl();
@@ -270,10 +270,10 @@ void UIHotKeyWnd::OnLBtnDown(int x, int y) {
         (this->geometry.width - this->m_balloon->geometry.width) / 2 + screenX,
         (this->m_selectedRow % this->m_rowsPerPage - 1) * this->m_rowHeight + this->m_verticalMargin + this->m_tabHeight + screenY + this->m_titleHeight
       );
-      this->m_balloon->Show(1);
+      this->m_balloon->Show(WINDOW_VISIBLE);
       g_windowMgr.Promote(this->m_balloon);
     } else {
-      this->m_balloon->Show(0);
+      this->m_balloon->Show(WINDOW_HIDDEN);
     }
 
     if (previous == this->m_selectedRow) {
@@ -393,10 +393,7 @@ void UIHotKeyWnd::Paint() {
   this->m_buttonBarHeight = this->DrawButtonBar(2, 0, 1);
   this->DrawPanelBackground(this->m_titleHeight, 0, "");
 
-  int visibleRow = 0;
-  const int count = g_session.HotkeyCount(this->m_tab);
-
-  for (int row = 0; row < count; ++row) {
+  for (int row = 0, visibleRow = 0, count = g_session.HotkeyCount(this->m_tab); row < count; ++row) {
     if (this->m_paged && row < 36 * this->m_page - 36) {
       continue;
     }
@@ -418,8 +415,7 @@ void UIHotKeyWnd::Paint() {
       const int textWidth = this->TextWidth(info.text.c_str(), 0, 0, 12, 0, 0);
       const int textX = (keyColumnWidth - textWidth) / 2;
       const int column = visibleRow / this->m_rowsPerPage;
-      const int rowY = this->m_titleHeight + this->m_tabHeight + this->m_verticalMargin +
-                       (visibleRow % this->m_rowsPerPage) * this->m_rowHeight;
+      const int rowY = this->m_rowHeight * (visibleRow % this->m_rowsPerPage) + this->m_verticalMargin + this->m_tabHeight + this->m_titleHeight;
       const int halfWidth = this->geometry.width / 2;
 
       const int backgroundX = column ? this->geometry.width - keyColumnWidth - this->m_horizontalMargin
@@ -431,7 +427,7 @@ void UIHotKeyWnd::Paint() {
       this->FillRegion(backgroundX, rowY, keyColumnWidth, this->m_rowHeight - 1, color);
 
       if (visibleRow == this->m_selectedRow) {
-        this->FillRegion(keyX + 1, rowY, halfWidth - this->m_horizontalMargin - 1, 19, 0xE1E1FF);
+        this->FillRegion(keyX + 1, rowY, this->geometry.width / 2 - this->m_horizontalMargin - 1, 19, 0xE1E1FF);
       }
 
       this->FillRegion(keyX, rowY - 1 + this->m_rowHeight, this->m_keyColumnWidth + this->m_descriptionColumnWidth, 1, 0xC0C0C0);
@@ -439,9 +435,8 @@ void UIHotKeyWnd::Paint() {
 
       const std::string fitted = this->FitDisplayText(130, info.description.c_str(), 0, 12, 0);
       const int fittedWidth = this->TextWidth(fitted.c_str(), 0, 0, 12, 0, 0);
-      const int descriptionX = keyX + (this->geometry.width / 2 - this->m_horizontalMargin - this->m_keyColumnWidth - fittedWidth) / 2;
-
-      this->DrawTextAt(descriptionX, rowY + 5, fitted.c_str(), 0, 0, 12, 0, 0, 0);
+      const int indent = (this->geometry.width / 2 - this->m_horizontalMargin - this->m_keyColumnWidth - fittedWidth) / 2;
+      this->DrawTextAt(indent + keyX, rowY + 5, fitted.c_str(), 0, 0, 12, 0, 0, 0);
       this->DrawTextAt(textX + backgroundX, rowY + 5, info.text.c_str(), 0, 0, 12, 0, 0, 0);
 
       ++visibleRow;
@@ -452,14 +447,16 @@ void UIHotKeyWnd::Paint() {
     std::string text = FormatOwnedString("%d / %d", this->m_page, this->m_pageCount);
     UIBitmapButton* prevButton = this->m_prevButton;
     const int pagesWidth = this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
-    const int pageX = (prevButton->geometry.width - pagesWidth + 60) / 2 + prevButton->geometry.x;
+    const int indent = (prevButton->geometry.width - pagesWidth + 60) / 2;
+    int pageX = prevButton->geometry.x;
+    pageX += indent;
 
     text = static_cast<const std::string&>(FormatOwnedString("%d", this->m_page));
     this->DrawOutlinedText(pageX, 25, text.c_str(), 0, 0x7F3CFF, 0xFFFFFF, 0, 11, 1, 0);
 
-    const int currentWidth = this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
+    pageX += this->TextWidth(text.c_str(), 0, 0, 12, 0, 0);
     text = static_cast<const std::string&>(FormatOwnedString(" / %d", this->m_pageCount));
-    this->DrawOutlinedText(pageX + currentWidth, 25, text.c_str(), 0, 0x666666, 0xFFFFFF, 0, 11, 1, 0);
+    this->DrawOutlinedText(pageX, 25, text.c_str(), 0, 0x666666, 0xFFFFFF, 0, 11, 1, 0);
   }
 
   const int bottomY = this->m_titleHeight + this->m_tabHeight + this->m_verticalMargin;
@@ -484,8 +481,9 @@ void UIHotKeyWnd::Paint() {
 // FUNCTION: fn_12620
 void UIHotKeyWnd::ReloadHotkeys() {
   this->m_selectedRow = -1;
+  auto* tables = this->hotkeys.data();
   for (int tab = 0; tab < 4; ++tab) {
-    this->hotkeys[tab].clear();
+    tables[tab].clear();
   }
 
   for (int position = 0; position < 4; ++position) {
@@ -522,15 +520,15 @@ int UIHotKeyWnd::ValidateSpecialHotkeyMode(int mode) {
   if (this->m_tab == 1 && g_session.HotkeyIndex(1, this->m_selectedRow) + 100 == 131) {
     const int key = g_windowMgr.keyCode;
     if (key == 0x12 || g_windowMgr.modifierKey == 0x12 || key == 0x11 || g_windowMgr.modifierKey == 0x11 || key == 0x10 || g_windowMgr.modifierKey == 0x10) {
-      return 3;
+      return HOTKEY_ASSIGN_INVALID;
     }
 
     if (key == 0x20 || key == 0x90) {
-      return g_windowMgr.modifierKey != 0 ? 4 : 2;
+      return g_windowMgr.modifierKey != 0 ? HOTKEY_ASSIGN_CHECK_CONFLICT : HOTKEY_ASSIGN_INCOMPLETE;
     }
 
-    if (mode == 4 && (key == 0x14 || (g_windowMgr.modifierKey == 0 && !g_windowMgr.IsSharedWindowId(key)))) {
-      return 3;
+    if (mode == HOTKEY_ASSIGN_CHECK_CONFLICT && (key == 0x14 || (g_windowMgr.modifierKey == 0 && !g_windowMgr.IsSharedWindowId(key)))) {
+      return HOTKEY_ASSIGN_INVALID;
     }
   }
 
@@ -561,35 +559,35 @@ bool UIHotKeyWnd::AssignSelectedHotkey(int mode) {
   }
 
   if (this->m_tab != 1 || g_session.HotkeyIndex(1, this->m_selectedRow) + 100 != 131) {
-    if (mode == 4) {
+    if (mode == HOTKEY_ASSIGN_CHECK_CONFLICT) {
       mode = this->CheckHotkeyConflict();
     }
   } else {
     const int key = g_windowMgr.keyCode;
     if (key == 0x12 || g_windowMgr.modifierKey == 0x12 || key == 0x11 || g_windowMgr.modifierKey == 0x11 || key == 0x10 || g_windowMgr.modifierKey == 0x10) {
-      mode = 3;
+      mode = HOTKEY_ASSIGN_INVALID;
     } else if (key == 0x20 || key == 0x90) {
       if (g_windowMgr.modifierKey == 0) {
-        mode = 2;
+        mode = HOTKEY_ASSIGN_INCOMPLETE;
       } else {
         mode = this->CheckHotkeyConflict();
       }
-    } else if (mode == 4) {
+    } else if (mode == HOTKEY_ASSIGN_CHECK_CONFLICT) {
       if (key == 0x14) {
-        mode = 3;
+        mode = HOTKEY_ASSIGN_INVALID;
       } else if (g_windowMgr.modifierKey != 0 || g_windowMgr.IsSharedWindowId(key)) {
         mode = this->CheckHotkeyConflict();
       } else {
-        mode = 3;
+        mode = HOTKEY_ASSIGN_INVALID;
       }
     }
   }
 
   switch (mode) {
-    case 1:
+    case HOTKEY_ASSIGN_IGNORE:
       return false;
-    case 2:
-    case 3:
+    case HOTKEY_ASSIGN_INCOMPLETE:
+    case HOTKEY_ASSIGN_INVALID:
       break;
     default: {
       const HotkeyEntry entry = this->GetHotkey(this->m_tab, this->m_selectedRow + (this->m_page * 9 - 9) * 4, true);
@@ -646,11 +644,11 @@ int UIHotKeyWnd::CheckHotkeyConflict() {
       HotkeyInfo info = entry.info;
       if (info.key1 == g_windowMgr.keyCode && info.key2 == g_windowMgr.modifierKey) {
         if (index == this->m_selectedRow && tab == this->m_tab) {
-          return 1;
+          return HOTKEY_ASSIGN_IGNORE;
         }
 
         StringFormat(message, sizeof(message), static_cast<std::size_t>(-1), LookupMessage(MSI_HOTKEYWND_NOTICE4), info.description.c_str());
-        if (g_windowMgr.Confirm(message, 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+        if (g_windowMgr.Confirm(message, 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
           info.key1 = 0;
           info.key2 = 0;
           info.text = "";
@@ -670,15 +668,15 @@ int UIHotKeyWnd::CheckHotkeyConflict() {
             }
           }
 
-          return 0;
+          return HOTKEY_ASSIGN_ACCEPT;
         }
 
-        return 1;
+        return HOTKEY_ASSIGN_IGNORE;
       }
     }
   }
 
-  return 0;
+  return HOTKEY_ASSIGN_ACCEPT;
 }
 
 // OFFSET: 0x00935270

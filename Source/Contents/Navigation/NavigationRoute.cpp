@@ -300,6 +300,12 @@ NaviCell* CNavigationManager::MapCellToView(NaviCell* out, const char* mapName, 
   return out;
 }
 
+// INLINED
+static NaviCell* DestinationCell(CNaviData& data, NaviCell* out) {
+  data.GetCell(out);
+  return out;
+}
+
 // OFFSET: 0x00B98630
 // FUNCTION: fn_19608
 std::string CNavigationManager::RouteText() {
@@ -309,10 +315,9 @@ std::string CNavigationManager::RouteText() {
   CNaviInfo* info = this->data.GetInfo();
   if (info != nullptr) {
     NaviCell cell;
-    this->data.GetCell(&cell);
-    if (cell.x > 0) {
+    if (DestinationCell(this->data, &cell)->x > 0) {
       NaviCell cellX;
-      StringFormat(buffer, sizeof(buffer), static_cast<std::size_t>(-1), "[%s] -> %s %d %d", LookupMessage(MSI_NAVIGATION_DESTINATION), info->GetName(), this->data.GetCell(&cellX)->x, this->data.GetCell(&cell)->y);
+      StringFormat(buffer, sizeof(buffer), static_cast<std::size_t>(-1), "[%s] -> %s %d %d", LookupMessage(MSI_NAVIGATION_DESTINATION), info->GetName(), DestinationCell(this->data, &cellX)->x, DestinationCell(this->data, &cell)->y);
     } else {
       StringFormat(buffer, sizeof(buffer), static_cast<std::size_t>(-1), "[%s] %s", LookupMessage(MSI_NAVIGATION_DESTINATION), info->GetName());
     }
@@ -327,70 +332,70 @@ std::string CNavigationManager::RouteText() {
 __declspec(noinline) void CNavigationManager::ShowRouteResult(int result, int mode) {
   std::string message;
   switch (result) {
-  case -100:
+  case NAVIGATION_RESULT_UNKNOWN:
     message = LookupMessage(MSI_NAVIGATION_RS_UNKNOWN);
     break;
-  case -99:
+  case NAVIGATION_RESULT_NOT_SAME_MAP:
     message = LookupMessage(MSI_NAVIGATION_RS_NOTSAMEMAP);
     break;
-  case -98:
+  case NAVIGATION_RESULT_FAIL_START_DATA:
     message = LookupMessage(MSI_NAVIGATION_RS_FAILSTARTDATA);
     break;
-  case -97:
+  case NAVIGATION_RESULT_FAIL_TARGET:
     message = LookupMessage(MSI_NAVIGATION_RS_FAILTARGET);
     break;
-  case -96:
+  case NAVIGATION_RESULT_FAIL_ROUTE:
     message = LookupMessage(MSI_NAVIGATION_RS_FAILROUTE);
     break;
-  case -95:
+  case NAVIGATION_RESULT_FAIL_PLAYER:
     message = LookupMessage(MSI_NAVIGATION_RS_FAILPLAYER);
     break;
-  case -94:
+  case NAVIGATION_RESULT_NO_DATA:
     message = LookupMessage(MSI_NAVIGATION_RS_NODATA);
     break;
-  case -93:
+  case NAVIGATION_RESULT_MAP_NOT_NAVIGATION:
     message = LookupMessage(MSI_NAVIGATION_RS_MAPNOTNAVIGATION);
     break;
-  case -92:
+  case NAVIGATION_RESULT_FAIL_TARGET_ROUTE:
     message = LookupMessage(MSI_NAVIGATION_RS_FAILTARGETROUTE);
     break;
-  case 0:
+  case NAVIGATION_RESULT_SUCCESS:
     message = LookupMessage(MSI_NAVIGATION_RS_SUCCESS);
     break;
-  case 1:
+  case NAVIGATION_RESULT_START:
     message = LookupMessage(MSI_NAVIGATION_RS_START);
     break;
-  case 2:
+  case NAVIGATION_RESULT_MOB_TARGET_MAP:
     message = LookupMessage(MSI_NAVIGATION_RS_MOBTARGETMAP);
     break;
-  case 3:
+  case NAVIGATION_RESULT_TARGET_MAP:
     message = LookupMessage(MSI_NAVIGATION_RS_TARGETMAP);
     break;
-  case 4:
+  case NAVIGATION_RESULT_SCROLL:
     message = LookupMessage(MSI_NAVIGATION_RS_SCROLL);
     break;
-  case 5:
+  case NAVIGATION_RESULT_ROUTE_SUCCESS:
     message = LookupMessage(MSI_NAVIGATION_RS_ROUTE_SUCCESS);
     break;
-  case 6:
+  case NAVIGATION_RESULT_MAP_TO_MAP_SUCCESS:
     message = LookupMessage(MSI_NAVIGATION_RS_MAPTMAP_SUCCESS);
     break;
-  case 7:
+  case NAVIGATION_RESULT_NPC_TO_MAP_SUCCESS:
     message = LookupMessage(MSI_NAVIGATION_RS_NPCTMAP_SUCCESS);
     break;
-  case 8:
+  case NAVIGATION_RESULT_MOB_TO_MAP_SUCCESS:
     message = LookupMessage(MSI_NAVIGATION_RS_MOBTMAP_SUCCESS);
     break;
-  case 10:
+  case NAVIGATION_RESULT_POST_MAP_SUCCESS:
     message = LookupMessage(MSI_NAVIGATION_RS_POSTMAP_SUCCESS);
     break;
-  case 9:
+  case NAVIGATION_RESULT_SAME_TARGET:
     message = LookupMessage(MSI_NAVIGATION_RS_SAMETARGET);
     break;
-  case 11:
+  case NAVIGATION_RESULT_HERE:
     message = LookupMessage(MSI_NAVIGATION_RS_HERE);
     break;
-  case -90:
+  case NAVIGATION_RESULT_UNABLE_TO_GUIDE_MAP:
     message = LookupMessage(MSI_NAVIGATION_UNABLETOGUIDEMAP);
     break;
   default:
@@ -404,7 +409,7 @@ __declspec(noinline) void CNavigationManager::ShowRouteResult(int result, int mo
     std::sprintf(buffer, LookupMessage(MSI_NAVIGATION_PRINT_S), message.c_str());
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(buffer), 0x62B0FF, 0, 0, 0);
 
-    if (result == 5 && this->selectedNode != -1 && this->nodes.size() > static_cast<unsigned>(this->selectedNode)) {
+    if (result == NAVIGATION_RESULT_ROUTE_SUCCESS && this->selectedNode != -1 && this->nodes.size() > static_cast<unsigned>(this->selectedNode)) {
       const int type = this->nodes[this->selectedNode]->GetType();
       if (type == 201 || type == 202 || type == 203 || type == 204) {
         std::sprintf(buffer, LookupMessage(MSI_NAVIGATION_PRINT_GO_S), this->nodes[this->selectedNode]->GetName());
@@ -429,7 +434,7 @@ __declspec(noinline) void CNavigationManager::ShowRouteResult(int result, int mo
   }
 
   if (mode == 0 || mode == 2) {
-    g_windowMgr.Confirm(message.c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(message.c_str(), 0, true, false, 0, "메시지", 280, 120, 0);
     if (mode == 4) {
       const int count = static_cast<int>(g_navigationManager.nodes.size());
       CNavi_Object* node = count == 0 ? nullptr : g_navigationManager.nodes[0];
@@ -437,7 +442,7 @@ __declspec(noinline) void CNavigationManager::ShowRouteResult(int result, int mo
       text += node->GetName();
       text += " ";
       text += static_cast<CNavi_Link*>(node)->GetLinkedName();
-      g_windowMgr.Confirm(text.c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(text.c_str(), 0, true, false, 0, "메시지", 280, 120, 0);
     }
   }
 }
@@ -467,11 +472,11 @@ std::string CNavigationManager::SelectedNodeText() {
     if (info != nullptr) {
       NaviCell cellX;
       NaviCell cellY;
-      std::sprintf(buffer, "%s %d %d...", info->GetName(), this->data.GetCell(&cellX)->x, this->data.GetCell(&cellY)->y);
+      std::sprintf(buffer, "%s %d %d...", info->GetName(), DestinationCell(this->data, &cellX)->x, DestinationCell(this->data, &cellY)->y);
     }
   }
 
-  this->selectedNodeText.assign(buffer, std::strlen(buffer));
+  this->selectedNodeText = buffer;
   return this->selectedNodeText;
 }
 
@@ -484,15 +489,15 @@ std::string CNavigationManager::SubDestinationText() {
   CNaviInfo* info = this->data.GetInfo();
   if (info != nullptr) {
     NaviCell cell;
-    if (this->data.GetCell(&cell)->x > 0) {
+    if (DestinationCell(this->data, &cell)->x > 0) {
       NaviCell cellX;
-      std::sprintf(buffer, ">.%s %d %d", info->GetName(), this->data.GetCell(&cellX)->x, this->data.GetCell(&cell)->y);
+      std::sprintf(buffer, ">.%s %d %d", info->GetName(), DestinationCell(this->data, &cellX)->x, DestinationCell(this->data, &cell)->y);
     } else {
       std::sprintf(buffer, ">.%s", info->GetName());
     }
   }
 
-  this->subDestinationText.assign(buffer, std::strlen(buffer));
+  this->subDestinationText = buffer;
   return this->subDestinationText;
 }
 
@@ -511,7 +516,7 @@ std::string CNavigationManager::DestinationText() {
     NaviCell cellX;
     NaviCell cellY;
     std::sprintf(buffer, "%s %d %d", node->GetInfo()->GetName(), node->GetCell(&cellX)->x, node->GetCell(&cellY)->y);
-    this->destinationText.assign(buffer, std::strlen(buffer));
+    this->destinationText = buffer;
     return this->destinationText;
   }
 
@@ -520,11 +525,11 @@ std::string CNavigationManager::DestinationText() {
     if (info != nullptr) {
       NaviCell cellX;
       NaviCell cellY;
-      std::sprintf(buffer, "%s %d %d", info->GetName(), this->data.GetCell(&cellX)->x, this->data.GetCell(&cellY)->y);
+      std::sprintf(buffer, "%s %d %d", info->GetName(), DestinationCell(this->data, &cellX)->x, DestinationCell(this->data, &cellY)->y);
     }
   }
 
-  this->destinationText.assign(buffer, std::strlen(buffer));
+  this->destinationText = buffer;
   return this->destinationText;
 }
 
@@ -534,27 +539,27 @@ std::string CNavigationManager::DestinationTitle() {
   char buffer[0x32];
   std::memset(buffer, 0, sizeof(buffer));
 
-  if (!this->nodes.empty() && this->selectedNode >= 0) {
-    if (this->nodes.size() <= static_cast<unsigned>(this->selectedNode)) {
-      this->destinationTitle.assign(buffer, std::strlen(buffer));
+  if (this->nodes.empty() || this->selectedNode < 0) {
+    if (this->viewMode == 2) {
+      NaviCell cell;
+      this->data.GetCell(&cell);
+      CNaviInfo* info = this->data.GetInfo();
+      if (info != nullptr) {
+        this->destinationTitle.assign(info->GetTitle());
+      }
       return this->destinationTitle;
     }
 
-    this->destinationTitle.assign(this->nodes[this->selectedNode]->GetInfo()->GetTitle());
+    this->destinationTitle.assign(buffer, std::strlen(buffer));
     return this->destinationTitle;
   }
 
-  if (this->viewMode == 2) {
-    NaviCell cell;
-    this->data.GetCell(&cell);
-    CNaviInfo* info = this->data.GetInfo();
-    if (info != nullptr) {
-      this->destinationTitle.assign(info->GetTitle());
-    }
+  if (this->nodes.size() <= static_cast<unsigned>(this->selectedNode)) {
+    this->destinationTitle.assign(buffer, std::strlen(buffer));
     return this->destinationTitle;
   }
 
-  this->destinationTitle.assign(buffer, std::strlen(buffer));
+  this->destinationTitle.assign(this->nodes[this->selectedNode]->GetInfo()->GetTitle());
   return this->destinationTitle;
 }
 
@@ -936,13 +941,14 @@ std::vector<unsigned char> CNavigationManager::WriteStates() {
     if (info == nullptr) {
       continue;
     }
-    buffer.resize(it->name.size() + 0x24 + offset, 0);
+    const int size = it->name.size() + 0x24 + offset;
+    buffer.resize(size, 0);
     reinterpret_cast<NaviTargetRecord*>(buffer.data() + offset)->type = it->type;
     offset += 4;
     char* mapName = reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->mapName;
     std::memcpy(mapName, info->GetName(), info->GetNameLength());
-    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->x = it->x;
-    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->y = it->y;
+    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->x = it->cell.first;
+    reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->y = it->cell.second;
     const int length = static_cast<int>(it->name.size());
     reinterpret_cast<NaviStateDataRecord*>(buffer.data() + offset)->nameLength = length;
     offset += 0x20;
@@ -952,19 +958,6 @@ std::vector<unsigned char> CNavigationManager::WriteStates() {
     }
   }
   return buffer;
-}
-
-// OFFSET: 0x00B888F0
-// FUNCTION: fn_19378
-__declspec(noinline) NaviCell* CNaviData::GetCell(NaviCell* out) {
-  *out = NaviCell{this->cellX, this->cellY};
-  return out;
-}
-
-// OFFSET: 0x00B88920
-// FUNCTION: fn_19380
-__declspec(noinline) CNaviInfo* CNaviData::GetInfo() {
-  return this->info;
 }
 
 // OFFSET: 0x00B88A00
@@ -1010,19 +1003,21 @@ bool CNavigationManager::SavedTargetText(char* out, int size) {
   char text[0x104];
   std::memset(text, 0, sizeof(text));
 
-  NaviCell cellA;
-  NaviCell cellB;
   if (this->savedTarget.type == 2) {
     CNavi_Object* object = static_cast<CNavi_Object*>(this->savedTarget.object);
     CNaviInfo* info = object->GetInfo();
-    std::sprintf(text, "%s %d %d", info->GetName(), object->GetCell(&cellA)->x, object->GetCell(&cellB)->y);
+    NaviCell cellX;
+    NaviCell cellY;
+    std::sprintf(text, "%s %d %d", info->GetName(), object->GetCell(&cellX)->x, object->GetCell(&cellY)->y);
   } else if (this->savedTarget.type == 3) {
     std::sprintf(text, "%s", static_cast<CNavi_Object*>(this->savedTarget.object)->GetInfo()->GetName());
   } else if (this->savedTarget.type == 1) {
     std::sprintf(text, "%s", static_cast<CNaviInfo*>(this->savedTarget.object)->GetName());
   } else if (this->savedTarget.type == 0) {
     CNaviInfo* info = static_cast<CNaviInfo*>(this->savedTarget.object);
-    std::sprintf(text, "%s %d %d", info->GetName(), this->data.GetCell(&cellB)->x, this->data.GetCell(&cellA)->y);
+    NaviCell cellX;
+    NaviCell cellY;
+    std::sprintf(text, "%s %d %d", info->GetName(), this->data.GetCell(&cellX)->x, this->data.GetCell(&cellY)->y);
   } else {
     return false;
   }
@@ -1241,7 +1236,7 @@ int CNavigationManager::AddWrappedRouteLines(int kind, int x, int y, const char*
     this->routeLines.push_back(routeLine);
   }
 
-  this->routeLines.back().text += "]";
+  this->routeLines[this->routeLines.size() - 1].text += "]";
   return count + 1;
 }
 
@@ -1290,6 +1285,22 @@ struct NavigationDestinationRecord {
 
 static_assert(sizeof(NavigationDestinationRecord) == 0x2C);
 
+// INLINED
+static void RecordDestination(std::string name, int x, int y) {
+  if (Replay::Instance().state == 2) {
+    char packet[100] = {};
+    NavigationDestinationRecord record = {};
+    record.header = ReplayUiRecordHeader(REPLAY_UI_NAVIGATION_DESTINATION);
+    record.length = sizeof(record);
+    std::memcpy(record.mapName, name.c_str(), name.size());
+    record.x = x;
+    record.y = y;
+    std::memcpy(packet, &record, sizeof(record));
+
+    Replay::Instance().Record(static_cast<std::uint16_t>(record.length), packet, 0x29, 0);
+  }
+}
+
 // OFFSET: 0x00B9E290
 // FUNCTION: fn_19628
 bool CNavigationManager::SetDestinationMap(std::string mapName, int x, int y) {
@@ -1298,34 +1309,20 @@ bool CNavigationManager::SetDestinationMap(std::string mapName, int x, int y) {
     return false;
   }
 
-  {
-    std::string name = mapName;
-    if (Replay::Instance().state == 2) {
-      char packet[100] = {};
-      NavigationDestinationRecord record = {};
-      record.header = ReplayUiRecordHeader(REPLAY_UI_NAVIGATION_DESTINATION);
-      record.length = sizeof(record);
-      std::memcpy(record.mapName, name.c_str(), name.size());
-      record.x = x;
-      record.y = y;
-      std::memcpy(packet, &record, sizeof(record));
-
-      Replay::Instance().Record(static_cast<std::uint16_t>(record.length), packet, 0x29, 0);
-    }
-  }
+  RecordDestination(mapName, x, y);
 
   char text[50];
   std::memset(text, 0, sizeof(text));
   this->currentTarget.object = info;
   if (x == 1000) {
     this->currentTarget.type = 1;
-    this->currentTarget.x = -1;
-    this->currentTarget.y = -1;
+    this->currentTarget.cell.first = -1;
+    this->currentTarget.cell.second = -1;
     std::sprintf(text, "%s", info->GetName());
   } else {
-    this->currentTarget.x = x;
+    this->currentTarget.cell.first = x;
     this->currentTarget.type = 0;
-    this->currentTarget.y = y;
+    this->currentTarget.cell.second = y;
     const char* name = info->GetName();
     std::sprintf(text, "%s %d,%d", name, x, y);
   }
@@ -1465,10 +1462,10 @@ bool CNavigationManager::LoadTargetPreview() {
           viewX = static_cast<int>(cellColumn * scale + offsetX);
           viewY = static_cast<int>(126.0f - (cellRow * scale + offsetY));
         }
-        this->previewY = viewY;
         this->previewX = viewX;
+        this->previewY = viewY;
       } else if (targetType == 0) {
-        if (this->currentTarget.x < 0) {
+        if (this->currentTarget.cell.first < 0) {
           NaviCell cellY;
           NaviCell cellX;
           const int cellRow = this->data.GetCell(&cellY)->y;
@@ -1486,11 +1483,11 @@ bool CNavigationManager::LoadTargetPreview() {
           this->previewY = viewY;
           this->previewX = viewX;
         } else {
-          const int cellColumn = this->currentTarget.x;
-          const int cellRow = this->currentTarget.y;
+          const int cellColumn = this->currentTarget.cell.first;
+          const int cellRow = this->currentTarget.cell.second;
           CNaviInfo* info = static_cast<CNaviInfo*>(this->currentTarget.object);
-          int viewX = -1;
           int viewY = -1;
+          int viewX = -1;
           if (info) {
             int offsetX;
             int offsetY;
@@ -1543,7 +1540,7 @@ bool CNavigationManager::BuildTargetRouteLines() {
     const unsigned int property = static_cast<unsigned char>(attributes >> 16);
     const unsigned int propertyLevel = property / 20;
     const unsigned int element = property % 10;
-    const unsigned int size = static_cast<unsigned char>(attributes);
+    const int size = attributes & 0xFF;
 
     int message;
     if (element == 1) {
@@ -1603,7 +1600,7 @@ bool CNavigationManager::BuildTargetRouteLines() {
     }
   } else if (type == 0) {
     this->AddWrappedRouteLines(1, 141, 46, static_cast<CNaviInfo*>(object)->GetName());
-    std::sprintf(text, "( %d %d )", this->currentTarget.x, this->currentTarget.y);
+    std::sprintf(text, "( %d %d )", this->currentTarget.cell.first, this->currentTarget.cell.second);
     this->routeLines.push_back({1, 142, 149, text, 0xDCDCDC, 0xCB6B54});
   }
   return true;
@@ -1617,7 +1614,7 @@ bool CNavigationManager::CollectStartLinks() {
     const std::string resolved = ResourceMgr::Instance().ResolveMapName(g_session.m_navigationPlayerMap);
     info = this->FindObject(resolved.c_str());
     if (info == nullptr) {
-      g_windowMgr.Confirm(LookupMessage(MSI_NAVIGATION_UNKNOWNMAP), 0, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_NAVIGATION_UNKNOWNMAP), 0, true, false, 0, "메시지", 280, 120, 0);
       return false;
     }
   }
@@ -1647,13 +1644,17 @@ bool CNavigationManager::CollectStartLinks() {
       NaviCell targetRowCell;
       NaviCell targetCell;
       if (this->pathFinder.FindPath(1, column, row, 8, 8, (*it)->GetCell(&targetCell)->x, (*it)->GetCell(&targetRowCell)->y, 10, route, 15)) {
-        this->data.startLinks.push_back(NaviLink{*it, static_cast<int>(route.points.size())});
+        const int cost = static_cast<int>(route.points.size());
+        this->data.startLinks.push_back(NaviLink{*it, cost});
       }
       this->pathFinder.Reset();
     }
   }
 
-  return !this->data.startLinks.empty();
+  if (this->data.startLinks.empty()) {
+    return false;
+  }
+  return true;
 }
 
 // OFFSET: 0x00BA0C90
@@ -1663,7 +1664,8 @@ bool CNavigationManager::RouteToSavedTarget(int cellX, int cellY) {
     return false;
   }
 
-  this->data.endLinks.clear();
+  std::vector<NaviLink>& endLinks = this->data.endLinks;
+  endLinks.clear();
   const int type = this->savedTarget.type;
   int x = -1;
   int y = -1;
@@ -1678,7 +1680,7 @@ bool CNavigationManager::RouteToSavedTarget(int cellX, int cellY) {
     const NaviCell* position = object->GetCell(&cell);
     x = position->x;
     y = position->y;
-    this->data.endLinks = object->CopyLinks();
+    endLinks = object->CopyLinks();
   } else {
     if (type == 3) {
       info = static_cast<CNavi_Object*>(this->savedTarget.object)->GetInfo();
@@ -1704,37 +1706,42 @@ bool CNavigationManager::RouteToSavedTarget(int cellX, int cellY) {
 
     int cost = 0;
     MovementRouteInterpolation route;
-    for (auto it = links.begin(); it != links.end(); ++it) {
+    for (CNavi_Link*& link : links) {
       if (this->savedTarget.type == 0) {
         this->pathFinder.Reset();
         cost = 0;
-        if ((*it)->GetLinkedCell().x == x && (*it)->GetLinkedCell().y == y) {
+        if (link->GetLinkedCell().x == x && link->GetLinkedCell().y == y) {
           cost = 1;
-        } else if (this->pathFinder.FindPath(1, (*it)->GetLinkedCell().x, (*it)->GetLinkedCell().y, 8, 8, x, y, 10, route, 15)) {
+        } else if (this->pathFinder.FindPath(1, link->GetLinkedCell().x, link->GetLinkedCell().y, 8, 8, x, y, 10, route, 15)) {
           cost = static_cast<int>(route.points.size());
         } else {
           continue;
         }
       }
-      this->data.endLinks.push_back(NaviLink{*it, cost});
+      endLinks.push_back(NaviLink{link, cost});
     }
   }
 
-  if (this->data.endLinks.empty()) {
+  if (endLinks.empty()) {
     return false;
   }
   return this->data.SetDestination(info, x, y);
 }
 
+// INLINED
+static NavigationTarget ChooseTarget(CNavigationManager* manager, int nodeIndex) {
+  manager->currentTarget = manager->savedTarget;
+  if (nodeIndex >= 0 && manager->nodes.size() > static_cast<unsigned int>(nodeIndex)) {
+    manager->currentTarget.type = 6;
+    manager->currentTarget.object = manager->nodes[nodeIndex];
+  }
+  return manager->currentTarget;
+}
+
 // OFFSET: 0x00BA10C0
 // FUNCTION: fn_19637
 bool CNavigationManager::SelectTarget(int nodeIndex) {
-  this->currentTarget = this->savedTarget;
-  if (nodeIndex >= 0 && this->nodes.size() > static_cast<unsigned int>(nodeIndex)) {
-    this->currentTarget.type = 6;
-    this->currentTarget.object = this->nodes[nodeIndex];
-  }
-  this->currentTarget = NavigationTarget(this->currentTarget);
+  this->currentTarget = ChooseTarget(this, nodeIndex);
   return this->LoadTargetPreview();
 }
 
@@ -1755,15 +1762,15 @@ void CNavigationManager::CancelRoute() {
 // OFFSET: 0x00B97B90
 // FUNCTION: fn_19602
 __declspec(noinline) int CNavigationManager::Navigate(int cellX, int cellY) {
+  int x = cellX;
   int y = cellY;
   if (this->savedTarget.object != nullptr) {
     const int type = this->savedTarget.type;
     CNaviInfo* info;
-    int x = cellX;
+    NaviCell cell;
     if (type == 2) {
       CNavi_Object* object = static_cast<CNavi_Object*>(this->savedTarget.object);
       info = object->GetInfo();
-      NaviCell cell;
       const NaviCell* position = object->GetCell(&cell);
       x = position->x;
       y = position->y;
@@ -1792,19 +1799,20 @@ __declspec(noinline) int CNavigationManager::Navigate(int cellX, int cellY) {
   }
 
 request:
-  if (this->RequestRoute(cellX, cellY) == -99) {
-    if (!this->RouteToSavedTarget(cellX, cellY)) {
-      return -97;
-    }
-    if (!this->CollectStartLinks()) {
-      return -98;
-    }
-    const int type = this->savedTarget.type;
-    this->routeResult =
-      this->data.FindRoute(&this->nodes, type != 2 && type != 0, this->allowGates, this->includeObjects, this->allowWarps, this->routeSide);
-    if (this->routeResult == 0) {
-      return -96;
-    }
+  if (this->RequestRoute(cellX, cellY) != -99) {
+    return this->RouteFromPlayer();
+  }
+  if (!this->RouteToSavedTarget(cellX, cellY)) {
+    return -97;
+  }
+  if (!this->CollectStartLinks()) {
+    return -98;
+  }
+  const int type = this->savedTarget.type;
+  this->routeResult =
+    this->data.FindRoute(&this->nodes, type != 2 && type != 0, this->allowGates, this->includeObjects, this->allowWarps, this->routeSide);
+  if (this->routeResult == 0) {
+    return -96;
   }
   return this->RouteFromPlayer();
 }
@@ -1814,18 +1822,20 @@ struct NavigationReplayHeader {
   /* 0000 */ std::int16_t tag;
   /* 0002 */ int size;
 
-  NavigationReplayHeader() : tag(0), size(0) {
+  // INLINED
+  NavigationReplayHeader() {
+    this->Clear();
   }
 
+  // INLINED
   ~NavigationReplayHeader() {
-    this->tag = 0;
-    this->size = 0;
+    this->Clear();
   }
 
-  void Read(const unsigned char* source) {
-    this->size = 0;
+  // INLINED
+  void Clear() {
     this->tag = 0;
-    std::memcpy(this, source, sizeof(*this));
+    this->size = 0;
   }
 };
 #pragma pack(pop)
@@ -1845,17 +1855,16 @@ int CNavigationManager::LoadReplayState(const std::vector<unsigned char>& data) 
   NavigationReplayHeader header;
   unsigned offset = 0;
 
-  header.Read(data.data() + offset);
+  header.Clear();
+  header = *reinterpret_cast<const NavigationReplayHeader*>(data.data() + offset);
   offset += 6;
   if (8000 != header.tag) {
     offset = static_cast<unsigned>(-1);
     return static_cast<int>(offset);
   }
-  if (data.size() <= 6) {
-    return static_cast<int>(offset);
-  }
-  do {
-      header.Read(data.data() + offset);
+  while (data.size() > offset) {
+      header.Clear();
+      header = *reinterpret_cast<const NavigationReplayHeader*>(data.data() + offset);
       offset += 6;
 
       switch (header.tag) {
@@ -1932,8 +1941,8 @@ int CNavigationManager::LoadReplayState(const std::vector<unsigned char>& data) 
         std::memcpy(buffer.data(), data.data() + offset, header.size);
         offset += header.size;
         const int* route = reinterpret_cast<const int*>(buffer.data());
-        int y = -1;
-        int x = -1;
+        int x = route[2];
+        int y = route[3];
         if (this->savedTarget.object != nullptr) {
           const int type = this->savedTarget.type;
           CNaviInfo* info;
@@ -1947,14 +1956,16 @@ int CNavigationManager::LoadReplayState(const std::vector<unsigned char>& data) 
             y = position->y;
           } else if (type == 3) {
             info = static_cast<CNavi_Object*>(this->savedTarget.object)->GetInfo();
+            x = -1;
+            y = -1;
           } else if (type == 1) {
             info = static_cast<CNaviInfo*>(this->savedTarget.object);
-          } else if (type == 0) {
-            info = static_cast<CNaviInfo*>(this->savedTarget.object);
-            x = route[2];
-            y = route[3];
-          } else {
+            x = -1;
+            y = -1;
+          } else if (type != 0) {
             found = false;
+          } else {
+            info = static_cast<CNaviInfo*>(this->savedTarget.object);
           }
           if (found) {
             this->data.SetDestination(info, x, y);
@@ -2023,7 +2034,7 @@ int CNavigationManager::LoadReplayState(const std::vector<unsigned char>& data) 
         offset += header.size;
         break;
       }
-  } while (data.size() > offset);
+  }
   return static_cast<int>(offset);
 }
 

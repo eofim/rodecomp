@@ -119,8 +119,9 @@ void UIMenuIconWnd::OnCreate(int width, int height) {
     "bank", "rec", "mail", "achievement", "tip", "shop", "keyboard", "attendance", "adventurerAgency", "repute", "adventureguide", "probability",
   };
 
+  int index = 0;
   unsigned int position = 0;
-  for (int index = 0; index < 24; ++index) {
+  for (; index < 24; ++index) {
     if (ids[index] == ID_STATUS && g_session.IsDoramJob(g_session.m_job) == true) {
       names[index] = "status_doram";
     }
@@ -137,9 +138,7 @@ void UIMenuIconWnd::OnCreate(int width, int height) {
     icon->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s.bmp", names[index].c_str()).c_str(), 1, 0);
     icon->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s_press.bmp", names[index].c_str()).c_str(), 2, 0);
     icon->SetSize(icon->BitmapWidth(), icon->BitmapHeight());
-    const int row = position / 5 * 43;
-    const int x = position % 5 * 42 + 9;
-    icon->Move(x, row + 23);
+    icon->Move(position % 5 * 42 + 9, position / 5 * 43 + 23);
     icon->SetId(ids[index]);
     icon->Enable(0);
     this->AddChild(icon);
@@ -156,7 +155,7 @@ void UIMenuIconWnd::OnCreate(int width, int height) {
       badge->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s_new.bmp", names[index].c_str()).c_str(), 1, 0);
       badge->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s_new_press.bmp", names[index].c_str()).c_str(), 2, 0);
       badge->SetSize(badge->BitmapWidth(), badge->BitmapHeight());
-      badge->Move(x, row + 17);
+      badge->Move(position % 5 * 42 + 9, position / 5 * 43 + 17);
       badge->SetId(ids[index]);
       badge->Enable(0);
       this->AddChild(badge);
@@ -303,7 +302,7 @@ void UIMenuIcon::OnMouseMove(int x, int y) {
     message = MSI_HOTKEY_GUIDE;
     break;
   case MENUICON_BANK:
-    behaviorId = 251;
+    behaviorId = WID_BANKWND;
     message = MSI_BANK;
     break;
   case MENUICON_MAIL:
@@ -426,7 +425,7 @@ int UIMenuIconWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         break;
       case MENUICON_REC:
         if (Replay::Instance().state != 1) {
-          g_windowMgr.Confirm("REC End please", 0, true, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm("REC End please", 0, true, false, 0, "메시지", 280, 120, 0);
         } else {
           this->ToggleWindow(WID_REPLAYRECCONTROLWND);
         }
@@ -489,7 +488,7 @@ int UIMenuIconWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument
         this->ToggleWindow(WID_ADVENTUREGUIDE);
         break;
       case MENUICON_PROBABILITY:
-        if (g_windowMgr.Confirm(LookupMessage(MSI_ETC_PROBABILITY_WEB_CONNECT), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_ETC_PROBABILITY_WEB_CONNECT), 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
           ShellExecuteA(hWnd, "open", LookupMessage(MSI_ETC_PROBABILITY_URL), nullptr, nullptr, SW_SHOWNORMAL);
         }
         break;

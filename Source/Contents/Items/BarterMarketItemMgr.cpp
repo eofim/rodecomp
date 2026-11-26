@@ -27,17 +27,10 @@ struct BarterTreeNode {
   /* 0014 */ int value;
 };
 
-struct BarterTreeLookup {
-  /* 0000 */ BarterTreeNode* node;
-  /* 0004 */ int direction;
-  /* 0008 */ BarterTreeNode* bound;
-};
-
 struct BarterTree {
   /* 0000 */ BarterTreeNode* head;
   /* 0004 */ std::size_t size;
 
-  BarterTreeLookup FindBound(const int& key);
   void EraseSubtree(BarterTree* owner, BarterTreeNode* node) noexcept;
   void Clear() noexcept;
   ~BarterTree();
@@ -57,7 +50,8 @@ CBarterMarketItemMgr* g_barterMarketItemMgr;
 // FUNCTION: fn_03719
 BarterMarketItem::BarterMarketItem(const BarterMarketItem& other) = default;
 
-// INLINED
+// OFFSET: 0x005D70C0
+// FUNCTION: fn_46485
 CBarterMarketItemMgr::CBarterMarketItemMgr()
 {
   this->initialized = true;
@@ -122,9 +116,9 @@ void CBarterMarketItemMgr::DestroyInstance()
   }
 }
 
-// OFFSET: 0x005D7C10
-// FUNCTION: fn_03727
-void CBarterMarketItemMgr::AddItem(const BarterMarketItem& item)
+// OFFSET: 0x005D7790
+// FUNCTION: fn_46622
+void CBarterMarketItemMgr::AddPurchaseQuantity(const BarterMarketItem& item)
 {
   std::list<BarterMarketItem>::iterator found = std::find_if(this->allItems.begin(), this->allItems.end(), [item](const BarterMarketItem& entry) {
     return entry.id == item.id;
@@ -134,6 +128,12 @@ void CBarterMarketItemMgr::AddItem(const BarterMarketItem& item)
   } else {
     this->allItems.push_back(item);
   }
+}
+
+// OFFSET: 0x005D7AE0
+// FUNCTION: fn_46623
+void CBarterMarketItemMgr::TakeStockQuantity(const BarterMarketItem& item)
+{
   const auto itemsEnd = this->items.end();
   std::list<BarterMarketItem>::iterator it = std::find_if(this->items.begin(), itemsEnd, [&item](const BarterMarketItem& entry) {
     return entry.id == item.id;
@@ -148,12 +148,11 @@ void CBarterMarketItemMgr::AddItem(const BarterMarketItem& item)
       }
     }
   }
-  this->RefreshTotals();
 }
 
-// OFFSET: 0x005D7D10
-// FUNCTION: fn_03728
-void CBarterMarketItemMgr::RemoveItem(const BarterMarketItem& item)
+// OFFSET: 0x005D7B60
+// FUNCTION: fn_46624
+void CBarterMarketItemMgr::RemovePurchaseQuantity(const BarterMarketItem& item)
 {
   for (std::list<BarterMarketItem>::iterator it = this->allItems.begin(); it != this->allItems.end(); ++it) {
     if (it->id == item.id) {
@@ -168,6 +167,12 @@ void CBarterMarketItemMgr::RemoveItem(const BarterMarketItem& item)
       break;
     }
   }
+}
+
+// OFFSET: 0x005D76E0
+// FUNCTION: fn_46621
+void CBarterMarketItemMgr::RestoreStockQuantity(const BarterMarketItem& item)
+{
   std::list<BarterMarketItem>::iterator found = std::find_if(this->items.begin(), this->items.end(), [item](const BarterMarketItem& entry) {
     return entry.id == item.id;
   });
@@ -178,6 +183,23 @@ void CBarterMarketItemMgr::RemoveItem(const BarterMarketItem& item)
   } else {
     this->items.push_back(item);
   }
+}
+
+// OFFSET: 0x005D7C10
+// FUNCTION: fn_03727
+void CBarterMarketItemMgr::AddItem(const BarterMarketItem& item)
+{
+  AddPurchaseQuantity(item);
+  TakeStockQuantity(item);
+  this->RefreshTotals();
+}
+
+// OFFSET: 0x005D7D10
+// FUNCTION: fn_03728
+void CBarterMarketItemMgr::RemoveItem(const BarterMarketItem& item)
+{
+  RemovePurchaseQuantity(item);
+  RestoreStockQuantity(item);
   this->RefreshTotals();
 }
 
@@ -205,30 +227,6 @@ void BarterTree::EraseSubtree(BarterTree* owner, BarterTreeNode* root) noexcept
     node = node->left;
     std::allocator<BarterTreeNode>().deallocate(erased, 1);
   }
-}
-
-// OFFSET: 0x005D6FD0
-// FUNCTION: fn_03718
-BarterTreeLookup BarterTree::FindBound(const int& key)
-{
-  BarterTreeNode* head = this->head;
-  BarterTreeLookup result;
-  BarterTreeNode* node = head->parent;
-  result.node = node;
-  result.direction = 0;
-  result.bound = head;
-  while (node->isnil == 0) {
-    result.node = node;
-    if (node->key < key) {
-      result.direction = 0;
-      node = node->right;
-    } else {
-      result.bound = node;
-      result.direction = 1;
-      node = node->left;
-    }
-  }
-  return result;
 }
 
 // OFFSET: 0x005D7390
@@ -430,9 +428,9 @@ void CExpandedBarterMarketItemMgr::DestroyInstance()
   }
 }
 
-// OFFSET: 0x005D9E30
-// FUNCTION: fn_03761
-void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
+// OFFSET: 0x005D9CA0
+// FUNCTION: fn_46628
+void CExpandedBarterMarketItemMgr::RemoveEntryQuantity(const BarterMarketEntry& entry)
 {
   for (std::vector<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it) {
     if (entry.id == it->id) {
@@ -443,6 +441,74 @@ void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
       break;
     }
   }
+}
+
+// OFFSET: 0x005D9C50
+// FUNCTION: fn_46627
+void CExpandedBarterMarketItemMgr::TakeItemQuantity(const BarterMarketEntry& entry)
+{
+  for (std::vector<BarterMarketEntry>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
+    if (entry.id == it->id && !it->flag_30) {
+      it->value -= entry.value;
+      if (it->value < 0) {
+        it->value = 0;
+      }
+      break;
+    }
+  }
+}
+
+// OFFSET: 0x005D9DA0
+// FUNCTION: fn_46629
+void CExpandedBarterMarketItemMgr::RemoveChunkQuantity(BarterChunk16 chunk, int count)
+{
+  for (std::vector<BarterChunk16>::iterator target = this->chunks.begin(); target != this->chunks.end(); ++target) {
+    if (target->field_0 == chunk.field_0 && target->field_4 == chunk.field_4) {
+      target->amount -= chunk.amount * count;
+      if (target->amount <= 0) {
+        this->chunks.erase(target);
+      }
+      break;
+    }
+  }
+}
+
+// OFFSET: 0x005D9810
+// FUNCTION: fn_46625
+void CExpandedBarterMarketItemMgr::AddChunkQuantity(BarterChunk16 chunk, int count)
+{
+  for (std::vector<BarterChunk16>::iterator target = this->chunks.begin();; ++target) {
+    if (target == this->chunks.end()) {
+      BarterChunk16 added;
+      added.field_0 = chunk.field_0;
+      added.field_4 = chunk.field_4;
+      added.amount = chunk.amount * count;
+      added.field_c = chunk.field_c;
+      this->chunks.push_back(added);
+      break;
+    }
+    if (target->field_0 == chunk.field_0 && target->field_4 == chunk.field_4) {
+      target->amount += chunk.amount * count;
+      break;
+    }
+  }
+}
+
+// OFFSET: 0x005D98A0
+// FUNCTION: fn_46626
+void CExpandedBarterMarketItemMgr::RecalculateTotal()
+{
+  this->total = 0;
+  for (std::vector<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it) {
+    this->total += it->field_8 * it->value;
+  }
+}
+
+// OFFSET: 0x005D9E30
+// FUNCTION: fn_03761
+void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
+{
+  RemoveEntryQuantity(entry);
   std::vector<BarterMarketEntry>::iterator found = this->items.begin();
   for (; found != this->items.end(); ++found) {
     if (entry.id == found->id) {
@@ -456,23 +522,12 @@ void CExpandedBarterMarketItemMgr::RemoveEntry(const BarterMarketEntry& entry)
   } else {
     this->items.push_back(entry);
   }
-  for (std::vector<BarterChunk16>::const_iterator it = entry.chunks.begin(); it != entry.chunks.end(); ++it) {
+  for (auto it = entry.chunks.begin(); it != entry.chunks.end(); ++it) {
     int count = entry.value;
     alignas(16) BarterChunk16 chunk = *it;
-    for (std::vector<BarterChunk16>::iterator target = this->chunks.begin(); target != this->chunks.end(); ++target) {
-      if (target->field_0 == chunk.field_0 && target->field_4 == chunk.field_4) {
-        target->amount -= chunk.amount * count;
-        if (target->amount <= 0) {
-          this->chunks.erase(target);
-        }
-        break;
-      }
-    }
+    RemoveChunkQuantity(chunk, count);
   }
-  this->total = 0;
-  for (std::vector<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it) {
-    this->total += it->field_8 * it->value;
-  }
+  RecalculateTotal();
 }
 
 // OFFSET: 0x005DA040
@@ -481,7 +536,7 @@ void CExpandedBarterMarketItemMgr::AddEntry(const BarterMarketEntry& entry)
 {
   std::vector<BarterMarketEntry>::iterator found = this->entries.begin();
   for (; found != this->entries.end(); ++found) {
-    if (found->id == entry.id) {
+    if (entry.id == found->id) {
       break;
     }
   }
@@ -490,38 +545,13 @@ void CExpandedBarterMarketItemMgr::AddEntry(const BarterMarketEntry& entry)
   } else {
     found->value += entry.value;
   }
-  for (std::vector<BarterMarketEntry>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
-    if (it->id == entry.id && !it->flag_30) {
-      it->value -= entry.value;
-      if (it->value < 0) {
-        it->value = 0;
-      }
-      break;
-    }
-  }
-  for (std::vector<BarterChunk16>::const_iterator it = entry.chunks.begin(); it != entry.chunks.end(); ++it) {
+  TakeItemQuantity(entry);
+  for (auto it = entry.chunks.begin(); it != entry.chunks.end(); ++it) {
     int count = entry.value;
-    BarterChunk16 chunk = *it;
-    for (std::vector<BarterChunk16>::iterator target = this->chunks.begin();; ++target) {
-      if (target == this->chunks.end()) {
-        alignas(16) BarterChunk16 added;
-        added.field_0 = chunk.field_0;
-        added.field_4 = chunk.field_4;
-        added.amount = chunk.amount * count;
-        added.field_c = chunk.field_c;
-        this->chunks.push_back(added);
-        break;
-      }
-      if (target->field_0 == chunk.field_0 && target->field_4 == chunk.field_4) {
-        target->amount += chunk.amount * count;
-        break;
-      }
-    }
+    alignas(16) BarterChunk16 chunk = *it;
+    AddChunkQuantity(chunk, count);
   }
-  this->total = 0;
-  for (std::vector<BarterMarketEntry>::iterator it = this->entries.begin(); it != this->entries.end(); ++it) {
-    this->total += it->field_8 * it->value;
-  }
+  RecalculateTotal();
 }
 
 // OFFSET: 0x005DA1C0
@@ -696,9 +726,9 @@ void SortMedianOfThree(BarterEntryPair* first, BarterEntryPair* mid, BarterEntry
     saved.value = last->value;
     *last = *mid;
     *mid = saved;
-    if (lastId < first->id) {
+    if (mid->id < first->id) {
       BarterEntryPair saved2;
-      saved2.id = lastId;
+      saved2.id = mid->id;
       saved2.value = mid->value;
       *mid = *first;
       *first = saved2;

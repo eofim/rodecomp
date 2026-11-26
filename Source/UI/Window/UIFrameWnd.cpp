@@ -3,6 +3,7 @@
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
+#include "UI/Window/ReplayChunkTag.h"
 #include "UI/Window/UIWindowMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Tables/MessageTable.h"
@@ -184,17 +185,18 @@ void UIFrameWnd::OnMouseMove(int x, int y) {
     return;
   }
 
-  int screenX = x;
-  int screenY = y;
-  this->ToScreen(screenX, screenY);
-  const int dx = screenX - this->m_dragX;
-  const int dy = screenY - this->m_dragY;
+  int screen[2];
+  screen[1] = x;
+  screen[0] = y;
+  int ownX, ownY;
+  this->ToScreen(screen[1], screen[0]);
+  const int dx = screen[1] - this->m_dragX;
+  const int dy = screen[0] - this->m_dragY;
 
   if (!g_snapMgr.Contains(this)) {
     this->Move(this->m_originX + dx, this->m_originY + dy);
   } else {
     this->MoveFromOrigin(dx, dy);
-    int ownX, ownY;
     g_windowMgr.ConstrainSnap(this, ownX, ownY, 0);
     int groupX = dx, groupY = dy;
     g_snapMgr.ConstrainGroup(this, groupX, groupY);
@@ -500,8 +502,8 @@ void UIMonsterInfoWnd::OnMouseHover(int x, int y) {
     return;
   }
 
-  int screenX = 0;
   int screenY = 0;
+  int screenX = 0;
   this->ToScreen(screenX, screenY);
   std::string name = g_modeMgr.GetGameMode()->ActorName(g_session.m_monsterInfoActorId);
   const std::size_t mark = name.find("#", 0);
@@ -511,7 +513,9 @@ void UIMonsterInfoWnd::OnMouseHover(int x, int y) {
 
   if (this->TextWidth(name.c_str(), 0, 0, 12, 0, 0) > 100) {
     CMode* mode = g_modeMgr.currentMode;
-    mode->ShowTooltip(name.c_str(), screenX + x, screenY + y, -1, false, true);
+    const int tipX = screenX + x;
+    y += screenY;
+    mode->ShowTooltip(name.c_str(), tipX, y, -1, false, true);
   }
 }
 
@@ -596,7 +600,6 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     g_windowMgr.SetFocus(this->m_amountEdit);
     return 0;
   case BANK_BUTTON_DEPOSIT: {
-    PACKET_CZ_BANK_TRANSACTION packet;
     if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == true) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_PROHIBIT)), 255, 0, 0, 0);
       return 0;
@@ -615,15 +618,12 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->m_status = LookupMessage(MSI_BANK_3_MINI);
       return 0;
     }
-    packet.amount = static_cast<int>(amount);
-    packet.id = ID_CZ_REQ_BANKING_DEPOSIT;
-    packet.aid = g_session.m_aid;
+    PACKET_CZ_BANK_TRANSACTION packet{ID_CZ_REQ_BANKING_DEPOSIT, g_session.m_aid, static_cast<int>(amount)};
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     this->m_status.clear();
     return 0;
   }
   case BANK_BUTTON_WITHDRAW: {
-    PACKET_CZ_BANK_TRANSACTION packet;
     if (g_modeMgr.GetGameMode() && g_modeMgr.GetGameMode()->IsMenuWindowOpen() == true) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BANK_PROHIBIT)), 255, 0, 0, 0);
       return 0;
@@ -642,9 +642,7 @@ int UIBank_NewWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       this->m_status = LookupMessage(MSI_BANK_7_MINI);
       return 0;
     }
-    packet.amount = static_cast<int>(amount);
-    packet.id = ID_CZ_REQ_BANKING_WITHDRAW;
-    packet.aid = g_session.m_aid;
+    PACKET_CZ_BANK_TRANSACTION packet{ID_CZ_REQ_BANKING_WITHDRAW, g_session.m_aid, static_cast<int>(amount)};
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     this->m_status.clear();
     return 0;
@@ -775,9 +773,9 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 
       std::string text = this->edit->Text();
       if (!this->edit->links.empty()) {
-        const std::string linked = this->edit->LinkedText();
-        text = linked;
-      } else if (_mbsstr(reinterpret_cast<const unsigned char*>(this->edit->Text()), reinterpret_cast<const unsigned char*>("<"))) {
+        text = static_cast<const std::string&>(this->edit->LinkedText());
+      } else if (const char* editText = this->edit->Text();
+                 _mbsstr(reinterpret_cast<const unsigned char*>(editText), reinterpret_cast<const unsigned char*>("<"))) {
         UIItemTagOnChat* tags = this->edit->itemTags;
         if (tags != nullptr && !tags->linkedText.empty()) {
           text = tags->linkedText;
@@ -802,7 +800,11 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
         self = name == g_session.DecodePlayerName();
       }
 
-      if (this->memberList->selected == -1 || buffer[0] == '/' || self) {
+      if (this->memberList->selected != -1 && buffer[0] != '/' && !self) {
+        g_windowMgr.chatInputText = buffer;
+        const std::string name = this->memberList->lines[this->memberList->selected];
+        g_modeMgr.currentMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
+      } else {
         if (g_session.ProcessEmotionShortcut(buffer) == 0) {
           std::string parts[3];
           int talkType;
@@ -817,10 +819,6 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
           }
           g_modeMgr.currentMode->SendMsg(MM_PROCESS_TALK_TYPE, talkType, reinterpret_cast<int>(parts), 0, 0);
         }
-      } else {
-        g_windowMgr.chatInputText = buffer;
-        const std::string name = this->memberList->lines[this->memberList->selected];
-        g_modeMgr.currentMode->SendMsg(MM_WHISPERMSG, reinterpret_cast<int>(name.c_str()), 0, 0, 0);
       }
 
       this->edit->PushHistory();
@@ -861,7 +859,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
       g_windowMgr.EnsureWindow(WID_CHATROOMCHANGEWND)->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(&mode->chatRoom), 0, 0, 0);
       break;
     case MENUID_QUERYINFO:
-      g_windowMgr.Confirm(LookupMessage(MSI_NOTSUPPORTEDYET), 0, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_NOTSUPPORTEDYET), 0, true, false, 0, "메시지", 280, 120, 0);
       break;
     case MENUID_WRITE_CHAT_TO_FILE:
       this->SaveChatLog();
@@ -897,7 +895,7 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
 
     if (this->memberList->selected != -1) {
       const std::string target = this->memberList->lines[this->memberList->selected];
-      if (this->memberRoles.find(target) == this->memberRoles.end() || this->memberRoles[target] == -1) {
+      if (this->memberRoles.end() == this->memberRoles.find(target) || this->memberRoles[target] == -1) {
         break;
       }
       switch (rank) {
@@ -1119,79 +1117,82 @@ int UIChatRoomWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     const unsigned size = static_cast<unsigned>(b);
     ChatRoomRecordHeader header;
     std::memcpy(&header, data, sizeof(header));
-    if (header.tag == 0x5014) {
-      g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ROOM_IS_MADE)), 0xFFFF00, 0, 0, 0);
-      ChatRoomTitleInfo* settings = &g_modeMgr.GetGameMode()->chatRoom;
-      unsigned offset = 6;
-      while (offset < size) {
-        std::memcpy(&header, data + offset, sizeof(header));
-        offset += 6;
-        switch (header.tag) {
-        case 0x5015:
-          return 0;
-        case 0x5016:
-          std::memcpy(this->saved, data + offset, header.size);
-          offset += header.size;
-          break;
-        case 0x5017: {
-          char value[260];
-          std::memset(value, 0, sizeof(value));
-          std::memcpy(value, data + offset, header.size);
-          offset += header.size;
-          settings->title = this->info.title = value;
-          break;
-        }
-        case 0x5018: {
-          char value[260];
-          std::memset(value, 0, sizeof(value));
-          std::memcpy(value, data + offset, header.size);
-          offset += header.size;
-          settings->password = this->info.password = value;
-          break;
-        }
-        case 0x5019:
-        std::memcpy(&this->info.type, data + offset, header.size);
-          offset += header.size;
-        settings->type = this->info.type;
-          break;
-        case 0x501A:
-          std::memcpy(&this->info.memberCount, data + offset, header.size);
-          offset += header.size;
-          settings->memberCount = this->info.memberCount;
-          break;
-        case 0x501B:
-          std::memcpy(&this->info.memberLimit, data + offset, header.size);
-          offset += header.size;
-          settings->memberLimit = this->info.memberLimit;
-          break;
-        case 0x501C:
-          std::memcpy(&this->info.id, data + offset, header.size);
-          offset += header.size;
-          settings->id = this->info.id;
-          this->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(settings), 0, 0, 0);
-          break;
-        case 0x501E: {
-          char value[260];
-          std::memset(value, 0, sizeof(value));
-          std::memcpy(value, data + offset, header.size);
-          offset += header.size;
-          this->SendMsg(nullptr, UM_CLEARMEMBER, 0, 0, 0, 0);
-          this->SendMsg(nullptr, UM_ADDMEMBER, reinterpret_cast<std::intptr_t>(value), 0, 0, 0);
-          break;
-        }
-        case 0x501F: {
-          char value[260];
-          std::memset(value, 0, sizeof(value));
-          std::memcpy(value, data + offset, header.size);
-          offset += header.size;
-          this->SendMsg(nullptr, UM_ADDMEMBER, reinterpret_cast<std::intptr_t>(value), 1, 0, 0);
-          break;
-        }
-        default:
-          offset += header.size;
-          break;
-        }
+    unsigned offset = sizeof(header);
+    if (REPLAY_CHUNK_CHAT_ROOM_BEGIN != header.tag) {
+      break;
+    }
+    g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_ROOM_IS_MADE)), 0xFFFF00, 0, 0, 0);
+    ChatRoomTitleInfo* settings = &g_modeMgr.GetGameMode()->chatRoom;
+    bool scanning = true;
+    while (scanning && size > offset) {
+      std::memcpy(&header, data + offset, sizeof(header));
+      offset += sizeof(header);
+      switch (header.tag) {
+      case REPLAY_CHUNK_CHAT_ROOM_END:
+        scanning = false;
+        break;
+      case REPLAY_CHUNK_CHAT_ROOM_SAVED:
+        std::memcpy(this->saved, data + offset, header.size);
+        offset += header.size;
+        break;
+      case REPLAY_CHUNK_CHAT_ROOM_TITLE: {
+        char value[260];
+        std::memset(value, 0, sizeof(value));
+        std::memcpy(value, data + offset, header.size);
+        offset += header.size;
+        settings->title = this->info.title = value;
+        break;
+      }
+      case REPLAY_CHUNK_CHAT_ROOM_PASSWORD: {
+        char value[260];
+        std::memset(value, 0, sizeof(value));
+        std::memcpy(value, data + offset, header.size);
+        offset += header.size;
+        settings->password = this->info.password = value;
+        break;
+      }
+      case REPLAY_CHUNK_CHAT_ROOM_TYPE:
+      std::memcpy(&this->info.type, data + offset, header.size);
+        offset += header.size;
+      settings->type = this->info.type;
+        break;
+      case REPLAY_CHUNK_CHAT_ROOM_MEMBER_COUNT:
+        std::memcpy(&this->info.memberCount, data + offset, header.size);
+        offset += header.size;
+        settings->memberCount = this->info.memberCount;
+        break;
+      case REPLAY_CHUNK_CHAT_ROOM_MEMBER_LIMIT:
+        std::memcpy(&this->info.memberLimit, data + offset, header.size);
+        offset += header.size;
+        settings->memberLimit = this->info.memberLimit;
+        break;
+      case REPLAY_CHUNK_CHAT_ROOM_ID:
+        std::memcpy(&this->info.id, data + offset, header.size);
+        offset += header.size;
+        settings->id = this->info.id;
+        this->SendMsg(nullptr, UM_SETINFO, reinterpret_cast<std::intptr_t>(settings), 0, 0, 0);
+        break;
+      case REPLAY_CHUNK_CHAT_ROOM_OWNER: {
+        char value[260];
+        std::memset(value, 0, sizeof(value));
+        std::memcpy(value, data + offset, header.size);
+        offset += header.size;
+        this->SendMsg(nullptr, UM_CLEARMEMBER, 0, 0, 0, 0);
+        this->SendMsg(nullptr, UM_ADDMEMBER, reinterpret_cast<std::intptr_t>(value), 0, 0, 0);
+        break;
+      }
+      case REPLAY_CHUNK_CHAT_ROOM_MEMBER: {
+        char value[260];
+        std::memset(value, 0, sizeof(value));
+        std::memcpy(value, data + offset, header.size);
+        offset += header.size;
+        this->SendMsg(nullptr, UM_ADDMEMBER, reinterpret_cast<std::intptr_t>(value), 1, 0, 0);
+        break;
+      }
+      default:
+        offset += header.size;
+        break;
       }
     }
     break;

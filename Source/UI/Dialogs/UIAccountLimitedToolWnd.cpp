@@ -1,3 +1,4 @@
+#include "UI/Dialogs/AccountLimitedOperation.h"
 #include "UI/Dialogs/UIAccountLimitedToolWnd.h"
 #include "UI/Window/UIEnums.h"
 
@@ -116,15 +117,15 @@ void UIAccountLimitedToolWnd::OnCreate(int, int) {
   accountIdText->Invalidate();
   this->AddChild(this->m_accountIdText);
 
-  const int buttonPositions[3][2] = {{this->geometry.width - 70, 22}, {15, 184}, {260, 184}};
-  this->m_message0 = 561;
+  this->m_message0 = ID_ADD_ITEM;
   {
     const char* buttonNames[3][4] = {
       {"btn_search", "btn_search_a", "btn_search_b", "btn_search_c"},
       {"btn_AddItem", "btn_AddItem_a", "btn_AddItem_b", "btn_AddItem_c"},
       {"btn_deleteItem", "btn_deleteItem_a", "btn_deleteItem_b", "btn_deleteItem_c"},
     };
-    const int buttonIds[3] = {321, 561, 211};
+    const int buttonIds[3] = {ID_SEARCH, ID_ADD_ITEM, ID_DELETE};
+    const int buttonPositions[3][2] = {{this->geometry.width - 70, 22}, {15, 184}, {260, 184}};
     const std::string prefix = "유저인터페이스\\";
     for (int i = 0; i < 3; ++i) {
       this->m_buttons[i] = new UIBitmapButton();
@@ -138,11 +139,14 @@ void UIAccountLimitedToolWnd::OnCreate(int, int) {
       this->m_buttons[i]->Enable(1);
       this->AddChild(this->m_buttons[i]);
       if (i == 0) {
-        this->m_buttons[i]->SetDisabled(0);
+        UIBitmapButton* button = this->m_buttons[i];
+        button->SetDisabled(0);
+        button->Invalidate();
       } else {
-        this->m_buttons[i]->SetDisabled(1);
+        UIBitmapButton* button = this->m_buttons[i];
+        button->SetDisabled(1);
+        button->Invalidate();
       }
-      this->m_buttons[i]->Invalidate();
     }
   }
 
@@ -190,7 +194,7 @@ int UIAccountLimitedToolWnd::SendMsg(UIWindow* sender, int message, std::intptr_
   switch (message) {
   case UM_COMMAND:
     switch (argument1) {
-    case 561: {
+    case ID_ADD_ITEM: {
       if (std::atoi(this->m_edits[1]->Text()) <= 0) {
         this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BARGAINSALE_TOOLWND_INPUT_COUNT_MSG)), 60, 0, 0);
         UITextViewer* viewer = this->m_viewer;
@@ -310,7 +314,7 @@ int UIAccountLimitedToolWnd::SendMsg(UIWindow* sender, int message, std::intptr_
     break;
   case UM_PARAM:
     switch (argument1) {
-    case 1:
+    case ACCOUNT_LIMITED_APPLY:
       switch (argument2) {
       case 3: {
         this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BARGAINSALE_TOOLWND_APPLY_FAILED_MSG)), 60, 0, 0);
@@ -367,7 +371,7 @@ int UIAccountLimitedToolWnd::SendMsg(UIWindow* sender, int message, std::intptr_
       }
       }
       break;
-    case 2:
+    case ACCOUNT_LIMITED_DELETE:
       if (argument2 == 1) {
         this->m_viewer->SendMsg(nullptr, UM_SETTEXT, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BARGAINSALE_TOOLWND_DELETE_FAILED_MSG)), 60, 0, 0);
         UITextViewer* viewer = this->m_viewer;
@@ -402,7 +406,7 @@ int UIAccountLimitedToolWnd::SendMsg(UIWindow* sender, int message, std::intptr_
         this->InvalidateChildren();
       }
       break;
-    case 0: {
+    case ACCOUNT_LIMITED_SEARCH: {
       this->m_accountIdText->SetNumber(argument2);
       UIBitmapButton* addButton = this->m_buttons[1];
       addButton->SetDisabled(0);

@@ -24,11 +24,24 @@ enum ServiceType : int {
   ServiceEu = 20,
 };
 
+enum Language : signed char {
+  LANGUAGE_KOREAN = 0,
+  LANGUAGE_JAPANESE = 2,
+  LANGUAGE_CHINESE = 3,
+  LANGUAGE_TAIWANESE = 4,
+  LANGUAGE_THAI = 5,
+  LANGUAGE_VIETNAMESE = 7,
+  LANGUAGE_ARABIC = 12,
+};
+
 enum ServerType : int {
   ServerPrimary = 0,
   ServerSakray = 1,
   ServerLocal = 2,
+  ServerInstantEvent = 3,
+  ServerPvp = 4,
   ServerPk = 5,
+  ServerStage = 13,
 };
 
 #endif

@@ -7,7 +7,33 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
+
+enum NavigationRouteResult : int {
+  NAVIGATION_RESULT_UNKNOWN = -100,
+  NAVIGATION_RESULT_NOT_SAME_MAP = -99,
+  NAVIGATION_RESULT_FAIL_START_DATA = -98,
+  NAVIGATION_RESULT_FAIL_TARGET = -97,
+  NAVIGATION_RESULT_FAIL_ROUTE = -96,
+  NAVIGATION_RESULT_FAIL_PLAYER = -95,
+  NAVIGATION_RESULT_NO_DATA = -94,
+  NAVIGATION_RESULT_MAP_NOT_NAVIGATION = -93,
+  NAVIGATION_RESULT_FAIL_TARGET_ROUTE = -92,
+  NAVIGATION_RESULT_UNABLE_TO_GUIDE_MAP = -90,
+  NAVIGATION_RESULT_SUCCESS = 0,
+  NAVIGATION_RESULT_START = 1,
+  NAVIGATION_RESULT_MOB_TARGET_MAP = 2,
+  NAVIGATION_RESULT_TARGET_MAP = 3,
+  NAVIGATION_RESULT_SCROLL = 4,
+  NAVIGATION_RESULT_ROUTE_SUCCESS = 5,
+  NAVIGATION_RESULT_MAP_TO_MAP_SUCCESS = 6,
+  NAVIGATION_RESULT_NPC_TO_MAP_SUCCESS = 7,
+  NAVIGATION_RESULT_MOB_TO_MAP_SUCCESS = 8,
+  NAVIGATION_RESULT_SAME_TARGET = 9,
+  NAVIGATION_RESULT_POST_MAP_SUCCESS = 10,
+  NAVIGATION_RESULT_HERE = 11,
+};
 
 class UIWindowMgr;
 class CActRes;
@@ -297,24 +323,24 @@ struct NavigationTarget {
   NavigationTarget() {
     this->type = -1;
     this->object = nullptr;
-    this->x = -1;
-    this->y = -1;
+    this->cell.first = -1;
+    this->cell.second = -1;
   }
   // OFFSET: 0x00B92A70
   // FUNCTION: fn_19554
   NavigationTarget(int type, void* object) {
     this->type = type;
     this->object = object;
-    this->x = -1;
-    this->y = -1;
+    this->cell.first = -1;
+    this->cell.second = -1;
   }
 
   // INLINED
   NavigationTarget(int type, void* object, int x, int y, std::string name) {
     this->type = type;
     this->object = object;
-    this->x = x;
-    this->y = y;
+    this->cell.first = x;
+    this->cell.second = y;
     this->name = name;
   }
 
@@ -324,8 +350,7 @@ struct NavigationTarget {
 
   /* 0000 */ int type;
   /* 0004 */ void* object;
-  /* 0008 */ int x = 0;
-  /* 000C */ int y = 0;
+  /* 0008 */ std::pair<int, int> cell;
   /* 0010 */ std::string name;
 };
 
@@ -334,8 +359,8 @@ struct NavigationTarget {
 inline NavigationTarget::~NavigationTarget() {
   this->type = -1;
   this->object = nullptr;
-  this->x = -1;
-  this->y = -1;
+  this->cell.first = -1;
+  this->cell.second = -1;
   this->name.clear();
 }
 

@@ -34,6 +34,12 @@ enum StylingShopStyleTable : int {
   STYLE_TABLE_BODY_STYLE = 7,
 };
 
+enum StylingAccessorySlot : int {
+  STYLING_ACCESSORY_TOP = 0,
+  STYLING_ACCESSORY_MID = 1,
+  STYLING_ACCESSORY_LOW = 2,
+};
+
 class UIDisplayCharacter : public UIWindow {
 public:
   UIDisplayCharacter();
@@ -189,7 +195,8 @@ class UIStaticBitmap;
 
 class UIAccessoryShowCase : public UIScrollWnd {
 public:
-  // INLINED
+  // OFFSET: 0x00822D70
+  // FUNCTION: fn_46528
   UIAccessoryShowCase(int width, int height) : UIScrollWnd(width, height, 0), m_itemFrames() {
     this->LoadAccessories(width, height);
   }

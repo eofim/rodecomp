@@ -382,6 +382,7 @@ __declspec(noinline) const char* EncryptedName<52, 0xBFF5C517A1A77F59ULL>::Text(
   return reinterpret_cast<const char*>(this->m_text);
 }
 
+
 // OFFSET: 0x00A5A550
 // FUNCTION: fn_16400
 __declspec(noinline) EncryptedName<6, 0x114901C7E37F6D49ULL>& GulimFontName1() {
@@ -634,7 +635,7 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::OnScroll(int posit
   if (this->data.size() == 0) {
     for (auto* item : this->items) {
       item->index = -1;
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
     }
     return;
   }
@@ -671,14 +672,14 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::OnScroll(int posit
       }
       item->SetSelected(row == this->selected);
       item->Move(this->itemX, y);
-      item->Show(1);
+      item->Show(WINDOW_VISIBLE);
     }
   }
 
   for (const auto end = this->items.end(); it != end; ++it) {
     auto* const item = *it;
     item->index = -1;
-    item->Show(0);
+    item->Show(WINDOW_HIDDEN);
   }
 }
 
@@ -955,25 +956,7 @@ void CUIRenewQuestUI::SelectQuest(unsigned int questId) {
   }
 
   std::string text = std::format("Not found Quest Info = %lu", questId);
-  g_windowMgr.Confirm(text.c_str(), 0, true, false, 0, "Message", 280, 120, 0);
-}
-
-// OFFSET: 0x00A59940
-// FUNCTION: fn_16362
-bool sub_A59940() {
-  return true;
-}
-
-// OFFSET: 0x00A59950
-// FUNCTION: fn_16363
-bool sub_A59950() {
-  return true;
-}
-
-// OFFSET: 0x00A59960
-// FUNCTION: fn_16364
-bool sub_A59960() {
-  return true;
+  g_windowMgr.Confirm(text.c_str(), 0, true, false, 0, "메시지", 280, 120, 0);
 }
 
 // OFFSET: 0x00A599F0
@@ -1026,7 +1009,7 @@ int CUIRenewQuestUI::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
 template <>
 void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
@@ -1037,16 +1020,16 @@ void CUIEditBoxEx::SetOnSubmit(std::function<void()> handler) {
   this->onSubmit = handler;
 }
 
-// OFFSET: 0x00A664C0
-// FUNCTION: fn_16616
-void RenewQuestUI::CUIQuestList::OnSelectItem(CUIQuestItem* item, const unsigned long& questId) {
-  if (item->questId == 0) {
+// OFFSET: 0x00A67190
+// FUNCTION: fn_46607
+void RenewQuestUI::CUIQuestItem::OpenQuestInfo() {
+  if (this->questId == 0) {
     return;
   }
 
-  if (item->questType == 2) {
+  if (this->questType == 2) {
     if (CUIRecommendedQuestInfo* info = dynamic_cast<CUIRecommendedQuestInfo*>(static_cast<UIFrameWnd*>(g_windowMgr.EnsureWindow(WID_RECOMMENDEDQUESTINFO)))) {
-      info->SetQuest(item->questId);
+      info->SetQuest(this->questId);
       if (UIWindow* other = g_windowMgr.LookupWindow(WID_ONGOINGQUESTINFO)) {
         info->Move(other->geometry.x, other->geometry.y);
         g_windowMgr.CloseWindow(WID_ONGOINGQUESTINFO);
@@ -1054,13 +1037,19 @@ void RenewQuestUI::CUIQuestList::OnSelectItem(CUIQuestItem* item, const unsigned
     }
   } else {
     if (CUIOngoingQuestInfo* info = dynamic_cast<CUIOngoingQuestInfo*>(static_cast<UIFrameWnd*>(g_windowMgr.EnsureWindow(WID_ONGOINGQUESTINFO)))) {
-      info->SetQuest(item->questId);
+      info->SetQuest(this->questId);
       if (UIWindow* other = g_windowMgr.LookupWindow(WID_RECOMMENDEDQUESTINFO)) {
         info->Move(other->geometry.x, other->geometry.y);
         g_windowMgr.CloseWindow(WID_RECOMMENDEDQUESTINFO);
       }
     }
   }
+}
+
+// OFFSET: 0x00A664C0
+// FUNCTION: fn_16616
+void RenewQuestUI::CUIQuestList::OnSelectItem(CUIQuestItem* item, const unsigned long& questId) {
+  item->OpenQuestInfo();
 }
 
 // OFFSET: 0x00A665C0
@@ -1080,8 +1069,8 @@ void RenewQuestUI::CUIQuestList::BindItem(CUIQuestItem* item, const unsigned lon
     item->icon->tooltip = info.m_iconTooltip;
     item->titleText->SetText(info.m_title);
     item->descriptionText->SetText(info.summary);
-    item->simpleViewCheckBox->Show(0);
-    item->activeCheckBox->Show(1);
+    item->simpleViewCheckBox->Show(WINDOW_HIDDEN);
+    item->activeCheckBox->Show(WINDOW_VISIBLE);
     CUICheckBox* activeCheckBox = item->activeCheckBox;
     activeCheckBox->checked = info.m_active;
     activeCheckBox->Invalidate();
@@ -1617,7 +1606,7 @@ void CUIRenewQuestUI::OnCreate(int width, int height) {
   normalButton->disabled = 0;
   normalButton->Invalidate();
   normalButton->SetId(2);
-  normalButton->SetText(std::string(""));
+  normalButton->SetText("");
   normalButton->SetFitText(0);
   normalButton->SetAlign(0, 0);
   normalButton->SetFont(std::string(GulimFontName1().Text()));
@@ -1639,7 +1628,7 @@ void CUIRenewQuestUI::OnCreate(int width, int height) {
   subButton->disabled = 0;
   subButton->Invalidate();
   subButton->SetId(3);
-  subButton->SetText(std::string(""));
+  subButton->SetText("");
   subButton->SetFitText(0);
   subButton->SetAlign(0, 0);
   subButton->SetFont(std::string(GulimFontName2().Text()));
@@ -1661,7 +1650,7 @@ void CUIRenewQuestUI::OnCreate(int width, int height) {
   dailyButton->disabled = 0;
   dailyButton->Invalidate();
   dailyButton->SetId(4);
-  dailyButton->SetText(std::string(""));
+  dailyButton->SetText("");
   dailyButton->SetFitText(0);
   dailyButton->SetAlign(0, 0);
   dailyButton->SetFont(std::string(GulimFontName3().Text()));
@@ -1683,7 +1672,7 @@ void CUIRenewQuestUI::OnCreate(int width, int height) {
   eventButton->disabled = 0;
   eventButton->Invalidate();
   eventButton->SetId(5);
-  eventButton->SetText(std::string(""));
+  eventButton->SetText("");
   eventButton->SetFitText(0);
   eventButton->SetAlign(0, 0);
   eventButton->SetFont(std::string(GulimFontName4().Text()));
@@ -1705,7 +1694,7 @@ void CUIRenewQuestUI::OnCreate(int width, int height) {
   etcButton->disabled = 0;
   etcButton->Invalidate();
   etcButton->SetId(1);
-  etcButton->SetText(std::string(""));
+  etcButton->SetText("");
   etcButton->SetFitText(0);
   etcButton->SetAlign(0, 0);
   etcButton->SetFont(std::string(GulimFontName5().Text()));
@@ -1786,7 +1775,7 @@ void CUIListBoxEx<RenewQuestUI::CUIQuestItem, unsigned long>::AddNewItem() {
     for (RenewQuestUI::CUIQuestItem*& slot : this->items) {
       RenewQuestUI::CUIQuestItem* item = new RenewQuestUI::CUIQuestItem();
       item->SetSize(this->itemWidth, this->rowHeight);
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->SetOnHover([this](CUIListItem* listItem) {
         for (RenewQuestUI::CUIQuestItem* other : this->items) {

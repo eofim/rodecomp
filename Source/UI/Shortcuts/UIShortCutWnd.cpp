@@ -424,7 +424,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     case TYPE_HEAL:
     case TYPE_SCHANGE:
     case TYPE_SPECIAL:
-      if (item.GetItemId() != ITEMID_TIME_GUARDIAN_BOX || g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_TO_OPEN_EVENT_ITEM), 2, false, false, 0, "Message", 280, 120, 0) != ID_NO) {
+      if (item.GetItemId() != ITEMID_TIME_GUARDIAN_BOX || g_windowMgr.Confirm(LookupMessage(MSI_CONFIRM_TO_OPEN_EVENT_ITEM), 2, false, false, 0, "메시지", 280, 120, 0) != ID_NO) {
         mode->SendMsg(MM_USEITEM, item.identity[1], 0, 0, 0);
       }
 
@@ -433,7 +433,7 @@ int UIShortCutWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::
     case TYPE_CASH_POINT_ITEM:
       if (g_session.m_manner >= 0) {
         const int result =
-          g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_CONFIRM_TO_OPEN_CASH_ITEM), item.DisplayName(0).c_str()).c_str(), 2, false, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_CONFIRM_TO_OPEN_CASH_ITEM), item.DisplayName(0).c_str()).c_str(), 2, false, false, 0, "메시지", 280, 120, 0);
         if (result == ID_YES) {
           mode->SendMsg(MM_USEITEM, item.identity[1], 0, 0, 0);
         }
@@ -727,13 +727,17 @@ void UINewChatWnd::OnLBtnUp(int x, int y) {
 // OFFSET: 0x009313F0
 // FUNCTION: fn_12704
 void UIRoMapWnd::OnLBtnUp(int x, int y) {
+  const int& mouseX = x;
+  const int& mouseY = y;
   this->fieldNames.clear();
 
-  unsigned int mapIndex = 0;
-  if (CWorldViewMap* map = g_worldViewMgr.CurrentWorld()->MapAt(mapIndex, x, y)) {
-    this->selectedMapIndex = mapIndex;
-    for (CWorldViewField* field : map->fields) {
-      this->fieldNames.push_back(field->fieldName);
+  {
+    unsigned int mapIndex = 0;
+    if (CWorldViewMap* map = g_worldViewMgr.CurrentWorld()->MapAt(mapIndex, mouseX, mouseY)) {
+      this->selectedMapIndex = mapIndex;
+      for (std::vector<CWorldViewField*>::iterator field = map->fields.begin(), last = map->fields.end(); field != last; ++field) {
+        this->fieldNames.push_back((*field)->fieldName);
+      }
     }
   }
 
@@ -758,8 +762,8 @@ void UIRoMapWnd::OnLBtnUp(int x, int y) {
       menu->Resize(width, height);
       menu->SendMsg(nullptr, UM_SET_CALLER_WID, 140, 0, 0, 0);
 
-      const int below = y + 1;
-      const int right = x + 2;
+      const int below = mouseY + 1;
+      const int right = mouseX + 2;
       const int menuX = this->geometry.width - right - width < 0 ? this->geometry.width - width : right;
       const int menuY = this->geometry.height - below - height < 0 ? this->geometry.height - height : below;
       menu->Move(menuX, menuY);
@@ -1006,15 +1010,16 @@ void UINewChatWnd::SaveChatLogs() {
 
   std::string name;
   int index = 0;
+  const auto& chatWindows = g_session.m_noSubChatWnds;
   for (std::vector<UIChatHisBox*>::iterator tab = this->m_tabs.begin(); tab != this->m_tabs.end(); ++tab, ++index) {
-    const std::map<int, SubChatWndInfo>::iterator info = g_session.m_noSubChatWnds.find(index);
-    if (info != g_session.m_noSubChatWnds.end()) {
+    const auto info = chatWindows.find(index);
+    if (info != chatWindows.end()) {
       name = info->second.name;
     }
 
     if (!name.empty()) {
-      sprintf(path, "%s\\Chat\\Chat_%s.txt", g_applicationDirectory, name.c_str());
       int number = 0;
+      sprintf(path, "%s\\Chat\\Chat_%s.txt", g_applicationDirectory, name.c_str());
       while (_access(path, 0) == 0) {
         ++number;
         sprintf(path, "%s\\Chat\\Chat_%s_%03d.txt", g_applicationDirectory, name.c_str(), number);
@@ -1029,10 +1034,10 @@ void UINewChatWnd::SaveChatLogs() {
     }
   }
 
-  for (std::map<int, UIWindow*>::iterator it = g_windowMgr.retainedWindows.begin(); it != g_windowMgr.retainedWindows.end(); ++it) {
+  for (auto it = g_windowMgr.retainedWindows.cbegin(); it != g_windowMgr.retainedWindows.cend(); ++it) {
     name = static_cast<UISubChatHisWnd*>(it->second)->Name();
-    sprintf(path, "%s\\Chat\\Chat_%s.txt", g_applicationDirectory, name.c_str());
     int number = 0;
+    sprintf(path, "%s\\Chat\\Chat_%s.txt", g_applicationDirectory, name.c_str());
     while (_access(path, 0) == 0) {
       ++number;
       sprintf(path, "%s\\Chat\\Chat_%s_%03d.txt", g_applicationDirectory, name.c_str(), number);
@@ -1105,7 +1110,7 @@ int UIMemorialDunWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argum
       g_windowMgr.CloseWindow(WID_MEMORIALDUNWND);
       return 0;
     case ID_CLOSE:
-      this->Show(0);
+      this->Show(WINDOW_HIDDEN);
       if (g_session.memorialDungeonState == 2) {
         g_session.memorialWindowOpen = 0;
       }
@@ -1261,7 +1266,7 @@ int UISubChatHisWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         }
       }
       if (this->TextWidth(local.c_str(), 0, 0, 12, 0, 0) + 10 >= this->geometry.width - 0x32) {
-        g_windowMgr.Confirm(LookupMessage(MSI_FAILED_CHANGE_TABNAME), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_FAILED_CHANGE_TABNAME), 0, true, false, 0, "메시지", 0x118, 0x78, 0);
       }
       this->m_edit->Move(-100, -100);
       this->m_edit->SetText("");
@@ -1586,7 +1591,7 @@ void UINewChatWnd::OnCreate(int width, int height) {
       this->m_suggestions->Move(this->m_chatEdit->geometry.x, this->m_chatEdit->geometry.y - this->m_suggestions->geometry.height);
       this->AddChild(this->m_suggestions);
       if (this->m_suggestions) {
-        this->m_suggestions->Show(0);
+        this->m_suggestions->Show(WINDOW_HIDDEN);
       }
     }
   }

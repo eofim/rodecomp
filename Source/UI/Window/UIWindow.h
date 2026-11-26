@@ -32,6 +32,11 @@ class UIItemTagButton;
 struct PriceColors;
 struct TextLink;
 
+enum WindowVisibility : int {
+  WINDOW_HIDDEN = 0,
+  WINDOW_VISIBLE = 1,
+};
+
 class UIWindow : public UIRPData {
   friend class UIWindowMgr;
   friend class CUIDropDownBox;
@@ -67,7 +72,7 @@ public:
   virtual void OnRun();
   virtual void OnSize(int width, int height);
   virtual void OnBeginEdit();
-  virtual void OnFinishEdit(int argument);
+  virtual void OnFinishEdit(bool argument);
   virtual void OnLBtnDown(int argument1, int argument2);
   virtual void OnLBtnDblClk(int argument1, int argument2);
   virtual void OnMouseMove(int argument1, int argument2);
@@ -194,7 +199,7 @@ public:
   );
   void FlushPrimitives();
   void FillSurface(std::uint32_t color, const tagRECT* rectangle);
-  void WrapLinkText(int* kind, std::vector<std::string>* lines, const std::string& text);
+  void WrapLinkText(int kind, std::vector<std::string>* lines, const std::string& text);
   void WrapTextWithBreaks(const char* text, std::vector<std::string>* lines, std::vector<bool>* breaks, int width);
   int DrawItemNameSegments(
     int x, int y, int width, const std::vector<const char*>& breaks, const char* text, const char* highlight, std::uint32_t highlightColor,
@@ -288,6 +293,12 @@ private:
 // FUNCTION: fn_03629
 inline void UIWindow::SetId(int value) {
   this->geometry.SetId(value);
+}
+
+// OFFSET: 0x005C9630
+// FUNCTION: fn_03632
+inline void UIWindow::Show(int visible) {
+  this->geometry.Show(visible);
 }
 
 extern std::uint32_t g_windowUid;

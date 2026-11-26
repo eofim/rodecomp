@@ -65,20 +65,21 @@ int WorldViewSpatial::ClassifyOriented(const OrientedBounds& bounds) const {
     const float first = Absolute(((normal.x * bounds.axes[0][0] + normal.y * bounds.axes[0][1]) + normal.z * bounds.axes[0][2]) * bounds.halfSize[0]);
     const float third = Absolute(((normal.x * bounds.axes[2][0] + normal.y * bounds.axes[2][1]) + normal.z * bounds.axes[2][2]) * bounds.halfSize[2]);
     const float radius = (second + first) + third;
-    const float distance = ((normal.x * bounds.center[0] + normal.y * bounds.center[1]) + normal.z * bounds.center[2]) + view.planes[plane][3];
+    const float distance =
+      ((view.normals[plane].x * bounds.center[0] + view.normals[plane].y * bounds.center[1]) + view.normals[plane].z * bounds.center[2]) + view.planes[plane][3];
 
     if (!(distance > radius)) {
       const float negative = -radius;
 
       if (!(distance > negative)) {
-        return 0;
+        return MODEL_VIEW_OUTSIDE;
       }
 
       clipped = true;
     }
   }
 
-  return clipped ? 2 : 1;
+  return clipped ? MODEL_VIEW_CLIPPED : MODEL_VIEW_INSIDE;
 }
 
 // INLINED
@@ -98,14 +99,14 @@ int ClassifyModelView(const OrientedBounds& bounds, const ModelViewPlanes& plane
       const float negative = -radius;
 
       if (!(distance > negative)) {
-        return 0;
+        return MODEL_VIEW_OUTSIDE;
       }
 
       clipped = true;
     }
   }
 
-  return clipped ? 2 : 1;
+  return clipped ? MODEL_VIEW_CLIPPED : MODEL_VIEW_INSIDE;
 }
 
 // INLINED
@@ -128,8 +129,8 @@ void DrawWorldModelLeaves(
         model->Update();
       }
 
-      if (visibility == 1 || visibility == 2) {
-        model->Draw(matrix, visibility == 2);
+      if (visibility == MODEL_VIEW_INSIDE || visibility == MODEL_VIEW_CLIPPED) {
+        model->Draw(matrix, visibility == MODEL_VIEW_CLIPPED);
       }
 
       model->renderFrame = frame;
@@ -191,10 +192,10 @@ void CView::Render() {
       }
 
       switch (visibility) {
-      case 1:
+      case MODEL_VIEW_INSIDE:
         model->Draw(matrix, false);
         break;
-      case 2:
+      case MODEL_VIEW_CLIPPED:
         model->Draw(matrix, true);
         break;
       }

@@ -18,6 +18,8 @@ struct MapInfo {
   /* 0018 */ bool m_showDisplayName;
   /* 001C */ std::pair<std::string, std::string> m_sign;
   /* 004C */ std::string m_backgroundBmp;
+
+  ~MapInfo();
 };
 
 struct MapNameDisplay {
@@ -27,6 +29,7 @@ struct MapNameDisplay {
   /* 000A */ unsigned short m_height;
   /* 000C */ DWORD m_startTime;
 
+  bool Draw();
   MapNameDisplay(std::string name, std::string subName, std::string bmp);
   // INLINED
   ~MapNameDisplay() {

@@ -163,6 +163,11 @@ void RC6::Base::SetKey(std::span<const std::uint8_t> key) {
 - A marked function is not compared or peer reviewed: it goes to maintainer review, who checks it
   against the reference build.
 - Use it only for such stubs, and only with a reference build that has the real body.
+- A body recovered by emulating the protector's VM (no build has it as ordinary x86) names the VM entry instead:
+  `// VIRTUALIZED: emulated 0x00B08F6A`, the address of the stub's jump into the VM. Keep the emulation evidence
+  in the batch notes; maintainer review checks the body against it.
+- Strings such a body uses that exist only inside the protector's encrypted VM data are listed by a maintainer in
+  `vmLiterals` (`data/decomp.json`), each with its evidence; no other literal outside the executable is allowed.
 
 ## 2a. Verification uses Clank
 
@@ -301,6 +306,10 @@ Never use `/utf-8`, and never save sources as CP949/EUC-KR.
   used them; an optimized SIMD instruction alone is not evidence. Scalar data is not `__m128i`.
 - Do not use `#pragma optimize` (including `#pragma optimize("y", off)`) to alter compiler optimization or frame-pointer settings.
   Use the configured project compiler settings; byte matching does not justify source-level optimization overrides.
+- Do not steer inlining from source: no `#pragma inline_depth`, `#pragma inline_recursion`, `[[msvc::noinline_calls]]`,
+  `[[msvc::forceinline_calls]]` or `[[msvc::flatten]]`. Write the plain call; a lower score is accepted.
+- Call virtual functions through the declared virtual (`this->effect->GetDuration()`), never through a function
+  pointer read from the vtable by offset, even when the original loads the target into a register first.
 - Explicit template instantiations and declarations that only steer linkage or inlining
   (`template __declspec(noinline) ...;`, `extern template ...;`) go in the unit's linkage prelude
   `Source/Linkage/<unit path>.h` (e.g. `Source/Linkage/Source/UI/Window/WindowDialogs.cpp.h`), never in the game

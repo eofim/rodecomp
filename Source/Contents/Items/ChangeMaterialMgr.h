@@ -9,6 +9,8 @@ struct lua_State;
 
 struct ChangeMaterialEntry {
   // INLINED
+  ChangeMaterialEntry() : itemId(0), count(0) {}
+  // INLINED
   ChangeMaterialEntry(int itemId, int count) : itemId(itemId), count(count) {}
   // INLINED
   ChangeMaterialEntry(const ChangeMaterialEntry& other) : itemId(other.itemId), count(other.count) {}
@@ -23,15 +25,15 @@ struct ChangeMaterialEntry {
   }
 };
 
-struct ChangeMaterialProduct {
+struct ChangeMaterialProduct : ChangeMaterialEntry {
   // INLINED
-  ChangeMaterialProduct(int itemId, int count, int rate) : itemId(itemId), count(count), rate(rate) {}
+  ChangeMaterialProduct() : rate(0) {}
   // INLINED
-  ChangeMaterialProduct(const ChangeMaterialProduct& other) : itemId(other.itemId), count(other.count), rate(other.rate) {}
+  ChangeMaterialProduct(int itemId, int count, int rate) : ChangeMaterialEntry(itemId, count), rate(rate) {}
+  // INLINED
+  ChangeMaterialProduct(const ChangeMaterialProduct& other) : ChangeMaterialEntry(other.itemId, other.count), rate(other.rate) {}
   ChangeMaterialProduct& operator=(const ChangeMaterialProduct& other) = default;
 
-  /* 0000 */ int itemId;
-  /* 0004 */ int count;
   /* 0008 */ int rate;
 };
 
@@ -84,9 +86,7 @@ public:
 
 class CChangeMaterialMgr {
 public:
-  // INLINED
-  CChangeMaterialMgr() : m_isValid(true) {
-  }
+  CChangeMaterialMgr();
 
   static bool CreateInstance();
   static void DestroyInstance();

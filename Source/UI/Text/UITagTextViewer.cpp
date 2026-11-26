@@ -4,7 +4,9 @@
 #include <algorithm>
 
 #include "Contents/Map/MapSkyMgr.h"
+#include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Buttons/UITextButton.h"
+#include "UI/Dialogs/UISayDialogWnd.h"
 #include "UI/Lists/UIScrollBar.h"
 #include "UI/Text/CreateLineInfo.h"
 
@@ -12,7 +14,7 @@
 // FUNCTION: fn_10515
 UITagTextViewer::UITagTextViewer()
     : UIScroll(), m_backgroundColor(0xFFFFFF), m_textWidth(0), m_lineSpacing(6), m_margin(3), m_topMargin(4), m_font(0, 12, false, false), m_outlined(false),
-      m_outlineColor(0xFFFFFF), m_horizontalAlign(0), m_verticalAlign(3), m_cursorY(0), m_offsetY(m_topMargin) {
+      m_outlineColor(0xFFFFFF), m_horizontalAlign(TEXT_ALIGN_LEFT), m_verticalAlign(TEXT_ALIGN_TOP), m_cursorY(0), m_offsetY(m_topMargin) {
 }
 
 // OFFSET: 0x0083E740
@@ -59,7 +61,7 @@ void TagTextViewer::UIScroll::OnCreate(int width, int height) {
   this->m_scrollBar = new UIScrollBar();
   this->m_scrollBar->Configure(width - 13, 0, 1, height);
   this->AddChild(this->m_scrollBar);
-  this->m_scrollBar->Show(0);
+  this->m_scrollBar->Show(WINDOW_HIDDEN);
   this->UpdateScroll();
 }
 
@@ -100,7 +102,7 @@ void TagTextViewer::UIScroll::UpdateScroll() {
   }
 
   if (height > this->geometry.height) {
-    this->m_scrollBar->Show(1);
+    this->m_scrollBar->Show(WINDOW_VISIBLE);
     this->m_scrollBar->SetRange(height - this->geometry.height, this->geometry.height, height);
     const int position = std::max(0, this->m_scrollPos);
     const int range = height - this->geometry.height;
@@ -110,7 +112,7 @@ void TagTextViewer::UIScroll::UpdateScroll() {
       it->first->Move(static_cast<int>(it->second.x), static_cast<int>(it->second.y - static_cast<float>(this->m_scrollPos)));
     }
   } else {
-    this->m_scrollBar->Show(0);
+    this->m_scrollBar->Show(WINDOW_HIDDEN);
   }
 
   this->Invalidate();
@@ -200,6 +202,20 @@ int UITagTextViewer::SendMsg(
   case UM_SCROLLVERT:
   case UM_SCROLLVERTPAGEUP:
   case UM_SCROLLVERTPAGEDOWN: {
+    if (this->parent && this->parent->geometry.id == WID_SAYDIALOGWND) {
+      bool hasPageButton = false;
+      for (UIBitmapButton* button : static_cast<UISayDialogWnd*>(this->parent)->m_buttons) {
+        if (button->geometry.id == ID_NEXT || button->geometry.id == ID_CLOSE) {
+          hasPageButton = true;
+          break;
+        }
+      }
+
+      if (!hasPageButton) {
+        return 0;
+      }
+    }
+
     const int previous = this->m_scrollPos;
     if (message == UM_SCROLLVERTPAGEUP) {
       this->m_scrollPos -= 30;
@@ -225,14 +241,14 @@ int UITagTextViewer::SendMsg(
 // FUNCTION: fn_10532
 void UITagTextViewer::SetAlign(unsigned char align) {
   switch (align) {
-  case 0:
-  case 1:
-  case 2:
+  case TEXT_ALIGN_LEFT:
+  case TEXT_ALIGN_RIGHT:
+  case TEXT_ALIGN_CENTER:
     this->m_horizontalAlign = align;
     break;
-  case 3:
-  case 4:
-  case 5:
+  case TEXT_ALIGN_TOP:
+  case TEXT_ALIGN_MIDDLE:
+  case TEXT_ALIGN_BOTTOM:
     this->m_verticalAlign = align;
     break;
   }
@@ -274,9 +290,9 @@ void UITagTextViewer::AddText(const std::string& text) {
   }
   this->m_offsetY = offset;
 
-  const std::vector<std::vector<UIWindow*>> lines = info.m_lines;
+  const std::vector<LineWindows> lines = info.m_lines;
   for (auto lineIt = lines.begin(); lineIt != lines.end(); ++lineIt) {
-    std::vector<UIWindow*> line = *lineIt;
+    std::vector<UIWindow*> line = lineIt->windows;
     for (auto windowIt = line.begin(); windowIt != line.end(); ++windowIt) {
       (*windowIt)->Move((*windowIt)->geometry.x + this->m_margin, (*windowIt)->geometry.y + offset + previousCursor + spacing);
       this->AddChild(*windowIt);
@@ -305,7 +321,7 @@ void UITagTextViewer::Layout() {
     this, joined.c_str(), this->m_textWidth, this->m_lineSpacing, this->m_font, this->m_outlined, this->m_outlineColor,
     false, 0xFFFFFF, this->m_horizontalAlign
   );
-  const std::vector<std::vector<UIWindow*>> lines = info.m_lines;
+  const std::vector<LineWindows> lines = info.m_lines;
 
   int offset = std::max(this->m_topMargin, 0);
   const unsigned int content = static_cast<unsigned int>(this->m_topMargin) + static_cast<unsigned int>(info.m_height);
@@ -317,7 +333,7 @@ void UITagTextViewer::Layout() {
     }
   }
   for (auto lineIt = lines.begin(); lineIt != lines.end(); ++lineIt) {
-    std::vector<UIWindow*> line = *lineIt;
+    std::vector<UIWindow*> line = lineIt->windows;
     for (auto windowIt = line.begin(), windowEnd = line.end(); windowIt != windowEnd; ++windowIt) {
       (*windowIt)->Move((*windowIt)->geometry.x + this->m_margin, (*windowIt)->geometry.y + offset);
       this->AddChild(*windowIt);

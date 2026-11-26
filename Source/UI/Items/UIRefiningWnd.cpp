@@ -104,6 +104,16 @@ UIRefining_BtnRefining::UIRefining_BtnRefining() : UIBitmapButton(), cost(0) {
 UIRefining_BtnReturn::UIRefining_BtnReturn() : UIBitmapButton(), highlighted(1) {
 }
 
+// OFFSET: 0x007F5200
+// FUNCTION: fn_46579
+inline void UIRefining_BtnRefining::InitializeBitmaps() {
+  this->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_normal.bmp", 0, 0);
+  this->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_normal.bmp", 1, 0);
+  this->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_press.bmp", 2, 0);
+  this->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_disable.bmp", 3, 0);
+  this->Resize(this->BitmapWidth(), this->BitmapHeight());
+}
+
 // OFFSET: 0x007F5E30
 // FUNCTION: fn_09907
 void UIRefiningWnd::OnCreate(int width, int height) {
@@ -119,11 +129,7 @@ void UIRefiningWnd::OnCreate(int width, int height) {
 
   UIRefining_BtnRefining* refining = new UIRefining_BtnRefining();
   this->refiningButton = refining;
-  refining->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_normal.bmp", 0, 0);
-  refining->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_normal.bmp", 1, 0);
-  refining->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_press.bmp", 2, 0);
-  refining->SetBitmap("유저인터페이스\\refining_renewal\\bt_refining_disable.bmp", 3, 0);
-  refining->Resize(refining->BitmapWidth(), refining->BitmapHeight());
+  refining->InitializeBitmaps();
   this->refiningButton->Move(84, 262);
   this->refiningButton->SetId(ID_OK);
   {
@@ -168,7 +174,7 @@ void UIRefiningWnd::OnCreate(int width, int height) {
 // FUNCTION: fn_09902
 void UIRefiningWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (static_cast<unsigned>(x - 109) <= 46 && static_cast<unsigned>(y - 201) <= 46 && drag->source == 1) {
+  if (static_cast<unsigned>(x - 109) <= 46 && static_cast<unsigned>(y - 201) <= 46 && drag->source == DRAG_ITEM_INVENTORY) {
     this->SendMsg(this, UM_REFRESHITEM, drag->id, 0, 0, 0);
   }
   g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -243,12 +249,31 @@ int UIRefiningWnd::SlotAt(int x, int y) {
 }
 
 // INLINED
+static bool LacksItems(int required, const ITEM_INFO& item) {
+  return required > item.quantity;
+}
+
+// INLINED
 static __forceinline int SelectedSuccessRate(const UIRefiningWnd* window) {
   if (window->item.identity[1] > 0 && window->materials.size() != 0 && window->selectedMaterial >= 0 &&
       window->materials.size() > static_cast<unsigned>(window->selectedMaterial)) {
     return window->materials[window->selectedMaterial].successRate;
   }
   return 0;
+}
+
+// OFFSET: 0x007F8E60
+// FUNCTION: fn_46574
+inline void UIRefining_BtnAgain::SetSuccess(unsigned char value) {
+  this->success = value;
+  this->UpdateBitmaps();
+}
+
+// OFFSET: 0x007F8E80
+// FUNCTION: fn_46575
+inline void UIRefining_BtnReturn::SetHighlighted(unsigned char value) {
+  this->highlighted = value;
+  this->UpdateBitmaps();
 }
 
 // OFFSET: 0x007F55A0
@@ -262,28 +287,12 @@ void UIRefiningWnd::ApplyResult() {
 
   switch (this->result) {
   case REFINING_STATE_SUCCESS:
-    {
-      UIRefining_BtnReturn* button = this->returnButton;
-      button->highlighted = 1;
-      button->UpdateBitmaps();
-    }
-    {
-      UIRefining_BtnAgain* button = this->againButton;
-      button->success = 1;
-      button->UpdateBitmaps();
-    }
+    this->returnButton->SetHighlighted(1);
+    this->againButton->SetSuccess(1);
     break;
   case REFINING_STATE_FAIL:
-    {
-      UIRefining_BtnReturn* button = this->returnButton;
-      button->highlighted = 0;
-      button->UpdateBitmaps();
-    }
-    {
-      UIRefining_BtnAgain* button = this->againButton;
-      button->success = 0;
-      button->UpdateBitmaps();
-    }
+    this->returnButton->SetHighlighted(0);
+    this->againButton->SetSuccess(0);
     {
       UIRefining_BtnAgain* button = this->againButton;
       button->SetDisabled(1);
@@ -292,16 +301,8 @@ void UIRefiningWnd::ApplyResult() {
     break;
   case REFINING_STATE_DOWNGRADE:
   case REFINING_STATE_FAIL2:
-    {
-      UIRefining_BtnReturn* button = this->returnButton;
-      button->highlighted = 0;
-      button->UpdateBitmaps();
-    }
-    {
-      UIRefining_BtnAgain* button = this->againButton;
-      button->success = 0;
-      button->UpdateBitmaps();
-    }
+    this->returnButton->SetHighlighted(0);
+    this->againButton->SetSuccess(0);
     break;
   }
 
@@ -336,7 +337,7 @@ void UIRefiningWnd::ApplyResult() {
       }
     } else {
       this->notice->SetNoticeInline(LookupMessage(MSI_USING_BLACKSMITH_BLESSING), 0, 0);
-      if (this->catalystCount > g_session.LookupClientItem(this->catalystItemId, 0).quantity) {
+      if (LacksItems(this->catalystCount, g_session.LookupClientItem(this->catalystItemId, 0))) {
         this->catalystEnabled = 0;
         this->notice->SetNoticeInline(LookupMessage(MSI_REFINING_AGAIN_FAILED_LACK_OF_BLACKSMITHBLESSING), 5000, 1);
         {
@@ -550,10 +551,11 @@ void UIRefiningWnd::OnLBtnUp(int x, int y) {
     button->Invalidate();
 
     if (this->materials[slot].successRate < 100 && this->catalystEnabled == 0) {
+      int messageId = 0;
       switch (this->materials[slot].itemId) {
       case ITEMID_CARNIUM:
       case ITEMID_BRADIUM:
-        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_ITEM_DISAPPEAR_OR_ITEM_DOWNGRADE), 0, 0);
+        messageId = MSI_REFINING_FAIL_ITEM_DISAPPEAR_OR_ITEM_DOWNGRADE;
         break;
       case ITEMID_HD_CARNIUM:
       case ITEMID_HD_BRADIUM:
@@ -567,7 +569,7 @@ void UIRefiningWnd::OnLBtnUp(int x, int y) {
       case ITEMID_ETHERDEOCON:
       case ITEMID_ENRICHED_ETHERNIUM:
       case ITEMID_ENRICHED_ETHERDEOCON:
-        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_ITEM_DOWMGRADE), 0, 0);
+        messageId = MSI_REFINING_FAIL_ITEM_DOWMGRADE;
         break;
       case ITEMID_ORIDECON:
       case ITEMID_ELUNIUM:
@@ -581,11 +583,11 @@ void UIRefiningWnd::OnLBtnUp(int x, int y) {
       case ITEMID_HD_ETEL_BRADIUM:
       case ITEMID_ETEL_CARNIUM:
       case ITEMID_HD_ETEL_CARNIUM:
-        this->notice->SetNotice(LookupMessage(MSI_REFINING_FAIL_ITEM_DISAPPEAR), 0, 0);
+        messageId = MSI_REFINING_FAIL_ITEM_DISAPPEAR;
         break;
-      default:
-        this->Invalidate();
-        return;
+      }
+      if (messageId != 0) {
+        this->notice->SetNotice(LookupMessage(messageId), 0, 0);
       }
     }
   } else {
@@ -629,11 +631,9 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
   char name[260];
   std::memset(name, 0, sizeof(name));
 
-  auto inRect = [&](int left, int top, int right, int bottom) {
-    return x >= left && x <= right && y >= top && y <= bottom;
-  };
-
-  if (this->selectedMaterial != -1 && inRect(81, 150, 105, 174)) {
+  const int& px = x;
+  const int& py = y;
+  if (this->selectedMaterial != -1 && px >= 81 && px <= 105 && py >= 150 && py <= 174) {
     ITEM_INFO info;
     info.SetItemId(this->materials[this->selectedMaterial].itemId);
     int capacity = 260;
@@ -645,7 +645,7 @@ void UIRefiningWnd::OnMouseHover(int x, int y) {
     return;
   }
 
-  if (this->catalystEnabled == 1 && inRect(161, 150, 185, 174)) {
+  if (this->catalystEnabled == 1 && px >= 161 && px <= 185 && py >= 150 && py <= 174) {
     ITEM_INFO info;
     info.SetItemId(this->catalystItemId);
     int capacity = 260;

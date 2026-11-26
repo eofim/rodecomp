@@ -186,12 +186,12 @@ void CEffect::SetWindowOffset(vector3d, int, int) {
 
 // OFFSET: 0x005A2470
 // FUNCTION: fn_03102
-void CEffect::SetFlipX(int) {
+void CEffect::SetFlipX(bool) {
 }
 
 // OFFSET: 0x005A2480
 // FUNCTION: fn_03103
-void CEffect::SetFlipY(int) {
+void CEffect::SetFlipY(bool) {
 }
 
 // OFFSET: 0x005A2490
@@ -252,16 +252,6 @@ void EffectResourceSwitcher::SetDelay(int argument) {
 void CEffect::SetResource(int) {
 }
 
-// OFFSET: 0x006FFA00
-// FUNCTION: fn_06967
-__declspec(noinline) unsigned char CEZ2STREffectEx::IsFinished() {
-  if (!this->emitter) {
-    return false;
-  }
-
-  return this->emitter->m_finishedClips >= this->emitter->m_clipLimit;
-}
-
 // OFFSET: 0x006FFA20
 // FUNCTION: fn_06968
 void CEZ2STREffectEx::Open() {
@@ -296,11 +286,11 @@ void CEZ2STREffectEx::Open() {
   emitter->m_delay = info->interval;
   this->frameStep = info->interval / 16;
   if (!info->soundPath.empty()) {
-    this->AddEvent(0, info->soundPath.c_str(), this->frameStep + 1, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, info->soundPath.c_str(), this->frameStep + 1, 0);
   }
 
   if (info->delay >= 0) {
-    this->AddEvent(1, nullptr, info->delay, 0);
+    this->AddEvent(EFFECT_EVENT_QUAKE, nullptr, info->delay, 0);
   }
 
   if (info->flags & 2) {
@@ -366,9 +356,19 @@ void CEZ2STREffectEx::OnProcess() {
     const float viewX = position.x * view.values[0] + position.y * view.values[3] + position.z * view.values[6] + view.values[9] + emitter->offsetX;
     const float viewY = position.x * view.values[1] + position.y * view.values[4] + position.z * view.values[7] + view.values[10] - emitter->offsetY;
 
-    const vector3d world = {viewX * inverse.values[0] + viewY * inverse.values[3] + viewZ * inverse.values[6] + inverse.values[9],
-                            viewX * inverse.values[1] + viewY * inverse.values[4] + viewZ * inverse.values[7] + inverse.values[10],
-                            viewX * inverse.values[2] + viewY * inverse.values[5] + viewZ * inverse.values[8] + inverse.values[11]};
+    vector3d world;
+    world.x = viewY * inverse.values[3];
+    world.x += viewX * inverse.values[0];
+    world.x += viewZ * inverse.values[6];
+    world.x += inverse.values[9];
+    world.y = viewX * inverse.values[1];
+    world.y += viewY * inverse.values[4];
+    world.y += viewZ * inverse.values[7];
+    world.y += inverse.values[10];
+    world.z = viewX * inverse.values[2];
+    world.z += viewY * inverse.values[5];
+    world.z += viewZ * inverse.values[8];
+    world.z += inverse.values[11];
     emitter->position = world;
     static_cast<CEZ2STRParticle*>(emitter)->Process(0.0f, 0.0f, 0.0f);
   }
@@ -404,17 +404,17 @@ void CEZ2STREffectEx::SetAlpha(float argument) {
 
 // OFFSET: 0x006FFF10
 // FUNCTION: fn_06973
-void CEZ2STREffectEx::SetFlipX(int argument) {
+void CEZ2STREffectEx::SetFlipX(bool argument) {
   if (this->emitter) {
-    this->emitter->m_flipX = static_cast<unsigned char>(argument);
+    this->emitter->m_flipX = argument;
   }
 }
 
 // OFFSET: 0x006FFF30
 // FUNCTION: fn_06974
-void CEZ2STREffectEx::SetFlipY(int argument) {
+void CEZ2STREffectEx::SetFlipY(bool argument) {
   if (this->emitter) {
-    this->emitter->m_flipY = static_cast<unsigned char>(argument);
+    this->emitter->m_flipY = argument;
   }
 }
 
@@ -481,7 +481,7 @@ void CEZ2STREffectEx::SetDelay(int argument) {
   }
 
   this->frameStep = argument / 16;
-  this->SetEventFrame(0, this->frameStep + 1);
+  this->SetEventFrame(EFFECT_EVENT_SOUND, this->frameStep + 1);
 }
 
 // INLINED
@@ -506,8 +506,8 @@ void CEZ2STREffectMgr::InfoInserter::operator()(const std::pair<const std::strin
   info.flags = entry.second.aboveUi ? info.flags | 4 : info.flags;
   info.soundPath = static_cast<const std::string&>(FromUtf8(entry.second.soundPath, g_textCodePage));
   info.flags = entry.second.soundLoop ? info.flags | 8 : info.flags;
-  info.delay = entry.second.delays[0];
-  info.interval = entry.second.delays[1];
+  info.delay = entry.second.quakeDelay;
+  info.interval = entry.second.startDelayTime;
   info.flags = entry.second.toGround ? info.flags | 16 : info.flags;
 
   std::string key = FromUtf8(entry.first, g_textCodePage);

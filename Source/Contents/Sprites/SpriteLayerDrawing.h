@@ -11,6 +11,11 @@
 #include <string>
 #include <utility>
 
+enum SpriteBlendVariant : char {
+  SPRITE_BLEND_CUSTOM_WEAPON = 1,
+  SPRITE_BLEND_BODY_HEAD_HIGH_ALPHA_REF = 2,
+};
+
 class CActRes;
 class CImfRes;
 class CPc;
@@ -20,8 +25,16 @@ struct SpriteFrameCell;
 struct SpriteRleImage;
 
 struct SpriteLayerResources {
-  /* 0000 */ CSprRes* sprite = nullptr;
-  /* 0004 */ CActRes* action = nullptr;
+  // INLINED
+  SpriteLayerResources() : sprite(nullptr), action(nullptr) {
+  }
+
+  // INLINED
+  SpriteLayerResources(CSprRes* sprite, CActRes* action) : sprite(sprite), action(action) {
+  }
+
+  /* 0000 */ CSprRes* sprite;
+  /* 0004 */ CActRes* action;
 };
 
 struct SpriteLayerCell {

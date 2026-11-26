@@ -13,24 +13,6 @@ WorldViewSpatial::WorldViewSpatial() {
 // OFFSET: 0x00ADAC70
 // FUNCTION: fn_17912
 CView::CView() {
-  this->camera.target.x = 0.0f;
-  this->camera.target.y = 0.0f;
-  this->camera.target.z = 0.0f;
-  this->camera.desiredTarget.x = 0.0f;
-  this->camera.desiredTarget.y = 0.0f;
-  this->camera.desiredTarget.z = 0.0f;
-  this->backupCurrentTarget.x = 0.0f;
-  this->backupCurrentTarget.y = 0.0f;
-  this->backupCurrentTarget.z = 0.0f;
-  this->backupDesiredTarget.x = 0.0f;
-  this->backupDesiredTarget.y = 0.0f;
-  this->backupDesiredTarget.z = 0.0f;
-  this->frame.eye.x = 0.0f;
-  this->frame.eye.y = 0.0f;
-  this->frame.eye.z = 0.0f;
-  this->frame.up.x = 0.0f;
-  this->frame.up.y = 0.0f;
-  this->frame.up.z = 0.0f;
   this->camera.yaw = 0.0f;
   this->shake.enabled = 0;
   this->skyBox = nullptr;
@@ -84,14 +66,14 @@ int WorldViewSpatial::ClassifyAxisAligned(const WorldSpatialTree& bounds) const 
       const float negative = -radius;
 
       if (!(distance > negative)) {
-        return 0;
+        return MODEL_VIEW_OUTSIDE;
       }
 
       clipped = true;
     }
   }
 
-  return clipped ? 2 : 1;
+  return clipped ? MODEL_VIEW_CLIPPED : MODEL_VIEW_INSIDE;
 }
 
 // OFFSET: 0x00ADB910
@@ -113,9 +95,9 @@ void WorldViewSpatial::CollectNode(WorldSpatialTree* node, int depth, bool fully
     } else {
       const int visibility = this->ClassifyAxisAligned(*child);
 
-      if (visibility == 2) {
+      if (visibility == MODEL_VIEW_CLIPPED) {
         this->CollectNode(child, depth + 1, false);
-      } else if (visibility == 1) {
+      } else if (visibility == MODEL_VIEW_INSIDE) {
         this->CollectNode(child, depth + 1, true);
       }
     }

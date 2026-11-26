@@ -2,6 +2,7 @@
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/WindowId.h"
 #include "UI/Window/UIEnums.h"
+#include "UI/Window/ReplayChunkTag.h"
 
 #include "Client/Mode/ModeDragState.h"
 #include "Client/Mode/CGameMode.h"
@@ -46,7 +47,7 @@ void UIMakeTargetProcessWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   }
 
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source == 1) {
+  if (drag->source == DRAG_ITEM_INVENTORY) {
     int emptySlot = 3;
     bool hasElementalStone = false;
     for (int index = 0; index < 3; ++index) {
@@ -78,9 +79,9 @@ void UIMakeTargetProcessWnd::DragAndDrop(int x, int y, std::intptr_t value) {
 // FUNCTION: fn_13601
 std::vector<unsigned char> UIMakeTargetProcessWnd::GetReplayData() {
   std::vector<unsigned char> records;
-  AppendReplayRecord(records, BuildReplayTaggedRecord(22000, nullptr, 0));
-  AppendReplayRecord(records, BuildReplayTaggedRecord(22002, &this->makeType, sizeof(this->makeType)));
-  AppendReplayRecord(records, BuildReplayTaggedRecord(22001, nullptr, 0));
+  AppendReplayRecord(records, BuildReplayTaggedRecord(REPLAY_CHUNK_MAKE_TARGET_PROCESS_BEGIN, nullptr, 0));
+  AppendReplayRecord(records, BuildReplayTaggedRecord(REPLAY_CHUNK_MAKE_TARGET_PROCESS_TYPE, &this->makeType, sizeof(this->makeType)));
+  AppendReplayRecord(records, BuildReplayTaggedRecord(REPLAY_CHUNK_MAKE_TARGET_PROCESS_END, nullptr, 0));
   return records;
 }
 
@@ -249,27 +250,28 @@ int UIMakeTargetProcessWnd::SendMsg(UIWindow* sender, int message, std::intptr_t
     header = *reinterpret_cast<const UIMakeTargetProcessRecordHeader*>(bytes);
     unsigned offset = 6;
 
-    if (22000 == header.id) {
-      bool scanning = true;
-      while (scanning && static_cast<unsigned>(b) > offset) {
-        header = *reinterpret_cast<const UIMakeTargetProcessRecordHeader*>(bytes + offset);
-        offset += 6;
+    if (REPLAY_CHUNK_MAKE_TARGET_PROCESS_BEGIN != header.id) {
+      break;
+    }
+    bool scanning = true;
+    while (scanning && static_cast<unsigned>(b) > offset) {
+      header = *reinterpret_cast<const UIMakeTargetProcessRecordHeader*>(bytes + offset);
+      offset += 6;
 
-        switch (header.id) {
-        case 22001:
-          scanning = false;
-          break;
+      switch (header.id) {
+      case REPLAY_CHUNK_MAKE_TARGET_PROCESS_END:
+        scanning = false;
+        break;
 
-        case 22002:
-          std::memcpy(&this->makeType, bytes + offset, header.bytes);
-          offset += header.bytes;
-          this->SendMsg(nullptr, UM_SETCURITEM, this->makeType, 0, 0, 0);
-          break;
+      case REPLAY_CHUNK_MAKE_TARGET_PROCESS_TYPE:
+        std::memcpy(&this->makeType, bytes + offset, header.bytes);
+        offset += header.bytes;
+        this->SendMsg(nullptr, UM_SETCURITEM, this->makeType, 0, 0, 0);
+        break;
 
-        default:
-          offset += header.bytes;
-          break;
-        }
+      default:
+        offset += header.bytes;
+        break;
       }
     }
     break;

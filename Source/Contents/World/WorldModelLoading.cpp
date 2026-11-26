@@ -7,6 +7,7 @@
 #include "Contents/World/WorldSpatialInitialization.h"
 #include "Resource/ResourceMgr.h"
 #include "Resource/World/WorldResource.h"
+#include "Security/ThemidaMgr.h"
 
 #include "Client/Application/ErrorDialog.h"
 #include "Client/Mode/CGameMode.h"
@@ -95,6 +96,7 @@ namespace {
 // OFFSET: 0x00AC8BF0
 // FUNCTION: fn_17680
 DWORD WINAPI CWorld::LoadDeferredModels(void* parameter) {
+  s_threadIds.insert(GetCurrentThreadId());
   CWorld* world = static_cast<CWorld*>(parameter);
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
   std::sort(g_deferredWorldModels.begin(), g_deferredWorldModels.end());
@@ -118,12 +120,13 @@ DWORD WINAPI CWorld::LoadDeferredModels(void* parameter) {
     Sleep(0);
   }
 
+  s_threadIds.erase(GetCurrentThreadId());
   return 0;
 }
 
 // OFFSET: 0x00ACB6C0
 // FUNCTION: fn_17705
-void CWorld::FinishModelLoading() {
+__declspec(noinline) void CWorld::FinishModelLoading() {
   if (hObject) {
     WaitForSingleObject(hObject, INFINITE);
     CloseHandle(hObject);
@@ -148,11 +151,10 @@ void CWorld::InitWorld() {
   this->movies = new BinkMovies();
   this->serializedSpatial = worldRes->spatial;
 
-  int* modeBounds = this->gameMode->areaBounds;
-  modeBounds[0] = worldRes->bounds[2];
-  modeBounds[1] = worldRes->bounds[3];
-  modeBounds[2] = worldRes->bounds[0];
-  modeBounds[3] = worldRes->bounds[1];
+  this->gameMode->areaBounds[0] = worldRes->bounds[2];
+  this->gameMode->areaBounds[1] = worldRes->bounds[3];
+  this->gameMode->areaBounds[2] = worldRes->bounds[0];
+  this->gameMode->areaBounds[3] = worldRes->bounds[1];
 
   g_worldLightDirection = worldRes->lightDirection;
   g_worldDiffuse = worldRes->diffuse;
@@ -206,20 +208,20 @@ void CWorld::InitWorld() {
 
     const int modelCount = static_cast<int>(worldRes->models.size());
     auto placementIt = worldRes->models.begin();
+    int lastPercent = -1;
     this->models.clear();
     this->models.reserve(modelCount);
 
     DWORD lastNoticeTime = 0;
-    int lastPercent = -1;
-    int progress = 0;
+    int loaded = 0;
 
     for (; placementIt != worldRes->models.end(); ++placementIt) {
-      progress += 100;
+      ++loaded;
       DWORD now = timeGetTime();
-      int percent = static_cast<int>(progress / modelCount);
-      if ((percent != lastPercent && now - lastNoticeTime > 15) || percent == 100) {
-        lastPercent = percent;
+      int percent = loaded * 100 / modelCount;
+      if ((lastPercent != percent && now - lastNoticeTime > 15) || percent == 100) {
         lastNoticeTime = now;
+        lastPercent = percent;
         g_windowMgr.SendNotice(UIM_LOADINGPERCENT, percent, 0, 0, 0, 0);
         g_windowMgr.DrawCenteredBackground();
         g_windowMgr.DrawWindows();
@@ -283,7 +285,7 @@ void CWorld::InitWorld() {
 
     this->published = static_cast<int>(this->models.size());
 
-    DWORD threadId = 0;
+    DWORD threadId;
     hObject = CreateThread(nullptr, 0, &CWorld::LoadDeferredModels, this, 0, &threadId);
     if (!hObject) {
       CWorld::LoadDeferredModels(this);

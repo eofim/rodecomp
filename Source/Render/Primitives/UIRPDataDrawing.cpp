@@ -1,3 +1,4 @@
+#include "Contents/Effects/Primitives/EffectPrim.h"
 #include "Render/Renderer.h"
 #include "Render/Primitives/UIRPData.h"
 #include "Render/Textures/Texture.h"
@@ -47,36 +48,30 @@ void UIRPData::DrawCroppedTexture(int x, int y, CTexture* texture, int sourceLef
   const float textureHeight = static_cast<float>(texture->TextureHeight());
   const float v0 = (static_cast<float>(sourceTop) + g_textureOffsetY) / textureHeight;
   const float v1 = (static_cast<float>(sourceBottom) + g_textureOffsetY) / textureHeight;
-  const float right = static_cast<float>(x + (sourceRight - sourceLeft));
-  const float bottom = static_cast<float>(y + (sourceBottom - sourceTop));
-  primitive->quad[0].u = u0;
+  const int right = sourceRight - sourceLeft + x;
+  const int bottom = sourceBottom - sourceTop + y;
   primitive->quad[0].x = static_cast<float>(x);
+  primitive->quad[0].y = static_cast<float>(y);
+  primitive->quad[0].u = u0;
   primitive->quad[0].v = v0;
+  primitive->quad[1].x = static_cast<float>(right);
+  primitive->quad[1].y = static_cast<float>(y);
   primitive->quad[1].u = u1;
   primitive->quad[1].v = v0;
   primitive->quad[2].x = static_cast<float>(x);
-  primitive->quad[0].y = static_cast<float>(y);
-  primitive->quad[1].y = static_cast<float>(y);
+  primitive->quad[2].y = static_cast<float>(bottom);
   primitive->quad[2].u = u0;
   primitive->quad[2].v = v1;
+  primitive->quad[3].x = static_cast<float>(right);
+  primitive->quad[3].y = static_cast<float>(bottom);
   primitive->quad[3].u = u1;
   primitive->quad[3].v = v1;
-  primitive->quad[1].x = right;
-  primitive->quad[2].y = bottom;
-  primitive->quad[3].x = right;
-  primitive->quad[3].y = bottom;
-  primitive->quad[0].z = 0.000001f;
-  primitive->quad[0].rhw = 0.999999f;
-  primitive->quad[0].diffuse = color;
-  primitive->quad[1].z = 0.000001f;
-  primitive->quad[1].rhw = 0.999999f;
-  primitive->quad[1].diffuse = color;
-  primitive->quad[2].z = 0.000001f;
-  primitive->quad[2].rhw = 0.999999f;
-  primitive->quad[2].diffuse = color;
-  primitive->quad[3].z = 0.000001f;
-  primitive->quad[3].rhw = 0.999999f;
-  primitive->quad[3].diffuse = color;
+  for (int i = 0; i < 4; ++i) {
+    primitive->quad[i].z = 0.000001f;
+    primitive->quad[i].rhw = 0.999999f;
+    primitive->quad[i].diffuse = color;
+  }
+
   this->m_primitives.push_back(primitive);
 }
 
@@ -205,9 +200,10 @@ void UIRPData::DrawNamedScaledRegion(float x, float y, std::string name, std::ui
     height = texture->Height();
   }
 
-  const float textureWidth = static_cast<float>(texture->TextureWidth());
+  const unsigned backingWidth = texture->TextureWidth();
+  const float scale = g_fireflyArcLength / scalePercent;
+  const float textureWidth = static_cast<float>(backingWidth);
   const float textureHeight = static_cast<float>(texture->TextureHeight());
-  const float scale = 100.0f / scalePercent;
 
   primitive->quad[0].x = x;
   primitive->quad[0].y = y;
@@ -215,12 +211,7 @@ void UIRPData::DrawNamedScaledRegion(float x, float y, std::string name, std::ui
   primitive->quad[0].v = static_cast<float>(sourceY) / textureHeight;
   primitive->quad[1].x = static_cast<float>(width) + x;
   primitive->quad[1].y = y;
-  if (width > imageWidth) {
-    primitive->quad[1].u = static_cast<float>(sourceX + imageWidth) / textureWidth;
-  } else {
-    primitive->quad[1].u = static_cast<float>(sourceX + width) / textureWidth;
-  }
-
+  primitive->quad[1].u = width > imageWidth ? static_cast<float>(sourceX + imageWidth) / textureWidth : static_cast<float>(sourceX + width) / textureWidth;
   primitive->quad[1].v = static_cast<float>(sourceY) / textureHeight;
   primitive->quad[2].x = x;
   primitive->quad[2].y = static_cast<float>(height) + y;

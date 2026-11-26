@@ -118,23 +118,23 @@ void CEnchantMgr::HandleEnchantResult(int messageId, int itemId) {
     }
 
     if (ID_CZ_REQUEST_RESET_ENCHANT == this->m_request.packetType) {
-      for (auto slotIt = enchant->second.slots.begin(); slotIt != enchant->second.slots.end(); ++slotIt) {
-        int slot = *slotIt;
+      for (const int slot : enchant->second.slots) {
         if (static_cast<uint32_t>(slot) < 4) {
-          item.SetCard(0, slot);
+          item.cards[slot] = 0;
         }
       }
     } else {
       if (static_cast<uint16_t>(this->m_request.slot) > 3) {
         return;
       }
-      item.SetCard(itemId, this->m_request.slot);
+      item.cards[this->m_request.slot] = itemId;
     }
 
     g_session.UpdateInventoryItem(item, 1);
-    int effect;
+    const int16_t packetType = this->m_request.packetType;
     const vector3d position = {0.0f, 0.0f, 0.0f};
-    switch (this->m_request.packetType) {
+    int effect;
+    switch (packetType) {
     case ID_CZ_REQUEST_RANDOM_ENCHANT:
     case ID_CZ_REQUEST_PERFECT_ENCHANT:
       effect = EF_UI_ENCHANT_SUCCESS;
@@ -153,8 +153,8 @@ void CEnchantMgr::HandleEnchantResult(int messageId, int itemId) {
     }
     g_effectMgr->Spawn(g_session.m_aid, effect, position, 0, -1, 0, 0);
   } else if (messageId == MSI_ENCHANT_FAILED) {
-    int effect;
     const vector3d position = {0.0f, 0.0f, 0.0f};
+    int effect;
     switch (this->m_request.packetType) {
     case ID_CZ_REQUEST_RANDOM_ENCHANT:
     case ID_CZ_REQUEST_PERFECT_ENCHANT:
@@ -286,56 +286,66 @@ void CEnchantMgr::RequestUpgradeRandomEnchant(uint64_t group, int16_t index, int
   m_request = EnchantRequest{ID_CZ_REQ_UPGRADE_RANDOM_ENCHANT, group, index, slot};
 }
 
-// INLINED
-inline void CEnchantMgr::AddRandomUpgradeEnchant(uint64_t group, uint32_t optionKey, const std::string& baseItemName, const std::string& itemName,
-                                                 uint64_t rate) {
-  int baseItemId = ItemDbToIdMgr()->GetItemID(baseItemName);
-  if (baseItemId != 0) {
-    int itemId = ItemDbToIdMgr()->GetItemID(itemName);
-    if (itemId != ITEMID_NONE) {
-      m_enchants[group].options[optionKey].randomUpgrades[baseItemId].rates[itemId] = rate;
-    }
+// OFFSET: 0x00682500
+// FUNCTION: fn_46505
+void CEnchantMgr::AddRandomUpgradeEnchant(uint64_t group, uint32_t optionKey, const std::string& baseItemName, const std::string& itemName,
+                                         uint64_t rate) {
+  const int baseItemId = ItemDbToIdMgr()->GetItemID(baseItemName);
+  if (baseItemId == ITEMID_NONE) {
+    return;
   }
+  const int itemId = ItemDbToIdMgr()->GetItemID(itemName);
+  if (itemId == ITEMID_NONE) {
+    return;
+  }
+  m_enchants[group].options[optionKey].randomUpgrades[baseItemId].rates[itemId] = rate;
 }
 
-// INLINED
-inline void CEnchantMgr::AddTargetItem(uint64_t group, const std::string& itemName) {
+// OFFSET: 0x00682660
+// FUNCTION: fn_46492
+void CEnchantMgr::AddTargetItem(uint64_t group, const std::string& itemName) {
   int itemId = ItemDbToIdMgr()->GetItemID(itemName);
   if (itemId != ITEMID_NONE) {
     m_enchants[group].targetItems.push_back(itemId);
   }
 }
 
-// INLINED
-inline void CEnchantMgr::AddUpgradeEnchant(uint64_t group, uint32_t optionKey, const std::string& baseItemName, const std::string& itemName,
+// OFFSET: 0x00682740
+// FUNCTION: fn_46493
+void CEnchantMgr::AddUpgradeEnchant(uint64_t group, uint32_t optionKey, const std::string& baseItemName, const std::string& itemName,
                                            uint64_t cost, const std::map<std::string, int>& materials) {
   m_enchants[group].options[optionKey].isUpgrade = true;
   AddPerfectUpgradeEnchant(group, optionKey, baseItemName, itemName, cost, materials);
 }
 
-// INLINED
-inline void CEnchantMgr::ApproveRandomOption(uint64_t group, bool approve) {
+// OFFSET: 0x00682790
+// FUNCTION: fn_46494
+void CEnchantMgr::ApproveRandomOption(uint64_t group, bool approve) {
   m_enchants[group].approveRandomOption = approve;
 }
 
-// INLINED
-inline void CEnchantMgr::SetCaution(uint64_t group, const std::string& caution) {
+// OFFSET: 0x00684560
+// FUNCTION: fn_46495
+void CEnchantMgr::SetCaution(uint64_t group, const std::string& caution) {
   m_enchants[group].caution = caution;
 }
 
-// INLINED
-inline void CEnchantMgr::SetCondition(uint64_t group, uint32_t condition1, uint32_t condition2) {
+// OFFSET: 0x00684590
+// FUNCTION: fn_46496
+void CEnchantMgr::SetCondition(uint64_t group, uint32_t condition1, uint32_t condition2) {
   m_enchants[group].condition1 = condition1;
   m_enchants[group].condition2 = condition2;
 }
 
-// INLINED
-inline void CEnchantMgr::SetGradeBonus(uint64_t group, uint32_t optionKey, const std::map<uint32_t, uint64_t>& gradeBonus) {
+// OFFSET: 0x00684A80
+// FUNCTION: fn_46497
+void CEnchantMgr::SetGradeBonus(uint64_t group, uint32_t optionKey, const std::map<uint32_t, uint64_t>& gradeBonus) {
   m_enchants[group].options[optionKey].gradeBonus = gradeBonus;
 }
 
-// INLINED
-inline void CEnchantMgr::SetRandomUpgradeRequire(uint64_t group, uint32_t optionKey, const std::string& itemName, uint64_t cost,
+// OFFSET: 0x00684B60
+// FUNCTION: fn_46498
+void CEnchantMgr::SetRandomUpgradeRequire(uint64_t group, uint32_t optionKey, const std::string& itemName, uint64_t cost,
                                                  const std::map<std::string, int>& materials) {
   int itemId = ItemDbToIdMgr()->GetItemID(itemName);
   if (itemId != ITEMID_NONE) {
@@ -344,27 +354,31 @@ inline void CEnchantMgr::SetRandomUpgradeRequire(uint64_t group, uint32_t option
   }
 }
 
-// INLINED
-inline void CEnchantMgr::SetRequire(uint64_t group, uint32_t optionKey, uint64_t cost, const std::map<std::string, int>& materials) {
+// OFFSET: 0x00684CB0
+// FUNCTION: fn_46499
+void CEnchantMgr::SetRequire(uint64_t group, uint32_t optionKey, uint64_t cost, const std::map<std::string, int>& materials) {
   m_enchants[group].options[optionKey].require.cost = cost;
   m_enchants[group].options[optionKey].require.materials = ConvertMaterials(materials);
 }
 
-// INLINED
-inline void CEnchantMgr::SetReset(uint64_t group, bool enabled, uint64_t rate, uint64_t cost, const std::map<std::string, int>& materials) {
+// OFFSET: 0x00684D80
+// FUNCTION: fn_46500
+void CEnchantMgr::SetReset(uint64_t group, bool enabled, uint64_t rate, uint64_t cost, const std::map<std::string, int>& materials) {
   m_enchants[group].resetEnabled = enabled;
   m_enchants[group].resetRate = rate;
   m_enchants[group].reset.cost = cost;
   m_enchants[group].reset.materials = ConvertMaterials(materials);
 }
 
-// INLINED
-inline void CEnchantMgr::SetSlotOrder(uint64_t group, const std::vector<int>& slots) {
+// OFFSET: 0x00684E50
+// FUNCTION: fn_46501
+void CEnchantMgr::SetSlotOrder(uint64_t group, const std::vector<int>& slots) {
   m_enchants[group].slots = slots;
 }
 
-// INLINED
-inline void CEnchantMgr::SetSuccessRate(uint64_t group, uint32_t optionKey, uint64_t rate) {
+// OFFSET: 0x00684EB0
+// FUNCTION: fn_46502
+void CEnchantMgr::SetSuccessRate(uint64_t group, uint32_t optionKey, uint64_t rate) {
   m_enchants[group].options[optionKey].successRate = rate;
 }
 

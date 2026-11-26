@@ -232,7 +232,7 @@ void UIRodexInboxWnd::OnCreate(int width, int height) {
     this->checks[row]->Move(0x11, row * 0x2C + 0x6C);
     this->checks[row]->SetChecked(0);
     this->checks[row]->m_message = 0;
-    this->checks[row]->Show(0);
+    this->checks[row]->Show(WINDOW_HIDDEN);
     this->AddChild(this->checks[row]);
 
     this->subjectButtons[row] = new UITextButton();
@@ -400,7 +400,7 @@ void UIRodexInboxWnd::Paint() {
           }
         }
       } else {
-        this->checks[row]->Show(0);
+        this->checks[row]->Show(WINDOW_HIDDEN);
         this->checks[row]->SetChecked(0);
         this->checks[row]->m_message = 0;
         this->senderButtons[row]->Enable(0);
@@ -410,7 +410,7 @@ void UIRodexInboxWnd::Paint() {
   } else {
     unsigned int index = this->page * 6;
     for (int row = 0; row < 6; ++row, ++index) {
-      this->checks[row]->Show(0);
+      this->checks[row]->Show(WINDOW_HIDDEN);
       this->senderButtons[row]->Enable(0);
       this->subjectButtons[row]->Enable(0);
       switch (g_rodexMailStore->inboxType) {
@@ -424,7 +424,7 @@ void UIRodexInboxWnd::Paint() {
                 this->expired = 0;
                 g_rodexMailStore->m_mails1.erase(it);
               } else {
-                this->checks[row]->Show(1);
+                this->checks[row]->Show(WINDOW_VISIBLE);
                 this->senderButtons[row]->Enable(1);
                 this->subjectButtons[row]->Enable(1);
                 this->SetMailRow(row, it->first, it->second.sender, it->second.title, it->second.isRead, it->second.isReturned, -1);
@@ -442,7 +442,7 @@ void UIRodexInboxWnd::Paint() {
                 this->expired = 0;
                 g_rodexMailStore->m_mails2.erase(it);
               } else {
-                this->checks[row]->Show(1);
+                this->checks[row]->Show(WINDOW_VISIBLE);
                 this->senderButtons[row]->Enable(1);
                 this->subjectButtons[row]->Enable(1);
                 this->SetMailRow(row, it->first, it->second.sender, it->second.title, it->second.isRead, it->second.isReturned, -1);
@@ -525,7 +525,7 @@ void UIRodexInboxWnd::SetMailRow(int row, std::int64_t mailId, std::string name,
   nameText = GetNavigationLinkParser()->ExpandMessages(nameText);
   subjectText = GetNavigationLinkParser()->ExpandMessages(subjectText);
 
-  this->checks[row]->Show(1);
+  this->checks[row]->Show(WINDOW_VISIBLE);
   this->checks[row]->m_message = static_cast<int>(mailId);
 
   this->senderButtons[row]->SetLabel(nameText.c_str());
@@ -708,11 +708,11 @@ void UIRodexInboxWnd::RequestMailAttachments(int type, std::int64_t mailId) {
   }
 
   RodexMailMap* mails = nullptr;
-  if (type == 0) {
+  if (type == MAIL_INBOX_NORMAL) {
     mails = &g_rodexMailStore->m_mails0;
-  } else if (type == 1) {
+  } else if (type == MAIL_INBOX_ACCOUNT) {
     mails = &g_rodexMailStore->m_mails1;
-  } else if (type == 2) {
+  } else if (type == MAIL_INBOX_RETURNED) {
     mails = &g_rodexMailStore->m_mails2;
   }
   unsigned char flags = 0;
@@ -855,6 +855,8 @@ void UIRodexInboxWnd::RequestAllMailActions() {
 // OFFSET: 0x00807AA0
 // FUNCTION: fn_10055
 int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, std::intptr_t argument2, std::intptr_t argument3, std::intptr_t argument4) {
+  PACKET_CZ_RODEX_RETURN returnPacket;
+
   if (g_windowMgr.rodexComposeWnd != nullptr || g_windowMgr.rodexContentsWnd != nullptr) {
     return 0;
   }
@@ -891,11 +893,11 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         this->page = 0;
 
         if (this->mailTab == sender) {
-          g_rodexMailStore->inboxType = 0;
+          g_rodexMailStore->inboxType = MAIL_INBOX_NORMAL;
         } else if (this->accountTab == sender) {
-          g_rodexMailStore->inboxType = 1;
+          g_rodexMailStore->inboxType = MAIL_INBOX_ACCOUNT;
         } else if (this->returnTab == sender) {
-          g_rodexMailStore->inboxType = 2;
+          g_rodexMailStore->inboxType = MAIL_INBOX_RETURNED;
         }
         this->searchActive = this->searchTab == sender;
         this->Invalidate();
@@ -964,17 +966,18 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
     case ID_DELETE:
       if (this->searchActive == 1) {
         std::vector<RodexMailEntry> selected;
+        const int firstRow = this->page * 6;
         for (int i = 0; i < 6; ++i) {
           UICheckBox* check = this->checks[i];
           if (check->geometry.visible == 1 && check->geometry.state != 0 && check->m_message != -1) {
-            selected.push_back(RodexMailEntry(this->searchResults[this->page * 6 + i]));
+            selected.push_back(RodexMailEntry(this->searchResults[firstRow + i]));
           }
         }
 
         if (selected.size() == 0) {
           break;
         }
-        if (g_windowMgr.Confirm(LookupMessage(MSI_RODEX_DELETE_SELECT_MAIL), 2, false, false, 0, "Message", 280, 120, 0) != ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_RODEX_DELETE_SELECT_MAIL), 2, false, false, 0, "메시지", 280, 120, 0) != ID_YES) {
           break;
         }
         for (int i = 0; i < 6; ++i) {
@@ -1004,7 +1007,7 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         if (selected.size() == 0) {
           break;
         }
-        if (g_windowMgr.Confirm(LookupMessage(MSI_RODEX_DELETE_SELECT_MAIL), 2, false, false, 0, "Message", 280, 120, 0) != ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_RODEX_DELETE_SELECT_MAIL), 2, false, false, 0, "메시지", 280, 120, 0) != ID_YES) {
           break;
         }
         for (int i = 0; i < 6; ++i) {
@@ -1058,10 +1061,9 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       if (g_rodexMailStore->inboxType == MAIL_INBOX_NORMAL) {
         RodexMailMap::iterator mail = g_rodexMailStore->m_mails0.find(argument2);
         if (mail != g_rodexMailStore->m_mails0.end()) {
-          PACKET_CZ_RODEX_RETURN packet;
-          packet.packetType = ID_CZ_RODEX_RETURN;
-          packet.mailId = static_cast<std::uint32_t>(mail->first);
-          GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
+          returnPacket.packetType = ID_CZ_RODEX_RETURN;
+          returnPacket.mailId = static_cast<std::uint32_t>(mail->first);
+          GetRagConnection().Send(GetRagConnection().GetPacketSize(returnPacket.packetType), &returnPacket);
         }
       }
       break;
@@ -1084,9 +1086,55 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         }
       }
 
-      const std::string text = FormatOwnedString(LookupMessage(MSI_RODEX_MESSAGE_DELETE_ALL), type.c_str());
-      if (g_windowMgr.Confirm(text.c_str(), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_RODEX_MESSAGE_DELETE_ALL), type.c_str()).c_str(), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         this->RequestAllMailActions();
+      }
+      break;
+    }
+
+    case RODEX_BUTTON_DELETE_SELECTED: {
+      if (this->searchActive == 1) {
+        std::vector<RodexMailEntry> selected;
+        const int firstRow = this->page * 6;
+        for (int i = 0; i < 6; ++i) {
+          UICheckBox* check = this->checks[i];
+          if (check->geometry.visible == 1 && check->geometry.state != 0 && check->m_message != -1) {
+            selected.push_back(RodexMailEntry(this->searchResults[firstRow + i]));
+          }
+        }
+
+        if (selected.size() != 0 &&
+            g_windowMgr.Confirm(LookupMessage(MSI_RODEX_MESSAGE_RECEIVE_SELECTED), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
+          for (std::vector<RodexMailEntry>::iterator entry = selected.begin(); entry != selected.end(); ++entry) {
+            this->RequestMailAttachments(entry->first, entry->second);
+          }
+          for (int i = 0; i < 6; ++i) {
+            this->checks[i]->SetChecked(0);
+            this->checks[i]->m_message = 0;
+          }
+        }
+      } else {
+        std::vector<int> selected;
+        for (int i = 0; i < 6; ++i) {
+          UICheckBox* check = this->checks[i];
+          if (check->geometry.visible == 1 && check->geometry.state != 0) {
+            const int id = check->m_message;
+            if (id != -1) {
+              selected.push_back(id);
+            }
+          }
+        }
+
+        if (selected.size() != 0 &&
+            g_windowMgr.Confirm(LookupMessage(MSI_RODEX_MESSAGE_RECEIVE_SELECTED), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
+          for (std::vector<int>::iterator id = selected.begin(); id != selected.end(); ++id) {
+            this->RequestMailAttachments(g_rodexMailStore->inboxType, *id);
+          }
+          for (int i = 0; i < 6; ++i) {
+            this->checks[i]->SetChecked(0);
+            this->checks[i]->m_message = 0;
+          }
+        }
       }
       break;
     }
@@ -1109,8 +1157,7 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         }
       }
 
-      const std::string text = FormatOwnedString(LookupMessage(MSI_RODEX_MESSAGE_RECEIVE_ALL), type.c_str());
-      if (g_windowMgr.Confirm(text.c_str(), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
+      if (g_windowMgr.Confirm(FormatOwnedString(LookupMessage(MSI_RODEX_MESSAGE_RECEIVE_ALL), type.c_str()).c_str(), 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES) {
         if (this->searchActive == 1) {
           for (std::vector<RodexMailEntry>::iterator entry = this->searchResults.begin(); entry != this->searchResults.end(); ++entry) {
             if (entry->first == 0) {
@@ -1135,52 +1182,6 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       }
       break;
     }
-
-    case RODEX_BUTTON_DELETE_SELECTED: {
-      if (this->searchActive == 1) {
-        std::vector<RodexMailEntry> selected;
-        for (int i = 0; i < 6; ++i) {
-          UICheckBox* check = this->checks[i];
-          if (check->geometry.visible == 1 && check->geometry.state != 0 && check->m_message != -1) {
-            selected.push_back(RodexMailEntry(this->searchResults[this->page * 6 + i]));
-          }
-        }
-
-        if (selected.size() != 0 &&
-            g_windowMgr.Confirm(LookupMessage(MSI_RODEX_MESSAGE_RECEIVE_SELECTED), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
-          for (std::vector<RodexMailEntry>::iterator entry = selected.begin(); entry != selected.end(); ++entry) {
-            this->RequestMailAttachments(entry->first, entry->second);
-          }
-          for (int i = 0; i < 6; ++i) {
-            this->checks[i]->SetChecked(0);
-            this->checks[i]->m_message = 0;
-          }
-        }
-      } else {
-        std::vector<int> selected;
-        for (int i = 0; i < 6; ++i) {
-          UICheckBox* check = this->checks[i];
-          if (check->geometry.visible == 1 && check->geometry.state != 0) {
-            const int id = check->m_message;
-            if (id != -1) {
-              selected.push_back(id);
-            }
-          }
-        }
-
-        if (selected.size() != 0 &&
-            g_windowMgr.Confirm(LookupMessage(MSI_RODEX_MESSAGE_RECEIVE_SELECTED), 2, false, false, 0, "Message", 280, 120, 0) == ID_YES) {
-          for (std::vector<int>::iterator id = selected.begin(); id != selected.end(); ++id) {
-            this->RequestMailAttachments(g_rodexMailStore->inboxType, *id);
-          }
-          for (int i = 0; i < 6; ++i) {
-            this->checks[i]->SetChecked(0);
-            this->checks[i]->m_message = 0;
-          }
-        }
-      }
-      break;
-    }
     }
     break;
 
@@ -1194,8 +1195,7 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       if (g_rodexMailStore->inboxType == MAIL_INBOX_NORMAL) {
         RodexMailMap::iterator mail = g_rodexMailStore->m_mails0.find(argument2);
         if (mail != g_rodexMailStore->m_mails0.end() && (mail->second.type & 8) == 0 && mail->second.sender.size() != 0) {
-          const std::pair<bool, std::string> title = g_navigationLinkParser->RemoveLineBreakTag(mail->second.title);
-          if (title.first != true) {
+          if (g_navigationLinkParser->RemoveLineBreakTag(mail->second.title).first != true) {
             mode->SendMsg(MM_OPEN_WRITE_RODEX, reinterpret_cast<int>(mail->second.sender.c_str()), 0, 0, 0);
           }
         }
@@ -1205,7 +1205,7 @@ int UIRodexInboxWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
       RodexMailMap::iterator mail = g_rodexMailStore->m_mails0.find(argument2);
       if (mail != g_rodexMailStore->m_mails0.end() && mail->second.isKnownSender == 0) {
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_RODEX_SPAMOPTION_WARNING)), 0xFF, 0, 0, 0);
-        if (g_windowMgr.Confirm(LookupMessage(MSI_RODEX_SPAMOPTION_WARNING), 2, false, false, 0, "Message", 280, 120, 0) == ID_NO) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_RODEX_SPAMOPTION_WARNING), 2, false, false, 0, "메시지", 280, 120, 0) == ID_NO) {
           break;
         }
       }

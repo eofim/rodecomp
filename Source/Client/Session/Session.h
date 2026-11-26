@@ -18,6 +18,7 @@
 
 #include <windows.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -76,11 +77,16 @@ struct GuildStorageLogEntry {
 };
 
 struct SessionRecord6144 {
-  /* 0000 */ unsigned char registered = 0;
-  /* 0001 */ unsigned char completed = 0;
-  /* 0004 */ std::uint32_t objectives[10] = {};
-  /* 002C */ int completedAt = 0;
-  /* 0030 */ std::uint8_t rewarded = 0;
+  // INLINED
+  SessionRecord6144() : registered(0), completed(0), completedAt(0), rewarded(0) {
+    std::memset(this->objectives, 0, sizeof(this->objectives));
+  }
+
+  /* 0000 */ unsigned char registered;
+  /* 0001 */ unsigned char completed;
+  /* 0004 */ std::uint32_t objectives[10];
+  /* 002C */ int completedAt;
+  /* 0030 */ std::uint8_t rewarded;
   /* 0031 */ std::uint8_t padding_0031;
   /* 0032 */ std::int16_t year;
   /* 0034 */ std::int16_t month;
@@ -174,28 +180,12 @@ struct SessionParameterNameLess {
 };
 
 struct SearchStoreResult {
-  SearchStoreResult() : item() {}
-  __declspec(noinline) SearchStoreResult(const SearchStoreResult& other) {
-    this->storeId = other.storeId;
-    this->accountId = other.accountId;
-    std::memcpy(this->storeName, other.storeName, sizeof(this->storeName));
-    this->price = other.price;
-    this->quantity = other.quantity;
-    new (&this->item) ITEM_INFO(other.item);
-  }
-  ~SearchStoreResult() {
-    this->item.displayName.~basic_string();
-    this->item.itemId.~basic_string();
-  }
-
   /* 0000 */ int storeId;
   /* 0004 */ int accountId;
   /* 0008 */ char storeName[80];
   /* 0058 */ int price;
   /* 005C */ std::uint16_t quantity;
-  union {
-    /* 0060 */ ITEM_INFO item;
-  };
+  /* 0060 */ ITEM_INFO item;
 };
 
 static_assert(sizeof(SearchStoreResult) == 0x158);
@@ -450,10 +440,10 @@ public:
   /* 17DC */ std::list<MessengerMember> m_partyMembers;
   /* 17E4 */ std::list<MessengerMember> m_friends;
   /* 17EC */ unsigned char padding_17EC[0x04];
-  /* 17F0 */ ITEM_INFO equippedItems[10];
-  /* 21A0 */ ITEM_INFO alternateEquippedItems[10];
-  /* 2B50 */ ITEM_INFO costumeItems[10];
-  /* 3500 */ ITEM_INFO alternateCostumeItems[10];
+  /* 17F0 */ std::array<ITEM_INFO, 10> equippedItems;
+  /* 21A0 */ std::array<ITEM_INFO, 10> alternateEquippedItems;
+  /* 2B50 */ std::array<ITEM_INFO, 10> costumeItems;
+  /* 3500 */ std::array<ITEM_INFO, 10> alternateCostumeItems;
   /* 3EB0 */ ITEM_INFO m_exchangeItems[10];
   /* 4860 */ ITEM_INFO m_itemSlots[10];
   /* 5210 */ int exchangeMoney;
@@ -703,14 +693,19 @@ public:
       /* 61B0 */ bool m_guildMemberListSort;
       /* 61B1 */ unsigned char showCameraInfo;
       /* 61B2 */ bool m_blockPrivateTab;
-      /* 61B3 */ bool m_itemDefaultSort;
-      /* 61B4 */ bool m_itemAscendingOrder;
-      /* 61B5 */ bool m_itemDescendingOrder;
+      union {
+        /* 61B3 */ bool m_itemSortModes[3];
+        struct {
+          /* 61B3 */ bool m_itemDefaultSort;
+          /* 61B4 */ bool m_itemAscendingOrder;
+          /* 61B5 */ bool m_itemDescendingOrder;
+        };
+      };
       /* 61B6 */ unsigned char padding_61B6[2];
     };
   };
-  /* 61B8 */ ITEM_INFO swapCostumeItems[10];
-  /* 6B68 */ ITEM_INFO swapEquippedItems[10];
+  /* 61B8 */ std::array<ITEM_INFO, 10> swapCostumeItems;
+  /* 6B68 */ std::array<ITEM_INFO, 10> swapEquippedItems;
   /* 7518 */ ITEM_INFO padding_7518[10];
   /* 7EC8 */ std::uint32_t swapArrowIndex;
   /* 7ECC */ bool m_sortPrivateTab;
@@ -862,7 +857,7 @@ public:
   void LoadDamageSkinSettings();
   BOOL LoadExceptionMinimapNameTable();
   BOOL LoadMapNameTable();
-  bool LoadMapPosTable();
+  BOOL LoadMapPosTable();
   BOOL ScaleMapPositions();
   bool LoadFogParameters();
   void SetCostumeItem(unsigned int index, const ITEM_INFO& item);
@@ -1225,7 +1220,8 @@ public:
   int GetRobeAlpha(int robeId);
   bool IsTopLayerRobe(int robe);
   int IsExchangeItemListFull();
-  // INLINED
+  // OFFSET: 0x00DDC8A0
+  // FUNCTION: fn_46547
   int GetFilledExchangeItemList() {
     int count = 0;
 
@@ -1412,7 +1408,7 @@ public:
   void SetOtherExchangeMoney(int value);
   void SetPlayerPosition(int x, int y, int direction);
   void SetRecord0734Value(int id, std::uint32_t value);
-  void LoadSkillDelayList(int skillId, std::vector<std::map<int, int>>& delays, int& skillFlag);
+  void LoadSkillDelayList(int skillId, std::vector<std::map<int, long>>& delays, int& skillFlag);
   int SetServiceFlags(int first, int second);
 };
 

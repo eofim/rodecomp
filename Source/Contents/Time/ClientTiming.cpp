@@ -4,6 +4,7 @@
 #include "Client/Session/Session.h"
 #include "Contents/Achievement/AchievementMgr.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Map/MapInfoMgr.h"
 #include "Contents/Navigation/NavigationManager.h"
 #include "File/CommonObject.h"
@@ -154,8 +155,8 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
   int cost = 0;
   int index = 1;
   for (; index < 9999; ++index) {
-    mapName = nullptr;
     name = nullptr;
+    mapName = nullptr;
     if (!script->Call("queryNavi_MapInfo", "d>ssddd", index, &mapName, &name, &id, &cell.x, &cell.y)) {
       std::sprintf(message, "Map 루아 읽기 실패 %d", index);
       MessageBoxA(hWnd, message, "Error", 0);
@@ -175,8 +176,8 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     title = nullptr;
     name = nullptr;
     mapName = nullptr;
-    cell.x = 0;
     cell.y = 0;
+    cell.x = 0;
     objectIndex = 0;
     if (!script->Call("queryNavi_NpcInfo", "d>sdddssdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &cell.x, &cell.y)) {
       std::sprintf(message, "Npc 루아 읽기 실패 %d", index);
@@ -199,8 +200,8 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     title = nullptr;
     name = nullptr;
     mapName = nullptr;
-    cell.x = 0;
     cell.y = 0;
+    cell.x = 0;
     objectIndex = 0;
     if (!script->Call("queryNavi_MobInfo", "d>sdddssdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &cell.x, &cell.y)) {
       std::sprintf(message, "몬스터 루아 읽기 실패 %d", index);
@@ -224,10 +225,10 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
     title = nullptr;
     name = nullptr;
     mapName = nullptr;
-    linkedX = 0;
     linkedY = 0;
-    cell.x = 0;
+    linkedX = 0;
     cell.y = 0;
+    cell.x = 0;
     objectIndex = 0;
     if (!script->Call(
           "queryNavi_LinkInfo", "d>sdddssddsdd", index, &mapName, &id, &objectType, &objectIndex, &name, &title, &cell.x, &cell.y, &linkedMap, &linkedX,
@@ -260,8 +261,8 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
   int robe = 0;
   for (index = 1; index < 9999; ++index) {
     mapName = nullptr;
-    cell.x = 0;
     cell.y = 0;
+    cell.x = 0;
     objectIndex = 0;
     if (!script->Call(
           "queryNavi_PickNpc", "d>sddddddddddd", index, &mapName, &cell.x, &cell.y, &job, &sex, &bodyPalette, &head, &headPalette, &accessory0, &accessory1,
@@ -384,12 +385,12 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
   }
 
   for (index = 1; index < 200; ++index) {
-    name = nullptr;
     linkedMap = nullptr;
-    id = 0;
-    objectIndex = 0;
-    linkedX = 0;
+    name = nullptr;
     linkedY = 0;
+    linkedX = 0;
+    objectIndex = 0;
+    id = 0;
     if (!script->Call("queryNavi_Scroll", "d>sddsdd", index, &name, &id, &objectIndex, &linkedMap, &linkedX, &linkedY)) {
       char text[260];
       std::memset(text, 0, sizeof(text));
@@ -409,19 +410,22 @@ bool CNavigationManager::LoadScript(LuaScript* script) {
       link->SetId(id);
       this->data.AddObject(link);
       link->ClearLinkedLinks();
-      for (int pass = 1;; ++pass) {
+      int pass = 1;
+      while (true) {
         targetId = -1;
         cost = 0;
-        if (!script->Call("queryNavi_Scroll_Pass", "dd>dd", index, pass, &targetId, &cost)) {
-          continue;
-        }
-        if (targetId == 0 && cost == 0) {
-          break;
-        }
-        CNavi_Link* target = info->FindLink(targetId, true);
-        if (target) {
+        if (script->Call("queryNavi_Scroll_Pass", "dd>dd", index, pass, &targetId, &cost)) {
+          if (targetId == 0 && cost == 0) {
+            break;
+          }
+          CNavi_Link* target = info->FindLink(targetId, true);
+          if (!target) {
+            ++pass;
+            continue;
+          }
           link->AddLinkedLink(NaviLink{target, cost});
         }
+        ++pass;
       }
     }
   }
@@ -527,9 +531,8 @@ void CSession::SetHotkeySkillLevel(std::uint32_t skillLevel, int index) {
 // OFFSET: 0x00E265C0
 // FUNCTION: fn_23916
 void CSession::RefreshTrackedAchievement(int id) {
-  std::vector<SessionRecord6178>& tracked = this->trackedAchievements;
-  auto found = std::find_if(tracked.begin(), tracked.end(), [&](SessionRecord6178 record) { return id == record.id; });
-  if (found == tracked.end()) {
+  auto found = std::find_if(this->trackedAchievements.begin(), this->trackedAchievements.end(), [&](SessionRecord6178 record) { return id == record.id; });
+  if (found == this->trackedAchievements.end()) {
     return;
   }
 
@@ -642,7 +645,7 @@ bool CSession::AddShopName(std::string name, int shopId) {
 // OFFSET: 0x00E00910
 // FUNCTION: fn_23644
 void CSession::LoadNavigationScripts() {
-  if (g_serviceMode == 0) {
+  if (g_serviceMode == ServerPrimary) {
     if (!this->m_hotkeyScript->Load("Lua Files\\Navigation\\Navi_f_krpri", true, false)) {
       return;
     }
@@ -654,7 +657,7 @@ void CSession::LoadNavigationScripts() {
     this->m_hotkeyScript->Load("Lua Files\\Navigation\\Navi_NpcDistance_krpri", true, false);
     this->m_hotkeyScript->Load("Lua Files\\Navigation\\Navi_Scroll_krpri", true, false);
     this->m_hotkeyScript->Load("Lua Files\\Navigation\\navi_picknpc_krpri", true, false);
-  } else if (g_serviceMode == 1) {
+  } else if (g_serviceMode == ServerSakray) {
     if (!this->m_hotkeyScript->Load("Lua Files\\Navigation\\Navi_f_krSak", true, false)) {
       return;
     }

@@ -43,6 +43,7 @@ public:
   UIRefining_BtnAgain();
   void Paint() override;
   void Enable(unsigned char value) override;
+  void SetSuccess(unsigned char value);
   void UpdateBitmaps();
 
   /* 0120 */ int cost;
@@ -53,6 +54,7 @@ public:
 class UIRefining_BtnRefining : public UIBitmapButton {
 public:
   UIRefining_BtnRefining();
+  void InitializeBitmaps();
   void Paint() override;
   void Enable(unsigned char value) override;
 
@@ -63,6 +65,7 @@ class UIRefining_BtnReturn : public UIBitmapButton {
 public:
   UIRefining_BtnReturn();
   void Paint() override;
+  void SetHighlighted(unsigned char value);
   void UpdateBitmaps();
 
   /* 0120 */ unsigned char highlighted;
@@ -78,7 +81,8 @@ struct RefiningNoticeText {
 
 class UIRefining_Notice : public UIStaticText {
 public:
-  // INLINED
+  // OFFSET: 0x007F4B90
+  // FUNCTION: fn_46539
   UIRefining_Notice() : UIStaticText(), expireTick(0), autoShown(0), highlight(0) {}
   void OnProcess() override;
   void Paint() override;

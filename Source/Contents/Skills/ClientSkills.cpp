@@ -11,6 +11,7 @@
 #include "Contents/CashEmotion/CashEmotionMgr.h"
 #include "Contents/ClientState.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Jobs/JobId.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Contents/Map/MapPropertyMgr.h"
@@ -40,7 +41,7 @@ char g_decodedPlayerName[64];
 void CSession::InitMapTypeInfoTable() {
   CFile file;
   if (!file.Open("MapInfoTable.scp", 0, true, false)) {
-    if (g_serviceType == 0) {
+    if (g_serviceType == ServiceKorea) {
       ShowErrorDialog("Load MapInfoTable Failed!", 0);
     } else {
       g_mapPropertyMgr->Clear();
@@ -50,9 +51,9 @@ void CSession::InitMapTypeInfoTable() {
     char* buffer = new char[size];
     file.Read(buffer, size);
 
-    int index = 0;
     int mapId = 0;
     int propertyId = 0;
+    int index = 0;
 
     do {
       char character = buffer[index++];
@@ -76,17 +77,19 @@ void CSession::InitMapTypeInfoTable() {
           } else {
             char valueText[16] = {};
             int textIndex = 0;
+            bool reading = true;
 
-            while (character != ' ' && character != '\t') {
+            while (reading && character != ' ' && character != '\t') {
               valueText[textIndex++] = character;
               character = buffer[index++];
               if (character == '\r') {
+                reading = false;
                 index += 1;
-                break;
               }
             }
 
-            g_mapPropertyMgr->SetValue(mapId, propertyId, std::atoi(valueText));
+            CMapPropertyMgr* mapPropertyMgr = g_mapPropertyMgr;
+            mapPropertyMgr->SetValue(mapId, propertyId, std::atoi(valueText));
             ++propertyId;
             if (propertyId >= 27) {
               ++mapId;
@@ -382,12 +385,11 @@ bool CSession::EquipAlternateCostumeItem(const ITEM_INFO& item) {
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
     if (slot != -1) {
-      ITEM_INFO& equipped = this->alternateCostumeItems[slot];
-      equipped = item;
-      equipped.quantity = 1;
-      equipped.expireTime = item.expireTime;
-      equipped.bindOnEquip = item.bindOnEquip;
-      equipped.sprite = item.sprite;
+      this->alternateCostumeItems[slot] = item;
+      this->alternateCostumeItems[slot].quantity = 1;
+      this->alternateCostumeItems[slot].expireTime = item.expireTime;
+      this->alternateCostumeItems[slot].bindOnEquip = item.bindOnEquip;
+      this->alternateCostumeItems[slot].sprite = item.sprite;
     }
   }
 
@@ -551,7 +553,7 @@ void CSession::DeleteProhibitionLog(std::uint32_t aid, std::uint32_t minutes) {
     message = "채팅 로그 삭제 성공";
   }
 
-  g_windowMgr.Confirm(message, 0, true, false, 0, "Message", 280, 120, 0);
+  g_windowMgr.Confirm(message, 0, true, false, 0, "메시지", 280, 120, 0);
 }
 
 // OFFSET: 0x00E08690
@@ -611,13 +613,13 @@ void CSession::UpdateAchievementRecord(const AchievementRecordPacket& packet) {
   }
 
   SessionRecord6144 record;
+  std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
   record.registered = 1;
   record.completed = packet.completed;
-  std::memcpy(record.objectives, packet.objectives, sizeof(record.objectives));
   record.completedAt = packet.completedAt;
   record.rewarded = packet.rewarded;
   ::SplitDate(packet.completedAt, record.year, record.month, record.day);
-  this->achievements.insert({packet.id, record});
+  this->achievements.insert(std::make_pair(packet.id, record));
 }
 
 // OFFSET: 0x00E08A00
@@ -964,12 +966,11 @@ bool CSession::EquipCostumeItem(const ITEM_INFO& item, const char* name) {
   for (int index = 0; index < 3; ++index) {
     const int slot = order[index];
     if (slot != -1) {
-      ITEM_INFO& equipped = this->costumeItems[slot];
-      equipped = item;
-      equipped.quantity = 1;
-      equipped.expireTime = item.expireTime;
-      equipped.bindOnEquip = item.bindOnEquip;
-      equipped.sprite = item.sprite;
+      this->costumeItems[slot] = item;
+      this->costumeItems[slot].quantity = 1;
+      this->costumeItems[slot].expireTime = item.expireTime;
+      this->costumeItems[slot].bindOnEquip = item.bindOnEquip;
+      this->costumeItems[slot].sprite = item.sprite;
     }
   }
 

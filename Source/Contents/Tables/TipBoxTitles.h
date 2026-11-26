@@ -19,6 +19,7 @@ struct TipBoxImage {
 
 struct TipBoxEntry {
   TipBoxEntry();
+  ~TipBoxEntry();
   /* 0000 */ std::string title;
   /* 0018 */ unsigned char randomEligible;
   /* 001C */ std::string bitmapName;
@@ -39,6 +40,16 @@ struct TipBoxLayout {
   /* 0018 */ int clipY;
   /* 001C */ float scale;
   /* 0020 */ std::string path;
+
+  TipBoxLayout() = default;
+  TipBoxLayout(const TipBoxLayout&) = default;
+  TipBoxLayout(TipBoxLayout&&) = default;
+  TipBoxLayout& operator=(const TipBoxLayout&) = default;
+  TipBoxLayout& operator=(TipBoxLayout&&) = default;
+
+  // OFFSET: 0x007AC330
+  // FUNCTION: fn_46588
+  ~TipBoxLayout() = default;
 };
 
 class CTipBoxMgr {

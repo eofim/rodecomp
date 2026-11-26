@@ -112,6 +112,18 @@ void UIRodexContentsWnd::DisableZenyButton() {
   this->Invalidate();
 }
 
+// OFFSET: 0x008037C0
+// FUNCTION: fn_46600
+void UIRodexContentsWnd::CreateReportButton() {
+  UIBasicButton* report = new UIBasicButton();
+  report->Configure(70, LookupMessage(MSI_RODEX_TAB_RETURN));
+  report->Move(224, 29);
+  report->SetId(ID_REPORT_RODEX);
+  report->SetDisabled(0);
+  report->Invalidate();
+  this->AddChild(report);
+}
+
 // OFFSET: 0x008020B0
 // FUNCTION: fn_10020
 void UIRodexContentsWnd::OnCreate(int, int) {
@@ -129,13 +141,7 @@ void UIRodexContentsWnd::OnCreate(int, int) {
                             mail->second.type);
 
       if ((mail->second.type & 8) == 0 && mail->second.isKnownSender == 0) {
-        UIBasicButton* report = new UIBasicButton();
-        report->Configure(70, LookupMessage(MSI_RODEX_TAB_RETURN));
-        report->Move(224, 29);
-        report->SetId(ID_REPORT_RODEX);
-        report->SetDisabled(0);
-        report->Invalidate();
-        this->AddChild(report);
+        this->CreateReportButton();
       }
     }
     break;
@@ -303,12 +309,12 @@ int UIRodexContentsWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
       }
       break;
     case ID_DELETE: {
-      if (g_rodexMailStore->inboxType == 0) {
+      if (g_rodexMailStore->inboxType == MAIL_INBOX_NORMAL) {
         const std::int64_t mailId = g_rodexMailStore->currentMailId;
         RodexMailMap::iterator mail = g_rodexMailStore->m_mails0.find(mailId);
         if (mail != g_rodexMailStore->m_mails0.end()) {
           if ((mail->second.type & 6) == 0) {
-            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
+            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "메시지", 0x118, 0x78, 0) == ID_YES) {
               g_modeMgr.GetGameMode()->SendMsg(MM_DELETE_MAIL, static_cast<int>(g_rodexMailStore->currentMailId), g_rodexMailStore->inboxType, 0, 0);
               if (g_windowMgr.rodexContentsWnd != 0) {
                 g_windowMgr.CloseWindow(WID_RODEXCONTENTSWND);
@@ -318,12 +324,12 @@ int UIRodexContentsWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
             g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_FAILED_DELETE_MAIL)), 0x64FFFF, 0, 0, 0);
           }
         }
-      } else if (g_rodexMailStore->inboxType == 1) {
+      } else if (g_rodexMailStore->inboxType == MAIL_INBOX_ACCOUNT) {
         const std::int64_t mailId = g_rodexMailStore->currentMailId;
         RodexMailMap::iterator mail = g_rodexMailStore->m_mails1.find(mailId);
         if (mail != g_rodexMailStore->m_mails1.end()) {
           if ((mail->second.type & 6) == 0) {
-            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
+            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "메시지", 0x118, 0x78, 0) == ID_YES) {
               g_modeMgr.GetGameMode()->SendMsg(MM_DELETE_MAIL, static_cast<int>(g_rodexMailStore->currentMailId), g_rodexMailStore->inboxType, 0, 0);
               if (g_windowMgr.rodexContentsWnd != 0) {
                 g_windowMgr.CloseWindow(WID_RODEXCONTENTSWND);
@@ -338,7 +344,7 @@ int UIRodexContentsWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
         RodexMailMap::iterator mail = g_rodexMailStore->m_mails2.find(mailId);
         if (mail != g_rodexMailStore->m_mails2.end()) {
           if ((mail->second.type & 6) == 0) {
-            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "Message", 0x118, 0x78, 0) == ID_YES) {
+            if (g_windowMgr.Confirm(LookupMessage(MSI_DO_YOU_REALLY_WANT_DELETE), 2, false, false, 0, "메시지", 0x118, 0x78, 0) == ID_YES) {
               g_modeMgr.GetGameMode()->SendMsg(MM_DELETE_MAIL, static_cast<int>(g_rodexMailStore->currentMailId), g_rodexMailStore->inboxType, 0, 0);
               if (g_windowMgr.rodexContentsWnd != 0) {
                 g_windowMgr.CloseWindow(WID_RODEXCONTENTSWND);
@@ -450,7 +456,7 @@ void UIRodexContentsWnd::SetMailContents(std::string title, std::string sender, 
     this->AddChild(this->m_zenyButton);
   }
 
-  if (g_rodexMailStore->inboxType == 0 && (flags & 8) == 0) {
+  if (g_rodexMailStore->inboxType == MAIL_INBOX_NORMAL && (flags & 8) == 0) {
     this->m_adminButton = new UIBasicButton();
     this->m_adminButton->Configure(70, LookupMessage(MSI_RODEX_BUTTON_ANSWER));
     this->m_adminButton->Move(224, 376);

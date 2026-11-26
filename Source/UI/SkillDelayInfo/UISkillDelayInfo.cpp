@@ -116,7 +116,7 @@ __forceinline void CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayInfo::CD
 template <>
 void CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayInfo::CDelayItemData>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
@@ -224,7 +224,7 @@ void CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayInfo::CDelayItemData>:
     for (SkillDelayInfo::CUIDelayItem*& slot : this->items) {
       SkillDelayInfo::CUIDelayItem* item = new SkillDelayInfo::CUIDelayItem();
       item->SetSize(this->itemWidth, this->rowHeight);
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->SetOnHover([this](CUIListItem* listItem) {
         for (SkillDelayInfo::CUIDelayItem* row : this->items) {
@@ -303,7 +303,7 @@ void CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayInfo::CDelayItemData>:
   if (this->data.size() == 0) {
     for (SkillDelayInfo::CUIDelayItem* item : this->items) {
       item->index = -1;
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
     }
     return;
   }
@@ -340,14 +340,14 @@ void CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayInfo::CDelayItemData>:
       }
       item->SetSelected(row == this->selected);
       item->Move(this->itemX, y);
-      item->Show(1);
+      item->Show(WINDOW_VISIBLE);
     }
   }
 
   for (const auto end = this->items.end(); it != end; ++it) {
     SkillDelayInfo::CUIDelayItem* item = *it;
     item->index = -1;
-    item->Show(0);
+    item->Show(WINDOW_HIDDEN);
   }
 }
 
@@ -424,6 +424,15 @@ CUITime::~CUITime() = default;
 void CUISkillDelayInfo::OnButtonClick() {
 }
 
+// OFFSET: 0x00A77A80
+// FUNCTION: fn_46631
+template <>
+void CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayInfo::CDelayItemData>::ClearData() {
+  this->data.clear();
+  this->selected = static_cast<unsigned int>(-1);
+  this->UpdateScrollBar();
+}
+
 // OFFSET: 0x00A77B00
 // FUNCTION: fn_45472
 void CUISkillDelayInfo::OnClose() {
@@ -498,7 +507,7 @@ int CUISkillDelayInfo::SendMsg(UIWindow* sender, int message, std::intptr_t argu
     return CUIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
   if (this->skillId != 7999) {
-    this->SetSkill(this->skillId);
+    this->SetSkill(reinterpret_cast<void*>(this->skillId));
   }
   return 0;
 }
@@ -510,7 +519,8 @@ static void AddDelayItem(CUIListBoxEx<SkillDelayInfo::CUIDelayItem, SkillDelayIn
 
 // OFFSET: 0x00A781C0
 // FUNCTION: fn_16889
-void CUISkillDelayInfo::SetSkill(int skillId) {
+void CUISkillDelayInfo::SetSkill(void* skill) {
+  int skillId = reinterpret_cast<int>(skill);
   this->skillId = skillId;
   this->delayList->ClearData();
 
@@ -524,7 +534,7 @@ void CUISkillDelayInfo::SetSkill(int skillId) {
   }
 
   int skillFlag = 0;
-  std::vector<std::map<int, int>> delays;
+  std::vector<std::map<int, long>> delays;
   g_session.LoadSkillDelayList(skillId, delays, skillFlag);
   for (unsigned int index = 0; index < delays.size(); ++index) {
     auto* list = this->delayList;
@@ -550,10 +560,10 @@ void CUISkillDelayInfo::SetSkill(int skillId) {
 
   this->delayList->Resize(this->delayList->geometry.width, this->delayList->data.size() * this->delayList->rowHeight + this->delayList->itemY);
   if (this->description->lines.empty()) {
-    this->description->Show(0);
+    this->description->Show(WINDOW_HIDDEN);
     this->Resize(this->geometry.width, this->delayList->geometry.y + this->delayList->geometry.height + 10);
   } else {
-    this->description->Show(1);
+    this->description->Show(WINDOW_VISIBLE);
     this->description->Resize(this->description->geometry.width, this->description->contentHeight + this->description->paddingBottom + this->description->paddingTop);
     this->description->Move(this->description->geometry.x, this->delayList->geometry.y + this->delayList->geometry.height + 10);
     this->Resize(this->geometry.width, this->description->geometry.y + this->description->geometry.height + 10);

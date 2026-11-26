@@ -27,6 +27,16 @@ static int ClampedRandom(int range) {
   return value >= 0 ? value : 0;
 }
 
+// INLINED
+static vector3d Add(const vector3d& left, const vector3d& right) {
+  return vector3d{left.x + right.x, left.y + right.y, left.z + right.z};
+}
+
+// INLINED
+static CEffect* SpawnAt(EffectLists* effects, int id, const vector3d& position) {
+  return effects->Spawn(0, id, position, 0, -1, 0, 0);
+}
+
 class CSkillAction_NW_INTENSIVE_AIM : public CSkillAction {
 public:
   int GetSkillAttackMotion() override;
@@ -240,31 +250,31 @@ void CSkillAction_NW_GRENADE_FRAGMENT::OnSkillEffect(int level, CGameActor* sour
 
   EffectLists* effectLists;
   switch (level) {
-  case 1:
+  case SKILL_ELEMENT_WATER:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_water"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
-  case 2:
+  case SKILL_ELEMENT_WIND:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_wind"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
-  case 3:
+  case SKILL_ELEMENT_EARTH:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_earth"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
-  case 4:
+  case SKILL_ELEMENT_FIRE:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_fire"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
-  case 5:
+  case SKILL_ELEMENT_DARKNESS:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_darkness"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
-  case 6:
+  case SKILL_ELEMENT_HOLY:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_saint"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
-  case 7:
+  case SKILL_ELEMENT_RESET:
     effectLists = g_effectMgr;
     effectLists->Spawn(source->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("grenade_fragment_reset"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     break;
@@ -534,16 +544,16 @@ void CSkillAction_NW_HASTY_FIRE_IN_THE_HOLE::OnSkillCast(int level, CGameActor* 
 void CSkillAction_NW_HASTY_FIRE_IN_THE_HOLE::OnGroundSkillEffect(vector3d position, int argument2, int argument3) {
   for (int index = 0; index < 3; ++index) {
     EffectLists* effectLists = g_effectMgr;
-    CEffect* effect = effectLists->Spawn(
-      0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_%d", index).c_str()), position.x, position.y, position.z, 0, -1, 0, 0
+    CEffect* effect = SpawnAt(
+      effectLists, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_%d", index).c_str()), position
     );
     if (effect) {
       effect->SetDelay(index * 288);
     }
 
     effectLists = g_effectMgr;
-    effect = effectLists->Spawn(
-      0, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_bottom_%d", index).c_str()), position.x, position.y, position.z, 0, -1, 0, 0
+    effect = SpawnAt(
+      effectLists, CEZ2STREffectMgr::GetInstance()->EffectId(FormatOwnedString("hasty_fire_in_the_hole_bottom_%d", index).c_str()), position
     );
     if (effect) {
       effect->SetDelay(index * 288);
@@ -743,10 +753,9 @@ void CSkillAction_NW_WILD_SHOT::OnSkillEffect(int level, CGameActor* source, CGa
       second = 3;
     }
     const float offsetX = ClientSin(radians) * static_cast<float>(second * 5);
-    const float x = offsetX + target->render.position.x;
-    const float y = target->render.position.y + 0.0f;
-    const float z = offsetZ + target->render.position.z;
-    CEffect* effect = g_effectMgr->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("wild_shot"), vector3d{x, y, z}, 0, -1, 0, 0);
+    const vector3d spawn = Add(vector3d{offsetX, 0.0f, offsetZ}, target->render.position);
+    EffectLists* effects = g_effectMgr;
+    CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("wild_shot"), vector3d{spawn.x, spawn.y, spawn.z}, 0, -1, 0, 0);
     if (effect) {
       effect->SetScale(0.8f);
       effect->SetDelay(delay);
@@ -809,7 +818,7 @@ void CSkillAction_NW_MIDNIGHT_FALLEN::OnGroundSkillEffect(vector3d position, int
     const float z = offsetZ + position.z;
     const float y = position.y + 0.0f;
     EffectLists* effects = g_effectMgr;
-    CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("midnight_fallen_bottom"), x, y, z, 0, -1, 0, 0);
+    CEffect* effect = effects->Spawn(0, CEZ2STREffectMgr::GetInstance()->EffectId("midnight_fallen_bottom"), vector3d{x, y, z}, 0, -1, 0, 0);
     if (effect) {
       effect->SetDelay(delay);
     }

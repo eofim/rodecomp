@@ -6,6 +6,7 @@
 #include "Render/Renderer.h"
 #include "Render/Drawing/SpriteGeometry.h"
 #include "Render/Primitives/SpriteQuad.h"
+#include "Render/Projection/RenderProjection.h"
 #include "Render/Textures/SpritePixels.h"
 #include "Resource/Sprites/ActionResource.h"
 #include "Resource/Sprites/SpriteResource.h"
@@ -86,15 +87,17 @@ void CEffectPrim::RenderGroundArcGlow(matrix& wtm) {
         angle = this->state.slots[ec].rotStart;
       }
 
-      const float radius = g_sinTable[this->state.slots[ec].rotStart] + this->state.slots[ec].distance;
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];
-      curB.x = radius * cosine;
+      const float radius = g_sinTable[this->state.slots[ec].rotStart] + this->state.slots[ec].distance;
+      const float baseX = radius * cosine;
+      const float baseZ = radius * sine;
+      curB.x = baseX;
       curB.y = 0.0f;
-      curB.z = radius * sine;
-      curT.x = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * cosine + curB.x;
+      curB.z = baseZ;
+      curT.x = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * cosine + baseX;
       curT.y = -(this->state.slots[ec].height[i] * g_sinTable[this->state.slots[ec].riseAngle]);
-      curT.z = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * sine + curB.z;
+      curT.z = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle] * sine + baseZ;
 
       if (i > 0) {
         int texture;
@@ -282,36 +285,37 @@ void CEffectPrim::RenderGroundArcStep(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    if (this->state.slots[ec].life != 1) {
+    auto& slotsRef = this->state.slots;
+    if (slotsRef[ec].life != 1) {
       continue;
     }
 
-    const int step = this->state.slots[ec].fullDisplayAngle / 20;
+    const int step = slotsRef[ec].fullDisplayAngle / 20;
     int i = 0;
-    for (int offset = 0; offset <= this->state.slots[ec].fullDisplayAngle; offset += step) {
-      int angle = this->state.slots[ec].rotStart + offset;
+    for (int offset = 0; offset <= slotsRef[ec].fullDisplayAngle; offset += step) {
+      int angle = slotsRef[ec].rotStart + offset;
       angle -= angle / 360 * 360;
-      if (this->state.slots[ec].fullDisplayAngle == 360 && i == 20) {
-        angle = this->state.slots[ec].rotStart;
+      if (slotsRef[ec].fullDisplayAngle == 360 && i == 20) {
+        angle = slotsRef[ec].rotStart;
       }
 
-      curB.x = this->state.slots[ec].distance * g_cosTable[angle];
-      curB.z = this->state.slots[ec].distance * g_sinTable[angle];
-      if (this->state.slots[ec].maxHeight == 6.001f) {
+      curB.x = slotsRef[ec].distance * g_cosTable[angle];
+      curB.z = slotsRef[ec].distance * g_sinTable[angle];
+      if (slotsRef[ec].maxHeight == 6.001f) {
         curB.y = -2.0f;
-      } else if (this->state.slots[ec].maxHeight == 24.001f) {
+      } else if (slotsRef[ec].maxHeight == 24.001f) {
         curB.y = -1.0f;
       } else {
         curB.y = 0.0f;
       }
 
-      const float riseX = this->state.slots[ec].height[i] * g_cosTable[this->state.slots[ec].riseAngle];
-      const float riseY = this->state.slots[ec].height[i] * g_sinTable[this->state.slots[ec].riseAngle];
+      const float riseX = slotsRef[ec].height[i] * g_cosTable[slotsRef[ec].riseAngle];
+      const float riseY = slotsRef[ec].height[i] * g_sinTable[slotsRef[ec].riseAngle];
       curT.x = riseX * g_cosTable[angle] + curB.x;
       curT.z = riseX * g_sinTable[angle] + curB.z;
-      if (this->state.slots[ec].maxHeight == 6.001f) {
+      if (slotsRef[ec].maxHeight == 6.001f) {
         curT.y = -(2.0f + riseY);
-      } else if (this->state.slots[ec].maxHeight == 24.001f) {
+      } else if (slotsRef[ec].maxHeight == 24.001f) {
         curT.y = -(1.0f + riseY);
       } else {
         curT.y = -riseY;
@@ -319,8 +323,8 @@ void CEffectPrim::RenderGroundArcStep(matrix& wtm) {
 
       if (i > 0) {
         this->RenderTeiRect(
-          &rpCnt, i - 1, this->state.slots[ec].alphaB, this->state.slots[ec].alphaB, prevB, curB, curT, prevT, wtm,
-          static_cast<char>(this->state.slots[ec].process % static_cast<int>(this->state.totalTexture))
+          &rpCnt, i - 1, slotsRef[ec].alphaB, slotsRef[ec].alphaB, prevB, curB, curT, prevT, wtm,
+          static_cast<char>(slotsRef[ec].process % static_cast<int>(this->state.totalTexture))
         );
       }
 
@@ -439,7 +443,7 @@ void CEffectPrim::RenderGroundSquare(matrix& wtm) {
       continue;
     }
 
-    int angle = this->state.slots[ec].rotStart;
+    const int angle = this->state.slots[ec].rotStart;
     float cosA = g_cosTable[angle];
     float sinA = g_sinTable[angle];
     const double radius = (g_sinTable[this->state.slots[ec].riseAngle] + 1.0f) * (this->state.slots[ec].distance * 0.1f) + this->state.slots[ec].distance * 0.8;
@@ -447,29 +451,37 @@ void CEffectPrim::RenderGroundSquare(matrix& wtm) {
     this->state.slots[ec].vecBPre.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecBPre.z = static_cast<float>(sinA * radius);
     this->state.slots[ec].vecBPre.y = this->state.slots[ec].height[0];
-    angle += angle < 270 ? 90 : -270;
-    cosA = g_cosTable[angle];
-    sinA = g_sinTable[angle];
+    int angle2 = angle + (angle < 270 ? 90 : -270);
+    cosA = g_cosTable[angle2];
+    sinA = g_sinTable[angle2];
     this->state.slots[ec].vecBNow.y = this->state.slots[ec].height[0];
     this->state.slots[ec].vecBNow.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecBNow.z = static_cast<float>(sinA * radius);
-    angle += angle + 90 < 360 ? 90 : -270;
-    cosA = g_cosTable[angle];
-    sinA = g_sinTable[angle];
+    angle2 += angle2 + 90 < 360 ? 90 : -270;
+    cosA = g_cosTable[angle2];
+    sinA = g_sinTable[angle2];
     this->state.slots[ec].vecTNow.y = this->state.slots[ec].height[0];
     this->state.slots[ec].vecTNow.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecTNow.z = static_cast<float>(sinA * radius);
-    angle += angle + 90 < 360 ? 90 : -270;
-    cosA = g_cosTable[angle];
-    sinA = g_sinTable[angle];
+    const int angle4 = angle2 + (angle2 + 90 < 360 ? 90 : -270);
+    cosA = g_cosTable[angle4];
+    sinA = g_sinTable[angle4];
     this->state.slots[ec].vecTPre.y = this->state.slots[ec].height[0];
     this->state.slots[ec].vecTPre.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecTPre.z = static_cast<float>(sinA * radius);
 
-    this->RenderTeiRect(
-      &rpCnt, this->state.slots[ec].alphaB, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, this->state.slots[ec].height[2] == 1.0f,
-      static_cast<char>(this->state.slots[ec].height[1]), 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0
-    );
+    const short alpha = this->state.slots[ec].alphaB;
+    if (this->state.slots[ec].height[2] == 1.0f) {
+      this->RenderTeiRect(
+        &rpCnt, alpha, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, 1,
+        static_cast<char>(this->state.slots[ec].height[1]), 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0
+      );
+    } else {
+      this->RenderTeiRect(
+        &rpCnt, alpha, this->state.slots[ec].vecBPre, this->state.slots[ec].vecBNow, this->state.slots[ec].vecTNow, this->state.slots[ec].vecTPre, wtm, 0,
+        static_cast<char>(this->state.slots[ec].height[1]), 0, 255, 255, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0
+      );
+    }
   }
 }
 
@@ -491,19 +503,19 @@ void CEffectPrim::RenderGroundSquareBlend(matrix& wtm) {
     this->state.slots[ec].vecBPre.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecBPre.z = static_cast<float>(sinA * radius);
     this->state.slots[ec].vecBPre.y = this->state.slots[ec].height[0];
-    const int angle2 = angle + (angle < 270 ? 90 : -270);
+    int angle2 = angle + (angle < 270 ? 90 : -270);
     cosA = g_cosTable[angle2];
     sinA = g_sinTable[angle2];
     this->state.slots[ec].vecBNow.y = this->state.slots[ec].height[0];
     this->state.slots[ec].vecBNow.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecBNow.z = static_cast<float>(sinA * radius);
-    const int angle3 = angle2 + (angle2 + 90 < 360 ? 90 : -270);
-    cosA = g_cosTable[angle3];
-    sinA = g_sinTable[angle3];
+    angle2 += angle2 + 90 < 360 ? 90 : -270;
+    cosA = g_cosTable[angle2];
+    sinA = g_sinTable[angle2];
     this->state.slots[ec].vecTNow.y = this->state.slots[ec].height[0];
     this->state.slots[ec].vecTNow.x = static_cast<float>(cosA * radius);
     this->state.slots[ec].vecTNow.z = static_cast<float>(sinA * radius);
-    const int angle4 = angle3 + (angle3 + 90 < 360 ? 90 : -270);
+    const int angle4 = angle2 + (angle2 + 90 < 360 ? 90 : -270);
     cosA = g_cosTable[angle4];
     sinA = g_sinTable[angle4];
     this->state.slots[ec].vecTPre.y = this->state.slots[ec].height[0];
@@ -693,8 +705,6 @@ void CEffectPrim::RenderFanWedge(matrix& wtm) {
     if (leftAngle < 0) {
       leftAngle += 360;
     }
-    const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
-    const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
     int rightAngle = angle + 7;
     if (rightAngle >= 360) {
       rightAngle -= 360;
@@ -703,25 +713,31 @@ void CEffectPrim::RenderFanWedge(matrix& wtm) {
     if (backAngle < 0) {
       backAngle += 360;
     }
-    left.x = dist * g_cosTable[leftAngle] * rotCos;
-    left.y = dist * g_cosTable[leftAngle] * rotSin + base;
+    const float leftSpread = dist * g_cosTable[leftAngle];
     left.z = dist * g_sinTable[leftAngle];
-    right.x = dist * g_cosTable[rightAngle] * rotCos;
-    right.y = dist * g_cosTable[rightAngle] * rotSin + base;
+    const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
+    const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
+    left.x = leftSpread * rotCos;
+    left.y = leftSpread * rotSin + base;
+    const float rightSpread = dist * g_cosTable[rightAngle];
     right.z = dist * g_sinTable[rightAngle];
-    back.x = g_cosTable[backAngle] * 7.0f * rotCos;
-    back.y = g_cosTable[backAngle] * 7.0f * rotSin + base;
-    back.z = g_sinTable[backAngle] * 7.0f;
+    right.x = rightSpread * rotCos;
+    right.y = rightSpread * rotSin + base;
+    const float backSpread = 7.0f * g_cosTable[backAngle];
+    back.z = 7.0f * g_sinTable[backAngle];
+    back.x = backSpread * rotCos;
+    back.y = backSpread * rotSin + base;
     int tipAngle = angle - 90;
     if (tipAngle < 0) {
       tipAngle += 360;
     }
-    tip.x = g_cosTable[tipAngle] * 7.0f * rotCos;
-    tip.y = g_cosTable[tipAngle] * 7.0f * rotSin + base;
-    tip.z = g_sinTable[tipAngle] * 7.0f;
+    const float tipSpread = 7.0f * g_cosTable[tipAngle];
+    tip.z = 7.0f * g_sinTable[tipAngle];
+    tip.x = tipSpread * rotCos;
+    tip.y = tipSpread * rotSin + base;
 
     this->RenderTeiRect(
-      &rpCnt, this->state.slots[ec].alphaB, tip, left, right, back, wtm, 0, static_cast<unsigned char>(static_cast<int>(this->state.slots[ec].height[1])), 0, 105,
+      &rpCnt, this->state.slots[ec].alphaB, tip, left, right, back, wtm, 0, static_cast<unsigned char>(this->state.slots[ec].height[1]), 0, 105,
       105, 255, 0.0f, 1.0f, 0.0f, 1.0f, 0
     );
   }
@@ -737,14 +753,13 @@ void CEffectPrim::RenderFanSlice(matrix& wtm) {
   int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
-    EffectPrimitiveSlot& slot = this->state.slots[ec];
-    if (slot.life != 1 || slot.alphaB <= 0) {
+    if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
       continue;
     }
 
-    const int angle = slot.riseAngle;
-    const float dist = slot.distance;
-    const float base = slot.height[0];
+    const int angle = this->state.slots[ec].riseAngle;
+    const float dist = this->state.slots[ec].distance;
+    const float base = this->state.slots[ec].height[0];
     int leftAngle = angle - 5;
     if (leftAngle < 0) {
       leftAngle += 360;
@@ -753,12 +768,16 @@ void CEffectPrim::RenderFanSlice(matrix& wtm) {
     if (rightAngle >= 360) {
       rightAngle -= 360;
     }
-    left.x = dist * g_cosTable[leftAngle] * g_cosTable[slot.rotStart];
-    left.y = dist * g_cosTable[leftAngle] * g_sinTable[slot.rotStart] + base;
+    const float leftSpread = dist * g_cosTable[leftAngle];
     left.z = dist * g_sinTable[leftAngle];
-    right.x = dist * g_cosTable[rightAngle] * g_cosTable[slot.rotStart];
-    right.y = dist * g_cosTable[rightAngle] * g_sinTable[slot.rotStart] + base;
+    const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
+    const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
+    left.x = leftSpread * rotCos;
+    left.y = leftSpread * rotSin + base;
+    const float rightSpread = dist * g_cosTable[rightAngle];
     right.z = dist * g_sinTable[rightAngle];
+    right.x = rightSpread * rotCos;
+    right.y = rightSpread * rotSin + base;
     center.x = 0.0f;
     center.y = base;
     center.z = 0.0f;
@@ -766,7 +785,7 @@ void CEffectPrim::RenderFanSlice(matrix& wtm) {
     center2.y = base;
     center2.z = 0.0f;
 
-    this->RenderTeiRect(&rpCnt, slot.alphaB, left, right, center, center2, wtm, 0, 0, 0, 0, 0, 255, 0.0f, 1.0f, 0.0f, 1.0f, 1);
+    this->RenderTeiRect(&rpCnt, this->state.slots[ec].alphaB, left, right, center, center2, wtm, 0, 0, 0, 0, 0, 255, 0.0f, 1.0f, 0.0f, 1.0f, 1);
   }
 }
 
@@ -786,27 +805,30 @@ void CEffectPrim::RenderFanTrail(matrix& wtm) {
     side[0] = angle - 20;
     side[1] = angle + 20;
     const int leftAngle = side[0] < 0 ? side[0] + 360 : side[0];
-    const int rightAngle = side[1] >= 360 ? side[1] - 360 : side[1];
-    const int backRightAngle = side[1] - 180 < 0 ? side[1] - 180 + 360 : side[1] - 180;
-    const int backLeftAngle = side[0] + 180 >= 360 ? side[0] + 180 - 360 : side[0] + 180;
 
-    const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
-    const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
     vector3d left;
     const float leftX = size * g_cosTable[leftAngle];
     left.z = size * g_sinTable[leftAngle];
+    const float rotCos = g_cosTable[this->state.slots[ec].rotStart];
+    const float rotSin = g_sinTable[this->state.slots[ec].rotStart];
     left.x = leftX * rotCos;
     left.y = leftX * rotSin + this->state.slots[ec].height[0];
+
+    const int rightAngle = side[1] >= 360 ? side[1] - 360 : side[1];
     vector3d right;
-    const float rightX = size * g_cosTable[rightAngle];
     right.z = size * g_sinTable[rightAngle];
+    const float rightX = size * g_cosTable[rightAngle];
     right.x = rightX * rotCos;
     right.y = rightX * rotSin + this->state.slots[ec].height[0];
+
+    const int backRightAngle = side[1] - 180 < 0 ? side[1] - 180 + 360 : side[1] - 180;
     vector3d backRight;
-    const float backRightX = size * g_cosTable[backRightAngle];
     backRight.z = size * g_sinTable[backRightAngle];
+    const float backRightX = size * g_cosTable[backRightAngle];
     backRight.x = backRightX * rotCos;
     backRight.y = backRightX * rotSin + this->state.slots[ec].height[0];
+
+    const int backLeftAngle = side[0] + 180 >= 360 ? side[0] + 180 - 360 : side[0] + 180;
     vector3d backLeft;
     const float backLeftX = size * g_cosTable[backLeftAngle];
     backLeft.z = size * g_sinTable[backLeftAngle];
@@ -822,7 +844,7 @@ void CEffectPrim::RenderFanTrail(matrix& wtm) {
       offset.x = dist * dirCos;
       offset.y = 0.0f;
       offset.z = dist * dirSin;
-      if (dist > 100.0f) {
+      if (dist > g_fireflyArcLength) {
         break;
       }
 
@@ -839,11 +861,11 @@ void CEffectPrim::RenderFanTrail(matrix& wtm) {
 // OFFSET: 0x00BF0370
 // FUNCTION: fn_19985
 void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
-  int rpCnt = 0;
   vector3d vec1{};
   vector3d vec2{};
   vector3d vec3{};
   vector3d vec4{};
+  int rpCnt = 0;
 
   for (int ec = 0; ec < 4; ++ec) {
     if (this->state.slots[ec].life != 1 || this->state.slots[ec].alphaB <= 0) {
@@ -910,13 +932,13 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       float remain = dist;
       int dir = this->state.slots[ec].riseAngle;
       vector3d bend0{};
-      if (dist > g_fireflyGroundOffset) {
+      if (dist > 20.0f) {
         remain = dist - g_fireflyGroundOffset;
         bend0.x = g_cosTable[dir] * g_fireflyGroundOffset;
         bend0.z = g_sinTable[dir] * g_fireflyGroundOffset;
       }
       vector3d bend1{};
-      if (dist > g_fireflyArcStep33) {
+      if (dist > 33.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -926,7 +948,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend1.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend2{};
-      if (dist > g_fireflyArcStep46) {
+      if (dist > 46.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -936,7 +958,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend2.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend3{};
-      if (dist > g_fireflyArcStep59) {
+      if (dist > 59.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -946,7 +968,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend3.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend4{};
-      if (dist > g_fireflyArcStep71) {
+      if (dist > 71.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -956,7 +978,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend4.z = g_sinTable[dir] * g_fireflyModeTwelve;
       }
       vector3d bend5{};
-      if (dist > g_fireflyArcStep84) {
+      if (dist > 84.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -1062,13 +1084,13 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
       float remain = dist;
       int dir = this->state.slots[ec].riseAngle;
       vector3d bend0{};
-      if (dist > g_fireflyGroundOffset) {
+      if (dist > 20.0f) {
         remain = dist - g_fireflyGroundOffset;
         bend0.x = g_cosTable[dir] * g_fireflyGroundOffset;
         bend0.z = g_sinTable[dir] * g_fireflyGroundOffset;
       }
       vector3d bend1{};
-      if (dist > g_fireflyArcStep33) {
+      if (dist > 33.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -1078,7 +1100,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend1.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend2{};
-      if (dist > g_fireflyArcStep46) {
+      if (dist > 46.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -1088,7 +1110,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend2.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend3{};
-      if (dist > g_fireflyArcStep59) {
+      if (dist > 59.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -1098,7 +1120,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend3.z = g_sinTable[dir] * g_fireflyModeThirteen;
       }
       vector3d bend4{};
-      if (dist > g_fireflyArcStep71) {
+      if (dist > 71.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -1108,7 +1130,7 @@ void CEffectPrim::RenderCurvedFanTrail(matrix& wtm) {
         bend4.z = g_sinTable[dir] * g_fireflyModeTwelve;
       }
       vector3d bend5{};
-      if (dist > g_fireflyArcStep84) {
+      if (dist > 84.0f) {
         dir += 5;
         if (dir >= 360) {
           dir -= 360;
@@ -1174,7 +1196,7 @@ __declspec(safebuffers) void CEffectPrim::RenderTwinFacingSquares(matrix& wtm) {
   vec3.y = 0.0f;
   vec4.y = 0.0f;
 
-  float radius = slot.distance * g_sinTable[static_cast<int>(slot.height[8])] * 0.05f + slot.distance;
+  float radius = slot.distance * g_sinTable[static_cast<int>(slot.height[8])] * g_fireflyNormalDrift + slot.distance;
   int angle = slot.process * 2;
   angle = angle % 360;
   vec1.x = radius * g_cosTable[angle];
@@ -1219,12 +1241,10 @@ __declspec(safebuffers) void CEffectPrim::RenderTwinFacingSquares(matrix& wtm) {
   }
 
   vec1.y = 0.0f;
-  vec2.y = 0.0f;
-  vec3.y = 0.0f;
-  vec4.y = 0.0f;
   int pulse = slot.process * 5;
   pulse = pulse % 90;
-  radius = slot.distance * g_sinTable[static_cast<int>(slot.height[8])] * 0.05f + (g_sinTable[pulse] * 2.0f + 1.0f) * slot.distance;
+  radius = slot.distance * g_sinTable[static_cast<int>(slot.height[8])] * g_fireflyNormalDrift +
+           (g_sinTable[pulse] * 2.0f + g_projectionDepthNumerator) * slot.distance;
   angle = slot.process * 2;
   angle = angle % 360;
   vec1.x = radius * g_cosTable[angle];
@@ -1232,29 +1252,32 @@ __declspec(safebuffers) void CEffectPrim::RenderTwinFacingSquares(matrix& wtm) {
   angle += 90;
   angle = angle % 360;
   vec2.x = radius * g_cosTable[angle];
+  vec2.y = 0.0f;
   vec2.z = radius * g_sinTable[angle];
   angle += 90;
   angle = angle % 360;
   vec3.x = radius * g_cosTable[angle];
+  vec3.y = 0.0f;
   vec3.z = radius * g_sinTable[angle];
   angle += 90;
   angle = angle % 360;
   vec4.x = radius * g_cosTable[angle];
+  vec4.y = 0.0f;
   vec4.z = radius * g_sinTable[angle];
   this->Tei_TowardScreen(vec1, vec2, vec3, vec4, slot.alphaT, this->state.slots[1].alphaT);
 
-  vec1.x = vec1.x + slot.vecBNow.x;
-  vec1.y = vec1.y + slot.vecBNow.y;
-  vec1.z = slot.vecBNow.z + vec1.z;
-  vec2.x = vec2.x + slot.vecBNow.x;
-  vec2.y = vec2.y + slot.vecBNow.y;
-  vec2.z = vec2.z + slot.vecBNow.z;
-  vec3.x = vec3.x + slot.vecBNow.x;
-  vec3.y = vec3.y + slot.vecBNow.y;
-  vec3.z = vec3.z + slot.vecBNow.z;
-  vec4.x = vec4.x + slot.vecBNow.x;
-  vec4.y = vec4.y + slot.vecBNow.y;
-  vec4.z = vec4.z + slot.vecBNow.z;
+  vec1.x += slot.vecBNow.x;
+  vec1.y += slot.vecBNow.y;
+  vec1.z += slot.vecBNow.z;
+  vec2.x += slot.vecBNow.x;
+  vec2.y += slot.vecBNow.y;
+  vec2.z += slot.vecBNow.z;
+  vec3.x += slot.vecBNow.x;
+  vec3.y += slot.vecBNow.y;
+  vec3.z += slot.vecBNow.z;
+  vec4.x += slot.vecBNow.x;
+  vec4.y += slot.vecBNow.y;
+  vec4.z += slot.vecBNow.z;
 
   if (slot.flag1[0] == 10) {
     this->RenderTeiRect(&rpCnt, slot.alphaB, vec1, vec2, vec3, vec4, wtm, 0, 1, 0, 255, 20, 20, 0.0f, 1.0f, 0.0f, 1.0f, 0);
@@ -1804,12 +1827,14 @@ __declspec(safebuffers) void CEffectPrim::RenderTaperedQuad(matrix& wtm) {
       angle2 += 360;
     }
 
-    vec1.x = dist * g_cosTable[angle1] * 0.5f + cosA * inner;
+    const float innerX = cosA * inner;
+    const float innerZ = sinA * inner;
+    vec1.x = dist * g_cosTable[angle1] * 0.5f + innerX;
     vec1.y = 0.0f;
-    vec1.z = dist * g_sinTable[angle1] * 0.5f + sinA * inner;
-    vec2.x = dist * g_cosTable[angle2] * 0.5f + cosA * inner;
+    vec1.z = dist * g_sinTable[angle1] * 0.5f + innerZ;
+    vec2.x = dist * g_cosTable[angle2] * 0.5f + innerX;
     vec2.y = 0.0f;
-    vec2.z = dist * g_sinTable[angle2] * 0.5f + sinA * inner;
+    vec2.z = dist * g_sinTable[angle2] * 0.5f + innerZ;
 
     int angle4 = angle - 90;
     if (angle < 90) {

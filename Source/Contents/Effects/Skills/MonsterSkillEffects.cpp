@@ -75,6 +75,19 @@ static vector3d Subtract(const vector3d& left, const vector3d& right) {
   return vector3d{left.x - right.x, left.y - right.y, left.z - right.z};
 }
 
+// INLINED
+static vector3d Add(const vector3d& left, const vector3d& right) {
+  return vector3d{left.x + right.x, left.y + right.y, left.z + right.z};
+}
+
+// INLINED
+static void SetIndices(CParticle* particle, int effectId, int group, int column, int row) {
+  particle->effectId = effectId;
+  particle->columnIndex = column;
+  particle->rowIndex = row;
+  particle->groupIndex = group;
+}
+
 // OFFSET: 0x0070C070
 // FUNCTION: fn_07123
 bool CCrimsonArrowEffect::IsAlive() {
@@ -130,7 +143,7 @@ void CCrimsonArrowEffect::Render() {
 // FUNCTION: fn_07130
 void CRootTwistEffect::InitEvents() {
   if (this->id == EF_SU_SV_ROOTTWIST) {
-    this->AddEvent(0, "effect\\su_roottwist.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\su_roottwist.wav", 0, 0);
   }
 }
 
@@ -174,7 +187,8 @@ bool CSprArrowEffect::IsAlive() {
 void CSprArrowEffect::OnProcess() {
   const float ticks =
       static_cast<float>(static_cast<double>(timeGetTime() - static_cast<unsigned int>(this->startTick)) / 24.0);
-  if (ticks < this->delayFrames) {
+  float delay = this->delayFrames;
+  if (ticks < delay) {
     return;
   }
 
@@ -214,10 +228,11 @@ void CSprArrowEffect::OnProcess() {
 
     const float inverse = 1.0f / SquareRoot(lengthSquared);
     this->spriteParticle->position += vector3d{inverse * dx * 2.5f, inverse * dy * 2.5f, inverse * dz * 2.5f};
+    delay = this->delayFrames;
   }
 
   ++this->spriteParticle->elapsedFrames;
-  const float time = ticks - this->delayFrames;
+  const float time = ticks - delay;
   if (this->frame > 8) {
     const int last = static_cast<int>(this->spriteParticle->action->FrameCount(0)) - 1;
     this->spriteFrame = std::min(this->spriteFrame + 1, last);
@@ -245,7 +260,7 @@ void CSprArrowEffect::Render() {
 }
 
 // INLINED
-static const char* BulletName(int job) {
+static const char* BulletNameForSprite(int job) {
   switch (job) {
   case JT_DISGUISER:
   case JT_G_DISGUISER:
@@ -312,7 +327,7 @@ void CSprArrowEffect::SetBulletSprite(int job) {
     return;
   }
 
-  const std::string_view name = BulletName(job);
+  const std::string_view name = BulletNameForSprite(job);
   if (name.empty()) {
     this->alive = false;
     return;
@@ -670,10 +685,7 @@ void CWarningPlaneEffect::AddPlane(vector3d position) {
   CParticle* particle = CreateParticle(&this->positionVector, 5);
   if (particle) {
     particle->SetTexture("warning_plane.tga");
-    particle->effectId = this->id;
-    particle->columnIndex = 0;
-    particle->rowIndex = 0;
-    particle->groupIndex = 1;
+    SetIndices(particle, this->id, 1, 0, 0);
     particle->scale = 2.5f;
     particle->alpha = 150;
     particle->SetColor(255, 0, 0);
@@ -1097,7 +1109,7 @@ void CFloralFlareRoad::Open() {
     flare->Load(std::string("froral_flareroad\\froral_flareroad\\froral_flareroad.str"));
     flare->m_delay = delay;
     this->emitters.push_back(flareEmitter);
-    this->AddEvent(0, "effect\\AG_ALL_BLOOM.wav", delay / 16, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\AG_ALL_BLOOM.wav", delay / 16, 0);
   }
 }
 
@@ -1214,55 +1226,51 @@ CParticle* CFootprintEffect::SpawnFootprint() {
   }
 
   CParticle* particle = CreateParticle(&this->positionVector, 1);
-  if (!particle) {
-    return particle;
-  }
+  if (particle) {
+    particle->alpha = this->baseAlpha;
+    particle->life = static_cast<float>(this->effectLifetime);
+    particle->speedParameter = static_cast<float>(this->baseAlpha) / static_cast<float>(this->effectLifetime * 60);
+    particle->sourceBlend = 5;
+    particle->destinationBlend = 6;
+    particle->SetTexture(texture);
+    RenderVertex* vertices = particle->vertices;
+    particle->InitParticleQuad(vertices);
 
-  particle->alpha = this->baseAlpha;
-  particle->life = static_cast<float>(this->effectLifetime);
-  particle->speedParameter = static_cast<float>(this->baseAlpha) / static_cast<float>(this->effectLifetime * 60);
-  particle->sourceBlend = 5;
-  particle->destinationBlend = 6;
-  particle->SetTexture(texture);
-  particle->InitParticleQuad(particle->vertices);
+    const float angle =
+      ScreenAngle(&this->lastPosition.x, &this->positionVector.x, g_modeMgr.GetGameMode()->camera->frame.view.values) + 90.0f;
+    const float scale = this->scaleParameter;
+    matrix world;
+    world.SetScale(scale, scale, 0.0f);
+    world.AppendXRotation(1.570796f);
+    world.AppendYRotation((angle + g_modeMgr.GetGameMode()->camera->camera.yaw) / 180.0f * 3.141592f);
+    world.AppendTranslate(&this->positionVector.x);
 
-  const float angle =
-    ScreenAngle(&this->lastPosition.x, this->position, g_modeMgr.GetGameMode()->camera->frame.view.values) + 90.0f;
-  const float scale = this->scaleParameter;
-  matrix world;
-  world.SetScale(scale, scale, 0.0f);
-  world.AppendXRotation(1.570796f);
-  world.AppendYRotation((angle + g_modeMgr.GetGameMode()->camera->camera.yaw) / 180.0f * 3.141592f);
-  world.AppendTranslate(this->position);
-
-  for (int i = 0; i < 4; ++i) {
-    const float x = particle->vertices[i].x * world.values[0] + particle->vertices[i].y * world.values[3] + 0.0f * world.values[6] + world.values[9];
-    const float z = particle->vertices[i].x * world.values[2] + particle->vertices[i].y * world.values[5] + 0.0f * world.values[8] + world.values[11];
-    CGameMode* mode = g_modeMgr.GetGameMode();
-    float y = mode->scene->terrain->PlaneHeight(x, z) - 2.0f;
-    if (-1000.0f != this->lastGroundHeight && y - this->lastGroundHeight > 5.0f) {
-      y = this->lastGroundHeight;
+    for (int i = 0; i < 4; ++i) {
+      vector3d point;
+      point.x = vertices[i].x * world.values[0] + vertices[i].y * world.values[3] + 0.0f * world.values[6] + world.values[9];
+      point.z = vertices[i].x * world.values[2] + vertices[i].y * world.values[5] + 0.0f * world.values[8] + world.values[11];
+      CGameMode* mode = g_modeMgr.GetGameMode();
+      point.y = mode->scene->terrain->PlaneHeight(point.x, point.z) - 2.0f;
+      if (-1000.0f != this->lastGroundHeight && point.y - this->lastGroundHeight > 5.0f) {
+        point.y = this->lastGroundHeight;
+      }
+      this->lastGroundHeight = point.y;
+      vertices[i].x = point.x;
+      vertices[i].y = point.y;
+      vertices[i].z = point.z;
     }
-    this->lastGroundHeight = y;
-    particle->vertices[i].x = x;
-    particle->vertices[i].y = y;
-    particle->vertices[i].z = z;
-  }
 
-  this->leftFoot = this->leftFoot == 0;
-  this->lastPosition.x = this->position[0];
-  this->lastPosition.y = this->position[1];
-  this->lastPosition.z = this->position[2];
+    this->leftFoot = this->leftFoot == 0;
+    this->lastPosition = this->positionVector;
+  }
   return particle;
 }
 
 // OFFSET: 0x00712A90
 // FUNCTION: fn_07242
 void CFootprintEffect::OnProcess() {
-  const float dy = this->position[1] - this->lastPosition.y;
-  const float dx = this->position[0] - this->lastPosition.x;
-  const float dz = this->position[2] - this->lastPosition.z;
-  if (static_cast<double>(dx * dx + dy * dy + dz * dz) > this->stepDistance) {
+  const vector3d delta = Subtract(this->positionVector, this->lastPosition);
+  if (static_cast<double>(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z) > this->stepDistance) {
     CParticle* emitter = this->SpawnFootprint();
     if (emitter) {
       this->emitters.emplace_back(emitter);
@@ -1428,10 +1436,13 @@ void CFootprintStrEffect::SpawnFootprint() {
 // OFFSET: 0x00713E00
 // FUNCTION: fn_07252
 void CFootprintStrEffect::OnProcess() {
-  const float dy = this->position[1] - this->lastPosition.y;
   const float dx = this->position[0] - this->lastPosition.x;
+  const float dy = this->position[1] - this->lastPosition.y;
   const float dz = this->position[2] - this->lastPosition.z;
-  if (static_cast<double>(dx * dx + dy * dy + dz * dz) > this->stepDistance) {
+  float distance = dx * dx;
+  distance += dy * dy;
+  distance += dz * dz;
+  if (static_cast<double>(distance) > this->stepDistance) {
     this->SpawnFootprint();
   }
 
@@ -1536,19 +1547,19 @@ void CFromTheAbyssEffect::UpdateParticle(std::pair<long long, AbyssParticle> par
   }
 
   switch (particle.second.kind) {
-  case 3:
+  case ABYSS_PARTICLE_DIE:
     if (IsEmitterAlive(emitter) != true) {
       FreeParticle(emitter);
-      this->particles[id].kind = 0;
+      this->particles[id].kind = ABYSS_PARTICLE_INACTIVE;
       this->particles[id].emitter = nullptr;
       return;
     }
     FollowAbyssOwner(this, emitter);
     break;
-  case 2:
+  case ABYSS_PARTICLE_LOOP:
     FollowAbyssOwner(this, emitter);
     break;
-  case 1:
+  case ABYSS_PARTICLE_CREATE:
     if (IsEmitterAlive(emitter) != true) {
       const double scale = emitter->m_scale;
       const vector3d offset = emitter->offset;
@@ -1563,7 +1574,7 @@ void CFromTheAbyssEffect::UpdateParticle(std::pair<long long, AbyssParticle> par
       }
 
       AbyssParticle& entry = this->particles[id];
-      entry.kind = 2;
+      entry.kind = ABYSS_PARTICLE_LOOP;
       entry.emitter = dying;
       return;
     }
@@ -1611,7 +1622,7 @@ void CFromTheAbyssEffect::SetLevel(long long level) {
         emitter->offset.z = this->waves[i].offset.z;
         AbyssParticle& entry = this->particles[i];
         entry.emitter = emitter;
-        entry.kind = 1;
+        entry.kind = ABYSS_PARTICLE_CREATE;
       }
     }
   } else if (level < this->level) {
@@ -1632,7 +1643,7 @@ void CFromTheAbyssEffect::SetLevel(long long level) {
           emitter->offset.z = offset.z;
         }
 
-        this->particles[i].kind = 3;
+        this->particles[i].kind = ABYSS_PARTICLE_DIE;
         this->particles[i].emitter = emitter;
       }
     }
@@ -1704,25 +1715,25 @@ void CFullScreenEffect::Render() {
 
     RenderVertex* vertices = primitive.quad;
     switch (particle->columnIndex) {
-    case 0:
+    case FULL_SCREEN_EFFECT_TOP_LEFT:
       SetScreenVertex(vertices[0], 0.0f, 0.0f, color, right, top);
       SetScreenVertex(vertices[1], static_cast<float>(g_renderer->viewport.centerX), 0.0f, color, left, top);
       SetScreenVertex(vertices[2], 0.0f, static_cast<float>(g_renderer->viewport.centerY), color, right, bottom);
       SetScreenVertex(vertices[3], static_cast<float>(g_renderer->viewport.centerX), static_cast<float>(g_renderer->viewport.centerY), color, left, bottom);
       break;
-    case 1:
+    case FULL_SCREEN_EFFECT_TOP_RIGHT:
       SetScreenVertex(vertices[0], static_cast<float>(g_renderer->viewport.centerX), 0.0f, color, left, top);
       SetScreenVertex(vertices[1], static_cast<float>(g_renderer->viewport.width), 0.0f, color, right, top);
       SetScreenVertex(vertices[2], static_cast<float>(g_renderer->viewport.centerX), static_cast<float>(g_renderer->viewport.centerY), color, left, bottom);
       SetScreenVertex(vertices[3], static_cast<float>(g_renderer->viewport.width), static_cast<float>(g_renderer->viewport.centerY), color, right, bottom);
       break;
-    case 2:
+    case FULL_SCREEN_EFFECT_BOTTOM_LEFT:
       SetScreenVertex(vertices[0], 0.0f, static_cast<float>(g_renderer->viewport.centerY), color, right, bottom);
       SetScreenVertex(vertices[1], static_cast<float>(g_renderer->viewport.centerX), static_cast<float>(g_renderer->viewport.centerY), color, left, bottom);
       SetScreenVertex(vertices[2], 0.0f, static_cast<float>(g_renderer->viewport.height), color, right, top);
       SetScreenVertex(vertices[3], static_cast<float>(g_renderer->viewport.centerX), static_cast<float>(g_renderer->viewport.height), color, left, top);
       break;
-    case 3:
+    case FULL_SCREEN_EFFECT_BOTTOM_RIGHT:
       SetScreenVertex(vertices[0], static_cast<float>(g_renderer->viewport.centerX), static_cast<float>(g_renderer->viewport.centerY), color, left, bottom);
       SetScreenVertex(vertices[1], static_cast<float>(g_renderer->viewport.width), static_cast<float>(g_renderer->viewport.centerY), color, right, bottom);
       SetScreenVertex(vertices[2], static_cast<float>(g_renderer->viewport.centerX), static_cast<float>(g_renderer->viewport.height), color, left, top);
@@ -1845,9 +1856,8 @@ void CHawkVumerangEffect::OnProcess() {
     particle->m_angle = 360.0f - static_cast<float>(angle) / 3.141592f * 180.0f;
     const float sine = static_cast<float>(ClientSin(static_cast<float>(angle)) * this->orbitRadius);
     const float cosine = static_cast<float>(ClientCos(static_cast<float>(angle)) * this->orbitRadius);
-    particle->position.z = this->orbitCenter.z + sine + this->orbitOffsetZ;
-    particle->position.x = cosine + this->orbitCenter.x + this->orbitOffsetX;
-    particle->position.y = this->orbitCenter.y + 0.0f + this->orbitOffsetY;
+    const vector3d orbit = Add(this->orbitCenter, vector3d{cosine, 0.0f, sine});
+    particle->position = Add(orbit, vector3d{this->orbitOffsetX, this->orbitOffsetY, this->orbitOffsetZ});
     this->emitters.push_front(particle);
   } else {
     this->finishedEmitters.push_back(particle);
@@ -1925,7 +1935,7 @@ void CDropItemEffect::InitEvents() {
     }
   }
 
-  this->AddEvent(0, (this->soundPath + this->soundName).c_str(), 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, (this->soundPath + this->soundName).c_str(), 0, 0);
 }
 
 // OFFSET: 0x00719660
@@ -2446,8 +2456,8 @@ void CPetitioEffect::Open() {
   petitio->Load(std::string("petitio\\petitio\\petitio.str"));
   this->emitters.push_back(petitioEmitter);
 
-  this->AddEvent(1, nullptr, 6, 0);
-  this->AddEvent(0, "effect\\CD_PETITIO.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_QUAKE, nullptr, 6, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\CD_PETITIO.wav", 0, 0);
 }
 
 // OFFSET: 0x0071FA30
@@ -2547,7 +2557,7 @@ void CPneumaticusProcellaEffect::Open() {
     }
   }
 
-  this->AddEvent(0, "effect\\CD_PNEUMATICUS_PROCELLA.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\CD_PNEUMATICUS_PROCELLA.wav", 0, 0);
 }
 
 // OFFSET: 0x00720410
@@ -2756,13 +2766,15 @@ void CRandomOptEffect::Init() {
         const float lift = height * g_sinTable[particle->phaseParameter];
         const float cosine = g_cosTable[angle];
         const float sine = g_sinTable[angle];
+        const float spreadX = spread * cosine;
+        const float spreadZ = spread * sine;
         EffectPoint points[2];
         points[0].x = particle->scale * cosine;
         points[0].y = 0.0f;
         points[0].z = particle->scale * sine;
-        points[1].x = points[0].x + spread * cosine;
+        points[1].x = points[0].x + spreadX;
         points[1].y = points[0].y - lift;
-        points[1].z = points[0].z + spread * sine;
+        points[1].z = points[0].z + spreadZ;
 
         particle->vertices[3].x = points[0].x;
         particle->vertices[3].y = points[0].y;
@@ -3011,7 +3023,7 @@ void CServantWeaponNewEffect::AddWeapon() {
       particle->angle = angle;
       CEZ2STRParticle* emitter = particle;
       this->emitters.push_back(std::move(emitter));
-      this->AddEvent(0, "effect\\DK_SERVANTWEAPON.wav", this->frame, 0);
+      this->AddEvent(EFFECT_EVENT_SOUND, "effect\\DK_SERVANTWEAPON.wav", this->frame, 0);
     }
   }
 }
@@ -3305,7 +3317,7 @@ void CServantWeaponNewEffect::Shoot(int skill) {
       FreeParticle(weapon);
       this->emitters.pop_back();
       this->trails.push_back(std::move(shot));
-      this->AddEvent(0, "effect\\DK_SERVANTWEAPON.wav", this->frame, 0);
+      this->AddEvent(EFFECT_EVENT_SOUND, "effect\\DK_SERVANTWEAPON.wav", this->frame, 0);
     }
   }
 }
@@ -3808,7 +3820,7 @@ void CSevereRainStorm::SpawnParticles() {
 // OFFSET: 0x00725D60
 // FUNCTION: fn_07414
 void CSevereRainStorm::SpawnCrossRain() {
-  const int ranges[10] = {3, 3, 3, 5, 5, 5, 7, 7, 7, 9};
+  const std::array<int, 10> ranges = {3, 3, 3, 5, 5, 5, 7, 7, 7, 9};
   const int index = std::max(0, std::min(this->effectLevel - 1, 9));
   vector3d position = *&this->positionVector;
   const int spread = ranges[index] * 50;
@@ -3823,7 +3835,7 @@ void CSevereRainStorm::SpawnCrossRain() {
   CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&position, 5));
   CEZ2STRParticle* emitter = particle;
   particle->Load(std::string("IMPERIAL_GUARD\\IG_CROSS_RAIN\\new_crossrain\\new_cross_rain\\new_cross_rain.str"));
-  this->emitters.push_back(emitter);
+  this->emitters.push_back(std::move(emitter));
 }
 
 // OFFSET: 0x00726110
@@ -3858,12 +3870,10 @@ void CSevereRainStorm::SpawnGrenades() {
 // OFFSET: 0x007265B0
 // FUNCTION: fn_07416
 void CSevereRainStorm::SpawnBombardHits() {
-  const float* const origin = this->position;
   for (int count = 0; count < 3; ++count) {
-    const vector3d base = {origin[0] + 0.0f, origin[1] - 15.0f, origin[2] + 0.0f};
-    vector3d position = base;
-    position.x = (static_cast<float>(ClampedRandom(451)) - 225.0f) * 0.1f + base.x;
-    position.z = (static_cast<float>(ClampedRandom(451)) - 225.0f) * 0.1f + base.z;
+    vector3d position = Add(this->positionVector, vector3d{0.0f, -15.0f, 0.0f});
+    position.x = (static_cast<float>(ClampedRandom(451)) - 225.0f) * 0.1f + position.x;
+    position.z = (static_cast<float>(ClampedRandom(451)) - 225.0f) * 0.1f + position.z;
 
     CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
     if (particle) {
@@ -3896,7 +3906,7 @@ void CSevereRainStorm::SpawnCrystalRain() {
   this->emitters.push_back(std::move(crystal));
 
   if (rand() % 7 == 0) {
-    this->AddEvent(0, "effect\\AG_RAIN_OF_CRYSTAL.wav", this->frame + 1, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\AG_RAIN_OF_CRYSTAL.wav", this->frame + 1, 0);
   }
 }
 
@@ -3943,7 +3953,7 @@ __declspec(noinline) void CSevereRainStorm::SpawnTwinklingGalaxy(int index) {
     this->emitters.push_back(std::move(emitter));
   }
 
-  this->AddEvent(0, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
 }
 
 // OFFSET: 0x00727050
@@ -3975,7 +3985,7 @@ void CSevereRainStorm::SpawnStarCannon() {
     this->emitters.push_back(std::move(emitter));
   }
 
-  this->AddEvent(0, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
 }
 
 // OFFSET: 0x00727450
@@ -4007,7 +4017,7 @@ void CSevereRainStorm::SpawnGalaxyStar() {
     this->emitters.push_back(std::move(emitter));
   }
 
-  this->AddEvent(0, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\SKY_EMPEROR\\ske_star_cannon.wav", this->frame + 1, 0);
 }
 
 // OFFSET: 0x00727850
@@ -4056,7 +4066,7 @@ bool CSevereRainStorm::IsAlive() {
     break;
   case EF_NW_GRENADES_DROPPING:
   case EF_NW_MISSION_BOMBARD:
-    if (this->ActorExists() != true && this->emitters.size() < 1) {
+    if (this->ActorExists() != true && this->emitters.size() <= 0) {
       return false;
     }
     break;
@@ -4171,13 +4181,13 @@ void CCrimsonArrowEffect::Open() {
     arrow->Load("crimsonarrow\\crimsonarrow\\crimsonarrow.str");
     emitter->offset = vector3d{0.0f, -13.0f, 0.0f};
     arrow->m_angle = static_cast<float>(angle);
-    this->AddEvent(0, "effect\\AG_CRIMSON_ARROW1.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\AG_CRIMSON_ARROW1.wav", 0, 0);
     break;
   case EF_RHYTHMSHOOTING_SHOT:
     arrow->Load("rhythmshooting\\rhythmshooting_shot\\rhythmshooting_shot.str");
     emitter->offset = vector3d{0.0f, -8.0f, 0.0f};
     arrow->m_angle = static_cast<float>(angle + 180.0);
-    this->AddEvent(0, "effect\\TR_RHYTHMSHOOTING.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\TR_RHYTHMSHOOTING.wav", 0, 0);
     break;
   case EF_UNLUCKY_RUSH:
     arrow->Load("unlucky_rush\\unlucky_rush\\unlucky_rush.str");
@@ -4193,7 +4203,7 @@ void CCrimsonArrowEffect::Open() {
     emitter->offset.y = -4.0f;
     emitter->offset.z = 0.0f;
     arrow->m_angle = static_cast<float>(angle);
-    this->AddEvent(0, "effect\\ABC_FRENZY_SHOT.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\ABC_FRENZY_SHOT.wav", 0, 0);
     break;
   }
 
@@ -4310,30 +4320,24 @@ void CSvgSpiritEffect::Open() {
 // OFFSET: 0x0070E240
 // FUNCTION: fn_07172
 void CCurseOfCubeEffect::SpawnShock() {
-  CEZ2STRParticle* particle;
   switch (this->id) {
   case EF_NPC_CURSE_OF_RED_CUBE: {
-    particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-    if (!particle) {
-      return;
+    CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
+    if (particle) {
+      particle->Open("NPC_CURSE_OF_RED_CUBE\\npc_cur_r_shock\\npc_cur_r_shock.str");
+      this->emitters.push_back(particle);
     }
-    particle->Open("NPC_CURSE_OF_RED_CUBE\\npc_cur_r_shock\\npc_cur_r_shock.str");
     break;
   }
   case EF_NPC_CURSE_OF_BLUE_CUBE: {
-    particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
-    if (!particle) {
-      return;
+    CEZ2STRParticle* particle = static_cast<CEZ2STRParticle*>(CreateEZ2STRParticle(&this->positionVector, 5));
+    if (particle) {
+      particle->Open("NPC_CURSE_OF_BLUE_CUBE\\npc_cur_b_shock\\npc_cur_b_shock.str");
+      this->emitters.push_back(particle);
     }
-    particle->Open("NPC_CURSE_OF_BLUE_CUBE\\npc_cur_b_shock\\npc_cur_b_shock.str");
     break;
   }
-  default:
-    return;
   }
-
-  CEZ2STRParticle* emitter = particle;
-  this->emitters.push_back(std::move(emitter));
 }
 
 // OFFSET: 0x0071F0C0
@@ -4457,7 +4461,7 @@ void CDancingKnifeEffect::SpawnSecondStrike() {
 void CDancingKnifeEffect::Open() {
   this->secondStrike = 0;
   this->SpawnFirstStrike();
-  this->AddEvent(0, "effect\\SHC_DANCING_KNIFE.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\SHC_DANCING_KNIFE.wav", 0, 0);
 }
 
 // OFFSET: 0x00710840
@@ -4803,7 +4807,7 @@ void CGaleStorm::SpawnArrow() {
   }
 
   if (rand() % 7 == 0) {
-    this->AddEvent(0, "effect\\WH_GALESTORM.wav", this->frame + 1, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\WH_GALESTORM.wav", this->frame + 1, 0);
   }
 }
 
@@ -4876,19 +4880,12 @@ void CGravityControlEffect::Open() {
 // FUNCTION: fn_07298
 void CHawkVumerangEffect::Open() {
   this->startTime = timeGetTime();
-  this->targetPosition = vector3d{this->position[0], this->position[1], this->position[2]};
-  this->originPosition.x = this->sourcePosition[0];
-  this->originPosition.y = this->sourcePosition[1];
-  this->originPosition.z = this->sourcePosition[2];
-  const float half = g_depthAverageHalf;
-  this->orbitCenter.x = (this->originPosition.x + this->targetPosition.x) * half;
-  this->orbitCenter.y = (this->originPosition.y + this->targetPosition.y) * half;
-  this->orbitCenter.z = (this->originPosition.z + this->targetPosition.z) * half;
+  this->targetPosition = this->positionVector;
+  this->originPosition = this->sourcePositionVector;
+  this->orbitCenter = Add(this->originPosition, this->targetPosition) * 0.5f;
 
-  const float dx = this->originPosition.x - this->targetPosition.x;
-  const float dy = this->originPosition.y - this->targetPosition.y;
-  const float dz = this->originPosition.z - this->targetPosition.z;
-  this->orbitRadius = static_cast<double>(SquareRoot(dy * dy + dx * dx + dz * dz)) * g_depthAverageHalf;
+  const vector3d delta = Subtract(this->originPosition, this->targetPosition);
+  this->orbitRadius = SquareRoot(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z) * 0.5f;
   this->startAngle = std::acos(static_cast<double>(this->targetPosition.x - this->orbitCenter.x) / this->orbitRadius);
   if (this->orbitCenter.z > this->targetPosition.z) {
     this->startAngle = 6.283184f - this->startAngle;
@@ -4902,7 +4899,7 @@ void CHawkVumerangEffect::Open() {
     this->emitters.push_back(particle);
   }
 
-  this->AddEvent(0, "effect\\WH_HAWKBOOMERANG.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\WH_HAWKBOOMERANG.wav", 0, 0);
 }
 
 // OFFSET: 0x00721AF0
@@ -4988,5 +4985,66 @@ void CSavageImpactEffect::Open() {
 
   this->emitter->Load(std::string("savage_impact\\savage_impact\\savage_impact.str"));
   this->emitter->m_angle = static_cast<float>(angle);
-  this->AddEvent(0, "effect\\SHC_SAVAGE_IMPACT.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\SHC_SAVAGE_IMPACT.wav", 0, 0);
+}
+
+// OFFSET: 0x0070C550
+// FUNCTION: fn_46569
+const char* BulletName(int job) {
+  switch (job) {
+  case JT_DISGUISER:
+  case JT_G_DISGUISER:
+  case JT_SPIRIT_H_WATER_S:
+  case JT_SPIRIT_H_WATER_L:
+  case JT_SPIRIT_H_WATER_SL:
+  case JT_SPIRIT_C_WATER_S:
+  case JT_SPIRIT_C_WATER_L:
+  case JT_SPIRIT_C_WATER_SL:
+    return "canon_bullet";
+  case JT_MD_PRI_RIGEL_AC:
+  case JT_MD_PRI_RIGEL_ACS:
+    return "RIGEL_BULLET";
+  case JT_SPIRIT_I_WATER_S:
+    return "phylla_bullet";
+  case JT_SPIRIT_B_FLAME_M:
+  case JT_SPIRIT_B_FLAME_L:
+  case JT_SPIRIT_B_FLAME_SL:
+    return "mg_corruption_root_h_bullet";
+  case JT_SPIRIT_C_FLAME_L:
+  case JT_SPIRIT_C_FLAME_SL:
+  case JT_SPIRIT_R_FLAME_L:
+  case JT_SPIRIT_R_FLAME_SL:
+    return "mg_corruption_root_bullet";
+  case JT_VR_MD_DREGG1:
+    return "VR_MD_DREGG1_bullet";
+  case JT_VR_MD_DREGG2:
+    return "VR_MD_DREGG2_bullet";
+  case JT_EP21_YORKER_B:
+    return "EP21_YORKER_Bullet";
+  case JT_EP21_YOSTER_D:
+    return "EP21_YOSTER_D_bullet";
+  case JT_EP21_YOSTER_E:
+    return "EP21_YOSTER_E_bullet";
+  case JT_VIOLEN:
+  case JT_CP_VIOLEN:
+    return "violen_bullet";
+  case JT_EP21_YORMI_B:
+  case JT_EP21_YORMI_B_H:
+    return "EP21_YORMI_bullet";
+  case JT_EP21_YORDOS_A:
+  case JT_G_EP21_YORDOS_A:
+  case JT_EP21_YORDOS_A_H:
+    return "EP21_YORDOS_Bullet";
+  case JT_EP21_YOSCOPUS_B:
+  case JT_EP21_YOSCOPUS_B_H:
+    return "EP21_YOSCOPUS_Bullet";
+  case JT_CH1_SHADOW_JAILER:
+    return "CH1_SHADOW_JAILER_bullet";
+  case JT_CH1_SCABIOSA:
+    return "CH1_SCABIOSA_bullet";
+  case JT_CH1_LOBELIA:
+    return "CH1_LOBELIA_bullet";
+  default:
+    return "skel_archer_arrow";
+  }
 }

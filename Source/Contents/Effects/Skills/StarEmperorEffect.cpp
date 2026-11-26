@@ -4,6 +4,7 @@
 #include "Contents/Effects/Core/EffectPoint.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "Contents/Effects/Particles/Particle.h"
+#include "Contents/Effects/Primitives/EffectPrimitiveMotion.h"
 #include "Contents/Map/MapSkyMgr.h"
 #include "Utility/Math/AffineMatrix.h"
 #include "Utility/Math/Vector3d.h"
@@ -53,8 +54,8 @@ void CStarEmperorEffect::BuildSphere() {
   for (int row = 0; row < 6; ++row) {
     const float top = static_cast<float>(row) * 0.16666667f;
     const float bottom = static_cast<float>(row + 1) * 0.16666667f;
-    const float topPitch = (static_cast<float>(row) * 30.0f - 90.0f) / 180.0f * 3.141592f;
-    const float bottomPitch = (static_cast<float>(row + 1) * 30.0f - 90.0f) / 180.0f * 3.141592f;
+    const float topPitch = (static_cast<float>(row) * 30.0f - g_cameraYawOffset) / 180.0f * 3.141592f;
+    const float bottomPitch = (static_cast<float>(row + 1) * 30.0f - g_cameraYawOffset) / 180.0f * 3.141592f;
 
     for (int column = 0; column < 12; ++column) {
       CParticle* particle = CreateParticle(&this->positionVector, 1);
@@ -127,8 +128,8 @@ void CStarEmperorEffect::Open() {
 // FUNCTION: fn_07479
 void CStarEmperorEffect::InitEvents() {
   if (this->id == EF_STAR_EMPEROR) {
-    this->AddEvent(0, "effect\\wizard_fire_pillar_a.wav", 1, 0);
-    this->AddEvent(0, "effect\\wizard_fire_pillar_b.wav", 31, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\wizard_fire_pillar_a.wav", 1, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\wizard_fire_pillar_b.wav", 31, 0);
   }
 }
 

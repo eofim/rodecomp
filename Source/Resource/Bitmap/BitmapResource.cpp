@@ -1,4 +1,3 @@
-#define BITMAPRESOURCE_NOINLINE_DTOR
 #include "Client/Application/ErrorDialog.h"
 #include "File/File.h"
 #include "Render/DeviceContext/DCSurface.h"
@@ -23,14 +22,20 @@ CBitmapRes* CBitmapRes::Create() {
 // FUNCTION: fn_07848
 bool CBitmapRes::Load(const char* name) {
   CFile file;
-  if (name && file.Open(name, 0, true, false)) {
-    if (this->Decode(name, file.GetData(), file.GetSize(), false)) {
-      file.Close();
-      return true;
-    }
-    file.Close();
+  if (!name) {
+    return false;
   }
 
+  if (!file.Open(name, 0, true, false)) {
+    return false;
+  }
+
+  if (this->Decode(name, file.GetData(), file.GetSize(), false)) {
+    file.Close();
+    return true;
+  }
+
+  file.Close();
   return false;
 }
 
@@ -54,9 +59,11 @@ bool CBitmapRes::LoadAlphaBitmap(const char* name) {
       const std::uint32_t source = x < 0 || x >= mask.image.width || y < 0 || y >= mask.image.height
                                        ? 0x00FF0000u
                                        : mask.image.pixels[x + y * mask.image.width];
-      const std::uint32_t channels = (source | 0xFFu) + ((source | 0xFF00u) >> 8) + ((source | 0xFF0000u) >> 16);
-      const std::int32_t alpha = static_cast<std::int32_t>(channels) / 3;
-      pixel = (color & 0x00FFFFFFu) + (static_cast<std::uint32_t>(alpha) << 24);
+      const int red = (source | 0xFF0000u) >> 16;
+      const int green = (source | 0xFF00u) >> 8;
+      const int blue = source | 0xFFu;
+      const int alpha = (blue + green + red) / 3;
+      pixel = (color & 0x00FFFFFFu) + (alpha << 24);
     }
   }
 
@@ -334,7 +341,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
   GifScreenDescriptor screen;
   memcpy_s(&screen, sizeof(screen), cursor, sizeof(screen));
   cursor += sizeof(screen);
-  if (iconOnly == true && (screen.width != 24 || screen.height != 24)) {
+  if (iconOnly == true && (24 != screen.width || 24 != screen.height)) {
     return false;
   }
 
@@ -369,7 +376,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
       ++cursor;
 
       switch (label) {
-      case 0xF9: {
+      case GIF_EXTENSION_GRAPHIC_CONTROL: {
         GifGraphicControl control;
         memcpy_s(&control, sizeof(control), cursor, sizeof(control));
         cursor += sizeof(control);
@@ -378,7 +385,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
         delay = std::max<unsigned int>(10, control.delay);
         break;
       }
-      case 0xFF: {
+      case GIF_EXTENSION_APPLICATION: {
         std::uint8_t blockSize;
         memcpy_s(&blockSize, sizeof(blockSize), cursor, sizeof(blockSize));
         ++cursor;
@@ -396,8 +403,8 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
 
           std::uint16_t loops;
           memcpy_s(&loops, sizeof(loops), cursor, sizeof(loops));
+          this->loopCount = 0 < loops ? loops + 1 : 0;
           cursor += sizeof(loops);
-          this->loopCount = loops > 0 ? loops + 1 : 0;
         }
         break;
       }
@@ -489,7 +496,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
     }
     case ';':
       delete[] globalPalette;
-      if (this->frames.size() != 0) {
+      if (0 < this->frames.size()) {
         this->image.pixels = this->frames[0].second;
       }
 
@@ -498,7 +505,7 @@ bool CGifRes::DecodeGif(const void* data, int bytes, bool iconOnly) {
       }
 
       this->lastFrameTime = timeGetTime();
-      if (this->frames.size() != 0) {
+      if (0 < this->frames.size()) {
         this->animated = true;
       }
 

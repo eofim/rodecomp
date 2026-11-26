@@ -20,7 +20,7 @@ void UIBroadcastBalloon::AddMessage(int category, const BroadcastBalloonMessage&
 
   unsigned int limit = 3;
   switch (category) {
-  case 2:
+  case BROADCAST_BALLOON_NOTICE:
     limit = 1;
     break;
   }
@@ -109,11 +109,11 @@ void UIBroadcastBalloon::Paint() {
 // FUNCTION: fn_09337
 void UIBroadcastBalloon::OnProcess() {
   if (this->m_messages.size() == 0) {
-    this->Show(0);
+    this->Show(WINDOW_HIDDEN);
     return;
   }
 
-  this->Show(1);
+  this->Show(WINDOW_VISIBLE);
   for (auto& entry : this->m_messages) {
     std::list<BroadcastBalloonMessage>& messages = entry.second;
     for (auto it = messages.begin(); it != messages.end();) {

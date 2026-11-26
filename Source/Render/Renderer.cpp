@@ -5,6 +5,7 @@
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Render/Primitives/TextureQuad.h"
@@ -26,12 +27,6 @@ char s_hourlyBannerState;
 short s_screenShakeStep;
 // GLOBAL: gl_24885
 int s_hourlyBannerAlpha;
-
-// OFFSET: 0x00544A60
-// FUNCTION: fn_01820
-std::uint32_t __fastcall sub_544A60(const CRenderer* renderer) {
-  return std::bit_cast<std::uint32_t>(renderer->viewDirectionZ);
-}
 
 // OFFSET: 0x0055D150
 // FUNCTION: fn_02097
@@ -90,7 +85,7 @@ void CRenderer::DrawBattleFieldIcon() {
     count = 2;
   }
 
-  int digits[2];
+  int digits[3];
   digits[0] = score % 10;
   score /= 10;
   digits[1] = score % 10;
@@ -142,7 +137,7 @@ void CRenderer::DrawHourlyBanner() {
     return;
   }
 
-  CTexture* texture = g_texMgr.Load("유저인터페이스\\", 0, false, true, false);
+  CTexture* texture = g_texMgr.Load("유저인터페이스\\T_GameGrade.tga", 0, false, true, false);
   if (texture != nullptr) {
     RECT rect;
     rect.bottom = texture->Height() + 45;
@@ -162,15 +157,14 @@ void CRenderer::DrawHourlyBanner() {
     }
 
     const std::uint32_t color = (alpha << 24) + 0xFFFFFF;
-    const TextureRegion region = {0.0f, 0.0f, 1.0f, 1.0f};
-    g_modeMgr.GetGameMode()->DrawTexture(rect, 0, 0.0999f, color, texture, region);
+    g_modeMgr.GetGameMode()->DrawTexture(rect, 0, 0.0999f, color, texture, UnitTextureRegion());
   }
 }
 
 // OFFSET: 0x0055E840
 // FUNCTION: fn_02112
 void CRenderer::DrawOverlays() {
-  if (g_serviceType == 0) {
+  if (g_serviceType == ServiceKorea) {
     this->DrawHourlyBanner();
   }
 

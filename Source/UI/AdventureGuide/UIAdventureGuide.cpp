@@ -47,15 +47,15 @@ template <> void CUIListBoxEx<AdventureGuide::CUITabInfo, Guide_Intro::Contents>
 // FUNCTION: fn_13994
 template <class T> void CUIListBox<T>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->scrollBar->SetOnChange([this](int position) {
     int y = 0;
     for (T* item : this->items) {
       if (position <= item->geometry.height + y && y < this->geometry.height + position) {
-        item->Show(1);
+        item->Show(WINDOW_VISIBLE);
         item->Move(this->itemX, this->itemY - position + y);
       } else {
-        item->Show(0);
+        item->Show(WINDOW_HIDDEN);
       }
       y += item->geometry.height;
     }
@@ -73,7 +73,7 @@ template <class T> void CUIListBox<T>::OnCreate(int width, int height) {
 // FUNCTION: fn_13998
 template <class T, class D> void CUIListBoxEx<T, D>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
@@ -161,8 +161,11 @@ void CUIAdventureGuide::OnCreate(int width, int height) {
   title->SetColor(0);
   title->SetShadow(1, 0xFFFFFF);
   title->SetOutline(0, 0xFFFFFF);
-  this->titleBar->titleText = title;
-  this->titleBar->AddChild(title);
+  {
+    CUITitleBar* titleBar = this->titleBar;
+    titleBar->titleText = title;
+    titleBar->AddChild(title);
+  }
 
   CUIImageButton* menuButton = new CUIImageButton();
   menuButton->SetSize(11, 11);
@@ -237,10 +240,16 @@ void CUIAdventureGuide::OnCreate(int width, int height) {
     tabs->SetImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_normal.bmp", 0x79DF094DD9616575ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_press.bmp", 0x11CB35636377DD07ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_over.bmp", 0x4755C1355575FD37ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_normal.bmp", 0x9BE3EF737387AD79ULL));
   }
 
-  this->tabs->itemWidth = 98;
-  this->tabs->rowHeight = 40;
-  this->tabs->itemX = 8;
-  this->tabs->itemY = 0;
+  {
+    CUIListBox<AdventureGuide::CUITab>* tabs = this->tabs;
+    tabs->itemWidth = 98;
+    tabs->rowHeight = 40;
+  }
+  {
+    CUIListBox<AdventureGuide::CUITab>* tabs = this->tabs;
+    tabs->itemX = 8;
+    tabs->itemY = 0;
+  }
   this->tabs->scrollBar->SetSize(8, 372);
   this->tabs->scrollBar->Move(0, 0);
   this->tabs->scrollBar->step = 20;
@@ -333,6 +342,22 @@ void CUIQuest::OnSelectQuest(CUIQuestInfo* item, const CQuestInfo&) {
   this->navigationButton->Show(selected);
 }
 
+// OFFSET: 0x009E02E0
+// FUNCTION: fn_46590
+inline void CUIItemInfo::SetSourceLines(const std::vector<std::string>& lines) {
+  this->sourcesViewer->Clear();
+  for (const std::string& line : lines) {
+    this->sourcesViewer->AddLine(line);
+  }
+}
+
+// OFFSET: 0x009E0320
+// FUNCTION: fn_46591
+inline void CUIQuestInfo::SetStatusLine(const std::string& line) {
+  this->statusViewer->Clear();
+  this->statusViewer->AddLine(line);
+}
+
 // OFFSET: 0x009DC320
 // FUNCTION: fn_14321
 void CUIItem::BindItem(CUIItemInfo* item, const CItemData& data) {
@@ -350,10 +375,7 @@ void CUIItem::BindItem(CUIItemInfo* item, const CItemData& data) {
   item->image->SetImage(image);
   item->SetStatusLines(data.entry.firstFlag, data.entry.secondFlag, data.entry.thirdFlag);
   item->SetDescription(data.type, info.Description());
-  item->sourcesViewer->Clear();
-  for (const std::string& value : data.entry.values) {
-    item->sourcesViewer->AddLine(value);
-  }
+  item->SetSourceLines(data.entry.values);
   item->description = data.entry.text;
 }
 
@@ -365,8 +387,7 @@ void __stdcall BindQuestInfo(CUIQuestInfo* owner, const CQuestInfo& data) {
     owner->SetTitle(data.id);
     owner->SetViewerLines(data.contents.values);
     owner->title = data.contents.first;
-    owner->statusViewer->Clear();
-    owner->statusViewer->AddLine(data.contents.second);
+    owner->SetStatusLine(data.contents.second);
     owner->questId = data.contents.questId;
     {
       const bool isNew = g_renewQuestMgr->IsNewQuest(data.contents.questId);
@@ -377,17 +398,15 @@ void __stdcall BindQuestInfo(CUIQuestInfo* owner, const CQuestInfo& data) {
     owner->SetTitle(data.id);
     owner->SetViewerLines(data.contents.values);
     owner->title = data.contents.first;
-    owner->statusViewer->Clear();
-    owner->statusViewer->AddLine(data.contents.second);
-    owner->stampImage->Show(0);
+    owner->SetStatusLine(data.contents.second);
+    owner->stampImage->Show(WINDOW_HIDDEN);
     return;
   case 4:
     owner->SetTip(data.id);
     owner->SetViewerLines(data.contents.values);
     owner->title = data.contents.first;
-    owner->statusViewer->Clear();
-    owner->statusViewer->AddLine(data.contents.second);
-    owner->stampImage->Show(0);
+    owner->SetStatusLine(data.contents.second);
+    owner->stampImage->Show(WINDOW_HIDDEN);
     return;
   }
 }
@@ -456,35 +475,31 @@ void CUIItemInfo::OnInit() {
 void CUIItemInfo::SetDescription(int type, const std::vector<const char*>& description) {
   this->descriptionViewer->Clear();
 
-  if (type == 5) {
+  if (type == ADVENTURE_GUIDE_ITEM) {
     this->type = 5;
-  } else if (type == 6) {
+  } else if (type == ADVENTURE_GUIDE_EQUIPMENT) {
     this->type = 4;
   }
 
   int lines = 0;
-  for (const char* value : description) {
+  for (const char* const& value : description) {
     if (lines > 6) {
       break;
     }
 
-    std::string text;
-    text = value;
-    constexpr char highlight[] = {'^', '7', '7', '7', '7', '7', '7'};
-    if (text.find(highlight, 0, sizeof(highlight)) == std::string::npos) {
-      continue;
-    }
-
-    std::smatch match;
-    std::regex pattern("\\^000000");
-    std::regex_search(text, match, pattern);
-    while (!match.empty()) {
-      std::string line = std::string(match.prefix().first, match.prefix().second) + match.str();
-      this->descriptionViewer->AddLine(line);
-      ++lines;
-      text = match.suffix();
-      text.erase(0, text.find_first_not_of(" \r\n\t\v\f"));
+    std::string text(value);
+    if (text.find("^" "777777") != std::string::npos) {
+      std::smatch match;
+      std::regex pattern("\\^000000");
       std::regex_search(text, match, pattern);
+      while (match.size() > 0) {
+        std::string line = std::string(match.prefix().first, match.prefix().second) + match.str();
+        this->descriptionViewer->AddLine(line);
+        ++lines;
+        text = match.suffix();
+        text.erase(0, text.find_first_not_of(" \r\n\t\v\f"));
+        std::regex_search(text, match, pattern);
+      }
     }
   }
 }
@@ -526,7 +541,7 @@ void CUIQuestInfo::OnInit() {
 // OFFSET: 0x009DD720
 // FUNCTION: fn_14340
 void CUISubTab::OnInit() {
-  this->stampImage->Show(0);
+  this->stampImage->Show(WINDOW_HIDDEN);
 }
 
 // OFFSET: 0x009DD730
@@ -638,14 +653,14 @@ void CUIItem::LoadPage(int type, int id) {
     this->itemList->data.push_back(data);
   }
   this->itemList->UpdateScrollBar();
-  this->findButton->Show(0);
-  this->navigationButton->Show(0);
+  this->findButton->Show(WINDOW_HIDDEN);
+  this->navigationButton->Show(WINDOW_HIDDEN);
 }
 
 // OFFSET: 0x009DDE50
 // FUNCTION: fn_14350
 void CUIMonster::LoadPage(int, int) {
-  this->navigationButton->Show(0);
+  this->navigationButton->Show(WINDOW_HIDDEN);
 }
 
 // OFFSET: 0x009DDE60
@@ -660,16 +675,16 @@ void CUIQuest::LoadPage(int type, int id) {
     data.contents = content;
     data.type = type;
     this->questList->data.push_back(data);
-    if (type == 1 && !g_renewQuestMgr->IsNewQuest(content.questId)) {
+    if (type == ADVENTURE_GUIDE_EPISODE && !g_renewQuestMgr->IsNewQuest(content.questId)) {
       g_renewQuestMgr->AddStatusRequest(content.questId);
     }
   }
   this->questList->UpdateScrollBar();
-  if (type == 1) {
+  if (type == ADVENTURE_GUIDE_EPISODE) {
     g_renewQuestMgr->SendQuestStatusRequest();
   }
-  this->findButton->Show(0);
-  this->navigationButton->Show(0);
+  this->findButton->Show(WINDOW_HIDDEN);
+  this->navigationButton->Show(WINDOW_HIDDEN);
 }
 
 // OFFSET: 0x009DE410
@@ -814,7 +829,7 @@ void CUIAdventureGuide::OnInit() {
         subTab->labelText->SetText(detail.text);
         subTab->id = id;
         subTab->questId = detail.questId;
-        if (tab->type == 1) {
+        if (tab->type == ADVENTURE_GUIDE_EPISODE) {
           const bool isNew = g_renewQuestMgr->IsNewQuest(detail.questId);
           subTab->stampImage->Show(isNew);
           if (!isNew) {
@@ -873,7 +888,7 @@ void AdventureGuide::CUIQuest::MarkQuest(int questId) {
     return item->questId == questId;
   });
   if (found != items.end()) {
-    (*found)->stampImage->Show(1);
+    (*found)->stampImage->Show(WINDOW_VISIBLE);
   }
 }
 
@@ -881,17 +896,18 @@ void AdventureGuide::CUIQuest::MarkQuest(int questId) {
 // FUNCTION: fn_14357
 void CUIAdventureGuide::MarkQuest(int questId) {
   for (AdventureGuide::CUITab* tab : this->tabs->items) {
-    if (tab->type != 1) {
+    if (tab->type != ADVENTURE_GUIDE_EPISODE) {
       continue;
     }
 
-    if (tab->subTabs) {
-      std::list<AdventureGuide::CUISubTab*> subTabs = tab->subTabs->items;
+    if (auto* subTabList = tab->subTabs) {
+      const std::list<AdventureGuide::CUISubTab*>& source = subTabList->items;
+      std::list<AdventureGuide::CUISubTab*> subTabs = source;
       auto found = std::find_if(subTabs.begin(), subTabs.end(), [questId](AdventureGuide::CUISubTab* subTab) {
         return subTab->questId == static_cast<unsigned int>(questId);
       });
       if (found != subTabs.end()) {
-        (*found)->stampImage->Show(1);
+        (*found)->stampImage->Show(WINDOW_VISIBLE);
       }
     }
 
@@ -995,9 +1011,11 @@ void CUICharacterInfo::OnCreate(int width, int height) {
   this->AddChild(this->name);
 }
 
+}
+
 // OFFSET: 0x009C8D00
 // FUNCTION: fn_14003
-void CUIItemInfo::OnCreate(int width, int height) {
+void AdventureGuide::CUIItemInfo::OnCreate(int width, int height) {
   this->image = new CUIStaticImage();
   this->image->SetSize(75, 100);
   this->image->Move(45, 14);
@@ -1040,15 +1058,15 @@ void CUIItemInfo::OnCreate(int width, int height) {
   this->descriptionViewer->SetScrollStep(20);
   {
     CUITextViewer* description = this->descriptionViewer;
-    description->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xDB27CB557D038759ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x3FA3AFA7035DE3FFULL));
+    description->SetScrollBarButtonImages(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xDB27CB557D038759ULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x3FA3AFA7035DE3FFULL));
   }
   {
     CUITextViewer* description = this->descriptionViewer;
-    description->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x87E3D1C50D572DEFULL));
+    description->SetScrollBarBackground(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x87E3D1C50D572DEFULL));
   }
   {
     CUITextViewer* description = this->descriptionViewer;
-    description->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x51BB39B763BBBD8DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xADC51BF9C98B413DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xDF8117FF49CFF551ULL));
+    description->SetScrollBarThumbImages(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x51BB39B763BBBD8DULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xADC51BF9C98B413DULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xDF8117FF49CFF551ULL));
   }
   this->AddChild(this->descriptionViewer);
 
@@ -1071,15 +1089,15 @@ void CUIItemInfo::OnCreate(int width, int height) {
   this->optionsViewer->SetScrollStep(20);
   {
     CUITextViewer* options = this->optionsViewer;
-    options->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x7D5D0F110B6B8371ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xF715514F5961B75BULL));
+    options->SetScrollBarButtonImages(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x7D5D0F110B6B8371ULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xF715514F5961B75BULL));
   }
   {
     CUITextViewer* options = this->optionsViewer;
-    options->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x4191BB5531FD3999ULL));
+    options->SetScrollBarBackground(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x4191BB5531FD3999ULL));
   }
   {
     CUITextViewer* options = this->optionsViewer;
-    options->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xB19D1FA9116F39D3ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x9569C9C7E70909AFULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xD7A749EB27D5BF6DULL));
+    options->SetScrollBarThumbImages(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xB19D1FA9116F39D3ULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x9569C9C7E70909AFULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xD7A749EB27D5BF6DULL));
   }
   this->AddChild(this->optionsViewer);
 
@@ -1102,18 +1120,20 @@ void CUIItemInfo::OnCreate(int width, int height) {
   this->sourcesViewer->SetScrollStep(20);
   {
     CUITextViewer* sources = this->sourcesViewer;
-    sources->SetScrollBarButtonImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xADADEB4DF7813B55ULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xD9452D81E5CD99C1ULL));
+    sources->SetScrollBarButtonImages(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xADADEB4DF7813B55ULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xD9452D81E5CD99C1ULL));
   }
   {
     CUITextViewer* sources = this->sourcesViewer;
-    sources->SetScrollBarBackground(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xFD69A9B3F311818DULL));
+    sources->SetScrollBarBackground(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xFD69A9B3F311818DULL));
   }
   {
     CUITextViewer* sources = this->sourcesViewer;
-    sources->SetScrollBarThumbImages(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x7F2DFFC1ABE91F2BULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD98F5345098D630DULL), OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x9B0F234DEFDF7593ULL));
+    sources->SetScrollBarThumbImages(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x7F2DFFC1ABE91F2BULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD98F5345098D630DULL), OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x9B0F234DEFDF7593ULL));
   }
   this->AddChild(this->sourcesViewer);
 }
+
+namespace AdventureGuide {
 
 // OFFSET: 0x009CC580
 // FUNCTION: fn_14005
@@ -1154,15 +1174,15 @@ void CUIMonsterInfo::OnCreate(int width, int height) {
   this->detailsViewer->SetScrollStep(20);
   {
     CUITextViewer* details = this->detailsViewer;
-    details->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x6FE153231D879777ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x33133B977BCD03CDULL)));
+    details->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x6FE153231D879777ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x33133B977BCD03CDULL)));
   }
   {
     CUITextViewer* details = this->detailsViewer;
-    details->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x2FEB8739E5975BD1ULL)));
+    details->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x2FEB8739E5975BD1ULL)));
   }
   {
     CUITextViewer* details = this->detailsViewer;
-    details->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x6BA1C1132F033B75ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xA12DAB392545D72FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x8783C33941E15117ULL)));
+    details->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x6BA1C1132F033B75ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xA12DAB392545D72FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x8783C33941E15117ULL)));
   }
   this->AddChild(this->detailsViewer);
 
@@ -1185,15 +1205,15 @@ void CUIMonsterInfo::OnCreate(int width, int height) {
   this->valuesViewer->SetScrollStep(20);
   {
     CUITextViewer* values = this->valuesViewer;
-    values->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xC70319B5EB61598FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x0B8745519B1F95D7ULL)));
+    values->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xC70319B5EB61598FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x0B8745519B1F95D7ULL)));
   }
   {
     CUITextViewer* values = this->valuesViewer;
-    values->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xA597A7E7492B39D5ULL)));
+    values->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xA597A7E7492B39D5ULL)));
   }
   {
     CUITextViewer* values = this->valuesViewer;
-    values->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xFFABE3D5D1BBEF73ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x0399459DAF454F0FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xD5A78DB38D8DAFABULL)));
+    values->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xFFABE3D5D1BBEF73ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x0399459DAF454F0FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xD5A78DB38D8DAFABULL)));
   }
   this->AddChild(this->valuesViewer);
 }
@@ -1206,7 +1226,7 @@ void CUIQuestInfo::OnCreate(int width, int height) {
   this->stampImage->Move(250, 10);
   {
     CUIStaticImage* stamp = this->stampImage;
-    stamp->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\stamp_completed.bmp", 0xF14F79170939C7F1ULL)));
+    stamp->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\stamp_completed.bmp", 0xF14F79170939C7F1ULL)));
   }
   this->AddChild(this->stampImage);
 
@@ -1229,15 +1249,15 @@ void CUIQuestInfo::OnCreate(int width, int height) {
   this->titleViewer->SetScrollStep(20);
   {
     CUITextViewer* title = this->titleViewer;
-    title->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x4941FD9F21BBB9FDULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xE7978FB5A94DD7FDULL)));
+    title->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x4941FD9F21BBB9FDULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xE7978FB5A94DD7FDULL)));
   }
   {
     CUITextViewer* title = this->titleViewer;
-    title->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xB7FD8F670FC7B96BULL)));
+    title->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xB7FD8F670FC7B96BULL)));
   }
   {
     CUITextViewer* title = this->titleViewer;
-    title->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x39FF7FB50DEB998FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x2FE993D1DDE1F197ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xAD075B8DB599F1CDULL)));
+    title->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x39FF7FB50DEB998FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x2FE993D1DDE1F197ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xAD075B8DB599F1CDULL)));
   }
   this->AddChild(this->titleViewer);
 
@@ -1260,15 +1280,15 @@ void CUIQuestInfo::OnCreate(int width, int height) {
   this->linesViewer->SetScrollStep(20);
   {
     CUITextViewer* lines = this->linesViewer;
-    lines->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x0F15B16B5BAFD57FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x7DE349D717D7F123ULL)));
+    lines->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x0F15B16B5BAFD57FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x7DE349D717D7F123ULL)));
   }
   {
     CUITextViewer* lines = this->linesViewer;
-    lines->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x7321C3814F8799E1ULL)));
+    lines->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x7321C3814F8799E1ULL)));
   }
   {
     CUITextViewer* lines = this->linesViewer;
-    lines->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x7941D76335CFA14FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xCB1D253B7FE1F563ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x7115D9F973F913C9ULL)));
+    lines->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x7941D76335CFA14FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xCB1D253B7FE1F563ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x7115D9F973F913C9ULL)));
   }
   this->AddChild(this->linesViewer);
 
@@ -1317,34 +1337,34 @@ void CUIItemInfo::OnRBtnDown(int, int) {
     location = this->location <= 9 ? 2 : 0x22;
   } else if (this->type == 4) {
     switch (this->location) {
-    case 0:
+    case GUIDE_EQUIP_HEAD_TOP:
       location = EQP_HEAD_TOP;
       break;
-    case 1:
+    case GUIDE_EQUIP_HEAD_MID:
       location = EQP_HEAD_MID;
       break;
-    case 2:
+    case GUIDE_EQUIP_HEAD_LOW:
       location = EQP_HEAD_LOW;
       break;
-    case 3:
+    case GUIDE_EQUIP_ARMOR:
       location = EQP_ARMOR;
       break;
-    case 4:
+    case GUIDE_EQUIP_GARMENT:
       location = EQP_GARMENT;
       break;
-    case 5:
+    case GUIDE_EQUIP_SHIELD:
       location = EQP_HAND_L;
       break;
-    case 6:
+    case GUIDE_EQUIP_SHOES:
       location = EQP_SHOES;
       break;
-    case 7:
+    case GUIDE_EQUIP_ACCESSORY_BOTH:
       location = EQP_ACC_RL;
       break;
-    case 8:
+    case GUIDE_EQUIP_ACCESSORY_RIGHT:
       location = EQP_ACC_R;
       break;
-    case 9:
+    case GUIDE_EQUIP_ACCESSORY_LEFT:
       location = EQP_ACC_L;
       break;
     default:
@@ -1473,7 +1493,7 @@ CUIListBox<CUISubTab>* CUITab::CreateSubTabList() {
 
   CUIListBox<CUISubTab>* list = this->subTabs;
   {
-    list->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_normal.bmp", 0x6BC977B3B5993503ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_press.bmp", 0xB5F3F779237315F3ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_over.bmp", 0x67DD5BAB1919D9D1ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_normal.bmp", 0xB5D7B5AF4FEDFF57ULL)));
+    list->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_normal.bmp", 0x6BC977B3B5993503ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_press.bmp", 0xB5F3F779237315F3ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_over.bmp", 0x67DD5BAB1919D9D1ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\tab_btn_sub_normal.bmp", 0xB5D7B5AF4FEDFF57ULL)));
   }
 
   {
@@ -1490,13 +1510,13 @@ CUIListBox<CUISubTab>* CUITab::CreateSubTabList() {
   this->subTabs->scrollBar->Move(89, 0);
   this->subTabs->scrollBar->step = 20;
   {
-    this->subTabs->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x9B9D51AD3515F779ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x038535BB092533B7ULL)));
+    this->subTabs->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x9B9D51AD3515F779ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0x038535BB092533B7ULL)));
   }
   {
-    this->subTabs->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xFB2BC75769E777D3ULL)));
+    this->subTabs->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xFB2BC75769E777D3ULL)));
   }
   {
-    this->subTabs->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x71A509DB43792991ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xDD69EDFFA18F537DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x8BBF792B47E72173ULL)));
+    this->subTabs->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x71A509DB43792991ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xDD69EDFFA18F537DULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x8BBF792B47E72173ULL)));
   }
 
   this->AddChild(this->subTabs);
@@ -1543,7 +1563,7 @@ template <>
 AdventureGuide::CUISubTab* CUIListBox<AdventureGuide::CUISubTab>::CreateItem() {
   AdventureGuide::CUISubTab* item = new AdventureGuide::CUISubTab();
   item->SetSize(this->itemWidth, this->rowHeight);
-  item->Show(0);
+  item->Show(WINDOW_HIDDEN);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   item->SetOnHover([this](CUIListItem* listItem) {
     for (AdventureGuide::CUISubTab* other : this->items) {
@@ -1566,7 +1586,7 @@ template <>
 AdventureGuide::CUITab* CUIListBox<AdventureGuide::CUITab>::CreateItem() {
   AdventureGuide::CUITab* item = new AdventureGuide::CUITab();
   item->SetSize(this->itemWidth, this->rowHeight);
-  item->Show(0);
+  item->Show(WINDOW_HIDDEN);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   item->SetOnHover([this](CUIListItem* listItem) {
     for (AdventureGuide::CUITab* other : this->items) {
@@ -1685,7 +1705,7 @@ void CUIIntro::OnCreate(int width, int height) {
   this->banner->SetSize(630, 216);
   this->banner->Move(0, 0);
   {
-    this->banner->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\bg_banner.bmp", 0xC517FB932D95BB6DULL)));
+    this->banner->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\bg_banner.bmp", 0xC517FB932D95BB6DULL)));
   }
   this->AddChild(this->banner);
 
@@ -1704,7 +1724,7 @@ void CUIIntro::OnCreate(int width, int height) {
   this->contents->SetOnSelect([this](CUITabInfo* item, const Guide_Intro::Contents& contents) { this->OnSelectContents(item, contents); });
   this->contents->SetBinder([this](CUITabInfo* item, const Guide_Intro::Contents& contents) { this->BindContents(item, contents); });
   {
-    this->contents->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x23BBD58F8B5FF5C9ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x0B7109397F6B1387ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x03772763F96D9DA5ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x050505679903579BULL)));
+    this->contents->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x23BBD58F8B5FF5C9ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x0B7109397F6B1387ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x03772763F96D9DA5ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_1.bmp", 0x050505679903579BULL)));
   }
   {
     CUIListBoxEx<CUITabInfo, Guide_Intro::Contents>* contents = this->contents;
@@ -1715,13 +1735,13 @@ void CUIIntro::OnCreate(int width, int height) {
   this->contents->scrollBar->Move(595, 0);
   this->contents->scrollBar->step = 44;
   {
-    this->contents->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xDD3913D5D7F97BE1ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xBF2B4B31397FF5A7ULL)));
+    this->contents->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0xDD3913D5D7F97BE1ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xBF2B4B31397FF5A7ULL)));
   }
   {
-    this->contents->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x83EFBFBB37EDBDBDULL)));
+    this->contents->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x83EFBFBB37EDBDBDULL)));
   }
   {
-    this->contents->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xED796785D1DF137FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD97D5DBDBB2F2709ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xA5FD29D7AB6DC59FULL)));
+    this->contents->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0xED796785D1DF137FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0xD97D5DBDBB2F2709ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0xA5FD29D7AB6DC59FULL)));
   }
   this->contents->AddNewItem();
   this->AddChild(this->contents);
@@ -1739,7 +1759,7 @@ void CUIItem::OnCreate(int width, int height) {
   this->itemList->SetOnSelect([this](CUIItemInfo* item, const CItemData& data) { this->OnSelectItem(item, data); });
   this->itemList->SetBinder([this](CUIItemInfo* item, const CItemData& data) { this->BindItem(item, data); });
   {
-    this->itemList->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0xC9712D676B5B3943ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_press.bmp", 0xED15938D333D2DB9ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_over.bmp", 0xBD2BA1C11B01E73BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0x4B755DB19953E311ULL)));
+    this->itemList->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0xC9712D676B5B3943ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_press.bmp", 0xED15938D333D2DB9ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_over.bmp", 0xBD2BA1C11B01E73BULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0x4B755DB19953E311ULL)));
   }
   {
     CUIListBoxEx<CUIItemInfo, CItemData>* itemList = this->itemList;
@@ -1750,13 +1770,13 @@ void CUIItem::OnCreate(int width, int height) {
   this->itemList->scrollBar->Move(619, 0);
   this->itemList->scrollBar->step = 20;
   {
-    this->itemList->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x4331A17F33095FEBULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xD1056FF94D4D2773ULL)));
+    this->itemList->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x4331A17F33095FEBULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xD1056FF94D4D2773ULL)));
   }
   {
-    this->itemList->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x0F97E779A933D917ULL)));
+    this->itemList->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x0F97E779A933D917ULL)));
   }
   {
-    this->itemList->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x3789496BE3E1D141ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x41CFCB831F6B6B91ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x5DE7712FAB613F75ULL)));
+    this->itemList->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x3789496BE3E1D141ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x41CFCB831F6B6B91ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x5DE7712FAB613F75ULL)));
   }
   this->itemList->AddNewItem();
   this->AddChild(this->itemList);
@@ -1771,7 +1791,7 @@ void CUIItem::OnCreate(int width, int height) {
     button->Invalidate();
   }
   {
-    this->findButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_normal.bmp", 0x81F58DED5D470D01ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_press.bmp", 0x454D31872BB3EDCBULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_over.bmp", 0x85E1F5A7A5755B7FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_disable.bmp", 0xAD6153019F93A527ULL)));
+    this->findButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_normal.bmp", 0x81F58DED5D470D01ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_press.bmp", 0x454D31872BB3EDCBULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_over.bmp", 0x85E1F5A7A5755B7FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_disable.bmp", 0xAD6153019F93A527ULL)));
   }
   this->AddChild(this->findButton);
 
@@ -1802,7 +1822,7 @@ void CUIQuest::OnCreate(int width, int height) {
   this->questList->SetOnSelect([this](CUIQuestInfo* item, const CQuestInfo& data) { this->OnSelectQuest(item, data); });
   this->questList->SetBinder([this](CUIQuestInfo* item, const CQuestInfo& data) { BindQuestInfo(item, data); });
   {
-    this->questList->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_2_normal.bmp", 0x793F370985ED674FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_2_press.bmp", 0x176F138D5DD7F365ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_2_over.bmp", 0xFBD599E117C547C1ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_2_normal.bmp", 0x0F41EBBDA32D1B17ULL)));
+    this->questList->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_2_normal.bmp", 0x793F370985ED674FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_2_press.bmp", 0x176F138D5DD7F365ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_2_over.bmp", 0xFBD599E117C547C1ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_2_normal.bmp", 0x0F41EBBDA32D1B17ULL)));
   }
   {
     CUIListBoxEx<CUIQuestInfo, CQuestInfo>* questList = this->questList;
@@ -1813,13 +1833,13 @@ void CUIQuest::OnCreate(int width, int height) {
   this->questList->scrollBar->Move(619, 0);
   this->questList->scrollBar->step = 20;
   {
-    this->questList->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x2D51E3B7236175EDULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xF3CB6F7711A71B6DULL)));
+    this->questList->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x2D51E3B7236175EDULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xF3CB6F7711A71B6DULL)));
   }
   {
-    this->questList->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x839B27DF8F5967B3ULL)));
+    this->questList->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0x839B27DF8F5967B3ULL)));
   }
   {
-    this->questList->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x9FED7DA189490D5DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x452FEF0D7FC95565ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x4F637DC51307B759ULL)));
+    this->questList->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x9FED7DA189490D5DULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x452FEF0D7FC95565ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x4F637DC51307B759ULL)));
   }
   this->questList->AddNewItem();
   this->AddChild(this->questList);
@@ -1834,7 +1854,7 @@ void CUIQuest::OnCreate(int width, int height) {
     button->Invalidate();
   }
   {
-    this->findButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_normal.bmp", 0x2DCB7567394DC1ABULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_press.bmp", 0xB39FA7917BCFBB8DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_over.bmp", 0x8D1D0FF1AF2B13F7ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_disable.bmp", 0x4F99DF03C3EF31B7ULL)));
+    this->findButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_normal.bmp", 0x2DCB7567394DC1ABULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_press.bmp", 0xB39FA7917BCFBB8DULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_over.bmp", 0x8D1D0FF1AF2B13F7ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_find_disable.bmp", 0x4F99DF03C3EF31B7ULL)));
   }
   this->AddChild(this->findButton);
 
@@ -1865,7 +1885,7 @@ void CUIMonster::OnCreate(int width, int height) {
   this->monsterList->SetOnSelect([this](CUIMonsterInfo* item, const CMonsterData& data) { this->OnSelectMonster(item, data); });
   this->monsterList->SetBinder([this](CUIMonsterInfo* item, const CMonsterData& data) { this->BindMonster(item, data); });
   {
-    this->monsterList->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0xE33F2FF779878559ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_press.bmp", 0xF15F8785CDE369BFULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_over.bmp", 0x792FFD1325418FB5ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0x49D33529F1556333ULL)));
+    this->monsterList->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0xE33F2FF779878559ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_press.bmp", 0xF15F8785CDE369BFULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_over.bmp", 0x792FFD1325418FB5ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\list_3_normal.bmp", 0x49D33529F1556333ULL)));
   }
   {
     CUIListBoxEx<CUIMonsterInfo, CMonsterData>* monsterList = this->monsterList;
@@ -1876,13 +1896,13 @@ void CUIMonster::OnCreate(int width, int height) {
   this->monsterList->scrollBar->Move(619, 0);
   this->monsterList->scrollBar->step = 20;
   {
-    this->monsterList->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x01CB4F1DF9D3F931ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xC5B1BBCD9BC9C997ULL)));
+    this->monsterList->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_up.bmp", 0x01CB4F1DF9D3F931ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_arrow_down.bmp", 0xC5B1BBCD9BC9C997ULL)));
   }
   {
-    this->monsterList->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xC1BB8111EDD183E1ULL)));
+    this->monsterList->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_bg_mid.bmp", 0xC1BB8111EDD183E1ULL)));
   }
   {
-    this->monsterList->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x1767DDE18D779D8BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x0B23D10F2F49D72BULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x136F2F9915D1DBCFULL)));
+    this->monsterList->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_up.bmp", 0x1767DDE18D779D8BULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_mid.bmp", 0x0B23D10F2F49D72BULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\scroll_thumb_down.bmp", 0x136F2F9915D1DBCFULL)));
   }
   this->monsterList->AddNewItem();
   this->AddChild(this->monsterList);
@@ -1897,7 +1917,7 @@ void CUIMonster::OnCreate(int width, int height) {
     button->Invalidate();
   }
   {
-    this->navigationButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_normal.bmp", 0x6BDF334F2BFDAD51ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_press.bmp", 0x674D9F3975573D41ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_over.bmp", 0x79E915E9AF6F55DDULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_disbale.bmp", 0xB7AFBD2FD9FD7501ULL)));
+    this->navigationButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_normal.bmp", 0x6BDF334F2BFDAD51ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_press.bmp", 0x674D9F3975573D41ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_over.bmp", 0x79E915E9AF6F55DDULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\AdventureGuide\\btn_navi_disbale.bmp", 0xB7AFBD2FD9FD7501ULL)));
   }
   this->AddChild(this->navigationButton);
 }

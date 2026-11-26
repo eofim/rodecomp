@@ -34,28 +34,37 @@ int CSession::UseLevel(int id) const {
   return 0;
 }
 
+namespace {
+
+struct UseSkillLevelAppender {
+  Json::Value* values;
+
+  // INLINED
+  bool operator()(const CSkillInfo& skill) const {
+    const int level = g_session.UseLevel(skill.id);
+    if (level != 0) {
+      Json::Value value;
+      value["SKID"] = skill.id;
+      value["SKLv"] = level;
+      this->values->append(value);
+    }
+
+    return true;
+  }
+};
+
+}
+
+// OFFSET: 0x005E7AE0
+// FUNCTION: fn_03940
+template <> bool std::_Func_impl_no_alloc<UseSkillLevelAppender, bool, const CSkillInfo&>::_Do_call(const CSkillInfo& skill) {
+  return this->_Callee(skill);
+}
+
 // INLINED
 inline void CCharacterLinkedUserDataMgr::SaveUseSkillLevel(Json::Value& data) {
   if (static_cast<int>(g_session.m_options.Get(7)) != 0) {
     Json::Value values;
-
-    struct UseSkillLevelAppender {
-      Json::Value* values;
-
-      // OFFSET: 0x005E7AE0
-      // FUNCTION: fn_03940
-      bool operator()(CSkillInfo& skill) const {
-        const int level = g_session.UseLevel(skill.id);
-        if (level != 0) {
-          Json::Value value;
-          value["SKID"] = skill.id;
-          value["SKLv"] = level;
-          this->values->append(value);
-        }
-
-        return true;
-      }
-    };
 
     g_session.m_skillBundle.ForEachGrouped(UseSkillLevelAppender{&values});
     data["UseSkillInfo"] = values;
@@ -100,25 +109,17 @@ void CCharacterLinkedUserDataMgr::Save() {
   data["SortPrivateTab"] = g_session.m_sortPrivateTab;
   this->ExportNormalItemSlots(data);
 
-  if (data.isNull() != true) {
-    root["data"] = data;
-    Json::StyledWriter writer;
-    const std::string response = writer.write(root);
-    CAsyncWorkMgr* mgr = g_asyncWorkMgr;
-    mgr->SaveCharacter(this->m_accountId, this->m_characterId, this->m_accountName, this->SaveUrl(),
-                       std::string(g_session.m_webAuthToken, 16), response);
-
-    ++this->m_pendingSaves;
-  }
-}
-
-// OFFSET: 0x00DDD0D0
-// FUNCTION: fn_23379
-int CSession::HomunSkillLevel(int skillId) const {
-  skillId -= 8000;
-  if (skillId > -1) {
-    return this->m_homunSkillLevels[skillId];
+  if (data.isNull() == true) {
+    return;
   }
 
-  return 0;
+  root["data"] = data;
+  Json::StyledWriter writer;
+  const std::string response = writer.write(root);
+  CAsyncWorkMgr* mgr = g_asyncWorkMgr;
+  mgr->SaveCharacter(this->m_accountId, this->m_characterId, this->m_accountName, this->SaveUrl(),
+                     std::string(g_session.m_webAuthToken, 16), response);
+
+  ++this->m_pendingSaves;
 }
+

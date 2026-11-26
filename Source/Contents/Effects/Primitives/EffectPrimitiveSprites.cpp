@@ -67,15 +67,9 @@ __declspec(safebuffers) void CEffectPrim::RenderLaunchEffects(matrix&) {
     const float baseY = slot.vecBPre.y;
     const float baseZ = slot.vecBPre.z;
     vec1 = vector3d{baseX + vec1.x, baseY + vec1.y, baseZ + vec1.z};
-    vec2.x = baseX + vec2.x;
-    vec2.y = baseY + vec2.y;
-    vec2.z = baseZ + vec2.z;
-    vec3.x = baseX + vec3.x;
-    vec3.y = baseY + vec3.y;
-    vec3.z = baseZ + vec3.z;
-    vec4.x = baseX + vec4.x;
-    vec4.y = baseY + vec4.y;
-    vec4.z = baseZ + vec4.z;
+    vec2 = vector3d{baseX + vec2.x, baseY + vec2.y, baseZ + vec2.z};
+    vec3 = vector3d{baseX + vec3.x, baseY + vec3.y, baseZ + vec3.z};
+    vec4 = vector3d{baseX + vec4.x, baseY + vec4.y, baseZ + vec4.z};
 
     if (vec1.y <= 0.0f && slot.process < 300 && static_cast<int>(slot.height[13]) > 0) {
       if (slot.flag1[0] == 0) {
@@ -207,7 +201,7 @@ static __declspec(safebuffers) __forceinline void DrawTrailSpriteQuad(
 void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
   CSprRes* sprite = this->GetSprite();
   CActRes* action = this->GetActRes();
-  const std::uint32_t alpha = static_cast<unsigned short>(static_cast<short>(this->state.alpha));
+  const unsigned short alpha = static_cast<unsigned short>(this->state.alpha);
 
   for (int ec = 0; ec < 4; ++ec) {
     if (this->state.slots[ec].life <= 0 || !(this->state.alpha > 0.0f)) {
@@ -270,7 +264,7 @@ void CEffectPrim::RenderSegmentSpriteTrail(matrix& wtm) {
           sprite->palette, 5, g_effectIconOuterRadius
         );
 
-        const std::uint8_t halfAlphaByte = static_cast<unsigned char>(alpha / 2);
+        const std::uint8_t halfAlphaByte = static_cast<unsigned char>(static_cast<short>(alpha) / 2);
         const std::uint32_t halfColor = (((((halfAlphaByte << 8) + red) << 8) + green) << 8) + blue;
         DrawTrailSpriteQuad(*this, this->state.slots[ec].vecBNow, top, left, bottom, right, screenY, depth, 0.0001f, angle, halfColor, image, sprite->palette, 0x101);
         DrawTrailSpriteQuad(

@@ -113,6 +113,16 @@ UIEntryQueueRequestWnd::UIEntryQueueRequestWnd()
 // FUNCTION: fn_46460
 __declspec(noinline) UIEntryQueueRequestWnd::~UIEntryQueueRequestWnd() = default;
 
+// INLINED
+static int QueueWindowLeft() {
+  return (g_renderer->viewport.width - 640) / 2 + 185;
+}
+
+// INLINED
+static int QueueWindowTop() {
+  return (g_renderer->viewport.height - 480) / 2 + 180;
+}
+
 // OFFSET: 0x00BA48E0
 // FUNCTION: fn_19691
 bool UIEntryQueueRequestWnd::Create() {
@@ -122,15 +132,16 @@ bool UIEntryQueueRequestWnd::Create() {
   this->SetSize(300, 250);
   this->OnCreate(300, 250);
   this->OnSize(300, 250);
-  int top = (g_renderer->viewport.height - 480) / 2 + 180;
-  this->Move((g_renderer->viewport.width - 640) / 2 + 185, top);
+  this->Move(QueueWindowLeft(), QueueWindowTop());
 
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 280, 305, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = ((blue & 0xFF) << 16 | (green & 0xFF) << 8 | (red & 0xFF)) | 0xFF000000u;
-  this->m_viewer->Invalidate();
+  UITextViewer* viewer = this->m_viewer;
+  const COLORREF rgb = RGB(red, green, blue);
+  viewer->backgroundColor = rgb | 0xFF000000u;
+  viewer->Invalidate();
   this->AddChild(this->m_viewer);
 
   char message[0x104];
@@ -252,15 +263,16 @@ bool UIEntryQueueStandByWnd::Create() {
   this->SetSize(280, 120);
   this->OnCreate(280, 120);
   this->OnSize(280, 120);
-  int top = (g_renderer->viewport.height - 480) / 2 + 180;
-  this->Move((g_renderer->viewport.width - 640) / 2 + 185, top);
+  this->Move(QueueWindowLeft(), QueueWindowTop());
 
   this->m_viewer = new UITextViewer();
   this->m_viewer->Configure(10, 22, 260, 65, 0);
   unsigned red, green, blue;
   g_skinInfo.PaletteChannels(2, 2, red, green, blue);
-  this->m_viewer->backgroundColor = ((blue & 0xFF) << 16 | (green & 0xFF) << 8 | (red & 0xFF)) | 0xFF000000u;
-  this->m_viewer->Invalidate();
+  UITextViewer* viewer = this->m_viewer;
+  const COLORREF rgb = RGB(red, green, blue);
+  viewer->backgroundColor = rgb | 0xFF000000u;
+  viewer->Invalidate();
   this->AddChild(this->m_viewer);
 
   const std::string path = "유저인터페이스\\";
@@ -435,7 +447,7 @@ void UIEntryQueueWnd::OnCreate(int width, int height) {
   this->m_helpButton->SetBitmap((path + "btn_help" + "_b.bmp").c_str(), 2, 0);
   this->m_helpButton->SetSize(this->m_helpButton->BitmapWidth(), this->m_helpButton->BitmapHeight());
   this->m_helpButton->Move(width - 62, height - 24);
-  this->m_helpButton->SetId(3);
+  this->m_helpButton->SetId(ENTRYQUEUE_BUTTON_HELP);
   this->AddChild(this->m_helpButton);
 }
 
@@ -471,7 +483,7 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
   case UM_COMMAND: {
     int error;
     switch (a) {
-    case 0:
+    case ENTRYQUEUE_BUTTON_INDIVIDUAL:
       if (g_session.GetMapProperty13() == 1) {
         error = MSI_BATTLEFIELD_MSG_NOT_JOINMAP;
       } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
@@ -484,10 +496,10 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
       }
       {
         const char* text = LookupMessage(error);
-        g_windowMgr.Confirm(text, 0, false, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(text, 0, false, false, 0, "메시지", 280, 120, 0);
       }
       return 0;
-    case 1:
+    case ENTRYQUEUE_BUTTON_PARTY:
       if (g_session.GetMapProperty13() == 1) {
         error = MSI_BATTLEFIELD_MSG_NOT_JOINMAP;
       } else if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
@@ -506,10 +518,10 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
       }
       {
         const char* text = LookupMessage(error);
-        g_windowMgr.Confirm(text, 0, false, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(text, 0, false, false, 0, "메시지", 280, 120, 0);
       }
       return 0;
-    case 2: {
+    case ENTRYQUEUE_BUTTON_GUILD: {
       GuildInfo* guild = &g_guildInfo;
       if (g_session.GetMapProperty13() != 1) {
         if (g_modeMgr.GetGameMode()->IsActiveSkillEffectId(0x29C)) {
@@ -531,16 +543,16 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
       }
       {
         const char* text = LookupMessage(error);
-        g_windowMgr.Confirm(text, 0, false, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(text, 0, false, false, 0, "메시지", 280, 120, 0);
       }
       return 0;
     }
-    case 3:
+    case ENTRYQUEUE_BUTTON_HELP:
       if (!g_windowMgr.CloseWindow(WID_ENTRYQUEUEHELPWND)) {
         g_windowMgr.EnsureWindow(WID_ENTRYQUEUEHELPWND);
       }
       return 0;
-    case 4:
+    case ENTRYQUEUE_BUTTON_CLOSE:
     case ID_CLOSE:
       this->RecordResponse(static_cast<int>(a), b, c, d);
       g_windowMgr.CloseWindow(WID_JOINTO_BATTLEFIELDWND);
@@ -548,7 +560,7 @@ int UIEntryQueueWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std
     default:
       return 0;
     }
-    g_windowMgr.Confirm(LookupMessage(error), 0, false, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(LookupMessage(error), 0, false, false, 0, "메시지", 280, 120, 0);
     return 0;
   }
   case UM_SETINFO:
@@ -638,7 +650,7 @@ bool UIEntryQueueWnd::ConfirmApply(const char* type) {
     char text[0x104];
     std::memset(text, 0, sizeof(text));
     sprintf_s(text, sizeof(text), "%s %s", info->displayName, type);
-    return g_windowMgr.Confirm(text, 2, false, false, 0, "Message", 280, 120, 0) == ID_YES;
+    return g_windowMgr.Confirm(text, 2, false, false, 0, "메시지", 280, 120, 0) == ID_YES;
   }
 
   return false;

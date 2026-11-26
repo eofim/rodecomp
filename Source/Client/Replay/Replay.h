@@ -25,10 +25,7 @@ struct ReplayCachedPacket {
     this->enabled = false;
   }
   ReplayCachedPacket(const ReplayCachedPacket& other);
-  // INLINED
-  ~ReplayCachedPacket() {
-    this->bytes.clear();
-  }
+  ~ReplayCachedPacket();
 };
 
 #pragma pack(push, 1)
@@ -117,7 +114,8 @@ public:
 
   Replay();
 
-  // INLINED
+  // OFFSET: 0x00B83B90
+  // FUNCTION: fn_46522
   ~Replay() {
     if (this->file) {
       if (this->fileMode == 31) {
@@ -130,6 +128,7 @@ public:
 
   bool Record(std::uint16_t bytes, const void* packet, int event, std::uint32_t delay);
   bool WriteSection(int id, const std::vector<unsigned char>& bytes, int event);
+  bool WriteSection(int id, std::uint32_t size, unsigned char* data, int event);
   int WriteHeader(int event);
   std::vector<unsigned char> BuildMetadata();
   std::uint32_t ParseMetadata(const std::vector<unsigned char>& data);
@@ -174,7 +173,8 @@ struct ReplayFileEntry {
     std::memset(this->name, 0, sizeof(this->name));
   }
 
-  // INLINED
+  // OFFSET: 0x00B83D30
+  // FUNCTION: fn_46523
   ~ReplayFileEntry() {
     this->index = 0;
     std::memset(this->name, 0, sizeof(this->name));
@@ -197,7 +197,8 @@ public:
   /* 0124 */ int fileState;
   /* 0128 */ unsigned char buffer[0x3E80];
 
-  // INLINED
+  // OFFSET: 0x00B83820
+  // FUNCTION: fn_46524
   __forceinline ReplayFileList()
       : replay(nullptr),
         path(),

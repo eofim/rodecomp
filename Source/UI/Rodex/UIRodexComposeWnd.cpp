@@ -42,6 +42,7 @@
 #include "Resource/MSGSTRINGID.h"
 #include "Network/Packets/PacketId.h"
 #include "UI/Login/UIPasswordWnd.h"
+#include "UI/Edit/ItemDropCountMode.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -174,10 +175,13 @@ void UIRodexScrollBar::Paint() {
   switch (this->vertical) {
   case 1: {
     this->FillRegion(0, 0, 5, this->geometry.height, 0xFFFFFF);
-    auto* upper = static_cast<CBitmapRes*>(
-      ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_upper.bmp"))
-    );
-    this->DrawBitmap(0, 0, upper, false);
+    if (this->state == 1) {
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_upper.bmp"))), false);
+    } else if (this->state == 4) {
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_upper.bmp"))), false);
+    } else {
+      this->DrawBitmap(0, 0, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_upper.bmp"))), false);
+    }
 
     int offset = this->ThumbOffset() + this->arrowLength;
     if (offset < 5) {
@@ -190,10 +194,13 @@ void UIRodexScrollBar::Paint() {
     }
 
     this->FillRegion(0, offset, 5, length, 0xE9E9E9);
-    auto* lower = static_cast<CBitmapRes*>(
-      ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_down.bmp"))
-    );
-    this->DrawBitmap(0, this->geometry.height - this->arrowLength, lower, false);
+    if (this->state == 2) {
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_down.bmp"))), false);
+    } else if (this->state == 5) {
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_down.bmp"))), false);
+    } else {
+      this->DrawBitmap(0, this->geometry.height - this->arrowLength, static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\basic_interface\\rodexsystem\\renewal\\scrollbar_arrow_down.bmp"))), false);
+    }
     break;
   }
   }
@@ -284,15 +291,15 @@ int UIRodexComposeWnd::MeasureText(const std::string& text, const unsigned& byte
 // FUNCTION: fn_09999
 void UIRodexComposeWnd::SetRecipient(int id, unsigned short job, unsigned short level, const char* name) {
   this->m_recipientLevelText->SetTextWithinWidth(FormatOwnedString("Lv%d", level).c_str(), 0);
-  this->m_recipientLevelText->Show(1);
+  this->m_recipientLevelText->Show(WINDOW_VISIBLE);
   this->m_recipientJobText->SetTextWithinWidth(g_session.GetJobName(job, 99), 0);
-  this->m_recipientJobText->Show(1);
+  this->m_recipientJobText->Show(WINDOW_VISIBLE);
   this->m_recipientId = id;
   this->m_recipientIdText->SetTextWithinWidth(g_session.ShortcutFilename(id).c_str(), 0);
-  this->m_recipientIdText->Show(1);
-  this->m_recipientEdit->Show(0);
+  this->m_recipientIdText->Show(WINDOW_VISIBLE);
+  this->m_recipientEdit->Show(WINDOW_HIDDEN);
   this->m_confirmRecipientButton->Enable(0);
-  this->m_confirmedRecipientEdit->Show(1);
+  this->m_confirmedRecipientEdit->Show(WINDOW_VISIBLE);
   this->m_confirmedRecipientEdit->SetText(name);
 }
 
@@ -306,12 +313,12 @@ void UIRodexComposeWnd::DragAndDrop(int x, int y, std::intptr_t value) {
 
   CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source == 1) {
+  if (drag->source == DRAG_ITEM_INVENTORY) {
     if (drag->quantity == 1) {
       this->SendMsg(nullptr, UM_DROP, 0, 0, 0, 0);
     } else {
       g_windowMgr.ShowWindowById(WID_ITEMDROPCNTWND, 1);
-      g_windowMgr.itemDropCntWnd->SendMsg(nullptr, UM_SETSTATE, 13, 0, 0, 0);
+      g_windowMgr.itemDropCntWnd->SendMsg(nullptr, UM_SETSTATE, ITEM_DROP_COUNT_RODEX_COMPOSE, 0, 0, 0);
     }
   } else {
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
@@ -594,7 +601,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
   UIEditCtrl_Custom* recipientEdit = this->m_confirmedRecipientEdit;
   recipientEdit->disabled = 1;
   recipientEdit->Invalidate();
-  this->m_confirmedRecipientEdit->Show(0);
+  this->m_confirmedRecipientEdit->Show(WINDOW_HIDDEN);
   this->AddChild(this->m_confirmedRecipientEdit);
 
   this->m_confirmRecipientButton = new UIBmpTextButton();
@@ -630,7 +637,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
   this->m_recipientLevelText->Move(0xAC, 0x19);
   this->m_recipientLevelText->SetColor(0xC6, 0x28, 0x28);
   this->m_recipientLevelText->SetFont(0, 11, 0, 0);
-  this->m_recipientLevelText->Show(0);
+  this->m_recipientLevelText->Show(WINDOW_HIDDEN);
   this->AddChild(this->m_recipientLevelText);
 
   this->m_recipientJobText = new UIStaticText();
@@ -638,7 +645,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
   this->m_recipientJobText->Move(0xAC, 0x25);
   this->m_recipientJobText->SetColor(0xC6, 0x28, 0x28);
   this->m_recipientJobText->SetFont(0, 11, 0, 0);
-  this->m_recipientJobText->Show(0);
+  this->m_recipientJobText->Show(WINDOW_HIDDEN);
   this->AddChild(this->m_recipientJobText);
 
   this->m_recipientIdText = new UIStaticText();
@@ -646,7 +653,7 @@ void UIRodexComposeWnd::OnCreate(int, int) {
   this->m_recipientIdText->Move(0xAC, 0x31);
   this->m_recipientIdText->SetColor(0xC6, 0x28, 0x28);
   this->m_recipientIdText->SetFont(0, 11, 0, 0);
-  this->m_recipientIdText->Show(0);
+  this->m_recipientIdText->Show(WINDOW_HIDDEN);
   this->AddChild(this->m_recipientIdText);
 
   this->m_titleEdit = new UIEditCtrl_Custom();

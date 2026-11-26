@@ -31,10 +31,9 @@ void CNeoPackageItemMgr::Init() {
 // OFFSET: 0x006D1E10
 // FUNCTION: fn_06523
 void CNeoPackageItemMgr::InsertPackage(int packageId, int groupId, int itemId, const std::string& name, int probability) {
-  std::map<int, PackageGroup>& groups = this->m_packages[packageId];
-  auto group = groups.try_emplace(groupId, PackageGroup{}).first;
-  group->second.totalProbability += probability;
-  group->second.items.emplace_back(itemId, name, probability);
+  auto group = this->m_packages[packageId].try_emplace(groupId, PackageGroup());
+  group.first->second.totalProbability += probability;
+  group.first->second.items.emplace_back(itemId, name, probability);
 }
 
 // INLINED
@@ -47,13 +46,17 @@ static std::optional<std::map<int, PackageGroup>*> FindGroups(std::map<int, std:
   return std::nullopt;
 }
 
+// OFFSET: 0x006D2120
+// FUNCTION: fn_46618
+inline int CNeoPackageItemMgr::ResolvePackageId(int itemId) {
+  int packageId = g_itemInfoMgr->GetPackageId(itemId);
+  return packageId == 0 ? itemId : packageId;
+}
+
 // OFFSET: 0x006D2140
 // FUNCTION: fn_06524
 __declspec(noinline) std::optional<std::map<int, PackageGroup>*> CNeoPackageItemMgr::FindPackage(int itemId) {
-  int packageId = g_itemInfoMgr->GetPackageId(itemId);
-  if (packageId == 0) {
-    packageId = itemId;
-  }
+  int packageId = this->ResolvePackageId(itemId);
 
   return FindGroups(this->m_packages, packageId);
 }
@@ -104,10 +107,7 @@ bool CNeoPackageItemMgr::LoadScript() {
 // FUNCTION: fn_06526
 __declspec(noinline) bool CNeoPackageItemMgr::HasPackage(int itemId) {
   const auto end = this->m_packages.end();
-  int packageId = g_itemInfoMgr->GetPackageId(itemId);
-  if (packageId == 0) {
-    packageId = itemId;
-  }
+  int packageId = this->ResolvePackageId(itemId);
 
   return end != this->m_packages.find(packageId);
 }
@@ -204,9 +204,7 @@ void CPaidPackageItemMgr::AddItem(int itemId) {
   }
 
   this->m_items.insert(itemId);
-  const auto tabEnd = selectPackage->second.end();
-  for (auto tabIt = selectPackage->second.begin(); tabIt != tabEnd; ++tabIt) {
-    std::pair<const int, SelectPackageTab>& tab = *tabIt;
+  for (std::pair<const int, SelectPackageTab>& tab : selectPackage->second) {
     std::optional<std::vector<ITEM_INFO>*> items = SelectPackageItemMgr()->FindItems(itemId, tab.first);
     if (items) {
       for (ITEM_INFO& item : **items) {

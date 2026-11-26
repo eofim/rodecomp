@@ -187,7 +187,7 @@ struct SealContext {
 static_assert(sizeof(SealContext) == 0x1C9C);
 
 // GLOBAL: gl_25067
-int g_keyedBoxRound;
+static int g_keyedBoxRound;
 
 // INLINED
 static unsigned int CryptonRotate(unsigned int value, unsigned int shift) {
@@ -215,7 +215,7 @@ static __forceinline unsigned int CryptonKeyTransform(unsigned int value, unsign
 // INLINED
 static __forceinline void CryptonRound(unsigned int* y, const unsigned int* x, const unsigned int* key, bool alternate) {
   if (!alternate) {
-    y[0] = g_cryptonTable0[x[0] & 255] ^ g_cryptonTable1[x[1] & 255] ^ g_cryptonTable2[x[2] & 255] ^ g_cryptonTable3[x[3] & 255] ^ key[0];
+    y[0] = g_cryptonTable0[x[0] & 255] ^ g_cryptonTable3[x[3] & 255] ^ g_cryptonTable2[x[2] & 255] ^ g_cryptonTable1[x[1] & 255] ^ key[0];
     y[1] = g_cryptonTable1[(x[0] >> 8) & 255] ^ g_cryptonTable2[(x[1] >> 8) & 255] ^ g_cryptonTable3[(x[2] >> 8) & 255] ^ g_cryptonTable0[(x[3] >> 8) & 255] ^ key[1];
     y[2] = g_cryptonTable2[(x[0] >> 16) & 255] ^ g_cryptonTable3[(x[1] >> 16) & 255] ^ g_cryptonTable0[(x[2] >> 16) & 255] ^ g_cryptonTable1[(x[3] >> 16) & 255] ^ key[2];
     y[3] = g_cryptonTable3[x[0] >> 24] ^ g_cryptonTable0[x[1] >> 24] ^ g_cryptonTable1[x[2] >> 24] ^ g_cryptonTable2[x[3] >> 24] ^ key[3];
@@ -478,20 +478,21 @@ unsigned int* CryptonSetKey(const unsigned int* input, unsigned int keyBits) {
     g_cryptonEncryptKey[5] = input[3];
   }
 
-  unsigned int x = (g_cryptonEncryptKey[0] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[1] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[2] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[3] & 0xCFF3FC3Fu) ^ g_cryptonKeyConstants[0];
-  unsigned int y = (g_cryptonEncryptKey[0] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[1] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[2] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[3] & 0x3FCFF3FCu) ^ g_cryptonKeyConstants[1];
-  unsigned int z = (g_cryptonEncryptKey[0] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[1] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[2] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[3] & 0xFC3FCFF3u) ^ g_cryptonKeyConstants[2];
-  unsigned int w = (g_cryptonEncryptKey[0] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[1] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[2] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[3] & 0xF3FC3FCFu) ^ g_cryptonKeyConstants[3];
+  unsigned int t[4];
+  t[0] = (g_cryptonEncryptKey[0] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[1] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[2] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[3] & 0xCFF3FC3Fu) ^ g_cryptonKeyConstants[0];
+  t[1] = (g_cryptonEncryptKey[0] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[1] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[2] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[3] & 0x3FCFF3FCu) ^ g_cryptonKeyConstants[1];
+  t[2] = (g_cryptonEncryptKey[0] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[1] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[2] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[3] & 0xFC3FCFF3u) ^ g_cryptonKeyConstants[2];
+  t[3] = (g_cryptonEncryptKey[0] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[1] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[2] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[3] & 0xF3FC3FCFu) ^ g_cryptonKeyConstants[3];
   for (unsigned int lane = 0; lane < 4; ++lane) {
-    g_cryptonEncryptKey[lane] = CryptonGammaTau(x, y, z, w, lane, false);
+    g_cryptonEncryptKey[lane] = CryptonGammaTau(t[0], t[1], t[2], t[3], lane, false);
   }
 
-  x = (g_cryptonEncryptKey[4] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[5] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[6] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[7] & 0x3FCFF3FCu) ^ g_cryptonKeyConstants[4];
-  y = (g_cryptonEncryptKey[4] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[5] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[6] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[7] & 0xFC3FCFF3u) ^ g_cryptonKeyConstants[5];
-  z = (g_cryptonEncryptKey[4] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[5] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[6] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[7] & 0xF3FC3FCFu) ^ g_cryptonKeyConstants[6];
-  w = (g_cryptonEncryptKey[4] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[5] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[6] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[7] & 0xCFF3FC3Fu) ^ g_cryptonKeyConstants[7];
+  t[0] = (g_cryptonEncryptKey[4] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[5] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[6] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[7] & 0x3FCFF3FCu) ^ g_cryptonKeyConstants[4];
+  t[1] = (g_cryptonEncryptKey[4] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[5] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[6] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[7] & 0xFC3FCFF3u) ^ g_cryptonKeyConstants[5];
+  t[2] = (g_cryptonEncryptKey[4] & 0xCFF3FC3Fu) ^ (g_cryptonEncryptKey[5] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[6] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[7] & 0xF3FC3FCFu) ^ g_cryptonKeyConstants[6];
+  t[3] = (g_cryptonEncryptKey[4] & 0x3FCFF3FCu) ^ (g_cryptonEncryptKey[5] & 0xFC3FCFF3u) ^ (g_cryptonEncryptKey[6] & 0xF3FC3FCFu) ^ (g_cryptonEncryptKey[7] & 0xCFF3FC3Fu) ^ g_cryptonKeyConstants[7];
   for (unsigned int lane = 0; lane < 4; ++lane) {
-    g_cryptonEncryptKey[lane + 4] = CryptonGammaTau(x, y, z, w, lane, true);
+    g_cryptonEncryptKey[lane + 4] = CryptonGammaTau(t[0], t[1], t[2], t[3], lane, true);
   }
 
   const unsigned int first = g_cryptonEncryptKey[0] ^ g_cryptonEncryptKey[1] ^ g_cryptonEncryptKey[2] ^ g_cryptonEncryptKey[3];
@@ -769,21 +770,17 @@ void BuildKeyedBoxes(unsigned char* boxes, const unsigned char* key, int keyLeng
   }
 
   int j = keyLength;
-  int base = 0;
   int keyIndex = 0;
   for (int box = 0; box < count; ++box) {
-    int offset = 0;
     for (int pass = 0; pass < 8; ++pass) {
       for (int i = 0; i < 256; ++i) {
-        j = (boxes[base + (offset + i) % 256] + j + key[keyIndex]) % 256;
-        unsigned char swap = boxes[base + i];
-        boxes[base + i] = boxes[base + j];
-        boxes[base + j] = swap;
+        j = (boxes[box * 256 + (pass * box + i) % 256] + j + key[keyIndex]) % 256;
+        unsigned char swap = boxes[box * 256 + i];
+        boxes[box * 256 + i] = boxes[box * 256 + j];
+        boxes[box * 256 + j] = swap;
         keyIndex = (keyIndex + 1) % keyLength;
       }
-      offset += box;
     }
-    base += 256;
   }
 }
 
@@ -854,15 +851,10 @@ void BuildSboxLookup() {
 // FUNCTION: fn_18414
 int KeyedBoxFeistel(const unsigned char* input, unsigned char* output, int length, const KeyedBoxContext* context) {
   if (length == 2) {
-    int round = g_keyedBoxRound;
-    unsigned char right = context->boxes[round++][input[0]] ^ input[1];
-    output[1] = right;
-    unsigned char left = context->boxes[round++][right] ^ input[0];
-    output[0] = left;
-    right = context->boxes[round++][left] ^ right;
-    g_keyedBoxRound = round + 1;
-    output[1] = right;
-    output[0] = context->boxes[round][right] ^ left;
+    output[1] = context->boxes[g_keyedBoxRound++][input[0]] ^ input[1];
+    output[0] = context->boxes[g_keyedBoxRound++][output[1]] ^ input[0];
+    output[1] = context->boxes[g_keyedBoxRound++][output[0]] ^ output[1];
+    output[0] = context->boxes[g_keyedBoxRound++][output[1]] ^ output[0];
     return 0;
   }
 

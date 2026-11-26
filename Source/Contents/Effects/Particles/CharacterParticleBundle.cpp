@@ -27,14 +27,15 @@ namespace {
 
   // INLINED
   static __forceinline vector3d TransformPoint(const matrix& transform, const vector3d point) {
-    return vector3d{point.y * transform.values[3] + point.x * transform.values[0] + point.z * transform.values[6] + transform.values[9],
-                    point.y * transform.values[4] + point.x * transform.values[1] + point.z * transform.values[7] + transform.values[10],
-                    point.y * transform.values[5] + point.x * transform.values[2] + point.z * transform.values[8] + transform.values[11]};
+    return vector3d{point.x * transform.values[0] + point.y * transform.values[3] + point.z * transform.values[6] + transform.values[9],
+                    point.x * transform.values[1] + point.y * transform.values[4] + point.z * transform.values[7] + transform.values[10],
+                    point.x * transform.values[2] + point.y * transform.values[5] + point.z * transform.values[8] + transform.values[11]};
   }
 
-  // GLOBAL: gl_24870
-  std::unordered_map<int, std::vector<RadialGridPoint>> g_clawMarkRings;
 }
+
+// GLOBAL: gl_24870
+std::unordered_map<int, std::vector<RadialGridPoint>> g_clawMarkRings;
 
 // OFFSET: 0x005A2E50
 // FUNCTION: fn_03122
@@ -123,9 +124,8 @@ void CharacterParticleBundle::Close() {
 // OFFSET: 0x005A3A10
 // FUNCTION: fn_03134
 const std::vector<RadialGridPoint>& CChopChopClawMarks::GetRing(int radius) {
-  const auto end = g_clawMarkRings.end();
   const auto found = g_clawMarkRings.find(radius);
-  if (found != end) {
+  if (found != g_clawMarkRings.end()) {
     return found->second;
   }
 

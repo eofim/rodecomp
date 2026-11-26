@@ -56,8 +56,8 @@ struct ItemListChunkHeader {
   }
 
   ~ItemListChunkHeader() {
-    this->size = 0;
     this->type = 0;
+    this->size = 0;
   }
 };
 #pragma pack(pop)
@@ -129,7 +129,7 @@ void UIParaItemPurchaseWnd::DragAndDrop(int x, int y, std::intptr_t value) {
 
   CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source == 3) {
+  if (drag->source == DRAG_ITEM_NPC_SHOP) {
     switch (drag->type) {
     case TYPE_ARMOR:
     case TYPE_WEAPON:
@@ -161,7 +161,7 @@ void UIParaItemShopWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   }
 
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source != 4) {
+  if (drag->source != DRAG_ITEM_PURCHASE_CART) {
     g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return;
   }
@@ -194,6 +194,11 @@ void UIParaResultWnd::OnLBtnDown(int x, int y) {
   }
 }
 
+// INLINED
+static void SetPriceChange(std::string& text, const std::string& name, const std::uint32_t& price, const char* amount) {
+  text = static_cast<const std::string&>(FormatOwnedString("%s %d -> %s Zeny", name.c_str(), price, amount));
+}
+
 // OFFSET: 0x009A9710
 // FUNCTION: fn_13755
 void UIParaResultWnd::OnMouseHover(int x, int y) {
@@ -210,7 +215,7 @@ void UIParaResultWnd::OnMouseHover(int x, int y) {
     std::memset(price, 0, sizeof(price));
     if (item.prices[0] != item.prices[1]) {
       const char* amount = FormatGroupedInteger(static_cast<int>(item.prices[1]), price, sizeof(price));
-      text = static_cast<const std::string&>(FormatOwnedString("%s %d -> %s Zeny", item.DisplayName(0).c_str(), item.prices[0], amount));
+      SetPriceChange(text, item.DisplayName(0), item.prices[0], amount);
     } else {
       const char* amount = FormatGroupedInteger(static_cast<int>(item.prices[1]), price, sizeof(price));
       text = static_cast<const std::string&>(FormatOwnedString("%s %s Zeny", item.DisplayName(0).c_str(), amount));
@@ -477,24 +482,28 @@ int UIParaItemPurchaseWnd::SendMsg(UIWindow* sender, int message, std::intptr_t 
     ItemListChunkHeader header;
     header = *reinterpret_cast<const ItemListChunkHeader*>(bytes);
     unsigned offset = 6;
-    if (20700 == header.type) {
-      while (static_cast<unsigned>(b) > offset) {
-        header = *reinterpret_cast<const ItemListChunkHeader*>(bytes + offset);
-        offset += 6;
-        if (header.type == 20701) {
-          UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMSHOPWND);
-          if (window) {
-            window->SendMsg(nullptr, UM_SETTITLE, 0, 0, 0, 0);
-            window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-          }
+    if (20700 != header.type) {
+      break;
+    }
 
-          this->SendMsg(nullptr, UM_SETTITLE, 0, 0, 0, 0);
-          this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
-          break;
-        }
-
+    bool scanning = true;
+    while (scanning && static_cast<unsigned>(b) > offset) {
+      header = *reinterpret_cast<const ItemListChunkHeader*>(bytes + offset);
+      offset += 6;
+      if (header.type != 20701) {
         offset += header.size;
+        continue;
       }
+
+      UIWindow* window = g_windowMgr.EnsureWindow(WID_ITEMSHOPWND);
+      if (window) {
+        window->SendMsg(nullptr, UM_SETTITLE, 0, 0, 0, 0);
+        window->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+      }
+
+      this->SendMsg(nullptr, UM_SETTITLE, 0, 0, 0, 0);
+      this->SendMsg(nullptr, UM_REFRESHITEM, 0, 0, 0, 0);
+      scanning = false;
     }
     break;
   }
@@ -847,13 +856,13 @@ void UIParaResultWnd::Paint() {
   }
   this->DrawButtonBar(this->alternateButtonBar != 1 ? 0 : 2, 0, 1);
 
-  const int columns = (this->geometry.width - 40) / 32;
-  const int slots = (this->geometry.height - this->headerHeight - this->footerHeight - 17) / 32;
-  for (int row = 0; row < slots; ++row) {
-    this->DrawItemSlotFrame(40, row * 32 + 17);
-  }
-
   {
+    const int columns = (this->geometry.width - 40) / 32;
+    const int slots = (this->geometry.height - this->headerHeight - this->footerHeight - 17) / 32;
+    for (int row = 0; row < slots; ++row) {
+      this->DrawItemSlotFrame(40, row * 32 + 17);
+    }
+
     unsigned red = 0, green = 0, blue = 0;
     g_skinInfo.PaletteChannels(2, 2, red, green, blue);
     this->FillRegion(72, 17, columns * 32 - 32, slots * 32, RGB(red, green, blue));

@@ -38,12 +38,14 @@ namespace {
     /* 0004 */ int runeId;
   };
 
+#pragma pack(push, 1)
   struct RuneSelectPacket {
     /* 0000 */ std::uint16_t id;
     /* 0002 */ std::uint16_t tagId;
     /* 0004 */ int runeId;
     /* 0008 */ std::uint8_t value;
   };
+#pragma pack(pop)
 
   struct RuneIdPacket {
     /* 0000 */ std::uint16_t id;
@@ -190,9 +192,9 @@ CTagData* CRuneSystemMgr::GetTag(int tagId) {
   }
 
   if (tagId > 0) {
-    for (CTagData*& tag : this->m_tags) {
-      if (tagId == tag->m_id) {
-        return tag;
+    for (std::vector<CTagData*>::iterator it = this->m_tags.begin(); it != this->m_tags.end(); ++it) {
+      if (tagId == (*it)->m_id) {
+        return *it;
       }
     }
   }
@@ -423,7 +425,7 @@ int RuneSetData::GetGradeValue() const {
 // FUNCTION: fn_08143
 std::vector<Decom_ItemInfo>* CRuneSystemMgr::GetDecomList(int itemId, int which) {
   const auto decom = this->m_itemDecoms.find(static_cast<int>(itemId));
-  const std::pair<int, int>* types = this->m_itemDecoms.end() == decom ? nullptr : &decom->second;
+  const DecomTypes* types = this->m_itemDecoms.end() == decom ? nullptr : &decom->second;
   if (!types) {
     return nullptr;
   }
@@ -716,9 +718,9 @@ int CRuneSystemMgr::UpdateOwnedDecomItems() {
   for (int i = 0; i < g_session.GetNumInventoryItems(); ++i) {
     ITEM_INFO item = g_session.GetInventoryItemAt(i);
     const auto decom = this->m_itemDecoms.find(std::atoi(item.itemId.c_str()));
-    const std::pair<int, int>* types = this->m_itemDecoms.end() == decom ? nullptr : &decom->second;
+    const DecomTypes* types = this->m_itemDecoms.end() == decom ? nullptr : &decom->second;
     if (types) {
-      this->m_ownedDecomItems.push_back(std::atoi(item.itemId.c_str()));
+      this->m_ownedDecomItems.emplace_back(static_cast<unsigned int>(std::atoi(item.itemId.c_str())));
     }
   }
   return static_cast<int>(this->m_ownedDecomItems.size());
@@ -769,12 +771,14 @@ void CRuneSystemMgr::SetCurRuneSet(int tagId, int runeSetId, int grade, int slot
 // OFFSET: 0x007688A0
 // FUNCTION: fn_08156
 void CRuneSystemMgr::SetSelectTag(int tagId) {
-  if (!this->m_tags.empty()) {
-    if (this->GetTag(tagId)) {
-      this->m_selectTag = tagId;
-    } else {
-      this->m_selectTag = this->m_tags.front()->m_id;
-    }
+  if (this->m_tags.empty()) {
+    return;
+  }
+  const auto hasTag = [&]() { return this->GetTag(tagId) != nullptr; };
+  if (hasTag()) {
+    this->m_selectTag = tagId;
+  } else {
+    this->m_selectTag = this->m_tags.front()->m_id;
   }
 }
 
@@ -838,7 +842,8 @@ inline RuneSetData* CRuneSystemMgr::GetRuneSet(int tagId, int runeSetId) {
   return static_cast<RuneSetData*>(this->FindRune(tagId, 0, runeSetId, nullptr));
 }
 
-// INLINED
+// OFFSET: 0x00765E40
+// FUNCTION: fn_46506
 inline void CRuneSystemMgr::InsertGradeType(int gradeId, int index, int value) {
   std::map<int, std::vector<int>>& types = this->m_gradeTypes;
   if (types[gradeId].size() < 15) {
@@ -850,7 +855,8 @@ inline void CRuneSystemMgr::InsertGradeType(int gradeId, int index, int value) {
   }
 }
 
-// INLINED
+// OFFSET: 0x00765EE0
+// FUNCTION: fn_46507
 inline void CRuneSystemMgr::InsertGradeFailType(int gradeId, int index, int value) {
   std::map<int, std::vector<int>>& types = this->m_gradeFailTypes;
   if (types[gradeId].size() < 15) {
@@ -862,7 +868,8 @@ inline void CRuneSystemMgr::InsertGradeFailType(int gradeId, int index, int valu
   }
 }
 
-// INLINED
+// OFFSET: 0x00765F80
+// FUNCTION: fn_46508
 inline void CRuneSystemMgr::InsertItemList(int listId, int itemId, int count) {
   this->m_itemLists[listId].emplace_back(itemId, count);
 }
@@ -1285,7 +1292,7 @@ int AddItemDecom(lua_State* state) {
     return 2;
   }
 
-  std::pair<int, int>& types = g_runeSystemMgr->m_itemDecoms[static_cast<int>(itemId)];
+  DecomTypes& types = g_runeSystemMgr->m_itemDecoms[static_cast<int>(itemId)];
   types.first = firstType;
   types.second = secondType;
   lua_pushboolean(state, 1);

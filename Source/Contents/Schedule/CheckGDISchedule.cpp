@@ -3,6 +3,7 @@
 
 #include "Client/Mode/ModeMgr.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Events/ShowRankingScheduler.h"
 #include "Network/Connection/Connection.h"
@@ -39,7 +40,7 @@ void CCheckGDISchedule::Process(const std::uint64_t& now) {
   }
 
 perform_check:
-  if (g_serviceType != 0) {
+  if (g_serviceType != ServiceKorea) {
     return;
   }
 
@@ -51,9 +52,9 @@ perform_check:
   g_timeScheduler->m_processingStopped = true;
 
   if (roll == 2) {
-    g_windowMgr.Confirm(LookupMessage(MSI_NPGAMEMON_XP_COMPATIBILITY), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_NPGAMEMON_XP_COMPATIBILITY), 0, true, false, 0, "메시지", 280, 120, 0);
   } else if (roll == 4) {
-    g_windowMgr.Confirm(LookupMessage(MSI_NPGAMEMON_ERROR_ILLEGAL_PRG), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_NPGAMEMON_ERROR_ILLEGAL_PRG), 0, true, false, 0, "메시지", 280, 120, 0);
   }
 
   GetRagConnection().Close();

@@ -49,10 +49,7 @@ void CThrowItemEffect::InitEmptyBottleParticle(CParticle* particle) {
   particle->angle = 0;
   particle->speedParameter = particle->animationParameter / 25.0f;
   particle->alpha = 255;
-  const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
-  particle->offsetX = offset.x;
-  particle->offsetY = offset.y;
-  particle->offsetZ = offset.z;
+  particle->offset = vector3d{this->position[0], this->position[1] - 8.0f, this->position[2]};
   particle->destinationBlend = 6;
 }
 
@@ -78,13 +75,10 @@ void CThrowItemEffect::InitStoneParticle(CParticle* particle) {
   particle->SetTexture("유저인터페이스\\item\\돌.bmp");
   particle->scale = 1.0f;
   particle->SetColor(255, 255, 255);
-  particle->angle = 0;
+  particle->angle = 0.0f;
   particle->speedParameter = 2.0f;
   particle->alpha = 255;
-  const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
-  particle->offsetX = offset.x;
-  particle->offsetY = offset.y;
-  particle->offsetZ = offset.z;
+  particle->offset = vector3d{this->position[0], this->position[1] - 8.0f, this->position[2]};
   particle->destinationBlend = 6;
 }
 
@@ -219,10 +213,7 @@ void CThrowItemEffect::Open() {
         particle->angle = 330.0f;
         particle->speedParameter = 1.5f;
         particle->alpha = 255;
-        const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
-        particle->offsetX = offset.x;
-        particle->offsetZ = offset.z;
-        particle->offsetY = offset.y;
+        particle->offset = vector3d{this->position[0], this->position[1] - 8.0f, this->position[2]};
         particle->destinationBlend = 6;
         if (this->sourceActor == 0) {
           const vector3d source = {this->position[0] - 8.0f, this->position[1], this->position[2]};
@@ -243,9 +234,7 @@ void CThrowItemEffect::Open() {
         particle->alpha = 255;
         const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
         particle->destinationBlend = 6;
-        particle->offsetZ = offset.z;
-        particle->offsetY = offset.y;
-        particle->offsetX = offset.x;
+        particle->offset = offset;
         break;
       }
       case EF_KAIHOU:
@@ -266,10 +255,7 @@ void CThrowItemEffect::Open() {
           particle->angle = 330.0f;
           particle->speedParameter = 1.5f;
           particle->alpha = 255;
-          const vector3d offset = {this->position[0], this->position[1] - 15.0f, this->position[2]};
-          particle->offsetZ = offset.z;
-          particle->offsetY = offset.y;
-          particle->offsetX = offset.x;
+          particle->offset = vector3d{this->position[0], this->position[1] - 15.0f, this->position[2]};
         }
         break;
       }
@@ -349,10 +335,7 @@ void CThrowItemEffect::InitializeParticle(CParticle* particle) {
     particle->angle = 330.0f;
     particle->speedParameter = 1.5f;
     particle->alpha = 255;
-    const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
-    particle->offsetX = offset.x;
-    particle->offsetZ = offset.z;
-    particle->offsetY = offset.y;
+    particle->offset = vector3d{this->position[0], this->position[1] - 8.0f, this->position[2]};
     particle->destinationBlend = 6;
     if (this->sourceActor == 0) {
       const vector3d source = {this->position[0] - 8.0f, this->position[1], this->position[2]};
@@ -362,7 +345,7 @@ void CThrowItemEffect::InitializeParticle(CParticle* particle) {
     }
     break;
   }
-  case EF_THROW_MULTIPLE_COIN:
+  case EF_THROW_MULTIPLE_COIN: {
     this->effectLifetime = 200;
     this->arcHeight = 10.0f;
     particle->SetTexture("effect\\coin_a.bmp");
@@ -371,11 +354,11 @@ void CThrowItemEffect::InitializeParticle(CParticle* particle) {
     particle->angle = 330.0f;
     particle->speedParameter = 2.0f;
     particle->alpha = 255;
+    const vector3d offset = {this->position[0], this->position[1] - 8.0f, this->position[2]};
     particle->destinationBlend = 6;
-    particle->offsetZ = this->position[2];
-    particle->offsetY = this->position[1] - 8.0f;
-    particle->offsetX = this->position[0];
+    particle->offset = offset;
     break;
+  }
   case EF_KAIHOU:
     if (CGameActor* owner = static_cast<CGameActor*>(FindRenderObject(this->actor))) {
       if (owner->charmType == CHARM_TYPE_WATER) {
@@ -394,9 +377,7 @@ void CThrowItemEffect::InitializeParticle(CParticle* particle) {
       particle->angle = 330.0f;
       particle->speedParameter = 1.5f;
       particle->alpha = 255;
-      particle->offsetZ = this->position[2];
-      particle->offsetY = this->position[1] - 15.0f;
-      particle->offsetX = this->position[0];
+      particle->offset = vector3d{this->position[0], this->position[1] - 15.0f, this->position[2]};
     }
     break;
   }
@@ -481,13 +462,13 @@ void CThrowItemEffect::InitEvents() {
   case EF_THROWITEM8:
   case EF_THROWITEM9:
   case EF_THROWITEM10:
-    this->AddEvent(0, "effect\\닌자_던지기.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\닌자_던지기.wav", 0, 0);
     break;
   case EF_THROWITEM:
-    this->AddEvent(0, "_heal_effect.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "_heal_effect.wav", 0, 0);
     break;
   case EF_THROWITEM11:
-    this->AddEvent(0, "effect\\G스포어익스플로젼.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\G스포어익스플로젼.wav", 0, 0);
     break;
   }
 }
@@ -616,6 +597,17 @@ void CThrowItemEffect::InitTrajectory(CParticle* particle) {
   }
 }
 
+// INLINED
+static void StartRing(CParticle* particle, float speed, int phase, int angle, int row) {
+  particle->alpha = 1;
+  particle->angleParameter = 360;
+  particle->speedParameter = speed;
+  particle->phaseParameter = phase;
+  particle->animationParameter = 0.0f;
+  particle->angle = static_cast<float>(angle);
+  particle->scale = static_cast<float>(row) + 1.0f;
+}
+
 // OFFSET: 0x00B7EA40
 // FUNCTION: fn_19240
 void CVolcanoEffect::AddRings() {
@@ -661,14 +653,7 @@ void CVolcanoEffect::AddRings() {
         particle->scale = static_cast<float>(row) + 1.0f;
         break;
       case EF_GUMGANG5: {
-        const int angle = particle->rowIndex * 90;
-        particle->alpha = 1;
-        particle->angleParameter = 360;
-        particle->speedParameter = 25.0f;
-        particle->phaseParameter = 80;
-        particle->animationParameter = 0.0f;
-        particle->angle = static_cast<float>(angle);
-        particle->scale = static_cast<float>(row) + 1.0f;
+        StartRing(particle, 25.0f, 80, particle->rowIndex * 90, row);
         particle->SetColor(0, 0, 255);
         break;
       }
@@ -754,6 +739,11 @@ bool CVolcanoEffect::IsAlive() {
   return false;
 }
 
+// INLINED
+static float Grow(float step, float scale) {
+  return scale + step;
+}
+
 // OFFSET: 0x00B7F1C0
 // FUNCTION: fn_19244
 void CVolcanoEffect::OnProcess() {
@@ -768,7 +758,7 @@ void CVolcanoEffect::OnProcess() {
     particlePosition.z = this->position[2];
 
     if (particle) {
-      const float scale = particle->scale + (this->id == EF_GUMGANG2 ? 0.1f : 0.3f);
+      const float scale = Grow(this->id == EF_GUMGANG2 ? 0.1f : 0.3f, particle->scale);
       particle->scale = scale;
 
       int tilt = particle->phaseParameter - 1;
@@ -812,8 +802,8 @@ void CVolcanoEffect::OnProcess() {
 
       int alpha = particle->alpha;
       if (particle->elapsedFrames > 10) {
-        alpha -= fadeOut;
-        alpha = alpha > 0 ? alpha : 0;
+        const int faded = alpha - fadeOut;
+        alpha = faded > 0 ? faded : 0;
       } else {
         alpha += fadeIn;
       }
@@ -823,9 +813,9 @@ void CVolcanoEffect::OnProcess() {
       const float radius = g_sinTable[segment * 9] * particle->speedParameter;
       const int angle =
         static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(particle->angleParameter) / 20.0f) * segment) + spin) % 360;
-      const float spread = radius * g_cosTable[tilt];
       const float cosine = g_cosTable[angle];
       const float sine = g_sinTable[angle];
+      const float spread = radius * g_cosTable[tilt];
       const float height = radius * g_sinTable[tilt];
       const float spreadX = spread * cosine;
       const float spreadZ = spread * sine;

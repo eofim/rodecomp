@@ -513,6 +513,16 @@ static void SetViewerBackground(UITagTextViewer* viewer, std::uint32_t color) {
   viewer->Invalidate();
 }
 
+// INLINED
+static int RightAligned(const UIWindow* parent, const UIWindow* child, int margin) {
+  return parent->geometry.width - child->geometry.width - margin;
+}
+
+// INLINED
+static int BottomAligned(const UIWindow* parent, const UIWindow* child, int margin) {
+  return parent->geometry.height - child->geometry.height - margin;
+}
+
 // OFFSET: 0x007FB190
 // FUNCTION: fn_09956
 void UIRecommededQuestScrollWnd::SetQuest(unsigned int questId) {
@@ -554,8 +564,7 @@ void UIRecommededQuestScrollWnd::SetQuest(unsigned int questId) {
   if (!quest.npcSprite.empty()) {
     UINpcSprWnd* npc = new UINpcSprWnd();
     npc->SetSprite(75, 145, quest.npcSprite);
-    const int y = this->geometry.height - npc->geometry.height - 10;
-    npc->Move(this->geometry.width - npc->geometry.width - 40, y);
+    npc->Move(RightAligned(this, npc, 40), BottomAligned(this, npc, 10));
     if (!quest.destinationMap.empty()) {
       npc->SetDestination(quest.destinationMap, quest.destinationX, quest.destinationY);
     }
@@ -669,8 +678,8 @@ void UIRenewDetailQuestInfoWnd::SetQuest(unsigned int questId, bool recommended)
   this->m_questId = questId;
   this->m_timeText = "";
   if (recommended) {
-    this->m_ongoingWnd->Show(0);
-    this->m_recommendedWnd->Show(1);
+    this->m_ongoingWnd->Show(WINDOW_HIDDEN);
+    this->m_recommendedWnd->Show(WINDOW_VISIBLE);
     this->m_recommendedWnd->SetQuest(this->m_questId);
     this->m_imageName = g_renewQuestMgr->GetRecommendedQuest(questId).backgroundImage;
     if (!this->m_imageName.empty()) {
@@ -683,8 +692,8 @@ void UIRenewDetailQuestInfoWnd::SetQuest(unsigned int questId, bool recommended)
       return;
     }
 
-    this->m_recommendedWnd->Show(0);
-    this->m_ongoingWnd->Show(1);
+    this->m_recommendedWnd->Show(WINDOW_HIDDEN);
+    this->m_ongoingWnd->Show(WINDOW_VISIBLE);
     this->m_ongoingWnd->SetQuest(this->m_questId);
     if (quest.m_year > 1970) {
       this->m_timeText = static_cast<const std::string&>(
@@ -740,7 +749,7 @@ void UIRenewQuestWnd::OnCreate(int, int) {
   this->m_closeButton->SetId(ID_CLOSE);
   this->AddChild(this->m_closeButton);
 
-  this->m_scrollBar = new UIRenewQuestScrollBar();
+  this->m_scrollBar = new UIRenewQuestScrollBar(0);
   this->m_scrollBar->Configure(374, 17, 1, 422);
   this->m_scroll = 0;
   this->AddChild(this->m_scrollBar);
@@ -765,7 +774,7 @@ void UIRenewQuestWnd::OnCreate(int, int) {
     this->m_rows.icons[index]->SetBitmap("유저인터페이스\\renew_questui\\ico_nq.bmp");
     this->m_rows.icons[index]->SetSize(this->m_rows.icons[index]->geometry.width, this->m_rows.icons[index]->geometry.height);
     this->m_rows.icons[index]->Move(46, index * 46 + 31);
-    this->m_rows.icons[index]->Show(0);
+    this->m_rows.icons[index]->Show(WINDOW_HIDDEN);
     this->AddChild(this->m_rows.icons[index]);
   }
 
@@ -904,7 +913,7 @@ void UIRenewQuestWnd::RefreshRows() {
         std::string bitmap = quest.m_icon.empty() ? std::string("유저인터페이스\\renew_questui\\ico_nq.bmp") : "유저인터페이스\\renew_questui\\" + quest.m_icon;
         this->m_rows.icons[i]->SetBitmap(bitmap.c_str());
         this->m_rows.icons[i]->SetTooltip(quest.m_iconTooltip.c_str());
-        this->m_rows.icons[i]->Show(1);
+        this->m_rows.icons[i]->Show(WINDOW_VISIBLE);
         this->m_rows.icons[i]->Invalidate();
         continue;
       }
@@ -929,7 +938,7 @@ void UIRenewQuestWnd::RefreshRows() {
         std::string bitmap = quest.m_icon.empty() ? std::string("유저인터페이스\\renew_questui\\ico_nq.bmp") : "유저인터페이스\\renew_questui\\" + quest.m_icon;
         this->m_rows.icons[i]->SetBitmap(bitmap.c_str());
         this->m_rows.icons[i]->SetTooltip(quest.m_iconTooltip.c_str());
-        this->m_rows.icons[i]->Show(1);
+        this->m_rows.icons[i]->Show(WINDOW_VISIBLE);
         this->m_rows.icons[i]->Invalidate();
         continue;
       }
@@ -937,23 +946,26 @@ void UIRenewQuestWnd::RefreshRows() {
 
     this->m_rows.checkBoxes[i]->SetHidden(true);
     this->m_rows.lockBoxes[i]->SetHidden(true);
-    this->m_rows.icons[i]->Show(0);
+    this->m_rows.icons[i]->Show(WINDOW_HIDDEN);
   }
 }
 
 // OFFSET: 0x007FD420
 // FUNCTION: fn_09979
 void UIRenewQuestWnd::UpdateScroll() {
-  const auto& quests = this->m_questIds[this->m_tab];
-  if (!quests.empty() && this->m_scrollBar) {
-    int maximum = static_cast<int>(quests.size()) - 9;
+  if (!this->m_questIds[this->m_tab].empty() && this->m_scrollBar) {
+    int maximum = static_cast<int>(this->m_questIds[this->m_tab].size()) - 9;
     if (maximum < 0) {
       maximum = 0;
     }
 
-    this->m_scrollable = maximum > 0;
     if (maximum > 0) {
-      this->m_scrollBar->SetRange(maximum, 9, static_cast<int>(quests.size()));
+      this->m_scrollable = true;
+    } else {
+      this->m_scrollable = false;
+    }
+    if (maximum > 0) {
+      this->m_scrollBar->SetRange(maximum, 9, static_cast<int>(this->m_questIds[this->m_tab].size()));
       if (this->m_scroll < 0) {
         this->m_scroll = 0;
       } else if (this->m_scroll > maximum) {
@@ -962,7 +974,7 @@ void UIRenewQuestWnd::UpdateScroll() {
       this->m_scrollBar->SetPosition(this->m_scroll);
     } else {
       this->m_scroll = 0;
-      this->m_scrollBar->SetRange(0, 9, static_cast<int>(quests.size()));
+      this->m_scrollBar->SetRange(0, 9, static_cast<int>(this->m_questIds[this->m_tab].size()));
     }
 
     this->m_scrollBar->Invalidate();
@@ -1169,7 +1181,7 @@ int UIRenewQuestWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argume
         }
       }
       if (!found) {
-        g_windowMgr.Confirm("not found quest info", 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm("not found quest info", 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
     }

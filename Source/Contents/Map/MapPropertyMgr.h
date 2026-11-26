@@ -17,14 +17,8 @@ public:
 
 class CMapPropertyMgr {
 public:
-  // INLINED
-  CMapPropertyMgr() {
-    this->m_valid = true;
-  }
-
-  // INLINED
-  virtual ~CMapPropertyMgr() {
-  }
+  CMapPropertyMgr();
+  virtual ~CMapPropertyMgr();
 
   static bool Create();
   static void Destroy();

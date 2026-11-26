@@ -11,6 +11,17 @@ class CSprRes;
 class UIWindow;
 struct ActionFrame;
 
+enum WndCharacterLayer : int {
+  WNDCHAR_LAYER_ROBE_BEHIND = 0,
+  WNDCHAR_LAYER_BODY = 1,
+  WNDCHAR_LAYER_HEAD = 2,
+  WNDCHAR_LAYER_HEAD_MID = 3,
+  WNDCHAR_LAYER_HEAD_TOP = 4,
+  WNDCHAR_LAYER_HEAD_LOW = 5,
+  WNDCHAR_LAYER_HELM_ROBE = 6,
+  WNDCHAR_LAYER_ROBE_FRONT = 7,
+};
+
 struct FuncDrawOffset {
   // INLINED
   FuncDrawOffset() : x(0), y(0) {
@@ -36,7 +47,8 @@ public:
   FuncDrawOffset LayerAnchorOffset(int layer, const ActionFrame** frame, CActRes* act);
   void LoadResources(const std::list<int>& layers);
 
-  // INLINED
+  // OFFSET: 0x007E5710
+  // FUNCTION: fn_46548
   std::pair<CSprRes*, CActRes*> Resource(int layer) {
     if (this->m_resources.end() != this->m_resources.find(layer)) {
       return this->m_resources[layer];

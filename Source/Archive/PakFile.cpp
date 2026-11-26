@@ -6,6 +6,9 @@
 #include <cstring>
 #include <zlib.h>
 
+// GLOBAL: gl_26045
+const char gl_obsoleteName000[44] = "data\\texture\\유저인터페이스\\map\\1@20cn1.bmp";
+
 namespace {
 #pragma pack(push, 1)
 
@@ -118,7 +121,7 @@ namespace myGPack {
   // FUNCTION: fn_04014
   bool CGPakUpdate::RemoveObsoleteEntries() {
     std::list<std::string> names;
-    names.push_back("data\\texture\\유저인터페이스\\map\\1@20cn1.bmp");
+    names.push_back(std::string(gl_obsoleteName000, 43));
     names.push_back("data\\texture\\유저인터페이스\\map\\1@20cn2.bmp");
     names.push_back("data\\texture\\유저인터페이스\\map\\1@4cdn.bmp");
     names.push_back("data\\texture\\유저인터페이스\\map\\1@4drk.bmp");
@@ -507,15 +510,17 @@ namespace myGPack {
     names.push_back("data\\texture\\유저인터페이스\\map\\yuno_in03.bmp");
     names.push_back("data\\texture\\유저인터페이스\\map\\yuno_pre.bmp");
 
-    std::int64_t removed = 0;
+    int removed = 0;
 
-    for (auto name = names.begin(); name != names.end(); ++name) {
-      for (auto entry = this->m_entries.begin(); entry != this->m_entries.end();) {
-        if (std::strcmp(entry->name.m_name, name->c_str()) == 0) {
-          entry = this->m_entries.erase(entry);
-          ++removed;
-        } else {
-          ++entry;
+    if (names.size() > 0) {
+      for (auto name = names.begin(); name != names.end(); ++name) {
+        for (auto entry = this->m_entries.begin(); entry != this->m_entries.end();) {
+          if (std::strcmp(entry->name.m_name, name->c_str()) == 0) {
+            entry = this->m_entries.erase(entry);
+            ++removed;
+          } else {
+            ++entry;
+          }
         }
       }
     }

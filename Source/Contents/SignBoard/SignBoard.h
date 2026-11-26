@@ -8,11 +8,18 @@
 #include <string>
 #include <vector>
 
+enum SignBoardType : int {
+  SIGNBOARD_BITMAP = 1,
+  SIGNBOARD_ICON = 2,
+  SIGNBOARD_TEXT = 3,
+};
+
 class UIStaticText;
 
 class CBmpObjWnd : public UIWindow {
 public:
   CBmpObjWnd();
+  void ResizeToBitmap();
   ~CBmpObjWnd() override;
   void OnCreate(int width, int height) override;
   void Paint() override;
@@ -27,6 +34,7 @@ public:
   void OnCreate(int width, int height) override;
   void Paint() override;
   void ApplyColor();
+  void UpdateText();
 
   /* 007C */ UIStaticText* text;
   /* 0080 */ std::string boardText;
@@ -75,7 +83,7 @@ struct SignBoardInfo {
 
 class CSignBoardMgr {
 public:
-  CSignBoardMgr() : initialized(true) {}
+  CSignBoardMgr();
   ~CSignBoardMgr() { std::vector<SignBoardInfo>(this->m_entries).swap(this->m_entries); }
 
   void Initialize();

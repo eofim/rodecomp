@@ -15,6 +15,18 @@
 #include <vector>
 #include "Resource/MSGSTRINGID.h"
 
+// GLOBAL: gl_24720
+unsigned char g_digitCharacters[256] = {
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
 #pragma pack(push, 1)
 struct ReplayTaggedRecordHeader {
   /* 0000 */ std::uint16_t id;
@@ -38,7 +50,7 @@ std::map<int, std::vector<const char*>> g_bookItemNames;
 
 // OFFSET: 0x006D8810
 // FUNCTION: fn_06597
-bool ITEM_INFO::IsEquipment() const {
+__declspec(noinline) bool ITEM_INFO::IsEquipment() const {
   switch (this->identity[0]) {
   case TYPE_ARMOR:
   case TYPE_WEAPON:
@@ -73,18 +85,14 @@ namespace {
   }
 
   // INLINED
-  ItemMoveInfo MakeEmptyItemMoveInfo() {
-    ItemMoveInfo info;
-    info.itemId = ITEMID_NONE;
-    info.drop = false;
-    info.trade = false;
-    info.storage = false;
-    info.cart = false;
-    info.sellToNpc = false;
-    info.mail = false;
-    info.auction = false;
-    info.guildStorage = false;
-    return info;
+  static bool IsDecimalText(const char* text) {
+    for (unsigned index = 0; index < std::strlen(text); ++index) {
+      if (!g_digitCharacters[static_cast<unsigned char>(text[index])]) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // INLINED
@@ -387,6 +395,14 @@ namespace {
     }
     return bytes;
   }
+
+}
+
+namespace {
+  // INLINED
+  __forceinline void AppendText(std::string& result, const char* text) {
+    result.append(text, std::strlen(text));
+  }
 }
 
 // OFFSET: 0x006D59A0
@@ -400,46 +416,63 @@ std::string ITEM_INFO::DisplayName(unsigned char detailed) const {
   if (this->identified == 1) {
     const int id = std::atoi(this->itemId.c_str());
     if ((static_cast<unsigned>(id) - 9001u <= 498 || static_cast<unsigned>(id) - 10000u <= 999) && CardId(*this, 3) == 1) {
-      result.append(InlineApprentice(*this, text, capacity, 0) > 0 ? text : "");
-      result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+      AppendText(result, InlineApprentice(*this, text, capacity, 0) > 0 ? text : "");
+      AppendText(result, IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
     } else if (CardId(*this, 0) == 254 && CardId(*this, 1) == 0) {
       if (this->refiningLevel > 0) {
-        result.append(InlineRefine(*this, text, capacity, 0) > 0 ? text : "");
+        AppendText(result, InlineRefine(*this, text, capacity, 0) > 0 ? text : "");
       }
 
-      if (this->grade > 0) {
-        result.append(this->Grade(text, capacity, 0) > 0 ? text : "");
+      if (0 < this->grade) {
+        AppendText(result, this->Grade(text, capacity, 0) > 0 ? text : "");
       }
 
-      if (g_serviceType == ServiceBrazil || g_serviceType == ServiceRussia) {
-        result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
-        result.append(InlineElement(*this, text, capacity, 0) > 0 ? text : "");
-        result.append(this->Creator(text, capacity, 0) > 0 ? text : "");
-      } else {
+      if (g_serviceType != ServiceBrazil && g_serviceType != ServiceRussia) {
         result += this->Creator(text, capacity, 0) > 0 ? text : "";
         result += InlineElement(*this, text, capacity, 0) > 0 ? text : "";
         result += IdentifiedName(*this, text, capacity, 0) > 0 ? text : "";
+      } else {
+        AppendText(result, IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+        AppendText(result, InlineElement(*this, text, capacity, 0) > 0 ? text : "");
+        AppendText(result, this->Creator(text, capacity, 0) > 0 ? text : "");
       }
     } else {
-      if (!this->IsEquipment() && detailed == 0) {
-        result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+      bool equipment = true;
+      switch (this->identity[0]) {
+      case TYPE_ARMOR:
+      case TYPE_WEAPON:
+      case TYPE_BOW:
+      case TYPE_BOTHHAND:
+      case TYPE_ARMORTM:
+      case TYPE_ARMORTB:
+      case TYPE_ARMORMB:
+      case TYPE_ARMORTMB:
+      case TYPE_GUN:
+      case 21:
+        break;
+      default:
+        equipment = false;
+        break;
+      }
+      if (!equipment && detailed == 0) {
+        AppendText(result, IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
       } else {
         if (this->refiningLevel > 0) {
-          result.append(InlineRefine(*this, text, capacity, 0) > 0 ? text : "");
+          AppendText(result, InlineRefine(*this, text, capacity, 0) > 0 ? text : "");
         }
 
-        if (this->grade > 0) {
-          result.append(this->Grade(text, capacity, 0) > 0 ? text : "");
+        if (0 < this->grade) {
+          AppendText(result, this->Grade(text, capacity, 0) > 0 ? text : "");
         }
 
         if (this->HasCards() == true) {
-          result.append(this->Prefixes(text, capacity, 0) > 0 ? text : "");
-          result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
-          result.append(this->Suffixes(text, capacity, 0) > 0 ? text : "");
-          result.append(InlineSlots(*this, text, capacity, 0) > 0 ? text : "");
+          AppendText(result, this->Prefixes(text, capacity, 0) > 0 ? text : "");
+          AppendText(result, IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+          AppendText(result, this->Suffixes(text, capacity, 0) > 0 ? text : "");
+          AppendText(result, InlineSlots(*this, text, capacity, 0) > 0 ? text : "");
         } else if (CardId(*this, 0) != 254 && CardId(*this, 0) != 255) {
-          result.append(IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
-          result.append(this->Slots(text, capacity, 0) > 0 ? text : "");
+          AppendText(result, IdentifiedName(*this, text, capacity, 0) > 0 ? text : "");
+          AppendText(result, this->Slots(text, capacity, 0) > 0 ? text : "");
         } else if (g_serviceType == ServiceBrazil) {
           result += IdentifiedName(*this, text, capacity, 0) > 0 ? text : "";
           result += InlineElement(*this, text, capacity, 0) > 0 ? text : "";
@@ -461,7 +494,7 @@ std::string ITEM_INFO::DisplayName(unsigned char detailed) const {
   } else {
     const int id = std::atoi(this->itemId.c_str());
     const char* name = FindItemDescription(id, g_itemDescriptions).unidentifiedName;
-    result.append(CopyText(text, capacity, 0, name ? name : " ") > 0 ? text : "");
+    AppendText(result, CopyText(text, capacity, 0, name ? name : " ") > 0 ? text : "");
   }
 
   return result;
@@ -608,7 +641,7 @@ ItemCardName& EnsureItemCardName(int id, std::map<int, ItemCardName>& values) {
 // FUNCTION: fn_45456
 ItemMoveInfo& FindItemMoveInfo(int id, std::map<int, ItemMoveInfo>& values) {
   // GLOBAL: gl_24789
-  static ItemMoveInfo missingMoveInfo = MakeEmptyItemMoveInfo();
+  static ItemMoveInfo missingMoveInfo;
   const auto entry = values.find(id);
   return entry == values.end() ? missingMoveInfo : entry->second;
 }
@@ -685,16 +718,14 @@ __declspec(noinline) void LoadItemNameTables() {
         ShowErrorDialog("item.txt 스크립트를 확인해주세요.", 0);
       }
 
-      char* unidentified = *cursor;
-      if (unidentified == nullptr || std::strstr(unidentified, "idenitfied equal unidentified") != nullptr) {
+      if (*cursor == nullptr || std::strstr(*cursor, "idenitfied equal unidentified") != nullptr) {
         desc.unidentifiedName = desc.identifiedName;
         desc.unidentifiedDescription = desc.identifiedDescription;
-        cursor += 2;
+        ++cursor;
       } else {
-        g_session.ConvertTooltipText(unidentified, unidentified);
-        unidentified = *cursor;
+        g_session.ConvertTooltipText(*cursor, *cursor);
+        desc.unidentifiedName = *cursor;
         cursor += 2;
-        desc.unidentifiedName = unidentified;
         if (cursor >= tokens.end()) {
           ShowErrorDialog("item.txt 스크립트를 확인해주세요.", 0);
         }
@@ -703,9 +734,9 @@ __declspec(noinline) void LoadItemNameTables() {
           desc.unidentifiedDescription.push_back(*cursor);
           ++cursor;
         }
-
-        ++cursor;
       }
+
+      ++cursor;
     }
 
     loaded = 1;
@@ -730,11 +761,11 @@ __declspec(noinline) void LoadItemNameTables() {
           continue;
         }
 
-        if (!IsNumericText(text)) {
+        if (IsDecimalText(text)) {
+          id = std::atoi(text);
+        } else {
           DecodeMessageRot(text);
           EnsureItemDescription(id, g_itemDescriptions).unidentifiedDescription.push_back(*token);
-        } else {
-          id = std::atoi(text);
         }
       }
     }
@@ -757,11 +788,11 @@ __declspec(noinline) void LoadItemNameTables() {
           continue;
         }
 
-        if (!IsNumericText(text)) {
+        if (IsDecimalText(text)) {
+          id = std::atoi(text);
+        } else {
           DecodeMessageRot(text);
           EnsureItemDescription(id, g_itemDescriptions).identifiedDescription.push_back(*token);
-        } else {
-          id = std::atoi(text);
         }
       }
     }
@@ -837,8 +868,10 @@ __declspec(noinline) void LoadItemNameTables() {
 
     if (IsNumericText(text)) {
       metalId = std::atoi(text);
-    } else if (std::strlen(text) != 0) {
-      EnsureItemDescriptionLines(metalId, g_metalProcessItems).push_back(*token);
+    } else {
+      if (std::strlen(text) != 0) {
+        EnsureItemDescriptionLines(metalId, g_metalProcessItems).push_back(*token);
+      }
     }
   }
 
@@ -871,7 +904,8 @@ __declspec(noinline) void LoadItemNameTables() {
       flags.mail = value[6] != 0;
       flags.auction = value[7] != 0;
       flags.guildStorage = value[8] != 0;
-      g_itemMoveInfo.insert(std::make_pair(flags.itemId, flags));
+      const std::map<int, ItemMoveInfo>::value_type entry(flags.itemId, flags);
+      g_itemMoveInfo.insert(entry);
     }
   }
 }

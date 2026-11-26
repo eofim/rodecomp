@@ -68,6 +68,8 @@ public:
 
   void Create(int width, int height, int rows);
   void SelectAchievement(int index);
+  bool HitTestRow(int x, int y, int* row);
+  void SelectAchievementById(int id);
   __declspec(noinline) void SetAchievements(std::map<int, AchievementInfo>* achievements, int mode);
   __declspec(noinline) void UpdateScroll();
 
@@ -85,7 +87,8 @@ struct UIAchTabGroup {
 
 class UIAchTab : public UIWindow {
 public:
-  // INLINED
+  // OFFSET: 0x007B20D0
+  // FUNCTION: fn_46517
   UIAchTab()
       : UIWindow(0), selectedGroup(-1), selectedSub(-1), fontHeight(0), hoverGroup(0), hoverSub(0) {
     this->scrollBar = nullptr;
@@ -130,7 +133,8 @@ public:
 
   void ClearGroups();
   void DrawGroup(int group);
-  __declspec(noinline) std::string Label(int group, int sub);
+  void NotifySelection(int group, int sub);
+  std::string Label(int group, int sub);
   __declspec(noinline) bool HitTestTab(int x, int y, int* a, int* b);
   __declspec(noinline) void UpdateScrollBar();
   void Refresh();
@@ -146,7 +150,8 @@ public:
 
 class UIAchTV : public UITextViewer {
 public:
-  // INLINED
+  // OFFSET: 0x007B2050
+  // FUNCTION: fn_46516
   UIAchTV() : selectionDisabled(0), textColor(0), outlineColor(0), underline(0) {
   }
 
@@ -193,7 +198,8 @@ public:
 
   __declspec(noinline) void UpdateInfo();
 
-  // INLINED
+  // OFFSET: 0x007B8C00
+  // FUNCTION: fn_46518
   void SetAchievement(int id, AchievementInfo* achievement) {
     this->achievementId = id;
     this->info = achievement;
@@ -208,6 +214,8 @@ public:
 class UIAchUpperWnd : public UIWindow {
 public:
   UIAchUpperWnd();
+  void SetCompletionCounts(int completed, int total);
+  void SetLevelPoints(int points, int total);
 
   /* 007C */ std::string title;
   /* 0094 */ int achievementPoints;
@@ -220,7 +228,7 @@ public:
   /* 00B4 */ int selected;
 
   // INLINED
-  void SetTitle(const std::string& text) {
+  void SetTitle(std::string text) {
     this->title = text;
   }
 

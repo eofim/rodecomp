@@ -34,7 +34,7 @@ bool UIWindowMgr::IsOrderFixed(int id) {
   case WID_ITEMSHOPWND2: case WID_ITEMSELLWND2: case WID_SEEKPARTYWND: case WID_MERCHANTMIRRORITEMWND_MODE_1: case WID_MERCHANTITEMMYSHOPWND_MODE_1: case WID_MERCHANTITEMSHOPWND_MODE_1: case WID_MERCHANTMIRRORITEMWND_MODE_2: case WID_LOGINOTPWND: case WID_SHOWINFO_TESTLAYER: case WID_SELECTREPLAYDATAWND: case WID_REPLAYCONTROLWND: case WID_MERCHANTSHOPTITLE: case WID_NCASH_CALLWND: case WID_COLLECTIONSYSTEMWND:
   case WID_REPLAYRECCONTROLWND: case WID_SECONDPASSWORDINPUTWND: case WID_SECONDPASSWORDEDITWND: case WID_QUESTDISPLAY: case WID_MULTIILLUSTWND_SLOT_0: case WID_MULTIILLUSTWND_SLOT_1: case WID_MULTIILLUSTWND_SLOT_2: case WID_MULTIILLUSTWND_SLOT_3: case WID_MULTIILLUSTWND_SLOT_4: case WID_MULTIILLUSTWND_SLOT_5: case WID_MULTIILLUSTWND_SLOT_6: case WID_MULTIILLUSTWND_SLOT_7: case WID_MULTIILLUSTWND_SLOT_8: case WID_MULTIILLUSTWND_SLOT_9:
   case WID_SAYDIALOGWND_OVERLAY: case WID_MERGEITEMWND: case WID_GUILD_STORAGE_LOG: case WID_MERCHANTITEMLOGWND_MODE_0: case WID_MERCHANTITEMLOGWND_MODE_1: case WID_OPENMAILBOXWND: case WID_MILEAGEWND: case WID_OPENROULLETTEWND: case WID_ROULLETTEWND: case WID_ACHTRACINGWND: case WID_NEWSELECTCHARWND: case WID_NEWMAKECHARWND: case WID_CAPTCHAREGISTERWND: case WID_MACRODETECTORWND:
-  case WID_MACROREPORTERWND: case WID_VIEWCAMERAINFOWND: case WID_REFININGWND: case WID_MINIPARTYWND: case WID_MENUICONWND: case WID_RPIMAGEWND2: case WID_DISCONNECTEDSERVERMSGWND: case WID_GRADEENCHANTWND: case WID_BALLOONOPENBTN: case WID_MACROBLACKLISTCHECKWND: case 600: case WID_EXCHANGEUI: case WID_DEBUFFREMOVEWND:
+  case WID_MACROREPORTERWND: case WID_VIEWCAMERAINFOWND: case WID_REFININGWND: case WID_MINIPARTYWND: case WID_MENUICONWND: case WID_RPIMAGEWND2: case WID_DISCONNECTEDSERVERMSGWND: case WID_GRADEENCHANTWND: case WID_BALLOONOPENBTN: case WID_MACROBLACKLISTCHECKWND: case WID_REPLAYMESSAGEBOXWND: case WID_EXCHANGEUI: case WID_DEBUFFREMOVEWND:
     return true;
   case 145: {
     UIWindow* window = g_windowMgr.LookupWindow(static_cast<WindowId>(145));
@@ -192,16 +192,23 @@ bool UIWindowMgr::HasTitleAtActorCell(std::uint32_t aid) {
     return true;
   }
 
-  int titleColumn = 0;
   int titleRow = 0;
+  int titleColumn = 0;
   int actorColumn = 0;
   int actorRow = 0;
   C3dAttr*& terrain = g_modeMgr.GetGameMode()->scene->terrain;
   terrain->SpatialCell(actor->render.position.x, actor->render.position.z, actorColumn, actorRow);
   for (UIWindow*& window : this->rendered) {
-    CRenderObject* owner;
     if (typeid(*window) == typeid(UIMerchantShopTitle)) {
-      owner = g_session.FindGameActor(static_cast<UIMerchantShopTitle*>(window)->ownerAid);
+      CRenderObject* owner = g_session.FindGameActor(static_cast<UIMerchantShopTitle*>(window)->ownerAid);
+      if (owner == nullptr) {
+        return true;
+      }
+
+      terrain->SpatialCell(owner->render.position.x, owner->render.position.z, titleColumn, titleRow);
+      if (actorColumn == titleColumn && titleRow == actorRow) {
+        return true;
+      }
     } else if (typeid(*window) == typeid(UIChatRoomTitle)) {
       const int roomId = static_cast<UIChatRoomTitle*>(window)->info.id;
       if (roomId == 0) {
@@ -213,18 +220,15 @@ bool UIWindowMgr::HasTitleAtActorCell(std::uint32_t aid) {
         return true;
       }
 
-      owner = g_session.FindGameActor(ownerAid);
-    } else {
-      continue;
-    }
+      CRenderObject* owner = g_session.FindGameActor(ownerAid);
+      if (owner == nullptr) {
+        return true;
+      }
 
-    if (owner == nullptr) {
-      return true;
-    }
-
-    terrain->SpatialCell(owner->render.position.x, owner->render.position.z, titleColumn, titleRow);
-    if (titleColumn == actorColumn && actorRow == titleRow) {
-      return true;
+      terrain->SpatialCell(owner->render.position.x, owner->render.position.z, titleColumn, titleRow);
+      if (actorColumn == titleColumn && titleRow == actorRow) {
+        return true;
+      }
     }
   }
 

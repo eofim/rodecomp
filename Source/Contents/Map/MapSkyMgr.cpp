@@ -324,12 +324,12 @@ void CWeatherEffect::StopLightning() {
 
 // INLINED
 static int ClampedRandom(int range) {
-  if (range == 0) {
-    return 0;
+  int result = 0;
+  if (range != 0) {
+    const int value = rand() % range;
+    result = value >= 0 ? value : 0;
   }
-
-  const int value = rand() % range;
-  return value >= 0 ? value : 0;
+  return result;
 }
 
 // INLINED
@@ -360,7 +360,8 @@ static void SetCloudScriptParameters(CCloud* cloud, int integerA, int integerB, 
 // FUNCTION: fn_03436
 void CMapSkyMgr::CreateClouds(const std::string& mapName) {
   int typeCount = 0;
-  this->m_script->Call("GetCloudTypeNum", "s>d", mapName.c_str(), &typeCount);
+  auto& script = this->m_script;
+  script->Call("GetCloudTypeNum", "s>d", mapName.c_str(), &typeCount);
 
   const int mapWidth =
     g_modeMgr.GetGameMode()->scene->terrain->width * g_modeMgr.GetGameMode()->scene->terrain->cellSize;
@@ -386,7 +387,7 @@ void CMapSkyMgr::CreateClouds(const std::string& mapName) {
     double param7 = 0.0;
     unsigned char flag = 1;
 
-    this->m_script->Call(
+    script->Call(
       "GetCloudInfo",
       "sd>dddddlllddlddlllb",
       mapName.c_str(),

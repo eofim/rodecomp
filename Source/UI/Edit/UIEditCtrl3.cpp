@@ -3,6 +3,7 @@
 #include "UI/Buttons/UIButton.h"
 #include "UI/Buttons/UINaviLinkButton.h"
 #include "UI/Navigation/NavigationLink.h"
+#include "UI/Window/UIEnums.h"
 
 // OFFSET: 0x00861AB0
 // FUNCTION: fn_10902
@@ -43,7 +44,7 @@ void UIEditCtrl3::PlaceLinks(const std::string& value, int y, int line, int firs
   for (auto entry = this->links.begin(); entry != this->links.end(); ++entry) {
     UIWindow* window = *entry;
 
-    if (window->geometry.id != 438) {
+    if (window->geometry.id != ID_NAVI_LINK) {
       continue;
     }
 
@@ -61,19 +62,20 @@ void UIEditCtrl3::PlaceLinks(const std::string& value, int y, int line, int firs
   const std::string remaining = value;
 
   {
-    std::string prefix;
-    std::string rest;
+    std::string prefix, rest;
 
     if (value.find("<") == std::string::npos && value.find(">") == std::string::npos) {
       return;
     }
 
-    for (auto entry = this->links.begin(); entry != this->links.end(); ++entry) {
+    std::list<UIWindow*>::iterator it;
+    for (auto entry = this->links.begin(); entry != this->links.end(); entry = ++it) {
       if (this->RemoveInvalidLink(438, entry)) {
         break;
       }
 
-      auto* button = static_cast<UINaviLinkButton*>(*entry);
+      it = entry;
+      auto* button = static_cast<UINaviLinkButton*>(*it);
       NavigationLinkParser* parser = g_navigationLinkParser;
       const std::string name = parser->FormatNavigationLink(button->Link(), false);
       const std::string fitted = this->FitTextToWidth(name, this->geometry.width / 2);
@@ -88,22 +90,18 @@ void UIEditCtrl3::PlaceLinks(const std::string& value, int y, int line, int firs
         rest = remaining.substr(found + std::strlen(display.c_str()));
 
         int x = 3;
-
         if (this->invalidatesParent == 0 && this->firstVisible != 0) {
           x = 3 - this->TextWidth(this->text.c_str(), this->firstVisible, 0, 12, 0, 0);
         }
 
         button->line = line;
-        (*entry)->Move(x - 1 + this->TextWidth(prefix.c_str(), 0, 0, 12, 0, 0), y);
+        (*it)->Move(x - 1 + this->TextWidth(prefix.c_str(), 0, 0, 12, 0, 0), y);
       }
 
       const std::string visible = this->FitTextToWidth(name, this->geometry.width / 2);
       this->SnapLinkSelection(prefix, static_cast<int>(std::strlen(visible.c_str())));
       this->pendingText[line] += prefix;
-      {
-        const std::string link = button->link;
-        this->pendingText[line].append(link.data(), link.size());
-      }
+      this->pendingText[line] += button->Link();
       this->pendingText[line] += rest;
     }
   }

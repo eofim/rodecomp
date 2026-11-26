@@ -98,8 +98,8 @@ bool CMsgEffect::UsesMsgEffect(int type) {
   switch (type) {
     case MET_CART:
     case MET_BIRD:
-    case 27:
-    case 31:
+    case MET_WARG:
+    case MET_BABY_WARG:
       return true;
     default:
       return false;
@@ -125,22 +125,37 @@ __forceinline static float MsgEffectDriftDirection(CMsgEffect* effect) {
   if (effect->m_drift.x == 0.0f && effect->m_owner != nullptr) {
     if (skinMode == 0) {
       const int angle = static_cast<int>(effect->m_owner->render.angle);
+      int dir;
       if (angle >= 0 && angle < 90) {
-        dirX = -0.8f;
-        effect->m_drift.x = -0.8f;
-        effect->m_drift.z = 0.8f;
+        dir = 0;
       } else if (angle >= 90 && angle < 180) {
-        dirX = -0.8f;
-        effect->m_drift.x = -0.8f;
-        effect->m_drift.z = -0.8f;
+        dir = 2;
       } else if (angle >= 180 && angle < 270) {
-        dirX = 0.8f;
-        effect->m_drift.x = 0.8f;
-        effect->m_drift.z = -0.8f;
+        dir = 4;
       } else {
-        dirX = 0.8f;
-        effect->m_drift.x = 0.8f;
-        effect->m_drift.z = 0.8f;
+        dir = 6;
+      }
+      switch (dir) {
+        case 0:
+          dirX = -0.8f;
+          effect->m_drift.x = -0.8f;
+          effect->m_drift.z = 0.8f;
+          break;
+        case 2:
+          dirX = -0.8f;
+          effect->m_drift.x = -0.8f;
+          effect->m_drift.z = -0.8f;
+          break;
+        case 4:
+          dirX = 0.8f;
+          effect->m_drift.x = 0.8f;
+          effect->m_drift.z = -0.8f;
+          break;
+        case 6:
+          dirX = 0.8f;
+          effect->m_drift.x = 0.8f;
+          effect->m_drift.z = 0.8f;
+          break;
       }
     } else {
       if (skinMode == 1) {
@@ -235,7 +250,7 @@ bool CMsgEffect::OnProcess() {
     case MET_BLUE_EFFECT:
       break;
     default:
-      if (this->m_type != 0x72) {
+      if (this->m_type != MET_NUMBER_HEAL) {
         this->PlayFrameSounds();
       }
       break;
@@ -258,8 +273,8 @@ bool CMsgEffect::OnProcess() {
       }
       return true;
 
-    case 0x1B:
-    case 0x1F: {
+    case MET_WARG:
+    case MET_BABY_WARG: {
       CActRes* action = this->GetActRes();
       const int frames = static_cast<int>(action->FrameCount(this->render.previousAnimation));
       if (frames == 0) {
@@ -398,8 +413,8 @@ bool CMsgEffect::OnProcess() {
     case 0x1C:
     case 0x1D:
     case 0x1E:
-    case 0x20:
-    case 0x21:
+    case MET_SHIELD_EFFECT:
+    case MET_COSTUME_BODY_EFFECT:
     case 0x22:
     case 0x23:
     case 0x24: {
@@ -463,8 +478,8 @@ bool CMsgEffect::OnProcess() {
     case MET_STUN_EFFECT:
     case MET_SILENCE_EFFECT:
     case MET_CURSOR_EFFECT:
-    case 0x25:
-    case 0x26: {
+    case MET_LASSITUDE_EFFECT:
+    case MET_MISFORTUNE_EFFECT: {
       elapsed = MsgEffectElapsedFrames(this);
       CActRes* action = this->GetActRes();
       const int frames = static_cast<int>(action->FrameCount(this->render.previousAnimation));
@@ -533,7 +548,7 @@ bool CMsgEffect::OnProcess() {
       return true;
 
     default:
-      if (this->m_type != 0x72) {
+      if (this->m_type != MET_NUMBER_HEAL) {
         return true;
       }
       elapsed = MsgEffectElapsedFrames(this);
@@ -1370,7 +1385,7 @@ void CMsgEffect::FollowOwner() {
       }
       break;
 
-    case 0x21:
+    case MET_COSTUME_BODY_EFFECT:
       if (this->m_owner != nullptr) {
         const CRenderObject* owner = this->m_owner;
         this->render.position = owner->render.position;
@@ -1378,7 +1393,7 @@ void CMsgEffect::FollowOwner() {
       }
       break;
 
-    case 0x20:
+    case MET_SHIELD_EFFECT:
       if (this->m_owner != nullptr) {
         const CRenderObject* owner = this->m_owner;
         this->render.position = owner->render.position;
@@ -1391,8 +1406,8 @@ void CMsgEffect::FollowOwner() {
     case MET_SLEEP_EFFECT:
     case MET_STUN_EFFECT:
     case MET_SILENCE_EFFECT:
-    case 0x25:
-    case 0x26:
+    case MET_LASSITUDE_EFFECT:
+    case MET_MISFORTUNE_EFFECT:
       if (this->m_owner != nullptr) {
         const CRenderObject* owner = this->m_owner;
         this->render.position = owner->render.position;
@@ -1426,8 +1441,8 @@ void CMsgEffect::FollowOwner() {
       }
       break;
 
-    case 0x1B:
-    case 0x1F:
+    case MET_WARG:
+    case MET_BABY_WARG:
       if (this->m_owner != nullptr) {
         CWorld* scene = g_modeMgr.GetGameMode()->scene;
         const float dist = this->m_owner->CalcDist(this->render.position.x, this->render.position.z);
@@ -1504,6 +1519,9 @@ void CMsgEffect::FollowOwner() {
         const int dir = this->Get8Dir2(this->render.angle, 1);
         CRenderObject* owner = this->m_owner;
         this->render.previousAnimation = this->render.animation + dir;
+        float movedX;
+        float movedZ;
+        float moved;
         bool approach = false;
         if (dist > 25.0f && this->motionInitialized == 0) {
           approach = true;
@@ -1511,9 +1529,8 @@ void CMsgEffect::FollowOwner() {
           this->motionInitialized = 1;
           approach = true;
         }
-        vector3d oldPosition;
         if (approach) {
-          oldPosition = this->render.position;
+          const vector3d oldPosition = this->render.position;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
@@ -1521,27 +1538,34 @@ void CMsgEffect::FollowOwner() {
           this->render.position.x += (owner->render.position.x - this->render.position.x) / 25.0f;
           this->render.curMotion = 8;
           this->render.position.z += (owner->render.position.z - this->render.position.z) / 25.0f;
+          movedX = this->render.position.x - oldPosition.x;
+          movedZ = this->render.position.z - oldPosition.z;
+          moved = SquareRoot(movedZ * movedZ + movedX * movedX);
+          this->travelDistance += moved;
         } else if (dist > 12.0f && this->activeMotion == 0) {
-          oldPosition = this->render.position;
+          const vector3d oldPosition = this->render.position;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
           direction.Normalize();
           this->render.position.x += (owner->render.position.x - this->render.position.x) / dist;
           this->render.position.z += (owner->render.position.z - this->render.position.z) / dist;
+          movedX = this->render.position.x - oldPosition.x;
+          movedZ = this->render.position.z - oldPosition.z;
+          moved = SquareRoot(movedZ * movedZ + movedX * movedX);
+          this->travelDistance += moved;
         } else if (dist > 3.0f) {
-          oldPosition = this->render.position;
+          const vector3d oldPosition = this->render.position;
           vector2d direction;
           direction.x = this->render.position.x - owner->render.position.x;
           direction.y = this->render.position.z - owner->render.position.z;
           direction.Normalize();
           this->render.position.x += (owner->render.position.x - this->render.position.x) / 20.0f;
           this->render.position.z += (owner->render.position.z - this->render.position.z) / 20.0f;
-        }
-        if (approach || dist > 3.0f) {
-          const float movedX = this->render.position.x - oldPosition.x;
-          const float movedZ = this->render.position.z - oldPosition.z;
-          this->travelDistance += SquareRoot(movedZ * movedZ + movedX * movedX);
+          movedX = this->render.position.x - oldPosition.x;
+          movedZ = this->render.position.z - oldPosition.z;
+          moved = SquareRoot(movedZ * movedZ + movedX * movedX);
+          this->travelDistance += moved;
         }
         this->Face(owner->render.position.x, owner->render.position.z);
         this->render.position.y = scene->terrain->Height(this->render.position.x, this->render.position.z) - 25.0f;
@@ -1558,7 +1582,7 @@ void CMsgEffect::FollowOwner() {
         this->render.position.y -= 20.0f;
       }
     default:
-      if (this->m_type == 0x72) {
+      if (this->m_type == MET_NUMBER_HEAL) {
         this->render.position.x = this->m_owner->render.position.x;
         this->render.position.z = this->m_owner->render.position.z;
       }
@@ -1588,7 +1612,7 @@ void CMsgEffect::Render(int argument) {
     case MET_NUMBER_CRITICAL:
     case MET_NUMBER_HALF:
     case MET_NUMBER_TOTAL:
-    case 114:
+    case MET_NUMBER_HEAL:
       if (!g_msgEffectShowSpecial) {
         return;
       }
@@ -1612,7 +1636,7 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         this->m_velocity.z = (position->z - this->render.position.z) / 10.0f;
         this->activeMotion = 1;
         this->motionInitialized = 0;
-      } else if (this->m_type == 27 || this->m_type == 31) {
+      } else if (this->m_type == MET_WARG || this->m_type == MET_BABY_WARG) {
         this->m_velocity.x = (position->x - this->render.position.x) / 10.0f;
         this->m_velocity.y = (position->y - this->render.position.y) / 10.0f;
         this->m_velocity.z = (position->z - this->render.position.z) / 10.0f;
@@ -1652,8 +1676,8 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       switch (this->m_type) {
         case MET_CART:
         case MET_BIRD:
-        case 27:
-        case 31:
+        case MET_WARG:
+        case MET_BABY_WARG:
           if (sender != nullptr) {
             const CRenderObject* owner = static_cast<const CRenderObject*>(sender);
             this->render.position.x = owner->render.position.x - ClientSine(static_cast<int>(owner->render.angle)) * 5.0f;
@@ -1674,7 +1698,7 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
       this->m_type = static_cast<int>(c);
       this->m_value = static_cast<int>(b);
       switch (static_cast<int>(c)) {
-        case 27:
+        case MET_WARG:
           this->render.flatDepth = 0;
           this->render.depthLayer = 0;
           this->render.shadowVisible = 1;
@@ -1682,7 +1706,7 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
           break;
 
         case MET_CART:
-        case 31:
+        case MET_BABY_WARG:
           this->render.flatDepth = 0;
           this->render.depthLayer = 0;
           this->render.shadowVisible = 1;
@@ -1715,6 +1739,21 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
     case AM_SETPOS2: {
       int offset = 0;
       switch (this->m_type) {
+        default:
+          if (this->m_type != MET_NUMBER_HEAL) {
+            return;
+          }
+
+          this->SetSpriteName(FormatOwnedString("%s.spr", g_session.m_damageResourceName.c_str()).c_str());
+          this->SetActionName(FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
+          this->render.animation = 0;
+          this->render.previousAnimation = 0;
+          this->render.position = *position;
+          this->render.position.y -= 12.0f;
+          this->m_baseY = this->render.position.y;
+          this->m_baseX = position->x;
+          break;
+
         case MET_NUMBER_TOTAL:
           offset = 15;
         case MET_NUMBER:
@@ -1732,28 +1771,6 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
         case MET_MISS:
           this->m_baseX = this->render.position.x;
           return;
-
-        case MET_CRITICAL_EFFECT:
-        case MET_LUCKY_EFFECT:
-        case MET_BIRD:
-        case 19:
-        case 20:
-          return;
-
-        default:
-          if (this->m_type != 114) {
-            return;
-          }
-
-          this->SetSpriteName(FormatOwnedString("%s.spr", g_session.m_damageResourceName.c_str()).c_str());
-          this->SetActionName(FormatOwnedString("%s.act", g_session.m_damageResourceName.c_str()).c_str());
-          this->render.animation = 0;
-          this->render.previousAnimation = 0;
-          this->render.position = *position;
-          this->m_baseX = this->render.position.x;
-          this->render.position.y -= 12.0f;
-          this->m_baseY = this->render.position.y;
-          break;
       }
 
       this->render.curMotion = static_cast<int>(c);
@@ -1790,8 +1807,8 @@ void CMsgEffect::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t
 
       switch (this->m_type) {
         case MET_CART:
-        case 27:
-        case 31:
+        case MET_WARG:
+        case MET_BABY_WARG:
           break;
 
         case MET_ICEBREAKEFFECT:

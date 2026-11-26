@@ -19,11 +19,11 @@ class CUITime;
 class CDelayItemData {
 public:
   // INLINED
-  CDelayItemData(int levelIndex, const std::map<int, int>& delayTimes) : levelIndex(levelIndex), delayTimes(delayTimes) {
+  CDelayItemData(int levelIndex, const std::map<int, long>& delayTimes) : levelIndex(levelIndex), delayTimes(delayTimes) {
   }
 
   /* 0000 */ int levelIndex;
-  /* 0004 */ std::map<int, int> delayTimes;
+  /* 0004 */ std::map<int, long> delayTimes;
 };
 
 class CUIDelayItem : public CUIListItem {
@@ -70,7 +70,7 @@ public:
   void OnClose();
   void OnSelectItem(SkillDelayInfo::CUIDelayItem* item, const SkillDelayInfo::CDelayItemData& data);
   void OnUpdateItem(SkillDelayInfo::CUIDelayItem* item, const SkillDelayInfo::CDelayItemData& data);
-  void SetSkill(int skillId);
+  void SetSkill(void* skill);
 
   /* 00D8 */ CUITitleBar* titleBar;
   /* 00DC */ CUIStaticText* skillNameText;

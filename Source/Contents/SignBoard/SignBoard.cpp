@@ -26,6 +26,10 @@
 // GLOBAL: gl_24892
 CSignBoardMgr* s_signBoardMgr = nullptr;
 
+// OFFSET: 0x0081F800
+// FUNCTION: fn_46542
+CSignBoardMgr::CSignBoardMgr() : initialized(true) {}
+
 // OFFSET: 0x0081FC30
 // FUNCTION: fn_10244
 bool CreateSignBoardMgr() {
@@ -75,7 +79,7 @@ void CSignBoardMgr::Initialize() {
     LowercaseText(mapName);
     if (entryMap == mapName) {
       switch (it->type) {
-      case 1: {
+      case SIGNBOARD_BITMAP: {
         C3DCooRendering* object = new C3DCooRendering();
         object->type = it->type;
         object->Create();
@@ -94,7 +98,7 @@ void CSignBoardMgr::Initialize() {
         g_modeMgr.GetGameMode()->scene->objects.push_back(object);
         break;
       }
-      case 2: {
+      case SIGNBOARD_ICON: {
         CIcon* icon = new CIcon();
         vector3d position = {0.0f, 0.0f, 0.0f};
         g_modeMgr.GetGameMode()->CellCenter(it->column, it->row, position.x, position.z);
@@ -105,7 +109,7 @@ void CSignBoardMgr::Initialize() {
         g_modeMgr.GetGameMode()->scene->objects.push_back(icon);
         break;
       }
-      case 3: {
+      case SIGNBOARD_TEXT: {
         C3DCooRendering* object = new C3DCooRendering();
         object->type = it->type;
         object->Create();
@@ -148,11 +152,11 @@ void CSignBoardMgr::LoadList() {
       &info.color
     );
     switch (info.type) {
-    case 2:
-      info.type = 2;
+    case SIGNBOARD_ICON:
+      info.type = SIGNBOARD_ICON;
       break;
-    case 3:
-      info.type = 3;
+    case SIGNBOARD_TEXT:
+      info.type = SIGNBOARD_TEXT;
       if (info.text == nullptr) {
         info.text = defaults.text;
       }
@@ -160,9 +164,9 @@ void CSignBoardMgr::LoadList() {
         info.color = defaults.color;
       }
       break;
-    case 1:
+    case SIGNBOARD_BITMAP:
     default:
-      info.type = 1;
+      info.type = SIGNBOARD_BITMAP;
       break;
     }
 
@@ -282,12 +286,12 @@ void CSignBoardWnd::Paint() {
 // FUNCTION: fn_10267
 void C3DCooRendering::Create() {
   switch (this->type) {
-  case 1:
+  case SIGNBOARD_BITMAP:
     this->window = new (std::nothrow) CBmpObjWnd();
     this->window->SetSize(0xaa, 0xaa);
     g_windowMgr.AddRenderedFront(this->window);
     break;
-  case 3:
+  case SIGNBOARD_TEXT:
     this->window = new (std::nothrow) CSignBoardWnd();
     this->window->SetSize(0xa2, 0x24);
     g_windowMgr.AddRenderedFront(this->window);
@@ -341,6 +345,13 @@ void CIcon::Render(int argument) {
   this->DrawSprite(argument, false, 0.0f);
 }
 
+// OFFSET: 0x00822060
+// FUNCTION: fn_46717
+void CBmpObjWnd::ResizeToBitmap() {
+  const CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(this->path.c_str())));
+  this->Resize(bitmap->image.width, bitmap->image.height);
+}
+
 // OFFSET: 0x008220A0
 // FUNCTION: fn_10273
 void CIcon::SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) {
@@ -368,14 +379,20 @@ void CIcon::Load(const std::string& name) {
   this->SetAction(0, 10, 0);
 }
 
+// OFFSET: 0x00822120
+// FUNCTION: fn_46718
+void CSignBoardWnd::UpdateText() {
+  this->ApplyColor();
+  this->text->SetTextFitted(this->boardText.c_str());
+}
+
 // OFFSET: 0x00822310
 // FUNCTION: fn_10276
 __declspec(noinline) void C3DCooRendering::SetBoard(const std::string& text, const std::string& color) {
   static_cast<CSignBoardWnd*>(this->window)->boardText = text;
   static_cast<CSignBoardWnd*>(this->window)->colorText = color;
   CSignBoardWnd* board = static_cast<CSignBoardWnd*>(this->window);
-  board->ApplyColor();
-  board->text->SetTextFitted(board->boardText.c_str());
+  board->UpdateText();
 }
 
 // OFFSET: 0x00822390
@@ -386,14 +403,13 @@ __declspec(noinline) void C3DCooRendering::SetWindowImage(const std::string& nam
   }
 
   switch (this->type) {
-  case 1: {
+  case SIGNBOARD_BITMAP: {
     static_cast<CBmpObjWnd*>(this->window)->path = name;
     CBmpObjWnd* window = static_cast<CBmpObjWnd*>(this->window);
-    const CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(window->path.c_str())));
-    window->Resize(bitmap->image.width, bitmap->image.height);
+    window->ResizeToBitmap();
     break;
   }
-  case 3:
+  case SIGNBOARD_TEXT:
     static_cast<CSignBoardWnd*>(this->window)->iconPath = name;
     break;
   }

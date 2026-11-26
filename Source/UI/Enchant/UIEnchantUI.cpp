@@ -41,7 +41,7 @@ inline CEnchantMgr* EnchantManager() {
 // FUNCTION: fn_14815
 template <class T, class D> void CUIListBoxEx<T, D>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
@@ -52,7 +52,7 @@ template <>
 EnchantUI::CUIEnchantItem* CUIListBoxEx<EnchantUI::CUIEnchantItem, EnchantUI::CEnchantItemData>::CreateItem() {
   EnchantUI::CUIEnchantItem* item = new EnchantUI::CUIEnchantItem();
   item->SetSize(this->itemWidth, this->rowHeight);
-  item->Show(0);
+  item->Show(WINDOW_HIDDEN);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   item->SetOnHover([this](CUIListItem* listItem) {
     for (EnchantUI::CUIEnchantItem* other : this->items) {
@@ -148,7 +148,7 @@ template <>
 EnchantUI::CUITargetItem* CUIListBoxEx<EnchantUI::CUITargetItem, ITEM_INFO>::CreateItem() {
   EnchantUI::CUITargetItem* item = new EnchantUI::CUITargetItem();
   item->SetSize(this->itemWidth, this->rowHeight);
-  item->Show(0);
+  item->Show(WINDOW_HIDDEN);
   item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
   item->SetOnHover([this](CUIListItem* listItem) {
     for (EnchantUI::CUITargetItem* other : this->items) {
@@ -291,7 +291,7 @@ void CUIEnchantItem::OnCreate(int width, int height) {
   this->name->SetAlign(0, 6);
   {
     // GLOBAL: gl_25222
-    this->name->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x39FF7FB50DEB998FULL)));
+    this->name->SetFont(std::string(OBFUSCATE_TEXT("Gulim", 0x39FF7FB50DEB998FULL)));
   }
   this->name->SetFontHeight(12);
   this->name->SetBold(1);
@@ -317,7 +317,7 @@ void CUITargetItem::OnCreate(int width, int height) {
   this->targetIcon->Move(166, 7);
   {
     // GLOBAL: gl_25223
-    this->targetIcon->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\grade_enchant\\grade_icon1.bmp", 0x75ADC57D87EFBD8FULL)));
+    this->targetIcon->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\grade_enchant\\grade_icon1.bmp", 0x75ADC57D87EFBD8FULL)));
   }
   this->AddChild(this->targetIcon);
 
@@ -329,7 +329,7 @@ void CUITargetItem::OnCreate(int width, int height) {
   this->targetText->SetAlign(0, 0);
   {
     // GLOBAL: gl_25224
-    this->targetText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xC517FB932D95BB6DULL)));
+    this->targetText->SetFont(std::string(OBFUSCATE_TEXT("Gulim", 0xC517FB932D95BB6DULL)));
   }
   this->targetText->SetFontHeight(12);
   this->targetText->SetBold(1);
@@ -362,7 +362,7 @@ void CUIIngredient::OnCreate(int width, int height) {
   this->backgroundImage->Move(0, 0);
   {
     // GLOBAL: gl_25225
-    this->backgroundImage->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_enc_off.bmp", 0x050505679903579BULL)));
+    this->backgroundImage->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_enc_off.bmp", 0x050505679903579BULL)));
   }
   this->AddChild(this->backgroundImage);
 
@@ -371,7 +371,7 @@ void CUIIngredient::OnCreate(int width, int height) {
   this->sufficientMaterialImage->Move(0, 0);
   {
     // GLOBAL: gl_25226
-    this->sufficientMaterialImage->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_enc_on.bmp", 0xDD3913D5D7F97BE1ULL)));
+    this->sufficientMaterialImage->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_enc_on.bmp", 0xDD3913D5D7F97BE1ULL)));
   }
   this->AddChild(this->sufficientMaterialImage);
 
@@ -391,7 +391,7 @@ void CUIIngredient::OnCreate(int width, int height) {
   this->ownedText->SetAlign(6, 6);
   {
     // GLOBAL: gl_25227
-    this->ownedText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xBF2B4B31397FF5A7ULL)));
+    this->ownedText->SetFont(std::string(OBFUSCATE_TEXT("Gulim", 0xBF2B4B31397FF5A7ULL)));
   }
   this->ownedText->SetFontHeight(12);
   this->ownedText->SetBold(1);
@@ -408,7 +408,7 @@ void CUIIngredient::OnCreate(int width, int height) {
   this->requiredText->SetAlign(6, 6);
   {
     // GLOBAL: gl_25228
-    this->requiredText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0x83EFBFBB37EDBDBDULL)));
+    this->requiredText->SetFont(std::string(OBFUSCATE_TEXT("Gulim", 0x83EFBFBB37EDBDBDULL)));
   }
   this->requiredText->SetFontHeight(12);
   this->requiredText->SetBold(1);
@@ -641,7 +641,7 @@ void CUINormal::OnCreate(int width, int height) {
     // GLOBAL: gl_25232
     // GLOBAL: gl_25231
     // GLOBAL: gl_25230
-    firstButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0xF3CB6F7711A71B6DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_pressed.bmp", 0x839B27DF8F5967B3ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0x9FED7DA189490D5DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_disable.bmp", 0x452FEF0D7FC95565ULL)));
+    firstButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0xF3CB6F7711A71B6DULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_pressed.bmp", 0x839B27DF8F5967B3ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0x9FED7DA189490D5DULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_disable.bmp", 0x452FEF0D7FC95565ULL)));
   }
   this->tab->AddChild(firstButton);
 
@@ -655,7 +655,7 @@ void CUINormal::OnCreate(int width, int height) {
     // GLOBAL: gl_25236
     // GLOBAL: gl_25235
     // GLOBAL: gl_25234
-    secondButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0x176F138D5DD7F365ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_pressed.bmp", 0xFBD599E117C547C1ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0x0F41EBBDA32D1B17ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_disable.bmp", 0x2D51E3B7236175EDULL)));
+    secondButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0x176F138D5DD7F365ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_pressed.bmp", 0xFBD599E117C547C1ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0x0F41EBBDA32D1B17ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_disable.bmp", 0x2D51E3B7236175EDULL)));
   }
   this->tab->AddChild(secondButton);
 
@@ -681,7 +681,7 @@ void CUISlot::OnCreate(int width, int height) {
     // GLOBAL: gl_25191
     // GLOBAL: gl_25190
     // GLOBAL: gl_25189
-    this->radioButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_out.bmp", 0x23BBD58F8B5FF5C9ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_select.bmp", 0x0B7109397F6B1387ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_over.bmp", 0x03772763F96D9DA5ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_out.bmp", 0x17A9E5BF39AD4737ULL)));
+    this->radioButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_out.bmp", 0x23BBD58F8B5FF5C9ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_select.bmp", 0x0B7109397F6B1387ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_over.bmp", 0x03772763F96D9DA5ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_socket_out.bmp", 0x17A9E5BF39AD4737ULL)));
   }
   {
     CUIRadioButton* radioButton = this->radioButton;
@@ -718,17 +718,17 @@ void CUISlot::OnCreate(int width, int height) {
   {
     // GLOBAL: gl_25195
     // GLOBAL: gl_25194
-    this->description->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0up.bmp", 0xCD8F077123FB7D6FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0down.bmp", 0x9949BFD527532943ULL)));
+    this->description->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\scroll0up.bmp", 0xCD8F077123FB7D6FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0down.bmp", 0x9949BFD527532943ULL)));
   }
   {
     // GLOBAL: gl_25196
-    this->description->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0mid.bmp", 0xED796785D1DF137FULL)));
+    this->description->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\scroll0mid.bmp", 0xED796785D1DF137FULL)));
   }
   {
     // GLOBAL: gl_25199
     // GLOBAL: gl_25198
     // GLOBAL: gl_25197
-    this->description->SetScrollBarThumbImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0bar_up.bmp", 0xD97D5DBDBB2F2709ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0bar_mid.bmp", 0xA5FD29D7AB6DC59FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\scroll0bar_down.bmp", 0xF14F79170939C7F1ULL)));
+    this->description->SetScrollBarThumbImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\scroll0bar_up.bmp", 0xD97D5DBDBB2F2709ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\scroll0bar_mid.bmp", 0xA5FD29D7AB6DC59FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\scroll0bar_down.bmp", 0xF14F79170939C7F1ULL)));
   }
   this->AddChild(this->description);
 }
@@ -761,7 +761,7 @@ void CUIUpgrade::OnCreate(int width, int height) {
     // GLOBAL: gl_25242
     // GLOBAL: gl_25241
     // GLOBAL: gl_25240
-    firstButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0x4F99DF03C3EF31B7ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_pressed.bmp", 0x9171997D6963C9F7ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0xCFF3899D95AF355FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_disable.bmp", 0xE52DF30DCBAF7125ULL)));
+    firstButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0x4F99DF03C3EF31B7ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_pressed.bmp", 0x9171997D6963C9F7ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_out.bmp", 0xCFF3899D95AF355FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_random_disable.bmp", 0xE52DF30DCBAF7125ULL)));
   }
   this->tab->AddChild(firstButton);
 
@@ -775,7 +775,7 @@ void CUIUpgrade::OnCreate(int width, int height) {
     // GLOBAL: gl_25246
     // GLOBAL: gl_25245
     // GLOBAL: gl_25244
-    secondButton->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0x4F637DC51307B759ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_pressed.bmp", 0x2DCB7567394DC1ABULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0xB39FA7917BCFBB8DULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_disable.bmp", 0x8D1D0FF1AF2B13F7ULL)));
+    secondButton->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0x4F637DC51307B759ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_pressed.bmp", 0x2DCB7567394DC1ABULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_out.bmp", 0xB39FA7917BCFBB8DULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\tab_enc_confirm_disable.bmp", 0x8D1D0FF1AF2B13F7ULL)));
   }
   this->tab->AddChild(secondButton);
 
@@ -1185,12 +1185,22 @@ void EnchantUI::CUIUpgradeRandom::OnInit() {
 }
 
 namespace EnchantUI {
+// INLINED
+static int IngredientX(const CUIIngredient* ingredient, int index) {
+  return ingredient->geometry.x + index % 4 * 74;
+}
+
+// INLINED
+static int IngredientY(const CUIIngredient* ingredient, int index) {
+  return ingredient->geometry.y + index / 4 * 52;
+}
+
 // OFFSET: 0x00A05CF0
 // FUNCTION: fn_14981
 void CUIEnchantPage::OnInit() {
   for (int i = 0; i < 8u; ++i) {
     CUIIngredient* ingredient = this->CreateIngredient();
-    ingredient->Move(ingredient->geometry.x + i % 4 * 74, ingredient->geometry.y + i / 4 * 52);
+    ingredient->Move(IngredientX(ingredient, i), IngredientY(ingredient, i));
     this->ingredients.push_back(ingredient);
   }
 
@@ -1243,7 +1253,7 @@ void CUIReset::OnInit() {
 void CUIEnchantPage::UpdateEnchantInfo() {
   this->enchantList->ClearData();
   for (CUIIngredient* ingredient : this->ingredients) {
-    ingredient->Show(0);
+    ingredient->Show(WINDOW_HIDDEN);
   }
 
   this->costText->SetText(std::to_string(0));
@@ -1266,7 +1276,7 @@ void CUIEnchantPage::UpdateEnchantInfo() {
 // FUNCTION: fn_15003
 void CUIReset::UpdateEnchantInfo() {
   for (CUIIngredient* ingredient : this->ingredients) {
-    ingredient->Show(0);
+    ingredient->Show(WINDOW_HIDDEN);
   }
 
   this->costText->SetText(std::to_string(0));
@@ -1285,11 +1295,11 @@ namespace EnchantUI {
 // FUNCTION: fn_15004
 void CUIEnchantPage::ResetSlots() {
   std::for_each(this->slots.begin(), this->slots.end(), [](std::pair<const int, CUISlot*> slot) {
-    slot.second->Show(0);
+    slot.second->Show(WINDOW_HIDDEN);
   });
 
   for (CUIIngredient* ingredient : this->ingredients) {
-    ingredient->Show(0);
+    ingredient->Show(WINDOW_HIDDEN);
   }
 
   this->enchantList->ClearData();
@@ -1335,18 +1345,30 @@ bool CUINormalPerfect::LoadEnchantList() {
 }
 
 namespace EnchantUI {
+// OFFSET: 0x00A05370
+// FUNCTION: fn_46592
+inline int CUIEnchantItem::GetItemId() const {
+  return std::atoi(this->itemIcon->GetItemInfo()->itemId.c_str());
+}
+
+// OFFSET: 0x00A053A0
+// FUNCTION: fn_46593
+inline int CUISlot::GetItemId() const {
+  return std::atoi(this->itemIcon->GetItemInfo()->itemId.c_str());
+}
+
 // OFFSET: 0x00A05470
 // FUNCTION: fn_14975
 void CUINormalPerfect::OnSelectEnchant(CUIEnchantItem* item, const CEnchantItemData& data) {
   for (CUIIngredient* ingredient : this->ingredients) {
-    ingredient->Show(0);
+    ingredient->Show(WINDOW_HIDDEN);
   }
 
   this->costText->SetText(std::to_string(0));
 
   std::optional<EnchantOptionInfo*> option = this->FindOption(this->selectedSlot);
   if (option && (*option)->perfectEnchants.size() != 0) {
-    const int itemId = std::atoi(item->itemIcon->GetItemInfo()->itemId.c_str());
+    const int itemId = item->GetItemId();
     auto it = (*option)->perfectEnchants.find(itemId);
     if (it != (*option)->perfectEnchants.end()) {
       this->SetCost(it->second);
@@ -1358,18 +1380,18 @@ void CUINormalPerfect::OnSelectEnchant(CUIEnchantItem* item, const CEnchantItemD
 // FUNCTION: fn_14976
 void CUIUpgradePerfect::OnSelectEnchant(CUIEnchantItem* item, const CEnchantItemData& data) {
   for (CUIIngredient* ingredient : this->ingredients) {
-    ingredient->Show(0);
+    ingredient->Show(WINDOW_HIDDEN);
   }
 
   this->costText->SetText(std::to_string(0));
 
   std::optional<EnchantOptionInfo*> option = this->FindOption(this->selectedSlot);
   if (option && (*option)->perfectUpgrades.size() != 0) {
-    const int baseItemId = std::atoi(this->slots[this->selectedSlot]->itemIcon->GetItemInfo()->itemId.c_str());
+    const int baseItemId = this->slots[this->selectedSlot]->GetItemId();
     auto base = (*option)->perfectUpgrades.find(baseItemId);
     if (base != (*option)->perfectUpgrades.end()) {
       auto& enchants = base->second;
-      const int itemId = std::atoi(item->itemIcon->GetItemInfo()->itemId.c_str());
+      const int itemId = item->GetItemId();
       auto it = enchants.find(itemId);
       if (it != enchants.end()) {
         this->SetCost(it->second);
@@ -1433,11 +1455,11 @@ bool CUIEnchantPage::SetItem(const ITEM_INFO& item) {
           slot->description->Clear();
           slot->description->AddLine(cardInfo.DisplayName(0));
         }
-        entry.second->Show(1);
+        entry.second->Show(WINDOW_VISIBLE);
         continue;
       }
     }
-    slot->Show(0);
+    slot->Show(WINDOW_HIDDEN);
   }
   return true;
 }
@@ -1469,11 +1491,11 @@ void CUIEnchantPage::SetCost(const EnchantPerfectInfo& info) {
   auto material = info.materials.begin();
   for (CUIIngredient* ingredient : this->ingredients) {
     if (material != info.materials.end()) {
-      ingredient->Show(1);
+      ingredient->Show(WINDOW_VISIBLE);
       ingredient->SetMaterial(material->first, material->second);
       ++material;
     } else {
-      ingredient->Show(0);
+      ingredient->Show(WINDOW_HIDDEN);
     }
   }
 
@@ -1540,7 +1562,7 @@ bool CUIUpgradeRandom::LoadEnchantList() {
   }
 
   auto& upgrades = (*option)->randomUpgrades;
-  const int baseItemId = std::atoi(this->slots[this->selectedSlot]->itemIcon->GetItemInfo()->itemId.c_str());
+  const int baseItemId = this->slots[this->selectedSlot]->GetItemId();
   auto base = upgrades.find(baseItemId);
   if (base == upgrades.end()) {
     return false;
@@ -1577,7 +1599,7 @@ bool CUIUpgradePerfect::LoadEnchantList() {
     return false;
   }
 
-  const int baseItemId = std::atoi(this->slots[this->selectedSlot]->itemIcon->GetItemInfo()->itemId.c_str());
+  const int baseItemId = this->slots[this->selectedSlot]->GetItemId();
   auto base = upgrades.find(baseItemId);
   if (base == upgrades.end() || base->second.size() == 0) {
     return false;
@@ -1604,7 +1626,7 @@ void CUIEnchantPage::OnCreate(int width, int height) {
   this->background->Move(0, 0);
   {
     // GLOBAL: gl_25259
-    this->background->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_subpage.bmp", 0x2FE993D1DDE1F197ULL)));
+    this->background->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_subpage.bmp", 0x2FE993D1DDE1F197ULL)));
   }
   this->AddChild(this->background);
 
@@ -1653,7 +1675,7 @@ void CUIEnchantPage::OnCreate(int width, int height) {
     // GLOBAL: gl_25262
     // GLOBAL: gl_25261
     // GLOBAL: gl_25260
-    this->enchantList->SetImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item.bmp", 0xAD075B8DB599F1CDULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item_press.bmp", 0x2F8B0F37118D157FULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item_over.bmp", 0x35E5656B5DEDCD75ULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item.bmp", 0x4941FD9F21BBB9FDULL)));
+    this->enchantList->SetImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item.bmp", 0xAD075B8DB599F1CDULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item_press.bmp", 0x2F8B0F37118D157FULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item_over.bmp", 0x35E5656B5DEDCD75ULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\btn_enc_item.bmp", 0x4941FD9F21BBB9FDULL)));
   }
   {
     auto* const list = this->enchantList;
@@ -1666,15 +1688,15 @@ void CUIEnchantPage::OnCreate(int width, int height) {
   {
     // GLOBAL: gl_25265
     // GLOBAL: gl_25264
-    this->enchantList->SetScrollBarButtonImages(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\scroll_arrow_up.bmp", 0xE7978FB5A94DD7FDULL)), std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\scroll_arrow_dowm.bmp", 0xB7FD8F670FC7B96BULL)));
+    this->enchantList->SetScrollBarButtonImages(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\scroll_arrow_up.bmp", 0xE7978FB5A94DD7FDULL)), std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\scroll_arrow_dowm.bmp", 0xB7FD8F670FC7B96BULL)));
   }
   {
     // GLOBAL: gl_25266
-    this->enchantList->SetScrollBarBackground(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\scroll_bg.bmp", 0xCB1D253B7FE1F563ULL)));
+    this->enchantList->SetScrollBarBackground(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\scroll_bg.bmp", 0xCB1D253B7FE1F563ULL)));
   }
   {
     // GLOBAL: gl_25267
-    this->enchantList->SetScrollBarThumbImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\scroll_btn.bmp", 0x7115D9F973F913C9ULL)));
+    this->enchantList->SetScrollBarThumbImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\scroll_btn.bmp", 0x7115D9F973F913C9ULL)));
   }
   this->enchantList->AddNewItem();
   this->AddChild(this->enchantList);
@@ -1687,7 +1709,7 @@ void CUIEnchantPage::OnCreate(int width, int height) {
   this->costText->SetAlign(2, 6);
   {
     // GLOBAL: gl_25268
-    this->costText->SetFont(std::string(OBFUSCATE_SOURCE_TEXT("Gulim", 0xE55723712993051DULL)));
+    this->costText->SetFont(std::string(OBFUSCATE_TEXT("Gulim", 0xE55723712993051DULL)));
   }
   this->costText->SetFontHeight(14);
   this->costText->SetBold(1);
@@ -1718,7 +1740,7 @@ void CUINormalPerfect::OnCreate(int width, int height) {
   CUIEnchantPage::OnCreate(width, height);
   {
     // GLOBAL: gl_25269
-    this->background->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageY.bmp", 0x0F15B16B5BAFD57FULL)));
+    this->background->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageY.bmp", 0x0F15B16B5BAFD57FULL)));
   }
 }
 
@@ -1728,7 +1750,7 @@ void CUINormalRandom::OnCreate(int width, int height) {
   CUIEnchantPage::OnCreate(width, height);
   {
     // GLOBAL: gl_25270
-    this->background->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageB.bmp", 0x793F370985ED674FULL)));
+    this->background->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageB.bmp", 0x793F370985ED674FULL)));
   }
 }
 
@@ -1738,7 +1760,7 @@ void CUIReset::OnCreate(int width, int height) {
   CUIEnchantPage::OnCreate(width, height);
   {
     // GLOBAL: gl_25271
-    this->background->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_subpage.bmp", 0x7941D76335CFA14FULL)));
+    this->background->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_subpage.bmp", 0x7941D76335CFA14FULL)));
   }
 }
 
@@ -1748,7 +1770,7 @@ void CUIUpgradePerfect::OnCreate(int width, int height) {
   CUIUpgradeEnchantPage::OnCreate(width, height);
   {
     // GLOBAL: gl_25272
-    this->background->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageY.bmp", 0x7321C3814F8799E1ULL)));
+    this->background->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageY.bmp", 0x7321C3814F8799E1ULL)));
   }
 }
 
@@ -1758,7 +1780,7 @@ void CUIUpgradeRandom::OnCreate(int width, int height) {
   CUIUpgradeEnchantPage::OnCreate(width, height);
   {
     // GLOBAL: gl_25273
-    this->background->SetImage(std::string(OBFUSCATE_SOURCE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageB.bmp", 0x7DE349D717D7F123ULL)));
+    this->background->SetImage(std::string(OBFUSCATE_TEXT("유저인터페이스\\EnchantUI\\bg_subpageB.bmp", 0x7DE349D717D7F123ULL)));
   }
 }
 }

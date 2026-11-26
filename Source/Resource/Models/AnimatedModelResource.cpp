@@ -100,7 +100,7 @@ C3dAnimModelRes::C3dAnimModelRes() {
   this->frameCount = 0;
   this->animationLength = 0;
   this->speed = 1.0f;
-  this->shade = 2;
+  this->shade = ANIMATED_MODEL_SHADE_SMOOTH;
   this->origin.x = 0.0f;
   this->origin.y = 0.0f;
   this->origin.z = 0.0f;
@@ -250,24 +250,27 @@ bool C3dAnimModelRes::Load(const char* name) {
   file.Close();
   delete[] names;
 
-  for (AnimatedModelNode* node : this->nodes) {
-    if (!node->parentName.empty()) {
-      const auto findNode = [this](const char* name) -> AnimatedModelNode* {
-        for (AnimatedModelNode* candidate : this->nodes) {
-          if (candidate->name == name) {
-            return candidate;
-          }
-        }
-        return nullptr;
-      };
-      AnimatedModelNode* parent = findNode(node->parentName.c_str());
-      node->parent = parent;
-      parent->children.push_back(node);
+  for (std::list<AnimatedModelNode*>::iterator it = this->nodes.begin(); it != this->nodes.end(); ++it) {
+    if (!(*it)->parentName.empty()) {
+      AnimatedModelNode* parent = FindNode((*it)->parentName.c_str());
+      (*it)->parent = parent;
+      parent->children.push_back(*it);
     }
   }
 
   this->rootNames.push_back(rootName.c_str());
   return true;
+}
+
+// OFFSET: 0x00759350
+// FUNCTION: fn_46702
+AnimatedModelNode* C3dAnimModelRes::FindNode(const char* name) {
+  for (std::list<AnimatedModelNode*>::iterator candidate = this->nodes.begin(); candidate != this->nodes.end(); ++candidate) {
+    if ((*candidate)->name == name) {
+      return *candidate;
+    }
+  }
+  return nullptr;
 }
 
 // OFFSET: 0x0075C9D0
@@ -377,8 +380,7 @@ bool C3dGrannyModelRes::Load(const char* name) {
   CFile file;
 
   if (!file.Open(name, 0, true, false)) {
-    const std::string message = std::string("Cannot find File : ") + std::string(name);
-    ShowErrorDialog(message.c_str(), 0);
+    ShowErrorDialog((std::string("Cannot find File : ") + std::string(name)).c_str(), 0);
     return false;
   }
 

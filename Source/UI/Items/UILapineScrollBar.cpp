@@ -142,7 +142,7 @@ UILapineBox_IngredientListWnd::UILapineBox_IngredientListWnd(int width, int heig
 void UILapineBoxWnd::DragAndDrop(int, int, std::intptr_t value) {
   CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (this->items.size() >= static_cast<unsigned>(this->maxItems) || drag->source != 27) {
+  if (this->items.size() >= static_cast<unsigned>(this->maxItems) || drag->source != DRAG_LAPINE_INGREDIENT) {
     mode->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
     return;
   }
@@ -158,7 +158,7 @@ void UILapineBoxWnd::DragAndDrop(int, int, std::intptr_t value) {
 void UILapineBox_IngredientListWnd::DragAndDrop(int, int, std::intptr_t value) {
   CGameMode* mode = g_modeMgr.GetGameMode();
   const ModeDragState* drag = reinterpret_cast<const ModeDragState*>(value);
-  if (drag->source == 26) {
+  if (drag->source == DRAG_LAPINE_BOX) {
     if (this->AddIngredient(drag->id) == 1) {
       this->parent->SendMsg(this, UM_DECITEM, drag->id, 0, 0, 0);
     }
@@ -261,11 +261,10 @@ void UILapineBoxWnd::Paint() {
   this->DrawCenteredText(115, 76, FormatOwnedString("%d", this->maxItems).c_str(), 14, 0, 11, 0xFFFFFF, 0);
 
   for (unsigned index = 0; index < this->items.size(); ++index) {
-    int position[2];
-    this->MaterialPosition(position, index);
+    const auto position = this->MaterialPosition(index);
     auto* shadow = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve("유저인터페이스\\lapine\\shadow_item_off.bmp")));
-    const int x = position[0];
-    const int y = position[1];
+    const int x = position.first;
+    const int y = position.second;
     this->DrawBitmap(x - 4, y + 11, shadow, true);
     this->DrawItemAndQuantity(x, y, this->items[index], 0, 0);
   }
@@ -343,7 +342,7 @@ unsigned char UILapineBox_IngredientListWnd::AddIngredient(std::uint32_t id) {
   if (entry != this->items.end()) {
     (*entry)->item.quantity += it->quantity;
     (*entry)->insufficient = 0;
-    (*entry)->Show(1);
+    (*entry)->Show(WINDOW_VISIBLE);
     (*entry)->Invalidate();
     this->Invalidate();
     return 1;

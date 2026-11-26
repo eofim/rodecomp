@@ -1,6 +1,7 @@
 #include "Contents/Tables/TipOfTheDay.h"
 #include "Client/Input/InputCharset.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "File/File.h"
 #include "File/ResourcePath.h"
 #include "UI/Text/TextWrapping.h"
@@ -23,9 +24,9 @@ int CTipOfTheDay::Load() {
   const char* fName;
   bool bDataFolder = false;
 
-  if (g_serviceType == 0) {
+  if (g_serviceType == ServiceKorea) {
     fName = "tipOfTheday.txt";
-  } else if (g_serviceType == 19) {
+  } else if (g_serviceType == ServiceUae) {
     fName = g_tipOfTheDayEnglish ? "tipoftheday.txt" : "tipOfTheday_Eng.txt";
   } else {
     fName = g_serverLanguage->ServiceName("tipofday.txt");
@@ -114,10 +115,3 @@ struct SubAE7C10 {
 // FUNCTION: fn_18080
 SubAE7C10::SubAE7C10() : a(0), b(0), c(0) {
 }
-
-// OFFSET: 0x00AE7D20
-// FUNCTION: fn_18081
-int __stdcall sub_AE7D20(void*, void*) {
-  return 0;
-}
-

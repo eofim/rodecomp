@@ -159,7 +159,7 @@ void UIWindowMgr::RestoreInput() {
       }
 
       if (this->hoverWindow) {
-        this->hoverWindow->OnFinishEdit(child->GetEditWindow() == this->hoverWindow);
+        this->hoverWindow->OnFinishEdit(child == nullptr ? false : child->GetEditWindow() == this->hoverWindow);
       }
 
       this->hoverWindow = child->GetEditWindow();
@@ -171,6 +171,62 @@ void UIWindowMgr::RestoreInput() {
       return;
     }
   }
+}
+
+// INLINED
+static __forceinline int WaitModal(UIWindowMgr* manager) {
+  if (g_modalImmediate == 0) {
+    CMode* pump = g_modeMgr.currentMode;
+
+    do {
+      if (manager->activeWindowId != 0) {
+        if (UIWindow* active = manager->Top()) {
+          active->Show(WINDOW_HIDDEN);
+          manager->Schedule(active);
+          manager->modalWindows.pop_back();
+        }
+
+        const int response = manager->activeWindowId;
+
+        if (manager->modalWindows.empty()) {
+          manager->activeWindowId = 0;
+        }
+
+        return response;
+      }
+
+      if (manager->modalResponse != 0) {
+        if (UIWindow* active = manager->Top()) {
+          active->Show(WINDOW_HIDDEN);
+          manager->Schedule(active);
+          manager->modalWindows.pop_back();
+        }
+
+        const int response = manager->modalResponse;
+        manager->modalResponse = 0;
+        return response;
+      }
+
+      if (pump) {
+        pump->Update();
+        pump = g_modeMgr.currentMode;
+      }
+
+      if (static_cast<int>(g_session.m_options.Get(20)) > 0) {
+        manager->activeWindowId = 0;
+        manager->modalResponse = 0;
+
+        while (!manager->modalWindows.empty()) {
+          manager->Schedule(manager->modalWindows.back());
+          manager->modalWindows.pop_back();
+        }
+
+        break;
+      }
+    } while (g_modalImmediate == 0);
+  }
+
+  return ID_OK;
 }
 
 // OFFSET: 0x00A901E0
@@ -225,7 +281,7 @@ int UIWindowMgr::Confirm(
       do {
         if (this->activeWindowId != 0) {
           if (UIWindow* active = this->Top()) {
-            active->Show(0);
+            active->Show(WINDOW_HIDDEN);
             this->Schedule(active);
             this->modalWindows.pop_back();
           }
@@ -242,7 +298,7 @@ int UIWindowMgr::Confirm(
 
         if (this->modalResponse != 0) {
           if (UIWindow* active = this->Top()) {
-            active->Show(0);
+            active->Show(WINDOW_HIDDEN);
             this->Schedule(active);
             this->modalWindows.pop_back();
           }
@@ -326,64 +382,8 @@ int UIWindowMgr::RunModal(UIWindow* window) {
   this->hoverWindow = nullptr;
   this->modalResponse = 0;
   this->modalWindows.push_back(window);
-  int result;
-  if (g_modalImmediate == 0) {
-    CMode* pump = g_modeMgr.currentMode;
 
-    do {
-      if (this->activeWindowId != 0) {
-        if (UIWindow* active = this->Top()) {
-          active->Show(0);
-          this->Schedule(active);
-          this->modalWindows.pop_back();
-        }
-
-        const int response = this->activeWindowId;
-
-        if (this->modalWindows.empty()) {
-          this->activeWindowId = 0;
-          this->RestoreInput();
-          return response;
-        }
-
-        result = response;
-        goto restoreInput;
-      }
-
-      if (this->modalResponse != 0) {
-        if (UIWindow* active = this->Top()) {
-          active->Show(0);
-          this->Schedule(active);
-          this->modalWindows.pop_back();
-        }
-
-        const int response = this->modalResponse;
-        this->modalResponse = 0;
-        this->RestoreInput();
-        return response;
-      }
-
-      if (pump) {
-        pump->Update();
-        pump = g_modeMgr.currentMode;
-      }
-
-      if (static_cast<int>(g_session.m_options.Get(20)) > 0) {
-        this->activeWindowId = 0;
-        this->modalResponse = 0;
-
-        while (!this->modalWindows.empty()) {
-          this->Schedule(this->modalWindows.back());
-          this->modalWindows.pop_back();
-        }
-
-        break;
-      }
-    } while (g_modalImmediate == 0);
-  }
-
-  result = ID_OK;
-restoreInput:
+  const int response = WaitModal(this);
   this->RestoreInput();
-  return result;
+  return response;
 }

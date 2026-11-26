@@ -13,11 +13,14 @@
 #include "Utility/Cipher/LocalEncryptedName.h"
 #include "Utility/Cipher/CryptName.h"
 #include "Utility/Cipher/Obfuscate.h"
+#include "Network/Connection/Connection.h"
+#include "Network/Packets/PacketId.h"
 
 #include "Resource/MSGSTRINGID.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <malloc.h>
 #include <new>
 #include <string>
 
@@ -30,6 +33,8 @@ static const char g_devClientTag[] = "Dev";
 // STRING: st_02591
 static const char g_nprotectSource[] =
     "C:\\repositories\\RagnarokClient\\RagnarokClient\\Security Solution\\nProtectGameGuard\\CNProtectGameGuardMgr.cpp";
+
+int sub_E92400();
 
 class CNPGameLib {
 public:
@@ -59,22 +64,81 @@ CNProtectGameGuardMgr::~CNProtectGameGuardMgr() {
 
 // OFFSET: 0x0076C670
 // FUNCTION: fn_08205
-void CNProtectGameGuardMgr::ProcessAuth(int, int) {
+void CNProtectGameGuardMgr::ProcessAuth(int first, int second) {
+  NSyncObject lock(&this->m_lock);
+  Send_CSAuth3ToGameMon(reinterpret_cast<const unsigned char*>(first), second, this->unknown_0008);
 }
 
 // OFFSET: 0x0076C6E0
 // FUNCTION: fn_08207
 void CNProtectGameGuardMgr::Stop() {
+  NSyncObject lock(&this->m_lock);
+  if (this->m_tokens.empty()) {
+    return;
+  }
+
+  const CNProtectGameGuardMgr::lcCSAuthToken& token = this->m_tokens.front();
+  unsigned int counter;
+  {
+    NSyncObject managerLock(&g_nProtectGameGuardMgr->m_lock);
+    counter = g_nProtectGameGuardMgr->unknown_0008;
+  }
+
+  if (token.id == static_cast<int>(counter) && !token.bytes.empty()) {
+    struct CsAuthPacket {
+      /* 0000 */ std::uint16_t id;
+      /* 0002 */ std::uint16_t length;
+      /* 0004 */ unsigned char data[1];
+    };
+
+    const std::size_t byteCount = token.bytes.size();
+    const std::size_t allocationSize = byteCount + 12;
+    unsigned char* const allocation = static_cast<unsigned char*>(
+      allocationSize <= 0x400 ? _alloca(allocationSize) : malloc(allocationSize));
+    if (allocation != nullptr) {
+      CsAuthPacket* const packet = reinterpret_cast<CsAuthPacket*>(allocation + 8);
+      const std::uint16_t length = static_cast<std::uint16_t>(byteCount + 4);
+      packet->id = static_cast<std::uint16_t>(ID_CZ_NPROTECTGAMEGUARDCSAUTH);
+      packet->length = length;
+      memcpy_s(packet->data, byteCount, token.bytes.data(), byteCount);
+      GetRagConnection().Send(static_cast<int>(length), packet);
+      if (allocationSize > 0x400) {
+        free(allocation);
+      }
+    }
+  }
+
+  this->m_tokens.erase(this->m_tokens.begin());
 }
 
 // OFFSET: 0x0076C930
 // FUNCTION: fn_08208
 void CNProtectGameGuardMgr::Tick() {
+  NSyncObject lock(&this->m_lock);
+  if (sub_E92400() != NPGAMEMON_SUCCESS) {
+    this->SetError(g_nprotectSource, 0x1E4, std::string());
+  }
 }
 
 // OFFSET: 0x0076CD60
 // FUNCTION: fn_08210
 int CNProtectGameGuardMgr::Create() {
+  if (g_nProtectGameGuardMgr != nullptr) {
+    return 0;
+  }
+
+  CNProtectGameGuardMgr* manager = new (std::nothrow) CNProtectGameGuardMgr;
+  g_nProtectGameGuardMgr = manager;
+  if (manager == nullptr) {
+    return 0;
+  }
+
+  if (!manager->m_initialized) {
+    delete manager;
+    g_nProtectGameGuardMgr = nullptr;
+    return 0;
+  }
+
   return 1;
 }
 
@@ -89,8 +153,9 @@ void CNProtectGameGuardMgr::Destroy() {
 
 // OFFSET: 0x0076CEC0
 // FUNCTION: fn_08213
-int CNProtectGameGuardMgr::HasError() {
-  return 0;
+bool CNProtectGameGuardMgr::HasError() {
+  NSyncObject lock(&this->m_lock);
+  return this->m_hasError;
 }
 
 // OFFSET: 0x0076CF30
@@ -133,12 +198,16 @@ const char* CNProtectGameGuardMgr::GameName() {
 
 // OFFSET: 0x0076D8A0
 // FUNCTION: fn_08217
-void CNProtectGameGuardMgr::SetHwnd(HWND) {
+void CNProtectGameGuardMgr::SetHwnd(HWND window) {
+  NSyncObject lock(&this->m_lock);
+  SetHwndToGameMon(reinterpret_cast<unsigned long>(window));
 }
 
 // OFFSET: 0x0076DF40
 // FUNCTION: fn_08220
 void CNProtectGameGuardMgr::IncrementCounter() {
+  NSyncObject lock(&this->m_lock);
+  ++this->unknown_0008;
 }
 
 // OFFSET: 0x0076DFA0
@@ -153,7 +222,9 @@ void CNProtectGameGuardMgr::SetError(const char*, int, std::string message) {
 
 // OFFSET: 0x0076E040
 // FUNCTION: fn_08222
-void CNProtectGameGuardMgr::Send(const char*) {
+void CNProtectGameGuardMgr::Send(const char* text) {
+  NSyncObject lock(&this->m_lock);
+  SendUserIDToGameMon(text);
 }
 
 // OFFSET: 0x0076D910
@@ -196,6 +267,9 @@ int __stdcall GameGuardCallback(int code, const int* packet) {
       }(), LookupMessage(MSI_GAMEHACK_DOUBT), code)));
     return 0;
   }
+  case NPGAMEMON_CHECK_CSAUTH2:
+  case NPGAMEMON_GAMEHACK_REPORT:
+    return 1;
   case NPGAMEMON_CHECK_CSAUTH3: {
     const int id = packet[0];
     const unsigned char* end = reinterpret_cast<const unsigned char*>(packet + 2) + packet[1];

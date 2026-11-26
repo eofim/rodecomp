@@ -103,7 +103,7 @@ void CUIOngoingQuestInfo::Initialize() {
 template <>
 void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItemData>::OnCreate(int width, int height) {
   this->scrollBar = new CUIVScrollBar();
-  this->scrollBar->Show(0);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->scrollBar->SetOnChange([this](int position) { this->OnScroll(position); });
   this->AddChild(this->scrollBar);
 }
@@ -136,7 +136,7 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
   if (this->data.size() == 0) {
     for (OngoingQuestInfo::CUIRewardItem* item : this->items) {
       item->index = -1;
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
     }
     return;
   }
@@ -173,14 +173,14 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
       }
       item->SetSelected(row == this->selected);
       item->Move(this->itemX, y);
-      item->Show(1);
+      item->Show(WINDOW_VISIBLE);
     }
   }
 
   for (const auto end = this->items.end(); it != end; ++it) {
     OngoingQuestInfo::CUIRewardItem* item = *it;
     item->index = -1;
-    item->Show(0);
+    item->Show(WINDOW_HIDDEN);
   }
 }
 
@@ -347,34 +347,38 @@ void CUIRewards::OnInit() {
   list->Invalidate();
   this->npcSprite = new UINpcSprWnd();
   this->npcSprite->SetSize(75, 145);
-  this->npcSprite->Show(0);
+  this->npcSprite->Show(WINDOW_HIDDEN);
   this->AddChild(this->npcSprite);
 }
 
 }
 
-// OFFSET: 0x00A55B70
-// FUNCTION: fn_16313
-void CUIOngoingQuestInfo::UpdateHuntInfo() {
-  OngoingQuestInfo::CUIScrollWindow* window = this->scrollWindow;
-  const unsigned int questId = this->questId;
-  window->secondContents->textViewer->Clear();
+// OFFSET: 0x00A55CC0
+// FUNCTION: fn_46603
+void OngoingQuestInfo::CUIScrollWindow::UpdateHuntInfo(unsigned int questId) {
+  this->secondContents->textViewer->Clear();
   auto& quests = g_renewQuestMgr->m_ongoingQuests;
   const auto found = quests.find(questId);
   if (found != quests.end()) {
     RenewQuestOngoingInfo& quest = found->second;
     for (int index = 0; index < quest.m_huntCount; ++index) {
-      window->secondContents->textViewer->AddLine(quest.GetHuntText(index));
+      this->secondContents->textViewer->AddLine(quest.GetHuntText(index));
     }
   }
 
-  window->firstContents->UpdateHeight();
-  window->secondContents->UpdateHeight();
-  window->rewards->UpdateHeight();
+  this->firstContents->UpdateHeight();
+  this->secondContents->UpdateHeight();
+  this->rewards->UpdateHeight();
 
-  const int total = window->ContentHeight();
-  window->scrollBar->SetTotal((std::max)(window->geometry.height, total));
-  window->scrollBar->SetPosition(0);
+  const int total = this->ContentHeight();
+  this->scrollBar->SetTotal((std::max)(this->geometry.height, total));
+  this->scrollBar->SetPosition(0);
+}
+
+// OFFSET: 0x00A55B70
+// FUNCTION: fn_16313
+void CUIOngoingQuestInfo::UpdateHuntInfo() {
+  this->scrollWindow->UpdateHuntInfo(this->questId);
 }
 
 // OFFSET: 0x00A56050
@@ -392,19 +396,20 @@ void CUIOngoingQuestInfo::SetQuest(unsigned int id) {
 
 namespace OngoingQuestInfo {
 
-// INLINED
-static void SetRewardNpc(CUIRewards* rewards, const std::string& sprite, const std::string& map, int x, int y) {
+// OFFSET: 0x00A55F70
+// FUNCTION: fn_46620
+inline void CUIRewards::SetRewardNpc(const std::string& sprite, const std::string& map, int x, int y) {
   if (sprite.empty()) {
-    rewards->npcSprite->Show(0);
+    this->npcSprite->Show(WINDOW_HIDDEN);
     return;
   }
 
-  rewards->npcSprite->SetSprite(75, 145, sprite);
+  this->npcSprite->SetSprite(75, 145, sprite);
   if (!map.empty()) {
-    rewards->npcSprite->SetDestination(map, x, y);
+    this->npcSprite->SetDestination(map, x, y);
   }
-  rewards->npcSprite->Move(rewards->geometry.width - rewards->npcSprite->geometry.width - 23, 9);
-  rewards->npcSprite->Show(1);
+  this->npcSprite->Move(this->geometry.width - this->npcSprite->geometry.width - 23, 9);
+  this->npcSprite->Show(WINDOW_VISIBLE);
 }
 
 // OFFSET: 0x00A56150
@@ -431,9 +436,9 @@ void CUIScrollWindow::SetQuest(unsigned int id) {
     }
     this->rewards->rewardList->UpdateScrollBar();
 
-    SetRewardNpc(this->rewards, quest.npcSprite, quest.destinationMap, quest.destinationX, quest.destinationY);
+    this->rewards->SetRewardNpc(quest.npcSprite, quest.destinationMap, quest.destinationX, quest.destinationY);
   } else {
-    g_windowMgr.Confirm(std::format("Not found Quest Info = %lu", id).c_str(), 0, true, false, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(std::format("Not found Quest Info = %lu", id).c_str(), 0, true, false, 0, "메시지", 280, 120, 0);
   }
 
   this->firstContents->UpdateHeight();
@@ -764,7 +769,7 @@ void CUIListBoxEx<OngoingQuestInfo::CUIRewardItem, OngoingQuestInfo::CRewardItem
     for (OngoingQuestInfo::CUIRewardItem*& slot : this->items) {
       OngoingQuestInfo::CUIRewardItem* item = new OngoingQuestInfo::CUIRewardItem();
       item->SetSize(this->itemWidth, this->rowHeight);
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
       item->SetImageResources(this->normalImage, this->hoverImage, this->pressedImage, this->disabledImage);
       item->SetOnHover([this](CUIListItem* listItem) {
         for (OngoingQuestInfo::CUIRewardItem* other : this->items) {

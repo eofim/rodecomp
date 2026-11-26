@@ -1,3 +1,5 @@
+#define D3D_OVERLOADS
+
 #include "Client/Application/ErrorDialog.h"
 #include "Render/Primitives/TextureQuad.h"
 #include "Render/DX7/RendererFogDX7.h"
@@ -7,25 +9,31 @@
 
 #include <bit>
 #include <cmath>
+#include <xmmintrin.h>
+
+namespace crt {
+extern "C" float sinf(float);
+extern "C" float cosf(float);
+}
 
 // OFFSET: 0x00556E50
-  // FUNCTION: fn_02039
-  __declspec(noinline) float ClientSin(volatile float angle) {
-    angle = sinf(angle);
-    return angle;
-  }
+// FUNCTION: fn_02039
+__declspec(noinline) float ClientSin(volatile float angle) {
+  angle = crt::sinf(angle);
+  return angle;
+}
 
 // OFFSET: 0x00556E40
-  // FUNCTION: fn_02038
-  __declspec(noinline) float ClientCos(volatile float angle) {
-    angle = cosf(angle);
-    return angle;
-  }
+// FUNCTION: fn_02038
+__declspec(noinline) float ClientCos(volatile float angle) {
+  angle = crt::cosf(angle);
+  return angle;
+}
 
 // OFFSET: 0x00556E60
 // FUNCTION: fn_02040
 float SquareRoot(volatile float value) {
-  value = sqrtf(value);
+  value = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(value)));
   return value;
 }
 
@@ -54,7 +62,7 @@ HRESULT PerspectiveMatrixDX7(D3DMATRIX& matrix, float fov, float aspect, float n
 }
 
 // INLINED
-static D3DDEVICEDESC7 SelectFogCaps(const D3DDEVICEDESC7& empty) {
+static D3DDEVICEDESC7 SelectFogCaps(D3DDEVICEDESC7 empty) {
   if (g_deviceOwnerDX7) {
     return g_deviceOwnerDX7->caps;
   }
@@ -65,7 +73,7 @@ static D3DDEVICEDESC7 SelectFogCaps(const D3DDEVICEDESC7& empty) {
 // FUNCTION: fn_02094
 void CRendererDX7::SetFog(int enabled) {
   D3DDEVICEDESC7 empty = g_emptyCapabilitiesDX7;
-  const D3DDEVICEDESC7 caps = SelectFogCaps(empty);
+  D3DDEVICEDESC7 caps = SelectFogCaps(empty);
   this->fog.supported = (caps.dpcTriCaps.dwRasterCaps & D3DPRASTERCAPS_FOGVERTEX) != 0;
   this->fog.enabled = enabled;
   this->device->SetRenderState(D3DRENDERSTATE_FOGENABLE, enabled);
@@ -83,12 +91,7 @@ void CRendererDX7::ApplyFog() {
 
   if (this->fog.enabled) {
     D3DDEVICEDESC7 empty = g_emptyCapabilitiesDX7;
-    D3DDEVICEDESC7 caps;
-    if (g_deviceOwnerDX7) {
-      caps = g_deviceOwnerDX7->caps;
-    } else {
-      caps = empty;
-    }
+    const D3DDEVICEDESC7 caps = g_deviceOwnerDX7 ? g_deviceOwnerDX7->caps : empty;
     const float start = g_depthStart * 1490.0f + 10.0f;
     const float end = g_depthEnd * 1490.0f + 10.0f;
     const int vertexFog = (caps.dpcTriCaps.dwRasterCaps & D3DPRASTERCAPS_FOGVERTEX) != 0;

@@ -90,6 +90,7 @@ public:
   void OnRBtnDown(int x, int y) override;
 
   void SetDescription(int type, const std::vector<const char*>& description);
+  void SetSourceLines(const std::vector<std::string>& lines);
   void SetStatusLines(unsigned char first, unsigned char second, unsigned char third);
 
   /* 00E8 */ CUIStaticImage* image;
@@ -125,6 +126,7 @@ public:
   void OnInit() override;
   void SetTitle(int id);
   void SetTip(int id);
+  void SetStatusLine(const std::string& line);
   void SetViewerLines(const std::vector<std::string>& lines);
 
   /* 00E8 */ CUIStaticImage* stampImage;
@@ -429,7 +431,7 @@ public:
     if (this->data.size() == 0) {
       for (T* item : this->items) {
         item->index = -1;
-        item->Show(0);
+        item->Show(WINDOW_HIDDEN);
       }
       return;
     }
@@ -466,14 +468,14 @@ public:
         }
         item->SetSelected(row == this->selected);
         item->Move(this->itemX, y);
-        item->Show(1);
+        item->Show(WINDOW_VISIBLE);
       }
     }
 
     for (const auto end = this->items.end(); it != end; ++it) {
       T* item = *it;
       item->index = -1;
-      item->Show(0);
+      item->Show(WINDOW_HIDDEN);
     }
   }
 

@@ -20,11 +20,6 @@ std::shared_ptr<CSurface> RenderSystemHolder::BackBufferSurface() const {
   return nullptr;
 }
 
-// OFFSET: 0x005699A0
-// FUNCTION: fn_02268
-RenderSystemHolder::RenderSystemHolder() : system(nullptr) {
-}
-
 // OFFSET: 0x00569C90
 // FUNCTION: fn_02270
 RenderSystemHolder::~RenderSystemHolder() noexcept {
@@ -37,12 +32,6 @@ RenderSystemHolder::~RenderSystemHolder() noexcept {
 // FUNCTION: fn_02274
 CRenderer* RenderSystemHolder::CreateRenderer() {
   return this->system ? this->system->CreateRenderer() : nullptr;
-}
-
-// OFFSET: 0x00569F20
-// FUNCTION: fn_02275
-CSurface* RenderSystemHolder::CreateSurface(std::uint32_t width, std::uint32_t height) {
-  return this->system ? this->system->CreateSurface(width, height) : nullptr;
 }
 
 // OFFSET: 0x00569F40
@@ -99,13 +88,13 @@ void RenderSystemHolder::PrepareErrorDialog() {
 // FUNCTION: fn_46359
 const char* RenderSystemHolder::BackendNameFor(std::int32_t backend) {
   switch (backend) {
-  case -1:
+  case RENDER_BACKEND_NOT_INITIALIZED:
     return "NotInitialized";
-  case 0:
+  case RENDER_BACKEND_DEFAULT:
     return "Default";
-  case 1:
+  case RENDER_BACKEND_DX7:
     return "DirectX 7";
-  case 2:
+  case RENDER_BACKEND_DX9:
     return "DirectX 9";
   default:
     return "";
@@ -115,7 +104,7 @@ const char* RenderSystemHolder::BackendNameFor(std::int32_t backend) {
 // OFFSET: 0x0056A230
 // FUNCTION: fn_02285
 std::int32_t RenderSystemHolder::Backend() const {
-  return this->system ? this->system->Backend() : -1;
+  return this->system ? this->system->Backend() : RENDER_BACKEND_NOT_INITIALIZED;
 }
 
 // OFFSET: 0x0056A0A0
@@ -169,16 +158,16 @@ HRESULT RenderSystemHolder::Initialize(int backend, HWND window) {
   }
 
   int type = backend;
-  if (type == 0) {
+  if (type == RENDER_BACKEND_DEFAULT) {
     type = PreferredBackend();
   }
 
   CRenderSystemBase* renderSystem;
   switch (type) {
-  case 1:
+  case RENDER_BACKEND_DX7:
     renderSystem = new CRenderSystemDX7();
     break;
-  case 2:
+  case RENDER_BACKEND_DX9:
     renderSystem = new CRenderSystemDX9();
     break;
   default:
@@ -210,7 +199,7 @@ HRESULT RenderSystemHolder::Present(bool option) const {
 // OFFSET: 0x00548E20
 // FUNCTION: fn_46357
 CDCSurface::CDCSurface(std::uint32_t width, std::uint32_t height) {
-  this->m_surface.reset(GetRenderSystemHolder()->CreateSurface(width, height));
+  this->m_surface = std::shared_ptr<CSurface>(GetRenderSystemHolder()->CreateSurface(width, height));
 }
 
 // OFFSET: 0x00548FE0

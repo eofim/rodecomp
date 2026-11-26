@@ -5,6 +5,15 @@
 #include <cstdint>
 #include <list>
 
+enum ActorPickQuadrant : int {
+  ACTOR_PICK_TOP_LEFT = 0,
+  ACTOR_PICK_TOP_RIGHT = 1,
+  ACTOR_PICK_BOTTOM_RIGHT = 2,
+  ACTOR_PICK_BOTTOM_LEFT = 3,
+};
+
+struct vector2d;
+
 struct ActorPickPoint {
   // INLINED
   ActorPickPoint() : x(0.0f), y(0.0f), z(0.0f) {
@@ -38,7 +47,7 @@ public:
   virtual ~CActorPickNode();
   void AddPickInfo(ActorPickInfo* info);
   __declspec(noinline) void Clear();
-  ActorPickInfo* Pick(float x, float y);
+  ActorPickInfo* Pick(vector2d point);
   void MakeQuardTree(int depth, ActorPickBounds bounds);
   int QuadrantAt(int x, int y) const;
   ActorPickBounds ChildBounds(ActorPickBounds bounds, int quadrant) const;

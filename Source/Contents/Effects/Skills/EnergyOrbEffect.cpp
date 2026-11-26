@@ -11,6 +11,14 @@
 #include <cstdlib>
 #include <cstring>
 
+// INLINED
+static void SetIndices(CParticle* particle, int effectId, int row, int column, int group) {
+  particle->effectId = effectId;
+  particle->rowIndex = row;
+  particle->columnIndex = column;
+  particle->groupIndex = group;
+}
+
 // OFFSET: 0x00B50D10
 // FUNCTION: fn_19022
 CEnergyOrbEffect::CEnergyOrbEffect() : CEffect(-1), count(0), mode(2), particles() {
@@ -48,10 +56,7 @@ void CEnergyOrbEffect::Open() {
         continue;
       }
 
-      particle->effectId = this->id;
-      particle->rowIndex = i;
-      particle->columnIndex = j;
-      particle->groupIndex = 1;
+      SetIndices(particle, this->id, i, j, 1);
       particle->angle = static_cast<float>(360 / this->count * i);
       particle->SetTexture("effect\\thunder_center.bmp");
       particle->alpha = 0;
@@ -165,9 +170,10 @@ __forceinline void CEnergyOrbEffect::UpdateParticle(CParticle* particle) {
       const float wave = g_sinTable[particle->phaseParameter] * 0.6f;
       const int index = static_cast<int>(particle->angle);
       const float radius = wave + particle->animationParameter;
+      const vector3d offset = {radius * g_cosTable[index], wave * particle->animationParameters[0] + particle->animationParameters[1], radius * g_sinTable[index]};
       matrix translation;
       std::memcpy(translation.values, g_identityMatrix, sizeof(translation.values));
-      translation.MakeTranslate(radius * g_cosTable[index], wave * particle->animationParameters[0] + particle->animationParameters[1], radius * g_sinTable[index]);
+      translation.MakeTranslate(offset.x, offset.y, offset.z);
 
       matrix scaled;
       scaled.Compose(scaling, rotation);

@@ -13,6 +13,14 @@
 #include <utility>
 #include <vector>
 
+enum AdventureGuideCategory : int {
+  ADVENTURE_GUIDE_EPISODE = 1,
+  ADVENTURE_GUIDE_QUEST = 3,
+  ADVENTURE_GUIDE_DUNGEON = 4,
+  ADVENTURE_GUIDE_ITEM = 5,
+  ADVENTURE_GUIDE_EQUIPMENT = 6,
+};
+
 struct AdventureGuideDetail {
   /* 0000 */ int minLevel;
   /* 0004 */ int maxLevel;
@@ -25,6 +33,11 @@ struct AdventureGuideIntro {
   /* 0004 */ std::string title;
   /* 001C */ std::string text;
   /* 0034 */ std::map<int, AdventureGuideDetail> details;
+
+  // OFFSET: 0x00662E00
+  // FUNCTION: fn_46571
+  ~AdventureGuideIntro() {
+  }
 };
 
 namespace Guide_Intro {
@@ -37,18 +50,27 @@ struct Contents {
 struct AdventureGuideIntroPage {
   /* 0000 */ std::string title;
   /* 0018 */ std::map<int, Guide_Intro::Contents> texts;
+
+  AdventureGuideIntroPage() = default;
+  AdventureGuideIntroPage(const AdventureGuideIntroPage&) = default;
+  AdventureGuideIntroPage(AdventureGuideIntroPage&&) = default;
+  AdventureGuideIntroPage& operator=(const AdventureGuideIntroPage&) = default;
+  AdventureGuideIntroPage& operator=(AdventureGuideIntroPage&&) = default;
+
+  // OFFSET: 0x00662EE0
+  // FUNCTION: fn_46572
+  ~AdventureGuideIntroPage() = default;
 };
 
 struct AdventureGuideEpisodeInfo {
-  /* 0000 */ int order;
+  bool IsAvailable() const;
+
+  /* 0000 */ int minLevel;
   /* 0004 */ int maxLevel;
   /* 0008 */ std::vector<std::string> values;
 };
 
-struct AdventureGuideEpisodeSource {
-  /* 0000 */ const char* name;
-  /* 0004 */ AdventureGuideEpisodeInfo info;
-};
+using AdventureGuideEpisodeSource = std::pair<const char*, AdventureGuideEpisodeInfo>;
 
 struct AdventureGuideEpisode {
   AdventureGuideEpisode(AdventureGuideEpisodeSource&& source);
@@ -58,6 +80,8 @@ struct AdventureGuideEpisode {
 };
 
 struct AdventureGuideContents {
+  bool IsAvailable() const;
+
   /* 0000 */ std::uint8_t flag;
   /* 0004 */ int minLevel;
   /* 0008 */ int maxLevel;
@@ -65,6 +89,11 @@ struct AdventureGuideContents {
   /* 0010 */ std::string first;
   /* 0028 */ std::string second;
   /* 0040 */ std::vector<std::string> values;
+
+  // OFFSET: 0x00662D20
+  // FUNCTION: fn_46570
+  ~AdventureGuideContents() {
+  }
 };
 
 struct AdventureGuideEntry {
@@ -91,7 +120,18 @@ struct AdventureGuideResult {
   /* 0004 */ std::string message;
 };
 
-class AdventureGuideEpisodeList : public std::list<AdventureGuideEpisode> {};
+class AdventureGuideEpisodeList : public std::list<AdventureGuideEpisode> {
+public:
+  AdventureGuideEpisodeList() = default;
+  AdventureGuideEpisodeList(const AdventureGuideEpisodeList&) = default;
+  AdventureGuideEpisodeList(AdventureGuideEpisodeList&&) = default;
+  AdventureGuideEpisodeList& operator=(const AdventureGuideEpisodeList&) = default;
+  AdventureGuideEpisodeList& operator=(AdventureGuideEpisodeList&&) = default;
+
+  // OFFSET: 0x00662F60
+  // FUNCTION: fn_46573
+  ~AdventureGuideEpisodeList() = default;
+};
 
 // VTABLE: vt_00350
 class CAdventureGuideMgr {
@@ -120,6 +160,8 @@ public:
   void GetContentsList(std::list<std::pair<int, AdventureGuideContents>>& out, int type, int id);
   void GetEntryList(std::list<std::pair<int, AdventureGuideEntry>>& out, int type, int id);
 
+  // OFFSET: 0x006664B0
+  // FUNCTION: fn_46609
   AdventureGuideResult SetIntroTitle(std::string_view title) {
     introPage.title = title;
     return AdventureGuideResult(true, "good");
@@ -141,6 +183,9 @@ public:
   __declspec(noinline) AdventureGuideResult InsertObtainGuide(int type, int id, std::string_view text);
   __declspec(noinline) AdventureGuideResult InsertMonsterContents(std::string_view name, int minLevel, int maxLevel);
   __declspec(noinline) AdventureGuideResult InsertMonsterReward(std::string_view name, std::string_view text);
+
+private:
+  bool CallGuideFunction(const std::string& function);
 };
 
 extern CAdventureGuideMgr* g_adventureGuideMgr;

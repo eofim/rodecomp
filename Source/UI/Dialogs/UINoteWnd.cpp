@@ -72,15 +72,16 @@ UINoteWnd::UINoteWnd()
     : UIFrameWnd(0), m_scroll(nullptr) {
 }
 
-// INLINED
+// OFFSET: 0x00951A80
+// FUNCTION: fn_46568
 inline void UINoteWnd_Scroll::SetNote(std::string text) {
   this->m_text = new UIStaticText_LF(0);
   this->m_text->SetSize(this->geometry.width - 13, 12);
   this->m_text->Move(0, 0);
   this->m_text->SetText(text);
   this->AddScrollChild(this->m_text);
-  this->horizontalBar->Show(0);
-  this->scrollBar->Show(0);
+  this->horizontalBar->Show(WINDOW_HIDDEN);
+  this->scrollBar->Show(WINDOW_HIDDEN);
   this->Invalidate();
 }
 

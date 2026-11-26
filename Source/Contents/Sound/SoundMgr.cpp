@@ -151,16 +151,16 @@ bool CSoundMgr::Initialize() {
 
   SoundConfiguration& configuration = g_soundConfiguration;
 
-  if (configuration.mode == 0) {
+  if (configuration.mode == SOUND_MODE_DISABLED) {
     return true;
   }
 
   switch (configuration.numSampleType) {
-  case 0:
+  case SOUND_SAMPLES_48:
     this->sampleCount = 48;
     this->sample3DCount = 48;
     break;
-  case 1:
+  case SOUND_SAMPLES_32:
     this->sampleCount = 32;
     this->sample3DCount = 32;
     break;
@@ -175,16 +175,16 @@ bool CSoundMgr::Initialize() {
   std::atexit(&ShutdownMilesAtExit);
   AIL_startup();
 
-  this->channels = configuration.mode == 1 ? 1 : 2;
+  this->channels = configuration.mode == SOUND_MODE_2D ? 1 : 2;
 
   switch (configuration.digitalRateType) {
-  case 0:
-    this->rate = 44100;
+  case SOUND_RATE_22050:
+    this->rate = 22050;
     break;
-  case 1:
+  case SOUND_RATE_11025:
     this->rate = 11025;
     break;
-  case 2:
+  case SOUND_RATE_8000:
     this->rate = 8000;
     break;
   default:
@@ -193,10 +193,10 @@ bool CSoundMgr::Initialize() {
   }
 
   switch (configuration.digitalBitsType) {
-  case 0:
+  case SOUND_BITS_16:
     this->bits = 16;
     break;
-  case 1:
+  case SOUND_BITS_8:
     this->bits = 8;
     break;
   default:
@@ -213,7 +213,7 @@ bool CSoundMgr::Initialize() {
 
   this->StopStreams();
 
-  if (configuration.mode == 1) {
+  if (configuration.mode == SOUND_MODE_2D) {
     for (int i = 0; i < this->sampleCount; ++i) {
       this->samples[i] = AIL_allocate_sample_handle(this->driver);
 
@@ -225,7 +225,7 @@ bool CSoundMgr::Initialize() {
     return true;
   }
 
-  if (configuration.mode != 2) {
+  if (configuration.mode != SOUND_MODE_3D) {
     return true;
   }
 
@@ -317,7 +317,7 @@ void CSoundMgr::Update() {
 // OFFSET: 0x006396B0
 // FUNCTION: fn_45423
 void CSoundMgr::Shutdown() {
-  if (g_soundConfiguration.mode == 0) {
+  if (g_soundConfiguration.mode == SOUND_MODE_DISABLED) {
     return;
   }
 
@@ -432,7 +432,7 @@ int CSoundMgr::Volume() const {
 // OFFSET: 0x00639A70
 // FUNCTION: fn_04757
 bool CSoundMgr::IsComplete() const {
-  if (g_soundConfiguration.mode == 0 || !this->stream || !this->secondaryStream || this->fadeExit != 0) {
+  if (g_soundConfiguration.mode == SOUND_MODE_DISABLED || !this->stream || !this->secondaryStream || this->fadeExit != 0) {
     return false;
   }
 
@@ -580,7 +580,7 @@ bool CSoundMgr::PlayData2D(const void* data, const float& x, const float& y, con
 // OFFSET: 0x00639F00
 // FUNCTION: fn_04763
 void CSoundMgr::PlayStream(const char* name, int loopCount, bool fade) {
-  if (g_soundConfiguration.mode == 0) {
+  if (g_soundConfiguration.mode == SOUND_MODE_DISABLED) {
     return;
   }
 
@@ -625,7 +625,7 @@ void CSoundMgr::PlayStream(const char* name, int loopCount, bool fade) {
 void CSoundMgr::PlayWave(const char* name, float x, float y, float z, int maximumDistance, int minimumDistance, float scale, int unused) {
   const unsigned char enabled = g_serviceOptions.Get(TT_EFFECT_SOUND_ON_OFF);
 
-  if (g_soundConfiguration.mode == 0 || !enabled) {
+  if (g_soundConfiguration.mode == SOUND_MODE_DISABLED || !enabled) {
     return;
   }
 
@@ -642,10 +642,10 @@ void CSoundMgr::PlayWave(const char* name, float x, float y, float z, int maximu
   }
 
   switch (g_soundConfiguration.mode) {
-  case 1:
+  case SOUND_MODE_2D:
     this->PlayData2D(wave->data, x, y, z, maximumDistance, minimumDistance, scale);
     break;
-  case 2:
+  case SOUND_MODE_3D:
     this->PlayData3D(wave->data, x, y, z, maximumDistance, minimumDistance, scale);
     break;
   }

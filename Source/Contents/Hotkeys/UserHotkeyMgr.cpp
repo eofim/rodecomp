@@ -54,7 +54,7 @@ namespace {
 // OFFSET: 0x00E12E50
 // FUNCTION: fn_23820
 int CSession::HotkeyIndex(int tab, int index) const {
-  if (tab == 1) {
+  if (tab == HOTKEY_TAB_INTERFACE) {
     for (int candidate = HK_FIRST_HIDDEN; candidate <= index; ++candidate) {
       if (HiddenInterfaceIndex(candidate) == true) {
         ++index;
@@ -64,12 +64,15 @@ int CSession::HotkeyIndex(int tab, int index) const {
 
   int count = 0;
   g_session.m_hotkeyScript->Call("GetOriginalHotKeyListSize", "d>d", tab + 1, &count);
-  return index >= count ? -1 : index;
+  if (index >= count) {
+    index = -1;
+  }
+  return index;
 }
 
 // INLINED
 static int HiddenHotkeyCount(int tab, int count) {
-  if (tab != 1) {
+  if (tab != HOTKEY_TAB_INTERFACE) {
     return 0;
   }
 
@@ -141,16 +144,16 @@ void CUserHotkeyMgr::Shutdown() {
 // OFFSET: 0x005F80A0
 // FUNCTION: fn_04058
 int CUserHotkeyMgr::TabAt(int position) const {
-  int tab = 0;
+  int tab = HOTKEY_TAB_SKILL_BAR_1;
   switch (position) {
   case 1:
-    tab = 3;
+    tab = HOTKEY_TAB_SKILL_BAR_2;
     break;
   case 2:
-    tab = 1;
+    tab = HOTKEY_TAB_INTERFACE;
     break;
   case 3:
-    tab = 2;
+    tab = HOTKEY_TAB_EMOTION;
     break;
   }
   return tab;
@@ -167,7 +170,7 @@ void CUserHotkeyMgr::Reset() {
 
 // OFFSET: 0x005BC420
 // FUNCTION: fn_03464
-void CUserHotkeyMgr::LoadV2(Json::Value& data) {
+void CAccountLinkedUserDataMgr::LoadUserHotkeysV2(Json::Value& data) {
   Json::Value values = data["UserHotkey_V2"];
   Json::Value::iterator it = values.begin();
   if (values.empty()) {
@@ -280,16 +283,16 @@ void CAccountLinkedUserDataMgr::ExportUserHotkey(Json::Value& data) {
     value["desc"] = ToUtf8(hotkey.description, g_textCodePage);
 
     switch (hotkey.tab) {
-    case 0:
+    case HOTKEY_TAB_SKILL_BAR_1:
       skillBar1.append(value);
       break;
-    case 3:
+    case HOTKEY_TAB_SKILL_BAR_2:
       skillBar2.append(value);
       break;
-    case 1:
+    case HOTKEY_TAB_INTERFACE:
       interfaceTab.append(value);
       break;
-    case 2:
+    case HOTKEY_TAB_EMOTION:
       emotionTab.append(value);
       break;
     }

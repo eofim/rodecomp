@@ -3,6 +3,12 @@
 
 #include "Resource/Models/ModelResource.h"
 
+enum AnimatedModelShadeType : int {
+  ANIMATED_MODEL_SHADE_NONE = 0,
+  ANIMATED_MODEL_SHADE_FLAT = 1,
+  ANIMATED_MODEL_SHADE_SMOOTH = 2
+};
+
 struct AnimatedModelFace {
   /* 0000 */ std::uint16_t vertices[3];
   /* 0006 */ std::uint16_t textureVertices[3];
@@ -80,6 +86,7 @@ public:
   C3dAnimModelRes* Create() override;
   bool Load(const char* name) override;
   void Unload() override;
+  AnimatedModelNode* FindNode(const char* name);
 
   /* 0110 */ int recordCount;
   /* 0114 */ AnimatedModelRecord* records;

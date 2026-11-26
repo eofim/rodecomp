@@ -326,11 +326,13 @@ void CPlayerSkillBundle::ApplyLevelChange(CSkillInfo& value) {
   const auto entry = this->levelChanges.find(id);
   if (entry != this->levelChanges.end()) {
     lcEXCInfo& change = entry->second;
-    if (value.level == change.previous || change.target < value.level) {
+    const int target = change.target;
+    const int level = value.level;
+    if (level == change.previous || target < level) {
       this->removals.push_back(id);
-    } else if (change.previous < value.level && value.level < change.target) {
-      change.previous = value.level;
-      value.level = change.target;
+    } else if (change.previous < level && level < target) {
+      change.previous = level;
+      value.level = target;
     }
   }
 
@@ -385,7 +387,7 @@ void CPlayerSkillBundle::SetSkillValue(int id, int value) {
 
 // OFFSET: 0x00771B40
 // FUNCTION: fn_08287
-void CPlayerSkillBundle::ForEachGrouped(std::function<bool(CSkillInfo&)> callback) {
+void CPlayerSkillBundle::ForEachGrouped(std::function<bool(const CSkillInfo&)> callback) {
   for (auto group = this->groups.begin(); group != this->groups.end(); ++group) {
     auto& skills = group->second;
     for (auto skill = skills.begin(); skill != skills.end(); ++skill) {

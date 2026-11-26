@@ -89,7 +89,8 @@ int CNaviData::FindRoute(std::vector<CNavi_Link*>* route, bool direct, bool allo
       result = this->range;
       std::vector<CNavi_Link*> path;
       for (int index = best; index != -1; index = this->entries[index].previous) {
-        path.push_back(this->entries[index].link);
+        CNavi_Link* link = this->entries[index].link;
+        path.push_back(link);
       }
       route->clear();
       for (int index = static_cast<int>(path.size()) - 1; index >= 0; --index) {
@@ -173,6 +174,19 @@ done:
   this->entries.clear();
   this->ResetLinkDepths();
   return result;
+}
+
+// OFFSET: 0x00B88920
+// FUNCTION: fn_19380
+__declspec(noinline) CNaviInfo* CNaviData::GetInfo() {
+  return this->info;
+}
+
+// OFFSET: 0x00B888F0
+// FUNCTION: fn_19378
+__declspec(noinline) NaviCell* CNaviData::GetCell(NaviCell* out) {
+  *out = NaviCell{this->cellX, this->cellY};
+  return out;
 }
 
 // OFFSET: 0x00B8A720

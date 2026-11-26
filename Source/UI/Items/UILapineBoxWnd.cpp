@@ -45,6 +45,18 @@ UILapineBoxWnd::UILapineBoxWnd()
       moveButton(nullptr), ingredientList(nullptr), ingredientId(0), noticeTick(0), noticeDuration(3000), waiting(0) {
 }
 
+// OFFSET: 0x006025B0
+// FUNCTION: fn_46616
+bool UILapineBox_IngredientListWnd::TransferIngredient(std::uint32_t id, int quantity) {
+  UILapineBoxWnd* box = static_cast<UILapineBoxWnd*>(this->parent);
+  if (box->items.size() < static_cast<std::size_t>(box->maxItems)) {
+    if (this->SendMsg(this, UM_DECITEM, id, 0, 0, 0) >= 0) {
+      return static_cast<UILapineBoxWnd*>(this->parent)->AddIngredient(id, quantity);
+    }
+  }
+  return false;
+}
+
 // OFFSET: 0x006006D0
 // FUNCTION: fn_04160
 void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
@@ -59,13 +71,7 @@ void UIIngredientInfoWnd::OnLBtnDblClk(int, int) {
     return;
   }
 
-  const int quantity = this->quantity;
-  UILapineBoxWnd* box = static_cast<UILapineBoxWnd*>(list->parent);
-  if (box->items.size() < static_cast<std::size_t>(box->maxItems)) {
-    if (list->SendMsg(list, UM_DECITEM, id, 0, 0, 0) >= 0) {
-      static_cast<UILapineBoxWnd*>(list->parent)->AddIngredient(id, quantity);
-    }
-  }
+  list->TransferIngredient(id, this->quantity);
 }
 
 // OFFSET: 0x00600830
@@ -140,10 +146,9 @@ void UILapineBoxWnd::OnMouseHover(int x, int y) {
     int tipY = -20;
     for (unsigned int index = 0; index < this->items.size(); ++index) {
       if (item.identity[1] == this->items[index].identity[1]) {
-        int position[2];
-        this->MaterialPosition(position, index);
-        tipX = position[0];
-        tipY = position[1] - 0x14;
+        const auto position = this->MaterialPosition(index);
+        tipX = position.first;
+        tipY = position.second - 0x14;
         break;
       }
     }
@@ -189,7 +194,7 @@ void UIIngredientInfoWnd::OnRBtnDown(int, int) {
 
 // OFFSET: 0x006024F0
 // FUNCTION: fn_04181
-__declspec(noinline) void UILapineBoxWnd::MaterialPosition(int* out, int index) {
+__declspec(noinline) std::pair<int, int> UILapineBoxWnd::MaterialPosition(int index) {
   if (index >= 0) {
     const unsigned int count = this->items.size();
     if (count >= static_cast<unsigned int>(index)) {
@@ -200,14 +205,11 @@ __declspec(noinline) void UILapineBoxWnd::MaterialPosition(int* out, int index) 
         left = 0x2A;
         top = 0xB7;
       }
-      out[1] = top;
-      out[0] = left + static_cast<unsigned int>(index) % columns * 0x22;
-      return;
+      return {left + static_cast<int>(static_cast<unsigned int>(index) % columns) * 0x22, top};
     }
   }
 
-  out[0] = 0;
-  out[1] = 0;
+  return {};
 }
 
 // OFFSET: 0x00602410
@@ -215,9 +217,8 @@ __declspec(noinline) void UILapineBoxWnd::MaterialPosition(int* out, int index) 
 __declspec(noinline) ITEM_INFO UILapineBoxWnd::ReadMaterial(int x, int y) {
   const ITEM_INFO* first = &this->items[0];
   for (unsigned int index = 0, count = this->items.size(); index < count; ++index) {
-    int position[2];
-    this->MaterialPosition(position, index);
-    if (x >= position[0] && x <= position[0] + 0x18 && y >= position[1] && y <= position[1] + 0x18) {
+    const auto position = this->MaterialPosition(index);
+    if (x >= position.first && x <= position.first + 0x18 && y >= position.second && y <= position.second + 0x18) {
       return first[index];
     }
   }
@@ -408,7 +409,7 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
     for (std::vector<UIIngredientInfoWnd*>::iterator it = this->items.begin(); it != this->items.end(); ++it) {
       ITEM_INFO owned = g_session.LookupClientItemByIdentity((*it)->item.identity[1]);
       if (owned.identity[1] <= 0) {
-        (*it)->Show(0);
+        (*it)->Show(WINDOW_HIDDEN);
       }
     }
     this->SendMsg(this, UM_SETPOS, 0, 0, 0, 0);
@@ -458,7 +459,7 @@ int UILapineBox_IngredientListWnd::SendMsg(UIWindow* sender, int message, std::i
 
     selected->item.quantity -= need;
     if (selected->item.quantity <= 0) {
-      (*it)->Show(0);
+      (*it)->Show(WINDOW_HIDDEN);
     } else {
       (*it)->insufficient = 1;
       (*it)->Invalidate();

@@ -15,6 +15,10 @@ struct RouletteSlot {
   /* 0008 */ short count;
 
   // INLINED
+  RouletteSlot() {
+  }
+
+  // INLINED
   bool operator<(const RouletteSlot& other) const {
     return this->row < other.row && this->column < other.column;
   }
@@ -77,6 +81,7 @@ public:
   /* 0380 */ ITEM_INFO m_additionItem;
 
   __declspec(noinline) RouletteMgr();
+  ~RouletteMgr();
   void AddItem(RouletteSlot slot);
 
   // INLINED
@@ -88,6 +93,7 @@ public:
   void Reset();
   void Draw();
   void Update();
+  void UpdateFinalCycle();
   void SetAdditionItem(int itemId);
   void StartSpin(int x, int y, int originX, int originY);
   void SetQuad(int x, int y, int originX, int originY);

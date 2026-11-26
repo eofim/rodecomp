@@ -62,14 +62,14 @@ void UISwapEquipmentWnd::DragAndDrop(int x, int y, std::intptr_t value) {
   ITEM_INFO item(0);
   unsigned char equipped = 0;
   switch (drag->source) {
-  case 1:
+  case DRAG_ITEM_INVENTORY:
     item = g_session.LookupClientItemByIdentity(drag->id);
     break;
-  case 2:
+  case DRAG_ITEM_EQUIP:
     equipped = 1;
     item = g_session.GetEquippedItemAt(drag->slot);
     break;
-  case 24:
+  case DRAG_ITEM_EQUIP_COSTUME:
     equipped = 1;
     item = g_session.GetCostumeItemAt(drag->slot);
     break;
@@ -258,48 +258,64 @@ int UISwapEquipmentWnd::SendMsg(UIWindow* sender, int message, std::intptr_t arg
 // FUNCTION: fn_10402
 void UISwapEquipmentWnd::SetSlotValue(int index, int value) {
   switch (index) {
-  case 8:
+  case SWAPEQUIP_SLOT_HEAD_MID:
     this->midAccessory = value;
     break;
-  case 9:
+  case SWAPEQUIP_SLOT_HEAD_LOW:
     this->bottomAccessory = value;
     break;
-  case 0:
+  case SWAPEQUIP_SLOT_HEAD_TOP:
     this->topAccessory = value;
     break;
-  case 2:
+  case SWAPEQUIP_SLOT_WEAPON:
     this->weaponView = value;
     break;
   }
 }
 
-// OFFSET: 0x00830400
-// FUNCTION: fn_10392
-ITEM_INFO UISwapEquipmentWnd::ItemAtPoint(int x, int y) {
+// INLINED
+static __forceinline int SwapEquipmentSlotAt(int x, int y, int width, int height) {
   int slot = -1;
-  if (y <= this->geometry.height && y >= 22 && y <= 151) {
-    if ((x >= 6 && x < 106) || (x >= 170 && x < this->geometry.width - 6)) {
-      slot = (y - 22) / 26;
-      if (x >= 170) {
-        if (slot == 0) {
-          slot = 9;
-        } else {
-          slot += 3;
-        }
-      } else {
-        if (slot == 0) {
-          slot = 8;
-        } else {
-          --slot;
-        }
-      }
-    }
+  if (y > height || y < 22 || y > 151) {
+    return -1;
+  }
 
-    if (x < 170 && x > 112 && y >= 28 && y <= 52) {
-      slot = 15;
+  if ((x >= 6 && x < 106) || (x >= 170 && x < width - 6)) {
+    slot = (y - 22) / 26;
+    if (x >= 170) {
+      if (slot == 0) {
+        slot = 9;
+      } else {
+        slot += 3;
+      }
+    } else {
+      if (slot == 0) {
+        slot = 8;
+      } else {
+        --slot;
+      }
     }
   }
 
+  if (x <= 112) {
+    return slot;
+  }
+
+  if (x >= 170) {
+    return slot;
+  }
+
+  if (y >= 28 && y <= 52) {
+    slot = 15;
+  }
+
+  return slot;
+}
+
+// OFFSET: 0x00830400
+// FUNCTION: fn_10392
+ITEM_INFO UISwapEquipmentWnd::ItemAtPoint(int x, int y) {
+  const int slot = SwapEquipmentSlotAt(x, y, this->geometry.width, this->geometry.height);
   return this->GetSlotItem(slot);
 }
 
@@ -440,15 +456,15 @@ void UISwapEquipmentWnd::OnLBtnDown(int x, int y) {
 
   if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
     if (g_windowMgr.GetHoverWindow() && item.identified != 0) {
-      if (g_windowMgr.GetHoverWindow()->geometry.id == 492) {
+      if (g_windowMgr.GetHoverWindow()->geometry.id == ID_NPC_TEXT_EDIT) {
         g_windowMgr.npcTextEditDialogWnd->InsertItemTag(item);
-      } else if (g_windowMgr.GetHoverWindow()->geometry.id == 490) {
+      } else if (g_windowMgr.GetHoverWindow()->geometry.id == ID_WHISPER_EDIT) {
         static_cast<UIChatEditCtrl*>(g_windowMgr.GetHoverWindow())->InsertItemLink(item);
-      } else if (g_windowMgr.GetHoverWindow()->geometry.id == 493) {
+      } else if (g_windowMgr.GetHoverWindow()->geometry.id == ID_CHAT_EDIT) {
         static_cast<UIChatEditCtrl*>(ChatWindow()->m_chatEdit)->InsertItemLink(item);
-      } else if (g_windowMgr.GetHoverWindow()->geometry.id == 491) {
+      } else if (g_windowMgr.GetHoverWindow()->geometry.id == ID_RODEX_COMPOSE_EDIT) {
         g_windowMgr.rodexComposeWnd->InsertItemTag(item);
-      } else if (g_windowMgr.GetHoverWindow()->geometry.id == 494) {
+      } else if (g_windowMgr.GetHoverWindow()->geometry.id == ID_CHATROOM_EDIT) {
         static_cast<UIChatEditCtrl*>(g_windowMgr.GetHoverWindow())->InsertItemLink(item);
       }
     }

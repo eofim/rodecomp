@@ -22,7 +22,7 @@ bool CGPak::Extract(const myGPack::PakEntry* entry, void* buffer) {
   }
   if (static_cast<signed char>(entry->flags) < 0) {
     return this->m_auxiliary.Extract(
-      std::string_view(entry->name.m_name), mapped, entry->alignedSize, this->m_scratch, buffer, entry->originalSize, 0
+      std::string_view(entry->name.m_name), mapped, entry->alignedSize, this->m_scratch, buffer, entry->originalSize, false
     );
   }
 
@@ -119,7 +119,6 @@ bool ContainsText(const std::string& text, std::string_view pattern) {
   return text.find(pattern) != std::string::npos;
 }
 
-#pragma inline_depth(0)
 // OFFSET: 0x0058A8F0
 // FUNCTION: fn_02759
 std::string GetFileName(const std::string& path) {
@@ -129,7 +128,6 @@ std::string GetFileName(const std::string& path) {
   }
   return path;
 }
-#pragma inline_depth()
 
 // OFFSET: 0x0058AAF0
 // FUNCTION: fn_02761

@@ -1,10 +1,12 @@
 #include "Contents/Actors/ActorEnums.h"
+#include "Client/Mode/GameModeResultEnums.h"
 #include "Client/Mode/ModeDragState.h"
 #include "Contents/Ground/TerrainHeight.h"
 #include "Network/Packets/NoticeEnums.h"
 #include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Effects/Core/EffectTypes.h"
 #include "UI/Window/WindowId.h"
+#include "UI/Window/ReplayChunkTag.h"
 #include "Network/Packets/ActorNamePacket.h"
 #include "Client/Mode/CGameMode.h"
 #include "UI/Window/UIEnums.h"
@@ -40,6 +42,7 @@
 #include "Contents/Actors/RenderObject.h"
 #include "Contents/Items/ItemInfo.h"
 #include "Contents/Actors/PlayerNameDictionary.h"
+#include "Contents/Effects/Particles/Particle.h"
 #include "Contents/Skills/ClientSkills.h"
 #include "Contents/Skills/SkillInfo.h"
 #include "Contents/Sound/SoundMgr.h"
@@ -120,8 +123,8 @@
 extern "C" long long _Xtime_get_ticks();
 
 #pragma pack(push, 1)
-struct GameModeTextRecord {
-  /* 0000 */ std::uint32_t header;
+struct GameModeTextRecordHeader {
+  /* 0000 */ std::uint32_t type;
   /* 0004 */ std::int16_t length;
   /* 0006 */ int firstLength;
   /* 000A */ int secondLength;
@@ -129,6 +132,10 @@ struct GameModeTextRecord {
   /* 0012 */ int roomOptionB;
   /* 0016 */ int roomOptionC;
   /* 001A */ int roomOptionD;
+};
+
+struct GameModeTextRecord {
+  /* 0000 */ GameModeTextRecordHeader header;
   /* 001E */ char buffer[0x172];
 };
 #pragma pack(pop)
@@ -1197,8 +1204,9 @@ MinimapMarker* CGameMode::FindMinimapMarker(std::uint32_t key) {
 // OFFSET: 0x00CF05E0
 // FUNCTION: fn_21415
 std::string CGameMode::GetMapResource(unsigned int index) {
-  if (!this->mapResources.empty() && index <= this->mapResources.size()) {
-    return this->mapResources[index];
+  const MapResourceList& resources = this->mapResources;
+  if (resources.first != resources.last && index <= static_cast<unsigned int>(resources.last - resources.first)) {
+    return resources.first[index];
   }
 
   return "";
@@ -1256,7 +1264,6 @@ std::string CGameMode::GetActiveSkillEffectTimeText(int skillId, int* activeSkil
     }
 
     char buffer[100];
-    int secondsPerMinute = 60;
     const int hours = remainingSeconds / 3600;
     if (hours != 0) {
       std::sprintf(buffer, "%d %s", hours, LookupMessage(MSI_TIME));
@@ -1264,8 +1271,8 @@ std::string CGameMode::GetActiveSkillEffectTimeText(int skillId, int* activeSkil
     }
 
     const int remainder = remainingSeconds - hours * 3600;
-    const int minutes = remainder / secondsPerMinute;
-    const int seconds = remainder % secondsPerMinute;
+    const auto divide = [&remainder](int divisor) { return std::pair<int, int>(remainder / divisor, remainder % divisor); };
+    const auto [minutes, seconds] = divide(60);
     if (minutes != 0) {
       std::sprintf(buffer, " %d %s", minutes, LookupMessage(MSI_MINUTE));
       output = output + buffer;
@@ -1337,22 +1344,22 @@ void CGameMode::RecordChatRoomSettings() {
 
   GameModeTextRecord record;
   std::memset(record.buffer, 0, sizeof(record.buffer));
-  const int length = static_cast<std::uint16_t>(this->chatRoom.title.size() + offsetof(GameModeTextRecord, buffer) + this->chatRoom.password.size());
-  const int titleLength = static_cast<int>(this->chatRoom.title.size());
-  const int passwordLength = static_cast<int>(this->chatRoom.password.size());
-  record.header = ReplayUiRecordHeader(REPLAY_UI_CHATROOM_SETTINGS);
-  record.length = length;
-  record.firstLength = titleLength;
-  record.secondLength = passwordLength;
-  record.roomOptionA = this->chatRoom.type;
-  record.roomOptionB = this->chatRoom.memberCount;
-  record.roomOptionC = this->chatRoom.memberLimit;
-  record.roomOptionD = this->chatRoom.id;
 
-  std::memcpy(record.buffer, this->chatRoom.title.data(), titleLength);
-  std::memcpy(record.buffer + titleLength, this->chatRoom.password.data(), passwordLength);
+  GameModeTextRecordHeader header;
+  header.type = ReplayUiRecordHeader(REPLAY_UI_CHATROOM_SETTINGS);
+  header.length = static_cast<std::int16_t>(this->chatRoom.title.size() + sizeof(GameModeTextRecordHeader) + this->chatRoom.password.size());
+  header.firstLength = static_cast<int>(this->chatRoom.title.size());
+  header.secondLength = static_cast<int>(this->chatRoom.password.size());
+  header.roomOptionA = this->chatRoom.type;
+  header.roomOptionB = this->chatRoom.memberCount;
+  header.roomOptionC = this->chatRoom.memberLimit;
+  header.roomOptionD = this->chatRoom.id;
+  record.header = header;
 
-  Replay::Instance().Record(length, &record, 0x2A, 0);
+  std::memcpy(record.buffer, this->chatRoom.title.data(), header.firstLength);
+  std::memcpy(record.buffer + header.firstLength, this->chatRoom.password.data(), header.secondLength);
+
+  Replay::Instance().Record(header.length, &record, 0x2A, 0);
 }
 
 #pragma pack(push, 1)
@@ -1440,7 +1447,7 @@ unsigned CGameMode::ReadReplayGroundSkills(const std::vector<unsigned char>& dat
   header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   unsigned offset = 6;
-  if (17000 != header.type) {
+  if (REPLAY_CHUNK_GROUND_SKILLS_BEGIN != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
     while (data.size() > offset) {
@@ -1450,20 +1457,20 @@ unsigned CGameMode::ReadReplayGroundSkills(const std::vector<unsigned char>& dat
 
       switch (header.type) {
       case 0xCD: {
-        std::vector<unsigned char> record(0x10);
+        std::vector<unsigned char> record(0x10, 0);
         std::memcpy(record.data(), data.data() + offset, header.size);
         offset += header.size;
         this->Zc_Skill_Entry(record.data());
         break;
       }
       case 0xCE: {
-        std::vector<unsigned char> record(0x61);
+        std::vector<unsigned char> record(0x61, 0);
         std::memcpy(record.data(), data.data() + offset, header.size);
         offset += header.size;
         this->Zc_Skill_Entry2(record.data());
         break;
       }
-      case 0x4269:
+      case REPLAY_CHUNK_GROUND_SKILLS_END:
         return offset;
       default:
         offset += header.size;
@@ -1505,7 +1512,7 @@ bool CGameMode::IsMenuWindowOpen() const {
 // OFFSET: 0x00CF0B30
 // FUNCTION: fn_21422
 bool CGameMode::ShowRestrictedNotice(int grade) {
-  if (g_serviceMode == 3 || g_serviceType == ServiceGermany || grade < 2) {
+  if (g_serviceMode == ServerInstantEvent || g_serviceType == ServiceGermany || grade < 2) {
     return false;
   }
 
@@ -1793,7 +1800,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_GIVE_MANNER_POINT:
-      if (g_serviceMode != 3) {
+      if (g_serviceMode != ServerInstantEvent) {
         int duration = argument3;
         if (duration < 0) {
           duration = 0;
@@ -2138,12 +2145,12 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       g_modeMgr.GetGameMode()->UpdateReplayActionSpeeds();
       return 0;
     case MM_RESTART_REPLAY:
-      g_loginStartMode = 0x19;
+      g_loginStartMode = LOGIN_STATE_OPEN_REPLAY;
       Replay::Instance().SetState(6);
       g_modeMgr.Switch(0, "login.rsw");
       return 0;
     case MM_EXIT_REPLAY:
-      g_loginStartMode = 0x1A;
+      g_loginStartMode = LOGIN_STATE_REPLAY_SERVER_LIST;
       Replay::Instance().SetState(6);
       g_modeMgr.Switch(0, "login.rsw");
       return 0;
@@ -2419,7 +2426,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       this->partyPosList.clear();
       return 0;
     case MM_CANCEL_USE_SKILL:
-      this->skillUseType = 0;
+      this->skillUseType = SUT_NOSKILL;
       this->skillId = 0;
       this->skillUseLevel = 0;
       g_pickInvert = 0;
@@ -2447,7 +2454,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     case MM_QUIT_TO_IDENTRY:
       g_charServerAccountIdPending = 0;
-      g_loginStartMode = 3;
+      g_loginStartMode = LOGIN_STATE_LOGIN;
       g_modeMgr.Switch(0, "login.rsw");
       return 0;
     case MM_NPC_TRADE_QUIT: {
@@ -2623,7 +2630,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
               std::sprintf(last, GetMessageString(0x319));
             }
             if (this->recordChat[9] == last && this->recordChat[7] == first &&
-                this->scene->player->render.state != 3) {
+                this->scene->player->render.state != ST_DEAD) {
               if ((g_session.IsSuperNoviceJob(g_session.GetDisplayJob()) &&
                    g_session.m_level >= g_session.m_maxBaseLevel) ||
                   (g_session.IsSuperNovice2Job(g_session.GetDisplayJob()) &&
@@ -2769,7 +2776,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       const char* name = reinterpret_cast<const char*>(argument1);
       if (std::strlen(name) >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       PACKET_CZ_REQ_JOIN_GUILD2 packet;
@@ -2818,7 +2825,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     case MM_REQ_JOIN_GROUP: {
       const char* name = reinterpret_cast<const char*>(argument1);
       if (std::strlen(name) >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       PACKET_CZ_PARTY_JOIN_REQ packet;
@@ -2872,7 +2879,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     }
     case MM_CONFORM_MAKEGROUP: {
       if (g_forbiddenWords.Contains(g_session.partyRequestName.c_str())) {
-        g_windowMgr.Confirm(LookupMessage(MSI_BAD_SENTANGE), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_BAD_SENTANGE), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       unsigned char packet[28];
@@ -2936,13 +2943,13 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       int windowIds[0x100];
       const int windowCount = g_windowMgr.GetRenderedWindowIds(windowIds);
       const int result = ReplayFileList::Instance().Open(0x1F, windowCount, reinterpret_cast<int>(windowIds));
-      if (result == 0) {
+      if (result == REPLAY_OPEN_SUCCESS) {
         Replay::Instance().SetState(1);
         return 0;
       }
-      if (result == -2) {
+      if (result == REPLAY_OPEN_FILE_EXISTS) {
         Replay::Instance().SetState(1);
-        g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_THESAMEFILEEXISTS), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_REPLAY_THESAMEFILEEXISTS), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       char message[50]{};
@@ -3195,7 +3202,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       std::strncpy(packet.key, name, 39);
       packet.key[39] = 0;
       if (std::strcmp(name, g_guildInfo.guildName.c_str()) != 0) {
-        g_windowMgr.Confirm(LookupMessage(MSI_DISORGANIZE_GUILD_FAILURE), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_DISORGANIZE_GUILD_FAILURE), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
@@ -3292,7 +3299,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
               g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PARTY_NOT_LEAVE_PARTY_UNTIL_YIELD_PARTYMASTER)), 0xFF, 0, 0, 0);
               return 0;
             }
-            if (g_windowMgr.Confirm(LookupMessage(MSI_PARTY_DO_YOU_WANT_BREAKING_UP), 2, false, false, 0, "Message", 280, 120, 0) != ID_YES) {
+            if (g_windowMgr.Confirm(LookupMessage(MSI_PARTY_DO_YOU_WANT_BREAKING_UP), 2, false, false, 0, "메시지", 280, 120, 0) != ID_YES) {
               return 0;
             }
           }
@@ -3373,7 +3380,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         }
       }
       if ((!g_session.IsHomunculusSkill(argument1) && !g_session.IsMercenarySkill(argument1) &&
-           this->scene->player->render.state == 6) || g_windowMgr.chatRoomWnd != nullptr) {
+           this->scene->player->render.state == ST_SIT) || g_windowMgr.chatRoomWnd != nullptr) {
         g_session.m_automaticSkills.Complete(argument1);
         return 0;
       }
@@ -3453,7 +3460,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         if (this->isPlayerDead == 0) {
           GetRagConnection().Send(static_cast<std::int16_t>(packetLength), packet);
         }
-        g_windowMgr.LookupWindow(WID_PARAITEMPURCHASEWND)->Show(0);
+        g_windowMgr.LookupWindow(WID_PARAITEMPURCHASEWND)->Show(WINDOW_HIDDEN);
         g_windowMgr.CloseWindow(WID_ITEMCOLLECTIONWND);
       } else {
         g_windowMgr.CloseWindow(WID_PARAITEMPURCHASEWND);
@@ -3501,7 +3508,11 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       ITEM_INFO item(0);
-      item = argument2 != 0 ? g_session.GetCostumeItemAt(argument1) : g_session.GetEquippedItemAt(argument1);
+      if (argument2 != 0) {
+        item = g_session.GetCostumeItemAt(argument1);
+      } else {
+        item = g_session.GetEquippedItemAt(argument1);
+      }
       if (item.identity[1] == 0 || item.quantity <= 0) {
         return 0;
       }
@@ -3669,7 +3680,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       if (argument1 != 0) {
         const std::string text(reinterpret_cast<const char*>(argument1));
         if (text.size() >= 24) {
-          g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+          g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "메시지", 280, 120, 0);
           return 0;
         }
         std::memcpy(packet.receiveName, text.c_str(), 24);
@@ -3771,7 +3782,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
           GetRagConnection().Send(static_cast<std::int16_t>(length), packet);
         }
         if (UIWindow* window = g_windowMgr.LookupWindow(WID_PARAITEMPURCHASEWND)) {
-          window->Show(0);
+          window->Show(WINDOW_HIDDEN);
         }
         g_windowMgr.CloseWindow(WID_ITEMCOLLECTIONWND);
       } else {
@@ -3785,7 +3796,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_CLICK_TO_BUYING_STORE: {
-      if ((this->scene != nullptr && this->scene->player != nullptr && this->scene->player->render.state == 3) ||
+      if ((this->scene != nullptr && this->scene->player != nullptr && this->scene->player->render.state == ST_DEAD) ||
           static_cast<std::uint32_t>(argument1) == g_session.m_aid || g_windowMgr.buyingShopItemsWnd != nullptr) {
         return 0;
       }
@@ -4123,7 +4134,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
             return 0;
           }
         }
-        if (g_windowMgr.Confirm(LookupMessage(MSI_GENDER_CHANGE_MESSAGE_CONFIRM), 2, false, false, 0, "Message", 280, 120, 0) != ID_YES) {
+        if (g_windowMgr.Confirm(LookupMessage(MSI_GENDER_CHANGE_MESSAGE_CONFIRM), 2, false, false, 0, "메시지", 280, 120, 0) != ID_YES) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_GENDER_CHANGE_MESSAGE_CANCEL)), 0xFF, 0, 0, 0);
           return 0;
         }
@@ -4144,11 +4155,11 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       }
       const char* name = reinterpret_cast<const char*>(argument1);
       if (_mbsstr(reinterpret_cast<const unsigned char*>(name), reinterpret_cast<const unsigned char*>("#"))) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_SPECIALLETTERS_ON_PARTYNAME), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NOT_USING_SPECIALLETTERS_ON_PARTYNAME), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       if (std::strlen(name) >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       g_windowMgr.CloseWindow(WID_PARTYSETTINGWND_PARTYCOUNT);
@@ -4553,11 +4564,11 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       if (g_serviceType == ServiceBrazil && std::strchr(name, 0x2323)) {
-        g_windowMgr.Confirm(LookupMessage(MSI_BILLING_1), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_BILLING_1), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       if (length >= 24) {
-        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_NAMELENGTH_TOO_LONG), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       if (g_modeMgr.GetGameMode()->scene->player->hasSp == 1) {
@@ -4598,7 +4609,11 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         return 0;
       }
       ITEM_INFO item(0);
-      item = argument2 ? g_session.GetSwapEquippedItem(argument1) : g_session.GetSwapCostumeItem(argument1);
+      if (argument2) {
+        item = g_session.GetSwapEquippedItem(argument1);
+      } else {
+        item = g_session.GetSwapCostumeItem(argument1);
+      }
       if (item.identity[1] && item.quantity > 0) {
         const PACKET_CZ_REQ_REMOVE_SWQP_EQUIPITEM packet{ID_CZ_REQ_REMOVE_SWQP_EQUIPITEM, static_cast<std::uint16_t>(item.identity[1])};
         GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
@@ -4638,7 +4653,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_PACKAGEITEM_SLEEPSTONECURSEFAIL)), 0xFF, 0, 0, 0);
         return 0;
       }
-      if (this->scene->player->render.state == 6) {
+      if (this->scene->player->render.state == ST_SIT) {
         const int itemId = item.GetItemId();
         if (itemId == ITEMID_WING_OF_FLY || itemId == ITEMID_WING_OF_BUTTERFLY || itemId == ITEMID_MAGNIFIER || itemId == ITEMID_ANODYNE || itemId == ITEMID_ALOEBERA || itemId == ITEMID_ANODYNE_B) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANT_USE_WHEN_SITDOWN)), 0xFF, 0, 0, 0);
@@ -4706,7 +4721,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       return 0;
     }
     case MM_REQ_BUY_FROMMC: {
-      if (this->scene != nullptr && this->scene->player != nullptr && this->scene->player->render.state == 3) {
+      if (this->scene != nullptr && this->scene->player != nullptr && this->scene->player->render.state == ST_DEAD) {
         return 0;
       }
       if (static_cast<std::uint32_t>(argument1) == g_session.m_aid || g_windowMgr.merchantItemShopWnd != nullptr) {
@@ -4724,7 +4739,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
     case MM_SEND_MAIL: {
       const auto& request = *reinterpret_cast<const RodexSendMailRequest*>(argument1);
       if (g_forbiddenWords.Contains(request.title.c_str()) || g_forbiddenWords.Contains(request.body.c_str())) {
-        g_windowMgr.Confirm(LookupMessage(MSI_ERROR_INCLUDE_VALGARISM), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_ERROR_INCLUDE_VALGARISM), 0, true, false, 0, "메시지", 0x118, 0x78, 0);
         return 0;
       }
       g_session.RestoreSelectionItems();
@@ -5090,7 +5105,7 @@ int CGameMode::SendMsg(int event, int argument1, int argument2, int argument3, i
       this->noMove = 1;
       this->noMoveStartTick = timeGetTime();
       GetRagConnection().Close();
-      if (g_windowMgr.Confirm(LookupMessage(MSI_UNABLE_TO_CONNECT_SERVER), 0, true, true, 0, "Message", 280, 120, 0) != ID_CONNECTION_FAILED_UNUSED_269) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_UNABLE_TO_CONNECT_SERVER), 0, true, true, 0, "메시지", 280, 120, 0) != ID_CONNECTION_FAILED_UNUSED_269) {
         this->SendMsg(MM_QUIT_TO_IDENTRY, 0, 0, 0, 0);
       }
       return 0;
@@ -5330,7 +5345,7 @@ void CGameMode::RequestAdminStatus() {
     return;
   }
 
-  if (g_serviceMode == 3) {
+  if (g_serviceMode == ServerInstantEvent) {
     return;
   }
 
@@ -5399,7 +5414,6 @@ void CGameMode::PlaceWindowAtActor(UIWindow* window, CRenderObject* actor) {
   }
 
   int x = actor->render.screenX + offsetX;
-  int y = actor->render.screenY + offsetY;
   if (x < -3) {
     x = -3;
   }
@@ -5407,6 +5421,7 @@ void CGameMode::PlaceWindowAtActor(UIWindow* window, CRenderObject* actor) {
   if (maximumX < x) {
     x = maximumX;
   }
+  int y = actor->render.screenY + offsetY;
   if (y < -3) {
     y = -3;
   }
@@ -5581,7 +5596,7 @@ bool CGameMode::ConfirmDraggedItemUse() {
         this->isDragAllowed = 0;
       }
       g_modeMgr.GetGameMode()->SendMsg(MM_CANCEL_DRAG, 0, 0, 0, 0);
-      g_windowMgr.Confirm(LookupMessage(MSI_UNEQUIP_ARROW), 0, true, false, 0, "Message", 280, 120, 0);
+      g_windowMgr.Confirm(LookupMessage(MSI_UNEQUIP_ARROW), 0, true, false, 0, "메시지", 280, 120, 0);
       return true;
     }
   }
@@ -5762,7 +5777,7 @@ unsigned CGameMode::ReadReplayGroundItems(const std::vector<unsigned char>& data
   header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   unsigned offset = 6;
-  if (15000 != header.type) {
+  if (REPLAY_CHUNK_GROUND_ITEMS_BEGIN != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
     while (data.size() > offset) {
@@ -5778,7 +5793,7 @@ unsigned CGameMode::ReadReplayGroundItems(const std::vector<unsigned char>& data
         this->ReceiveItemFallEntry(record.data());
         break;
       }
-      case 15001:
+      case REPLAY_CHUNK_GROUND_ITEMS_END:
         return offset;
       default:
         offset += header.size;
@@ -5801,7 +5816,7 @@ unsigned CGameMode::ReadReplayActors(const std::vector<unsigned char>& data) {
   header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   unsigned offset = 6;
-  if (10000 != header.type) {
+  if (REPLAY_CHUNK_ACTORS_BEGIN != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
     std::vector<unsigned char> record;
@@ -5815,7 +5830,7 @@ unsigned CGameMode::ReadReplayActors(const std::vector<unsigned char>& data) {
       }
 
       switch (header.type) {
-      case 10001:
+      case REPLAY_CHUNK_ACTORS_END:
         goto finished;
       case 0xD0:
         std::memcpy(record.data(), data.data() + offset, header.size);
@@ -5913,7 +5928,7 @@ void CGameMode::UpdatePetFriendlyWindow(int previousFriendly) {
 
   if (g_session.GetPetFriendlyState(g_session.m_petFriendly) == 0 && g_session.m_petFriendly <= 100) {
     const int petId = g_session.petGid;
-    if (this->petFriendlyNoticeIds.find(petId) == this->petFriendlyNoticeIds.end()) {
+    if (this->petFriendlyNoticeIds.end() == this->petFriendlyNoticeIds.find(petId)) {
       if (g_windowMgr.petInfoWnd == nullptr) {
         g_windowMgr.EnsureWindow(WID_PETINFOWND);
       }
@@ -5923,7 +5938,8 @@ void CGameMode::UpdatePetFriendlyWindow(int previousFriendly) {
   }
 
   if (previousFriendly < g_session.m_petFriendly && g_session.m_petFriendly > 99) {
-    this->UpdatePetFriendlyNoticeIds(g_session.petGid, false);
+    const int petId = g_session.petGid;
+    this->petFriendlyNoticeIds.erase(petId);
   }
 }
 
@@ -6030,21 +6046,22 @@ std::vector<unsigned char> CGameMode::SaveActiveSkillEffects() {
   std::vector<unsigned char> data;
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(19000);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_ACTIVE_SKILL_EFFECTS_BEGIN);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
-  for (ActiveSkillEffect effect : g_activeSkillEffects) {
+  for (auto it = g_activeSkillEffects.begin(), end = g_activeSkillEffects.end(); it != end; ++it) {
+    ActiveSkillEffect effect = *it;
     if (effect.expiration != 0 && effect.expiration != 999999) {
       effect.expiration -= timeGetTime();
     }
 
-    const std::vector<unsigned char> chunk = MakeRecordChunk(0x4A43, effect);
+    const std::vector<unsigned char> chunk = MakeFilledRecordChunk(REPLAY_CHUNK_ACTIVE_SKILL_EFFECTS_EFFECT, effect);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(19001);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_ACTIVE_SKILL_EFFECTS_END);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -6057,17 +6074,17 @@ std::vector<unsigned char> CGameMode::SaveQuestState() {
   std::vector<unsigned char> data;
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(14000);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_QUEST_STATE_BEGIN);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeFilledRecordChunk(14011, this->isOnQuest);
+    const std::vector<unsigned char> chunk = MakeFilledRecordChunk(REPLAY_CHUNK_QUEST_STATE_IS_ON_QUEST, this->isOnQuest);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(14001);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_QUEST_STATE_END);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -6361,7 +6378,7 @@ void CGameMode::TargetActorByAid(int aid) {
     }
   }
 
-  if (allowed && g_mouse.buttons[0] == 1 && force != 0 && !HIBYTE(GetAsyncKeyState(VK_MENU))) {
+  if (allowed && g_mouse.buttons[0] == MOUSE_BUTTON_PRESSED && force != 0 && !HIBYTE(GetAsyncKeyState(VK_MENU))) {
     this->SendMsg(MM_SETLOCKONMOUSE, 1, 0, 0, 0);
     this->isAutoMoveClickOn = 0;
     if (g_session.GetSiegeMode() == 0 && (HIBYTE(GetAsyncKeyState(VK_CONTROL)) || forceOption != 0)) {
@@ -6405,7 +6422,7 @@ std::vector<unsigned char> CGameMode::WriteReplaySkillState() {
   std::vector<unsigned char> data;
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(17000);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_GROUND_SKILLS_BEGIN);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -6431,7 +6448,7 @@ std::vector<unsigned char> CGameMode::WriteReplaySkillState() {
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(17001);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_GROUND_SKILLS_END);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -6451,7 +6468,7 @@ unsigned CGameMode::ReadReplayGuildInfo(const std::vector<unsigned char>& data) 
   header.Clear();
   header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
   unsigned offset = 6;
-  if (13000 != header.type) {
+  if (REPLAY_CHUNK_NAME_CARD_BEGIN != header.type) {
     offset = 0xFFFFFFFFu;
   } else {
     while (data.size() > offset) {
@@ -6464,23 +6481,23 @@ unsigned CGameMode::ReadReplayGuildInfo(const std::vector<unsigned char>& data) 
       }
 
       switch (header.type) {
-      case 13001:
+      case REPLAY_CHUNK_NAME_CARD_END:
         goto finished;
-      case 13002:
+      case REPLAY_CHUNK_NAME_CARD_GUILD_EMBLEM:
         std::memcpy(record.data(), data.data() + offset, header.size);
         offset += header.size;
         this->SaveEmblemFile(record);
         break;
-      case 13003:
+      case REPLAY_CHUNK_NAME_CARD_DATA:
         std::memcpy(record.data(), data.data() + offset, header.size);
         offset += header.size;
         this->nameCard.Load(record);
         break;
-      case 13004:
+      case REPLAY_CHUNK_NAME_CARD_GUILD_ID:
         std::memcpy(&guildId, data.data() + offset, header.size);
         offset += header.size;
         break;
-      case 13005: {
+      case REPLAY_CHUNK_NAME_CARD_EMBLEM_VERSION: {
         int emblemVersion = 0;
         std::memcpy(&emblemVersion, data.data() + offset, header.size);
         offset += header.size;
@@ -6501,50 +6518,54 @@ finished:
 
 #include "Contents/Actors/Item.h"
 
+// INLINED
+static int GetActorEmblemVersion(const CGuildMgr* guildMgr, CGameActor* actor) {
+  return guildMgr->GetEmblemVersion(actor->GetGdid());
+}
+
 // OFFSET: 0x00CE93E0
 // FUNCTION: fn_21347
 std::vector<unsigned char> CGameMode::SaveNameCardState() {
   std::vector<unsigned char> data;
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(13000);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_NAME_CARD_BEGIN);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   std::vector<char> buffer;
   std::vector<std::string> names;
   if (static_cast<int>(this->nameCard.Save(buffer)) > 0) {
-    const std::vector<unsigned char> chunk = MakeDataChunk(13003, buffer);
+    const std::vector<unsigned char> chunk = MakeDataChunk(REPLAY_CHUNK_NAME_CARD_DATA, buffer);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   {
-    if (this->AppendGuildEmblem(buffer, names, this->scene->player->GetGdid(), g_guildMgr->GetEmblemVersion(this->scene->player->GetGdid()))) {
-      const std::vector<unsigned char> chunk = MakeDataChunk(13002, buffer);
+    if (this->AppendGuildEmblem(buffer, names, this->scene->player->GetGdid(), GetActorEmblemVersion(g_guildMgr, this->scene->player))) {
+      const std::vector<unsigned char> chunk = MakeDataChunk(REPLAY_CHUNK_NAME_CARD_GUILD_EMBLEM, buffer);
       data.insert(data.end(), chunk.begin(), chunk.end());
     }
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeRecordChunk(13004, this->scene->player->GetGdid());
+    const std::vector<unsigned char> chunk = MakeFilledRecordChunk(REPLAY_CHUNK_NAME_CARD_GUILD_ID, this->scene->player->GetGdid());
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeRecordChunk(13005, g_guildMgr->GetEmblemVersion(this->scene->player->GetGdid()));
+    const std::vector<unsigned char> chunk = MakeFilledRecordChunk(REPLAY_CHUNK_NAME_CARD_EMBLEM_VERSION, GetActorEmblemVersion(g_guildMgr, this->scene->player));
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   for (std::list<CGameActor*>::iterator it = this->scene->actors.begin(); it != this->scene->actors.end(); ++it) {
-    CGameActor* actor = *it;
-    if (this->AppendGuildEmblem(buffer, names, actor->GetGdid(), g_guildMgr->GetEmblemVersion(actor->GetGdid()))) {
-      const std::vector<unsigned char> chunk = MakeDataChunk(13002, buffer);
+    if (this->AppendGuildEmblem(buffer, names, (*it)->GetGdid(), GetActorEmblemVersion(g_guildMgr, *it))) {
+      const std::vector<unsigned char> chunk = MakeDataChunk(REPLAY_CHUNK_NAME_CARD_GUILD_EMBLEM, buffer);
       data.insert(data.end(), chunk.begin(), chunk.end());
     }
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(13001);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_NAME_CARD_END);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -6631,14 +6652,14 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
   std::vector<unsigned char> data;
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(10000);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_ACTORS_BEGIN);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   std::vector<char> scratch;
   for (std::list<CGameActor*>::iterator it = this->scene->actors.begin(); it != this->scene->actors.end(); ++it) {
     if ((*it)->storedActorEntry == 0) {
-      if ((*it)->render.state == 1) {
+      if ((*it)->render.state == ST_MOVE) {
         AppendChunk(data, MakeDataChunk(0xD6, this->BuildActorEntryPacket(*it, ID_ZC_NOTIFY_MOVEENTRY11)));
       } else {
         AppendChunk(data, MakeDataChunk(0xD9, this->BuildActorEntryPacket(*it, ID_ZC_NOTIFY_STANDENTRY11)));
@@ -6704,12 +6725,15 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
 
     const int count = (*it)->GetMadogearType();
     if (count > 0) {
-      GameModeStoredRecord0191 record = {};
-      record.remaining = 9999;
-      record.count = count;
-      record.total = 9999;
+      GameModeStoredRecord0191 record;
+      record.packetType = 0;
       record.aid = (*it)->render.accountId;
       record.statusType = 0x47D;
+      record.remaining = 9999;
+      record.count = count;
+      record.value2 = 0;
+      record.total = 9999;
+      record.value3 = 0;
 
       const std::vector<unsigned char> chunk = MakeFilledRecordChunk(0x191, record);
       data.insert(data.end(), chunk.begin(), chunk.end());
@@ -6717,7 +6741,7 @@ std::vector<unsigned char> CGameMode::SaveActorStates() {
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(10001);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_ACTORS_END);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -6892,10 +6916,13 @@ void CGameMode::ProcessUiMessage(unsigned char* message) {
   }
   case REPLAY_UI_STORE_TITLE: {
     const GameModeUiKindTextMessage* text = reinterpret_cast<const GameModeUiKindTextMessage*>(message);
-    if (text->kind == WID_MERCHANTSHOPMAKEWND) {
+    switch (text->kind) {
+    case WID_MERCHANTSHOPMAKEWND_MODE_1:
       g_session.storeTitle.assign(text->text, std::strlen(text->text));
-    } else if (text->kind == WID_MERCHANTSHOPMAKEWND_MODE_1) {
+      break;
+    case WID_MERCHANTSHOPMAKEWND:
       g_session.storeTitle.assign(text->text, std::strlen(text->text));
+      break;
     }
     break;
   }
@@ -7024,7 +7051,7 @@ std::vector<unsigned char> CGameMode::SaveGroundItems() {
   std::vector<unsigned char> data;
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(15000);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_GROUND_ITEMS_BEGIN);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -7040,10 +7067,13 @@ std::vector<unsigned char> CGameMode::SaveGroundItems() {
     int row;
     int subColumn;
     int subRow;
-    this->WorldSubcell(item->render.position.x, item->render.position.z, column, row, subColumn, subRow);
+    const float x = item->render.position.x;
+    const float z = item->render.position.z;
+    this->WorldSubcell(x, z, column, row, subColumn, subRow);
     packet.x = static_cast<std::int16_t>(column);
     packet.y = static_cast<std::int16_t>(row);
     packet.subX = static_cast<unsigned char>(subColumn);
+    packet.subY = static_cast<unsigned char>(subRow);
 
     const int length = static_cast<int>(item->name.size());
     std::size_t digits = 0;
@@ -7057,13 +7087,12 @@ std::vector<unsigned char> CGameMode::SaveGroundItems() {
     std::memcpy(text, static_cast<CItem*>(*it)->name.c_str() + (length - 3) - digits, digits);
     packet.count = static_cast<std::int16_t>(std::atoi(text));
 
-    packet.subY = static_cast<unsigned char>(subRow);
     const std::vector<unsigned char> chunk = MakeFilledRecordChunk(0xCF, packet);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
   {
-    const std::vector<unsigned char> chunk = MakeEmptyChunk(15001);
+    const std::vector<unsigned char> chunk = MakeEmptyChunk(REPLAY_CHUNK_GROUND_ITEMS_END);
     data.insert(data.end(), chunk.begin(), chunk.end());
   }
 
@@ -7092,19 +7121,22 @@ void CGameMode::EnsureNameBalloon(UINameBalloonText*& balloon) {
   switch (g_serviceOptions.Get(TT_NAME_ABOVE_HEAD_ON_OFF) != 0) {
   case NAME_BALLOON_BOTTOM:
     balloon = new UINameBalloonText();
+    balloon->SetSize(8, 8);
     break;
   case NAME_BALLOON_TOP:
     balloon = new UINameBalloonText();
+    balloon->SetSize(8, 8);
     break;
   case NAME_BALLOON_LEFT:
     balloon = new UIVerticalNameBalloonText();
+    balloon->SetSize(8, 8);
     break;
   case NAME_BALLOON_RIGHT:
     balloon = new UIVerticalNameBalloonText();
+    balloon->SetSize(8, 8);
     break;
   }
 
-  balloon->SetSize(8, 8);
   g_windowMgr.AddRenderedFront(balloon);
 }
 
@@ -7134,21 +7166,21 @@ void CGameMode::ShowNoticeBalloon(const std::vector<std::string>* lines) {
     return;
   }
 
-  UIBroadcastBalloon* balloon = this->noticeBalloon;
-  if (!balloon) {
+  if (!this->noticeBalloon) {
     this->noticeBalloon = new UIBroadcastBalloon();
     this->noticeBalloon->SetSize(g_renderer->viewport.width, 50);
     this->noticeBalloon->Move(0, 130 * g_renderer->viewport.height / 480);
     g_windowMgr.AddRenderedFront(this->noticeBalloon);
-    balloon = this->noticeBalloon;
-    if (!balloon) {
-      return;
-    }
+  }
+
+  UIBroadcastBalloon* balloon = this->noticeBalloon;
+  if (!balloon) {
+    return;
   }
 
   BroadcastBalloonMessage message(20);
-  for (std::vector<std::string>::const_iterator it = lines->begin(); it != lines->end(); ++it) {
-    message.lines.emplace_back(*it, 0xFFFF, 0);
+  for (const std::string& line : *lines) {
+    message.lines.emplace_back(line, 0xFFFF, 0);
   }
   balloon->AddMessage(2, message);
 }
@@ -7224,7 +7256,7 @@ void CGameMode::ChangeZoneServer(std::string mapName, int x, int y, int ip, int 
       GetRagConnection().SetBlock(1);
     } else {
       GetRagConnection().Close();
-      if (g_windowMgr.Confirm(LookupMessage(MSI_SERVER_CONNECTION_FAILED), 1, true, true, 0, "Message", 280, 120, 0) != ID_CONNECTION_FAILED_UNUSED_269) {
+      if (g_windowMgr.Confirm(LookupMessage(MSI_SERVER_CONNECTION_FAILED), 1, true, true, 0, "메시지", 280, 120, 0) != ID_CONNECTION_FAILED_UNUSED_269) {
         this->SendMsg(MM_QUIT_TO_IDENTRY, 0, 0, 0, 0);
       }
       return;
@@ -7286,7 +7318,7 @@ void CGameMode::UpdateBalloons() {
   UITransBalloonText*& skillBalloon = this->skillBalloon;
   UITransBalloonText*& hintBalloon = this->skillHintBalloon;
   int& shownSkill = this->shownSkillId;
-  if (this->skillUseType == 0) {
+  if (this->skillUseType == SUT_NOSKILL) {
     if (skillBalloon) {
       g_windowMgr.Schedule(skillBalloon);
       skillBalloon = nullptr;
@@ -7342,12 +7374,11 @@ void CGameMode::UpdateBalloons() {
     CPlayer* player = this->scene->player;
     const int x = player->render.screenX - 30;
     const int y = player->render.screenY;
-    const int offset = static_cast<int>(static_cast<float>(12 * g_renderer->viewport.height / 480) * player->render.distanceScale);
+    int offset = static_cast<int>(static_cast<float>(12 * g_renderer->viewport.height / 480) * player->render.distanceScale);
     if (g_session.IsScreenShakeActive()) {
-      this->itemWindow->Move(x, y - offset);
-    } else {
-      this->itemWindow->Move(x, offset + y);
+      offset = -offset;
     }
+    this->itemWindow->Move(x, y + offset);
   }
 
   if (this->achievementBalloon && timeGetTime() > this->achievementBalloonTick + 10000) {
@@ -7940,7 +7971,6 @@ void CGameMode::InitializeState() {
   if (g_session.m_searchStoreInfoCreated) {
     g_windowMgr.EnsureWindow(WID_SEARCH_STORE_INFO);
   }
-  g_windowMgr.EnsureWindow(WID_OPENROULLETTEWND);
 
   if (g_session.showCameraInfo) {
     g_windowMgr.EnsureWindow(WID_VIEWCAMERAINFOWND);
@@ -8005,7 +8035,7 @@ void CGameMode::InitializeState() {
   this->sameChatRepeatCount = 0;
   this->serverTimeSyncCount = 0;
   this->lastChat = "";
-  this->skillUseType = 0;
+  this->skillUseType = SUT_NOSKILL;
   this->skillId = 0;
   g_pickInvert = 0;
   this->cardItemIndex = 0;
@@ -8099,11 +8129,12 @@ void CGameMode::InitializeState() {
     }
   }
 
-  if (!g_mapSkyMgr) {
-    g_mapSkyMgr = new (std::nothrow) CMapSkyMgr;
+  CMapSkyMgr* skyMgr = g_mapSkyMgr;
+  if (!skyMgr) {
+    skyMgr = new (std::nothrow) CMapSkyMgr;
   }
-
-  g_mapSkyMgr->Apply(this->mapName);
+  g_mapSkyMgr = skyMgr;
+  skyMgr->Apply(this->mapName);
   if ((g_serviceType == ServiceMalaysia || g_serviceType == ServiceSingapore) && std::strcmp(this->mapName, "comodo.rsw") == 0 && g_serviceOptions.Get(TT_EFFECT_ON_OFF)) {
     g_weatherEffect.Fireworks();
   }
@@ -8160,7 +8191,7 @@ void CGameMode::InitializeState() {
 // FUNCTION: fn_21337
 void CGameMode::ProcessRightButtonDrag() {
   switch (g_mouse.buttons[1]) {
-  case 1: {
+  case MOUSE_BUTTON_PRESSED: {
     if (g_windowMgr.menuWnd) {
       g_windowMgr.CloseWindow(WID_MENUWND);
     }
@@ -8189,9 +8220,9 @@ void CGameMode::ProcessRightButtonDrag() {
     shortcuts->SendMsg(nullptr, UM_USE_SHORTEN_ITEM, 8, 0, 0, 0);
     return;
   }
-  case 2:
+  case MOUSE_BUTTON_HELD:
     if (!HIBYTE(GetAsyncKeyState(VK_MENU)) && !HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
-      this->SetCursorAction(4);
+      this->SetCursorAction(CURSOR_ACTION_ROTATE_CAMERA);
       if (this->hasViewParameters) {
         float yaw = static_cast<float>(g_mouse.x) + this->camera->camera.desiredYaw - static_cast<float>(this->oldMouseX);
         const float low = static_cast<float>(this->viewParameters[3]);
@@ -8228,26 +8259,29 @@ void CGameMode::ProcessRightButtonDrag() {
         range = 20.0f;
       }
       g_cameraPitch = this->camera->camera.desiredPitch - static_cast<float>(delta);
-      float limit;
       if (this->hasViewParameters) {
         if (g_cameraPitch < static_cast<float>(this->viewParameters[7])) {
           g_cameraPitch = static_cast<float>(this->viewParameters[7]);
         }
-        limit = static_cast<float>(this->viewParameters[6]);
+        if (g_cameraPitch > static_cast<float>(this->viewParameters[6])) {
+          g_cameraPitch = static_cast<float>(this->viewParameters[6]);
+        }
       } else {
         if (g_cameraPitch < -45.0f - range) {
           g_cameraPitch = -45.0f - range;
         }
+
+        float limit;
         if (HIBYTE(GetAsyncKeyState(VK_CONTROL)) && this->camera->camera.desiredDistance <= g_serviceOptionJitterScale) {
           limit = range - 45.0f;
         } else {
           limit = range - 70.0f;
         }
+        if (g_cameraPitch > limit) {
+          g_cameraPitch = limit;
+        }
       }
 
-      if (g_cameraPitch > limit) {
-        g_cameraPitch = limit;
-      }
       this->camera->camera.desiredPitch = g_cameraPitch;
     }
 
@@ -8277,7 +8311,7 @@ void CGameMode::ProcessRightButtonDrag() {
       this->camera->camera.desiredDistance = g_cameraDistance;
     }
     return;
-  case 4:
+  case MOUSE_BUTTON_DOUBLE_CLICKED:
     if (this->hasViewParameters) {
       return;
     }
@@ -8303,7 +8337,7 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
   }
 
   this->wheelTick = timeGetTime();
-  if (g_mouse.wheel == 0 || this->skillUseType != 0) {
+  if (g_mouse.wheel == 0 || this->skillUseType != SUT_NOSKILL) {
     return;
   }
 
@@ -8318,28 +8352,34 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
 
   if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
     const float step = g_mouse.wheel > 0 ? -5.0f : 5.0f;
-    const float range = this->canRotateView ? 20.0f : 10.0f;
+    float range = 10.0f;
+    if (this->canRotateView) {
+      range = 20.0f;
+    }
     g_cameraPitch = this->camera->camera.desiredPitch - step;
-    float limit;
     if (this->hasViewParameters) {
       if (g_cameraPitch < static_cast<float>(this->viewParameters[7])) {
         g_cameraPitch = static_cast<float>(this->viewParameters[7]);
       }
-      limit = static_cast<float>(this->viewParameters[6]);
+      if (g_cameraPitch > static_cast<float>(this->viewParameters[6])) {
+        g_cameraPitch = static_cast<float>(this->viewParameters[6]);
+      }
     } else {
       if (g_cameraPitch < -45.0f - range) {
         g_cameraPitch = -45.0f - range;
       }
+
+      float limit;
       if (HIBYTE(GetAsyncKeyState(VK_CONTROL)) && this->camera->camera.desiredDistance <= g_serviceOptionJitterScale) {
         limit = range - 45.0f;
       } else {
         limit = range - 70.0f;
       }
+      if (g_cameraPitch > limit) {
+        g_cameraPitch = limit;
+      }
     }
 
-    if (g_cameraPitch > limit) {
-      g_cameraPitch = limit;
-    }
     this->camera->camera.desiredPitch = g_cameraPitch;
     return;
   }
@@ -8357,8 +8397,9 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
         return;
       }
 
-      if (shortcuts->m_slots[3]->enabled && automatic->Contains(shortcuts->m_slots[3]->itemId)) {
-        g_session.SetOption(automatic->CancelOption(shortcuts->m_slots[3]->itemId), 1);
+      if (shortcuts->m_slots[7]->enabled && automatic->Contains(shortcuts->m_slots[7]->itemId)) {
+        const int option = automatic->CancelOption(shortcuts->m_slots[7]->itemId);
+        g_session.SetOption(option, 1);
       } else {
         automatic->DisableAll();
       }
@@ -8369,8 +8410,9 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
         return;
       }
 
-      if (shortcuts->m_slots[2]->enabled && automatic->Contains(shortcuts->m_slots[2]->itemId)) {
-        g_session.SetOption(automatic->CancelOption(shortcuts->m_slots[2]->itemId), 1);
+      if (shortcuts->m_slots[6]->enabled && automatic->Contains(shortcuts->m_slots[6]->itemId)) {
+        const int option = automatic->CancelOption(shortcuts->m_slots[6]->itemId);
+        g_session.SetOption(option, 1);
       } else {
         automatic->DisableAll();
       }
@@ -8382,42 +8424,50 @@ void CGameMode::ProcessMouseWheel(int requireControl) {
 
   const float step = g_mouse.wheel > 0 ? -24.3f : 24.3f;
   g_cameraDistance = this->camera->camera.desiredDistance - step;
-  float maxDistance = this->canRotateView ? g_serviceOptionJitterScale : g_cameraBaseDistance;
+  float maxDistance = g_cameraBaseDistance;
+  if (this->canRotateView) {
+    maxDistance = g_serviceOptionJitterScale;
+  }
   CSkillInfo zoomSkill = g_session.m_skillBundle.Lookup(0x1B9);
-  bool extendedZoom = false;
   if (this->hasViewParameters) {
     if (g_cameraDistance < static_cast<float>(this->viewParameters[0])) {
       g_cameraDistance = static_cast<float>(this->viewParameters[0]);
     }
     maxDistance = static_cast<float>(this->viewParameters[1] + this->viewParameters[0]);
-  } else if (zoomSkill.level <= 0 && this->scene->player->render.state == 6 && !this->scene->player->HasId(EF_BLIND)) {
-    switch (g_session.m_job) {
-    case JT_STAR:
-    case JT_STAR_B:
-    case JT_STAR_EMPEROR:
-    case JT_STAR_EMPEROR_B:
-    case JT_SKY_EMPEROR:
-      extendedZoom = true;
-      break;
-    }
-  }
-
-  if (extendedZoom) {
-    if (g_cameraDistance < g_cameraMinDistance) {
-      g_cameraDistance = g_cameraMinDistance;
-    }
-    if (g_cameraDistance > maxDistance * 3.0f) {
-      g_cameraDistance = maxDistance * 3.0f;
-    }
-    if (g_cameraDistance > maxDistance && this->camera->camera.desiredPitch > -50.0f) {
-      this->camera->camera.desiredPitch = -50.0f;
-    }
-  } else {
-    if (!this->hasViewParameters && g_cameraDistance < g_cameraMinDistance) {
-      g_cameraDistance = g_cameraMinDistance;
-    }
     if (g_cameraDistance > maxDistance) {
       g_cameraDistance = maxDistance;
+    }
+  } else {
+    bool extendedZoom = false;
+    if (zoomSkill.level <= 0 && this->scene->player->render.state == ST_SIT && !this->scene->player->HasId(EF_BLIND)) {
+      switch (g_session.m_job) {
+      case JT_STAR:
+      case JT_STAR_B:
+      case JT_STAR_EMPEROR:
+      case JT_STAR_EMPEROR_B:
+      case JT_SKY_EMPEROR:
+        extendedZoom = true;
+        break;
+      }
+    }
+
+    if (extendedZoom) {
+      if (g_cameraDistance < g_cameraMinDistance) {
+        g_cameraDistance = g_cameraMinDistance;
+      }
+      if (g_cameraDistance > maxDistance * 3.0f) {
+        g_cameraDistance = maxDistance * 3.0f;
+      }
+      if (g_cameraDistance > maxDistance && this->camera->camera.desiredPitch > -50.0f) {
+        this->camera->camera.desiredPitch = -50.0f;
+      }
+    } else {
+      if (g_cameraDistance < g_cameraMinDistance) {
+        g_cameraDistance = g_cameraMinDistance;
+      }
+      if (g_cameraDistance > maxDistance) {
+        g_cameraDistance = maxDistance;
+      }
     }
   }
 
@@ -8431,6 +8481,96 @@ struct ContactNpcPacket {
   /* 0006 */ unsigned char type;
 };
 #pragma pack(pop)
+
+struct CashItemSchedulePacket {
+  /* 0000 */ std::int16_t packetType;
+};
+
+static_assert(sizeof(CashItemSchedulePacket) == 2);
+
+// INLINED
+static unsigned ReadReplaySkillEffects(const std::vector<unsigned char>& data) {
+  if (data.empty()) {
+    return 0xFFFFFFFFu;
+  }
+
+  GameModeChunkHeader header;
+  g_activeSkillEffects.erase(g_activeSkillEffects.begin(), g_activeSkillEffects.end());
+  unsigned offset = 6;
+  header.Clear();
+  header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
+  if (REPLAY_CHUNK_ACTIVE_SKILL_EFFECTS_BEGIN != header.type) {
+    return 0xFFFFFFFFu;
+  }
+
+  while (data.size() > offset) {
+    header.Clear();
+    header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
+    offset += 6;
+
+    switch (header.type) {
+    case REPLAY_CHUNK_ACTIVE_SKILL_EFFECTS_END:
+      g_statusRefreshSuppressed = 1;
+      return offset;
+    case REPLAY_CHUNK_ACTIVE_SKILL_EFFECTS_EFFECT: {
+      ActiveSkillEffect effect;
+      std::memcpy(&effect, data.data() + offset, header.size);
+      offset += header.size;
+      if (effect.expiration != 999999) {
+        g_cooldownOwner->Register(effect.id, effect.totalDuration, effect.expiration - effect.remainingDuration, effect.totalDuration - effect.remainingDuration);
+      }
+      g_activeSkillEffects.push_back(effect);
+      break;
+    }
+    default:
+      offset += header.size;
+      break;
+    }
+  }
+
+  g_statusRefreshSuppressed = 1;
+  return offset;
+}
+
+// INLINED
+static unsigned ReadReplayQuestState(CGameMode* mode, const std::vector<unsigned char>& data) {
+  if (data.empty()) {
+    return 0xFFFFFFFFu;
+  }
+
+  GameModeChunkHeader header;
+  header.Clear();
+  header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
+  unsigned offset = 6;
+  if (REPLAY_CHUNK_QUEST_STATE_BEGIN != header.type) {
+    return 0xFFFFFFFFu;
+  }
+
+  while (data.size() > offset) {
+    header.Clear();
+    header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
+    offset += 6;
+
+    switch (header.type) {
+    case REPLAY_CHUNK_QUEST_STATE_END:
+      return offset;
+    case REPLAY_CHUNK_QUEST_STATE_IS_ON_QUEST:
+      std::memcpy(&mode->isOnQuest, data.data() + offset, header.size);
+      offset += header.size;
+      break;
+    default:
+      offset += header.size;
+      break;
+    }
+  }
+
+  return offset;
+}
+
+// INLINED
+static std::string MapFileName(const char* name) {
+  return std::string(name);
+}
 
 // OFFSET: 0x00CDDA50
 // FUNCTION: fn_21320
@@ -8446,37 +8586,7 @@ void CGameMode::Initialize(const char* name) {
   this->bossAlarmAndCopyNameFlags[1] = 0;
 
   if (Replay::Instance().state == 6) {
-    const std::vector<unsigned char> data = Replay::Instance().ReadSection(0x12);
-    if (data.begin() != data.end()) {
-      GameModeChunkHeader header;
-      g_activeSkillEffects.erase(g_activeSkillEffects.begin(), g_activeSkillEffects.end());
-      unsigned offset = 6;
-      header.Clear();
-      header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
-      if (header.type == 19000) {
-        while (offset < data.size()) {
-          header.Clear();
-          header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
-          offset += 6;
-          if (header.type == 19001) {
-            break;
-          }
-
-          if (header.type == 19011) {
-            ActiveSkillEffect effect;
-            std::memcpy(&effect, data.data() + offset, header.size);
-            offset += header.size;
-            if (effect.expiration != 999999) {
-              g_cooldownOwner->Register(effect.id, effect.totalDuration, effect.expiration - effect.remainingDuration, effect.totalDuration - effect.remainingDuration);
-            }
-            g_activeSkillEffects.push_back(effect);
-          } else {
-            offset += header.size;
-          }
-        }
-        g_statusRefreshSuppressed = 1;
-      }
-    }
+    ReadReplaySkillEffects(Replay::Instance().ReadSection(0x12));
   }
 
   g_session.ClearPairValues(1, 0, 0);
@@ -8520,11 +8630,11 @@ void CGameMode::Initialize(const char* name) {
   this->mousePointer = new CMousePointer();
   this->scene->objects.push_back(this->mousePointer);
   CSoundMgr* soundMgr = g_soundMgr;
-  soundMgr->SetDefaultName(g_session.GetBgmFileName(std::string(this->mapName).c_str()));
+  soundMgr->SetDefaultName(g_session.GetBgmFileName(MapFileName(this->mapName).c_str()));
 
   g_weatherEffect.enabled = g_serviceOptions.Get(TT_LIGHTMAP_ON_OFF) == 0;
   if (g_serviceOptions.Get(TT_FOG_ON_OFF)) {
-    int found = 0;
+    int found;
     const std::vector<std::string>* fog = g_session.GetFogParameters(this->mapName, &found);
     if (found) {
       g_depthStart = static_cast<float>(std::atof((*fog)[0].c_str()));
@@ -8559,10 +8669,8 @@ void CGameMode::Initialize(const char* name) {
 
   if (g_replayAnimationScaling == 0) {
     std::uint64_t now = _Xtime_get_ticks();
-    std::int64_t interval = 60000;
-    g_timeScheduler->AddSchedule(new CCheckGDISchedule(now, interval, 2));
-    interval = 5000;
-    CPingLiveSchedule* ping = new CPingLiveSchedule(now, interval);
+    g_timeScheduler->AddSchedule(new CCheckGDISchedule(now, 60000, 2));
+    CPingLiveSchedule* ping = new CPingLiveSchedule(now, 5000);
     g_session.m_pingLiveSchedule = ping->serial;
     g_timeScheduler->AddSchedule(ping);
   }
@@ -8572,8 +8680,9 @@ void CGameMode::Initialize(const char* name) {
       this->SendMsg(MM_STOVE_AUTHENTICATION, 1, 0, 0, 0);
       g_stoveMgr->FetchAllProducts();
     } else {
-      std::int16_t packet = ID_CZ_REQ_SCHEDULER_CASHITEM;
-      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet), &packet);
+      CashItemSchedulePacket packet;
+      packet.packetType = ID_CZ_REQ_SCHEDULER_CASHITEM;
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.packetType), &packet);
     }
   }
 
@@ -8594,28 +8703,7 @@ void CGameMode::Initialize(const char* name) {
     this->ReadReplayGroundItems(Replay::Instance().ReadSection(0x10));
     this->ReadReplayGroundSkills(Replay::Instance().ReadSection(0x11));
 
-    const std::vector<unsigned char> data = Replay::Instance().ReadSection(0x17);
-    if (data.begin() != data.end()) {
-      GameModeChunkHeader header;
-      unsigned offset = 6;
-      header.Clear();
-      header = *reinterpret_cast<const GameModeChunkHeader*>(data.data());
-      if (header.type == 14000) {
-        while (offset < data.size()) {
-          header.Clear();
-          header = *reinterpret_cast<const GameModeChunkHeader*>(data.data() + offset);
-          offset += 6;
-          if (header.type == 14001) {
-            break;
-          }
-
-          if (header.type == 14011) {
-            std::memcpy(&this->isOnQuest, data.data() + offset, header.size);
-          }
-          offset += header.size;
-        }
-      }
-    }
+    ReadReplayQuestState(this, Replay::Instance().ReadSection(0x17));
 
     g_navigationManager.LoadReplayState(Replay::Instance().ReadSection(0x18));
     g_windowMgr.LoadReplaySettings(Replay::Instance().ReadSection(0x14));
@@ -8806,18 +8894,18 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
   if (mode == 2 || mode == 4) {
     const int shiftHeld = HIBYTE(GetAsyncKeyState(VK_SHIFT));
     attack = IsSupportSkill(this->skillId) ? shiftHeld : shiftHeld == 0;
-    this->SetCursorAction(11);
+    this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
   } else {
     attack = HIBYTE(GetAsyncKeyState(VK_SHIFT)) == 0;
     if (actor->objectType == NPC_PET_TYPE) {
-      this->SetCursorAction(0);
+      this->SetCursorAction(CURSOR_ACTION_DEFAULT);
     } else if (g_session.GetMapProperty08() != 0 || this->scene->isSiegeMode != 0) {
       if (g_session.IsLocalPlayerAid(actor->GetGdid())) {
         attack = 0;
-        this->SetCursorAction(0);
+        this->SetCursorAction(CURSOR_ACTION_DEFAULT);
       }
     } else {
-      this->SetCursorAction(5);
+      this->SetCursorAction(CURSOR_ACTION_ATTACK);
 
     }
   }
@@ -8835,7 +8923,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
         CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
         if (homun && homun->HasActiveHomunculusAI()) {
           AiMessage message = {};
-          message.type = 3;
+          message.type = ATTACK_OBJECT_CMD;
           message.target = actor->render.accountId;
           homun->SetResMsg2AI(&message, 0);
         }
@@ -8843,13 +8931,13 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
         CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
         if (homun && homun->HasActiveHomunculusAI()) {
           AiMessage message = {};
-          message.type = 3;
+          message.type = ATTACK_OBJECT_CMD;
           message.target = g_session.homunEnemyGid;
           homun->SetMsg2AI(&message, 0);
         }
         g_session.attackHomunEnemy = 0;
       } else {
-        this->SetCursorAction(11);
+        this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
         g_session.homunEnemyGid = actor->render.accountId;
         g_session.homunEnemyX = 0;
         g_session.homunEnemyY = 0;
@@ -8863,7 +8951,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
       CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
       if (homun && homun->HasActiveHomunculusAI()) {
         AiMessage message = {};
-        message.type = 7;
+        message.type = SKILL_OBJECT_CMD;
         message.level = this->skillUseLevel;
         message.skill = this->skillId;
         message.target = actor->render.accountId;
@@ -8878,7 +8966,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
       CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
-        message.type = 3;
+        message.type = ATTACK_OBJECT_CMD;
         message.target = actor->render.accountId;
         mercenary->SetResMsg2AI(&message, 1);
       }
@@ -8886,16 +8974,16 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
       CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
-        message.type = 3;
+        message.type = ATTACK_OBJECT_CMD;
         message.target = g_session.mercenaryEnemyGid;
         mercenary->SetMsg2AI(&message, 1);
       }
       g_session.attackMercenaryEnemy = 0;
     } else {
-      this->SetCursorAction(11);
-      g_session.mercenaryEnemyGid = actor->render.accountId;
+      this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
       g_session.mercenaryEnemyX = 0;
       g_session.mercenaryEnemyY = 0;
+      g_session.mercenaryEnemyGid = actor->render.accountId;
       g_session.moveMercenaryEnemy = 0;
       g_session.attackMercenaryEnemy = 1;
     }
@@ -8908,7 +8996,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
     CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
     if (mercenary && mercenary->HasActiveMercenaryAI()) {
       AiMessage message = {};
-      message.type = 7;
+      message.type = SKILL_OBJECT_CMD;
       message.level = this->skillUseLevel;
       message.skill = this->skillId;
       message.target = actor->render.accountId;
@@ -8937,7 +9025,7 @@ void CGameMode::ProcessActorClick(int& handled, ActorPickInfo* pick, CGameActor*
   }
 
   this->ShowActorNameBalloon(targetAid);
-  if (actor->render.state == 3) {
+  if (actor->render.state == ST_DEAD) {
     targetAid = 0;
   }
 }
@@ -9032,12 +9120,12 @@ int CGameMode::ProcessMousePick(int result, ActorPickInfo* pick) {
   int& clickTarget = this->lastMonGid;
 
   if (this->lockOnMouse != 0) {
-    this->SetCursorAction(5);
+    this->SetCursorAction(CURSOR_ACTION_ATTACK);
     if (lockedPick != 0) {
       if (g_mouse.buttons[0] == 1) {
         this->SendMsg(MM_SETLOCKONMOUSE, 0, 0, 0, 0);
       } else {
-        this->SetCursorAction(0);
+        this->SetCursorAction(CURSOR_ACTION_DEFAULT);
         if (!pick) {
           return result;
         }
@@ -9066,12 +9154,12 @@ int CGameMode::ProcessMousePick(int result, ActorPickInfo* pick) {
   if (lockedPick == 0) {
     if (clickTarget != 0) {
       if (pick) {
-        if (pick->kind == 3) {
-          this->SetCursorAction(0);
+        if (pick->kind == ACTOR_PICK_PET) {
+          this->SetCursorAction(CURSOR_ACTION_DEFAULT);
           return 0;
         }
-        if (pick->kind == 4) {
-          this->SetCursorAction(0);
+        if (pick->kind == ACTOR_PICK_COMPANION) {
+          this->SetCursorAction(CURSOR_ACTION_DEFAULT);
           this->ShowActorNameBalloon(pick->accountId);
           return this->HandleActorPick(pick, result);
         }
@@ -9113,12 +9201,8 @@ int CGameMode::ProcessMousePick(int result, ActorPickInfo* pick) {
 // OFFSET: 0x00CE0210
 // FUNCTION: fn_21329
 int CGameMode::ProcessGroundClick(int result) {
-  const auto drawCell = [](GroundGeometry* ground, const float* matrix, int column, int row, std::uint32_t color) {
-    ground->DrawGrid(matrix, column, row, color);
-  };
-
-  int row;
   int column;
+  int row;
   UIMacroReporterWnd* reporter = static_cast<UIMacroReporterWnd*>(g_windowMgr.LookupWindow(WID_MACROREPORTERWND));
   if (reporter) {
     if (reporter->activeOnly == true && reporter->m_mode == 1) {
@@ -9128,7 +9212,7 @@ int CGameMode::ProcessGroundClick(int result) {
       const int radius = reporter->reportCount;
       for (int dx = -radius; dx <= radius; ++dx) {
         for (int dy = -radius; dy <= radius; ++dy) {
-          drawCell(this->scene->ground, this->camera->frame.view.values, column + dx, row + dy, 0x660000FF);
+          this->scene->ground->DrawGrid(this->camera->frame.view.values, column + dx, row + dy, 0x660000FF);
         }
       }
 
@@ -9151,18 +9235,19 @@ int CGameMode::ProcessGroundClick(int result) {
       column = -1;
       row = -1;
       this->PickScreenTerrain(column, row);
-      drawCell(this->scene->ground, this->camera->frame.view.values, column, row, 0x66FF0000);
+      const int pickedRow = row;
+      this->scene->ground->DrawGrid(this->camera->frame.view.values, column, pickedRow, 0x66FF0000);
       if (g_mouse.buttons[0] == 1) {
         shop->SetSuspended(0);
-        shop->SetSelection(static_cast<short>(column), static_cast<short>(row));
-        if (g_windowMgr.Confirm(LookupMessage(MSI_ASSISTANT_VENDING_POS), 2, true, false, 0, "Message", 280, 120, 0) == ID_YES) {
+        shop->SetSelection(static_cast<short>(column), static_cast<short>(pickedRow));
+        if (g_windowMgr.Confirm(LookupMessage(MSI_ASSISTANT_VENDING_POS), 2, true, false, 0, "메시지", 280, 120, 0) == ID_YES) {
           shop->SendShopRequest();
           return -1;
         }
         shop->SetSuspended(1);
       }
     } else if (shop->HasSelection() == true) {
-      drawCell(this->scene->ground, this->camera->frame.view.values, shop->selectedRow, shop->selectedColumn, 0x66FF0000);
+      this->scene->ground->DrawGrid(this->camera->frame.view.values, shop->selectedRow, shop->selectedColumn, 0x66FF0000);
     }
   }
 
@@ -9186,7 +9271,7 @@ int CGameMode::ProcessGroundClick(int result) {
         if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
           if (homun && homun->HasActiveHomunculusAI()) {
             AiMessage message = {};
-            message.type = 1;
+            message.type = MOVE_CMD;
             message.x = column;
             message.y = row;
             homun->SetResMsg2AI(&message, 0);
@@ -9200,7 +9285,7 @@ int CGameMode::ProcessGroundClick(int result) {
         g_session.attackHomunEnemy = 0;
         if (homun && homun->HasActiveHomunculusAI()) {
           AiMessage message = {};
-          message.type = 1;
+          message.type = MOVE_CMD;
           message.x = column;
           message.y = row;
           homun->SetMsg2AI(&message, 0);
@@ -9228,7 +9313,7 @@ int CGameMode::ProcessGroundClick(int result) {
       if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
         if (mercenary && mercenary->HasActiveMercenaryAI()) {
           AiMessage message = {};
-          message.type = 1;
+          message.type = MOVE_CMD;
           message.x = column;
           message.y = row;
           mercenary->SetResMsg2AI(&message, 1);
@@ -9242,7 +9327,7 @@ int CGameMode::ProcessGroundClick(int result) {
       g_session.attackMercenaryEnemy = 0;
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
-        message.type = 1;
+        message.type = MOVE_CMD;
         message.x = column;
         message.y = row;
         mercenary->SetMsg2AI(&message, 1);
@@ -9257,13 +9342,13 @@ int CGameMode::ProcessGroundClick(int result) {
         CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
         if (mercenary && mercenary->HasActiveMercenaryAI()) {
           const std::uint32_t state = mercenary->render.state;
-          if (state == 1 || state == 0 || state == 4) {
+          if (state == ST_MOVE || state == ST_STAND || state == ST_DAMAGE) {
             AiMessage message;
-            message.type = 8;
+            message.type = SKILL_AREA_CMD;
             message.x = column;
             message.y = row;
-            message.level = this->skillUseLevel;
             message.skill = this->skillId;
+            message.level = this->skillUseLevel;
             message.target = 0;
             mercenary->SetMsg2AI(&message, 1);
             return 1;
@@ -9283,7 +9368,7 @@ int CGameMode::ProcessGroundClick(int result) {
         case 1:
         case 4: {
           AiMessage message;
-          message.type = 8;
+          message.type = SKILL_AREA_CMD;
           message.x = column;
           message.y = row;
           message.level = this->skillUseLevel;
@@ -9357,7 +9442,7 @@ int CGameMode::ProcessGroundClick(int result) {
 
   g_windowMgr.UpdateNavigationList();
   clickTick = timeGetTime();
-  if (HIBYTE(GetAsyncKeyState(VK_SHIFT)) || g_windowMgr.chatRoomWnd || this->scene->player->render.state == 6) {
+  if (HIBYTE(GetAsyncKeyState(VK_SHIFT)) || g_windowMgr.chatRoomWnd || this->scene->player->render.state == ST_SIT) {
     this->scene->player->SendMsg(nullptr, AM_REQ_CHANGE_DIR, column, row, 0, 0, 0, 0);
     return result;
   }
@@ -9479,7 +9564,7 @@ void CGameMode::Update() {
             int y = actor->destCellY;
             int cellX = x;
             int cellY = y;
-            if (g_windowMgr.chatRoomWnd == nullptr && this->scene->player->render.state != 6) {
+            if (g_windowMgr.chatRoomWnd == nullptr && this->scene->player->render.state != ST_SIT) {
               bool reachable = true;
               if (!this->IsValidCell(x, y)) {
                 reachable = this->GetClosestValidCell(&cellX, &cellY);
@@ -9637,7 +9722,7 @@ void CGameMode::ProcessInput() {
     handled = 0;
   }
 
-  if (this->skillUseType != 0) {
+  if (this->skillUseType != SUT_NOSKILL) {
     if (g_session.m_mapTransitionFlag == 0) {
       if (g_mouse.wheel > 0) {
         this->SendMsg(MM_USESKILL_LEVEL_PLUS, 1, 0, 0, 0);
@@ -9648,7 +9733,7 @@ void CGameMode::ProcessInput() {
     g_session.m_mapTransitionFlag = 0;
   }
 
-  if (g_mouse.buttons[0] == 3) {
+  if (g_mouse.buttons[0] == MOUSE_BUTTON_RELEASED) {
     if (this->scene->player) {
       this->scene->player->SendMsg(nullptr, AM_ATTACKCLICKUP, 0, 0, 0, 0, 0, 0);
     }
@@ -9665,7 +9750,7 @@ void CGameMode::ProcessInput() {
   }
 
   g_pickModifierKey = HIBYTE(GetAsyncKeyState(VK_SHIFT));
-  ActorPickInfo* pick = g_actorPickNode.Pick(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+  ActorPickInfo* pick = g_actorPickNode.Pick(vector2d(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)));
   UIWindow* blocker = g_windowMgr.LookupWindow(WID_EXCHANGEUI);
   if (!blocker) {
     this->OpenActorMenu(pick, handled);
@@ -9679,20 +9764,18 @@ void CGameMode::ProcessInput() {
     if (pick) {
       int offset;
       if (this->skillId == AM_POTIONPITCHER) {
-        offset = g_session.IsCompanionJob(pick->job) && pick->kind == 4;
+        offset = g_session.IsCompanionJob(pick->job) && pick->kind == ACTOR_PICK_COMPANION;
       } else {
-        int eligible;
+        int eligible = 0;
         if (g_session.monsterInfoEnabled && g_session.IsMonsterClass(pick->job)) {
           eligible = 1;
-        } else if (g_serviceOptions.Get(TT_ITEM_SNAP_ON_OFF)) {
-          eligible = pick->kind == 1;
-        } else {
-          eligible = 0;
+        } else if (g_serviceOptions.Get(TT_ITEM_SNAP_ON_OFF) && pick->kind == ACTOR_PICK_ITEM) {
+          eligible = 1;
         }
         offset = 0;
         switch (pick->kind) {
-        case 3:
-        case 4:
+        case ACTOR_PICK_PET:
+        case ACTOR_PICK_COMPANION:
           break;
         default:
           offset = eligible;
@@ -9700,8 +9783,10 @@ void CGameMode::ProcessInput() {
         }
       }
       if (offset) {
+        const float bottom = pick->corners[1].y;
+        const float halfHeight = (pick->corners[0].y - bottom) * g_depthAverageHalf;
         this->cursorOffsetX = (pick->corners[0].x - pick->corners[1].x) * g_depthAverageHalf + pick->corners[1].x - static_cast<float>(g_mouse.x);
-        this->cursorOffsetY = (pick->corners[0].y - pick->corners[1].y) * g_depthAverageHalf + pick->corners[1].y - static_cast<float>(g_mouse.y);
+        this->cursorOffsetY = halfHeight + bottom - static_cast<float>(g_mouse.y);
       }
     }
   }
@@ -9712,14 +9797,14 @@ void CGameMode::ProcessInput() {
       !g_windowMgr.LookupWindow(WID_RUNESYSTEMWND)) {
     handled = this->ProcessGroundClick(this->ProcessMousePick(handled, pick));
     this->UpdateHoverNameBalloon();
-    if (handled != 1 && g_mouse.buttons[0] == 1) {
+    if (handled != 1 && g_mouse.buttons[0] == MOUSE_BUTTON_PRESSED) {
       g_windowMgr.SetFocus(nullptr);
     }
   } else if (pick && handled == 0) {
     this->ShowActorNameBalloon(pick->accountId);
   }
 
-  if ((handled == 1 || g_mouse.buttons[0] == 1) && g_mouse.buttons[0] == 1) {
+  if ((handled == 1 || g_mouse.buttons[0] == MOUSE_BUTTON_PRESSED) && g_mouse.buttons[0] == MOUSE_BUTTON_PRESSED) {
     g_moveRequestPending = false;
     this->SendMsg(MM_CANCEL_USE_SKILL, 0, 0, 0, 0);
     if (timeGetTime() > this->noMoveStartTick + 5000) {
@@ -9728,23 +9813,23 @@ void CGameMode::ProcessInput() {
     this->leftBtnClickTick = timeGetTime();
   }
 
-  const bool statusIcons = g_serviceOptions.Get(TT_STATEINFO_ON_OFF) != 0;
+  const bool statusIcons = g_serviceOptions.Get(TT_STATEINFO_ON_OFF);
   if (Replay::Instance().state != 6 && statusIcons) {
     this->ProcessStatusIconTooltip(g_mouse.x, g_mouse.y);
   }
 
   if (handled == 0) {
-    if (this->skillUseType != 0) {
-      this->SetCursorAction(10);
-    } else if (g_mouse.buttons[1] != 2) {
+    if (this->skillUseType != SUT_NOSKILL) {
+      this->SetCursorAction(CURSOR_ACTION_SKILL);
+    } else if (g_mouse.buttons[1] != MOUSE_BUTTON_HELD) {
       int column = -1;
       int row = -1;
       this->PickScreenTerrain(column, row);
       const TerrainHeightCell* cell = this->scene->terrain->CellAt(column, row);
       if (cell && cell->type != TERRAIN_CELL_BLOCKED && cell->type != TERRAIN_CELL_CLIFF) {
-        this->SetCursorAction(0);
+        this->SetCursorAction(CURSOR_ACTION_DEFAULT);
       } else {
-        this->SetCursorAction(13);
+        this->SetCursorAction(CURSOR_ACTION_MOVE_BLOCKED);
       }
     }
   }
@@ -9805,6 +9890,10 @@ struct TalkWhisperSettingPacket {
   /* 001A */ unsigned char type;
 };
 
+struct TalkCommandPacket {
+  /* 0000 */ std::int16_t id;
+};
+
 struct TalkConfigPacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ unsigned char value;
@@ -9822,12 +9911,16 @@ struct TalkSelectPacket {
   /* 0007 */ unsigned char option;
 };
 
+struct TalkCameraView {
+  /* 0000 */ float range;
+  /* 0004 */ float rotation;
+  /* 0008 */ float latitude;
+};
+
 struct TalkCameraPacket {
   /* 0000 */ std::int16_t id;
   /* 0002 */ unsigned char action;
-  /* 0003 */ float range;
-  /* 0007 */ float rotation;
-  /* 000B */ float latitude;
+  /* 0003 */ TalkCameraView view;
 };
 
 struct TalkNamePacket {
@@ -9885,7 +9978,8 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     if (this->refuseWhisperName.size() > 0x18) {
       break;
     }
-    g_whisperBlockMgr->Add(this->refuseWhisperName);
+    auto* blockMgr = g_whisperBlockMgr;
+    blockMgr->Add(this->refuseWhisperName);
     TalkWhisperSettingPacket packet;
     packet.id = ID_CZ_SETTING_WHISPER_PC;
     StringFormat(packet.name, 0x18, static_cast<std::size_t>(-1), "%s", this->refuseWhisperName.c_str());
@@ -9898,7 +9992,8 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     if (this->refuseWhisperName.size() > 0x18) {
       break;
     }
-    g_whisperBlockMgr->Remove(this->refuseWhisperName);
+    auto* blockMgr = g_whisperBlockMgr;
+    blockMgr->Remove(this->refuseWhisperName);
     TalkWhisperSettingPacket packet;
     packet.id = ID_CZ_SETTING_WHISPER_PC;
     StringFormat(packet.name, 0x18, static_cast<std::size_t>(-1), "%s", this->refuseWhisperName.c_str());
@@ -9919,7 +10014,7 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     if (g_session.m_whisperRecord != 0) {
       CGameMode* mode = g_modeMgr.GetGameMode();
       if (g_session.IsAdminSubMode(7) != 0) {
-        char directory[3000];
+        char directory[2048];
         PrepareChatLog(mode, directory);
       }
       std::sprintf(text, "Chatting Auto Save Start..");
@@ -9966,48 +10061,49 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
       g_windowMgr.SetChatInputText(text + 1);
       clan = true;
     }
-    int clanChat = clan;
     if (HIBYTE(GetAsyncKeyState(VK_CAPITAL))) {
-      clanChat = 1;
+      clan = true;
     }
-    if (talkType == TT_NORMAL_FROM_CHATROOM) {
-      this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
-      break;
-    }
-    if (g_session.battleChat != 0) {
-      this->SendMsg(MM_CHAT_BATTLEFIELD, 0, 0, 0, 0);
-      break;
-    }
-    const int sendMode = g_session.m_chatTarget;
-    if (sendMode == 2 && g_guildInfo.m_guildId != 0) {
-      this->SendMsg(alternate ? MM_CHATMSG : MM_CHAT_GUILD, 0, 0, 0, 0);
-      break;
-    }
-    if (sendMode == 1) {
-      if (party == 0 && g_session.PartyCount() != 0) {
-        this->SendMsg(MM_CHAT_PARTY, 0, 0, 0, 0);
-      } else {
-        this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
+    if (talkType != TT_NORMAL_FROM_CHATROOM) {
+      if (g_session.battleChat != 0) {
+        this->SendMsg(MM_CHAT_BATTLEFIELD, 0, 0, 0, 0);
+        break;
       }
-      break;
+      if (g_session.m_chatTarget == 2 && g_guildInfo.m_guildId != 0) {
+        if (alternate != 0) {
+          this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
+        } else {
+          this->SendMsg(MM_CHAT_GUILD, 0, 0, 0, 0);
+        }
+        break;
+      }
+      if (g_session.m_chatTarget == 1) {
+        if (party == 0 && g_session.PartyCount() != 0) {
+          this->SendMsg(MM_CHAT_PARTY, 0, 0, 0, 0);
+          break;
+        }
+      } else {
+        if (g_session.m_chatTarget == 3 && g_clanInfo->m_hasClan == 1) {
+          this->SendMsg(MM_CHAT_CLAN, 0, 0, 0, 0);
+        } else if (g_session.m_chatTarget == 4 && g_guildInfo.m_guildId != 0) {
+          if (!clan) {
+            this->SendMsg(MM_CHAT_ALLY, 0, 0, 0, 0);
+          } else {
+            this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
+          }
+        } else if (party != 0 && g_session.PartyCount() != 0) {
+          this->SendMsg(MM_CHAT_PARTY, 0, 0, 0, 0);
+        } else if (alternate != 0) {
+          this->SendMsg(MM_CHAT_GUILD, 0, 0, 0, 0);
+        } else if (clan) {
+          this->SendMsg(MM_CHAT_ALLY, 0, 0, 0, 0);
+        } else {
+          this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
+        }
+        break;
+      }
     }
-    if (sendMode == 3 && g_clanInfo->m_hasClan == 1) {
-      this->SendMsg(MM_CHAT_CLAN, 0, 0, 0, 0);
-      break;
-    }
-    if (sendMode == 4 && g_guildInfo.m_guildId != 0) {
-      this->SendMsg(static_cast<char>(clanChat) ? MM_CHATMSG : MM_CHAT_ALLY, 0, 0, 0, 0);
-      break;
-    }
-    if (party != 0 && g_session.PartyCount() != 0) {
-      this->SendMsg(MM_CHAT_PARTY, 0, 0, 0, 0);
-    } else if (alternate != 0) {
-      this->SendMsg(MM_CHAT_GUILD, 0, 0, 0, 0);
-    } else if (static_cast<char>(clanChat)) {
-      this->SendMsg(MM_CHAT_ALLY, 0, 0, 0, 0);
-    } else {
-      this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
-    }
+    this->SendMsg(MM_CHATMSG, 0, 0, 0, 0);
     break;
   }
   case TT_BROADCAST:
@@ -10040,8 +10136,8 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
       g_session.HiFriends(nullptr);
       std::sprintf(text, "[ To Friends ] : (Hi) *^_^*");
     } else {
-      char* message = const_cast<char*>(g_windowMgr.chatInputText.c_str());
       std::string copy;
+      char* message = const_cast<char*>(g_windowMgr.chatInputText.c_str());
       copy = message;
       g_session.HiFriends(message);
       if (g_serviceType == ServiceKorea) {
@@ -10126,11 +10222,13 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
       g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_BATTLE_OFF)), 0x64FFFF, 0, 0, 0);
     }
     break;
-  case TT_BATTLECHAT_ON_OFF:
+  case TT_BATTLECHAT_ON_OFF: {
     g_session.battleChat = 1 - g_session.battleChat;
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(g_session.battleChat ? MSI_BATTLECHAT_ON : MSI_BATTLECHAT_OFF)), 0x64FFFF, 0, 0, 0);
+    const char* text = LookupMessage(g_session.battleChat ? MSI_BATTLECHAT_ON : MSI_BATTLECHAT_OFF);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x64FFFF, 0, 0, 0);
     break;
+  }
   case TT_AUTO_MSG_ON_OFF:
     g_session.m_autoReplyEnabled = !g_session.m_autoReplyEnabled;
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
@@ -10190,15 +10288,19 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     }
     g_windowMgr.RefreshGameSettings();
     break;
-  case TT_TINGONLY_ON_OFF:
+  case TT_TINGONLY_ON_OFF: {
     g_soundMgr->tingOnly = g_soundMgr->tingOnly == 0;
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(g_soundMgr->tingOnly ? MSI_TINGONLY_ON : MSI_TINGONLY_OFF)), 0x64FFFF, 0, 0, 0);
+    const char* text = LookupMessage(g_soundMgr->tingOnly ? MSI_TINGONLY_ON : MSI_TINGONLY_OFF);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x64FFFF, 0, 0, 0);
     break;
-  case TT_FRAMESKIP_ON_OFF:
+  }
+  case TT_FRAMESKIP_ON_OFF: {
     g_frameskip = 1 - g_frameskip;
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
-    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(g_frameskip ? MSI_FRAME_SKIP_ON : MSI_FRAME_SKIP_OFF)), 0x64FFFF, 0, 0, 0);
+    const char* text = LookupMessage(g_frameskip ? MSI_FRAME_SKIP_ON : MSI_FRAME_SKIP_OFF);
+    g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x64FFFF, 0, 0, 0);
     break;
+  }
   case TT_MUSIC_ON_OFF:
     g_serviceOptions.Set(TT_MUSIC_ON_OFF, !g_serviceOptions.Get(TT_MUSIC_ON_OFF));
     g_windowMgr.SendNotice(UIM_OPENCHATWND, 0, 0, 0, 0, 0);
@@ -10234,12 +10336,9 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
   case TT_REQ_ITEM_CREATE:
     this->SendMsg(MM_ITEM_CREATE, reinterpret_cast<int>(parts[0].c_str()), 0, 0, 0);
     break;
-  case TT_REQ_MOVETO_MAP: {
-    const int third = std::atoi(parts[2].c_str());
-    const int second = std::atoi(parts[1].c_str());
-    this->SendMsg(MM_MOVETO_MAP, reinterpret_cast<int>(parts[0].c_str()), second, third, 0);
+  case TT_REQ_MOVETO_MAP:
+    this->SendMsg(MM_MOVETO_MAP, reinterpret_cast<int>(parts[0].c_str()), std::atoi(parts[1].c_str()), std::atoi(parts[2].c_str()), 0);
     break;
-  }
   case TT_REMOVE:
     this->SendMsg(MM_REMOVE_TO_AID, reinterpret_cast<int>(parts[0].c_str()), 0, 0, 0);
     break;
@@ -10265,7 +10364,8 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     std::string value(parts[0].c_str());
     LowercaseText(value);
     if (value == "off" || value == "on") {
-      this->SendMsg(0x55, value == "off" ? 0 : 1, 0, 0, 0);
+      const int enabled = value == "off" ? 0 : 1;
+      this->SendMsg(0x55, enabled, 0, 0, 0);
     }
     break;
   }
@@ -10524,12 +10624,9 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
   case TT_REQ_RESETSKILL:
     this->SendMsg(MM_RESET_SKILL, std::atoi(parts[0].c_str()), 0, 0, 0);
     break;
-  case TT_CHANGE_MAPTYPE: {
-    const int third = std::atoi(parts[2].c_str());
-    const int second = std::atoi(parts[1].c_str());
-    this->SendMsg(MM_REQ_CHANGE_MAPTYPE, std::atoi(parts[0].c_str()), second, third, 0);
+  case TT_CHANGE_MAPTYPE:
+    this->SendMsg(MM_REQ_CHANGE_MAPTYPE, std::atoi(parts[0].c_str()), std::atoi(parts[1].c_str()), std::atoi(parts[2].c_str()), 0);
     break;
-  }
   case TT_HIDE: {
     std::uint32_t flags = g_session.m_jobFlags;
     if (IsCloaking(flags)) {
@@ -10544,14 +10641,18 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     if (IsAdminAccount(g_session.m_aid)) {
       const unsigned char enabled = this->bossAlarmAndCopyNameFlags[1];
       this->bossAlarmAndCopyNameFlags[1] = enabled == 0;
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(enabled == 0 ? "Copy_Name_On!!" : "Copy_Name_Off!!"), 0x64FFFF, 0, 0, 0);
+      if (enabled == 0) {
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("Copy_Name_On!!"), 0x64FFFF, 0, 0, 0);
+      } else {
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("Copy_Name_Off!!"), 0x64FFFF, 0, 0, 0);
+      }
     }
     break;
   case TT_REQ_ACCEPT_INVITE_PARTY:
   case TT_REQ_REFUSE_INVITE_PARTY: {
     TalkConfigPacket packet;
-    packet.value = talkType != TT_REQ_ACCEPT_INVITE_PARTY;
     packet.id = ID_CZ_PARTY_CONFIG;
+    packet.value = talkType != TT_REQ_ACCEPT_INVITE_PARTY;
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
@@ -10589,14 +10690,21 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
   }
   case TT_NAVIGATION2: {
     const NaviCell cell = g_navigationManager.ParseCell(parts[1].c_str());
-    bool first = false;
-    bool second = false;
-    bool third = false;
-    if (cell.x == -1 || cell.y == -1 || !g_navigationManager.ParseFlags(parts[2].c_str(), &first, &second, &third)) {
+    if (cell.x == -1 || cell.y == -1) {
       g_navigationManager.ShowRouteResult(-100, 1);
       break;
     }
-    unsigned char mode = second ? 1 : 0;
+    bool third = false;
+    bool second = false;
+    bool first = false;
+    if (!g_navigationManager.ParseFlags(parts[2].c_str(), &first, &second, &third)) {
+      g_navigationManager.ShowRouteResult(-100, 1);
+      break;
+    }
+    unsigned char mode = 0;
+    if (second) {
+      mode = 1;
+    }
     if (first) {
       mode += 2;
     }
@@ -10612,11 +10720,11 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
   case TT_SHOW_BUILD_INFO: {
     char text[1024];
     std::memset(text, 0, sizeof(text));
-    sprintf_s(text, sizeof(text), "build : %s - %s", "Feb 11 2026", "10:21:26");
+    sprintf_s(text, sizeof(text), "build : %s - %s", "Feb 11 2026", "10:22:12");
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFFFF, 0, 0, 0);
     sprintf_s(text, sizeof(text), "ver : %d.%d.%d", 14, 2, 3);
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFFFF, 0, 0, 0);
-    sprintf_s(text, sizeof(text), "s/n : %s", "");
+    sprintf_s(text, sizeof(text), "s/n : %s", "XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFFFF, 0, 0, 0);
     _snprintf_s(text, _TRUNCATE, "verification : %s", "XXXXXXX");
     g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0xFFFF, 0, 0, 0);
@@ -10650,11 +10758,10 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     }
     break;
   }
-  case TT_MACRO_REGISTER:
-  case TT_MACRO_DETECTOR: {
+  case TT_MACRO_REGISTER: {
     TalkConfigPacket packet;
-    packet.value = talkType == TT_MACRO_REGISTER ? 2 : 3;
     packet.id = ID_CZ_UI_OPEN;
+    packet.value = 2;
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
@@ -10665,11 +10772,16 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
   }
+  case TT_MACRO_DETECTOR: {
+    TalkConfigPacket packet;
+    packet.id = ID_CZ_UI_OPEN;
+    packet.value = 3;
+    GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+    break;
+  }
   case TT_VIEW_CAMERAINFO_ON_OFF: {
     TalkCameraPacket packet;
-    packet.range = 0.0f;
-    packet.rotation = 0.0f;
-    packet.latitude = 0.0f;
+    packet.view = TalkCameraView{};
     packet.id = ID_CZ_VIEW_CAMERAINFO;
     packet.action = 1;
     GetRagConnection().Send(sizeof(packet), &packet);
@@ -10681,27 +10793,27 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
       break;
     }
     TalkCameraPacket packet;
-    packet.action = 0;
     packet.id = ID_CZ_VIEW_CAMERAINFO;
-    packet.range = camera->camera.distance;
-    packet.rotation = camera->camera.yaw;
-    packet.latitude = camera->camera.pitch;
+    packet.action = 0;
+    packet.view.range = camera->camera.distance;
+    packet.view.rotation = camera->camera.yaw;
+    packet.view.latitude = camera->camera.pitch;
     if (parts[0].find("range", 0) != std::string::npos) {
-      packet.range = static_cast<float>(std::atof(parts[1].c_str()));
+      packet.view.range = static_cast<float>(std::atof(parts[1].c_str()));
     } else if (parts[0].find("rotation", 0) != std::string::npos) {
-      packet.rotation = static_cast<float>(std::atof(parts[1].c_str()));
+      packet.view.rotation = static_cast<float>(std::atof(parts[1].c_str()));
     } else if (parts[0].find("latitude", 0) != std::string::npos) {
-      packet.latitude = static_cast<float>(std::atof(parts[1].c_str()));
+      packet.view.latitude = static_cast<float>(std::atof(parts[1].c_str()));
     } else {
-      packet.range = static_cast<float>(std::atof(parts[0].c_str()));
-      packet.rotation = static_cast<float>(std::atof(parts[1].c_str()));
-      packet.latitude = static_cast<float>(std::atof(parts[2].c_str()));
+      packet.view.range = static_cast<float>(std::atof(parts[0].c_str()));
+      packet.view.rotation = static_cast<float>(std::atof(parts[1].c_str()));
+      packet.view.latitude = static_cast<float>(std::atof(parts[2].c_str()));
     }
     GetRagConnection().Send(sizeof(packet), &packet);
     break;
   }
   case TT_RESET_COOLTIME: {
-    TalkConfigPacket packet;
+    TalkCommandPacket packet;
     packet.id = ID_CZ_CMD_RESETCOOLTIME;
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
     break;
@@ -10750,40 +10862,38 @@ void CGameMode::ExecuteTalkType(int talkType, std::string* arguments) {
   case TT_PROBABILITY_TEST: {
     this->recordItemPickups = this->recordItemPickups == 0;
     std::string server("Dev");
-    if (g_serviceMode == ServerPrimary && server.compare(0, 3, g_launchServerName, std::strlen(g_launchServerName)) != 0) {
-      break;
-    }
-    SYSTEMTIME time;
-    GetLocalTime(&time);
-    if (this->recordItemPickups == 1) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("확률 로그 시작"), 0x64FFFF, 0, 0, 0);
-      std::string name(FormatString("ProbabilityLog(%02d-%02d-%02d).txt", time.wYear, time.wMonth, time.wDay));
-      FILE* file = std::fopen(name.c_str(), "a");
-      if (file) {
-        std::fprintf(file, "시작 : %02d-%02d-%02d %02d:%02d:%02d \n", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
-                     time.wSecond);
-      }
-      std::fclose(file);
-    } else {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("확률 로그 끝"), 0x64FFFF, 0, 0, 0);
-      std::string name(FormatString("ProbabilityLog(%02d-%02d-%02d).txt", time.wYear, time.wMonth, time.wDay));
-      FILE* file = std::fopen(name.c_str(), "a");
-      if (file) {
-        for (const auto& entry : this->itemPickupCounts) {
-          int itemId = entry.first;
-          int count = entry.second;
-          ITEM_INFO item;
-          item.SetItemId(itemId);
-          item.identified = 1;
-          const std::string itemName = item.DisplayName(0);
-          std::string line = std::format("ID : {}, {}, {}개 \n", itemId, itemName.c_str(), count);
-          std::fprintf(file, line.c_str());
+    if (g_serviceMode != ServerPrimary || server.compare(g_launchServerName) == 0) {
+      SYSTEMTIME time;
+      GetLocalTime(&time);
+      if (this->recordItemPickups == 1) {
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("확률 로그 시작"), 0x64FFFF, 0, 0, 0);
+        std::string name(FormatString("ProbabilityLog(%02d-%02d-%02d).txt", time.wYear, time.wMonth, time.wDay));
+        FILE* file = std::fopen(name.c_str(), "a");
+        if (file) {
+          std::fprintf(file, "시작 : %02d-%02d-%02d %02d:%02d:%02d \n", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
+                       time.wSecond);
         }
-        std::fprintf(file, "끝 : %02d-%02d-%02d %02d:%02d:%02d \n\n", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
-                     time.wSecond);
         std::fclose(file);
+      } else {
+        g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>("확률 로그 끝"), 0x64FFFF, 0, 0, 0);
+        std::string name(FormatString("ProbabilityLog(%02d-%02d-%02d).txt", time.wYear, time.wMonth, time.wDay));
+        FILE* file = std::fopen(name.c_str(), "a");
+        if (file) {
+          for (const auto& entry : this->itemPickupCounts) {
+            int itemId = entry.first;
+            int count = entry.second;
+            ITEM_INFO item;
+            item.SetItemId(itemId);
+            item.identified = 1;
+            std::string line = std::format("ID : {}, {}, {}개 \n", itemId, item.DisplayName(0).c_str(), count);
+            std::fprintf(file, line.c_str());
+          }
+          std::fprintf(file, "끝 : %02d-%02d-%02d %02d:%02d:%02d \n\n", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
+                       time.wSecond);
+          std::fclose(file);
+        }
+        this->itemPickupCounts.clear();
       }
-      this->itemPickupCounts.clear();
     }
     break;
   }
@@ -10809,10 +10919,10 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
   const std::intptr_t mode = this->skillUseType;
 
   int skillMode;
-  int shiftHeld;
+  unsigned int support;
   bool optionalSelf;
-  int support;
-  int attack;
+  unsigned int shiftHeld;
+  unsigned int attack;
   if (mode == 2 || mode == 4) {
     skillMode = 1;
     shiftHeld = HIBYTE(GetAsyncKeyState(VK_SHIFT));
@@ -10879,7 +10989,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
           attack = 0;
           if (skillMode) {
             attack = support;
-            if ((selfTargetOption || shiftHeld) && optionalSelf == true) {
+            if ((selfTargetOption || shiftHeld) && optionalSelf) {
               attack = 1;
             }
           }
@@ -10896,23 +11006,23 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     }
   }
 
-  if (attack && actor->render.state != 3) {
-    this->SetCursorAction(skillMode == 0 ? 5 : 11);
+  if (attack && actor->render.state != ST_DEAD) {
+    this->SetCursorAction(skillMode == 0 ? CURSOR_ACTION_ATTACK : CURSOR_ACTION_SKILL_TARGET);
     handled = 1;
-  } else if (skillMode && actor->render.state != 3) {
-    this->SetCursorAction(10);
+  } else if (skillMode && actor->render.state != ST_DEAD) {
+    this->SetCursorAction(CURSOR_ACTION_SKILL);
   } else {
-    this->SetCursorAction(0);
+    this->SetCursorAction(CURSOR_ACTION_DEFAULT);
   }
 
-  const std::uint32_t& homunAid = g_session.m_homunAid;
-  const std::uint32_t& mercenaryAid = g_session.m_mercenaryAid;
-  if ((attack || this->scene->isSiegeMode != 0) && actor->render.state != 3 && !skillMode && g_session.homunAlive != 0 && g_mouse.buttons[1] == 1 && HIBYTE(GetAsyncKeyState(VK_MENU))) {
+  const std::uint32_t homunAid = g_session.m_homunAid;
+  const std::uint32_t mercenaryAid = g_session.m_mercenaryAid;
+  if ((attack || this->scene->isSiegeMode != 0) && actor->render.state != ST_DEAD && !skillMode && g_session.homunAlive != 0 && g_mouse.buttons[1] == 1 && HIBYTE(GetAsyncKeyState(VK_MENU))) {
     if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
       if (homun && homun->HasActiveHomunculusAI()) {
         AiMessage message = {};
-        message.type = 3;
+        message.type = ATTACK_OBJECT_CMD;
         message.target = actor->render.accountId;
         homun->SetResMsg2AI(&message, 0);
       }
@@ -10920,13 +11030,13 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
       CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
       if (homun && homun->HasActiveHomunculusAI()) {
         AiMessage message = {};
-        message.type = 3;
+        message.type = ATTACK_OBJECT_CMD;
         message.target = g_session.homunEnemyGid;
         homun->SetMsg2AI(&message, 0);
       }
       g_session.attackHomunEnemy = 0;
     } else {
-      this->SetCursorAction(11);
+      this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
       g_session.homunEnemyGid = actor->render.accountId;
       g_session.homunEnemyX = 0;
       g_session.homunEnemyY = 0;
@@ -10940,7 +11050,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
     if (homun && homun->homunAI && homun->homunAI->state) {
       AiMessage message = {};
-      message.type = 7;
+      message.type = SKILL_OBJECT_CMD;
       message.level = this->skillUseLevel;
       message.skill = this->skillId;
       message.target = actor->render.accountId;
@@ -10949,12 +11059,12 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     return;
   }
 
-  if ((attack || this->scene->isSiegeMode != 0) && actor->render.state != 3 && !skillMode && g_session.mercenaryAlive != 0 && g_mouse.buttons[0] == 1 && HIBYTE(GetAsyncKeyState(VK_MENU))) {
+  if ((attack || this->scene->isSiegeMode != 0) && actor->render.state != ST_DEAD && !skillMode && g_session.mercenaryAlive != 0 && g_mouse.buttons[0] == 1 && HIBYTE(GetAsyncKeyState(VK_MENU))) {
     if (HIBYTE(GetAsyncKeyState(VK_SHIFT))) {
       CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
-        message.type = 3;
+        message.type = ATTACK_OBJECT_CMD;
         message.target = actor->render.accountId;
         mercenary->SetResMsg2AI(&message, 1);
       }
@@ -10962,13 +11072,13 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
       CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
       if (mercenary && mercenary->HasActiveMercenaryAI()) {
         AiMessage message = {};
-        message.type = 3;
+        message.type = ATTACK_OBJECT_CMD;
         message.target = g_session.mercenaryEnemyGid;
         mercenary->SetMsg2AI(&message, 1);
       }
       g_session.attackMercenaryEnemy = 0;
     } else {
-      this->SetCursorAction(11);
+      this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
       g_session.mercenaryEnemyGid = actor->render.accountId;
       g_session.mercenaryEnemyX = 0;
       g_session.mercenaryEnemyY = 0;
@@ -10982,7 +11092,7 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
     CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
     if (mercenary && mercenary->HasActiveMercenaryAI()) {
       AiMessage message = {};
-      message.type = 7;
+      message.type = SKILL_OBJECT_CMD;
       message.level = this->skillUseLevel;
       message.skill = this->skillId;
       message.target = actor->render.accountId;
@@ -11029,20 +11139,19 @@ void CGameMode::ProcessActorPick(int& handled, ActorPickInfo* pick, CGameActor* 
 // FUNCTION: fn_21434
 void CGameMode::ProcessStatusIconTooltip(int x, int y) {
   if (this->statusIconTooltip) {
-    this->statusIconTooltip->Show(0);
+    this->statusIconTooltip->Show(WINDOW_HIDDEN);
   }
 
   if (g_activeSkillEffects.begin() == g_activeSkillEffects.end()) {
     return;
   }
 
-  int& hoveredId = this->hoveredStatusIconId;
   const int count = static_cast<int>(g_activeSkillEffects.end() - g_activeSkillEffects.begin());
   const int rows = (g_renderer->viewport.height - 169) / 35;
   const int columns = count / rows + (count % rows != 0 ? 1 : 0);
   const int right = g_renderer->viewport.width - 18;
   if (right - columns * 45 + 15 > x || x > right || y < 168 || y > rows * 35 + 168) {
-    hoveredId = -1;
+    this->hoveredStatusIconId = -1;
     return;
   }
 
@@ -11067,7 +11176,7 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
 
   const int id = g_session.m_statusIconIds[slot];
   if (id == -1) {
-    hoveredId = -1;
+    this->hoveredStatusIconId = -1;
     if (this->statusIconTooltip) {
       this->statusIconTooltip->SetText(" ", 35);
     }
@@ -11084,7 +11193,7 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
     timeText = this->GetActiveSkillEffectTimeText(id, &activeId);
   }
 
-  if (hoveredId != id || !this->statusIconTooltip || id == 0x175 || id == 0x2B7) {
+  if (this->hoveredStatusIconId != id || !this->statusIconTooltip || id == 0x175 || id == 0x2B7) {
     if (!this->statusIconTooltip) {
       this->statusIconTooltip = new UITransBalloonText();
       this->statusIconTooltip->SetSize(50, 50);
@@ -11158,18 +11267,20 @@ void CGameMode::ProcessStatusIconTooltip(int x, int y) {
     }
 
     if (this->statusIconTooltip->GetLine(0) != " ") {
-      this->statusIconTooltip->Show(1);
-      const int windowHeight = this->statusIconTooltip->geometry.height;
-      const int left = right - 30 + (slot / rows) * -45 - this->statusIconTooltip->geometry.width;
-      const int top = (slot % rows) * 35;
-      const int windowY = windowHeight + 171 + top > g_renderer->viewport.height ? g_renderer->viewport.height - windowHeight : top + 171;
+      this->statusIconTooltip->Show(WINDOW_VISIBLE);
+      const UITransBalloonText* tooltip = this->statusIconTooltip;
+      const int windowHeight = tooltip->geometry.height;
+      const int left = right - 30 + (slot / rows) * -45 - tooltip->geometry.width;
+      const int top = (slot % rows) * 35 + 171;
+      const int viewportHeight = g_renderer->viewport.height;
+      const int windowY = top + windowHeight > viewportHeight ? viewportHeight - windowHeight : top;
       this->statusIconTooltip->Move(left, windowY);
     }
 
-    hoveredId = id;
+    this->hoveredStatusIconId = id;
   } else {
     if (this->statusIconTooltip->GetLine(0).size() != 0) {
-      this->statusIconTooltip->Show(1);
+      this->statusIconTooltip->Show(WINDOW_VISIBLE);
     }
   }
 
@@ -11195,9 +11306,9 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
 
   if (pick->accountId != g_session.m_aid) {
     switch (pick->kind) {
-    case 0:
+    case ACTOR_PICK_CHARACTER:
       if (pick->job != JT_WARPNPC && g_session.IsAllyActor(pick->accountId, pick->job) == 1) {
-        this->SetCursorAction(1);
+        this->SetCursorAction(CURSOR_ACTION_INTERACT);
         if (g_mouse.buttons[0] == 2) {
           result = 2;
         } else {
@@ -11265,19 +11376,19 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           }
 
           const int state = actor != nullptr ? actor->render.state : 3;
-          if (attack && state != 3) {
-            this->SetCursorAction(skillMode ? 11 : 5);
+          if (attack && state != ST_DEAD) {
+            this->SetCursorAction(skillMode ? CURSOR_ACTION_SKILL_TARGET : CURSOR_ACTION_ATTACK);
             result = 1;
             this->lastPcGid = pick->accountId;
           } else {
-            this->SetCursorAction(skillMode && state != 3 ? 10 : 0);
+            this->SetCursorAction(skillMode && state != ST_DEAD ? CURSOR_ACTION_SKILL : CURSOR_ACTION_DEFAULT);
             result = 0;
             if (g_mouse.buttons[0] == 0 && this->lockOnMouse == 0 && this->lastMonGid == 0) {
               this->lastPcGid = pick->accountId;
             }
           }
         } else if (g_session.IsNpcJob(pick->job) == true) {
-          this->SetCursorAction(1);
+          this->SetCursorAction(CURSOR_ACTION_INTERACT);
           if (g_mouse.buttons[0] == 2) {
             result = 2;
           }
@@ -11312,14 +11423,14 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           if (this->isAutoMoveClickOn != 0) {
             if (attack) {
               if (skillMode) {
-                this->SetCursorAction(11);
+                this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
               } else if (actor != nullptr && actor->objectType == NPC_PET_TYPE) {
-                this->SetCursorAction(0);
+                this->SetCursorAction(CURSOR_ACTION_DEFAULT);
               } else {
-                this->SetCursorAction(5);
+                this->SetCursorAction(CURSOR_ACTION_ATTACK);
               }
             } else {
-              this->SetCursorAction(skillMode ? 10 : 0);
+              this->SetCursorAction(skillMode ? CURSOR_ACTION_SKILL : CURSOR_ACTION_DEFAULT);
             }
           }
 
@@ -11331,11 +11442,11 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           }
         }
       } else {
-        this->SetCursorAction(7);
+        this->SetCursorAction(CURSOR_ACTION_WARP);
         result = 2;
       }
       break;
-    case 2: {
+    case ACTOR_PICK_GROUND_SKILL: {
       result = 1;
       int action;
       if (g_session.GetSiegeMode()) {
@@ -11378,10 +11489,10 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
         case UNT_SOLIDTRAP:
         case UNT_SWIFTTRAP:
         case UNT_FLAMETRAP:
-          action = this->skillUseType == 5 ? 10 : 5;
+          action = this->skillUseType == 5 ? CURSOR_ACTION_SKILL : CURSOR_ACTION_ATTACK;
           break;
         default:
-          action = this->skillUseType == 5 ? 10 : 0;
+          action = this->skillUseType == 5 ? CURSOR_ACTION_SKILL : CURSOR_ACTION_DEFAULT;
           break;
         }
       } else {
@@ -11396,10 +11507,10 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
         case UNT_SOLIDTRAP:
         case UNT_SWIFTTRAP:
         case UNT_FLAMETRAP:
-          action = this->skillUseType == 5 ? 10 : 5;
+          action = this->skillUseType == 5 ? CURSOR_ACTION_SKILL : CURSOR_ACTION_ATTACK;
           break;
         default:
-          action = this->skillUseType == 5 ? 10 : 0;
+          action = this->skillUseType == 5 ? CURSOR_ACTION_SKILL : CURSOR_ACTION_DEFAULT;
           break;
         }
       }
@@ -11409,26 +11520,26 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       }
       break;
     }
-    case 1:
+    case ACTOR_PICK_ITEM:
       result = 1;
-      this->SetCursorAction(9);
+      this->SetCursorAction(CURSOR_ACTION_PICKUP);
       if (g_mouse.buttons[0] == 2) {
         result = 2;
       }
       break;
-    case 3:
+    case ACTOR_PICK_PET:
       result = 0;
-      this->SetCursorAction(0);
+      this->SetCursorAction(CURSOR_ACTION_DEFAULT);
       break;
-    case 4: {
+    case ACTOR_PICK_COMPANION: {
       result = 0;
-      this->SetCursorAction(0);
+      this->SetCursorAction(CURSOR_ACTION_DEFAULT);
       CGameActor* actor = this->scene->GetGameActorByAID(pick->accountId);
-      if (actor != nullptr && actor->render.state != 3) {
+      if (actor != nullptr && actor->render.state != ST_DEAD) {
         if (g_session.m_aid == static_cast<std::uint32_t>(actor->emblemVersion)) {
           if (actor->objectType == NPC_HO_TYPE && this->skillId == AM_POTIONPITCHER) {
             result = 1;
-            this->SetCursorAction(11);
+            this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
             this->lastMonGid = pick->accountId;
           }
         } else {
@@ -11441,7 +11552,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
               }
             }
             result = 1;
-            this->SetCursorAction(5);
+            this->SetCursorAction(CURSOR_ACTION_ATTACK);
             this->lastMonGid = pick->accountId;
           }
         }
@@ -11456,14 +11567,50 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
   }
 
   switch (pick->kind) {
-  case 0: {
+  case ACTOR_PICK_COMPANION: {
+    this->SetCursorAction(CURSOR_ACTION_DEFAULT);
+    if (g_session.IsMercenaryJob(pick->job)) {
+      CWorld* scene = this->scene;
+      if (this->skillId == AM_POTIONPITCHER || ((scene->isPKZone != 0 || scene->isSiegeMode != 0 || siegeMode != 0) && !g_session.IsHomunAid(pick->accountId))) {
+        if ((this->scene->isPKZone != 0 || this->scene->isSiegeMode != 0 || siegeMode != 0) && !g_session.IsHomunAid(pick->accountId)) {
+          this->SetCursorAction(CURSOR_ACTION_ATTACK);
+        }
+        this->RequestPlayerAction(pick->accountId, 1);
+        this->forcedAttack = 0;
+        return 0;
+      }
+      break;
+    }
+
+    const std::intptr_t mode = this->skillUseType;
+    int attack;
+    if (mode == 2 || mode == 4) {
+      const int shift = HIBYTE(GetAsyncKeyState(VK_SHIFT));
+      attack = shift;
+      if (IsSupportSkill(this->skillId)) {
+        attack = shift == 0;
+      }
+    } else {
+      attack = HIBYTE(GetAsyncKeyState(VK_SHIFT));
+    }
+    if (pick->healthState != 0 || this->scene->isPKZone != 0 || this->scene->isSiegeMode != 0 || siegeMode != 0) {
+      attack = 1;
+    }
+
+    const bool allowed = pick->accountId != mercenaryAid || this->skillUseType == SUT_TO_ALL;
+    if (allowed && attack) {
+      this->RequestPlayerAction(pick->accountId, 1);
+    }
+    return 0;
+  }
+  case ACTOR_PICK_CHARACTER: {
     if (pick->job == JT_WARPNPC) {
       return result;
     }
 
     if (g_session.IsAllyActor(pick->accountId, pick->job) == 1) {
       const int state = this->scene->player->render.state;
-      if (state != 0 && state != 6) {
+      if (state != ST_STAND && state != ST_SIT) {
         return result;
       }
       if (this->IsMenuWindowOpen() == true) {
@@ -11512,7 +11659,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
           if (homun != nullptr && homun->HasActiveHomunculusAI()) {
             AiMessage message = {};
-            message.type = 3;
+            message.type = ATTACK_OBJECT_CMD;
             message.target = pick->accountId;
             homun->SetResMsg2AI(&message, 0);
           }
@@ -11520,13 +11667,13 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
           if (homun != nullptr && homun->HasActiveHomunculusAI()) {
             AiMessage message = {};
-            message.type = 3;
+            message.type = ATTACK_OBJECT_CMD;
             message.target = g_session.homunEnemyGid;
             homun->SetMsg2AI(&message, 0);
           }
           g_session.attackHomunEnemy = 0;
         } else {
-          this->SetCursorAction(11);
+          this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
           g_session.homunEnemyGid = pick->accountId;
           g_session.homunEnemyX = 0;
           g_session.homunEnemyY = 0;
@@ -11540,7 +11687,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
         CGameActor* homun = this->scene->GetGameActorByAID(homunAid);
         if (homun != nullptr && homun->HasActiveHomunculusAI()) {
           AiMessage message;
-          message.type = 7;
+          message.type = SKILL_OBJECT_CMD;
           message.x = 0;
           message.y = 0;
           message.level = this->skillUseLevel;
@@ -11556,7 +11703,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
           if (mercenary != nullptr && mercenary->HasActiveMercenaryAI()) {
             AiMessage message = {};
-            message.type = 3;
+            message.type = ATTACK_OBJECT_CMD;
             message.target = pick->accountId;
             mercenary->SetResMsg2AI(&message, 1);
           }
@@ -11564,13 +11711,13 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
           CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
           if (mercenary != nullptr && mercenary->HasActiveMercenaryAI()) {
             AiMessage message = {};
-            message.type = 3;
+            message.type = ATTACK_OBJECT_CMD;
             message.target = g_session.mercenaryEnemyGid;
             mercenary->SetMsg2AI(&message, 1);
           }
           g_session.attackMercenaryEnemy = 0;
         } else {
-          this->SetCursorAction(11);
+          this->SetCursorAction(CURSOR_ACTION_SKILL_TARGET);
           g_session.mercenaryEnemyGid = pick->accountId;
           g_session.mercenaryEnemyX = 0;
           g_session.mercenaryEnemyY = 0;
@@ -11584,7 +11731,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
         CGameActor* mercenary = this->scene->GetGameActorByAID(mercenaryAid);
         if (mercenary != nullptr && mercenary->HasActiveMercenaryAI()) {
           AiMessage message;
-          message.type = 7;
+          message.type = SKILL_OBJECT_CMD;
           message.x = 0;
           message.y = 0;
           message.level = this->skillUseLevel;
@@ -11655,7 +11802,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       }
       if (companion != nullptr) {
         AiMessage message;
-        message.type = 7;
+        message.type = SKILL_OBJECT_CMD;
         message.x = 0;
         message.y = 0;
         message.level = this->skillUseLevel;
@@ -11666,7 +11813,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       }
     }
 
-    const bool allowed = pick->accountId != g_session.m_aid || this->skillUseType == 4;
+    const bool allowed = pick->accountId != g_session.m_aid || this->skillUseType == SUT_TO_ALL;
     if (!allowed || !attack) {
       return result;
     }
@@ -11684,7 +11831,7 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
     this->forcedAttack = 0;
     return result;
   }
-  case 2:
+  case ACTOR_PICK_GROUND_SKILL:
     switch (pick->job) {
     case UNT_ICEWALL:
     case UNT_BLASTMINE:
@@ -11720,50 +11867,14 @@ int CGameMode::HandleActorPick(ActorPickInfo* pick, int result) {
       }
       return result;
     }
-  case 3:
-    this->SetCursorAction(0);
+  case ACTOR_PICK_PET:
+    this->SetCursorAction(CURSOR_ACTION_DEFAULT);
     return 0;
-  case 1:
-    if (g_mouse.buttons[0] == 1 && this->skillUseType == 0) {
+  case ACTOR_PICK_ITEM:
+    if (g_mouse.buttons[0] == 1 && this->skillUseType == SUT_NOSKILL) {
       this->scene->player->SendMsg(nullptr, AM_PROCEEDPICKUPITEM, pick->accountId, 0, 0, 0, 0, 0);
     }
     break;
-  case 4: {
-    this->SetCursorAction(0);
-    if (g_session.IsMercenaryJob(pick->job)) {
-      CWorld* scene = this->scene;
-      if (this->skillId == AM_POTIONPITCHER || ((scene->isPKZone != 0 || scene->isSiegeMode != 0 || siegeMode != 0) && !g_session.IsHomunAid(pick->accountId))) {
-        if ((this->scene->isPKZone != 0 || this->scene->isSiegeMode != 0 || siegeMode != 0) && !g_session.IsHomunAid(pick->accountId)) {
-          this->SetCursorAction(5);
-        }
-        this->RequestPlayerAction(pick->accountId, 1);
-        this->forcedAttack = 0;
-        return 0;
-      }
-      break;
-    }
-
-    const std::intptr_t mode = this->skillUseType;
-    int attack;
-    if (mode == 2 || mode == 4) {
-      const int shift = HIBYTE(GetAsyncKeyState(VK_SHIFT));
-      attack = shift;
-      if (IsSupportSkill(this->skillId)) {
-        attack = shift == 0;
-      }
-    } else {
-      attack = HIBYTE(GetAsyncKeyState(VK_SHIFT));
-    }
-    if (pick->healthState != 0 || this->scene->isPKZone != 0 || this->scene->isSiegeMode != 0 || siegeMode != 0) {
-      attack = 1;
-    }
-
-    const bool allowed = pick->accountId != mercenaryAid || this->skillUseType == 4;
-    if (allowed && attack) {
-      this->RequestPlayerAction(pick->accountId, 1);
-    }
-    return 0;
-  }
   }
 
   return result;

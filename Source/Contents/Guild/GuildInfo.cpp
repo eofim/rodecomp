@@ -13,6 +13,10 @@
 // GLOBAL: gl_25465
 GuildInfo g_guildInfo;
 
+// OFFSET: 0x00AE3DB0
+// FUNCTION: fn_46561
+GuildInfo::~GuildInfo() = default;
+
 // OFFSET: 0x00AE38C0
 // FUNCTION: fn_18026
 GuildInfo::GuildInfo() {
@@ -109,6 +113,22 @@ int GuildInfo::CountRelatedGuilds(int relation) {
 // FUNCTION: fn_18038
 int GuildInfo::GetAgitCount() {
   return static_cast<int>(this->agitIds.size());
+}
+
+// OFFSET: 0x00AE46D0
+// FUNCTION: fn_46630
+void GuildInfo::ResetGuildDetails() {
+  const int guildId = this->m_guildId;
+  const int invite = this->canInvite;
+  const int expel = this->canExpel;
+  const int master = this->isMaster;
+  const int state = this->requestState;
+  this->Init();
+  this->m_guildId = guildId;
+  this->canInvite = invite;
+  this->canExpel = expel;
+  this->isMaster = master;
+  this->requestState = state;
 }
 
 // OFFSET: 0x00AE4740
@@ -249,6 +269,18 @@ void GuildInfo::UpdateCharacterName(int characterId, const char* name) {
   }
 }
 
+// OFFSET: 0x00AE5060
+// FUNCTION: fn_46689
+void GuildInfo::UpdateOnlineMemberCount() {
+  int count = 0;
+  for (auto it = this->m_members.begin(); it != this->m_members.end(); ++it) {
+    if (it->online) {
+      ++count;
+    }
+  }
+  this->onlineMemberCount = count;
+}
+
 // OFFSET: 0x00AE4F50
 // FUNCTION: fn_18045
 void GuildInfo::UpdateMemberStatus(int accountId, int online, int characterId, short sex, short head, short headPalette) {
@@ -262,13 +294,7 @@ void GuildInfo::UpdateMemberStatus(int accountId, int online, int characterId, s
     }
   }
 
-  int count = 0;
-  for (auto it = this->m_members.begin(); it != this->m_members.end(); ++it) {
-    if (it->online) {
-      ++count;
-    }
-  }
-  this->onlineMemberCount = count;
+  UpdateOnlineMemberCount();
   g_windowMgr.RefreshGuildWindows();
 }
 
@@ -282,13 +308,7 @@ void GuildInfo::SetMemberOnline(int accountId, int online) {
     }
   }
 
-  int count = 0;
-  for (auto it = this->m_members.begin(); it != this->m_members.end(); ++it) {
-    if (it->online) {
-      ++count;
-    }
-  }
-  this->onlineMemberCount = count;
+  UpdateOnlineMemberCount();
   g_windowMgr.RefreshGuildWindows();
 }
 

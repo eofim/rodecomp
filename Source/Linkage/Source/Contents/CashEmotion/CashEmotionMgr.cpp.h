@@ -75,6 +75,9 @@ extern "C" {
 #include <utility>
 #include <windows.h>
 
+template __declspec(noinline) std::back_insert_iterator<std::vector<int>> std::copy(
+  std::vector<int>::const_iterator, std::vector<int>::const_iterator, std::back_insert_iterator<std::vector<int>>
+);
 extern template std::vector<int>::vector(const std::vector<int>&);
 template __declspec(noinline) std::unordered_map<std::string, CashEmotionCommand*>::iterator
 std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::find<void>(const std::string&);
@@ -85,5 +88,10 @@ std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::_Try_emplace<cons
 template __declspec(noinline) std::string fmt::format<int&, int&, int&, int&, int&>(
   fmt::format_string<int&, int&, int&, int&, int&>, int&, int&, int&, int&, int&
 );
+template __forceinline std::size_t std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::_Min_load_factor_buckets(const std::size_t) const noexcept;
+template __forceinline std::size_t std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::_Desired_grow_bucket_count(const std::size_t) const noexcept;
+template __forceinline void std::unordered_map<std::string, CashEmotionCommand*>::_Mybase::_Rehash_for_1();
+template __forceinline std::function<int()>::~function() noexcept;
+template __forceinline std::string fmt::format<int&>(fmt::format_string<int&>, int&);
 template __forceinline std::vector<CashEmotionEntry>::~vector();
 template __forceinline void std::vector<CashEmotionEntry>::_Tidy() noexcept;

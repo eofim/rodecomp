@@ -93,14 +93,14 @@
 #include "UI/Status/UIHomunInfoWnd.h"
 #include "UI/Status/UIMerInfoWnd.h"
 
-extern template int std::_Traits_compare<std::char_traits<char>>(const char*, std::size_t, const char*, std::size_t) noexcept;
+template __declspec(noinline) int std::_Traits_compare<std::char_traits<char>>(const char* const, const std::size_t, const char* const, const std::size_t) noexcept;
 using SessionShopTree = std::_Tree<std::_Tmap_traits<
   int, SessionShop, std::less<int>, std::allocator<std::pair<const int, SessionShop>>, false>>;
 extern template std::_Tree_find_result<std::_Tree_node<std::pair<const int, SessionShop>, void*>*>
 SessionShopTree::_Find_lower_bound<int>(const int&) const;
 using NameToIdTree = std::_Tree<std::_Tmap_traits<
   std::string, int, std::less<std::string>, std::allocator<std::pair<const std::string, int>>, false>>;
-extern template std::_Tree_find_result<std::_Tree_node<std::pair<const std::string, int>, void*>*>
+template __declspec(noinline) std::_Tree_find_result<std::_Tree_node<std::pair<const std::string, int>, void*>*>
 NameToIdTree::_Find_lower_bound<std::string>(const std::string&) const;
 using ShopEntryTree = std::_Tree<std::_Tmap_traits<
   int, std::pair<int, int>, std::less<int>, std::allocator<std::pair<const int, std::pair<int, int>>>, false>>;
@@ -118,4 +118,17 @@ using PendingActorNameTree = std::_Tree<std::_Tset_traits<
 template __declspec(noinline) std::_Tree_find_result<std::_Tree_node<std::uint32_t, void*>*>
 PendingActorNameTree::_Find_lower_bound<std::uint32_t>(const std::uint32_t&) const;
 template __declspec(noinline) void std::vector<SearchStoreResult>::_Destroy(SearchStoreResult*, SearchStoreResult*);
+template __forceinline void std::_Tree<std::_Tmap_traits<
+  int, SessionRecord6144, std::less<int>, std::allocator<std::pair<const int, SessionRecord6144>>, false>>::clear() noexcept;
 template __declspec(noinline) std::pair<std::string, std::vector<std::string>>::pair(std::string&, std::vector<std::string>&);
+template __declspec(noinline) std::_Tree_node<std::pair<const int, float>, void*>*
+std::allocator<std::_Tree_node<std::pair<const int, float>, void*>>::allocate(const std::size_t);
+template __declspec(noinline) std::_Tree_node<std::pair<const int, MapPosEntry>, void*>*
+std::allocator<std::_Tree_node<std::pair<const int, MapPosEntry>, void*>>::allocate(const std::size_t);
+template __declspec(noinline) std::_Tree_node<std::pair<const int, RobeAlpha>, void*>*
+std::allocator<std::_Tree_node<std::pair<const int, RobeAlpha>, void*>>::allocate(const std::size_t);
+template __declspec(noinline) std::_Tree_node<std::pair<const std::string, int>, void*>*
+std::allocator<std::_Tree_node<std::pair<const std::string, int>, void*>>::allocate(const std::size_t);
+template __declspec(noinline) std::_Tree_node<std::pair<const int, SessionShop>, void*>*
+std::allocator<std::_Tree_node<std::pair<const int, SessionShop>, void*>>::allocate(const std::size_t);
+template __declspec(noinline) std::map<std::string, MapPosEntry>::map();

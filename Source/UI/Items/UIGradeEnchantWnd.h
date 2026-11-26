@@ -13,6 +13,12 @@ enum GradeEnchantButtonId : int {
   GRADEENCHANT_BUTTON_PROBABILITY = 510,
 };
 
+enum GradeEnchantState : int {
+  GRADEENCHANT_STATE_EMPTY = 0,
+  GRADEENCHANT_STATE_READY = 1,
+  GRADEENCHANT_STATE_RESULT = 2,
+};
+
 #pragma pack(push, 1)
 struct GradeEnchantMaterial {
   /* 0000 */ std::uint32_t itemId;
@@ -43,6 +49,7 @@ static_assert(sizeof(GradeEnchantInfo) == 16);
 class UIGradeEnchant_BtnStart : public UIBitmapButton {
 public:
   UIGradeEnchant_BtnStart();
+  void InitializeBitmaps();
   void Paint() override;
   void Enable(unsigned char value) override;
 };
@@ -50,6 +57,7 @@ public:
 class UIGradeEnchant_BtnEnhancedUp : public UIBitmapButton {
 public:
   UIGradeEnchant_BtnEnhancedUp();
+  void InitializeBitmaps();
   void Paint() override;
   void OnMouseHover(int x, int y) override;
   void Enable(unsigned char value) override;
@@ -61,6 +69,7 @@ public:
 class UIGradeEnchant_BtnEnhancedDown : public UIBitmapButton {
 public:
   UIGradeEnchant_BtnEnhancedDown();
+  void InitializeBitmaps();
   void Paint() override;
   void Enable(unsigned char value) override;
 };
@@ -83,6 +92,7 @@ public:
   int SelectedMaterialZeny();
   int SuccessRate();
   void UpdateEnchantMessages();
+  void ShowResultMessage();
   void SetEnchantInfo(
     short index, int value, int materialCount, GradeEnchantInfo info, int enchantOption, int enchantOptionCount, const GradeEnchantMaterial* materials
   );

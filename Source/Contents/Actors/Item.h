@@ -7,12 +7,21 @@
 #include <cstdint>
 #include <string>
 
+enum ItemDropGrade : std::uint16_t {
+  ITEM_DROP_GRADE_BLUE = 1,
+  ITEM_DROP_GRADE_YELLOW = 2,
+  ITEM_DROP_GRADE_PURPLE = 3,
+  ITEM_DROP_GRADE_GREEN = 4,
+  ITEM_DROP_GRADE_RED = 5,
+};
+
 class CItem : public EffectActor {
 public:
   CItem();
   void SubD8B5A0();
   void SubD8B5B0();
   bool OnProcess() override;
+  int GetGradeDropEffect(int grade) const;
   void SendMsg(CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g) override;
   void Render(int argument) override;
   void SetRenderInfo(const float* bounds, float x, float y) override;

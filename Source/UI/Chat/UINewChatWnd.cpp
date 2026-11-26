@@ -1,3 +1,4 @@
+#include "UI/Chat/ChatTarget.h"
 #include "UI/Chat/UINewChatWnd.h"
 #include "Client/Mode/ModeMessage.h"
 #include "UI/Window/UIEnums.h"
@@ -301,10 +302,22 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
   case UM_ADDCHAT:
   case UM_ADDCHAT2:
     if (message != UM_ADDCHAT2) {
-      std::vector<std::string> lines;
       char name[25] = {};
+      std::vector<std::string> lines;
       if (d != 0) {
         std::strcpy(name, reinterpret_cast<const char*>(d));
+      }
+
+      bool hasLink = false;
+      NavigationLinkParser* parser = g_navigationLinkParser;
+      std::string plain = RemoveTextColors(reinterpret_cast<const char*>(a));
+      if (parser->HasLink(plain)) {
+        hasLink = true;
+        lines.push_back(plain);
+      } else {
+        WrapPlainText(
+          RemoveTextColors(reinterpret_cast<const char*>(a)).c_str(), lines, 0x5E
+        );
       }
 
       switch (c) {
@@ -313,8 +326,8 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       case 4:
       case 21: {
         std::string text(reinterpret_cast<const char*>(a));
-        const int length = static_cast<int>(std::strlen(reinterpret_cast<const char*>(a)));
         const int position = static_cast<int>(text.find(" :"));
+        const int length = static_cast<int>(std::strlen(reinterpret_cast<const char*>(a)));
         if (position > 0 && position < length && position < 24) {
           std::memcpy(name, reinterpret_cast<const char*>(a), position);
           name[position] = '\0';
@@ -323,24 +336,13 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       }
       }
 
-      if (g_serviceType == ServiceGermany && std::strlen(name) > 24) {
+      const std::size_t nameLength = std::strlen(name);
+      if (g_serviceType == ServiceGermany && nameLength > 24) {
         return 0;
       }
 
       if (std::strcmp(name, g_session.DecodePlayerName()) == 0) {
         name[0] = '\0';
-      }
-
-      bool hasLink = false;
-      std::string plain = RemoveTextColors(reinterpret_cast<const char*>(a));
-      NavigationLinkParser* parser = g_navigationLinkParser;
-      if (parser->HasLink(plain)) {
-        hasLink = true;
-        lines.push_back(plain);
-      } else {
-        WrapPlainText(
-          RemoveTextColors(reinterpret_cast<const char*>(a)).c_str(), lines, 0x5E
-        );
       }
 
       bool everyTab = false;
@@ -505,7 +507,7 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       this->m_chatEdit->PushHistory();
       this->m_inputEdit = this->m_chatEdit;
       g_windowMgr.SetFocus(this->m_chatEdit);
-      this->m_chatEdit->linkedText = "";
+      this->m_chatEdit->linkedText.clear();
       if (std::strlen(buffer) == 0) {
         return 0;
       }
@@ -549,7 +551,7 @@ int UINewChatWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a, std::i
       int subCount = static_cast<int>(g_session.m_subChatWnds.size());
       const int total = noSubCount + subCount;
       if (total == this->m_maxTabs) {
-        g_windowMgr.Confirm(LookupMessage(MSI_FAILED_ADD_TAB), 0, true, false, 0, "Message", 0x118, 0x78, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_FAILED_ADD_TAB), 0, true, false, 0, "메시지", 0x118, 0x78, 0);
         return 0;
       }
 

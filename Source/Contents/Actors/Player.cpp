@@ -12,6 +12,7 @@
 #include "Contents/Skills/SkillUnitId.h"
 
 #include "Client/Mode/CGameMode.h"
+#include "Utility/Math/ClientAngles.h"
 #include "Client/Mode/ModeMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Actors/ActorStateFlags.h"
@@ -36,6 +37,7 @@
 #include "Contents/Jobs/JobId.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Contents/Jobs/JobNames.h"
+#include "Contents/Models/ModelAnimation.h"
 #include "Contents/Map/MapSkyMgr.h"
 #include "Contents/Tables/MessageTable.h"
 #include "Contents/Skills/ClientSkills.h"
@@ -86,6 +88,9 @@ unsigned char g_statusRefreshSuppressed;
 
 // GLOBAL: gl_25150
 static std::uint32_t g_groundShadowPixels[35 * 35];
+
+// GLOBAL: gl_24556
+float terrainSubcellFraction = 0.0625f;
 
 // OFFSET: 0x00DA7700
 // FUNCTION: fn_22558
@@ -413,7 +418,7 @@ void CGrannyPc::SetState(int state, int resetPosition) {
     break;
   case ST_MOVE:
     this->isCounter = 0;
-    if (this->bodyState != 1 && this->bodyState != 2) {
+    if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
       this->render.isMotionFreezed = false;
     }
     this->headDir = 0;
@@ -438,8 +443,11 @@ void CGrannyPc::SetState(int state, int resetPosition) {
         this->GetEffectiveJob(-1) == JT_WANDERER_H || this->GetEffectiveJob(-1) == JT_ROYAL_GUARD_H || this->GetEffectiveJob(-1) == JT_ROYAL_GUARD) {
       this->SetAction(0x20, 6, 1);
     } else if (this->GetEffectiveJob(-1) == JT_MONK || this->GetEffectiveJob(-1) == JT_MONK_H || this->GetEffectiveJob(-1) == JT_MONK_B ||
-               this->GetEffectiveJob(-1) == JT_SURA || this->GetEffectiveJob(-1) == JT_SURA_H || this->GetEffectiveJob(-1) == JT_SURA_B ||
-               this->GetEffectiveJob(-1) == JT_INQUISITOR) {
+               this->GetEffectiveJob(-1) == JT_SURA || this->GetEffectiveJob(-1) == JT_SURA_H || this->GetEffectiveJob(-1) == JT_SURA_B) {
+      this->SetAction(0x60, 6, 1);
+      this->SetSequenceInterval(4);
+      this->SetFrameSequence(0x60, 0, 0, 0x60, 0, 1, 400, 0);
+    } else if (this->GetEffectiveJob(-1) == JT_INQUISITOR) {
       this->SetAction(0x60, 6, 1);
       this->SetSequenceInterval(4);
       this->SetFrameSequence(0x60, 0, 0, 0x60, 0, 1, 400, 0);
@@ -452,7 +460,7 @@ void CGrannyPc::SetState(int state, int resetPosition) {
     break;
   case ST_ATTACK: {
     this->isCounter = 0;
-    if (this->bodyState != 1 && this->bodyState != 2) {
+    if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
       this->render.isMotionFreezed = false;
     }
     const bool weaponAllowed = g_session.IsJobWeaponAllowed(
@@ -472,7 +480,7 @@ void CGrannyPc::SetState(int state, int resetPosition) {
   }
   case ST_ATTACK2: {
     this->isCounter = 0;
-    if (this->bodyState != 1 && this->bodyState != 2) {
+    if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
       this->render.isMotionFreezed = false;
     }
     const bool weaponAllowed = g_session.IsJobWeaponAllowed(
@@ -604,8 +612,9 @@ void CPc::LoadEquipAction(int slot, const char* name) {
     this->equipActions[slot]->Unlock();
   }
 
-  if (IsMonsterJob(this->render.accountId)) {
-    if (IsObfuscatedMessage(this->render.accountId)) {
+  auto& renderRef = this->render;
+  if (IsMonsterJob(renderRef.accountId)) {
+    if (IsObfuscatedMessage(renderRef.accountId)) {
       switch (slot) {
         case 0:
           if (this->sex != 0) {
@@ -1138,7 +1147,7 @@ void CPc::ApplyLayerEffects(
 
   if ((this->render.flags & 0x80800) != 0 && (this->render.flags & 0x20000) == 0) {
     const float scale = this->render.scale;
-    for (int step = 1, depth = 3; depth <= 6; ++step, depth += 3) {
+    for (int depth = 3, step = 1; depth <= 6; depth += 3, ++step) {
       const unsigned char alpha = this->render.outlineAlpha;
       const float distanceScale = g_renderer->ScaleDistance(distance);
       const float factor = g_session.GetSkillFactor(this->GetEffectiveJob(-1)) * distanceScale * (static_cast<float>(step) * 0.01f + 1.0f);
@@ -2083,10 +2092,10 @@ void CPc::DrawBody(int, int layer, const float* position, float x, float y, floa
 // FUNCTION: fn_22598
 void CPc::RenderOverlaySprite(const float* matrix, int) {
   const float* origin = &this->render.position.x;
-  float position[3];
-  position[0] = origin[0] * matrix[0] + origin[1] * matrix[3] + origin[2] * matrix[6] + matrix[9];
-  position[1] = origin[0] * matrix[1] + origin[1] * matrix[4] + origin[2] * matrix[7] + matrix[10];
-  position[2] = origin[0] * matrix[2] + origin[1] * matrix[5] + origin[2] * matrix[8] + matrix[11];
+  vector3d position;
+  position.x = origin[0] * matrix[0] + origin[1] * matrix[3] + origin[2] * matrix[6] + matrix[9];
+  position.y = origin[0] * matrix[1] + origin[1] * matrix[4] + origin[2] * matrix[7] + matrix[10];
+  position.z = origin[0] * matrix[2] + origin[1] * matrix[5] + origin[2] * matrix[8] + matrix[11];
 
   float x;
   float y;
@@ -2107,21 +2116,30 @@ void CPc::RenderOverlaySprite(const float* matrix, int) {
   ResourceMgr::Instance().Load(this->imfName.c_str());
   int drawn = 0;
   int count = 0;
-  if (std::strlen(this->equipActions[0] ? this->equipActions[0]->GetName() : "") == 0) {
+  int layer = 0;
+  if (std::strlen(this->equipActions[layer] ? this->equipActions[layer]->GetName() : "") == 0) {
     return;
   }
 
-  if (std::strlen(this->equipSprites[0] ? this->equipSprites[0]->GetName() : "") == 0) {
+  if (std::strlen(this->equipSprites[layer] ? this->equipSprites[layer]->GetName() : "") == 0) {
     return;
   }
 
-  CActRes* action = static_cast<CActRes*>(this->GetEquipAction(0));
-  CSprRes* sprite = static_cast<CSprRes*>(this->equipSprites[0]);
+  CActRes* action = static_cast<CActRes*>(this->GetEquipAction(layer));
+  CSprRes* sprite = static_cast<CSprRes*>(this->equipSprites[layer]);
   if (this->render.curMotion >= static_cast<int>(action->FrameCount(this->render.previousAnimation))) {
     return;
   }
 
   const ActionFrame& frame = action->Frame(this->render.previousAnimation, this->render.curMotion);
+  if (layer == 6 && frame.sound != -1) {
+    std::string sound = action->Sound(frame.sound);
+    if (sound.find(".wav") != std::string::npos) {
+      std::strcpy(this->hitWaveName, sound.c_str());
+    }
+    this->isPlayHitWave = 1;
+  }
+
   for (int index = 0; index < frame.cellCount; ++index) {
     const SpriteFrameCell& cell = frame.Cell(index);
     if (cell.image == -1) {
@@ -2134,7 +2152,7 @@ void CPc::RenderOverlaySprite(const float* matrix, int) {
     SpriteQuad quad;
     tagRECT box;
     std::uint32_t color;
-    if (!this->PrepareSprite(0, count, distanceScale, cell, x, y, position, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, 0, 0, 0)) {
+    if (!this->PrepareSprite(0, count, distanceScale, cell, x, y, &position.x, scale, &bottomRhw, &topRhw, image, &quad, &box, &color, 0, 0, 0)) {
       continue;
     }
 
@@ -2918,7 +2936,9 @@ void CPlayer::UpdatePendingAction() {
     } else if ((this->GetEffectiveJob(-1) >= JT_TAEKWON && this->GetEffectiveJob(-1) < JT_2004_JOB_LAST) || this->GetEffectiveJob(-1) == JT_GUNSLINGER ||
                this->GetEffectiveJob(-1) == JT_NINJA) {
       const int state = static_cast<int>(this->render.state);
-      if (state != ST_MOVE && state != ST_STAND && state != ST_DAMAGE && state != ST_SKILL && state != ST_BEGIN_SKILL && state < 16) {
+      const bool stateOk = state == ST_MOVE || state == ST_STAND || state == ST_DAMAGE || state == ST_SKILL ||
+                           state == ST_BEGIN_SKILL || state >= 16;
+      if (!stateOk) {
         return;
       }
     } else {
@@ -2928,19 +2948,18 @@ void CPlayer::UpdatePendingAction() {
       }
     }
 
-    const float distance = this->AdjustFollowDistance(
-      target, target->CalcDist(this->render.position.x, this->render.position.y, this->render.position.z)
-    );
+    const float targetDistance = target->CalcDist(this->render.position.x, this->render.position.y, this->render.position.z);
+    const float distance = this->AdjustFollowDistance(target, targetDistance);
     const bool inRange = static_cast<float>(g_session.storeItemLimit * 5) + 5.5f >= distance;
     if ((this->destCellX != column || this->destCellZ != row) && !inRange) {
-      const std::uint32_t delay = this->proceedType != 5 ? 450 : 1200;
+      const std::uint32_t delay = this->proceedType != PT_ATTACK_2 ? 450 : 1200;
       const bool elapsed = timeGetTime() > this->tickOfMoveForAttack + delay;
       const int state = static_cast<int>(this->render.state);
       int cellX = target->movementState[5];
       int cellY = target->destCellY;
       float x;
       float z;
-      if (this->proceedType == 5) {
+      if (this->proceedType == PT_ATTACK_2) {
         x = target->render.position.x;
         z = target->render.position.z;
       } else {
@@ -2990,9 +3009,9 @@ void CPlayer::UpdatePendingAction() {
     int row;
     mode->WorldCell(this->render.position.x, this->render.position.z, column, row);
     const float x = target->render.position.x;
+    const float z = target->render.position.z;
     int cellX = target->movementState[5];
     int cellY = target->destCellY;
-    const float z = target->render.position.z;
     const int range = mode->GetSkillAttackRange(this->skillId, this->skillUseLevel);
     mode->FindWalkableCellToward(this->render.position.x, this->render.position.z, x, z, cellX, cellY, range);
     const int state = static_cast<int>(this->render.state);
@@ -3208,28 +3227,7 @@ void CPlayer::ReapplySkillEffects() {
       }
       break;
     }
-    case EFST_ONEHANDQUICKEN: {
-      CRagEffect* effect = this->LaunchEffect(EF_MAKEBLUR, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      if (effect) {
-        effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_TWOHANDQUICKEN, 0, 0, 0);
-      }
-      break;
-    }
-    case EFST_NJ_BUNSINJYUTSU: {
-      CRagEffect* effect = this->LaunchEffect(EF_BUNSINJYUTSU, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      if (effect) {
-        effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_BUNSINJYUTSU, 0, 0, 0);
-      }
-      break;
-    }
     case EFST_OVERTHRUST: {
-      CRagEffect* effect = this->LaunchEffect(EF_MAKEBLUR, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      if (effect) {
-        effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_OVERTHRUST, 0, 0, 0);
-      }
-      break;
-    }
-    case EFST_OVERTHRUSTMAX: {
       CRagEffect* effect = this->LaunchEffect(EF_MAKEBLUR, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       if (effect) {
         effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_OVERTHRUST, 0, 0, 0);
@@ -3257,29 +3255,32 @@ void CPlayer::ReapplySkillEffects() {
       this->LaunchEffect(EF_STEELBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       this->LaunchEffect(EF_SU_STOOP, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
-    case EFST_SG_SUN_WARM:
-    case EFST_SG_MOON_WARM:
-    case EFST_SG_STAR_WARM:
-      this->LaunchEffect(EF_DOUBLEGUMGANG, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      this->LaunchEffect(EF_REDLIGHTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_KAITE:
-      this->LaunchEffect(EF_REFLECTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    case EFST_PROPERTYUNDEAD:
+      this->LaunchEffect(EF_UNDEADBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
     case EFST_AURABLADE:
       this->LaunchEffect(EF_AURABLADE2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
+    case EFST_LKCONCENTRATION:
+      this->LaunchEffect(EF_LKCONCENTRATION, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
     case EFST_BERSERK:
       this->LaunchEffect(EF_REDBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
-    case EFST_LKCONCENTRATION:
-      this->LaunchEffect(EF_LKCONCENTRATION, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    case EFST_ASSUMPTIO:
+    case EFST_ASSUMPTIO2:
+    case EFST_ASSUMPTIO_BUFF:
+      this->LaunchEffect(EF_ASSUMPTIO, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
     case EFST_MAGICPOWER:
       this->LaunchEffect(EF_LIGHTBLADE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
     case EFST_MOON:
       this->LaunchEffect(EF_SPHEREWIND2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_SOULLINK:
+      g_weatherEffect.StartDarken();
+      this->LaunchEffect(EF_ASURABODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
     case EFST_DEVIL1: {
       CSkillInfo skill = g_session.m_skillBundle.Lookup(0x1B9);
@@ -3305,16 +3306,39 @@ void CPlayer::ReapplySkillEffects() {
       this->skillEffect = this->LaunchEffect(EF_STATUS_STATE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
     }
-    case EFST_SOULLINK:
-      g_weatherEffect.StartDarken();
-      this->LaunchEffect(EF_ASURABODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_PROPERTYUNDEAD:
-      this->LaunchEffect(EF_UNDEADBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+    case EFST_KAITE:
+      this->LaunchEffect(EF_REFLECTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       break;
     case EFST_SKE:
       g_weatherEffect.StartDarken();
       break;
+    case EFST_ONEHANDQUICKEN: {
+      CRagEffect* effect = this->LaunchEffect(EF_MAKEBLUR, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      if (effect) {
+        effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_TWOHANDQUICKEN, 0, 0, 0);
+      }
+      break;
+    }
+    case EFST_SG_SUN_WARM:
+    case EFST_SG_MOON_WARM:
+    case EFST_SG_STAR_WARM:
+      this->LaunchEffect(EF_DOUBLEGUMGANG, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_REDLIGHTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_OVERTHRUSTMAX: {
+      CRagEffect* effect = this->LaunchEffect(EF_MAKEBLUR, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      if (effect) {
+        effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_OVERTHRUST, 0, 0, 0);
+      }
+      break;
+    }
+    case EFST_NJ_BUNSINJYUTSU: {
+      CRagEffect* effect = this->LaunchEffect(EF_BUNSINJYUTSU, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      if (effect) {
+        effect->SendMsg(nullptr, AM_SETCOUNT, 0, SETCOUNT_EFFECT_COLOR, EF_BUNSINJYUTSU, 0, 0, 0);
+      }
+      break;
+    }
     case EFST_DAURA:
       this->LaunchEffect(EF_DOUBLEGUMGANG, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       this->LaunchEffect(EF_REDLIGHTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
@@ -3322,6 +3346,191 @@ void CPlayer::ReapplySkillEffects() {
     case EFST_DBARRIER:
       this->LaunchEffect(EF_STEELBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
       this->LaunchEffect(EF_SU_STOOP, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_ALL_RIDING:
+      this->SetRiding(1);
+      this->SetSprJob(this->GetEffectiveJob(-1));
+      this->SetBodyPalette(this->render.bodyPalette);
+      break;
+    case EFST_EQUIPPED_DIVINE_ARMOR:
+    case EFST_EQUIPPED_HOLY_ARMOR:
+      this->SendMsg(nullptr, AM_STATUS_CHANGE, type, 1, 0, 0, 0, 0);
+      break;
+    case EFST_KAGEMUSYA:
+      while (this->HasId(EF_KAGEMUSYA)) {
+        this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_KAGEMUSYA, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_KAGEMUSYA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_ZANGETSU:
+      while (this->HasId(EF_BLUELIGHTBODY)) {
+        this->SendMsg(this, AM_DELETE_EFFECT, EF_BLUELIGHTBODY, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_BLUELIGHTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_GENSOU:
+      g_effectMgr->Retire(this->render.accountId, 0x3ED);
+      if (g_effectMgr->HasAllocator(0x3ED)) {
+        CEffect* orb = g_effectMgr->Spawn(this->render.accountId, EF_OB_GENSOU, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+        if (orb) {
+          static_cast<CEnergyOrbEffect*>(orb)->SetCount(10);
+        }
+      }
+      while (this->HasId(EF_GRAYBODY)) {
+        this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_GRAYBODY, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_GRAYBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_ON_PUSH_CART:
+      this->SendMsg(nullptr, AM_STATUS_CHANGE, type, 1, g_session.replayPacketMode, 0, 0, 0);
+      break;
+    case EFST_FLOWER_LEAF:
+      g_effectMgr->Retire(this->render.accountId, 0x3F5);
+      if (g_effectMgr->HasAllocator(0x3F5) == true) {
+        g_effectMgr->Spawn(this->render.accountId, EF_CHERRYBLOSSOM, this->render.position, 0, -1, 0, 0);
+      }
+      break;
+    case EFST_OFFERTORIUM:
+      while (this->HasId(EF_AB_OFFERTORIUM_RING)) {
+        this->SendMsg(this, AM_DELETE_EFFECT, EF_AB_OFFERTORIUM_RING, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_AB_OFFERTORIUM_RING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_TELEKINESIS_INTENSE:
+      while (this->HasId(EF_WL_TELEKINESIS_INTENSE)) {
+        this->SendMsg(this, AM_DELETE_EFFECT, EF_WL_TELEKINESIS_INTENSE, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_WL_TELEKINESIS_INTENSE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_DARKCROW:
+      while (this->HasId(EF_GC_DARKCROW)) {
+        this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_GC_DARKCROW, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_GC_DARKCROW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_GC_DARKCROW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      this->LaunchEffect(EF_GC_DARKCROW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_WIDEWEB:
+      while (this->HasId(EF_BOTTOM_SPIDER)) {
+        this->SendMsg(this, AM_DELETE_EFFECT, EF_BOTTOM_SPIDER, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_BOTTOM_SPIDER, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_CHILL:
+      while (this->HasId(EF_NPC_CHILL)) {
+        this->SendMsg(this, AM_DELETE_EFFECT, EF_NPC_CHILL, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_NPC_CHILL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_BURNT:
+      while (this->HasId(EF_NPC_BURNT)) {
+        this->SendMsg(this, AM_DELETE_EFFECT, EF_NPC_BURNT, 0, 0, 0, 0, 0);
+      }
+      this->LaunchEffect(EF_NPC_BURNT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_ANTI_M_BLAST:
+      g_effectMgr->Retire(this->render.accountId, 0x470);
+      if (g_effectMgr->HasAllocator(0x470) == true) {
+        g_effectMgr->Spawn(this->render.accountId, EF_RL_ANTI_MATERIAL_BLAST, this->render.position, 0, -1, 0, 0);
+      }
+      break;
+    case EFST_SV_ROOTTWIST:
+      g_effectMgr->Retire(this->render.accountId, 0x456);
+      if (g_effectMgr->HasAllocator(0x456) == true) {
+        g_effectMgr->Spawn(this->render.accountId, EF_SU_SV_ROOTTWIST, this->render.position, 0, -1, 0, 0);
+      }
+      break;
+    case EFST_BITESCAR:
+      g_effectMgr->Retire(this->render.accountId, 0x45F);
+      if (g_effectMgr->HasAllocator(0x45F) == true) {
+        g_effectMgr->Spawn(this->render.accountId, EF_BITE_SCAR, this->render.position, 0, -1, 0, 0);
+      }
+      break;
+    case EFST_TUNAPARTY:
+      g_effectMgr->Retire(this->render.accountId, 0x449);
+      if (g_effectMgr->HasAllocator(0x449) == true) {
+        g_effectMgr->Spawn(this->render.accountId, EF_TUNAPARTY, this->render.position, 0, -1, 0, 0);
+      }
+      break;
+    case EFST_SUHIDE:
+      this->SetState(ST_SU_HIDE, 1);
+      this->render.isMotionFreezed = true;
+      break;
+    case EFST_SPRITEMABLE:
+      g_effectMgr->Retire(this->render.accountId, 0x448);
+      if (g_effectMgr->HasAllocator(0x448) == true) {
+        g_effectMgr->Spawn(this->render.accountId, EF_SPRITEMABLE, this->render.position, 0, -1, 0, 0);
+      }
+      break;
+    case EFST_SOULATTACK:
+      this->alternateDoramAppearance[0] = 1;
+      break;
+    case EFST_IMMUNE_PROPERTY_NOTHING:
+    case EFST_IMMUNE_PROPERTY_WATER:
+    case EFST_IMMUNE_PROPERTY_GROUND:
+    case EFST_IMMUNE_PROPERTY_FIRE:
+    case EFST_IMMUNE_PROPERTY_WIND:
+    case EFST_IMMUNE_PROPERTY_POISON:
+    case EFST_IMMUNE_PROPERTY_SAINT:
+    case EFST_IMMUNE_PROPERTY_DARKNESS:
+    case EFST_IMMUNE_PROPERTY_TELEKINESIS:
+    case EFST_IMMUNE_PROPERTY_UNDEAD:
+      g_effectMgr->Spawn(this->render.accountId, type + 0x87, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      break;
+    case EFST_LUNARSTANCE:
+      if (g_effectMgr->Has(this->render.accountId, EF_LUNAR_STANCE) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4BF);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_LUNAR_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      break;
+    case EFST_UNIVERSESTANCE:
+      if (g_effectMgr->Has(this->render.accountId, EF_UNIVERSE_STANCE) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4C1);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_UNIVERSE_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      break;
+    case EFST_SUNSTANCE:
+      if (g_effectMgr->Has(this->render.accountId, EF_SUN_STANCE) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4BE);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_SUN_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      break;
+    case EFST_FLASHKICK:
+      if (g_effectMgr->Has(this->render.accountId, EF_FLASH_KICK) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4C5);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_FLASH_KICK, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      break;
+    case EFST_STARSTANCE:
+      if (g_effectMgr->Has(this->render.accountId, EF_STAR_STANCE) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4C0);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_STAR_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      break;
+    case EFST_GRAVITYCONTROL:
+      if (g_effectMgr->Has(this->render.accountId, EF_UNK_1201) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4B1);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_UNK_1201, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_soundMgr->PlayWave("effect\\t_캐스팅.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
+      break;
+    case EFST_SOULUNITY:
+      if (g_effectMgr->Has(this->render.accountId, EF_SOUL_UNITY) == true) {
+        g_effectMgr->Retire(this->render.accountId, 0x4C6);
+      }
+      g_effectMgr->Spawn(this->render.accountId, EF_SOUL_UNITY, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
+      g_soundMgr->PlayWave("effect\\t_바람방출.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
+      break;
+    case EFST_SOULSHADOW:
+    case EFST_SOULFAIRY:
+    case EFST_SOULFALCON:
+    case EFST_SOULGOLEM:
+      g_weatherEffect.StartDarken();
+      this->LaunchEffect(EF_ASURABODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
+      break;
+    case EFST_SOUND_OF_DESTRUCTION:
+      g_effectMgr->Retire(this->render.accountId, 0x66C);
+      g_effectMgr->Spawn(this->render.accountId, EF_NEW_SOUNDOFDESTRUCTION_TARGET, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
       break;
     case EFST_DA_CONTRACT:
       this->LaunchEffect(EF_M04, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
@@ -3393,34 +3602,34 @@ void CPlayer::ReapplySkillEffects() {
         }
         if (ball) {
           switch (value) {
-          case 0:
+          case TETRA_BALL_FIRE:
             ball->AddBall(0x4EE, type - 0x16B);
             break;
-          case 1:
+          case TETRA_BALL_WIND:
             ball->AddBall(0x4F0, type - 0x16B);
             break;
-          case 2:
+          case TETRA_BALL_WATER:
             ball->AddBall(0x4EF, type - 0x16B);
             break;
-          case 3:
+          case TETRA_BALL_EARTH:
             ball->AddBall(0x4F1, type - 0x16B);
             break;
           }
         } else {
           switch (value) {
-          case 0:
+          case TETRA_BALL_FIRE:
             ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_1, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
-          case 1:
+          case TETRA_BALL_WIND:
             ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_3, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
-          case 2:
+          case TETRA_BALL_WATER:
             ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_2, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
-          case 3:
+          case TETRA_BALL_EARTH:
             ball = dynamic_cast<CTetraBallEffect*>(g_effectMgr->Spawn(this->render.accountId, EF_TETRA_VORTEX_BALL_4, vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0));
             ball->MoveFirstTo(type - 0x16B);
             break;
@@ -3458,89 +3667,6 @@ void CPlayer::ReapplySkillEffects() {
     case EFST_EQUIPED_FLOOR:
       this->SendMsg(nullptr, AM_STATUS_CHANGE, 0x23B, 1, value, 0, 0, 0);
       break;
-    case EFST_ALL_RIDING:
-      this->SetRiding(1);
-      this->SetSprJob(this->GetEffectiveJob(-1));
-      this->SetBodyPalette(this->render.bodyPalette);
-      break;
-    case EFST_ON_PUSH_CART:
-      this->SendMsg(nullptr, AM_STATUS_CHANGE, type, 1, g_session.replayPacketMode, 0, 0, 0);
-      break;
-    case EFST_TELEKINESIS_INTENSE:
-      while (this->HasId(EF_WL_TELEKINESIS_INTENSE)) {
-        this->SendMsg(this, AM_DELETE_EFFECT, EF_WL_TELEKINESIS_INTENSE, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_WL_TELEKINESIS_INTENSE, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_WIDEWEB:
-      while (this->HasId(EF_BOTTOM_SPIDER)) {
-        this->SendMsg(this, AM_DELETE_EFFECT, EF_BOTTOM_SPIDER, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_BOTTOM_SPIDER, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_BURNT:
-      while (this->HasId(EF_NPC_BURNT)) {
-        this->SendMsg(this, AM_DELETE_EFFECT, EF_NPC_BURNT, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_NPC_BURNT, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_CHILL:
-      while (this->HasId(EF_NPC_CHILL)) {
-        this->SendMsg(this, AM_DELETE_EFFECT, EF_NPC_CHILL, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_NPC_CHILL, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_OFFERTORIUM:
-      while (this->HasId(EF_AB_OFFERTORIUM_RING)) {
-        this->SendMsg(this, AM_DELETE_EFFECT, EF_AB_OFFERTORIUM_RING, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_AB_OFFERTORIUM_RING, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_ZANGETSU:
-      while (this->HasId(EF_BLUELIGHTBODY)) {
-        this->SendMsg(this, AM_DELETE_EFFECT, EF_BLUELIGHTBODY, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_BLUELIGHTBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_GENSOU:
-      g_effectMgr->Retire(this->render.accountId, 0x3ED);
-      if (g_effectMgr->HasAllocator(0x3ED)) {
-        CEffect* orb = g_effectMgr->Spawn(this->render.accountId, EF_OB_GENSOU, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-        if (orb) {
-          static_cast<CEnergyOrbEffect*>(orb)->SetCount(10);
-        }
-      }
-      while (this->HasId(EF_GRAYBODY)) {
-        this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_GRAYBODY, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_GRAYBODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_KAGEMUSYA:
-      while (this->HasId(EF_KAGEMUSYA)) {
-        this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_KAGEMUSYA, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_KAGEMUSYA, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_ANTI_M_BLAST:
-      g_effectMgr->Retire(this->render.accountId, 0x470);
-      if (g_effectMgr->HasAllocator(0x470) == true) {
-        g_effectMgr->Spawn(this->render.accountId, EF_RL_ANTI_MATERIAL_BLAST, this->render.position, 0, -1, 0, 0);
-      }
-      break;
-    case EFST_FLOWER_LEAF:
-      g_effectMgr->Retire(this->render.accountId, 0x3F5);
-      if (g_effectMgr->HasAllocator(0x3F5) == true) {
-        g_effectMgr->Spawn(this->render.accountId, EF_CHERRYBLOSSOM, this->render.position, 0, -1, 0, 0);
-      }
-      break;
-    case EFST_DARKCROW:
-      while (this->HasId(EF_GC_DARKCROW)) {
-        this->SendMsg(nullptr, AM_DELETE_EFFECT, EF_GC_DARKCROW, 0, 0, 0, 0, 0);
-      }
-      this->LaunchEffect(EF_GC_DARKCROW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      this->LaunchEffect(EF_GC_DARKCROW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      this->LaunchEffect(EF_GC_DARKCROW, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
     case EFST_HALLUCINATIONWALK:
     case EFST_NPC_HALLUCINATIONWALK: {
       while (this->HasId(EF_MAKEHALLU)) {
@@ -3552,109 +3678,6 @@ void CPlayer::ReapplySkillEffects() {
       }
       break;
     }
-    case EFST_ASSUMPTIO:
-    case EFST_ASSUMPTIO2:
-    case EFST_ASSUMPTIO_BUFF:
-      this->LaunchEffect(EF_ASSUMPTIO, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_SPRITEMABLE:
-      g_effectMgr->Retire(this->render.accountId, 0x448);
-      if (g_effectMgr->HasAllocator(0x448) == true) {
-        g_effectMgr->Spawn(this->render.accountId, EF_SPRITEMABLE, this->render.position, 0, -1, 0, 0);
-      }
-      break;
-    case EFST_SUHIDE:
-      this->SetState(ST_SU_HIDE, 1);
-      this->render.isMotionFreezed = true;
-      break;
-    case EFST_TUNAPARTY:
-      g_effectMgr->Retire(this->render.accountId, 0x449);
-      if (g_effectMgr->HasAllocator(0x449) == true) {
-        g_effectMgr->Spawn(this->render.accountId, EF_TUNAPARTY, this->render.position, 0, -1, 0, 0);
-      }
-      break;
-    case EFST_SV_ROOTTWIST:
-      g_effectMgr->Retire(this->render.accountId, 0x456);
-      if (g_effectMgr->HasAllocator(0x456) == true) {
-        g_effectMgr->Spawn(this->render.accountId, EF_SU_SV_ROOTTWIST, this->render.position, 0, -1, 0, 0);
-      }
-      break;
-    case EFST_BITESCAR:
-      g_effectMgr->Retire(this->render.accountId, 0x45F);
-      if (g_effectMgr->HasAllocator(0x45F) == true) {
-        g_effectMgr->Spawn(this->render.accountId, EF_BITE_SCAR, this->render.position, 0, -1, 0, 0);
-      }
-      break;
-    case EFST_SOULATTACK:
-      this->alternateDoramAppearance[0] = 1;
-      break;
-    case EFST_IMMUNE_PROPERTY_NOTHING:
-    case EFST_IMMUNE_PROPERTY_WATER:
-    case EFST_IMMUNE_PROPERTY_GROUND:
-    case EFST_IMMUNE_PROPERTY_FIRE:
-    case EFST_IMMUNE_PROPERTY_WIND:
-    case EFST_IMMUNE_PROPERTY_POISON:
-    case EFST_IMMUNE_PROPERTY_SAINT:
-    case EFST_IMMUNE_PROPERTY_DARKNESS:
-    case EFST_IMMUNE_PROPERTY_TELEKINESIS:
-    case EFST_IMMUNE_PROPERTY_UNDEAD:
-      g_effectMgr->Spawn(this->render.accountId, type + 0x87, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
-    case EFST_GRAVITYCONTROL:
-      if (g_effectMgr->Has(this->render.accountId, EF_UNK_1201) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4B1);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_UNK_1201, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      g_soundMgr->PlayWave("effect\\t_캐스팅.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
-      break;
-    case EFST_SUNSTANCE:
-      if (g_effectMgr->Has(this->render.accountId, EF_SUN_STANCE) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4BE);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_SUN_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
-    case EFST_LUNARSTANCE:
-      if (g_effectMgr->Has(this->render.accountId, EF_LUNAR_STANCE) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4BF);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_LUNAR_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
-    case EFST_STARSTANCE:
-      if (g_effectMgr->Has(this->render.accountId, EF_STAR_STANCE) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4C0);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_STAR_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
-    case EFST_UNIVERSESTANCE:
-      if (g_effectMgr->Has(this->render.accountId, EF_UNIVERSE_STANCE) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4C1);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_UNIVERSE_STANCE, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
-    case EFST_FLASHKICK:
-      if (g_effectMgr->Has(this->render.accountId, EF_FLASH_KICK) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4C5);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_FLASH_KICK, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
-    case EFST_SOULUNITY:
-      if (g_effectMgr->Has(this->render.accountId, EF_SOUL_UNITY) == true) {
-        g_effectMgr->Retire(this->render.accountId, 0x4C6);
-      }
-      g_effectMgr->Spawn(this->render.accountId, EF_SOUL_UNITY, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      g_soundMgr->PlayWave("effect\\t_바람방출.wav", 0.0f, 0.0f, 0.0f, 250, 40, 1.0f, 0);
-      break;
-    case EFST_SOULSHADOW:
-    case EFST_SOULFAIRY:
-    case EFST_SOULFALCON:
-    case EFST_SOULGOLEM:
-      g_weatherEffect.StartDarken();
-      this->LaunchEffect(EF_ASURABODY, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
-      break;
-    case EFST_SOUND_OF_DESTRUCTION:
-      g_effectMgr->Retire(this->render.accountId, 0x66C);
-      g_effectMgr->Spawn(this->render.accountId, EF_NEW_SOUNDOFDESTRUCTION_TARGET, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
-      break;
     case EFST_DEADLY_DEFEASANCE:
       if (!g_effectMgr->Has(this->render.accountId, EF_DEADLY_PROJECTION)) {
         g_effectMgr->Spawn(this->render.accountId, EF_DEADLY_PROJECTION, 0.0f, 0.0f, 0.0f, 0, -1, 0, 0);
@@ -3797,10 +3820,6 @@ void CPlayer::ReapplySkillEffects() {
     case EFST_FIRST_BRAND:
     case EFST_SECOND_BRAND:
       break;
-    case EFST_EQUIPPED_DIVINE_ARMOR:
-    case EFST_EQUIPPED_HOLY_ARMOR:
-      this->SendMsg(nullptr, AM_STATUS_CHANGE, type, 1, 0, 0, 0, 0);
-      break;
     default:
       switch (type) {
       case EFST_HAT_EFFECT:
@@ -3846,6 +3865,11 @@ struct PlayerSkillRequest {
   int level;
 };
 
+struct RouteClearProxy {
+  /* 0000 */ MovementRouteInterpolation route;
+  __declspec(noinline) void Clear();
+};
+
 // OFFSET: 0x00DB9A00
 // FUNCTION: fn_22672
 void CPlayer::SendMsg(
@@ -3888,7 +3912,7 @@ void CPlayer::SendMsg(
     break;
   case AM_REQ_ATTACK_REPEAT: {
     CRenderObject* target = mode->scene->GetGameActorByAID(this->proceedTargetGid);
-    if (target == nullptr || static_cast<CGameActor*>(target)->objectType != 7) {
+    if (target == nullptr || static_cast<CGameActor*>(target)->objectType != NPC_PET_TYPE) {
       mode->SendMsg(MM_REQUEST_ACT, 7, this->proceedTargetGid, 0, 0);
     }
     break;
@@ -3938,48 +3962,56 @@ void CPlayer::SendMsg(
     const float heading = this->Heading(this->render.position.x, this->render.position.z, targetX, targetZ);
     const float facing = static_cast<float>((CPlayer::AngleToDirection(static_cast<float>(heading + 22.5)) + 4) * 45);
     int delta = static_cast<int>(this->render.angle - facing);
+    int direction;
     if (delta < 0) {
       delta += 360;
+      direction = delta / 45;
+    } else {
+      direction = delta / 45;
     }
-    int direction = delta / 45;
     if (direction < 0) {
       direction += 8;
     } else if (direction >= 8) {
       direction -= 8;
     }
-    if (direction == 0 || direction == 4) {
+    if (direction == 0) {
       this->headDir = 0;
       this->render.angle = facing;
-    } else if (direction == 1) {
+    }
+    if (direction == 4) {
+      this->headDir = 0;
+      this->render.angle = facing;
+    }
+    if (direction == 1) {
       if (this->headDir != 1) {
         this->headDir = 1;
       } else {
         this->headDir = 0;
         this->render.angle = facing;
       }
-    } else {
-      if (direction == 2 || direction == 3) {
-        this->headDir = 1;
-        const float angle = facing + 45.0f;
-        this->render.angle = angle;
-        if (angle >= 360.0f) {
-          this->render.angle = angle - 360.0f;
-        }
+    }
+    if (direction == 2 || direction == 3) {
+      this->headDir = 1;
+      const float angle = facing + 45.0f;
+      this->render.angle = angle;
+      if (angle >= 360.0f) {
+        this->render.angle = angle - 360.0f;
       }
-      if (direction == 7) {
-        if (this->headDir != 2) {
-          this->headDir = 2;
-        } else {
-          this->headDir = 0;
-          this->render.angle = facing;
-        }
-      } else if (direction == 5 || direction == 6) {
-        const float angle = facing - 45.0f;
+    }
+    if (direction == 7) {
+      if (this->headDir != 2) {
         this->headDir = 2;
-        this->render.angle = angle;
-        if (angle < 0.0f) {
-          this->render.angle = angle + 360.0f;
-        }
+      } else {
+        this->headDir = 0;
+        this->render.angle = facing;
+      }
+    }
+    if (direction == 5 || direction == 6) {
+      const float angle = facing - 45.0f;
+      this->headDir = 2;
+      this->render.angle = angle;
+      if (angle < 0.0f) {
+        this->render.angle = angle + 360.0f;
       }
     }
     const int motion = this->headDir;
@@ -4028,12 +4060,12 @@ void CPlayer::SendMsg(
     break;
   case AM_ATTACKCLICKUP: {
     const int attackMode = this->proceedType;
-    if (attackMode != 1 && attackMode != 5) {
-      if (attackMode == 3) {
+    if (attackMode != PT_ATTACK && attackMode != PT_ATTACK_2) {
+      if (attackMode == PT_SKILL) {
         mode->SendMsg(MM_SETLOCKONMOUSE, 0, 0, 0, 0);
         break;
       }
-      if (attackMode != 6) {
+      if (attackMode != PT_TOUCH_SKILL) {
         break;
       }
     }
@@ -4052,7 +4084,7 @@ void CPlayer::SendMsg(
   case AM_PROCEEDGROUNDSKILL:
     if (this->render.state != ST_SIT &&
         (!IsHiding(this->stateFlags) || b == 0x89 || b == 0xD4 || b == 0x211 || b == 0x212)) {
-      this->proceedType = 4;
+      this->proceedType = PT_GROUNDSKILL;
       this->skillId = bLow;
       this->gSkillDx = cLow;
       this->gSkillDy = static_cast<int>(d);
@@ -4062,19 +4094,20 @@ void CPlayer::SendMsg(
   case AM_PROCEEDSKILL:
     if (this->render.state != ST_SIT &&
         (!IsHiding(this->stateFlags) || c == 0x89 || c == 0xD4 || c == 0x211 || c == 0x212 || c == 0x250)) {
-      this->proceedType = 3;
+      this->proceedType = PT_SKILL;
       this->proceedTargetGid = bLow;
       this->skillId = cLow;
     }
     break;
   case AM_RESUMEPROCEEDATTACK:
     if (this->render.state != ST_SIT && !IsHiding(this->stateFlags)) {
-      int attackMode = 1;
-      if (this->proceedType == 1) {
-        attackMode = 5;
+      if (this->proceedType == PT_ATTACK) {
+        this->tickOfMoveForAttack = timeGetTime() - 1200;
+        this->proceedType = PT_ATTACK_2;
+      } else {
+        this->tickOfMoveForAttack = timeGetTime() - 1200;
+        this->proceedType = PT_ATTACK;
       }
-      this->tickOfMoveForAttack = timeGetTime() - 1200;
-      this->proceedType = attackMode;
       this->proceedTargetGid = bLow;
       this->isAttackRequest = 0;
       this->totalAttackReqCnt = 0;
@@ -4086,11 +4119,12 @@ void CPlayer::SendMsg(
     if (this->render.state != ST_SIT && !IsHiding(this->stateFlags)) {
       CRenderObject* target = mode->scene->GetGameActorByAID(static_cast<std::uint32_t>(b));
       if (target != nullptr) {
-        this->proceedType =
-          static_cast<std::uint32_t>(g_session.m_moveSpeed * 4 / 3) <
-              static_cast<std::uint32_t>(static_cast<CGameActor*>(target)->moveSpeed)
-            ? 5
-            : 1;
+        if (static_cast<std::uint32_t>(static_cast<CGameActor*>(target)->moveSpeed) >
+            static_cast<std::uint32_t>(g_session.m_moveSpeed * 4 / 3)) {
+          this->proceedType = PT_ATTACK_2;
+        } else {
+          this->proceedType = PT_ATTACK;
+        }
         this->proceedTargetGid = bLow;
         this->isAttackRequest = 0;
         this->attackMode = cLow;
@@ -4100,14 +4134,14 @@ void CPlayer::SendMsg(
     break;
   case AM_PROCEEDPICKUPITEM:
     if (this->render.state != ST_SIT && !IsHiding(this->stateFlags)) {
-      this->proceedType = 2;
+      this->proceedType = PT_PICKUPITEM;
       this->proceedTargetGid = bLow;
     }
     break;
   case AM_PROCEEDTOUCHSKILL:
     if (this->render.state != ST_SIT && !IsHiding(this->stateFlags)) {
       const int* skill = reinterpret_cast<const int*>(static_cast<std::intptr_t>(c));
-      this->proceedType = 6;
+      this->proceedType = PT_TOUCH_SKILL;
       this->skillId = skill[1];
       this->skillUseLevel = skill[3];
       this->proceedTargetGid = bLow;
@@ -4117,7 +4151,7 @@ void CPlayer::SendMsg(
     }
     break;
   case AM_CLEAR_ROUTE:
-    this->route.points.clear();
+    reinterpret_cast<RouteClearProxy*>(&this->route)->Clear();
     break;
   default:
     this->CPc::SendMsg(sender, message, b, c, d, e, f, g);
@@ -4222,9 +4256,9 @@ void CGrannyPc::RenderModel(
     matrix world;
     world.Compose(local, view);
 
+    RenderCommand* command = commands[mesh];
     std::uint16_t* meshIndices = indices;
     int vertexCount = 0;
-    RenderCommand* command = commands[mesh];
     for (int triangle = 0; triangle < triangleCount; ++triangle) {
       for (int corner = 3; corner != 0; --corner) {
         const GrannyPNT332Vertex& vertex = source[meshIndices[vertexCount]];
@@ -4409,7 +4443,7 @@ void CPc::SetState(int state, int resetPosition) {
     break;
   case ST_MOVE:
     this->isCounter = 0;
-    if (this->bodyState != 1 && this->bodyState != 2) {
+    if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
       this->render.isMotionFreezed = false;
     }
     this->headDir = 0;
@@ -4497,7 +4531,7 @@ void CPc::SetState(int state, int resetPosition) {
     break;
   case ST_ATTACK: {
     this->isCounter = 0;
-    if (this->bodyState != 1 && this->bodyState != 2) {
+    if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
       this->render.isMotionFreezed = false;
     }
 
@@ -4565,7 +4599,7 @@ void CPc::SetState(int state, int resetPosition) {
   }
   case ST_ATTACK2: {
     this->isCounter = 0;
-    if (this->bodyState != 1 && this->bodyState != 2) {
+    if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
       this->render.isMotionFreezed = false;
     }
     const bool weaponAllowed = g_session.IsJobWeaponAllowed(this->GetEffectiveJob(-1), this->sex, this->weaponPair);
@@ -4776,11 +4810,12 @@ struct PcMoveEntry {
 void CPc::SendMsg(
   CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
 ) {
+  const int bLow = static_cast<int>(b);
   CGameMode* mode = g_modeMgr.GetGameMode();
   switch (message) {
   case AM_SET_HEAD_DIR:
     if (this->render.state == ST_STAND || this->render.state == ST_SIT) {
-      this->render.curMotion = static_cast<int>(b);
+      this->render.curMotion = bLow;
     }
     break;
   case AM_REMOVEGAGE:
@@ -4795,7 +4830,7 @@ void CPc::SendMsg(
       this->gaugeWindow->SetSize(60, 5);
       g_windowMgr.AddRenderedFront(this->gaugeWindow);
     }
-    this->gaugeWindow->SetValues(static_cast<int>(b), static_cast<int>(c));
+    this->gaugeWindow->SetValues(bLow, static_cast<int>(c));
     this->gaugeWindow->SetLimits(0, 0);
     const int y = ScaleByScreenHeight(12) + this->render.screenY;
     this->gaugeWindow->Move(this->render.screenX - 30, y);
@@ -5001,8 +5036,8 @@ void CPc::SendMsg(
     this->SetGuildInfo(entry->guildId, entry->guildVersion);
     this->SetPropensityInfo(entry->honor, entry->virtue);
     mode->CellCenter(entry->startX, entry->startY, this->render.position.x, this->render.position.z);
-    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubX - 8);
-    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubY - 8);
+    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubX - 8);
+    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubY - 8);
     this->render.position.y =
       mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
@@ -5034,8 +5069,8 @@ void CPc::SendMsg(
     this->SetGuildInfo(entry->guildId, entry->guildVersion);
     this->SetPropensityInfo(entry->honor, entry->virtue);
     mode->CellCenter(entry->startX, entry->startY, this->render.position.x, this->render.position.z);
-    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubX - 8);
-    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubY - 8);
+    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubX - 8);
+    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubY - 8);
     this->render.position.y =
       mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
@@ -5204,6 +5239,7 @@ void CGrannyPc::SendMsg(
   CGameObject* sender, std::int64_t message, std::int64_t b, std::int64_t c, std::int64_t d, std::int64_t e, std::int64_t f, std::int64_t g
 ) {
   CGameMode* mode = g_modeMgr.GetGameMode();
+  const std::uint32_t* partyAid;
   switch (message) {
   case AM_SET_HEAD_DIR:
     if (this->render.state == ST_STAND || this->render.state == ST_SIT) {
@@ -5355,8 +5391,8 @@ void CGrannyPc::SendMsg(
     if (c == 2 && !IsInvisible(this->stateFlags)) {
       this->LaunchEffect(EF_ENTRY2, vector3d{0.0f, 0.0f, 0.0f}, 0.0f);
     }
-    this->ShowPartyMemberEffect(entry->aid);
-    break;
+    partyAid = &entry->aid;
+    goto showPartyEffect;
   }
   case AM_INITMOVEENTRY: {
     PcMoveEntry* entry = reinterpret_cast<PcMoveEntry*>(static_cast<std::intptr_t>(b));
@@ -5374,8 +5410,8 @@ void CGrannyPc::SendMsg(
     this->SetGuildInfo(entry->guildId, entry->guildVersion);
     this->SetPropensityInfo(entry->honor, entry->virtue);
     mode->CellCenter(entry->startX, entry->startY, this->render.position.x, this->render.position.z);
-    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubX - 8);
-    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubY - 8);
+    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubX - 8);
+    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubY - 8);
     this->render.position.y =
       mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
@@ -5386,8 +5422,8 @@ void CGrannyPc::SendMsg(
     } else {
       this->SetState(ST_STAND, 1);
     }
-    this->ShowPartyMemberEffect(entry->aid);
-    break;
+    partyAid = &entry->aid;
+    goto showPartyEffect;
   }
   case AM_INITMOVEENTRY2: {
     PcMoveEntry* entry = reinterpret_cast<PcMoveEntry*>(static_cast<std::intptr_t>(b));
@@ -5408,8 +5444,8 @@ void CGrannyPc::SendMsg(
     this->SetGuildInfo(entry->guildId, entry->guildVersion);
     this->SetPropensityInfo(entry->honor, entry->virtue);
     mode->CellCenter(entry->startX, entry->startY, this->render.position.x, this->render.position.z);
-    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubX - 8);
-    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * 0.0625f * static_cast<float>(entry->startSubY - 8);
+    this->render.position.x += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubX - 8);
+    this->render.position.z += static_cast<float>(mode->scene->terrain->cellSize) * terrainSubcellFraction * static_cast<float>(entry->startSubY - 8);
     this->render.position.y =
       mode->scene->terrain->Height(this->render.position.x, this->render.position.z);
     if (this->FindRoute(entry->startX, entry->startY, entry->startSubX, entry->startSubY, entry->destX, entry->destY, entry->speed)) {
@@ -5420,8 +5456,8 @@ void CGrannyPc::SendMsg(
     } else {
       this->SetState(ST_STAND, 1);
     }
-    this->ShowPartyMemberEffect(entry->aid);
-    break;
+    partyAid = &entry->aid;
+    goto showPartyEffect;
   }
   case AM_MOVEENTRY:
   case AM_MOVEENTRY2: {
@@ -5445,8 +5481,8 @@ void CGrannyPc::SendMsg(
       this->SetState(ST_MOVE, 1);
       this->pathStartCell = 0;
     }
-    this->ShowPartyMemberEffect(entry->aid);
-    break;
+    partyAid = &entry->aid;
+    goto showPartyEffect;
   }
   case AM_CHANGE_RANK:
     this->pkRank = static_cast<int>(c);
@@ -5458,6 +5494,10 @@ void CGrannyPc::SendMsg(
   case AM_MAKE_BLUR_ACTOR:
     break;
   }
+  return;
+
+showPartyEffect:
+  this->ShowPartyMemberEffect(*partyAid);
 }
 
 // OFFSET: 0x00DAC080
@@ -5624,4 +5664,11 @@ void CPlayer::SetState(int state, int resetPosition) {
   }
 
   CPc::SetState(state, resetPosition);
+}
+
+// FOLDED: fn_17886
+void RouteClearProxy::Clear() {
+  if (this->route.points.begin() != this->route.points.end()) {
+    this->route.points.clear();
+  }
 }

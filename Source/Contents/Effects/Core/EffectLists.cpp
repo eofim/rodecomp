@@ -219,18 +219,21 @@ void EffectLists::Retire(CEffect* effect, unsigned char removeActive) {
   }
 }
 
+// INLINED
+static void RemoveActive(std::map<int, std::list<CEffect*>>& active, int owner, CEffect* effect) {
+  auto entry = active.find(owner);
+  if (entry != active.end()) {
+    active[owner].remove_if([effect](CEffect* other) { return other == effect; });
+  }
+}
+
 // OFFSET: 0x00B25120
 // FUNCTION: fn_18777
 void EffectLists::Retire(int actor, int id) {
   if (CEffect* found = this->Find(actor, id)) {
     CEffect* effect = found;
     this->retired.push_back(effect);
-
-    const int owner = effect->actor;
-    auto entry = this->active.find(owner);
-    if (entry != this->active.end()) {
-      this->active[owner].remove_if([effect](CEffect* other) { return other == effect; });
-    }
+    RemoveActive(this->active, effect->actor, effect);
   }
 }
 
@@ -455,13 +458,18 @@ struct CEffectAllocator : CAllocator {
 
 }
 
+struct ThunderingOrbName {
+  __declspec(noinline) EncryptedName<0x44, 0x2F8B0F37118D157FULL>& operator()() const;
+};
+
 // OFFSET: 0x00B1D9E0
 // FUNCTION: fn_18561
-__declspec(noinline) EncryptedName<0x44, 0x2F8B0F37118D157FULL>& ThunderingOrbName() {
+EncryptedName<0x44, 0x2F8B0F37118D157FULL>& ThunderingOrbName::operator()() const {
   OBFUSCATE_STRING_BODY("DRUID\\KR_THUNDERING_ORB\\thundering_orb_orb\\thundering_orb_small.str", 0x2F8B0F37118D157FULL);
 }
 
-// INLINED
+// OFFSET: 0x00B1ACA0
+// FUNCTION: fn_46540
 __forceinline EffectLists::EffectLists() {
   this->initialized = false;
   if (this->RegisterAllocators()) {
@@ -548,7 +556,7 @@ namespace {
 // FUNCTION: fn_18655
 template <>
 CEffect* CEffectAllocator<CThunderingOrb>::Create() {
-  return new (std::nothrow) CThunderingOrb(ThunderingOrbName().Text());
+  return new (std::nothrow) CThunderingOrb(ThunderingOrbName{}().Text());
 }
 
 // INLINED
@@ -1369,7 +1377,9 @@ bool CGravityControlEffect::IsAlive() {
   return this->ActorExists();
 }
 
-CMeteorEffect::~CMeteorEffect() {
+// OFFSET: 0x00B1D680
+// FUNCTION: fn_46483
+__declspec(noinline) CMeteorEffect::~CMeteorEffect() {
 }
 
 // OFFSET: 0x00B1D6E0

@@ -290,15 +290,15 @@ int AiHomunAttack(lua_State* state) {
   }
 
   // GLOBAL: gl_24908
-  static std::uint32_t lastAttackTime;
-  if (g_session.m_homunStats[7] + lastAttackTime < timeGetTime()) {
+  static std::uint32_t lastHomunAttackTime;
+  if (g_session.m_homunStats[7] + lastHomunAttackTime < timeGetTime()) {
     ActionRequestPacket packet;
     packet.opcode = ID_CZ_REQUEST_ACTNPC;
     packet.aid = aid;
     packet.target = target;
     packet.action = 0;
     GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.opcode), &packet);
-    lastAttackTime = timeGetTime();
+    lastHomunAttackTime = timeGetTime();
   }
 
   return 0;
@@ -415,9 +415,9 @@ int AiHomunGetV(lua_State* state) {
 
     std::uint32_t homunAid = g_session.m_homunAid;
     if (actor->render.accountId != g_session.m_aid && !g_session.IsCompanionAid(actor->render.accountId)) {
+      int targetX, targetY;
       CGameActor* targetActor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(homunAid);
       if (targetActor) {
-        int targetX, targetY;
         g_modeMgr.GetGameMode()->WorldCell(targetActor->render.position.x, targetActor->render.position.z, targetX, targetY);
 
         int range = 0;
@@ -602,9 +602,9 @@ int AiMercenaryGetV(lua_State* state) {
 
     std::uint32_t mercAid = g_session.m_mercenaryAid;
     if (actor->render.accountId != g_session.m_aid && !g_session.IsCompanionAid(actor->render.accountId)) {
+      int targetX, targetY;
       CGameActor* targetActor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(mercAid);
       if (targetActor) {
-        int targetX, targetY;
         g_modeMgr.GetGameMode()->WorldCell(targetActor->render.position.x, targetActor->render.position.z, targetX, targetY);
 
         int range = 0;
@@ -795,14 +795,12 @@ int AiTraceAI(lua_State* state) {
   }
   std::strcat(path, "\\TraceAI.txt");
 
-  char* buffer;
+  char* buffer = const_cast<char*>(text);
   if (file.Open(path, 0, true, false)) {
     size = file.GetSize();
     buffer = new char[size];
     file.Read(buffer, size);
     file.Close();
-  } else {
-    buffer = const_cast<char*>(text);
   }
 
   file.Open(path, 0x1001, true, false);
@@ -817,7 +815,7 @@ int AiTraceAI(lua_State* state) {
   const int hour = (time >> 16) & 0xFF;
   const int minute = (time >> 8) & 0xFF;
   const int second = time & 0xFF;
-  sprintf(stamp, "%d/%d/%d - %d:%d:%d", year, month, day, hour, minute, second);
+  sprintf(stamp, "%d년 %d월 %d일 %d시 %d분 %d초 ", year, month, day, hour, minute, second);
   file.Write(stamp, std::strlen(stamp));
   file.Write(text, std::strlen(text));
   file.Write("\r\n", 2);
@@ -866,6 +864,19 @@ struct MoveNpcPacket {
 
 static_assert(sizeof(MoveNpcPacket) == 9);
 
+// INLINED
+CGameActor* FindAiActor(std::uint32_t aid, int& index) {
+  if (g_session.IsHomunAid(aid)) {
+    index = 0;
+  } else if (g_session.IsMercenaryAid(aid)) {
+    index = 1;
+  } else {
+    return nullptr;
+  }
+
+  return g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
+}
+
 }
 
 // OFFSET: 0x00D9EEF0
@@ -873,23 +884,16 @@ static_assert(sizeof(MoveNpcPacket) == 9);
 int AiGetMsg(lua_State* state) {
   std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
   int index;
-  if (g_session.IsHomunAid(aid)) {
-    index = 0;
-  } else if (g_session.IsMercenaryAid(aid)) {
-    index = 1;
-  } else {
-    return 0;
-  }
-
-  CGameActor* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
+  CGameActor* actor = FindAiActor(aid, index);
   if (!actor) {
     return 0;
   }
 
   AiMessage message = *actor->GetMsg2AI(index);
   lua_newtable(state);
+  const int type = message.type;
   lua_pushnumber(state, 1);
-  lua_pushnumber(state, message.type);
+  lua_pushnumber(state, type);
   lua_settable(state, -3);
   switch (message.type) {
   case MOVE_CMD:
@@ -924,23 +928,16 @@ int AiGetMsg(lua_State* state) {
 int AiGetResMsg(lua_State* state) {
   std::uint32_t aid = static_cast<std::uint32_t>(luaL_checknumber(state, 1));
   int index;
-  if (g_session.IsHomunAid(aid)) {
-    index = 0;
-  } else if (g_session.IsMercenaryAid(aid)) {
-    index = 1;
-  } else {
-    return 0;
-  }
-
-  CGameActor* actor = g_modeMgr.GetGameMode()->scene->GetGameActorByAID(aid);
+  CGameActor* actor = FindAiActor(aid, index);
   if (!actor) {
     return 0;
   }
 
   AiMessage message = *actor->GetResMsg2AI(index);
   lua_newtable(state);
+  const int type = message.type;
   lua_pushnumber(state, 1);
-  lua_pushnumber(state, message.type);
+  lua_pushnumber(state, type);
   lua_settable(state, -3);
   switch (message.type) {
   case MOVE_CMD:
@@ -980,7 +977,7 @@ int AiIsMonster(lua_State* state) {
   if (actor) {
     int job = actor->GetEffectiveJob(-1);
     bool checkState = false;
-    if (((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || static_cast<unsigned>(job - 20021) <= 11978) && actor->objectType != 7) {
+    if (((job > JT_MON_BEGIN && job < JT_MONSTER_LAST) || static_cast<unsigned>(job - 20021) <= 11978) && actor->objectType != NPC_PET_TYPE) {
       switch (actor->objectType) {
       case NPC_MERSOL_TYPE:
       case NPC_ELEMENTAL_TYPE:
@@ -1098,7 +1095,7 @@ int AiSkillGround(lua_State* state) {
 
   CGameMode* mode = g_modeMgr.GetGameMode();
   CGameActor* actor = mode->scene->GetGameActorByAID(aid);
-  if (actor->render.state == 1 || actor->render.state == 0 || actor->render.state == 4) {
+  if (actor->render.state == ST_MOVE || actor->render.state == ST_STAND || actor->render.state == ST_DAMAGE) {
     mode->SendMsg(MM_USE_SKILL_TOGROUND, reinterpret_cast<int>(skillArgs), 0, 0, 0);
   }
   mode->SendMsg(MM_SETLOCKONMOUSE, 0, 0, 0, 0);
@@ -1140,7 +1137,7 @@ int AiSkillObject(lua_State* state) {
   }
 
   CGameActor* actor = mode->scene->GetGameActorByAID(aid);
-  if (targetActor && (actor->render.state == 1 || actor->render.state == 0 || actor->render.state == 4)) {
+  if (targetActor && (actor->render.state == ST_MOVE || actor->render.state == ST_STAND || actor->render.state == ST_DAMAGE)) {
     mode->SendMsg(MM_USE_SKILL, skillId, target, level, 0);
   }
   mode->SendMsg(MM_SETLOCKONMOUSE, 0, 0, 0, 0);

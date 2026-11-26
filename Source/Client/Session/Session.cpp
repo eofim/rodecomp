@@ -945,6 +945,17 @@ std::vector<int> CSession::FindInventoryIndicesByItemId(int itemId, unsigned cha
   return indices;
 }
 
+// OFFSET: 0x00DDD0D0
+// FUNCTION: fn_23379
+int CSession::HomunSkillLevel(int skillId) const {
+  skillId -= 8000;
+  if (skillId > -1) {
+    return this->m_homunSkillLevels[skillId];
+  }
+
+  return 0;
+}
+
 // OFFSET: 0x00DDD710
 // FUNCTION: fn_23388
 ITEM_INFO CSession::GetInventoryItemAt(int index) const {
@@ -1034,9 +1045,9 @@ int CSession::GetCommandId(const char* name) const {
 }
 
 // INLINED
-template <std::size_t Length>
-static bool IsTalkCommand(const std::string& token, const char (&command)[Length]) {
-  return token.size() == Length && std::memcmp(token.data(), command, Length) == 0;
+template <std::array Command>
+static bool IsTalkCommand(const std::string& token) {
+  return token.size() == Command.size() && std::memcmp(token.data(), Command.data(), Command.size()) == 0;
 }
 
 // OFFSET: 0x00DE1010
@@ -1058,78 +1069,78 @@ int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
   LowercaseText(tokenizer[0]);
   if (text[0] != '/') {
     *talkType = TT_NORMAL;
-  } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xD0'})) {
+  } else if (IsTalkCommand<std::array{'/', '\xA4', '\xD0'}>(tokenizer[0])) {
     *talkType = TT_BROADCAST;
     offset = 3;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'b'})) {
+  } else if (IsTalkCommand<std::array{'/', 'b'}>(tokenizer[0])) {
     *talkType = TT_BROADCAST;
     offset = 2;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'l', 'b'})) {
+  } else if (IsTalkCommand<std::array{'/', 'l', 'b'}>(tokenizer[0])) {
     *talkType = TT_LOCALBROADCAST;
     offset = 3;
-  } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xD3', '\xA4', '\xD0'})) {
+  } else if (IsTalkCommand<std::array{'/', '\xA4', '\xD3', '\xA4', '\xD0'}>(tokenizer[0])) {
     *talkType = TT_LOCALBROADCAST;
     offset = 5;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'n', 'b'})) {
+  } else if (IsTalkCommand<std::array{'/', 'n', 'b'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_BROADCAST;
     offset = 3;
-  } else if (IsTalkCommand(tokenizer[0], {'/', '\xC6', '\xC4', '\xB6', '\xF5', '\xB8', '\xBB'})) {
+  } else if (IsTalkCommand<std::array{'/', '\xC6', '\xC4', '\xB6', '\xF5', '\xB8', '\xBB'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_BLUEBROADCAST;
     offset = 7;
-  } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xCC', '\xA4', '\xD0'})) {
+  } else if (IsTalkCommand<std::array{'/', '\xA4', '\xCC', '\xA4', '\xD0'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_BROADCAST;
     offset = 5;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'n', 'l', 'b'})) {
+  } else if (IsTalkCommand<std::array{'/', 'n', 'l', 'b'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_LOCALBROADCAST;
     offset = 4;
-  } else if (IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xCF', '\xA4', '\xD0'})) {
+  } else if (IsTalkCommand<std::array{'/', '\xA4', '\xCF', '\xA4', '\xD0'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_LOCALBROADCAST;
     offset = 5;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'b', 'b'})) {
+  } else if (IsTalkCommand<std::array{'/', 'b', 'b'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_BLUEBROADCAST;
     offset = 3;
   } else if (tokenizer[0] == "/지역파란말") {
     *talkType = TT_NAMELESS_BLUELOCALBROADCAST;
     offset = 11;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'm', 'b'})) {
+  } else if (IsTalkCommand<std::array{'/', 'm', 'b'}>(tokenizer[0])) {
     *talkType = TT_NAMELESS_BLUELOCALBROADCAST;
     offset = 3;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'k', 'i', 'l', 'l'})) {
+  } else if (IsTalkCommand<std::array{'/', 'k', 'i', 'l', 'l'}>(tokenizer[0])) {
     *talkType = TT_DISCONNECT_CHARACTER;
     offset = 5;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'v'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xBD'})) {
+  } else if (IsTalkCommand<std::array{'/', 'v'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', '\xA4', '\xBD'}>(tokenizer[0])) {
     *talkType = TT_VOLUME;
     if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
       return -1;
     }
-    char volume[20];
+    char volume[36];
     _itoa(g_soundMgr->sampleVolume, volume, 10);
     parts[0].assign(volume, std::strlen(volume));
     return -1;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'b', 'v'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xD0', '\xA4', '\xBD'})) {
+  } else if (IsTalkCommand<std::array{'/', 'b', 'v'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', '\xA4', '\xD0', '\xA4', '\xBD'}>(tokenizer[0])) {
     *talkType = TT_BVOLUME;
     if (tokenizer.TokenCount() >= 2) {
       parts[0] = tokenizer[1];
       return -1;
     }
-    char volume[20];
+    char volume[36];
     _itoa(g_soundMgr->Volume(), volume, 10);
     parts[0].assign(volume, std::strlen(volume));
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', 'g', 'c'}) || IsTalkCommand(tokenizer[0], {'/', 'g', 'u', 'i', 'l', 'd', 'c', 'h', 'a', 't'})) && tokenizer.TokenCount() >= 2) {
+  } else if ((IsTalkCommand<std::array{'/', 'g', 'c'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', 'g', 'u', 'i', 'l', 'd', 'c', 'h', 'a', 't'}>(tokenizer[0])) && tokenizer.TokenCount() >= 2) {
     *talkType = TT_GUILD_CHAT;
-    parts[0] = text + (IsTalkCommand(tokenizer[0], {'/', 'g', 'c'}) ? 4 : 11);
+    parts[0] = text + (IsTalkCommand<std::array{'/', 'g', 'c'}>(tokenizer[0]) ? 4 : 11);
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', 'e', 'x'}) || IsTalkCommand(tokenizer[0], {'/', '\xC2', '\xF7', '\xB4', '\xDC'})) && tokenizer.TokenCount() >= 2) {
+  } else if ((IsTalkCommand<std::array{'/', 'e', 'x'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', '\xC2', '\xF7', '\xB4', '\xDC'}>(tokenizer[0])) && tokenizer.TokenCount() >= 2) {
     *talkType = TT_REQ_WHISPER_PC_EX;
-    parts[0] = text + (IsTalkCommand(tokenizer[0], {'/', 'e', 'x'}) ? 4 : 6);
+    parts[0] = text + (IsTalkCommand<std::array{'/', 'e', 'x'}>(tokenizer[0]) ? 4 : 6);
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', 'i', 'n'}) || IsTalkCommand(tokenizer[0], {'/', '\xC7', '\xD8', '\xC1', '\xA6'})) && tokenizer.TokenCount() >= 2) {
+  } else if ((IsTalkCommand<std::array{'/', 'i', 'n'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', '\xC7', '\xD8', '\xC1', '\xA6'}>(tokenizer[0])) && tokenizer.TokenCount() >= 2) {
     *talkType = TT_REQ_WHISPER_PC_IN;
-    parts[0] = text + (IsTalkCommand(tokenizer[0], {'/', 'i', 'n'}) ? 4 : 6);
+    parts[0] = text + (IsTalkCommand<std::array{'/', 'i', 'n'}>(tokenizer[0]) ? 4 : 6);
     return -1;
-  } else if (IsTalkCommand(tokenizer[0], {'/', 'r', 'e', 'd'})) {
+  } else if (IsTalkCommand<std::array{'/', 'r', 'e', 'd'}>(tokenizer[0])) {
     *talkType = TT_IS_REDCELL;
     for (int index = 1; index < tokenizer.TokenCount(); ++index) {
       const std::string& token = tokenizer[index];
@@ -1137,15 +1148,15 @@ int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
       parts[0].append(" ");
     }
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xB0', '\xC5', '\xB7', '\xA1'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'j', 'f', 'o'}) || IsTalkCommand(tokenizer[0], {'/', '\xB1', '\xB3', '\xC8', '\xAF'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'y', 'g', 'h', 'k', 's'}) || IsTalkCommand(tokenizer[0], {'/', 'd', 'e', 'a', 'l'}) || IsTalkCommand(tokenizer[0], {'/', '\xA4', '\xB7', '\xA4', '\xA7', '\xB9', '\xCC'})) && tokenizer.TokenCount() == 2) {
+  } else if ((IsTalkCommand<std::array{'/', '\xB0', '\xC5', '\xB7', '\xA1'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', 'r', 'j', 'f', 'o'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', '\xB1', '\xB3', '\xC8', '\xAF'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', 'r', 'y', 'g', 'h', 'k', 's'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', 'd', 'e', 'a', 'l'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', '\xA4', '\xB7', '\xA4', '\xA7', '\xB9', '\xCC'}>(tokenizer[0])) && tokenizer.TokenCount() == 2) {
     *talkType = TT_REQ_EXCHANGE_ITEM;
     parts[0] = tokenizer[1];
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xB1', '\xE6', '\xB5', '\xE5'}) || IsTalkCommand(tokenizer[0], {'/', 'r', 'l', 'f', 'e', 'm'}) || IsTalkCommand(tokenizer[0], {'/', 'g', 'u', 'i', 'l', 'd'})) && tokenizer.TokenCount() == 2) {
+  } else if ((IsTalkCommand<std::array{'/', '\xB1', '\xE6', '\xB5', '\xE5'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', 'r', 'l', 'f', 'e', 'm'}>(tokenizer[0]) || IsTalkCommand<std::array{'/', 'g', 'u', 'i', 'l', 'd'}>(tokenizer[0])) && tokenizer.TokenCount() == 2) {
     *talkType = TT_REQ_MAKE_GUILD;
     parts[0] = tokenizer[1];
     return -1;
-  } else if ((IsTalkCommand(tokenizer[0], {'/', '\xC7', '\xD8', '\xC3', '\xBC'}) || tokenizer[0] == "/gocp" || tokenizer[0] == "/breakguild") && tokenizer.TokenCount() == 2) {
+  } else if ((IsTalkCommand<std::array{'/', '\xC7', '\xD8', '\xC3', '\xBC'}>(tokenizer[0]) || tokenizer[0] == "/gocp" || tokenizer[0] == "/breakguild") && tokenizer.TokenCount() == 2) {
     *talkType = TT_REQ_BREAK_GUILD;
     parts[0] = tokenizer[1];
     return -1;
@@ -1172,8 +1183,8 @@ int CSession::GetTalkType(const char* text, int* talkType, std::string* parts) {
     *talkType = TT_REQ_MOVETO_MAP;
     parts[0] = tokenizer[1];
     if (tokenizer.TokenCount() == 4) {
-      parts[1] = tokenizer[2];
       parts[2] = tokenizer[3];
+      parts[1] = tokenizer[2];
     } else {
       parts[1] = parts[2].assign("0");
     }
@@ -2194,7 +2205,13 @@ void CSession::UpdateInventoryItem(const ITEM_INFO& item, unsigned char refresh)
 
   if (it == this->m_inventoryItems.end()) {
     this->m_inventoryItems.push_back(item);
-  } else if (item.quantity == 0) {
+    if (refresh) {
+      RefreshItemWindows(&g_windowMgr);
+    }
+    return;
+  }
+
+  if (item.quantity == 0) {
     this->m_inventoryItems.erase(it);
   } else {
     *it = item;
@@ -2694,11 +2711,12 @@ unsigned char CSession::GetShopType(int id) {
 // OFFSET: 0x00DE3930
 // FUNCTION: fn_23484
 std::pair<int, int> CSession::GetShopEntry(unsigned int index, int key) {
+  const unsigned int itemIndex = index;
   auto name = this->m_nameToId.find(std::string(this->m_navigationPlayerMap));
   if (name != this->m_nameToId.end()) {
     auto shop = this->m_shops.find(name->second);
-    if (shop != this->m_shops.end() && shop->second.items.size() > index) {
-      std::map<int, std::pair<int, int>>& entries = shop->second.items[index];
+    if (shop != this->m_shops.end() && shop->second.items.size() > itemIndex) {
+      std::map<int, std::pair<int, int>>& entries = shop->second.items[itemIndex];
       auto entry = entries.find(key);
       if (entries.end() != entry) {
         return entry->second;
@@ -2892,7 +2910,7 @@ void CSession::LoadExternalSettings() {
     case ServerSakray:
       this->m_hotkeyScript->Load("Lua Files\\service_thailand\\ExternalSettings_th_sak", true, false);
       break;
-    case 13:
+    case ServerStage:
       this->m_hotkeyScript->Load("Lua Files\\service_thailand\\ExternalSettings_th_stage", true, false);
       break;
     default:
@@ -3040,6 +3058,14 @@ void CSession::LoadExternalSettings() {
   }
 }
 
+// INLINED
+static int GetSystemMilliseconds() {
+  SYSTEMTIME systemTime;
+  GetSystemTime(&systemTime);
+  return (((((static_cast<unsigned char>(systemTime.wYear) * 12 + systemTime.wMonth) * 31 + systemTime.wDay) * 24 + systemTime.wHour + 9) * 60 + systemTime.wMinute) * 60 + systemTime.wSecond) * 1000 +
+    systemTime.wMilliseconds;
+}
+
 // OFFSET: 0x00DE3F20
 // FUNCTION: fn_23489
 void CSession::Init() {
@@ -3051,8 +3077,7 @@ void CSession::Init() {
   const char* fileName = std::strrchr(modulePath, '\\') + 1;
   std::strncpy(directory, modulePath, std::strlen(modulePath) - std::strlen(fileName));
 
-  HKEY key;
-  if (RegCreateKeyExA(HKEY_CURRENT_USER, OBFUSCATE_ARRAY_TEXT("Software\\Gravity\\RagnarokOnline", 0x2FE993D1DDE1F197ULL, char), 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, nullptr) == ERROR_SUCCESS) {
+  if (HKEY key; RegCreateKeyExA(HKEY_CURRENT_USER, OBFUSCATE_ARRAY_TEXT("Software\\Gravity\\RagnarokOnline", 0x2FE993D1DDE1F197ULL, char), 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &key, nullptr) == ERROR_SUCCESS) {
     std::string valueName = OBFUSCATE_ARRAY_TEXT("RagPath", 0xE7978FB5A94DD7FDULL, char);
     if (g_serviceMode == ServerSakray) {
       std::string sakrayValueName = OBFUSCATE_ARRAY_TEXT("SakrayPath", 0xB7FD8F670FC7B96BULL, char);
@@ -3065,13 +3090,7 @@ void CSession::Init() {
   this->m_chatTarget = 0;
   this->m_showEffects = 1;
   this->m_aid = 0;
-
-  SYSTEMTIME systemTime;
-  GetSystemTime(&systemTime);
-  const int now =
-    (((((static_cast<unsigned char>(systemTime.wYear) * 12 +systemTime.wMonth) * 31 + systemTime.wDay) * 24 + systemTime.wHour + 9) * 60 + systemTime.wMinute) * 60 + systemTime.wSecond) * 1000 +
-    systemTime.wMilliseconds;
-  this->m_clientTimeOffset = now - timeGetTime();
+  this->m_clientTimeOffset = GetSystemMilliseconds() - timeGetTime();
   this->m_guildTargetCharacter = 0;
   this->m_whisperOption0 = 0;
   this->m_timeAttackStart = 0;
@@ -3177,12 +3196,7 @@ void CSession::Init() {
   this->elementalGid = -1;
   this->LoadProhibitionLog();
 
-  this->storeSearchResults.clear();
-  this->storeSearchCount = 0;
-  this->storeSearchPageFlags = 0;
-  this->storeSearchX = -1;
-  this->storeSearchY = -1;
-  this->storeSearchOwnerAid = INVALID_AID;
+  this->ClearStoreSearchResults();
   this->ClearPairValues(1, 1, 1);
 
   this->m_lockItemDrop = false;
@@ -3208,7 +3222,15 @@ void CSession::Init() {
   this->m_mileageWndElapsed = 0;
   this->m_mileageWndBonus = 1;
   this->m_muteSellSound = true;
-  this->ClearAchievements();
+  this->achievements.clear();
+  this->achievementScore = 0;
+  this->achievementLevel = 0;
+  this->achievementCompleted = 0;
+  this->achievementTotal = 0;
+  this->jobTitles.clear();
+  this->achievementIds.clear();
+  this->jobTitle = 0;
+  this->trackedAchievements.clear();
   this->playerAppearanceState = 0;
   this->m_bodyCostume = 0;
   this->m_lastIntervalTime = timeGetTime();
@@ -3221,9 +3243,7 @@ void CSession::Init() {
   this->m_guildMemberListSort = true;
   this->m_blockPrivateTab = false;
   this->m_sortPrivateTab = false;
-  this->m_itemDefaultSort = false;
-  this->m_itemAscendingOrder = false;
-  this->m_itemDescendingOrder = false;
+  std::memset(this->m_itemSortModes, 0, sizeof(this->m_itemSortModes));
   this->m_showMenuIcon = true;
   this->m_homunculusAutoFeed = false;
   this->m_selectedIndex = -1;
@@ -3425,6 +3445,9 @@ void CSession::ClearAchievements() {
   this->achievementScore = 0;
   this->achievementIds.clear();
   this->jobTitle = 0;
+  for (SessionRecord6178& record : this->trackedAchievements) {
+    record.objectives.clear();
+  }
   this->trackedAchievements.clear();
 }
 
@@ -3793,7 +3816,7 @@ void CSession::InitCommandTables() {
   this->m_commandIds.push_back(std::pair<const char*, int>("/rkfanfl", 51));
   this->m_commandIds.push_back(std::pair<const char*, int>("/savechat", 51));
   this->m_commandIds.push_back(std::pair<const char*, int>("/miss", 53));
-  if (g_serviceMode != 3) {
+  if (g_serviceMode != ServerInstantEvent) {
     this->m_commandIds.push_back(std::pair<const char*, int>("/noshift", 105));
     this->m_commandIds.push_back(std::pair<const char*, int>("/noctrl", 109));
     this->m_commandIds.push_back(std::pair<const char*, int>("/ns", 105));
@@ -4191,43 +4214,34 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\NPCIdentity", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\jobName_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\jobName", true, false);
-  {
-    const std::array<char, 27> source = OBFUSCATE_SOURCE_CHARS(27, "Lua Files\\DataInfo\\PetInfo", 0x35E5656B5DEDCD75ULL);
-    this->m_hotkeyScript->Load(OBFUSCATE_DECRYPT(0x35E5656B5DEDCD75ULL, source), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\DataInfo\\PetInfo", 0x35E5656B5DEDCD75ULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\AccessoryId", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\accName_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\accName", true, false);
 
   std::string chatWndInfo("ChatWndInfo_U");
   chatWndInfo = "SaveData\\ChatWndInfo_U";
-  if (!this->m_hotkeyScript->Load(chatWndInfo.c_str(), false, true) || !this->m_hotkeyScript->HasTable("ChatSubWnd_1")) {
+  if (!this->m_hotkeyScript->Load(chatWndInfo.c_str(), false, true)) {
+    this->m_hotkeyScript->Load("Lua Files\\ChatWndInfo\\ChatWndInfo", true, false);
+  } else if (!this->m_hotkeyScript->HasTable("ChatSubWnd_1")) {
     this->m_hotkeyScript->Load("Lua Files\\ChatWndInfo\\ChatWndInfo", true, false);
   }
 
   this->m_hotkeyScript->Load("Lua Files\\ChatWndInfo\\ChatWndInfo_F", true, false);
-  this->m_canDragWnd = this->m_hotkeyScript->GlobalInteger("CanDragWnd") == 1;
+  if (this->m_hotkeyScript->GlobalInteger("CanDragWnd") == 1) {
+    this->m_canDragWnd = true;
+  } else {
+    this->m_canDragWnd = false;
+  }
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\jobinheritlist", true, false);
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\SkillID", true, false);
-  {
-    const std::array<char, 35> source = OBFUSCATE_SOURCE_CHARS(35, "Lua Files\\SkillInfoz\\SkillInfoList", 0x4941FD9F21BBB9FDULL);
-    thread_local EncryptedName<sizeof(source), 0x4941FD9F21BBB9FDULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
-  {
-    const std::array<char, 35> source = OBFUSCATE_SOURCE_CHARS(35, "Lua Files\\SkillInfoz\\SkillDescript", 0x891B232D09451965ULL);
-    thread_local EncryptedName<sizeof(source), 0x891B232D09451965ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\SkillInfoz\\SkillInfoList", 0x4941FD9F21BBB9FDULL), true, false);
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\SkillInfoz\\SkillDescript", 0x891B232D09451965ULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\SkillDelayList", true, false);
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\SkillInfo_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\SkillInfoz\\skilltreeview", true, false);
   this->m_hotkeyScript->Load("Lua Files\\StateIcon\\EFSTIDs", true, false);
-  {
-    const std::array<char, 34> source = OBFUSCATE_SOURCE_CHARS(34, "Lua Files\\StateIcon\\StateIconInfo", 0x758F1D0B4F7705B9ULL);
-    thread_local EncryptedName<sizeof(source), 0x758F1D0B4F7705B9ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\StateIcon\\StateIconInfo", 0x758F1D0B4F7705B9ULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\StateIcon\\StateIconInfo_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\StateIcon\\StateIconImgInfo", true, false);
   this->m_hotkeyScript->Load("System\\LuaFiles514\\OptionInfo", false, true);
@@ -4269,11 +4283,7 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\KafraMoveMapServiceList_F", true, false);
   this->LoadNavigationScripts();
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\HelpMsgStr", true, false);
-  {
-    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\EntryQueue\\EntryQueueList", 0xD1413DBB01CD8B51ULL);
-    thread_local EncryptedName<sizeof(source), 0xD1413DBB01CD8B51ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\EntryQueue\\EntryQueueList", 0xD1413DBB01CD8B51ULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\WeaponTable", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\WeaponTable_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\JobIdentity", true, false);
@@ -4303,26 +4313,14 @@ void CSession::LoadLuaDataFiles() {
   }
 
   this->m_hotkeyScript->Load("Lua Files\\SignBoardList_F", true, false);
-  {
-    const std::array<char, 24> source = OBFUSCATE_SOURCE_CHARS(24, "Lua Files\\SignBoardList", 0x637B959D55771F69ULL);
-    thread_local EncryptedName<sizeof(source), 0x637B959D55771F69ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\SignBoardList", 0x637B959D55771F69ULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\StylingShop\\StylingShopInfo_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\StylingShop\\StylingShopInfo", true, false);
   this->m_hotkeyScript->Load("Lua Files\\EffectTool\\ForceRenderEffect", true, false);
   this->m_hotkeyScript->Load("Lua Files\\OffsetItemPos\\OffsetItemPos_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\OffsetItemPos\\OffsetItemPos", true, false);
-  {
-    const std::array<char, 37> source = OBFUSCATE_SOURCE_CHARS(37, "Lua Files\\datainfo\\LapineDdukDDakBox", 0x2BAD156DE3E1F9D9ULL);
-    thread_local EncryptedName<sizeof(source), 0x2BAD156DE3E1F9D9ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
-  {
-    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\datainfo\\LapineUpgradeBox", 0x75ADC57D87EFBD8FULL);
-    thread_local EncryptedName<sizeof(source), 0x75ADC57D87EFBD8FULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\datainfo\\LapineDdukDDakBox", 0x2BAD156DE3E1F9D9ULL), true, false);
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\datainfo\\LapineUpgradeBox", 0x75ADC57D87EFBD8FULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\transparentItem\\transparentItem", true, false);
   this->m_hotkeyScript->Load("Lua Files\\transparentItem\\transparentItem_f", true, false);
   this->LoadRobeAlpha();
@@ -4330,36 +4328,22 @@ void CSession::LoadLuaDataFiles() {
   this->m_hotkeyScript->Load("Lua Files\\DataInfo\\TB_Layer_Priority", true, false);
   this->m_hotkeyScript->Load("Lua Files\\datainfo\\tb_cashshop_banner", true, false);
   this->m_hotkeyScript->Load("Lua Files\\datainfo\\tb_stoveshop_banner", true, false);
-  {
-    const std::array<char, 26> source = OBFUSCATE_SOURCE_CHARS(26, "Lua Files\\Agit\\AgitConfig", 0xEDC74F6D13DF71EFULL);
-    thread_local EncryptedName<sizeof(source), 0xEDC74F6D13DF71EFULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
-  {
-    const std::array<char, 28> source = OBFUSCATE_SOURCE_CHARS(28, "Lua Files\\Agit\\AgitConfig_F", 0xF161095D0DE18F95ULL);
-    thread_local EncryptedName<sizeof(source), 0xF161095D0DE18F95ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\Agit\\AgitConfig", 0xEDC74F6D13DF71EFULL), true, false);
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\Agit\\AgitConfig_F", 0xF161095D0DE18F95ULL), true, false);
   this->m_hotkeyScript->Load("Lua Files\\datainfo\\tb_checkAttendance_banner", true, false);
-  {
-    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\DamageSkin\\DamageSkinList", 0x0B7109397F6B1387ULL);
-    thread_local EncryptedName<sizeof(source), 0x0B7109397F6B1387ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
-  {
-    const std::array<char, 36> source = OBFUSCATE_SOURCE_CHARS(36, "Lua Files\\DamageSkin\\DamageSkinInfo", 0x03772763F96D9DA5ULL);
-    thread_local EncryptedName<sizeof(source), 0x03772763F96D9DA5ULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
-  {
-    const std::array<char, 38> source = OBFUSCATE_SOURCE_CHARS(38, "Lua Files\\DamageSkin\\DamageSkinInfo_F", 0xC517FB932D95BB6DULL);
-    thread_local EncryptedName<sizeof(source), 0xC517FB932D95BB6DULL> name(source);
-    this->m_hotkeyScript->Load(name.Text(), true, false);
-  }
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\DamageSkin\\DamageSkinList", 0x0B7109397F6B1387ULL), true, false);
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\DamageSkin\\DamageSkinInfo", 0x03772763F96D9DA5ULL), true, false);
+  this->m_hotkeyScript->Load(OBFUSCATE_TEXT("Lua Files\\DamageSkin\\DamageSkinInfo_F", 0xC517FB932D95BB6DULL), true, false);
   g_cashEmotionMgr->LoadScripts();
   this->m_hotkeyScript->Load("Lua Files\\AdventureGuide\\AvailableJobList_F", true, false);
   this->m_hotkeyScript->Load("Lua Files\\AdventureGuide\\AvailableJobList", true, false);
 }
+// OFFSET: 0x00DCC480
+// FUNCTION: fn_46760
+static EncryptedName<14, 0x5FFD7FABB5D1EF57ULL>& AcolyteBodyPath3Encrypted() {
+  OBFUSCATE_ARRAY_BODY("성직자\\성직자", 0x5FFD7FABB5D1EF57ULL, char);
+}
+
 // OFFSET: 0x00DE98B0
 // FUNCTION: fn_23502
 void CSession::InitResourceNameTables() {
@@ -5298,7 +5282,7 @@ void CSession::InitResourceNameTables() {
   shieldJobNames[74] = SwordmanBodyPath3().Text();
   shieldJobNames[75] = MagicianBodyPath3().Text();
   shieldJobNames[76] = ArcherBodyPath3().Text();
-  shieldJobNames[77] = OBFUSCATE_ARRAY("성직자\\성직자", 0x5FFD7FABB5D1EF57ULL, char).Text();
+  shieldJobNames[77] = AcolyteBodyPath3Encrypted().Text();
   shieldJobNames[78] = MerchantBodyPath3().Text();
   shieldJobNames[79] = ThiefBodyPath4().Text();
   shieldJobNames[80] = KnightBodyPath2().Text();

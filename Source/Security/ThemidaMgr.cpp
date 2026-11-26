@@ -2,19 +2,42 @@
 
 #include "Archive/GPak.h"
 
+#include <atomic>
 #include <new>
 #include <random>
+#include <windows.h>
 
 // GLOBAL: gl_24891
 CThemidaMgr* g_themidaMgr;
 
-struct ThemidaKeyEncoderA {
-  unsigned char* Generate(const unsigned char* input);
-};
+// GLOBAL: gl_26182
+std::atomic<bool> s_themidaThreadStop;
+// GLOBAL: gl_26185
+std::atomic<bool> s_themidaThreadStarted;
+// GLOBAL: gl_26183
+ThemidaKeyEncoderA s_themidaKeyA;
+// GLOBAL: gl_26184
+ThemidaKeyEncoderB s_themidaThreadHandle;
 
-struct ThemidaKeyEncoderB {
-  unsigned char* Generate(const unsigned char* input);
-};
+// OFFSET: 0x0076F150
+// FUNCTION: fn_46732
+// VIRTUALIZED: emulated 0x0076F16A
+static DWORD WINAPI ThemidaWatchThread(void*) {
+  s_themidaKeyA.Generate(reinterpret_cast<const unsigned char*>(&ThemidaKeyMagic));
+  s_themidaThreadStarted = true;
+  s_themidaThreadStarted.notify_one();
+
+  std::mt19937 engine(std::random_device{}());
+  std::uniform_int_distribution<int> interval(500, 1500);
+  for (;;) {
+    Sleep(interval(engine));
+    if (s_themidaThreadStop) {
+      break;
+    }
+  }
+
+  return 1;
+}
 
 // OFFSET: 0x0076EC00
 // FUNCTION: fn_08235
@@ -29,27 +52,23 @@ CThemidaMgr::~CThemidaMgr() {
 // OFFSET: 0x0076EC20
 // FUNCTION: fn_08237
 unsigned char* ThemidaKeyEncoderA::Generate(const unsigned char* input) {
-  auto* output = reinterpret_cast<unsigned char*>(this);
-  PakUniformRandom random(1, 0xfe, std::random_device{}());
-  FillRandomBytes(reinterpret_cast<char*>(output), reinterpret_cast<char*>(output) + 5, random);
-  output[5] = input[0] ^ output[1] ^ output[0];
-  output[6] = input[1] ^ output[2] ^ output[1];
-  output[7] = input[2] ^ output[3] ^ output[2];
-  output[8] = output[4] ^ input[3] ^ output[3];
-  return output;
+  PakUniformRandom random(std::random_device{}());
+  FillRandomBytes(reinterpret_cast<char*>(this->m_key), reinterpret_cast<char*>(this->m_key) + 5, random);
+  for (int index = 0; index < 4; ++index) {
+    this->m_key[index + 5] = input[index] ^ this->m_key[index + 1] ^ this->m_key[index];
+  }
+  return this->m_key;
 }
 
 // OFFSET: 0x0076ECC0
 // FUNCTION: fn_08238
 unsigned char* ThemidaKeyEncoderB::Generate(const unsigned char* input) {
-  auto* output = reinterpret_cast<unsigned char*>(this);
-  PakUniformRandom random(1, 0xfe, std::random_device{}());
-  FillRandomBytes(reinterpret_cast<char*>(output), reinterpret_cast<char*>(output) + 5, random);
-  output[5] = input[0] ^ output[1] ^ output[0];
-  output[6] = input[1] ^ output[2] ^ output[1];
-  output[7] = input[2] ^ output[3] ^ output[2];
-  output[8] = output[4] ^ input[3] ^ output[3];
-  return output;
+  PakUniformRandom random(std::random_device{}());
+  FillRandomBytes(reinterpret_cast<char*>(this->m_key), reinterpret_cast<char*>(this->m_key) + 5, random);
+  for (int index = 0; index < 4; ++index) {
+    this->m_key[index + 5] = input[index] ^ this->m_key[index + 1] ^ this->m_key[index];
+  }
+  return this->m_key;
 }
 
 // OFFSET: 0x0076EDE0
@@ -81,9 +100,27 @@ void CThemidaMgr::Destroy() {
 // OFFSET: 0x0076EEB0
 // FUNCTION: fn_08242
 void CThemidaMgr::Check() {
+  unsigned int value = 0;
+  s_themidaKeyA.Generate(reinterpret_cast<const unsigned char*>(&value));
+
+  value = reinterpret_cast<unsigned int>(CreateThread(nullptr, 0, &ThemidaWatchThread, nullptr, 0, nullptr));
+  s_themidaThreadHandle.Generate(reinterpret_cast<const unsigned char*>(&value));
+  s_themidaThreadStarted.wait(false);
+  s_themidaThreadStarted = false;
 }
 
 // OFFSET: 0x0076F050
 // FUNCTION: fn_08243
 void CThemidaMgr::StopThread() {
+  s_themidaThreadStop.exchange(true);
+  unsigned int handle = s_themidaThreadHandle.Decode();
+  if (handle != 0) {
+    WaitForSingleObject(reinterpret_cast<HANDLE>(handle), INFINITE);
+    CloseHandle(reinterpret_cast<HANDLE>(s_themidaThreadHandle.Decode()));
+    unsigned int zero = 0;
+    s_themidaThreadHandle.Generate(reinterpret_cast<const unsigned char*>(&zero));
+  }
+
+  unsigned int zero = 0;
+  s_themidaKeyA.Generate(reinterpret_cast<const unsigned char*>(&zero));
 }

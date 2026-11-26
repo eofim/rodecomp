@@ -1136,11 +1136,15 @@ std::pair<bool, int> CSkillActionMgr::GetSkillCastMotion(int skillId) {
 // OFFSET: 0x0077AD90
 // FUNCTION: fn_08405
 vector3d CellWorldPosition(int column, int row) {
-  if (!g_modeMgr.GetGameMode() || !g_modeMgr.GetGameMode()->scene ||
-      !g_modeMgr.GetGameMode()->scene->terrain) {
+  if (!g_modeMgr.GetGameMode()) {
     return vector3d{0.0f, 0.0f, 0.0f};
   }
-
+  if (!g_modeMgr.GetGameMode()->scene) {
+    return vector3d{0.0f, 0.0f, 0.0f};
+  }
+  if (!g_modeMgr.GetGameMode()->scene->terrain) {
+    return vector3d{0.0f, 0.0f, 0.0f};
+  }
   vector3d position = {0.0f, 0.0f, 0.0f};
   g_modeMgr.GetGameMode()->scene->CellOrigin(column, row, position.x, position.z);
   position.y = g_modeMgr.GetGameMode()->scene->terrain->Height(position.x, position.z);
@@ -1371,11 +1375,11 @@ void CSkillAction_ABC_CHASING_BREAK::OnSkillEffect(int level, CGameActor* source
     effect->SendMsg(nullptr, AM_SETPOS, 0, reinterpret_cast<int>(&target->render.position), 0, 0, 0, 0);
   }
 
-  for (int angle = 0; angle < 360; angle += 45) {
+  for (int index = 0; index < 8; ++index) {
     EffectLists* effects = g_effectMgr;
     CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("chasing_break"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0);
     if (effect) {
-      effect->SetAngle(static_cast<float>(angle));
+      effect->SetAngle(static_cast<float>(index * 45));
       effect->SetDelay(ClampedRandom(150));
       effect->SetScale(0.15f);
       effect->EnableGroundRender();
@@ -2346,6 +2350,23 @@ void CSkillAction_DK_DRAGONIC_PIERCE::OnSkillCast(int level, CGameActor* source)
   }
 }
 
+// INLINED
+static int ScreenDirection(float angle) {
+  if (angle > 60.0f && angle <= 120.0f) {
+    return 0;
+  }
+  if (angle > 120.0f && angle <= 240.0f) {
+    return 1;
+  }
+  if (angle > 240.0f && angle <= 300.0f) {
+    return 2;
+  }
+  if ((angle > 300.0f && angle <= 360.0f) || (angle >= 0.0f && angle <= 60.0f)) {
+    return 3;
+  }
+  return -1;
+}
+
 // OFFSET: 0x007801B0
 // FUNCTION: fn_08480
 void CSkillAction_DK_DRAGONIC_PIERCE::OnSkillEffect(int level, CGameActor* source, CGameActor* target) {
@@ -2356,25 +2377,20 @@ void CSkillAction_DK_DRAGONIC_PIERCE::OnSkillEffect(int level, CGameActor* sourc
   const float angle = ScreenAngle(
     &source->render.position.x, &target->render.position.x, g_modeMgr.GetGameMode()->camera->frame.view.values
   );
-  int direction;
-  if (angle > 60.0f && angle <= 120.0f) {
-    direction = 0;
-  } else if (angle > 120.0f && angle <= 240.0f) {
-    direction = 1;
-  } else if (angle > 240.0f && angle <= 300.0f) {
-    direction = 2;
-  } else if ((angle > 300.0f && angle <= 360.0f) || (angle >= 0.0f && angle <= 60.0f)) {
-    direction = 3;
-  } else {
+  const int direction = ScreenDirection(angle);
+  if (direction == -1) {
     return;
   }
 
   const float scale = source->attackMotion * source->render.speed * 16.0f;
-  const bool flip = direction != 1 && direction != 2;
+  bool flip = true;
+  if (direction == 1 || direction == 2) {
+    flip = false;
+  }
   const bool horizontal = (direction & 1) != 0;
-  std::string name = horizontal ? "dragonic_pierce_horizon" : "dragonic_pierce_vertical";
+  const std::string name(horizontal ? "dragonic_pierce_horizon" : "dragonic_pierce_vertical");
   EffectLists* effects = g_effectMgr;
-  if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(name), 0.0f, 0.0f, 0.0f, 0, -1, 0, 0)) {
+  if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId(name), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     effect->SetDelay(static_cast<int>(scale));
     float offset;
     if (horizontal) {
@@ -2384,11 +2400,14 @@ void CSkillAction_DK_DRAGONIC_PIERCE::OnSkillEffect(int level, CGameActor* sourc
       effect->SetFlipY(flip);
       offset = flip ? -90.0f : -270.0f;
     }
-    effect->SetAngle(static_cast<float>((static_cast<int>(angle + offset) + 360) % 360));
+    float rotated = angle;
+    rotated += offset;
+    const int rotation = (static_cast<int>(rotated) + 360) % 360;
+    effect->SetAngle(static_cast<float>(rotation));
   }
 
   effects = g_effectMgr;
-  if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("dragonic_pierce_bottom"), 0.0f, 0.0f, 0.0f, 0, -1, 0, 0)) {
+  if (CEffect* effect = effects->Spawn(target->render.accountId, CEZ2STREffectMgr::GetInstance()->EffectId("dragonic_pierce_bottom"), vector3d{0.0f, 0.0f, 0.0f}, 0, -1, 0, 0)) {
     effect->SetDelay(static_cast<int>(scale));
   }
 }

@@ -196,8 +196,44 @@ HRESULT STDMETHODCALLTYPE CWebEventReceiver::Invoke(DISPID id, REFIID, LCID, WOR
     break;
   }
 
+  case DISPID_DOCUMENTCOMPLETE: {
+    IDispatch* browserIdentity = nullptr;
+    if (FAILED(this->m_browser->QueryInterface(IID_IDispatch, reinterpret_cast<void**>(&browserIdentity)))) {
+      break;
+    }
+
+    if (args->rgvarg[1].pdispVal != browserIdentity) {
+      break;
+    }
+
+    if (this->m_document) {
+      UnadviseBrowserEvents(this->m_document, DIID_HTMLDocumentEvents2, this->m_documentCookie);
+      this->m_document->Release();
+      this->m_document = nullptr;
+      this->m_documentCookie = 0;
+    }
+    if (SUCCEEDED(this->m_browser->get_Document(&this->m_document)) && this->m_document) {
+      AdviseBrowserEvents(this->m_document, this, DIID_HTMLDocumentEvents2, &this->m_documentCookie);
+    }
+
+    browserIdentity->Release();
+    break;
+  }
+
   case DISPID_ONQUIT:
-    this->Disconnect();
+    if (this->m_document) {
+      ATL::AtlUnadvise(this->m_document, DIID_HTMLDocumentEvents2, this->m_documentCookie);
+      this->m_document->Release();
+      this->m_document = nullptr;
+      this->m_documentCookie = 0;
+    }
+    if (this->m_browser) {
+      this->m_browser->Stop();
+      UnadviseBrowserEvents(this->m_browser, DIID_DWebBrowserEvents2, this->m_browserCookie);
+      this->m_browser->Release();
+      this->m_browser = nullptr;
+    }
+    g_windowMgr.RemoveBrowser(this->m_host);
     break;
 
   case DISPID_HTMLDOCUMENTEVENTS2_ONCONTEXTMENU: {
@@ -214,24 +250,6 @@ HRESULT STDMETHODCALLTYPE CWebEventReceiver::Invoke(DISPID id, REFIID, LCID, WOR
     break;
   }
 
-  case DISPID_DOCUMENTCOMPLETE: {
-    IDispatch* browserIdentity = nullptr;
-    if (FAILED(this->m_browser->QueryInterface(IID_IDispatch, reinterpret_cast<void**>(&browserIdentity)))) {
-      break;
-    }
-
-    if (args->rgvarg[1].pdispVal != browserIdentity) {
-      break;
-    }
-
-    this->ReleaseDocument();
-    if (SUCCEEDED(this->m_browser->get_Document(&this->m_document)) && this->m_document) {
-      AdviseBrowserEvents(this->m_document, this, DIID_HTMLDocumentEvents2, &this->m_documentCookie);
-    }
-
-    browserIdentity->Release();
-    break;
-  }
   }
 
   return S_OK;

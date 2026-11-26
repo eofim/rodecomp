@@ -60,6 +60,7 @@ struct ITEM_INFO {
   explicit ITEM_INFO(int unused);
   ITEM_INFO(const ITEM_INFO& other);
   ITEM_INFO& operator=(const ITEM_INFO& other);
+  ~ITEM_INFO() {}
   void Reset();
   std::uint32_t Assign(const ModeDragState& item);
   ITEM_INFO& AssignBasic(const RawItemBasic& item);
@@ -79,7 +80,7 @@ struct ITEM_INFO {
   int Star(char* output, int& capacity, unsigned char consume) const;
   int Apprentice(char* output, int& capacity, unsigned char consume) const;
   void SetItemId(int value);
-  void SetOption(ItemOption option, const int& index);
+  void SetOption(ItemOptionRecord option, const int& index);
   void SetCard(const int& card, const int& index);
   int GetItemId() const;
   bool HasSpecialCard() const;
@@ -103,7 +104,13 @@ struct ITEM_INFO {
     };
   };
   /* 0010 */ std::int32_t quantity;
-  /* 0014 */ std::uint32_t prices[2];
+  union {
+    /* 0014 */ std::uint32_t prices[2];
+    struct {
+      /* 0014 */ std::uint32_t price;
+      /* 0018 */ std::uint32_t realPrice;
+    };
+  };
   /* 001C */ std::uint32_t cards[4];
   /* 002C */ std::string itemId;
   /* 0044 */ std::string displayName;

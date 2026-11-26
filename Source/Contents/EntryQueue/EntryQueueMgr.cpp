@@ -39,7 +39,9 @@ CEntryQueueMgr* g_entryQueueMgr;
 // GLOBAL: gl_24869
 std::map<unsigned int, EntryQueueInfo*> g_entryQueueList;
 
-CEntryQueueMgr::~CEntryQueueMgr() {
+// OFFSET: 0x00BA1CD0
+// FUNCTION: fn_46480
+__declspec(noinline) CEntryQueueMgr::~CEntryQueueMgr() {
   for (std::map<unsigned int, EntryQueueInfo*>::iterator it = g_entryQueueList.begin(); it != g_entryQueueList.end(); ++it) {
     if (it->second) {
       delete it->second;
@@ -145,34 +147,34 @@ void CEntryQueueMgr::OnApplyResult(const EntryQueueApplyResult* packet) {
     return;
   }
   case BG_APPLY_QUEUE_FINISHED:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_FULL), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_FULL), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_INVALID_NAME:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_UNKNOWN_NAME), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_UNKNOWN_NAME), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_INVALID_APP:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_UNKNOWN_TYPE), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_UNKNOWN_TYPE), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_PLAYER_COUNT:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_MAXOVER), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_MAXOVER), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_PLAYER_LEVEL:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_JOIN_NOTLEVEL), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_JOIN_NOTLEVEL), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_DUPLICATE:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_JOIN_OVERLAP), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_JOIN_OVERLAP), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_RECONNECT:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_RESTART), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_RESTART), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_PLAYER_CLASS:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_NOTJOB), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_NOTJOB), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   case BG_APPLY_PARTYGUILD_LEADER:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_JOIN_ONLYBOSS), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_JOIN_ONLYBOSS), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
-  case 15:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_BUSY_PARTYMEMBER), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case BG_APPLY_BUSY_PARTYMEMBER:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_BUSY_PARTYMEMBER), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
   }
 }
@@ -181,19 +183,19 @@ void CEntryQueueMgr::OnApplyResult(const EntryQueueApplyResult* packet) {
 // FUNCTION: fn_19668
 void CEntryQueueMgr::OnCancelResult(const EntryQueueNotice* notice) {
   switch (notice->result) {
-  case 1:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_CANCEL_JOINWAIT), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case ENTRYQUEUE_NOTICE_CANCELLED:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_CANCEL_JOINWAIT), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     g_windowMgr.CloseWindow(WID_ENTRYQUEUESTANDBYWND);
     this->ready = 0;
     break;
-  case 3:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_WRONG_NAME), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case ENTRYQUEUE_NOTICE_WRONG_NAME:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_WRONG_NAME), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
-  case 11:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_NOTRANK), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case ENTRYQUEUE_NOTICE_NOT_RANKED:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_NOTRANK), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
-  case 14:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_FAIL_CHOICE), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case ENTRYQUEUE_NOTICE_FAIL_CHOICE:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_FAIL_CHOICE), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     g_windowMgr.CloseWindow(WID_ENTRYQUEUESTANDBYWND);
     this->ready = 0;
     break;
@@ -271,11 +273,11 @@ void CEntryQueueMgr::OnReady(const EntryQueueReady* packet) {
 // FUNCTION: fn_19673
 void CEntryQueueMgr::OnResultNotice(const EntryQueueNotice* notice) {
   switch (notice->result) {
-  case 3:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_WRONG_NAME), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case ENTRYQUEUE_NOTICE_WRONG_NAME:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_WRONG_NAME), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
     break;
-  case 11:
-    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_NOTRANK), 0, false, false, 0, "Message", 0x118, 0x78, 0);
+  case ENTRYQUEUE_NOTICE_NOT_RANKED:
+    g_windowMgr.Confirm(LookupMessage(MSI_BATTLEFIELD_MSG_NOTRANK), 0, false, false, 0, "메시지", 0x118, 0x78, 0);
   }
 }
 
@@ -288,7 +290,8 @@ void CEntryQueueMgr::OnNotify(const EntryQueueNotice* notice) {
   }
 }
 
-// INLINED
+// OFFSET: 0x00BA1A90
+// FUNCTION: fn_46482
 CEntryQueueMgr::CEntryQueueMgr() : current(nullptr), ready(0) {
   std::memset(&this->queueName, 0, sizeof(this->queueName) + sizeof(this->characterName));
   g_session.m_hotkeyScript->Call("ReadEntryQueueList", "");

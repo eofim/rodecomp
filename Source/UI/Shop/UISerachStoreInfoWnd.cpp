@@ -69,11 +69,12 @@ ITEM_INFO UISerachStoreInfoWnd::ItemAt(int x, int y) {
   if (x > 5 && x < this->geometry.width - 10 && y > 100 && y < (this->m_rowHeight + 10) * 10) {
     const int row = (y - 100) / this->m_rowHeight;
     this->m_hoverRow = row;
-    if (static_cast<unsigned int>(row + (this->m_page - 1) * 10) >= g_session.storeSearchResults.size()) {
+    const int page = this->m_page;
+    if (static_cast<unsigned int>(row + (page - 1) * 10) >= g_session.storeSearchResults.size()) {
       return item;
     }
 
-    std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + (row + (this->m_page - 1) * 10);
+    std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + (row + (page - 1) * 10);
     if (it != g_session.storeSearchResults.end()) {
       item = it->item;
     }
@@ -187,7 +188,7 @@ void UISerachStoreInfoWnd::OnCreate(int width, int height) {
   this->AddCloseButton("", 0);
   this->SendMsg(this, UM_REFRESH, 0, 0, 0, 0);
   g_windowMgr.SetFocus(this->m_edits[1]);
-  this->m_message0 = 0x16D;
+  this->m_message0 = ID_FIND;
 }
 
 // OFFSET: 0x009331F0
@@ -331,7 +332,7 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
     if (argument1 != 0) {
       this->m_statusText = "";
       switch (argument2) {
-      case 387:
+      case ID_FIRST_PAGE:
         this->m_page = 1;
         break;
       case SSI_FAILED_NOTHING_SEARCH_ITEM:
@@ -348,13 +349,13 @@ int UISerachStoreInfoWnd::SendMsg(UIWindow* sender, int message, std::intptr_t a
         this->m_statusText = LookupMessage(MSI_SSI_FAILED_SEARCH_CNT);
         break;
       case SSI_FAILED_LIMIT_SEARCH_TIME:
-        g_windowMgr.Confirm(LookupMessage(MSI_SSI_FAILED_LIMIT_SERACH_TIME), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_SSI_FAILED_LIMIT_SERACH_TIME), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       case SSI_FAILED_SSILIST_CLICK_TO_OPEN_STORE:
         g_session.storeSearchX = -1;
         g_session.storeSearchY = -1;
         g_session.storeSearchOwnerAid = INVALID_AID;
-        g_windowMgr.Confirm(LookupMessage(MSI_FAIL_OPEN_STORE), 0, true, false, 0, "Message", 280, 120, 0);
+        g_windowMgr.Confirm(LookupMessage(MSI_FAIL_OPEN_STORE), 0, true, false, 0, "메시지", 280, 120, 0);
         return 0;
       }
       this->m_searchPending = 0;
@@ -426,14 +427,13 @@ void UISerachStoreInfoWnd::OnLBtnDblClk(int x, int y) {
     return;
   }
 
-  const unsigned int index = this->m_hoverRow + 10 * this->m_page - 10;
-  std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + index;
+  std::vector<SearchStoreResult>::iterator it = g_session.storeSearchResults.begin() + (this->m_page - 1) * 10 + this->m_hoverRow;
   if (it == g_session.storeSearchResults.end()) {
     return;
   }
 
   if (g_session.m_storeSearchPage != 0 &&
-      g_windowMgr.Confirm(LookupMessage(MSI_OPEN_SEARCH_STORE), 2, true, false, 0, "Message", 0x118, 0x78, 0) != ID_YES) {
+      g_windowMgr.Confirm(LookupMessage(MSI_OPEN_SEARCH_STORE), 2, true, false, 0, "메시지", 0x118, 0x78, 0) != ID_YES) {
     return;
   }
 

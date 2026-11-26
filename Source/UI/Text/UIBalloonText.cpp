@@ -334,6 +334,11 @@ UINameBalloonText::UINameBalloonText() : UIBalloonText(), monsterType(0), framed
 UIVerticalNameBalloonText::UIVerticalNameBalloonText() : UINameBalloonText() {
 }
 
+// INLINED
+static int LargerHeight(std::size_t imageHeight, std::size_t textHeight) {
+  return static_cast<int>(textHeight < imageHeight ? imageHeight : textHeight);
+}
+
 // OFFSET: 0x00865EB0
 // FUNCTION: fn_10940
 void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsigned char monsterType) {
@@ -389,7 +394,7 @@ void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsi
       char line[260];
       std::memset(line, 0, sizeof(line));
       if (g_serviceType == ServiceKorea) {
-        sprintf_s(line, sizeof(line), "%s (%s) ", name.c_str(), party);
+        sprintf_s(line, sizeof(line), "%s『%s』", name.c_str(), party);
       } else {
         sprintf_s(line, sizeof(line), "%s (%s)", name.c_str(), party);
       }
@@ -416,7 +421,7 @@ void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsi
       char line[260];
       std::memset(line, 0, sizeof(line));
       if (g_serviceType == ServiceKorea) {
-        sprintf_s(line, sizeof(line), "%s (%s) ", guild, position);
+        sprintf_s(line, sizeof(line), "%s『%s』", guild, position);
       } else {
         sprintf_s(line, sizeof(line), "%s [%s]", guild, position);
       }
@@ -436,23 +441,20 @@ void UINameBalloonText::SetName(const CActorNameCard& info, bool stripHash, unsi
   if (monsterType == 0 || info.groupIconId != 0) {
     this->Resize(width, static_cast<int>(this->m_lines.size()) * (g_nameBalloonFontHeight + 2) + 6);
   } else {
-    const char* path;
+    const char* path = nullptr;
     if (monsterType == 1) {
       path = "유저인터페이스\\montype_boss.bmp";
     } else if (monsterType == 2) {
       path = "유저인터페이스\\montype_mvp.bmp";
-    } else {
-      this->Invalidate();
-      return;
     }
 
-    CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
-    if (bitmap) {
-      std::size_t height = this->m_lines.size() * (g_nameBalloonFontHeight + 2) + 6;
-      if (height < static_cast<std::size_t>(bitmap->image.height)) {
-        height = bitmap->image.height;
+    if (path) {
+      CBitmapRes* bitmap = static_cast<CBitmapRes*>(ResourceMgr::Instance().Load(Resolve(path)));
+      if (bitmap) {
+        this->Resize(
+          bitmap->image.width + this->nameWidth, LargerHeight(bitmap->image.height, this->m_lines.size() * (g_nameBalloonFontHeight + 2) + 6)
+        );
       }
-      this->Resize(bitmap->image.width + this->nameWidth, static_cast<int>(height));
     }
   }
 

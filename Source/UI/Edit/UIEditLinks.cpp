@@ -8,6 +8,7 @@
 #include "UI/Edit/UIEditCtrl.h"
 #include "UI/Edit/UIItemTagCtrl.h"
 #include "UI/Buttons/UINaviLinkButton.h"
+#include "UI/Window/UIEnums.h"
 
 #include <algorithm>
 #include <cstring>
@@ -81,20 +82,26 @@ bool UIEditCtrl::RemoveInvalidLink(int type, std::list<UIWindow*>::iterator& ent
       continue;
     }
 
-    if (boundary == g_serverLanguage->cursor) {
-      if (before.find("<") != std::string::npos) {
-        remaining = current.substr(0, position - 1);
-      } else {
-        remaining = current.substr(0, position);
-      }
-
-      remaining += current.substr((after.find(">") != std::string::npos ? position + 1 : position) + bytes);
-      g_serverLanguage->ResetInput();
-      g_serverLanguage->Insert(remaining.c_str());
-      this->RemoveChild(*entry, 1);
-      entry = this->links.erase(entry);
-      return true;
+    if (boundary != g_serverLanguage->cursor) {
+      continue;
     }
+
+    if (before.find("<") != std::string::npos) {
+      remaining = current.substr(0, position - 1);
+    } else {
+      remaining = current.substr(0, position);
+    }
+
+    if (after.find(">") != std::string::npos) {
+      ++position;
+    }
+
+    remaining += current.substr(position + bytes);
+    g_serverLanguage->ResetInput();
+    g_serverLanguage->Insert(remaining.c_str());
+    this->RemoveChild(*entry, 1);
+    entry = this->links.erase(entry);
+    return true;
   } while (found != -1);
 
   return true;
@@ -150,7 +157,7 @@ void UIEditCtrl::UpdateLinks() {
   for (auto it = this->links.begin(); it != this->links.end();) {
     UIWindow* window = *it;
     ++it;
-    if (window->geometry.id == 438) {
+    if (window->geometry.id == ID_NAVI_LINK) {
       hasLink = true;
     }
   }
@@ -239,6 +246,7 @@ void UIChatEditCtrl::InsertItemTag(int tagId) {
 
   const std::string tag = this->itemTags->AddSkillTag(tagId, 0x7F00E4);
   g_serverLanguage->ReplaceInput((this->text + tag).c_str());
-  this->itemTags->taggedText = this->text;
+  UIItemTagOnChat* const tags = this->itemTags;
+  tags->taggedText = this->text;
 }
 

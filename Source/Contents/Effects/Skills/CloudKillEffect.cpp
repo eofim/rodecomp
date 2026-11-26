@@ -59,7 +59,7 @@ __forceinline void CCloudKillEffect::AddParticle() {
   particle->SetSprite("이팩트\\particle3.spr");
   particle->SetAction("이팩트\\particle3.act");
   particle->life = static_cast<float>(this->particleLifetimeFrames) / 60.0f;
-  this->particles.push_back(created);
+  this->particles.push_back(particle);
 }
 
 // OFFSET: 0x006FC8F0
@@ -144,9 +144,10 @@ void CCloudKillEffect::UpdateSprite(CSpriteParticle* particle) {
 
   const vector3d center = this->positionVector;
   AdvanceSpriteVelocity(particle);
-  particle->position.y = center.y + particle->originY + particle->velocity.y;
-  particle->position.x = center.x + particle->originX + particle->velocity.x;
-  particle->position.z = center.z + particle->originZ + particle->velocity.z;
+  auto& positionRef = particle->position;
+  positionRef.y = center.y + particle->originY + particle->velocity.y;
+  positionRef.x = center.x + particle->originX + particle->velocity.x;
+  positionRef.z = center.z + particle->originZ + particle->velocity.z;
   particle->angle = particle->spin + particle->angle;
   const float alpha = static_cast<float>(particle->alpha);
   float fade = particle->animationParameter;
@@ -197,10 +198,10 @@ void CCloudKillEffect::OnProcess() {
   }
 
   for (auto it = this->particles.begin(); it != this->particles.end();) {
-    CSpriteParticle* particle = static_cast<CSpriteParticle*>(*it);
+    CSpriteParticle* particle = *it;
     if (IsParticleActive(particle) != true) {
       FreeParticle(particle);
-      it = this->particles.erase(it);
+      this->particles.erase(it++);
     } else {
       this->UpdateParticle(particle);
       ++particle->elapsedFrames;
@@ -216,7 +217,7 @@ void CCloudKillEffect::OnProcess() {
     CSpriteParticle* particle = static_cast<CSpriteParticle*>(*it);
     if (IsParticleActive(particle) != true) {
       FreeParticle(particle);
-      it = this->sprites.erase(it);
+      this->sprites.erase(it++);
     } else {
       this->UpdateSprite(particle);
       ++particle->elapsedFrames;

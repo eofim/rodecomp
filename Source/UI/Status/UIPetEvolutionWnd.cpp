@@ -113,7 +113,7 @@ void UIPetEvolutionWnd::Paint() {
   int index = 0;
   for (auto it = this->m_materials.begin(); it != this->m_materials.end(); ++it, ++index) {
     std::memset(text, 0, sizeof(text));
-    std::sprintf(text, "%dea", it->second);
+    std::sprintf(text, "%d개", it->second);
     UITextButton* button = this->m_materialButtons[index];
     this->DrawTextAt(button->geometry.width + button->geometry.x + 10, button->geometry.y + 1, text, 0, 0, 12, 0, 1, 0
     );
@@ -156,9 +156,9 @@ int UIPetEvolutionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
         return 0;
       }
 
+      const int evolvedEggId = this->m_evolvedEggId;
       int count = static_cast<int>(materials.size());
       std::uint16_t length = static_cast<std::uint16_t>(count * 2 + 8);
-      const int evolvedEggId = this->m_evolvedEggId;
       PACKET_CZ_PET_EVOLUTION packet;
       std::memset(packet.materials, 0, sizeof(packet.materials));
       packet.packetType = ID_CZ_PET_EVOLUTION;
@@ -166,7 +166,7 @@ int UIPetEvolutionWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argu
       packet.evolvedEggId = evolvedEggId;
       std::memcpy(packet.materials, materials.data(), count * 2);
       GetRagConnection().Send(static_cast<short>(length), &packet);
-        g_windowMgr.CloseWindow(WID_PETEVOLUTIONWND);
+      g_windowMgr.CloseWindow(WID_PETEVOLUTIONWND);
       break;
     }
 

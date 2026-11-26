@@ -1,4 +1,5 @@
 #include "Contents/Hotkeys/EmotionHotkeys.h"
+#include "Contents/UserData/AccountLinkedUserDataMgr.h"
 #include "Client/Session/Session.h"
 #include "Contents/Tables/MessageTable.h"
 #include "File/File.h"
@@ -13,7 +14,7 @@
 
 // OFFSET: 0x005BC230
 // FUNCTION: fn_03463
-void EmotionHotkeys::Load(Json::Value& data) {
+void CAccountLinkedUserDataMgr::LoadEmotionHotkeys(Json::Value& data) {
   Json::Value values = data["EmotionHotkey"];
   EmotionHotkeys& hotkeys = g_session.m_emotionHotkeys;
   hotkeys.saved.clear();
@@ -28,20 +29,20 @@ void EmotionHotkeys::Load(Json::Value& data) {
 // OFFSET: 0x00E24D10
 // FUNCTION: fn_23900
 bool CSession::HasEmotionHotkeyChanges() const {
-  if (!this->m_emotionHotkeys.saved.empty()) {
-    const std::string* current = this->m_emotionHotkeys.current.data();
-    const std::string* saved = this->m_emotionHotkeys.saved.data();
-    for (int i = 0; i < 10; ++i) {
-      const std::string& entry = saved[i];
-      if (entry != current[i]) {
-        return true;
-      }
-    }
-
-    return false;
+  auto saved = this->m_emotionHotkeys.saved.begin();
+  if (saved == this->m_emotionHotkeys.saved.end()) {
+    return true;
   }
 
-  return true;
+  const std::string* current = this->m_emotionHotkeys.current.data();
+  for (int i = 0; i < 10; ++i) {
+    const std::string& entry = saved[i];
+    if (entry != current[i]) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // OFFSET: 0x00E48460
@@ -59,17 +60,19 @@ void CSession::SaveEmotionHotkeys() const {
   }
   output += "}\r\n";
 
-  if (!output.empty()) {
-    const std::string directory = "savedata\\shortcutlist";
-    if (_access_s(directory.c_str(), 0) != 0) {
-      _mkdir(directory.c_str());
-    }
+  if (output.empty()) {
+    return;
+  }
 
-    CFile file;
-    if (file.Open(std::format("{}\\{}.lua", directory, this->ShortcutFilename(this->m_aid)).c_str(), 0x1001, false, true)) {
-      file.Write(output.data(), static_cast<std::uint32_t>(output.size()));
-      file.Close();
-    }
+  const std::string directory = "savedata\\shortcutlist";
+  if (_access_s(directory.c_str(), 0) != 0) {
+    _mkdir(directory.c_str());
+  }
+
+  CFile file;
+  if (file.Open(std::format("{}\\{}.lua", directory, this->ShortcutFilename(this->m_aid)).c_str(), 0x1001, false, true)) {
+    file.Write(output.data(), static_cast<std::uint32_t>(output.size()));
+    file.Close();
   }
 }
 

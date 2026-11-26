@@ -21,6 +21,7 @@
 #include "Client/Mode/CGameMode.h"
 #include "Client/Session/Session.h"
 #include "Contents/Configuration/ServiceConfiguration.h"
+#include "Contents/Configuration/ServiceEnums.h"
 #include "Contents/Configuration/ServiceOptions.h"
 #include "Contents/Jobs/JobInheritance.h"
 #include "Contents/Skills/ClientSkills.h"
@@ -51,12 +52,18 @@ CCorpse::CCorpse() {
   this->render.motionStartTime = timeGetTime();
 }
 
-// OFFSET: 0x00DA0DE0
-// FUNCTION: fn_22352
-CBlowEffect::CBlowEffect() {
+// OFFSET: 0x00DA2CF0
+// FUNCTION: fn_46665
+inline void CBlowEffect::LoadSpriteAndAction() {
   this->SetSpriteName("이팩트\\이팩트.spr");
   this->SetActionName("이팩트\\이팩트.act");
   this->render.animation = 0;
+}
+
+// OFFSET: 0x00DA0DE0
+// FUNCTION: fn_22352
+CBlowEffect::CBlowEffect() {
+  this->LoadSpriteAndAction();
 }
 
 // OFFSET: 0x00DA1210
@@ -169,9 +176,9 @@ CSoundMaker::CSoundMaker() {
   this->lastTick = timeGetTime() - 4000u;
 }
 
-// OFFSET: 0x00DA2220
-// FUNCTION: fn_22364
-CNpc::~CNpc() {
+// OFFSET: 0x00DA2C80
+// FUNCTION: fn_46664
+inline void CNpc::CloseGaugeWindows() {
   if (this->playerGaugeWindow) {
     g_windowMgr.Schedule(this->playerGaugeWindow);
     this->playerGaugeWindow = nullptr;
@@ -181,6 +188,12 @@ CNpc::~CNpc() {
     g_windowMgr.Schedule(this->pcGaugeWindow);
     this->pcGaugeWindow = nullptr;
   }
+}
+
+// OFFSET: 0x00DA2220
+// FUNCTION: fn_22364
+CNpc::~CNpc() {
+  this->CloseGaugeWindows();
 }
 
 CBlowEffect::~CBlowEffect() = default;
@@ -503,16 +516,16 @@ bool CGndRiser::OnProcess() {
 
   CGameMode* mode = g_modeMgr.GetGameMode();
   if (mode) {
-    GroundGeometry* ground = mode->scene->ground;
     const float half = static_cast<float>(this->lifetime / 2);
+    auto* scene = mode->scene;
     if (frame > half) {
       const float rise = frame - half;
       const float span = static_cast<float>(this->lifetime) * g_depthAverageHalf;
       const float alpha = (rise * rise - span * span) / 25.0f;
-      ground->SetGndRiseAmount(alpha, this->screenX, this->screenY);
+      scene->ground->SetGndRiseAmount(alpha, this->screenX, this->screenY);
     } else {
       const float alpha = -frame * frame / 25.0f;
-      ground->SetGndRiseAmount(alpha, this->screenX, this->screenY);
+      scene->ground->SetGndRiseAmount(alpha, this->screenX, this->screenY);
     }
   }
 
@@ -764,7 +777,7 @@ void CNpc::SendMsg(
             this->playerGaugeWindow->actorKind = 8;
             break;
           }
-          case 7: {
+          case NPC_PET_TYPE: {
             this->playerGaugeWindow->SetThirdValues(
               [] { return static_cast<std::int64_t>(g_session.petHunger); },
               [] { return static_cast<std::int64_t>(g_session.m_petMaxHunger); }
@@ -1026,7 +1039,7 @@ void CHalluNPC::Render(int argument) {
   }
 
   if (this->render.visible) {
-    if (this->render.state != 6 && this->render.state != 3) {
+    if (this->render.state != ST_SIT && this->render.state != ST_DEAD) {
       this->DrawShadow(argument, this->render.scale);
     }
     if (this->render.enabled) {
@@ -1134,8 +1147,10 @@ void CNpc::Render(int argument) {
         }
         if (this->render.enabled) {
           this->RenderMercenary(matrix, this->GetEffectiveJob(-1));
-          return;
+        } else {
+          this->UpdateTlvertex(matrix);
         }
+        return;
       }
       break;
   }
@@ -1400,7 +1415,7 @@ bool CNpc::OnProcess() {
       break;
   }
 
-  if (this->objectType != 7) {
+  if (this->objectType != NPC_PET_TYPE) {
     this->PlayFrameSounds();
   }
 
@@ -1470,7 +1485,7 @@ bool CNpc::OnProcess() {
   this->UpdateMinimapMarker();
 
   switch (this->objectType) {
-    case 7:
+    case NPC_PET_TYPE:
     case NPC_HO_TYPE:
     case NPC_MERSOL_TYPE:
     case NPC_ELEMENTAL_TYPE:
@@ -1499,11 +1514,11 @@ void CBlurPC::Render(int argument) {
   rand();
 
   if (this->render.visible) {
-    if (g_serviceType == 4 && IsAdminAccount(this->render.accountId) && this->render.accountId != g_session.m_aid) {
+    if (g_serviceType == ServiceTaiwan && IsAdminAccount(this->render.accountId) && this->render.accountId != g_session.m_aid) {
       return;
     }
 
-    if (this->render.state != 6 && this->render.state != 3) {
+    if (this->render.state != ST_SIT && this->render.state != ST_DEAD) {
       this->DrawShadow(argument, this->render.scale);
     }
     if (this->render.enabled) {
@@ -1573,11 +1588,11 @@ void CHalluPC::Render(int argument) {
   rand();
 
   if (this->render.visible) {
-    if (g_serviceType == 4 && IsAdminAccount(this->render.accountId) && this->render.accountId != g_session.m_aid) {
+    if (g_serviceType == ServiceTaiwan && IsAdminAccount(this->render.accountId) && this->render.accountId != g_session.m_aid) {
       return;
     }
 
-    if (this->render.state != 6 && this->render.state != 3) {
+    if (this->render.state != ST_SIT && this->render.state != ST_DEAD) {
       this->DrawShadow(argument, this->render.scale);
     }
     if (this->render.enabled) {
@@ -1657,7 +1672,7 @@ void CNpc::SetState(int state, int) {
         break;
       }
 
-      if (this->render.state == 4) {
+      if (this->render.state == ST_DAMAGE) {
         this->render.position.x = this->damageDestX;
         this->render.position.z = this->damageDestZ;
       }
@@ -1667,23 +1682,23 @@ void CNpc::SetState(int state, int) {
           this->render.isLieOnGround = false;
           this->render.trackBounds = 1;
           this->SetAction(0, 4, 0);
-          if (this->healthState != 0) {
+          if (this->healthState != OPT1_NONE) {
             int emotion;
             int hungerLevel = g_session.GetPetHungryState(g_session.petHunger);
             switch (this->healthState) {
-              case 1:
+              case OPT1_STONE:
                 emotion = g_session.GetPetEmotionNumber(this->GetEffectiveJob(-1), 7, hungerLevel);
                 this->SetAction(40, 4, 1);
                 break;
-              case 2:
+              case OPT1_FREEZE:
                 emotion = g_session.GetPetEmotionNumber(this->GetEffectiveJob(-1), 8, hungerLevel);
                 this->SetAction(48, 4, 1);
                 break;
-              case 3:
+              case OPT1_STUN:
                 emotion = g_session.GetPetEmotionNumber(this->GetEffectiveJob(-1), 9, hungerLevel);
                 this->SetAction(56, 4, 1);
                 break;
-              case 4:
+              case OPT1_SLEEP:
                 emotion = g_session.GetPetEmotionNumber(this->GetEffectiveJob(-1), 5, hungerLevel);
                 this->SetAction(64, 4, 1);
                 break;
@@ -1694,10 +1709,10 @@ void CNpc::SetState(int state, int) {
             if (this->render.accountId == g_session.petGid) {
               g_modeMgr.GetGameMode()->SendMsg(MM_PET_ACT, emotion, 0, 0, 0);
             }
-            this->healthState = 0;
+            this->healthState = OPT1_NONE;
             this->render.isMotionFinished = false;
           } else {
-            if (this->render.state != 0) {
+            if (this->render.state != ST_STAND) {
               this->petEmotionStartTick = timeGetTime();
             }
             if (g_session.moveHomunEnemy) {
@@ -1714,7 +1729,7 @@ void CNpc::SetState(int state, int) {
           this->RegisterPos();
           break;
         case ST_MOVE:
-          if (this->bodyState != 1 && this->bodyState != 2) {
+          if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
             this->render.isMotionFreezed = false;
           }
           if (this->GetEffectiveJob(-1) >= JT_MER_ARCHER01 && this->GetEffectiveJob(-1) <= JT_MER_SWORDMAN10) {
@@ -1741,7 +1756,7 @@ void CNpc::SetState(int state, int) {
           }
           break;
         case ST_ATTACK:
-          if (this->bodyState != 1 && this->bodyState != 2) {
+          if (this->bodyState != OPT1_STONE && this->bodyState != OPT1_FREEZE) {
             this->render.isMotionFreezed = false;
           }
           if (this->objectType == NPC_HO_TYPE) {
@@ -1781,7 +1796,7 @@ void CNpc::SetState(int state, int) {
           this->render.animationSequenceActive = 0;
           this->render.timedSequenceActive = 0;
           this->render.isMotionFreezed = false;
-          if (this->bodyState == 2) {
+          if (this->bodyState == OPT1_FREEZE) {
             this->SendMsg(nullptr, AM_DELETE_ICEEFFECT, 0, 0, 0, 0, 0, 0);
             this->SendMsg(nullptr, AM_MAKE_ICEBREAKE_FFECT, 0, 0, 0, 0, 0, 0);
           }
@@ -1797,7 +1812,7 @@ void CNpc::SetState(int state, int) {
           }
           break;
         case ST_SLEEP:
-          if (this->bodyState == 2) {
+          if (this->bodyState == OPT1_FREEZE) {
             this->SendMsg(nullptr, AM_DELETE_ICEEFFECT, 0, 0, 0, 0, 0, 0);
             this->SendMsg(nullptr, AM_MAKE_ICEBREAKE_FFECT, 0, 0, 0, 0, 0, 0);
           }

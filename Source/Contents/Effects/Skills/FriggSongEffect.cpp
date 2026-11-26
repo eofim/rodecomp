@@ -10,6 +10,14 @@
 #include <algorithm>
 #include <cstring>
 
+// INLINED
+static void SetIndices(CParticle* particle, int effectId, int column, int row, int group) {
+  particle->effectId = effectId;
+  particle->columnIndex = column;
+  particle->rowIndex = row;
+  particle->groupIndex = group;
+}
+
 // OFFSET: 0x00701BB0
 // FUNCTION: fn_06999
 CFriggSongEffect::CFriggSongEffect() : CEffect(0x423) {
@@ -28,10 +36,9 @@ void CFriggSongEffect::UpdateSegmentVertices(CParticle* particle) {
     return;
   }
 
-  const int segment = particle->columnIndex;
   const float speed = particle->speedParameter;
-  int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(particle->angleParameter) / 20.0f) * segment) + particle->angle) % 360;
-  if (segment == 20) {
+  int angle = static_cast<int>(static_cast<float>(static_cast<int>(static_cast<float>(particle->angleParameter) / 20.0f) * particle->columnIndex) + particle->angle) % 360;
+  if (particle->columnIndex == 20) {
     angle = static_cast<int>(particle->angle);
   }
 
@@ -46,11 +53,11 @@ void CFriggSongEffect::UpdateSegmentVertices(CParticle* particle) {
   const float innerX = particle->scale * cosine;
   const float innerY = 0.0f;
   const float innerZ = particle->scale * sine;
-  const float outerX = innerX + offsetX;
   const float outerY = 0.0f - height;
+  const float outerX = innerX + offsetX;
   const float outerZ = innerZ + offsetZ;
 
-  if (segment >= 1 && segment <= 20) {
+  if (particle->columnIndex >= 1 && particle->columnIndex <= 20) {
     particle->vertices[1].x = outerX;
     particle->vertices[1].y = outerY;
     particle->vertices[1].z = outerZ;
@@ -113,10 +120,7 @@ void CFriggSongEffect::Open() {
     }
 
     particle->SetTexture("effect\\ring_blue.tga");
-    particle->effectId = this->id;
-    particle->columnIndex = column;
-    particle->rowIndex = 0;
-    particle->groupIndex = 1;
+    SetIndices(particle, this->id, column, 0, 1);
     particle->alpha = 50;
     particle->SetColor(50, 200, 50);
     const int row = particle->rowIndex;
@@ -140,7 +144,6 @@ void CFriggSongEffect::Open() {
     const float spread = speed * g_cosTable[tilt];
     const float height = speed * g_sinTable[tilt];
     const float offsetX = spread * cosine;
-
     EffectPoint points[2];
     const float innerX = particle->scale * cosine;
     const float innerY = 0.0f;
@@ -177,7 +180,7 @@ void CFriggSongEffect::Open() {
 // OFFSET: 0x007021A0
 // FUNCTION: fn_07003
 void CFriggSongEffect::InitEvents() {
-  this->AddEvent(0, "effect\\wm_frigg_song.wav", 0, 0);
+  this->AddEvent(EFFECT_EVENT_SOUND, "effect\\wm_frigg_song.wav", 0, 0);
 }
 
 // OFFSET: 0x007023D0
@@ -196,23 +199,25 @@ void CFriggSongEffect::UpdateParticle(CParticle* particle) {
   const int age = particle->elapsedFrames;
   const float baseAngle = particle->angle;
   const int angle = static_cast<int>(baseAngle - static_cast<float>(age));
-  float& height = particle->animationParameter;
-  if (age < 20) {
-    height = g_projectionDepthNumerator;
-  } else if (age <= 140) {
-    height = (std::max)(g_sinTable[age - 20] * particle->speedParameter, 0.0f);
-  } else {
-    const float speed = particle->speedParameter;
-    particle->speedParameter = (std::max)(speed - 0.5f - speed * 0.01f, 0.0f);
-    height = particle->speedParameter;
+  float height = 1.0f;
+  if (age >= 20) {
+    if (age <= 140) {
+      const float value = g_sinTable[age - 20] * particle->speedParameter;
+      height = value < 0.0f ? 0.0f : value;
+    } else {
+      const float speed = particle->speedParameter - 0.5f - particle->speedParameter * 0.01f;
+      particle->speedParameter = speed < 0.0f ? 0.0f : speed;
+      height = particle->speedParameter;
+    }
   }
+  particle->animationParameter = height;
 
   matrix rotation;
   std::memcpy(rotation.values, g_identityMatrix, sizeof(rotation.values));
   rotation.MakeYRotation(static_cast<float>(angle) / 180.0f * 3.141592f);
   matrix scale;
   std::memcpy(scale.values, g_identityMatrix, sizeof(scale.values));
-  scale.SetScale(1.0f, height / 100.0f * 1.1f, 1.0f);
+  scale.SetScale(1.0f, particle->animationParameter / 100.0f * 1.1f, 1.0f);
   matrix first = rotation;
   rotation.Compose(first, scale);
   particle->transform = rotation;
@@ -233,10 +238,10 @@ void CFriggSongEffect::OnProcess() {
         height = 1.0f;
       } else if (age <= 140) {
         const float value = g_sinTable[age - 20] * particle->speedParameter;
-        height = value > 0.0f ? value : 0.0f;
+        height = value < 0.0f ? 0.0f : value;
       } else {
-        const float speed = particle->speedParameter;
-        particle->speedParameter = (std::max)(speed - 0.5f - speed * 0.01f, 0.0f);
+        const float speed = particle->speedParameter - 0.5f - particle->speedParameter * 0.01f;
+        particle->speedParameter = speed < 0.0f ? 0.0f : speed;
         height = particle->speedParameter;
       }
 

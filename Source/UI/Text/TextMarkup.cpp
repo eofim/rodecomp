@@ -170,13 +170,11 @@ const std::string UIWindow::DisplayTextTag(const std::string& source, const std:
       result += text.substr(0, position);
     }
 
-    const int content = position + static_cast<int>(begin.size());
-    std::string tail = text.substr(content);
+    position += static_cast<int>(begin.size());
+    std::string tail = text.substr(position);
     const int close = static_cast<int>(tail.find(end));
 
-    if (close == -1) {
-      position = content;
-    } else {
+    if (close != -1) {
       result += tail.substr(0, close);
       text = tail.substr(close + end.size());
       position = static_cast<int>(text.find(begin));
@@ -257,7 +255,7 @@ void UIWindow::ExtractTextLinks(const std::string& source, const std::string& be
       std::string metadata;
 
       if (info != -1) {
-        display = tail.substr(0, info);
+        display = display.substr(0, info);
         metadata = tail.substr(info + g_infoTagBegin.size());
         const int infoEnd = static_cast<int>(metadata.find(g_infoTagEnd));
 

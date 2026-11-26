@@ -57,8 +57,8 @@ void SetRoMapMarker(std::string name, const WorldViewArea& area, RoMapMarker& ma
 
   marker.name = name;
   marker.area = area;
-  marker.center[0] = centerX;
-  marker.center[1] = centerY;
+  marker.center.x = centerX;
+  marker.center.y = centerY;
   marker.width = static_cast<float>(width);
   marker.height = static_cast<float>(height);
 }
@@ -143,10 +143,8 @@ void UIRoMapWnd::DrawHoverTooltip() {
   bool leftSide = false;
   int maxWidth = 0;
   const int lineHeight = this->TextHeight(" ", 0, 0, 12, 1, 0) + 3;
-  const WorldViewRecord* record = this->hoveredRecord;
+  const WorldViewArea rect = this->hoveredRecord->area;
   const WorldViewArea* anchor = this->previewArea;
-  RECT rect;
-  std::memcpy(&rect, &record->area, sizeof(rect));
   int x = anchor->right;
   if (x < rect.right) {
     leftSide = true;
@@ -157,7 +155,7 @@ void UIRoMapWnd::DrawHoverTooltip() {
 
   int y = anchor->top;
   int count = 0;
-  for (std::list<std::string>::const_iterator it = record->relatedNames.begin(); it != this->hoveredRecord->relatedNames.end(); ++it) {
+  for (std::list<std::string>::const_iterator it = this->hoveredRecord->relatedNames.begin(); it != this->hoveredRecord->relatedNames.end(); ++it) {
     const int width = this->TextWidth(it->c_str(), 0, 0, 12, 1, 0);
     if (maxWidth < width) {
       maxWidth = width;
@@ -265,14 +263,18 @@ void UIRoMapWnd::DrawFieldLabels() {
       continue;
     }
 
-    for (std::vector<CWorldViewField*>::const_iterator fieldIt = map->fields.begin(); fieldIt != map->fields.end(); ++fieldIt) {
+    std::vector<CWorldViewField*>::const_iterator fieldIt = map->fields.begin();
+    const std::vector<CWorldViewField*>::const_iterator fieldEnd = map->fields.end();
+    for (; fieldIt != fieldEnd; ++fieldIt) {
       name = (*fieldIt)->fieldName;
       if (name.empty()) {
         continue;
       }
 
       const CWorldViewField* field = *fieldIt;
-      this->DrawRoundedOutline(field->left, field->top, field->right - field->left, field->bottom - field->top, borderColor);
+      const int width = field->right - field->left;
+      const int height = field->bottom - field->top;
+      this->DrawRoundedOutline(field->left, field->top, width, height, borderColor);
       int y;
       int levelY;
       if (atBottom) {
@@ -348,8 +350,8 @@ void UIRoMapWnd::DrawDungeonLinks() {
       width = field->right - field->left;
       height = field->bottom - field->top;
       const int mapWidth = map->right - map->left;
-      const int mapHeight = map->bottom - map->top;
       const float startX = static_cast<float>(width) * g_depthAverageHalf + static_cast<float>(field->left);
+      const int mapHeight = map->bottom - map->top;
       const float startY = static_cast<float>(height) * g_depthAverageHalf + static_cast<float>(field->top);
       const float endX = static_cast<float>(mapWidth) * g_depthAverageHalf + static_cast<float>(map->left);
       const float endY = static_cast<float>(mapHeight) * g_depthAverageHalf + static_cast<float>(map->top) + 1.0f;
@@ -368,8 +370,8 @@ void UIRoMapWnd::DrawDungeonLinks() {
       }
 
       DrawTexturedRectangle(map->left, map->top, mapWidth, mapHeight, color, positionTexture);
-      x = field->left;
       y = field->top;
+      x = field->left;
     } else {
       const WorldViewRecord* selected = this->selectedRecord;
       isSelected = selected != nullptr && map->left == selected->left && map->right == selected->right && map->top == selected->top &&
@@ -418,7 +420,8 @@ void UIRoMapWnd::DrawMarks() {
           static_cast<float>(area[2] - area[0]) * g_depthAverageHalf + static_cast<float>(area[0]),
           static_cast<float>(area[3] - area[1]) * g_depthAverageHalf + static_cast<float>(area[1])
         };
-        DrawScreenLine(start, end, 5, g_texMgr.Load("유저인터페이스\\worldview_interface\\wv_Airf2.bmp", 0, false, true, false), 0x99FFFFFF);
+        CTexture* const texture = g_texMgr.Load("유저인터페이스\\worldview_interface\\wv_Airf2.bmp", 0, false, true, false);
+        DrawScreenLine(start, end, 5, texture, 0x99FFFFFF);
       }
     }
 
@@ -531,6 +534,35 @@ bool UIRoMapWnd::LocateRecord(WorldViewRecord& record) {
   return false;
 }
 
+// INLINED
+static bool CreateRecordAt(WorldViewRecord*& record, int x, int y) {
+  if (record) {
+    delete record;
+    record = nullptr;
+  }
+
+  unsigned int mapIndex = 0;
+  CWorldViewWorld* world = g_worldViewMgr.CurrentWorld();
+  if (!world) {
+    return false;
+  }
+
+  CWorldViewField* field = world->FieldAt(mapIndex, x, y);
+  if (!field) {
+    return false;
+  }
+
+  const int mapId = world->maps[mapIndex]->id;
+  record = new WorldViewRecord();
+  record->worldIndex = g_worldViewMgr.currentWorld;
+  record->mapIndex = mapId;
+  record->name = field->name;
+  record->area = field->area;
+
+  record->screenArea = world->maps[mapIndex]->area;
+  return true;
+}
+
 // OFFSET: 0x00932920
 // FUNCTION: fn_12713
 void UIRoMapWnd::OnMouseMove(int x, int y) {
@@ -555,31 +587,9 @@ void UIRoMapWnd::OnMouseMove(int x, int y) {
 
   this->Invalidate();
 
-  if (this->selectedRecord) {
-    delete this->selectedRecord;
-    this->selectedRecord = nullptr;
+  if (CreateRecordAt(this->selectedRecord, x, y)) {
+    this->Invalidate();
   }
-
-  unsigned int mapIndex = 0;
-  CWorldViewWorld* world = g_worldViewMgr.CurrentWorld();
-  if (!world) {
-    return;
-  }
-
-  CWorldViewField* field = world->FieldAt(mapIndex, x, y);
-  if (!field) {
-    return;
-  }
-
-  const int mapId = world->maps[mapIndex]->id;
-  this->selectedRecord = new WorldViewRecord();
-  this->selectedRecord->worldIndex = g_worldViewMgr.currentWorld;
-  this->selectedRecord->mapIndex = mapId;
-  this->selectedRecord->name = field->name;
-  this->selectedRecord->area = field->area;
-
-  this->selectedRecord->screenArea = world->maps[mapIndex]->area;
-  this->Invalidate();
 }
 
 // OFFSET: 0x0091DBB0
@@ -650,23 +660,26 @@ void UIRoMapWnd::DrawKafraMarkers(float elapsed) {
     RoMapMarker from = this->m_kafraMarkers.current;
     RoMapMarker to = this->m_kafraMarkers.markers[i];
     targets.insert(std::pair<std::string, RoMapMarker>(to.name, to));
-    if (to.name.size() == 10 && std::memcmp(to.name.c_str(), "izlude.rsw", 10) == 0) {
-      from.center[0] = static_cast<float>(from.area.right);
-      to.center[0] = to.width * 0.8f + static_cast<float>(to.area.left);
-      to.center[1] = static_cast<float>(to.area.top);
+    if (to.name == "izlude.rsw") {
+      from.center.x = static_cast<float>(from.area.right);
+      to.center.x = to.width * 0.8f + static_cast<float>(to.area.left);
+      to.center.y = static_cast<float>(to.area.top);
     }
 
-    const float blend = this->m_kafraMarkers.blend;
-    CTexture* head = g_texMgr.Load("mapArrow_head.bmp", 0, true, true, false);
-    CTexture* body = g_texMgr.Load("mapArrow_body.bmp", 1, true, true, false);
+    const ScreenPoint fromMin(static_cast<float>(from.area.left), static_cast<float>(from.area.top));
+    const ScreenPoint fromMax(static_cast<float>(from.area.right), static_cast<float>(from.area.bottom));
+    const ScreenPoint toMin(static_cast<float>(to.area.left), static_cast<float>(to.area.top));
+    const ScreenPoint toMax(static_cast<float>(to.area.right), static_cast<float>(to.area.bottom));
     this->DrawArrow(
-      from.center[0], from.center[1], to.center[0], to.center[1], static_cast<float>(from.area.left), static_cast<float>(from.area.top),
-      static_cast<float>(from.area.right), static_cast<float>(from.area.bottom), static_cast<float>(to.area.left), static_cast<float>(to.area.top),
-      static_cast<float>(to.area.right), static_cast<float>(to.area.bottom), 10, body, 20, head, blend, 0xAAFFFFFF
+      from.center, to.center, fromMin, fromMax, toMin, toMax, 10,
+      g_texMgr.Load("mapArrow_body.bmp", 1, true, true, false), 20, g_texMgr.Load("mapArrow_head.bmp", 0, true, true, false), this->m_kafraMarkers.blend,
+      0xAAFFFFFF
     );
   }
 
-  this->DrawKafraIcon(static_cast<float>(this->m_kafraMarkers.current.area.right), static_cast<float>(this->m_kafraMarkers.current.area.top));
+  this->DrawKafraIcon(
+    ScreenPoint{static_cast<float>(this->m_kafraMarkers.current.area.right), static_cast<float>(this->m_kafraMarkers.current.area.top)}
+  );
   for (std::map<std::string, RoMapMarker>::iterator it = targets.begin(); it != targets.end(); ++it) {
     this->DrawMapMarker(it->second, 1);
   }
@@ -703,10 +716,10 @@ UIRoMapWnd::UIRoMapWnd() : UIFrameWnd(0), previewTexture(nullptr) {
   this->m_showLabels = 0;
   this->m_lastTime = 0;
   this->m_resetTime = 1;
-  this->m_flyingShipRoute.lineTextureName.assign("유저인터페이스\\worldview_interface\\wv_Airf3.bmp", 0x2F);
+  this->m_flyingShipRoute.lineTextureName = "유저인터페이스\\worldview_interface\\wv_Airf3.bmp";
   this->m_flyingShipRoute.lineColor = 0xAAFFFFFF;
   this->m_flyingShipRoute.routeType = 1;
-  this->m_flyingShipRoute2.lineTextureName.assign("유저인터페이스\\worldview_interface\\wv_Airf3.bmp", 0x2F);
+  this->m_flyingShipRoute2.lineTextureName = "유저인터페이스\\worldview_interface\\wv_Airf3.bmp";
   this->m_flyingShipRoute2.lineColor = 0xAAFFFFFF;
   this->m_flyingShipRoute2.routeType = 0;
   this->m_comboHeight = 0x12;
@@ -792,10 +805,11 @@ int UIRoMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
         if (g_navigationManager.SearchNavigation(name, 0, true) == true) {
           this->RefreshWorldMapLevels();
         }
+        return 0;
       }
-      return 0;
+      break;
     }
-    return 0;
+    break;
 
   case UM_COMBOBOX_SELECTED:
     if (this->m_worldCombo == sender) {
@@ -820,7 +834,7 @@ int UIRoMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
       this->Invalidate();
       return 0;
     }
-    return 0;
+    break;
 
   case UM_REFRESH:
     this->ClearRecords();
@@ -832,13 +846,16 @@ int UIRoMapWnd::SendMsg(UIWindow* sender, int message, std::intptr_t argument1, 
     if (this->m_searchEdit == sender) {
       if (this->m_searchEdit->Length() > 0) {
         this->SendMsg(this->m_searchEdit, UM_COMMAND, ID_SEARCH, 0, 0, 0);
-        return 0;
+        break;
       }
     }
-    break;
+    [[fallthrough]];
+
+  default:
+    return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
   }
 
-  return UIFrameWnd::SendMsg(sender, message, argument1, argument2, argument3, argument4);
+  return 0;
 }
 
 // OFFSET: 0x0091CFB0
@@ -863,6 +880,7 @@ bool CFlyingShipRouteInfo::UpdateRoute(WorldViewRecord* record) {
         route.push_back("yuno.rsw");
         route.push_back("einbroch.rsw");
         this->BuildRoute(route);
+        return true;
       } else if (name == "lighthalzen.rsw") {
         std::vector<std::string> route;
         route.push_back("lighthalzen.rsw");
@@ -873,6 +891,7 @@ bool CFlyingShipRouteInfo::UpdateRoute(WorldViewRecord* record) {
         route.push_back("einbroch.rsw");
         route.push_back("lighthalzen.rsw");
         this->BuildRoute(route);
+        return true;
       } else if (name == "hugel.rsw") {
         std::vector<std::string> route;
         route.push_back("hugel.rsw");
@@ -883,6 +902,7 @@ bool CFlyingShipRouteInfo::UpdateRoute(WorldViewRecord* record) {
         route.push_back("yuno.rsw");
         route.push_back("hugel.rsw");
         this->BuildRoute(route);
+        return true;
       } else if (name == "yuno.rsw") {
         std::vector<std::string> route;
         route.push_back("yuno.rsw");
@@ -893,10 +913,10 @@ bool CFlyingShipRouteInfo::UpdateRoute(WorldViewRecord* record) {
         route.push_back("hugel.rsw");
         route.push_back("yuno.rsw");
         this->BuildRoute(route);
+        return true;
       } else {
         return false;
       }
-      return true;
     case 0: {
       std::vector<std::string> route;
       if (name == "izlude.rsw") {
@@ -904,21 +924,25 @@ bool CFlyingShipRouteInfo::UpdateRoute(WorldViewRecord* record) {
         route.push_back("yuno.rsw");
         route.push_back("ra_fild12.rsw");
         route.push_back("izlude.rsw");
+        this->BuildRoute(route);
+        return true;
       } else if (name == "ra_fild12.rsw") {
         route.push_back("ra_fild12.rsw");
         route.push_back("izlude.rsw");
         route.push_back("yuno.rsw");
         route.push_back("ra_fild12.rsw");
+        this->BuildRoute(route);
+        return true;
       } else if (name == "yuno.rsw") {
         route.push_back("yuno.rsw");
         route.push_back("ra_fild12.rsw");
         route.push_back("izlude.rsw");
         route.push_back("yuno.rsw");
+        this->BuildRoute(route);
+        return true;
       } else {
         return false;
       }
-      this->BuildRoute(route);
-      return true;
     }
     }
 
@@ -949,8 +973,8 @@ __forceinline void CFlyingShipRouteInfo::UpdateAnimation(UIRoMapWnd* wnd, float 
       ++this->segmentIndex;
     }
 
-    const float dy = this->entries[this->segmentIndex].center[1] - this->entries[this->segmentIndex + 1].center[1];
-    const float dx = this->entries[this->segmentIndex].center[0] - this->entries[this->segmentIndex + 1].center[0];
+    const float dy = this->entries[this->segmentIndex].center.y - this->entries[this->segmentIndex + 1].center.y;
+    const float dx = this->entries[this->segmentIndex].center.x - this->entries[this->segmentIndex + 1].center.x;
     const float distance = SquareRoot(dx * dx + dy * dy);
     if (this->travelledDistance == 0.0f) {
       this->segmentLength = distance;

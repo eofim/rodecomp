@@ -93,7 +93,7 @@ void CLoginMode::ReceiveBillingInfo(const unsigned char* data) {
   }
 
   this->otpStarted = timeGetTime() + 90000;
-  g_windowMgr.Confirm(text, 0, true, true, 0, "Message", 280, 120, 0);
+  g_windowMgr.Confirm(text, 0, true, true, 0, "메시지", 280, 120, 0);
 }
 
 // OFFSET: 0x00D9A9F0
@@ -126,7 +126,7 @@ void CLoginMode::ReceiveNotifyBan(const unsigned char* data) {
     break;
   case BAN_NOT_SETTLED:
     strcpy(text, LookupMessage(MSI_NOT_SETTLED));
-    if (g_windowMgr.Confirm(text, 2, true, true, 0, "Message", 280, 120, 0) == ID_YES) {
+    if (g_windowMgr.Confirm(text, 2, true, true, 0, "메시지", 280, 120, 0) == ID_YES) {
       g_modeMgr.Quit();
       this->OpenAccountRegistration();
     }
@@ -183,29 +183,29 @@ void CLoginMode::ReceiveNotifyBan(const unsigned char* data) {
   case BAN_HAN_VALID:
     strcpy(text, LookupMessage(MSI_BAN_HAN_VALID));
     break;
-  case 107:
+  case BAN_OVER_CHARACTER_LIST:
     if (g_serviceType == ServiceKorea) {
       char buffer[200];
       sprintf(buffer, LookupMessage(MSI_BAN_OVER_CHARACTER_LIST), 9);
       strcpy(text, buffer);
     }
     break;
-  case 108:
+  case BAN_IP_BLOCK:
     strcpy(text, LookupMessage(MSI_BAN_IP_BLOCK));
     break;
-  case 109:
+  case BAN_INVALID_PWD_CNT:
     strcpy(text, LookupMessage(MSI_BAN_INVALID_PWD_CNT));
     break;
-  case 110:
+  case BAN_NOT_ALLOWED_JOBCLASS:
     strcpy(text, LookupMessage(MSI_BAN_NOT_ALLOWED_JOBCLASS));
     break;
-  case 113:
+  case BAN_SHUTDOWN_TEENAGER:
     strcpy(text, LookupMessage(MSI_BAN_SHUTDOWN_TEENAGER));
     break;
-  case 114:
+  case BAN_BILLING_SERVER_ERROR:
     strcpy(text, LookupMessage(MSI_BAN_BILLING_SERVER_ERROR));
     break;
-  case 116:
+  case BAN_IP_BLOCK_FOR_ZERO:
     strcpy(text, LookupMessage(MSI_BAN_IP_BLOCK_FOR_ZERO));
     break;
   default:
@@ -217,11 +217,11 @@ void CLoginMode::ReceiveNotifyBan(const unsigned char* data) {
     char message[256];
     // GLOBAL: gl_25060
     sprintf(message, OBFUSCATE_ARRAY("%s(%d)", 0xBD2BA1C11B01E73BULL, std::uint8_t).Text(), text, packet->errorCode);
-    g_windowMgr.Confirm(message, 0, true, true, 0, "Message", 280, 120, 0);
+    g_windowMgr.Confirm(message, 0, true, true, 0, "메시지", 280, 120, 0);
   }
 
   if (g_session.m_loginModeFlag == true) {
-    this->pendingCursorType = 3;
+    this->pendingCursorType = LOGIN_STATE_LOGIN;
   } else {
     g_modeMgr.currentMode->SendMsg(MM_QUIT, 0, 0, 0, 0);
   }

@@ -4,10 +4,20 @@
 #include <cstdint>
 
 struct TextureRegion {
-  /* 0000 */ float left;
-  /* 0004 */ float top;
-  /* 0008 */ float right;
-  /* 000C */ float bottom;
+  /* 0000 */ float left = 0.0f;
+  /* 0004 */ float top = 0.0f;
+  /* 0008 */ float right = 0.0f;
+  /* 000C */ float bottom = 0.0f;
+};
+
+struct UnitTextureRegion : TextureRegion {
+  // INLINED
+  UnitTextureRegion() {
+    this->left = 0.0f;
+    this->top = 0.0f;
+    this->right = 1.0f;
+    this->bottom = 1.0f;
+  }
 };
 
 extern float g_depthStart;

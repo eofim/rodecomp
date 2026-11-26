@@ -212,14 +212,10 @@ void CPowderingEffect::InitSpriteParticle(CParticle* particle) {
   CSpriteParticle* spriteParticle = static_cast<CSpriteParticle*>(particle);
 
   const float xVal = static_cast<float>(RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1);
-
   const float yVal = static_cast<float>(RandomSpan(7) + 7);
-
   const float zVal = static_cast<float>(RandomSpan(this->particleGridSize * 5) - this->particleGridSize * 5 / 2 + 1);
 
-  spriteParticle->velocity.x = xVal;
-  spriteParticle->velocity.y = -yVal;
-  spriteParticle->velocity.z = zVal;
+  spriteParticle->velocity = vector3d{xVal, -yVal, zVal};
 
   const int r3 = RandomSpan(3) + 1;
 
@@ -232,7 +228,7 @@ void CPowderingEffect::InitSpriteParticle(CParticle* particle) {
 // FUNCTION: fn_07091
 void CPowderingEffect::InitEvents() {
   if (this->id == 1104) {
-    this->AddEvent(0, "effect\\su_cn_powdering.wav", 0, 0);
+    this->AddEvent(EFFECT_EVENT_SOUND, "effect\\su_cn_powdering.wav", 0, 0);
   }
 }
 

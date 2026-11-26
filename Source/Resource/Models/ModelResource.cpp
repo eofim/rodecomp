@@ -361,7 +361,7 @@ bool C3dModelResV1::Load(const char* name) {
   file.Read(&volumeCount, 4);
 
   if (major == 1) {
-    if (minor >= 3) {
+    if (minor > 2) {
       for (int index = 0; index < volumeCount; ++index) {
         auto* volume = new ModelVolume;
         ModelVolumeRecord record{};
@@ -799,12 +799,11 @@ granny_control* C3dGrannyModelRes::PlayAnimation(unsigned action, granny_model_i
 }
 
 // INLINED
-static vector3d TransformPoint(const vector3d& point, const float* m) {
-  return vector3d{
-    point.x * m[0] + point.y * m[3] + point.z * m[6] + m[9],
-    point.x * m[1] + point.y * m[4] + point.z * m[7] + m[10],
-    point.x * m[2] + point.y * m[5] + point.z * m[8] + m[11]
-  };
+static void TransformPoint(vector3d& result, const float* point, const matrix& transform) {
+  const float* m = transform.values;
+  result.x = point[0] * m[0] + point[1] * m[3] + point[2] * m[6] + m[9];
+  result.y = point[0] * m[1] + point[1] * m[4] + point[2] * m[7] + m[10];
+  result.z = point[0] * m[2] + point[1] * m[5] + point[2] * m[8] + m[11];
 }
 
 // OFFSET: 0x00758710
@@ -812,10 +811,13 @@ static vector3d TransformPoint(const vector3d& point, const float* m) {
 bool C3dGrannyModelRes::ProjectBounds(float* rect, const matrix& view, const matrix& world, const float* eye) const {
   matrix matrix;
   matrix.MakeZRotation(3.141592f);
-  const vector3d position = TransformPoint(vector3d{this->position[0], this->position[1], this->position[2]}, matrix.values);
+  vector3d position;
+  TransformPoint(position, this->position, matrix);
   matrix.Compose(world, view);
 
-  const vector3d projected = TransformPoint(position, matrix.values);
+  const float rotated[] = {position.x, position.y, position.z};
+  vector3d projected;
+  TransformPoint(projected, rotated, matrix);
   const float deltaX = eye[0] - position.x;
   const float deltaY = eye[1] - position.y;
   const float deltaZ = eye[2] - position.z;
@@ -854,7 +856,7 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
   };
 
   switch (shadeType) {
-  case 0: {
+  case ANIMATED_MODEL_SHADE_NONE: {
     for (int index = 0; index < this->faceCount; ++index) {
       const std::uint32_t color = (alpha << 24) + 0xFFFFFF;
       this->faceColors[index][0] = color;
@@ -863,7 +865,7 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
     }
     break;
   }
-  case 1: {
+  case ANIMATED_MODEL_SHADE_FLAT: {
     for (int index = 0; index < this->faceCount; ++index) {
       const AnimatedModelFace& face = this->faces[index];
       const AnimatedModelVertex* vertices = this->frames[frame].vertices;
@@ -872,12 +874,12 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
       const vector3d v2 = transform(vertices[face.vertices[2]].position);
       const vector3d a{v2.x - v0.x, v2.y - v0.y, v2.z - v0.z};
       const vector3d b{v2.x - v1.x, v2.y - v1.y, v2.z - v1.z};
-      const float nx = b.y * a.z - b.z * a.y;
       const float ny = b.z * a.x - b.x * a.z;
       const float nz = b.x * a.y - b.y * a.x;
+      const float nx = b.y * a.z - b.z * a.y;
       const float inverse = 1.0f / SquareRoot(ny * ny + nx * nx + nz * nz);
       const float dot = nx * inverse * light[0] + ny * inverse * light[1] + nz * inverse * light[2];
-      const float intensity = std::max(dot, 0.0f);
+      const float intensity = std::max(0.0f, dot);
       const float redLevel = intensity * diffuse[0] + ambient[0];
       const float red = std::min(redLevel, g_projectionDepthNumerator);
       const float greenLevel = intensity * diffuse[1] + ambient[1];
@@ -893,7 +895,7 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
     }
     break;
   }
-  case 2: {
+  case ANIMATED_MODEL_SHADE_SMOOTH: {
     for (int index = 0; index < this->faceCount; ++index) {
       const AnimatedModelFace& face = this->faces[index];
       const AnimatedModelVertex* vertices = this->frames[frame].vertices;
@@ -948,7 +950,7 @@ void AnimatedModelNode::Shade(const float* matrix, int frame, const float* light
           const ShadeVector& normal = vertexNormals[face.vertices[corner]];
           const int source = this->sharedTextureVertices == 0 ? frame : 0;
           const float dot = normal.y * light[1] + light[0] * normal.x + normal.z * light[2];
-          const float intensity = std::max(dot, 0.0f);
+          const float intensity = std::max(0.0f, dot);
           const float redLevel = intensity * diffuse[0] + ambient[0];
           const float red = std::min(redLevel, g_projectionDepthNumerator);
           const float greenLevel = intensity * diffuse[1] + ambient[1];

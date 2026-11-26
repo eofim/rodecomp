@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 class UIBitmapButton;
@@ -24,7 +25,8 @@ public:
 
 class UILapineUpgradeBox_IngredientListWnd : public UIScrollWnd {
 public:
-  // INLINED
+  // OFFSET: 0x00602F00
+  // FUNCTION: fn_46541
   UILapineUpgradeBox_IngredientListWnd(int width, int height)
       : UIScrollWnd(width, height, 0), minRefine(0), maxRefine(20) {
     this->UIWindow::Resize(width, height);
@@ -65,6 +67,7 @@ public:
   void Paint() override;
   int SendMsg(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) override;
   unsigned char AddIngredient(std::uint32_t id);
+  bool TransferIngredient(std::uint32_t id, int quantity);
   bool CanUseIngredient(std::uint32_t identity);
 
   /* 00B0 */ std::vector<ITEM_INFO> materials;
@@ -100,7 +103,7 @@ public:
   void SetIngredient(int id);
   void AddMaterial(int id, int quantity);
   __declspec(noinline) ITEM_INFO ReadMaterial(int x, int y);
-  __declspec(noinline) void MaterialPosition(int* out, int index);
+  __declspec(noinline) std::pair<int, int> MaterialPosition(int index);
   void SetWaiting(unsigned char waiting);
   // INLINED
 
